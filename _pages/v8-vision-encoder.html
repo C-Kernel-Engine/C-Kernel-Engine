@@ -194,6 +194,9 @@
             <li><strong>Host bridge:</strong> <code>version/v8/scripts/run_multimodal_bridge_v8.py</code></li>
             <li><strong>Operator surface:</strong> <code>version/v8/scripts/ck_run_v8.py</code></li>
         </ul>
+        <p>
+            The checked-in smoke image uses <code>.ppm</code>, the Portable Pixmap format. A PPM file is just a small header plus raw RGB pixels, so the bridge can parse it directly and keep CI independent of PNG/JPEG decoder differences. It is a deterministic test fixture format, not a requirement for normal image runs.
+        </p>
         <div class="v8-vision-links">
             <a class="v8-vision-link primary" href="v8-runbook.html">Open v8 Runbook</a>
             <a class="v8-vision-link secondary" href="vision-encoder-parity.html">See Encoder Parity Notes</a>
@@ -408,4 +411,3 @@
         The important thing is not only that Qwen3-VL now captions an image. It is that the same deterministic stack now spans GGUF intake, template lowering, generated vision execution, bridge stitching, and decoder continuation. That is the shape of a real transformer runtime, not an application wrapper.
     </div>
 </div>
-

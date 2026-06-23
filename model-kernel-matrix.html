@@ -971,6 +971,8 @@
     .model-card.mc-qwen2::before  { background: var(--orange); }
     .model-card.mc-qwen3::before  { background: var(--green); }
     .model-card.mc-qwen35::before { background: #1abc9c; }
+    .model-card.mc-qwen3vl::before { background: #00bcd4; }
+    .model-card.mc-qwen::before   { background: #16a085; }
     .model-card.mc-gemma3::before { background: var(--blue); }
     .model-card.mc-gemma4::before { background: #f39c12; }
     .model-card.mc-llama::before  { background: #e74c3c; }
@@ -1195,7 +1197,64 @@
       font-size: 0.85rem;
       color: var(--text-muted);
     }
+
+    .runner-callout {
+      margin-top: 1.25rem;
+      background: #0f151c;
+      border: 1px solid #263242;
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+    .runner-callout strong {
+      color: var(--orange);
+    }
+    .model-command {
+      margin: 0.85rem 0 0.75rem;
+      background: #0b1118;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .model-command-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.42rem 0.55rem;
+      border-bottom: 1px solid #263242;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .copy-command {
+      border: 1px solid #2b3a4a;
+      background: #121a24;
+      color: #9ed6ff;
+      border-radius: 6px;
+      padding: 0.18rem 0.5rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .copy-command:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+    .model-command pre {
+      margin: 0;
+      padding: 0.7rem;
+      overflow-x: auto;
+      color: #cfe8ff;
+      line-height: 1.45;
+      font-size: 0.72rem;
+      background: #090e14;
+    }
   </style>
+
+  <div class="runner-callout">
+    <strong>Recommended runner track:</strong> this model page points to the latest hardened v8 command path for hands-on smoke tests. Version pages remain historical snapshots of each engine generation; the cards below show the current practical command to convert, compile, run, and optionally emit the IR visualizer for that family. Large cards such as Gemma4, Nemotron, GLM4, and vision models assume a high-memory CPU host.
+  </div>
 
   <div class="matrix-hero">
 
@@ -1207,6 +1266,13 @@
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen2">Copy</button></div>
+        <pre id="cmd-qwen2"><code>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</code></pre>
       </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
@@ -1225,6 +1291,13 @@
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen3">Copy</button></div>
+        <pre id="cmd-qwen3"><code>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</code></pre>
       </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
@@ -1252,6 +1325,13 @@
         <span class="tag learned">gated_deltanet</span>
         <span class="tag learned">0.8B dense compatible</span>
       </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen35">Copy</button></div>
+        <pre id="cmd-qwen35"><code>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --context-len 1034 --force-compile --force-convert --chat-template=qwen35 \
+  --generate-visualizer</code></pre>
+      </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q8_0</span>
@@ -1275,11 +1355,53 @@
         <span class="tag fixed">first-divergence @ rope_qk</span>
         <span class="tag fixed">rope_layout contract honored</span>
       </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma3">Copy</button></div>
+        <pre id="cmd-gemma3"><code>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</code></pre>
+      </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q8_0 ★</span>
         <span class="mq-chip">Q4_K</span>
         <span class="mq-chip">BF16</span>
         <span class="mq-chip">FP32</span>
+      </div>
+    </div>
+
+
+    <!-- Qwen3-VL -->
+    <div class="model-card mc-qwen3vl">
+      <span class="model-badge">template: qwen3_vl.json + mmproj</span>
+      <div class="model-title">Qwen3-VL 8B Instruct</div>
+      <div class="model-arch">Vision encoder bridge · multimodal token stitching · Qwen3 decoder<br>GGUF decoder + mmproj runtime · thinking-mode control</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 multimodal inference — image preprocessing, bridge, mixed prompt prefill</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Nightly vision smoke — promoted baseline before adding more vision families</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up scope: Qwen3-VL is the current promoted multimodal baseline. It validates that the encoder bridge, image marker contract, and decoder mixed-prefill path work together before Gemma4 vision and later audio lanes are treated as production-ready.
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Qwen3-VL vision smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen3vl">Copy</button></div>
+        <pre id="cmd-qwen3vl"><code>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+  --image-path version/v8/test_assets/v8_vision_doc_card_72.png \
+  --prompt 'Explain this image.' \
+  --context-len 1024 --force-compile --force-convert \
+  --thinking-mode suppressed</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">multimodal_bridge</span>
+        <span class="tag learned">mixed_prefill</span>
+        <span class="tag fixed">vision nightly smoke</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M decoder ★</span>
+        <span class="mq-chip">Q8_0 mmproj</span>
+        <span class="mq-chip">image bridge</span>
       </div>
     </div>
 
@@ -1293,12 +1415,20 @@
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Conversion/parity harness — GGUF fixes, safetensors declarative map, PyTorch-vs-CK comparator</span></div>
       </div>
       <div class="source-note">
-        Bring-up scope: GLM4 support is currently a low-memory conversion and template lane. The patch adds a declarative safetensors source map, GGUF metadata handling, synthetic safetensors conversion coverage, and a PyTorch-vs-CK parity harness. Full real-model runtime smoke should run on a higher-memory machine.
+        Bring-up scope: GLM4 now has the real GGUF runtime lane plus the safetensors/PyTorch parity lane. The key hardening was making partial pairwise RoPE and projection producer/consumer wiring explicit enough that Q4_K_M GGUF generation stays coherent instead of collapsing at the first token.
       </div>
       <div class="model-tags">
         <span class="tag learned">declarative safetensors map</span>
         <span class="tag learned">partial_rope contract</span>
         <span class="tag fixed">synthetic conversion tested</span>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-glm4">Copy</button></div>
+        <pre id="cmd-glm4"><code>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=glm4 \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
       </div>
       <div class="model-quant">
         <span class="mq-chip">BF16 safetensors</span>
@@ -1325,6 +1455,24 @@
         <span class="tag fixed">BF16 PyTorch parity lane</span>
         <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
       </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 text smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma4">Copy</button></div>
+        <pre id="cmd-gemma4"><code>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf \
+  --context-len 2048 --force-compile --force-convert --chat-template=gemma4 \
+  --prompt 'Give me a detailed example of C code.' \
+  --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Gemma4 vision bridge smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma4-vision">Copy</button></div>
+        <pre id="cmd-gemma4-vision"><code>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf \
+  --mmproj hf://unsloth/gemma-4-E4B-it-GGUF/mmproj-F16.gguf \
+  --image-path version/v8/test_assets/v8_vision_doc_card_72.ppm \
+  --prompt 'Explain this image in one short paragraph.' \
+  --context-len 1024 --chat-template=gemma4 \
+  --max-tokens 8 --temperature 0.0</code></pre>
+      </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">BF16 safetensors</span>
@@ -1350,6 +1498,14 @@
         <span class="tag fixed">native BPE encode default-on</span>
         <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
       </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-nemotron">Copy</button></div>
+        <pre id="cmd-nemotron"><code>version/v8/scripts/cks-v8-run run \
+  hf://bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF/nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
+      </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q5_0</span>
@@ -1374,6 +1530,13 @@
         <span class="tag learned">untied output.weight</span>
         <span class="tag learned">ChatML auto template</span>
         <span class="tag fixed">template-audit first</span>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-nanbeige">Copy</button></div>
+        <pre id="cmd-nanbeige"><code>version/v8/scripts/cks-v8-run run \
+  hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</code></pre>
       </div>
       <div class="model-quant">
         <span class="mq-chip">Q4_K_M</span>
@@ -1455,6 +1618,26 @@
       <div class="cell dim">No</div>
       <div class="cell ok">Tied</div>
 
+      <div class="cell row-head">Qwen3-VL</div>
+      <div class="cell ok">BPE + image markers</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">RoPE + vision pos</div>
+      <div class="cell ok">Vision bridge + causal</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell ok">Bridge norms</div>
+      <div class="cell ok">LM head</div>
+
+      <div class="cell row-head">GLM4</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell ok">Attention bias</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Partial pairwise RoPE</div>
+      <div class="cell ok">Causal GQA</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">LM head</div>
+
       <div class="cell row-head">Gemma3</div>
       <div class="cell ok">SentencePiece</div>
       <div class="cell ok">From weights</div>
@@ -1474,6 +1657,16 @@
       <div class="cell ok">GeGLU</div>
       <div class="cell ok">Yes</div>
       <div class="cell ok">Tied</div>
+
+      <div class="cell row-head">Nemotron-H</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">No-RoPE KV + sparse attn</div>
+      <div class="cell ok">Mamba2 + sparse attn</div>
+      <div class="cell ok">ReLU2</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">LM head</div>
 
       <div class="cell row-head">Llama / Nanbeige</div>
       <div class="cell ok">SentencePiece</div>
@@ -1540,6 +1733,26 @@
       <div class="cell ok">Yes</div>
       <div class="cell ok">Yes</div>
 
+      <div class="cell row-head">Qwen3-VL</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + image markers</div>
+      <div class="cell ok">vision_bridge + attn</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
+      <div class="cell row-head">GLM4</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn + partial_rope</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
       <div class="cell row-head">Gemma3</div>
       <div class="cell ok">sqrt(dim)</div>
       <div class="cell ok">Yes</div>
@@ -1559,6 +1772,16 @@
       <div class="cell ok">geglu</div>
       <div class="cell ok">Yes</div>
       <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Nemotron-H</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">mamba2 + sparse_attn</div>
+      <div class="cell ok">relu2</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
 
       <div class="cell row-head">Llama / Nanbeige</div>
       <div class="cell dim">No</div>
@@ -1656,8 +1879,9 @@
       <div class="test-item">unsloth--gemma-4-E4B-it-GGUF / local Q4_K_M BUMP</div>
       <div class="test-item">mradermacher--Nanbeige4.1-3B-GGUF</div>
       <div class="test-item">Qwen--Qwen3.5-0.8B-GGUF</div>
+      <div class="test-item">Qwen--Qwen3-VL-8B-Instruct-GGUF + mmproj</div>
       <div class="test-item">bartowski--nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF / Q4_K_M</div>
-      <div class="test-item">GLM4 synthetic safetensors + GGUF conversion/parity harness</div>
+      <div class="test-item">unsloth--GLM-4-9B-0414-GGUF / Q4_K_M</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
       Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
@@ -1685,7 +1909,10 @@
         <strong>Nemotron Nano 9B v2:</strong> the first real failure was stitching, not tokenizer or final head: Mamba2 state shape and no-RoPE KV placement had to be explicit in IR. Native BPE encode is now default-on so <code>ck_run_v8.py</code> raw prompts work end-to-end; token-id-only fallback remains available with <code>CK_DISABLE_FULL_BPE_TOKENIZER=1</code>.
       </div>
       <div class="test-item">
-        <strong>GLM4:</strong> v8 now has a template, GLM4 GGUF metadata fixes, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK parity harness. This is a conversion/parity lane until full real-model smoke is run on a higher-memory host.
+        <strong>GLM4:</strong> v8 now has a template, GLM4 GGUF metadata fixes, declarative safetensors mapping, PyTorch-vs-CK parity harnesses, and a coherent Q4_K_M GGUF runtime smoke. The important fix was separating semantic stream sources in the template from physical quantized activation buffers in the kernel ABI.
+      </div>
+      <div class="test-item">
+        <strong>Qwen3-VL / Gemma4 vision:</strong> Qwen3-VL remains the promoted vision baseline. Gemma4 vision now has a matching CLIP/mmproj conversion path, a Gemma4 image marker contract, and a correctness-first mixed-prefill bridge; longer semantic parity and speed are still active work.
       </div>
     </div>
   </div>
@@ -1709,7 +1936,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3/Gemma4, Nemotron-H, GLM4 conversion/parity scaffolding, plus the Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Qwen3-VL/Gemma3/Gemma4 text, early Gemma4 vision bridge support, Nemotron-H, GLM4, plus the Llama/Nanbeige bring-up lane.
     Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
     Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, Nemotron-H adds Mamba2 recurrent state coverage, GLM4 adds partial-RoPE/BPE conversion contracts, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
@@ -1723,6 +1950,33 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
     <a href="https://www.dartmouth.edu/ai50/" target="_blank" rel="noopener">Dartmouth AI 1956</a>,
     <a href="https://www.nature.com/articles/323533a0" target="_blank" rel="noopener">Nature 1986 — Backpropagation</a>
   </div>
+
+
+  <script>
+    document.addEventListener('click', async function(event) {
+      const button = event.target.closest('[data-copy-command]');
+      if (!button) return;
+      const command = document.getElementById(button.getAttribute('data-copy-command'));
+      const text = command ? command.textContent.trim() : '';
+      if (!text) return;
+      const oldText = button.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (err) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'absolute';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+      }
+      button.textContent = 'Copied';
+      setTimeout(function() { button.textContent = oldText; }, 1200);
+    });
+  </script>
 </div>
     </main>
 
@@ -1952,7 +2206,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-22</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-23</p>
             </div>
         </div>
     </footer>

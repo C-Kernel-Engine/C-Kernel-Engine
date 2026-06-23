@@ -1507,9 +1507,11 @@ make v6.6-gate
 
   <p>
     The v8 inference regression manifest currently covers Gemma3, Qwen2, Qwen3,
-    Qwen3.5, Qwen3-VL, and Nanbeige. The Gemma4 high-memory smoke stays in the
-    inference lane but skips unless enough RAM is available. v7 training gates cover
-    train IR, backward synthesis, layout/memory audit, and training-kernel parity.
+    Qwen3.5, and Nanbeige. Qwen3-VL is covered by the explicit vision smoke lane
+    because the 8B decoder + mmproj path needs cached artifacts and more RAM than
+    small CI runners usually provide. Gemma4, Nemotron, and GLM4 high-memory smokes stay
+    in the inference lane but skip unless enough RAM is available. v7 training gates
+    cover train IR, backward synthesis, layout/memory audit, and training-kernel parity.
     v6.6 reports still write under <code>version/v6.6/tools/</code> when run manually.
   </p>
 
@@ -1874,8 +1876,8 @@ Both are mathematically valid RoPE, but weights are trained for one convention.
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-23</p>
             </div>
         </div>
     </footer>
