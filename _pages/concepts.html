@@ -20,6 +20,7 @@
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
+    <li><a href="#glm4-rope">GLM-4 RoPE: Pairwise Partial Rotary</a></li>
     <li><a href="#gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
@@ -190,7 +191,7 @@ Backward:
 <div class="grid grid-2">
     <div class="card card-accent">
         <h3 style="margin-top: 0;">Pairwise / Consecutive RoPE</h3>
-        <p>This is the layout used by <strong>Llama-family checkpoints</strong>, including Nanbeige in our v7 work.</p>
+        <p>This is the layout used by <strong>Llama-family checkpoints</strong>, including Nanbeige in our v7 work, and by <strong>GLM-4</strong> for its rotary slice.</p>
         <pre>(0,1), (2,3), (4,5), ...</pre>
         <p>Each even/odd pair is treated as one 2D rotation plane. That makes the math read exactly like the textbook RoPE formula:</p>
         <pre>x'[2i]   = x[2i] * cos - x[2i+1] * sin
@@ -259,8 +260,30 @@ Split-half:
     </div>
     <div>
         <strong>Implementation note in CK right now</strong><br>
-        The older split-half path already has AVX/AVX-512 SIMD specialization. The pairwise path was added to match Llama-family semantics, and the direct split-half path was added for model families that need per-layer rotary parameters instead of one global cache contract.
+        The older split-half path already has AVX/AVX-512 SIMD specialization. The pairwise path is selected through template/model-map metadata for model families that rotate adjacent even/odd pairs, including Llama-style layouts and GLM-4 partial RoPE. The direct split-half path was added for model families that need per-layer rotary parameters instead of one global cache contract.
     </div>
+</div>
+
+<h3 id="glm4-rope">GLM-4 RoPE: Pairwise Partial Rotary</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">What changed for GLM-4?</h3>
+    <p>GLM-4 uses the pairwise/interleaved RoPE layout, but only on the configured rotary slice of each attention head. For example, with a 128-dimensional head and a 64-dimensional rotary slice, CK rotates adjacent pairs inside the first 64 dimensions and leaves the remaining 64 dimensions unchanged.</p>
+    <pre>Pairwise partial RoPE:
+  rotate:      (x0, x1), (x2, x3), ... within rotary_dim
+  pass-through: dimensions rotary_dim .. head_dim-1
+
+GLM template/model map:
+  rope_layout       = pairwise
+  partial_rotary    = true
+  rope_qk override  = rope_forward_qk_pairwise</pre>
+    <p>This is a model compatibility feature, not a tuning knob. If GLM-4 is lowered with split-half RoPE, the projection kernels can still be correct, but Q/K diverge immediately after RoPE and the attention output drifts from PyTorch.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">How CK controls this</h3>
+    <p>The GLM template declares the circuit-level RoPE policy with <code>rope_layout: "pairwise"</code> and the safetensors model map carries the same architecture contract. Lowering reads that metadata and emits <code>rope_forward_qk_pairwise</code> for the Q/K rotary operation. The kernel itself is generic: it implements pairwise partial rotary math and does not know that the caller is GLM.</p>
+    <p>This keeps the DSL/compiler path deterministic. Templates and model maps describe the semantic contract; kernel maps bind that contract to an implementation; generated C should not infer or guess the rotary convention from tensor shape alone.</p>
 </div>
 
 <h3 id="gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</h3>
