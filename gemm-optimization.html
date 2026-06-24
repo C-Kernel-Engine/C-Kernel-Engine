@@ -6,11 +6,11 @@
     <title>GEMM Optimization  | C-Kernel-Engine</title>
     <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/gemm-optimization.html">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/gemm-optimization.html">
     <meta property="og:title" content="GEMM Optimization  | C-Kernel-Engine">
     <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/gemm-optimization.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/gemm-optimization.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -1514,6 +1514,19 @@
             <span class="hero-badge">1.44x Faster than PyTorch/MKL</span>
         </section>
 
+        <div class="card" style="border-left: 4px solid var(--orange);">
+            <h3>Current v8 Prefill Target: Q4_K Repacking</h3>
+            <p>
+                The next CK prefill gap is not generic GEMM theory or thread count. It is Q4_K_M layout:
+                CK now has Q8_K activations, persistent threadpool dispatch, packed metadata, and a safe CK-vs-llama perf lane,
+                but Qwen3.5 prefill still trails llama.cpp because llama uses an interleaved/repacked Q4_K GEMM hot loop.
+            </p>
+            <p style="margin: 0;">
+                See <a href="prefill-performance-roadmap.html">Prefill Performance Roadmap</a> for the Q8 activation contract,
+                threadpool, packed-meta, 2D scheduler, and 8x8 repacked Q4_K microkernel plan.
+            </p>
+        </div>
+
         <!-- Performance Stats -->
         <div class="grid-4">
             <div class="stat-card">
@@ -1533,6 +1546,135 @@
                 <div class="stat-label">Register Tile</div>
             </div>
         </div>
+
+        <h2 id="gemm-vs-gemv-production">GEMM vs GEMV in Production LLM Serving</h2>
+        <p>
+            In transformer inference, most expensive linear layers reduce to either GEMM or GEMV. The distinction matters because a kernel that is good for one can be poor for the other.
+        </p>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>GEMV: decode latency</h3>
+                <p>
+                    GEMV is matrix-vector multiplication: one new token is multiplied by a weight matrix. This is the common decode path after the prompt is already in the KV cache.
+                </p>
+                <pre><code>// Decode, one token
+output[1, N] = activation[1, K] x weight[N, K]</code></pre>
+                <p>
+                    GEMV is usually memory-bandwidth bound. Each output row streams weight bytes, does a dot product, and has limited reuse of the activation vector. The important questions are:
+                </p>
+                <ul>
+                    <li>Are weights read sequentially in the inner loop?</li>
+                    <li>Are quantized blocks decoded with SIMD instead of scalar code?</li>
+                    <li>Is thread overhead smaller than the work per row?</li>
+                    <li>Does the final logits projection avoid tiny-task oversubscription?</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>GEMM: prefill throughput</h3>
+                <p>
+                    GEMM is matrix-matrix multiplication: many prompt tokens are processed together. This is the prefill path and the dominant cost for long prompts.
+                </p>
+                <pre><code>// Prefill, M prompt tokens
+output[M, N] = activations[M, K] x weight[N, K]</code></pre>
+                <p>
+                    GEMM can reuse weights and activations across many outputs, so a production kernel must create reuse deliberately:
+                </p>
+                <ul>
+                    <li>Tile M, N, and K so hot data fits in L1/L2/L3.</li>
+                    <li>Keep a small accumulator tile in registers.</li>
+                    <li>Pack or interleave weights when the canonical layout is not enough.</li>
+                    <li>Use a thread split that creates enough work without saturating memory bandwidth.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Why simple correctness kernels are not production kernels</h3>
+            <p>
+                A reference kernel proves the math. A production kernel has to prove the data movement. The same equation can run 3x slower if it repeatedly reloads cache lines, transposes buffers between operators, dispatches too many tiny tasks, or decodes quantized blocks in a layout that SIMD cannot consume efficiently.
+            </p>
+            <p>
+                This is why CK keeps scalar/reference, ISA-specific, tiled, packed, and dispatch-selected kernels separate. The reference path protects parity. The optimized path earns its place only when it matches parity and wins on the shapes used by real models.
+            </p>
+        </div>
+
+        <h2 id="production-kernel-checklist">Production Kernel Checklist</h2>
+        <div class="grid-3">
+            <div class="card">
+                <h3>1. Shape first</h3>
+                <p>
+                    Measure real model shapes, not synthetic square matrices only. Qwen2, Qwen3, Gemma, Nanbeige, and vision models stress different M/N/K regimes.
+                </p>
+            </div>
+            <div class="card">
+                <h3>2. Layout before instruction count</h3>
+                <p>
+                    If the weight layout forces scattered loads or repeated unpacking, more SIMD instructions will not fix the bottleneck. Repacking and interleaving often matter more than another arithmetic trick.
+                </p>
+            </div>
+            <div class="card">
+                <h3>3. Cache reuse</h3>
+                <p>
+                    Fast GEMM keeps reused A/B tiles close to the core. Fast GEMV streams weights predictably and avoids extra copies around activations, logits, and head-major attention output.
+                </p>
+            </div>
+            <div class="card">
+                <h3>4. Threading policy</h3>
+                <p>
+                    More threads are not automatically better. Small GEMV and tiny-M prefill can regress when threadpool overhead and memory contention exceed useful work.
+                </p>
+            </div>
+            <div class="card">
+                <h3>5. Quantization path</h3>
+                <p>
+                    Quantized inference is usually Q4_K/Q5_K/Q6_K weights times Q8_K or Q8_0 activations. Test the actual mixed-format kernel, not only dequantize-to-FP32 fallback.
+                </p>
+            </div>
+            <div class="card">
+                <h3>6. Parity gates</h3>
+                <p>
+                    Keep exact/reference kernels available. Enable optimized kernels by dispatch only after they pass llama.cpp/PyTorch parity for the relevant format and shape.
+                </p>
+            </div>
+        </div>
+
+        <h2 id="how-to-profile-gemm-gemv">How to Tell What Is Slow</h2>
+        <p>
+            A useful performance investigation separates raw kernel speed from model-level orchestration.
+        </p>
+        <table>
+            <tr>
+                <th>Symptom</th>
+                <th>Likely Cause</th>
+                <th>What to Run</th>
+            </tr>
+            <tr>
+                <td>Decode is slow, prompt is acceptable</td>
+                <td>GEMV/logits path is bandwidth-bound or overscheduled</td>
+                <td><code>make llamacpp-parity-perf</code>, <code>make test-gemv-comprehensive</code></td>
+            </tr>
+            <tr>
+                <td>Prompt/prefill is slow, standalone GEMM is fast</td>
+                <td>Model executor overhead: quantization, transposes, per-op boundaries</td>
+                <td>v8 op-level profiling and lowered prefill call inspection</td>
+            </tr>
+            <tr>
+                <td>Large shapes improve, small shapes regress</td>
+                <td>Thread split or tiled kernel not shape-gated</td>
+                <td><code>make test-q6k-prefill-dispatch-sweep-quick</code></td>
+            </tr>
+            <tr>
+                <td>CK matches parity but trails llama.cpp</td>
+                <td>Packed/interleaved layout or graph scheduling gap</td>
+                <td>Compare against llama.cpp repacked paths and kernel-level speed lanes</td>
+            </tr>
+        </table>
+
+        <p>
+            The practical rule is simple: first prove the kernel is mathematically correct, then prove it wins for the exact shapes, formats, thread counts, and hardware where dispatch will select it.
+        </p>
 
         <!-- Inspiration Section -->
         <h2>Standing on the Shoulders of Giants</h2>
@@ -2406,8 +2548,8 @@ gemm_microkernel_packed(A, B, C, M, N, K);</code></pre>
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
             </div>
         </div>
     </footer>

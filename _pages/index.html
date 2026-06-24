@@ -208,6 +208,13 @@
 
 <p>The intended deployment model is dependency-light execution, not dependency-free development. The generated runtime can be compiled with GCC or Clang, but the preferred path is to use the strongest native CPU toolchain for the target machine: Intel oneAPI/ICX on Intel CPUs, tuned GCC/Clang on AMD CPUs, ARM toolchains on ARM systems, and standard systems libraries for cluster execution.</p>
 
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Generated C, Planned Memory</h3>
+    <p>C-Kernel-Engine uses C as an <strong>auditable compiler target</strong>, not as a large hand-written pointer maze. The model graph, tensor shapes, lifetimes, kernel contracts, and memory sections are resolved before code emission. The generated C then reads and writes deterministic offsets from planned buffers instead of allocating or guessing inside the hot path.</p>
+    <p>This is the memory-safety model: avoid most ordinary C mistakes by not hand-authoring the model body in C in the first place. The compiler pipeline emits explicit offsets, optional bounds/canary checks, cache-aligned sections, and reproducible layout reports; ASAN, Valgrind, PyTorch parity, llama.cpp parity, perf, VTune, and Advisor validate the artifact from correctness down to memory behavior.</p>
+    <p style="margin-bottom: 0;">The result is still native C, but the important contract is visible: <code>IR op -> tensor lifetime -> byte offset -> generated pointer -> kernel call</code>. That makes the execution path deterministic, inspectable, and measurable for applications where memory layout is the application.</p>
+</div>
+
 <p>The north star is distributed CPU inference and training: model/layer ownership across CPU nodes, explicit activation and gradient movement, MPI/RDMA-style communication where available, and pipeline parallelism over hardware that can be bought, powered, audited, and scaled incrementally.</p>
 
 <p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding.</p>

@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680" role="img" aria-labelledby="vpos-title vpos-desc">
+  <title id="vpos-title">Position encoding: 1D text RoPE vs 2D vision RoPE</title>
+  <desc id="vpos-desc">Text tokens carry a single position index that drives standard RoPE across head-dimension pairs. Image patch tokens carry two coordinates, a row and a column, and multi-section RoPE rotates one slice of the head dimension by the row angle and another slice by the column angle, while a learned 2D position table is bilinearly interpolated and added.</desc>
+  <defs>
+    <linearGradient id="vpos-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <filter id="vpos-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="vpos-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="vpos-arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="680" fill="url(#vpos-bg)"/>
+  <g opacity="0.22" stroke="#26364f" stroke-width="1">
+    <path d="M0 80H1100M0 160H1100M0 240H1100M0 320H1100M0 400H1100M0 480H1100M0 560H1100M0 640H1100"/>
+  </g>
+
+  <text x="50" y="50" fill="#e5f2ff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">How a token knows where it is: 1D text vs 2D vision</text>
+  <text x="50" y="80" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="14">Same RoPE idea — rotate Q/K by a position angle. Text has one index; a patch has two: (row y, col x).</text>
+
+  <!-- ===================== LEFT: TEXT 1D ===================== -->
+  <g transform="translate(40 110)" filter="url(#vpos-shadow)">
+    <rect x="0" y="0" width="500" height="510" rx="14" fill="#0b1220" stroke="#23334f"/>
+    <text x="24" y="38" fill="#7dd3fc" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">TEXT &#8212; 1D RoPE</text>
+    <text x="24" y="62" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="13">position = token index t (0,1,2,&#8230;)</text>
+
+    <!-- token row -->
+    <g transform="translate(24 84)">
+      <rect x="0"   y="0" width="84" height="44" rx="8" fill="#10243a" stroke="#38bdf8"/>
+      <rect x="92"  y="0" width="84" height="44" rx="8" fill="#10243a" stroke="#38bdf8"/>
+      <rect x="184" y="0" width="84" height="44" rx="8" fill="#10243a" stroke="#38bdf8"/>
+      <rect x="276" y="0" width="84" height="44" rx="8" fill="#10243a" stroke="#38bdf8"/>
+      <rect x="368" y="0" width="84" height="44" rx="8" fill="#10243a" stroke="#38bdf8"/>
+      <text x="42"  y="22" text-anchor="middle" fill="#e5f2ff" font-family="Inter" font-size="13">The</text>
+      <text x="134" y="22" text-anchor="middle" fill="#e5f2ff" font-family="Inter" font-size="13">cat</text>
+      <text x="226" y="22" text-anchor="middle" fill="#e5f2ff" font-family="Inter" font-size="13">sat</text>
+      <text x="318" y="22" text-anchor="middle" fill="#e5f2ff" font-family="Inter" font-size="13">on</text>
+      <text x="410" y="22" text-anchor="middle" fill="#e5f2ff" font-family="Inter" font-size="13">mat</text>
+      <text x="42"  y="38" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">t=0</text>
+      <text x="134" y="38" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">t=1</text>
+      <text x="226" y="38" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">t=2</text>
+      <text x="318" y="38" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">t=3</text>
+      <text x="410" y="38" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">t=4</text>
+    </g>
+
+    <text x="24" y="178" fill="#cbd5e1" font-family="Inter" font-size="14">RoPE angle for dim-pair i:</text>
+    <rect x="24" y="190" width="452" height="40" rx="8" fill="#111c2f" stroke="#2b3b55"/>
+    <text x="40" y="215" fill="#fbbf24" font-family="JetBrains Mono" font-size="15">&#952;&#7522;(t) = t &#183; base^(&#8722;2i/d)</text>
+
+    <!-- head dim pairs -->
+    <text x="24" y="266" fill="#cbd5e1" font-family="Inter" font-size="14">One angle rotates every (x&#7522;, x&#7522;&#8323;&#8260;&#8322;) pair across head_dim:</text>
+    <g transform="translate(24 282)">
+      <rect x="0"   y="0" width="446" height="54" rx="8" fill="#0e1b2c" stroke="#38bdf8" stroke-opacity="0.5"/>
+      <g font-family="JetBrains Mono" font-size="12" fill="#7dd3fc">
+        <rect x="12"  y="12" width="64" height="30" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="44"  y="32" text-anchor="middle">pair 0</text>
+        <rect x="84"  y="12" width="64" height="30" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="116" y="32" text-anchor="middle">pair 1</text>
+        <rect x="156" y="12" width="64" height="30" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="188" y="32" text-anchor="middle">pair 2</text>
+        <rect x="228" y="12" width="64" height="30" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="260" y="32" text-anchor="middle">&#8230;</text>
+        <rect x="300" y="12" width="134" height="30" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="367" y="32" text-anchor="middle">pair d/2&#8722;1</text>
+      </g>
+    </g>
+    <text x="24" y="372" fill="#9fb6d8" font-family="Inter" font-size="13">All pairs share the same scalar t &#8212; order along one line.</text>
+
+    <!-- summary chip -->
+    <rect x="24" y="392" width="452" height="92" rx="10" fill="#08111f" stroke="#24344f"/>
+    <text x="40" y="418" fill="#e5f2ff" font-family="Inter" font-size="14" font-weight="700">Mental model</text>
+    <text x="40" y="442" fill="#9fb6d8" font-family="Inter" font-size="13">Position is a point on a line. Attention sees</text>
+    <text x="40" y="462" fill="#9fb6d8" font-family="Inter" font-size="13">relative distance (t&#7522; &#8722; t&#11388;) automatically from the</text>
+    <text x="40" y="482" fill="#9fb6d8" font-family="Inter" font-size="13">rotation &#8212; "how far apart in the sequence".</text>
+  </g>
+
+  <!-- ===================== RIGHT: VISION 2D ===================== -->
+  <g transform="translate(560 110)" filter="url(#vpos-shadow)">
+    <rect x="0" y="0" width="500" height="510" rx="14" fill="#0b1220" stroke="#23334f"/>
+    <text x="24" y="38" fill="#fbbf24" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">VISION &#8212; 2D M-RoPE</text>
+    <text x="24" y="62" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="13">position = (row y, col x) on the patch grid</text>
+
+    <!-- patch grid -->
+    <g transform="translate(24 80)">
+      <g stroke="#5a4a1a" stroke-width="1.2" fill="#1c1606">
+        <rect x="0"  y="0"  width="44" height="44"/><rect x="44" y="0"  width="44" height="44"/><rect x="88" y="0"  width="44" height="44"/><rect x="132" y="0" width="44" height="44"/>
+        <rect x="0"  y="44" width="44" height="44"/><rect x="44" y="44" width="44" height="44"/><rect x="88" y="44" width="44" height="44"/><rect x="132" y="44" width="44" height="44"/>
+        <rect x="0"  y="88" width="44" height="44"/><rect x="44" y="88" width="44" height="44"/><rect x="88" y="88" width="44" height="44"/><rect x="132" y="88" width="44" height="44"/>
+      </g>
+      <!-- highlight a patch -->
+      <rect x="44" y="44" width="44" height="44" fill="none" stroke="#fbbf24" stroke-width="2.8"/>
+      <text x="66" y="70" text-anchor="middle" fill="#fde68a" font-family="JetBrains Mono" font-size="11">(1,1)</text>
+      <!-- axis labels -->
+      <text x="-10" y="24" text-anchor="end" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">y=0</text>
+      <text x="-10" y="68" text-anchor="end" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">y=1</text>
+      <text x="-10" y="112" text-anchor="end" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">y=2</text>
+      <text x="22"  y="148" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">x=0</text>
+      <text x="66"  y="148" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">x=1</text>
+      <text x="110" y="148" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="11">x=2</text>
+    </g>
+
+    <!-- two coords -->
+    <text x="240" y="104" fill="#cbd5e1" font-family="Inter" font-size="14">Each patch token carries</text>
+    <text x="240" y="124" fill="#cbd5e1" font-family="Inter" font-size="14">two indices instead of one:</text>
+    <rect x="240" y="136" width="110" height="34" rx="7" fill="#10243a" stroke="#38bdf8"/>
+    <text x="295" y="158" text-anchor="middle" fill="#7dd3fc" font-family="JetBrains Mono" font-size="13">y = row</text>
+    <rect x="360" y="136" width="110" height="34" rx="7" fill="#2a1b08" stroke="#fbbf24"/>
+    <text x="415" y="158" text-anchor="middle" fill="#fde68a" font-family="JetBrains Mono" font-size="13">x = col</text>
+
+    <!-- head dim split -->
+    <text x="24" y="252" fill="#cbd5e1" font-family="Inter" font-size="14">head_dim is split into sections &#8212; each rotated by its own coordinate:</text>
+    <g transform="translate(24 266)">
+      <rect x="0"   y="0" width="223" height="54" rx="8" fill="#0e1b2c" stroke="#38bdf8"/>
+      <text x="112" y="22" text-anchor="middle" fill="#7dd3fc" font-family="Inter" font-size="13" font-weight="700">y-section</text>
+      <text x="112" y="42" text-anchor="middle" fill="#9fb6d8" font-family="JetBrains Mono" font-size="11">&#952;(y) = y &#183; base^(&#8722;2i/d)</text>
+      <rect x="227" y="0" width="219" height="54" rx="8" fill="#20170b" stroke="#fbbf24"/>
+      <text x="336" y="22" text-anchor="middle" fill="#fde68a" font-family="Inter" font-size="13" font-weight="700">x-section</text>
+      <text x="336" y="42" text-anchor="middle" fill="#f3d27a" font-family="JetBrains Mono" font-size="11">&#952;(x) = x &#183; base^(&#8722;2i/d)</text>
+    </g>
+
+    <!-- position id buffer -->
+    <text x="24" y="356" fill="#cbd5e1" font-family="Inter" font-size="13">vision_position_ids_2d_merge &#8594; buffer [4 &#215; N]:</text>
+    <g transform="translate(24 366)" font-family="JetBrains Mono" font-size="11">
+      <rect x="0"   y="0" width="110" height="26" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="55"  y="17" text-anchor="middle" fill="#7dd3fc">y stream</text>
+      <rect x="114" y="0" width="110" height="26" rx="5" fill="#2a1b08" stroke="#fbbf24"/><text x="169" y="17" text-anchor="middle" fill="#fde68a">x stream</text>
+      <rect x="228" y="0" width="108" height="26" rx="5" fill="#10243a" stroke="#38bdf8"/><text x="282" y="17" text-anchor="middle" fill="#7dd3fc">y dup</text>
+      <rect x="340" y="0" width="106" height="26" rx="5" fill="#2a1b08" stroke="#fbbf24"/><text x="393" y="17" text-anchor="middle" fill="#fde68a">x dup</text>
+    </g>
+
+    <!-- learned table note -->
+    <rect x="24" y="406" width="452" height="78" rx="10" fill="#08111f" stroke="#24344f"/>
+    <text x="40" y="430" fill="#e5f2ff" font-family="Inter" font-size="14" font-weight="700">Plus a learned 2D table</text>
+    <text x="40" y="452" fill="#9fb6d8" font-family="Inter" font-size="12.5">position_embeddings_add_tiled_2d bilinearly resizes a</text>
+    <text x="40" y="470" fill="#9fb6d8" font-family="Inter" font-size="12.5">source_grid&#215;source_grid table to this image&#8217;s grid and adds it.</text>
+  </g>
+
+  <!-- bottom takeaway -->
+  <g transform="translate(40 632)">
+    <rect x="0" y="0" width="1020" height="34" rx="10" fill="#0b1f17" stroke="#1f5c3f"/>
+    <text x="20" y="22" fill="#a7e0bf" font-family="Inter, Arial, sans-serif" font-size="13.5">
+      Same rotation trick, richer index: text rotates by "how far along the line"; a patch rotates by "which row" and "which column" so attention recovers 2D spatial distance.
+    </text>
+  </g>
+</svg>

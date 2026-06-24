@@ -972,6 +972,8 @@
     .model-card.mc-qwen3::before  { background: var(--green); }
     .model-card.mc-qwen35::before { background: #1abc9c; }
     .model-card.mc-qwen3vl::before { background: #00bcd4; }
+    .model-card.mc-gemma4v::before { background: #ff6f91; }
+    .model-card.mc-siglip::before  { background: #a78bfa; }
     .model-card.mc-qwen::before   { background: #16a085; }
     .model-card.mc-gemma3::before { background: var(--blue); }
     .model-card.mc-gemma4::before { background: #f39c12; }
@@ -1255,6 +1257,135 @@
   <div class="runner-callout">
     <strong>Recommended runner track:</strong> this model page points to the latest hardened v8 command path for hands-on smoke tests. Version pages remain historical snapshots of each engine generation; the cards below show the current practical command to convert, compile, run, and optionally emit the IR visualizer for that family. Large cards such as Gemma4, Nemotron, GLM4, and vision models assume a high-memory CPU host.
   </div>
+
+  <h2 style="color: var(--orange); margin-top: 2rem;">One Pipeline, Every Model</h2>
+  <p class="lead" style="margin-top: 0;">
+    Every supported family enters through the same deterministic compile path. The artifact (GGUF) carries the numbers,
+    the template carries the structure, and lowering turns both into a concrete C runtime with a fixed memory plan.
+    Vision families add a second lane that produces an encoder prefix and bridges it into the decoder.
+  </p>
+
+  <svg viewBox="0 0 1180 520" width="100%" role="img"
+       aria-label="C-Kernel-Engine model compilation pipeline: GGUF and template lower to IR, memory plan, codegen and runtime, with a vision encoder lane bridging into the decoder."
+       style="max-width: 1180px; margin: 0.5rem auto 1.75rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <defs>
+      <linearGradient id="mk-text" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffb400"/><stop offset="1" stop-color="#e5a200"/>
+      </linearGradient>
+      <linearGradient id="mk-vision" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#07adf8"/><stop offset="1" stop-color="#00bcd4"/>
+      </linearGradient>
+      <linearGradient id="mk-run" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#47b475"/><stop offset="1" stop-color="#2f8d59"/>
+      </linearGradient>
+      <marker id="mk-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+      <marker id="mk-arrow-v" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#07adf8"/>
+      </marker>
+      <style>
+        .mk-stage{fill:#323232;stroke:#454545;stroke-width:1.4;rx:12;}
+        .mk-title{fill:#f5f5f5;font-size:18px;font-weight:700;}
+        .mk-sub{fill:#b0b0b0;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-band{fill:#9aa7b4;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .mk-chip{fill:#0f151c;stroke:#263242;stroke-width:1;rx:6;}
+        .mk-chip-t{fill:#9ed6ff;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+    </defs>
+
+    <!-- band labels -->
+    <text x="24" y="40" class="mk-band">Source of truth</text>
+    <text x="24" y="250" class="mk-band">Deterministic compile</text>
+    <text x="24" y="430" class="mk-band">Vision lane (multimodal families)</text>
+
+    <!-- Row 1: sources -->
+    <g>
+      <rect class="mk-stage" x="24"  y="58" width="250" height="92" rx="12"/>
+      <text x="44" y="92"  class="mk-title">GGUF artifact</text>
+      <text x="44" y="116" class="mk-sub">tensors · dtypes · shapes</text>
+      <text x="44" y="134" class="mk-sub">tokenizer · vision metadata</text>
+
+      <rect class="mk-stage" x="320" y="58" width="250" height="92" rx="12"/>
+      <text x="340" y="92"  class="mk-title">Template <tspan class="mk-sub">.json</tspan></text>
+      <text x="340" y="116" class="mk-sub">header / body / footer graph</text>
+      <text x="340" y="134" class="mk-sub">kernel ids · contracts</text>
+    </g>
+    <!-- supported template chips -->
+    <g>
+      <rect class="mk-chip" x="616" y="58"  width="120" height="26" rx="6"/><text x="676" y="76" text-anchor="middle" class="mk-chip-t">qwen2/3/3.5</text>
+      <rect class="mk-chip" x="746" y="58"  width="120" height="26" rx="6"/><text x="806" y="76" text-anchor="middle" class="mk-chip-t">gemma3/4</text>
+      <rect class="mk-chip" x="876" y="58"  width="120" height="26" rx="6"/><text x="936" y="76" text-anchor="middle" class="mk-chip-t">glm4</text>
+      <rect class="mk-chip" x="1006" y="58" width="150" height="26" rx="6"/><text x="1081" y="76" text-anchor="middle" class="mk-chip-t">nemotron_h</text>
+      <rect class="mk-chip" x="616" y="92"  width="120" height="26" rx="6"/><text x="676" y="110" text-anchor="middle" class="mk-chip-t">llama</text>
+      <rect class="mk-chip" x="746" y="92"  width="120" height="26" rx="6"/><text x="806" y="110" text-anchor="middle" class="mk-chip-t">qwen3vl</text>
+      <rect class="mk-chip" x="876" y="92"  width="160" height="26" rx="6"/><text x="956" y="110" text-anchor="middle" class="mk-chip-t" fill="#9ed6ff">gemma4_vision</text>
+      <rect class="mk-chip" x="1046" y="92" width="110" height="26" rx="6"/><text x="1101" y="110" text-anchor="middle" class="mk-chip-t" fill="#cbb6ff">siglip_vit</text>
+      <text x="616" y="140" class="mk-sub" fill="#808080">11 templates resolve into the same lowering passes</text>
+    </g>
+
+    <!-- arrows sources -> compile -->
+    <path d="M149,150 L149,200" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mk-arrow)"/>
+    <path d="M445,150 L445,200" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mk-arrow)"/>
+
+    <!-- Row 2: compile pipeline -->
+    <g>
+      <rect class="mk-stage" x="24"   y="266" width="200" height="86" rx="12"/>
+      <text x="44" y="300" class="mk-title">IR lowering</text>
+      <text x="44" y="324" class="mk-sub">build_ir_v8.py</text>
+      <text x="44" y="342" class="mk-sub">template → kernel calls</text>
+
+      <rect class="mk-stage" x="264" y="266" width="200" height="86" rx="12"/>
+      <text x="284" y="300" class="mk-title">Memory plan</text>
+      <text x="284" y="324" class="mk-sub">bump offsets</text>
+      <text x="284" y="342" class="mk-sub">no malloc at runtime</text>
+
+      <rect class="mk-stage" x="504" y="266" width="200" height="86" rx="12"/>
+      <text x="524" y="300" class="mk-title">C codegen</text>
+      <text x="524" y="324" class="mk-sub">kernel dispatch</text>
+      <text x="524" y="342" class="mk-sub">SIMD tier select</text>
+
+      <rect x="744" y="266" width="220" height="86" rx="12" fill="url(#mk-run)" opacity="0.16" stroke="#47b475" stroke-width="1.6"/>
+      <text x="764" y="300" class="mk-title">Runtime</text>
+      <text x="764" y="324" class="mk-sub" fill="#a7e0bf">native C · deterministic</text>
+      <text x="764" y="342" class="mk-sub" fill="#a7e0bf">GEMM/GEMV · attention</text>
+    </g>
+    <path d="M224,309 L260,309" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mk-arrow)"/>
+    <path d="M464,309 L500,309" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mk-arrow)"/>
+    <path d="M704,309 L740,309" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mk-arrow)"/>
+
+    <!-- text decoder feeds runtime token stream -->
+    <rect class="mk-stage" x="994" y="266" width="162" height="86" rx="12"/>
+    <text x="1014" y="300" class="mk-title">Decoder</text>
+    <text x="1014" y="324" class="mk-sub">prefill + decode</text>
+    <text x="1014" y="342" class="mk-sub">token stream out</text>
+    <path d="M964,309 L990,309" fill="none" stroke="#47b475" stroke-width="1.8" marker-end="url(#mk-arrow)"/>
+
+    <!-- Row 3: vision lane -->
+    <g>
+      <rect x="24"  y="446" width="190" height="58" rx="12" fill="url(#mk-vision)" opacity="0.14" stroke="#07adf8" stroke-width="1.5"/>
+      <text x="44" y="472" class="mk-title" font-size="16">Image in</text>
+      <text x="44" y="492" class="mk-sub" fill="#9ed6ff">resize · normalize</text>
+
+      <rect x="244" y="446" width="210" height="58" rx="12" fill="url(#mk-vision)" opacity="0.14" stroke="#07adf8" stroke-width="1.5"/>
+      <text x="264" y="472" class="mk-title" font-size="16">Patch frontend</text>
+      <text x="264" y="492" class="mk-sub" fill="#9ed6ff">im2patch · pos · merge</text>
+
+      <rect x="484" y="446" width="210" height="58" rx="12" fill="url(#mk-vision)" opacity="0.14" stroke="#07adf8" stroke-width="1.5"/>
+      <text x="504" y="472" class="mk-title" font-size="16">ViT encoder</text>
+      <text x="504" y="492" class="mk-sub" fill="#9ed6ff">attn · MLP · deepstack</text>
+
+      <rect x="724" y="446" width="210" height="58" rx="12" fill="url(#mk-vision)" opacity="0.22" stroke="#00bcd4" stroke-width="1.8"/>
+      <text x="744" y="472" class="mk-title" font-size="16">Bridge prefix</text>
+      <text x="744" y="492" class="mk-sub" fill="#9ed6ff">projector rows → decoder</text>
+    </g>
+    <path d="M214,475 L240,475" fill="none" stroke="#07adf8" stroke-width="1.6" marker-end="url(#mk-arrow-v)"/>
+    <path d="M454,475 L480,475" fill="none" stroke="#07adf8" stroke-width="1.6" marker-end="url(#mk-arrow-v)"/>
+    <path d="M694,475 L720,475" fill="none" stroke="#07adf8" stroke-width="1.6" marker-end="url(#mk-arrow-v)"/>
+    <!-- bridge climbs into decoder -->
+    <path d="M934,460 C1010,440 1060,400 1070,354" fill="none" stroke="#00bcd4" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#mk-arrow-v)"/>
+    <text x="750" y="400" class="mk-sub" fill="#7fd8ec">prefix rows stitch in before text tokens</text>
+  </svg>
 
   <div class="matrix-hero">
 
@@ -1562,6 +1693,55 @@
         <span class="mq-chip">Q5_0</span>
         <span class="mq-chip">Q8_0</span>
         <span class="mq-chip">FP32</span>
+      </div>
+    </div>
+
+    <!-- Gemma4 Vision -->
+    <div class="model-card mc-gemma4v">
+      <span class="model-badge">template: gemma4_vision.json</span>
+      <div class="model-title">Gemma4 Vision</div>
+      <div class="model-arch">SigLIP-style ViT encoder · XY position embeddings · average-pool merge<br>projector prep → Gemma4 decoder bridge · deterministic patch frontend</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 multimodal inference — patch frontend, encoder graph, projector bridge</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Bring-up lane — staged behind the promoted Qwen3-VL baseline</span></div>
+      </div>
+      <div class="source-note">
+        Vision lane scope: shares the same lowering + memory-planning stack as Qwen3-VL. Uses <code>position_embeddings_add_gemma4v_xy</code> and <code>spatial_average_pool_contiguous</code> for the Gemma4 merge path instead of Qwen3-VL's 2×2 spatial merge.
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">gemma4v_xy_posemb</span>
+        <span class="tag learned">avgpool_merge</span>
+        <span class="tag learned">projector_bridge</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M decoder ★</span>
+        <span class="mq-chip">Q8_0 mmproj</span>
+        <span class="mq-chip">FP32 encoder</span>
+        <span class="mq-chip">image bridge</span>
+      </div>
+    </div>
+
+    <!-- SigLIP ViT -->
+    <div class="model-card mc-siglip">
+      <span class="model-badge">template: siglip_vit.json</span>
+      <div class="model-title">SigLIP ViT (encoder)</div>
+      <div class="model-arch">Standalone vision tower · im2patch → patch embed · LayerNorm · full attention<br>learned position embeddings · GELU MLP · reusable encoder contract</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 encoder graph — patch frontend, transformer body, projector footer</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Encoder-only — pairs with a decoder template via the bridge contract</span></div>
+      </div>
+      <div class="source-note">
+        Why it exists: SigLIP is the shared ViT backbone behind several vision-language families. Templating it on its own keeps the encoder reusable, so a new VLM can be brought up by swapping the decoder + projector instead of rewriting the vision tower.
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">reusable_vit</span>
+        <span class="tag learned">im2patch</span>
+        <span class="tag learned">encoder_contract</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip">FP32</span>
+        <span class="mq-chip">BF16</span>
+        <span class="mq-chip">encoder prefix</span>
       </div>
     </div>
 

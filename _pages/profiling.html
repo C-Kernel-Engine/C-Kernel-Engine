@@ -18,6 +18,65 @@
     <p style="margin: 0;">Use the dedicated <a href="v7-profiling.html"><code>v7-profiling.html</code></a> runbook for VTune (<code>hotspots</code>/<code>memory-access</code>/<code>uarch-exploration</code>), Advisor roofline, perf/flamegraph capture, and run-dir artifact flow.</p>
 </div>
 
+<div class="alert alert-warning">
+    <strong>Intel VTune / Advisor host-driver warning:</strong>
+    VTune and Advisor are useful for CK-vs-llama.cpp hotspot, memory, uarch, and roofline work, but some collection modes load Intel out-of-tree kernel drivers
+    such as <code>sep5</code>, <code>vtsspp</code>, <code>socwatch2_16</code>, and <code>pax</code>. On the local ThinkPad i7 / Linux 6.14 profiling host, a deeper
+    collection triggered repeated <code>BUG: scheduling while atomic</code> traces in <code>sep5</code>, followed by unrelated <code>runc</code>/<code>nmcli</code>
+    core dumps and an unclean reboot. That signature points to the profiler driver path, not CK user-space math.
+    Prefer <code>perf stat</code>, <code>perf record</code>, flamegraphs, and CK-vs-llama timing gates for routine iteration; run VTune/Advisor deep collections only on a
+    disposable profiling boot, server host, or after accepting that the whole machine may need a reboot.
+</div>
+
+<h2>Safe v8 Prefill Counter Lane</h2>
+
+<p>For CK-vs-llama.cpp prefill work, start with the safe <code>perf stat</code> lane instead of VTune deep counters:</p>
+
+<pre><code>make profile-v8-prefill-perf-stat</code></pre>
+
+<p>The target compares the cached v8 Qwen3.5 Q4_K_M runtime against the local llama.cpp build with a fixed-token
+128-token prefill and one decode token. It writes a timestamped Markdown and JSON report under
+<code>profile_results/v8_prefill_perf_stat/</code> with prefill/decode tok/s, milliseconds, cycles, instructions, IPC,
+cache misses, cache miss rate, and context switches.</p>
+
+<p>The Q4_K packed-meta x8 prefill kernel is shape-gated on by default for measured short/medium
+Qwen/Nemotron-family prefill shapes. Use this escape hatch when validating a new CPU or bisecting a regression:</p>
+
+<pre><code>CK_DISABLE_Q4K_PACKED_META_X8_PREFILL=1 \
+CK_V8_PREFILL_PERF_ENGINE=ck \
+make profile-v8-prefill-perf-stat</code></pre>
+
+<p>On the local ThinkPad i7, the dispatch matrix showed the x8 layout winning at <code>M=32</code> and
+<code>M=64</code> Q4_K prefill shapes, while the longer <code>M=128,N=896,K=4864</code> compact-down shape
+lost to the canonical pool path. That is why the default gate has both a minimum and maximum token tile size.
+Treat these as host-local engineering numbers, not a universal benchmark: the llama lane uses <code>llama-bench</code>,
+run-to-run variance exists, and the important signal is the shape-gated layout win.</p>
+
+<p>Use these environment knobs when testing the older Q4_K packed-meta 2D scheduler without changing the default dispatcher:</p>
+
+<pre><code>CK_ENABLE_Q4K_PACKED_META_2D_PREFILL=1 \
+CK_FORCE_Q4K_PACKED_META_2D_PREFILL=1 \
+CK_Q4K_PACKED_META_TILE_M=8 \
+CK_Q4K_PACKED_META_TILE_N=512 \
+CK_V8_PREFILL_PERF_ENGINE=ck \
+make profile-v8-prefill-perf-stat</code></pre>
+
+<p>The local ThinkPad i7 data showed only a small win from 2D packed-meta scheduling. The stronger win came from
+the x8 packed-meta layout, which groups eight Q4_K output rows per K block so the hot loop reuses each Q8 activation
+load across multiple output lanes. Force it explicitly for new sweeps with
+<code>CK_FORCE_Q4K_PACKED_META_X8_PREFILL=1</code>. See
+<a href="prefill-performance-roadmap.html">Prefill Performance Roadmap</a> for the optimization ladder and promotion rules.</p>
+
+<p>The token-tile/output-tile experiment is separate from the default x8 path:</p>
+
+<pre><code>CK_ENABLE_Q4K_PACKED_META_X8MT_PREFILL=1 \
+CK_Q4K_PACKED_META_X8MT_TILE_M=2 \
+CK_V8_PREFILL_PERF_ENGINE=ck \
+make profile-v8-prefill-perf-stat</code></pre>
+
+<p>Use this to test the first two-dimensional Q4_K prefill path. It is intentionally opt-in until model-level
+timings are stable across hardware and prompt lengths.</p>
+
 <nav class="toc">
     <h3>Contents</h3>
     <ul>

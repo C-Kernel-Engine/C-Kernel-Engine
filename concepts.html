@@ -6,11 +6,11 @@
     <title>Deep Dive: LLM Concepts  | C-Kernel-Engine</title>
     <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/concepts.html">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/concepts.html">
     <meta property="og:title" content="Deep Dive: LLM Concepts  | C-Kernel-Engine">
     <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/concepts.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/concepts.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -959,6 +959,7 @@
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
+    <li><a href="#glm4-rope">GLM-4 RoPE: Pairwise Partial Rotary</a></li>
     <li><a href="#gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
@@ -970,6 +971,8 @@
     <li><a href="#mamba2-reference">Mamba2 Reference Kernels</a></li>
     <li><a href="#moe-routing">Mixture of Experts: Router + ReLU2 Experts</a></li>
     <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
+    <li><a href="#vision-patch">Vision Patch Embedding</a></li>
+    <li><a href="#vision-position">&mdash; 1D Text vs 2D Vision Position (RoPE)</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
 
@@ -1129,7 +1132,7 @@ Backward:
 <div class="grid grid-2">
     <div class="card card-accent">
         <h3 style="margin-top: 0;">Pairwise / Consecutive RoPE</h3>
-        <p>This is the layout used by <strong>Llama-family checkpoints</strong>, including Nanbeige in our v7 work.</p>
+        <p>This is the layout used by <strong>Llama-family checkpoints</strong>, including Nanbeige in our v7 work, and by <strong>GLM-4</strong> for its rotary slice.</p>
         <pre>(0,1), (2,3), (4,5), ...</pre>
         <p>Each even/odd pair is treated as one 2D rotation plane. That makes the math read exactly like the textbook RoPE formula:</p>
         <pre>x'[2i]   = x[2i] * cos - x[2i+1] * sin
@@ -1198,8 +1201,30 @@ Split-half:
     </div>
     <div>
         <strong>Implementation note in CK right now</strong><br>
-        The older split-half path already has AVX/AVX-512 SIMD specialization. The pairwise path was added to match Llama-family semantics, and the direct split-half path was added for model families that need per-layer rotary parameters instead of one global cache contract.
+        The older split-half path already has AVX/AVX-512 SIMD specialization. The pairwise path is selected through template/model-map metadata for model families that rotate adjacent even/odd pairs, including Llama-style layouts and GLM-4 partial RoPE. The direct split-half path was added for model families that need per-layer rotary parameters instead of one global cache contract.
     </div>
+</div>
+
+<h3 id="glm4-rope">GLM-4 RoPE: Pairwise Partial Rotary</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">What changed for GLM-4?</h3>
+    <p>GLM-4 uses the pairwise/interleaved RoPE layout, but only on the configured rotary slice of each attention head. For example, with a 128-dimensional head and a 64-dimensional rotary slice, CK rotates adjacent pairs inside the first 64 dimensions and leaves the remaining 64 dimensions unchanged.</p>
+    <pre>Pairwise partial RoPE:
+  rotate:      (x0, x1), (x2, x3), ... within rotary_dim
+  pass-through: dimensions rotary_dim .. head_dim-1
+
+GLM template/model map:
+  rope_layout       = pairwise
+  partial_rotary    = true
+  rope_qk override  = rope_forward_qk_pairwise</pre>
+    <p>This is a model compatibility feature, not a tuning knob. If GLM-4 is lowered with split-half RoPE, the projection kernels can still be correct, but Q/K diverge immediately after RoPE and the attention output drifts from PyTorch.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">How CK controls this</h3>
+    <p>The GLM template declares the circuit-level RoPE policy with <code>rope_layout: "pairwise"</code> and the safetensors model map carries the same architecture contract. Lowering reads that metadata and emits <code>rope_forward_qk_pairwise</code> for the Q/K rotary operation. The kernel itself is generic: it implements pairwise partial rotary math and does not know that the caller is GLM.</p>
+    <p>This keeps the DSL/compiler path deterministic. Templates and model maps describe the semantic contract; kernel maps bind that contract to an implementation; generated C should not infer or guess the rotary convention from tensor shape alone.</p>
 </div>
 
 <h3 id="gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</h3>
@@ -1773,6 +1798,84 @@ output = gate * value       # Gate controls information flow
 
 <hr>
 
+<h2 id="vision-patch">Vision Patch Embedding</h2>
+
+<p>Multimodal families (Qwen3-VL, Gemma4 Vision, the standalone SigLIP ViT tower) start by turning a raw image into a sequence of encoder tokens. There is no attention or MLP here yet &mdash; this is the <em>frontend</em> that the transformer body consumes. In CK-Engine these steps are concrete kernels in <code>src/kernels/vision_kernels.c</code>, not hidden preprocessing, which is what lets the vision encoder share the same lowering and memory plan as the text decoder.</p>
+
+<div class="img-container svg-viewer" data-title="Vision Patch Embedding: im2patch, projection, 2x2 spatial merge, tiled 2D position">
+    <img src="assets/concept-vision-patch-embedding.svg" alt="Vision patch embedding kernel dataflow">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Frontend Contract</h3>
+        <pre>
+im2patch:        [C,H,W] -> [N, C*P*P]    (N = (H/P)*(W/P))
+patch embed:     [N, C*P*P] -> [N, d]     (dual proj + stream merge + bias)
+spatial_merge_2x2: group 4 patches -> [N/4, 4*d]
++ tiled 2D pos:  position_embeddings_add_tiled_2d + 2D RoPE
+        </pre>
+        <p>Each patch is a <code>P&times;P</code> tile across all channels, flattened into one row. <code>spatial_merge_2x2</code> then groups a 2&times;2 block of patches into a single token using <code>tile_order_index_2d</code>, which is why the encoder works on a coarser grid than the raw patch grid.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Depthwise / Why Strided</h3>
+        <p><code>im2patch</code> reads strided pixel rows directly rather than materializing reshaped copies, keeping the frontend allocation-free. The same kernels serve two merge policies:</p>
+        <ul>
+            <li><strong>Qwen3-VL:</strong> <code>spatial_merge_2x2</code> + <code>position_embeddings_add_tiled_2d</code></li>
+            <li><strong>Gemma4 Vision:</strong> <code>spatial_average_pool_contiguous</code> + <code>position_embeddings_add_gemma4v_xy</code></li>
+            <li><strong>Deepstack:</strong> <code>feature_concat</code> stitches selected layer taps before the projector footer</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Current CK Coverage</h3>
+    <p>The patch frontend is validated as part of the <code>v8</code> Qwen3-VL encoder parity path. The remaining flagged item is the layout <code>memcpy</code> in <code>im2patch</code> (one row copy per patch row) tracked in <code>KERNEL_STATUS.md</code> for conversion to fully strided access. See the <a href="v8-vision-encoder.html">v8 Vision Encoder</a> page for the full encoder &rarr; bridge &rarr; decoder pipeline.</p>
+</div>
+
+<h3 id="vision-position">How a Patch Knows Where It Is: 1D Text vs 2D Vision RoPE</h3>
+
+<p>Your intuition is exactly right. In text, a token's "position" is a single number &mdash; its index <code>t</code> in the sequence (0, 1, 2, &hellip;). RoPE turns that index into a rotation angle and rotates every <code>(x<sub>i</sub>, x<sub>i+d/2</sub>)</code> dimension pair of Q and K by it. Because rotation is relative, attention automatically recovers "how many tokens apart" two positions are. Position lives on <strong>one line</strong>.</p>
+
+<p>An image patch has no single index that means anything &mdash; what matters is <em>where on the grid</em> it sits. So instead of one scalar, a patch token carries <strong>two</strong> coordinates: its row <code>y</code> and its column <code>x</code> on the patch grid (the grid being <code>(H/P) &times; (W/P)</code>). This is the "context is basically the row and the height/column of the i-th patch" idea you described.</p>
+
+<div class="img-container svg-viewer" data-title="Position encoding: 1D text RoPE vs 2D vision M-RoPE">
+    <img src="assets/concept-vision-position-encoding.svg" alt="Comparison of 1D text RoPE position and 2D vision patch position encoding">
+</div>
+
+<p>CK encodes this two ways at once, both grounded in <code>src/kernels/vision_kernels.c</code>:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">1. Multi-section (M-)RoPE &mdash; the rotation path</h3>
+        <p>It is the <em>same</em> RoPE math, just applied to two indices. The head dimension is split into sections: one slice of dims is rotated by an angle derived from the <strong>row</strong> <code>&theta;(y)</code>, another slice by an angle derived from the <strong>column</strong> <code>&theta;(x)</code>.</p>
+        <pre>
+text   :  angle = t * base^(-2i/d)          // one index
+vision :  y-dims rotate by  y * base^(-2i/d)
+          x-dims rotate by  x * base^(-2i/d) // two indices
+        </pre>
+        <p><code>vision_position_ids_2d_merge</code> builds the position buffer as four flattened streams <code>[y | x | y | x]</code>, emitted in the same 2&times;2 merged-tile order the patches use, so a token's coordinates line up with its embedding row. After rotation, attention can recover both vertical and horizontal distance between patches &mdash; true 2D relative position.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">2. Learned 2D position table &mdash; the additive path</h3>
+        <p>On top of (or instead of) rotation, vision encoders also keep a <strong>learned</strong> position embedding table indexed by grid cell &mdash; the direct analogue of GPT-2's learned 1D positional embedding, but 2D.</p>
+        <p><code>position_embeddings_add_tiled_2d</code> takes a table trained at a fixed <code>source_grid &times; source_grid</code> resolution and <strong>bilinearly interpolates</strong> it to whatever grid the current image actually produced, then adds it row-by-row. That is what lets one trained table serve images of different sizes.</p>
+        <p style="margin-bottom:0;">Gemma4 vision uses the XY variant <code>position_embeddings_add_gemma4v_xy</code>, which adds separate per-row and per-column components instead of a single interpolated grid.</p>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>The one-line summary</strong><br>
+        Text RoPE answers &ldquo;how far along the sequence?&rdquo; with one index. Vision M-RoPE answers &ldquo;which row and which column?&rdquo; with two &mdash; same rotation trick, applied to a 2D grid coordinate, with an interpolatable learned table layered on top.
+    </div>
+</div>
+
+<hr>
+
 <h2 id="weight-tying">Weight Tying</h2>
 
 <p>Weight tying shares parameters between the input embedding and output projection, reducing model size with minimal quality loss.</p>
@@ -2106,8 +2209,8 @@ With weight tying: W = E  (same matrix!)
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
             </div>
         </div>
     </footer>

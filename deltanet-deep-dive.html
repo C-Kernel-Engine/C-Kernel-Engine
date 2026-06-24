@@ -6,11 +6,11 @@
     <title>Gated DeltaNet Deep Dive | C-Kernel-Engine</title>
     <meta name="description" content="Architecture and kernel notes for the Gated DeltaNet path in C-Kernel-Engine, including the Qwen3.5-style recurrent attention work.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/deltanet-deep-dive.html">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/deltanet-deep-dive.html">
     <meta property="og:title" content="Gated DeltaNet Deep Dive | C-Kernel-Engine">
     <meta property="og:description" content="Architecture and kernel notes for the Gated DeltaNet path in C-Kernel-Engine, including the Qwen3.5-style recurrent attention work.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/deltanet-deep-dive.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/deltanet-deep-dive.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -1459,6 +1459,497 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 8: DeltaNet vs SSM (Mamba)
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>DeltaNet vs SSM (Mamba): Two Paths Beyond Attention</h2>
+
+<p>Both DeltaNet and Mamba-style SSMs solve the same fundamental problem: <strong>constant-cost per-token inference without a growing KV-cache</strong>. But they arrive at that solution through entirely different mathematical paths. C-Kernel-Engine implements both — <code>deltanet_kernels.c</code> (767 lines) and <code>ssm_kernels.c</code> (143 lines) — which gives us a concrete basis for comparison.</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Kernel Sources</strong><br>
+        DeltaNet: <code>src/kernels/deltanet_kernels.c</code> — Gated delta rule with AVX/AVX2/AVX-512<br>
+        SSM: <code>src/kernels/ssm_kernels.c</code> — Causal depthwise conv1d for Mamba-style layers<br>
+        Supporting: <code>recurrent_state_kernels.c</code>, <code>recurrent_gate_kernels.c</code>, <code>recurrent_norm_kernels.c</code>
+    </div>
+</div>
+
+<h3>The Core Difference</h3>
+
+<p>The difference is best understood as <em>what the state represents</em> and <em>how it gets updated</em>:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>DeltaNet: Corrective Associative Memory</h3>
+        <p>The state is a <strong>d×d matrix</strong> — a learned key-value associative memory. Each step:</p>
+        <ol>
+            <li>Probe the memory: <code>kv_mem = Sᵀ · k̂</code></li>
+            <li>Compute the error: <code>δ = β_s · (v − kv_mem)</code></li>
+            <li>Write the correction: <code>S += outer(k̂, δ)</code></li>
+        </ol>
+        <p>The state is <em>repaired</em> at every step. Information that is already correct costs nothing to maintain. Only errors drive updates.</p>
+    </div>
+    <div class="card">
+        <h3>SSM (Mamba): Input-Dependent Linear Recurrence</h3>
+        <p>The state is a <strong>d-dimensional hidden vector</strong>. Each step:</p>
+        <ol>
+            <li>Decay: <code>h_t = A_t · h_{t-1}</code></li>
+            <li>Inject: <code>h_t += B_t · x_t</code></li>
+            <li>Read: <code>y_t = C_t · h_t</code></li>
+        </ol>
+        <p>The state is a <em>linear dynamical system</em>. Information decays continuously via A_t. New inputs are injected via B_t. The output is a learned projection C_t.</p>
+    </div>
+</div>
+
+<h3>Mathematical Comparison</h3>
+
+<div class="card">
+<pre><code>═══════════════════════════════════════════════════════════════
+GATED DELTANET (per head, per token)
+═══════════════════════════════════════════════════════════════
+State:    S ∈ ℝ^{d × d}     (matrix — stores key-value associations)
+Decay:    S ← exp(g) · S     (element-wise scalar decay)
+Retrieve: kv_mem = Sᵀ · k̂    (what does memory say for this key?)
+Error:    δ = σ(β) · (v − kv_mem)  (correction signal)
+Update:   S ← S + outer(k̂, δ)     (rank-1 write)
+Output:   out = Sᵀ · q̂             (read with query)
+
+Total per step:  O(d²)  — dominated by state matrix operations
+
+═══════════════════════════════════════════════════════════════
+MAMBA-2 SSM (per channel, per token)
+═══════════════════════════════════════════════════════════════
+State:    h ∈ ℝ^d            (vector — linear dynamical system)
+Decay:    h ← A_t · h        (input-selective diagonal decay)
+Inject:   h ← h + B_t · x_t  (input-selective injection)
+Output:   y_t = C_t · h       (input-selective readout)
+
+Conv:     Pre-SSM depthwise conv1d with learned kernel
+
+Total per step:  O(d) for the recurrence + O(k·d) for conv1d
+
+═══════════════════════════════════════════════════════════════
+KEY DISTINCTION
+═══════════════════════════════════════════════════════════════
+DeltaNet writes CORRECTIONS. It asks "what is wrong with my memory?"
+SSM writes INPUTS. It asks "what should I add to my state?"
+
+DeltaNet has d² state. SSM has d state.
+DeltaNet has one update rule. SSM has conv1d + recurrence.</code></pre>
+</div>
+
+<h3>Comparison Table</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>Property</th>
+            <th>Gated DeltaNet</th>
+            <th>Mamba-2 SSM</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>State shape</strong></td>
+            <td>Matrix: d × d per head</td>
+            <td>Vector: d per channel</td>
+        </tr>
+        <tr>
+            <td><strong>State size (typical)</strong></td>
+            <td>128² × 4B = 64 KB/head</td>
+            <td>~16–64 × 4B = 64–256 B/channel</td>
+        </tr>
+        <tr>
+            <td><strong>Update rule</strong></td>
+            <td>Delta rule: write the error</td>
+            <td>Linear recurrence: decay + inject</td>
+        </tr>
+        <tr>
+            <td><strong>Selectivity</strong></td>
+            <td>β gate (how much to correct) + g gate (how much to forget)</td>
+            <td>A, B, C are all input-dependent (selective scan)</td>
+        </tr>
+        <tr>
+            <td><strong>Pre-processing</strong></td>
+            <td>L2 normalization of q, k</td>
+            <td>Depthwise conv1d (short kernel, typically k=4)</td>
+        </tr>
+        <tr>
+            <td><strong>Compute per token</strong></td>
+            <td>O(d²) — state matrix sweep</td>
+            <td>O(k·d) conv + O(d) recurrence</td>
+        </tr>
+        <tr>
+            <td><strong>Memory per head/layer</strong></td>
+            <td>O(d²) — can be large for high-d</td>
+            <td>O(d + k) — very compact</td>
+        </tr>
+        <tr>
+            <td><strong>Prefill strategy</strong></td>
+            <td>Chunked: process T tokens in chunks, update S incrementally</td>
+            <td>Parallel scan (associative scan over the recurrence)</td>
+        </tr>
+        <tr>
+            <td><strong>What it resembles</strong></td>
+            <td>Adaptive filter / Hopfield network</td>
+            <td>Control-theory state observer / IIR filter</td>
+        </tr>
+        <tr>
+            <td><strong>Strength</strong></td>
+            <td>Precise associative recall from compressed memory</td>
+            <td>Fast streaming, efficient long-range dependency modeling</td>
+        </tr>
+        <tr>
+            <td><strong>Weakness</strong></td>
+            <td>d² cost limits head dimension; rank-1 updates can collide</td>
+            <td>Diagonal A limits expressive capacity per step</td>
+        </tr>
+        <tr>
+            <td><strong>Used by</strong></td>
+            <td>Qwen3.5 / qwen3next (recurrent layers)</td>
+            <td>Nemotron 3, Mamba, Mamba-2, Jamba</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>The Kernel Engineer's View</h3>
+
+<p>From an implementation standpoint, these two families have very different performance profiles:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>DeltaNet Kernel Profile</h3>
+        <ul>
+            <li><strong>Compute-bound</strong> for large state_dim (d ≥ 128)</li>
+            <li>The state sweep is a dense d×d matrix operation — perfect for SIMD</li>
+            <li>AVX-512 gives 16 floats/iter → the inner loop is tight</li>
+            <li>The outer product <code>outer(k̂, δ)</code> is a rank-1 update — maps to FMA chains</li>
+            <li>Memory layout: state is row-major [d×d], vector ops stride by d</li>
+            <li>767 lines in CK-Engine with 4 ISA tiers (ref/avx/avx2/avx512)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>SSM Conv1d Kernel Profile</h3>
+        <ul>
+            <li><strong>Memory-bandwidth-bound</strong> for typical kernel sizes (k=4)</li>
+            <li>Depthwise conv1d: each channel has its own tiny filter</li>
+            <li>Very little arithmetic intensity — just k multiplies per output</li>
+            <li>Benefits from prefetch and streaming access patterns</li>
+            <li>Memory layout: [num_seqs × num_channels × (history + tokens)]</li>
+            <li>143 lines in CK-Engine — the simplicity is the point</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Why Hybrid Architectures Use Both (or One + Attention)</h3>
+
+<p>Neither DeltaNet nor SSM can fully replace attention. Each trades exact token-by-token recall for efficiency. Modern architectures solve this by interleaving:</p>
+
+<div class="card">
+<pre><code>Qwen3.5 strategy:
+  Layer 0: DeltaNet (recurrent)
+  Layer 1: DeltaNet (recurrent)
+  Layer 2: DeltaNet (recurrent)
+  Layer 3: Full Attention        ← exact recall every 4th layer
+  Layer 4: DeltaNet (recurrent)
+  ...
+
+Nemotron 3 strategy:
+  Layer 0: Mamba-2 SSM
+  Layer 1: Mamba-2 SSM
+  Layer 2: Mamba-2 SSM
+  Layer 3: Full Attention        ← similar interleaving
+  Layer 4: Mamba-2 SSM
+  ...
+
+Both keep ~75% of layers as constant-cost recurrent.
+The remaining ~25% attention layers handle precise retrieval.</code></pre>
+</div>
+
+<p>The <em>hypothesis</em> behind both approaches: most tokens in a long context only need approximate memory (streaming summary), but some tokens need exact recall (names, numbers, specific facts). The hybrid gives you both.</p>
+
+<h3>SSM Kernel Internals — The Conv1d Path</h3>
+
+<p>The SSM kernel in CK-Engine implements the <em>causal depthwise convolution</em> that precedes the SSM recurrence in Mamba-style models. This is not the full Mamba forward pass — it is the conv1d stage that prepares inputs for the selective scan.</p>
+
+<div class="card">
+<pre><code>// ssm_kernels.c — forward pass structure
+
+void ssm_conv1d_forward_ref(
+    const float *conv_x,     // [num_seqs, num_channels, kernel_size-1 + num_tokens]
+    const float *kernel,     // [num_channels, kernel_size]
+    float *out,              // [num_seqs, num_tokens, num_channels]
+    int kernel_size,         // typically 4
+    int num_channels,        // model dim / num_heads
+    int num_tokens,          // sequence length
+    int num_seqs             // batch
+)
+
+// For each (seq, token, channel):
+//   out[seq][tok][ch] = dot(conv_x[seq][ch][tok : tok+kernel_size], kernel[ch][:])
+//
+// This is a depthwise (channel-independent) causal convolution.
+// Each channel has its own learned kernel of size k (typically 4).
+// The conv_x buffer carries history from previous chunks (kernel_size-1 slots).</code></pre>
+</div>
+
+<p>The <code>recurrent_state_kernels.c</code> file handles the <em>state management pipeline</em> — copying history into the conv buffer, appending new q/k/v tokens, and extracting the updated state for the next chunk:</p>
+
+<div class="card">
+<pre><code>// recurrent_state_kernels.c — state pipeline
+
+void recurrent_conv_state_update_forward(
+    const float *state_in,   // previous history [num_seqs × channels × history_len]
+    const float *q, *k, *v,  // new token projections
+    float *conv_x,           // assembled conv buffer [num_seqs × channels × total_len]
+    float *state_out,        // updated history for next call
+    int history_len,         // kernel_size - 1
+    int num_seqs, num_tokens,
+    int q_dim, k_dim, v_dim
+)
+
+// Step 1: Copy old history into conv buffer positions [0 : history_len]
+// Step 2: Append new tokens into positions [history_len : history_len + num_tokens]
+// Step 3: Extract updated history (last history_len positions) → state_out
+//
+// This is the "shift register" that feeds the causal conv1d kernel.</code></pre>
+</div>
+
+<p>The diagram below shows what <code>ssm_conv1d_forward_ref</code> actually computes: a per-channel sliding window of width <code>kernel_size</code> walks across the token axis, and each output is a dot product against that channel's own learned kernel. Because every channel uses its own filter and never mixes with neighbours, it is a <em>depthwise</em> convolution — cheap, embarrassingly parallel across channels, and causal by construction.</p>
+
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 380" style="max-width:1000px;width:100%;height:auto;font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <marker id="ssm-a" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#0891b2"/>
+    </marker>
+    <style>
+      .ssm-t{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ssm-s{fill:#b0b0b0;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      .ssm-lab{fill:#9aa7b4;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="ssm-lab">conv_x[seq, ch, ·]  — history + tokens</text>
+
+  <!-- history cells -->
+  <g>
+    <rect x="20"  y="46" width="48" height="48" rx="6" fill="rgba(148,163,184,0.12)" stroke="#5a6b78" stroke-width="1.3"/>
+    <rect x="68"  y="46" width="48" height="48" rx="6" fill="rgba(148,163,184,0.12)" stroke="#5a6b78" stroke-width="1.3"/>
+    <rect x="116" y="46" width="48" height="48" rx="6" fill="rgba(148,163,184,0.12)" stroke="#5a6b78" stroke-width="1.3"/>
+    <text x="92" y="118" text-anchor="middle" class="ssm-s" fill="#7f8c99">history (k−1)</text>
+    <!-- new tokens -->
+    <rect x="164" y="46" width="48" height="48" rx="6" fill="rgba(6,182,212,0.14)" stroke="#06b6d4" stroke-width="1.3"/>
+    <rect x="212" y="46" width="48" height="48" rx="6" fill="rgba(6,182,212,0.14)" stroke="#06b6d4" stroke-width="1.3"/>
+    <rect x="260" y="46" width="48" height="48" rx="6" fill="rgba(6,182,212,0.14)" stroke="#06b6d4" stroke-width="1.3"/>
+    <rect x="308" y="46" width="48" height="48" rx="6" fill="rgba(6,182,212,0.14)" stroke="#06b6d4" stroke-width="1.3"/>
+    <rect x="356" y="46" width="48" height="48" rx="6" fill="rgba(6,182,212,0.14)" stroke="#06b6d4" stroke-width="1.3"/>
+    <text x="84"  y="76" text-anchor="middle" class="ssm-s">h₋₂</text>
+    <text x="92"  y="76" text-anchor="middle" class="ssm-s"></text>
+    <text x="188" y="76" text-anchor="middle" class="ssm-s">x₀</text>
+    <text x="236" y="76" text-anchor="middle" class="ssm-s">x₁</text>
+    <text x="284" y="76" text-anchor="middle" class="ssm-s">x₂</text>
+    <text x="332" y="76" text-anchor="middle" class="ssm-s">x₃</text>
+    <text x="380" y="76" text-anchor="middle" class="ssm-s">x₄</text>
+    <text x="262" y="118" text-anchor="middle" class="ssm-s" fill="#7fd8e6">new tokens (num_tokens)</text>
+  </g>
+
+  <!-- sliding window highlight for token x2 -->
+  <rect x="164" y="40" width="192" height="60" rx="8" fill="none" stroke="#ffb400" stroke-width="2.6"/>
+  <text x="260" y="36" text-anchor="middle" class="ssm-s" fill="#ffb400">window for out[x₂] = 4 taps</text>
+
+  <!-- kernel -->
+  <text x="560" y="30" class="ssm-lab">kernel[ch, :]  — per-channel filter</text>
+  <g>
+    <rect x="560" y="46" width="42" height="48" rx="6" fill="rgba(255,180,0,0.14)" stroke="#ffb400" stroke-width="1.3"/>
+    <rect x="602" y="46" width="42" height="48" rx="6" fill="rgba(255,180,0,0.14)" stroke="#ffb400" stroke-width="1.3"/>
+    <rect x="644" y="46" width="42" height="48" rx="6" fill="rgba(255,180,0,0.14)" stroke="#ffb400" stroke-width="1.3"/>
+    <rect x="686" y="46" width="42" height="48" rx="6" fill="rgba(255,180,0,0.14)" stroke="#ffb400" stroke-width="1.3"/>
+    <text x="581" y="76" text-anchor="middle" class="ssm-s">w₀</text>
+    <text x="623" y="76" text-anchor="middle" class="ssm-s">w₁</text>
+    <text x="665" y="76" text-anchor="middle" class="ssm-s">w₂</text>
+    <text x="707" y="76" text-anchor="middle" class="ssm-s">w₃</text>
+    <text x="644" y="118" text-anchor="middle" class="ssm-s" fill="#ffce5a">kernel_size = 4</text>
+  </g>
+
+  <!-- dot product node -->
+  <circle cx="500" cy="200" r="34" fill="rgba(6,182,212,0.16)" stroke="#06b6d4" stroke-width="2"/>
+  <text x="500" y="198" text-anchor="middle" class="ssm-t" font-size="20">Σ</text>
+  <text x="500" y="216" text-anchor="middle" class="ssm-s" fill="#7fd8e6">dot</text>
+
+  <path d="M260,100 C320,150 420,170 470,186" fill="none" stroke="#0891b2" stroke-width="1.6" marker-end="url(#ssm-a)"/>
+  <path d="M644,100 C600,150 560,170 530,186" fill="none" stroke="#0891b2" stroke-width="1.6" marker-end="url(#ssm-a)"/>
+
+  <!-- output -->
+  <rect x="430" y="278" width="140" height="56" rx="10" fill="#2f2f2f" stroke="#06b6d4" stroke-width="1.6"/>
+  <text x="500" y="304" text-anchor="middle" class="ssm-t" font-size="14">out[seq, x₂, ch]</text>
+  <text x="500" y="324" text-anchor="middle" class="ssm-s" fill="#7fd8e6">one scalar / channel</text>
+  <path d="M500,234 L500,276" fill="none" stroke="#0891b2" stroke-width="1.8" marker-end="url(#ssm-a)"/>
+
+  <!-- depthwise note -->
+  <text x="760" y="200" class="ssm-lab">depthwise</text>
+  <text x="760" y="224" class="ssm-s" fill="#b0b0b0">channel c uses only</text>
+  <text x="760" y="242" class="ssm-s" fill="#b0b0b0">kernel[c] — no cross-</text>
+  <text x="760" y="260" class="ssm-s" fill="#b0b0b0">channel mixing.</text>
+  <text x="760" y="288" class="ssm-s" fill="#7f8c99">Output then feeds the</text>
+  <text x="760" y="306" class="ssm-s" fill="#7f8c99">selective scan recurrence.</text>
+</svg>
+</div>
+
+<h3>The Fundamental Analogy</h3>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 440" style="max-width:1000px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="gDeltaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="gSSMGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="gAttnGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1000" height="440" rx="12" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="998" height="438" rx="11" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <text x="500" y="35" text-anchor="middle" font-size="16" font-weight="700" fill="#f5f5f5" letter-spacing="1">THREE MEMORY PARADIGMS</text>
+
+  <!-- Attention column -->
+  <rect x="30" y="60" width="290" height="360" rx="10" fill="#262637" stroke="#8b5cf6" stroke-width="1.5"/>
+  <rect x="30" y="60" width="290" height="42" rx="10" fill="url(#gAttnGrad)"/>
+  <rect x="30" y="90" width="290" height="12" fill="url(#gAttnGrad)"/>
+  <text x="175" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">STANDARD ATTENTION</text>
+
+  <text x="50" y="130" font-size="11" fill="#c4b5fd" font-weight="600">Analogy:</text>
+  <text x="50" y="148" font-size="11" fill="#94a3b8">Perfect notebook. Write everything.</text>
+  <text x="50" y="165" font-size="11" fill="#94a3b8">Search the whole book each time.</text>
+
+  <text x="50" y="195" font-size="11" fill="#c4b5fd" font-weight="600">State:</text>
+  <text x="50" y="213" font-size="11" fill="#94a3b8">KV-cache: all past keys + values</text>
+  <text x="50" y="230" font-size="11" fill="#94a3b8">Shape: [T × d] — grows with T</text>
+
+  <text x="50" y="260" font-size="11" fill="#c4b5fd" font-weight="600">Update:</text>
+  <text x="50" y="278" font-size="11" fill="#94a3b8">Append new row. Never modify old.</text>
+
+  <text x="50" y="308" font-size="11" fill="#c4b5fd" font-weight="600">Read:</text>
+  <text x="50" y="326" font-size="11" fill="#94a3b8">Softmax over ALL past keys.</text>
+  <text x="50" y="343" font-size="11" fill="#94a3b8">Cost: O(T) per query.</text>
+
+  <text x="50" y="380" font-size="11" fill="#c4b5fd" font-weight="600">Tradeoff:</text>
+  <text x="50" y="398" font-size="11" fill="#94a3b8">Perfect recall ↔ linear cost growth</text>
+
+  <!-- DeltaNet column -->
+  <rect x="355" y="60" width="290" height="360" rx="10" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <rect x="355" y="60" width="290" height="42" rx="10" fill="url(#gDeltaGrad)"/>
+  <rect x="355" y="90" width="290" height="12" fill="url(#gDeltaGrad)"/>
+  <text x="500" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">GATED DELTANET</text>
+
+  <text x="375" y="130" font-size="11" fill="#fcd34d" font-weight="600">Analogy:</text>
+  <text x="375" y="148" font-size="11" fill="#94a3b8">Whiteboard. Fixed size. Erase and</text>
+  <text x="375" y="165" font-size="11" fill="#94a3b8">rewrite only what's wrong.</text>
+
+  <text x="375" y="195" font-size="11" fill="#fcd34d" font-weight="600">State:</text>
+  <text x="375" y="213" font-size="11" fill="#94a3b8">Matrix S: associative memory</text>
+  <text x="375" y="230" font-size="11" fill="#94a3b8">Shape: [d × d] — always fixed</text>
+
+  <text x="375" y="260" font-size="11" fill="#fcd34d" font-weight="600">Update:</text>
+  <text x="375" y="278" font-size="11" fill="#94a3b8">Delta rule: S += outer(k̂, δ)</text>
+  <text x="375" y="295" font-size="11" fill="#94a3b8">Write the correction, not the value.</text>
+
+  <text x="375" y="325" font-size="11" fill="#fcd34d" font-weight="600">Read:</text>
+  <text x="375" y="343" font-size="11" fill="#94a3b8">out = Sᵀ · q̂. Cost: O(d²) always.</text>
+
+  <text x="375" y="380" font-size="11" fill="#fcd34d" font-weight="600">Tradeoff:</text>
+  <text x="375" y="398" font-size="11" fill="#94a3b8">Fixed cost ↔ lossy (rank-1 collisions)</text>
+
+  <!-- SSM column -->
+  <rect x="680" y="60" width="290" height="360" rx="10" fill="#262637" stroke="#06b6d4" stroke-width="1.5"/>
+  <rect x="680" y="60" width="290" height="42" rx="10" fill="url(#gSSMGrad)"/>
+  <rect x="680" y="90" width="290" height="12" fill="url(#gSSMGrad)"/>
+  <text x="825" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">MAMBA-2 SSM</text>
+
+  <text x="700" y="130" font-size="11" fill="#67e8f9" font-weight="600">Analogy:</text>
+  <text x="700" y="148" font-size="11" fill="#94a3b8">Sliding-window sensor. Measure the</text>
+  <text x="700" y="165" font-size="11" fill="#94a3b8">stream. Decay old, inject new.</text>
+
+  <text x="700" y="195" font-size="11" fill="#67e8f9" font-weight="600">State:</text>
+  <text x="700" y="213" font-size="11" fill="#94a3b8">Hidden vector h: dynamical system</text>
+  <text x="700" y="230" font-size="11" fill="#94a3b8">Shape: [d] — compact</text>
+
+  <text x="700" y="260" font-size="11" fill="#67e8f9" font-weight="600">Update:</text>
+  <text x="700" y="278" font-size="11" fill="#94a3b8">h = A·h + B·x (linear recurrence)</text>
+  <text x="700" y="295" font-size="11" fill="#94a3b8">A, B, C are input-dependent.</text>
+
+  <text x="700" y="325" font-size="11" fill="#67e8f9" font-weight="600">Read:</text>
+  <text x="700" y="343" font-size="11" fill="#94a3b8">y = C·h. Cost: O(d) always.</text>
+
+  <text x="700" y="380" font-size="11" fill="#67e8f9" font-weight="600">Tradeoff:</text>
+  <text x="700" y="398" font-size="11" fill="#94a3b8">Cheapest cost ↔ limited capacity/step</text>
+</svg>
+</div>
+
+<h3>When Each Wins</h3>
+
+<table>
+    <thead>
+        <tr>
+            <th>Scenario</th>
+            <th>Best choice</th>
+            <th>Why</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Exact retrieval from long context</td>
+            <td>Attention</td>
+            <td>Nothing is lost — full KV-cache scan</td>
+        </tr>
+        <tr>
+            <td>Long streaming decode (100K+ tokens)</td>
+            <td>SSM (Mamba)</td>
+            <td>O(d) per step, no memory growth, fast</td>
+        </tr>
+        <tr>
+            <td>Learned key-value associations</td>
+            <td>DeltaNet</td>
+            <td>d² state has capacity; delta rule is precise</td>
+        </tr>
+        <tr>
+            <td>High throughput, memory-constrained</td>
+            <td>SSM (Mamba)</td>
+            <td>Smallest state footprint</td>
+        </tr>
+        <tr>
+            <td>Chunked prefill with state reuse</td>
+            <td>DeltaNet</td>
+            <td>State survives chunks; no parallel scan needed</td>
+        </tr>
+        <tr>
+            <td>CPU inference (SIMD-friendly)</td>
+            <td>DeltaNet</td>
+            <td>Dense d×d operations map perfectly to AVX/AVX-512</td>
+        </tr>
+        <tr>
+            <td>GPU inference (parallel scan)</td>
+            <td>SSM (Mamba)</td>
+            <td>Parallel associative scan maps to GPU warps</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>The kernel engineer's takeaway:</strong> DeltaNet is compute-bound and SIMD-friendly — it rewards wide vector units and dense FMA throughput. SSM conv1d is bandwidth-bound and simple — it rewards prefetch and streaming memory access. On a Xeon with AVX-512, DeltaNet's d×d sweep can actually be faster than you'd expect because the arithmetic intensity is high enough to hide memory latency. SSM's conv with k=4 hits the memory wall almost immediately.</p>
+
 <div class="card card-accent" style="margin-top:2rem;">
     <h3>📊 Back to Kernel Catalog</h3>
     <p>For the full list of CK-Engine kernels (GEMM, RoPE, Softmax, Loss, etc.), see:</p>
@@ -1691,8 +2182,8 @@
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
             </div>
         </div>
     </footer>

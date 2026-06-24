@@ -1,0 +1,189 @@
+<!-- TITLE: Prefill Performance Roadmap -->
+<!-- NAV: profiling -->
+
+<div class="container">
+  <h1>Prefill Performance Roadmap</h1>
+  <p class="lead">
+    The current CK prefill path is correct and auditable, but the Q4_K_M gap against llama.cpp is now mostly a layout and microkernel problem.
+  </p>
+
+  <div class="alert alert-info">
+    <strong>Current signal:</strong>
+    Qwen3.5 0.8B Q4_K_M decode is close enough to be useful for model bring-up. The first safe perf lane showed
+    canonical CK prefill around <code>31 tok/s</code> while llama.cpp was around <code>78 tok/s</code> on the local i7.
+    After x8 testing, the dispatch matrix showed x8 winning for short/medium prefill shapes and losing for the
+    longer <code>M=128,N=896,K=4864</code> compact-down shape. Treat the exact numbers as host-local; the durable
+    signal is that layout and shape-gated dispatch, not math, are the bottlenecks.
+  </div>
+
+  <h2>Why Prefill Is Different</h2>
+  <p>
+    Decode is mostly GEMV: one activation vector times many weight rows. Prefill is GEMM: many token rows times many output rows.
+    A fast decode kernel can still leave prefill slow because prefill needs to reuse both activation rows and weight blocks across a two-dimensional tile.
+  </p>
+  <p>
+    The key mistake is to treat prefill as many independent GEMV calls. That preserves correctness, but it reloads metadata and activation blocks too often.
+    llama.cpp's faster path uses repacked/interleaved layouts so the hot loop computes a block of rows and columns together.
+  </p>
+
+  <h2>Optimization Ladder</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Step</th>
+        <th>What Changed</th>
+        <th>Why It Matters</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Q8 activation contract</td>
+        <td>Quantize prefill activations to <code>Q8_K</code> before mixed-quant GEMM.</td>
+        <td>Stops repeatedly feeding FP32 into quantized weights and aligns CK with llama-style quantized dot products.</td>
+        <td>Active</td>
+      </tr>
+      <tr>
+        <td>Persistent threadpool</td>
+        <td>Use CK's pthread pool instead of creating OpenMP regions around every kernel.</td>
+        <td>Reduces launch overhead and gives the runtime explicit control over active threads, row splitting, and phase-specific dispatch.</td>
+        <td>Active</td>
+      </tr>
+      <tr>
+        <td>Shape-gated dispatch</td>
+        <td>Choose serial, row-split, N-split, or 2D dispatch based on <code>M,N,K</code> and thread count.</td>
+        <td>Small shapes can regress when parallel overhead or activation rereads dominate; wide shapes need more jobs to fill cores.</td>
+        <td>Active for Q6; experimental for Q4</td>
+      </tr>
+      <tr>
+        <td>Packed Q4_K metadata</td>
+        <td>Pre-unpack Q4_K scales/mins into a cached packed-meta layout.</td>
+        <td>Moves repeated metadata decoding out of the hottest dot-product path.</td>
+        <td>Active, but not enough</td>
+      </tr>
+      <tr>
+        <td>Q4_K 8x8 repacked GEMM</td>
+        <td>Pack eight Q4_K output rows together and compute an output-row tile for each Q8_K token row.</td>
+        <td>This captures the first llama.cpp-style layout win: each Q8 activation load is reused across multiple output lanes instead of one row at a time.</td>
+        <td>Shape-gated default for measured short/medium Q4_K prefill shapes</td>
+      </tr>
+      <tr>
+        <td>Token-tile x output-tile GEMM</td>
+        <td>Add an opt-in <code>x8mt</code> lane that schedules small token tiles against eight-row output tiles.</td>
+        <td>This reuses the same packed Q4_K group across multiple Q8_K token rows and is the first step toward a true register-blocked GEMM microkernel.</td>
+        <td>Experimental benchmark/runtime lane</td>
+      </tr>
+      <tr>
+        <td>Fused MLP kernels</td>
+        <td>Fuse norm/projection/SwiGLU/down or similar sequences after the base GEMM is competitive.</td>
+        <td>Useful, but premature while the Q4_K prefill GEMM itself is still the dominant gap.</td>
+        <td>Later</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>The Q4_K Repack Target</h2>
+  <p>
+    The current CK packed-meta path is shaped like this:
+  </p>
+  <pre><code>for each token m:
+  for each output row n:
+    for each Q4_K block b:
+      dot_one_q4k_block_with_one_q8k_block()</code></pre>
+
+  <p>
+    That is simple and auditable, but it is still scalar at the tile level. The next target is shaped more like this:
+  </p>
+  <pre><code>for token tile Mx4 or Mx8:
+  pack Q8_K activations into an interleaved tile
+  for output tile Nx8:
+    read one interleaved Q4_K weight tile
+    accumulate an MxN output tile in registers
+    apply Q4_K scale/min metadata once per tile lane</code></pre>
+
+  <p>
+    This mirrors the idea behind llama.cpp's <code>ggml_gemm_q4_K_8x8_q8_K</code>: the math is the same, but the memory layout changes so the CPU hot loop does less bookkeeping per useful multiply.
+    The important part is not copying llama.cpp blindly; the important part is matching the dataflow: interleave weights, interleave activations, compute a small output tile, and keep metadata close to the SIMD lanes.
+  </p>
+  <p>
+    CK keeps the canonical <code>for token -> for output row -> dot()</code> kernel as the reliable fallback.
+    The <code>packed-x8</code> lane groups eight Q4_K output rows per K block and uses a SIMD tile accumulator that loads each Q8 activation chunk once, then reuses it across the active output lanes.
+    It is now the default for measured short/medium Qwen/Nemotron-family Q4_K prefill shapes, with
+    <code>CK_DISABLE_Q4K_PACKED_META_X8_PREFILL=1</code> as the escape hatch and
+    <code>CK_FORCE_Q4K_PACKED_META_X8_PREFILL=1</code> for new hardware sweeps.
+  </p>
+  <p>
+    The current x8 shape is still closer to:
+  </p>
+  <pre><code>for token:
+  for output_row_group_of_8:
+    compute 8 output rows for one Q8_K token row</code></pre>
+  <p>
+    The stronger target remains:
+  </p>
+  <pre><code>for token_tile:
+  for output_tile:
+    compute multiple tokens x multiple output rows together</code></pre>
+
+  <p>
+    The current experimental <code>x8mt</code> path takes the first step:
+  </p>
+  <pre><code>CK_ENABLE_Q4K_PACKED_META_X8MT_PREFILL=1 \
+CK_Q4K_PACKED_META_X8MT_TILE_M=2 \
+make profile-v8-prefill-perf-stat</code></pre>
+
+  <p>
+    In the local dispatch matrix, <code>x8mt</code> with <code>tile_m=2</code> edged out plain x8 on the measured
+    Q4_K shapes, including the longer <code>M=128,N=896,K=4864</code> compact-down shape. It remains opt-in because
+    end-to-end Qwen2 timings on the laptop were noisy and not yet a stable promotion signal. The next real kernel
+    improvement is to keep the tile accumulators in registers across the token tile instead of using x8mt mostly as
+    a scheduling/data-reuse step.
+  </p>
+
+  <h2>Why 2D Scheduling Was Not Enough</h2>
+  <p>
+    CK now has an opt-in Q4_K packed-meta 2D scheduler:
+  </p>
+  <pre><code>CK_ENABLE_Q4K_PACKED_META_2D_PREFILL=1 \
+CK_FORCE_Q4K_PACKED_META_2D_PREFILL=1 \
+CK_Q4K_PACKED_META_TILE_M=8 \
+CK_Q4K_PACKED_META_TILE_N=512 \
+CK_V8_PREFILL_PERF_ENGINE=ck \
+make profile-v8-prefill-perf-stat</code></pre>
+
+  <p>
+    Local tests showed only a small and noisy improvement. That is expected: 2D scheduling creates better work distribution, but the hot loop still computes one output value at a time.
+    The x8 layout fixed the more important part first: reuse one activation chunk across multiple output lanes.
+    The next step is a true token-tile/output-tile microkernel.
+  </p>
+
+  <h2>Measurement Contract</h2>
+  <p>
+    Use the safe perf lane for routine iteration:
+  </p>
+  <pre><code>make profile-v8-prefill-perf-stat</code></pre>
+
+  <p>
+    The report records prefill/decode tok/s, milliseconds, cycles, instructions, IPC, cache misses, cache miss rate, and context switches.
+    This is the default lane because VTune/Advisor deep collection can load kernel drivers that destabilized the local Linux profiling host.
+  </p>
+
+  <h2>Promotion Rule</h2>
+  <ol>
+    <li>Keep every new layout behind a shape gate and an escape hatch.</li>
+    <li>Prove parity against canonical CK for synthetic Q4_K/Q8_K blocks.</li>
+    <li>Benchmark micro-shapes: Qwen3.5 gate/up, down, qkv/out, compact MLP, and wider MLP shapes.</li>
+    <li>Benchmark end-to-end Qwen3.5 v8 prefill against llama.cpp with the same cached GGUF.</li>
+    <li>Promote only the shapes where the sweep wins; keep canonical dispatch as the fallback.</li>
+  </ol>
+
+  <h2>Related Files</h2>
+  <ul>
+    <li><code>src/kernels/gemm_kernels_q4k_q8k_vnni.c</code> - Q4_K x Q8_K packed-meta kernels.</li>
+    <li><code>version/v8/src/ck_parallel_prefill_v8.c</code> - v8 prefill dispatch policy.</li>
+    <li><code>scripts/perf_stat_v8_prefill_compare.py</code> - safe CK-vs-llama perf counter lane.</li>
+    <li><code>benchmarks/compare_ck_llama_v8.py</code> - standardized v8 model-family comparison.</li>
+    <li><a href="q6-prefill-roofline.html">Q6_K Prefill Roofline Notes</a> - shape-gating precedent for Q6_K.</li>
+    <li><a href="profiling.html">Profiling Guide</a> - safe profiling commands and VTune/Advisor warning.</li>
+  </ul>
+</div>
