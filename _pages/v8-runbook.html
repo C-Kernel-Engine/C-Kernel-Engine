@@ -264,15 +264,16 @@ python -m pip install -r requirements-v8.txt</pre>
   --chat-template auto \
   --generate-visualizer</pre>
     </div>
-    <p class="mini-note">Current scope: these are the validated <code>v8</code> text-family operator surfaces. The multimodal Qwen3-VL path is separate and remains the only promoted vision family today.</p>
+    <p class="mini-note">Current scope: these are the validated <code>v8</code> text-family operator surfaces. The multimodal Qwen3-VL path remains the promoted vision baseline; Gemma4 vision now has a high-memory bridge smoke lane for second-family coverage.</p>
 </div>
 
 <div class="card card-yellow">
     <h3 style="margin-top: 0;">High-Memory v8 Smoke Targets</h3>
-    <p>Gemma4 and Nemotron Nano 9B v2 are intentionally tracked as high-memory smoke lanes. They should appear in nightly/test reports, but skip cleanly on smaller runners instead of pretending the model family is untested.</p>
+    <p>Gemma4 text, Gemma4 vision, and Nemotron Nano 9B v2 are intentionally tracked as high-memory smoke lanes. They should appear in nightly/test reports, but skip cleanly on smaller runners instead of pretending the model family is untested.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>make test-v8-gemma4-highmem
+make test-v8-gemma4-vision-smoke
 make test-v8-nemotron9-highmem
 
 # Lower the threshold only when you intentionally want to run locally:
@@ -303,6 +304,27 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
         <li><strong>Only optimize after parity is understood.</strong> Once BF16/FP32 graph parity and GGUF coherence are clean, profile Q4_K/Q5_K/Q6_K/Q8_K kernels and threadpool scheduling separately.</li>
     </ol>
     <p class="mini-note">Gemma4 followed this route: BF16 safetensors proved the split-direct RoPE circuit against PyTorch, then the GGUF Q4_K_M path reused the same IR/kernel contract for coherent long-answer smoke testing.</p>
+</div>
+
+<h2>Canonical Gemma4 Vision Bridge Smoke</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Second-Family Vision Bridge</h3>
+    <p>Gemma4 vision uses the Gemma4 text decoder with the matching <code>mmproj-F16.gguf</code> encoder artifact. Use the checked-in PPM test image so the smoke path does not depend on Pillow.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf \
+  --mmproj hf://unsloth/gemma-4-E4B-it-GGUF/mmproj-F16.gguf \
+  --image-path version/v8/test_assets/v8_vision_doc_card_72.ppm \
+  --prompt "Explain this image." \
+  --context-len 1024 \
+  --force-compile \
+  --chat-template gemma4 \
+  --max-tokens 8 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">A healthy smoke converts or reuses the Gemma4 vision encoder, produces a 196-token vision prefix, completes mixed prefill in the Gemma4 decoder, and writes a bridge report. Current scope is bridge correctness; longer semantic parity remains active work.</p>
 </div>
 
 <h2>Canonical Qwen3-VL Vision Run</h2>

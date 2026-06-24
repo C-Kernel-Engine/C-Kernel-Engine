@@ -6,11 +6,11 @@
     <title>Model + Kernel Matrix  | C-Kernel-Engine</title>
     <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/model-kernel-matrix.html">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html">
     <meta property="og:title" content="Model + Kernel Matrix  | C-Kernel-Engine">
     <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/model-kernel-matrix.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -1446,6 +1446,7 @@
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent long-answer smoke</span></div>
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">BF16 safetensors → BUMP — PyTorch parity bring-up path</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Vision bridge smoke — Gemma4 mmproj-F16 encoder → mixed decoder prefill</span></div>
       </div>
       <div class="source-note">
         Bring-up fix: Gemma4 keeps the split-half RoPE channel layout, but it cannot use one global cached split-half contract. The template exports per-layer/direct RoPE metadata, and lowering selects <code>rope_forward_qk_split_direct_f32</code> from IR data rather than hard-coding a Gemma-only kernel.
@@ -1454,6 +1455,7 @@
         <span class="tag fixed">rope_param_mode: per_layer_direct</span>
         <span class="tag fixed">BF16 PyTorch parity lane</span>
         <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
+        <span class="tag learned">vision bridge smoke-tested</span>
       </div>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 text smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma4">Copy</button></div>
@@ -1912,7 +1914,7 @@
         <strong>GLM4:</strong> v8 now has a template, GLM4 GGUF metadata fixes, declarative safetensors mapping, PyTorch-vs-CK parity harnesses, and a coherent Q4_K_M GGUF runtime smoke. The important fix was separating semantic stream sources in the template from physical quantized activation buffers in the kernel ABI.
       </div>
       <div class="test-item">
-        <strong>Qwen3-VL / Gemma4 vision:</strong> Qwen3-VL remains the promoted vision baseline. Gemma4 vision now has a matching CLIP/mmproj conversion path, a Gemma4 image marker contract, and a correctness-first mixed-prefill bridge; longer semantic parity and speed are still active work.
+        <strong>Qwen3-VL / Gemma4 vision:</strong> Qwen3-VL remains the promoted vision baseline. Gemma4 vision now has a matching CLIP/mmproj conversion path, a Gemma4 image marker contract, and a confirmed encoder-prefix-to-decoder mixed-prefill smoke; semantic parity and speed remain active work.
       </div>
     </div>
   </div>
@@ -1936,7 +1938,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Qwen3-VL/Gemma3/Gemma4 text, early Gemma4 vision bridge support, Nemotron-H, GLM4, plus the Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Qwen3-VL/Gemma3/Gemma4 text, Gemma4 vision bridge smoke support, Nemotron-H, GLM4, plus the Llama/Nanbeige bring-up lane.
     Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
     Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, Nemotron-H adds Mamba2 recurrent state coverage, GLM4 adds partial-RoPE/BPE conversion contracts, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
@@ -2206,7 +2208,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
             </div>
         </div>
     </footer>
