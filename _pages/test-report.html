@@ -376,6 +376,41 @@
     </div>
 
     <div class="regression-section">
+      <h2>Vision Visualizer Artifacts</h2>
+      <p class="regression-meta" id="vision-visualizer-meta">
+        `make v8-visualizer-vision-artifacts` status is not available in this report yet.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card">
+          <div class="value" id="vision-visualizer-status">-</div>
+          <div class="label">Overall</div>
+        </div>
+        <div class="summary-card passed">
+          <div class="value" id="vision-visualizer-passed">0</div>
+          <div class="label">Checks Passed</div>
+        </div>
+        <div class="summary-card failed">
+          <div class="value" id="vision-visualizer-failed">0</div>
+          <div class="label">Checks Failed</div>
+        </div>
+        <div class="summary-card">
+          <div class="value" id="vision-visualizer-total">0</div>
+          <div class="label">Checks Total</div>
+        </div>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr><th>Status</th><th>Check</th><th>Detail</th></tr>
+        </thead>
+        <tbody id="vision-visualizer-tbody">
+          <tr><td colspan="3" class="updated-time">No vision visualizer artifact data published in this report.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="regression-section">
       <h2>v7 Kernel Map Contracts</h2>
       <p class="regression-meta" id="kernel-map-meta">
         `make v7-kernel-map-contracts` status is not available in this report yet.
@@ -909,6 +944,7 @@ function renderResults(data) {
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRegressionFast(data.regression_fast || null);
   renderArchitectureContracts(data.architecture_contracts || null);
+  renderVisionVisualizer(data.vision_visualizer || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
   renderBackpropRegression(data.backprop_regression || null);
 
@@ -1052,6 +1088,53 @@ function contractBadge(status) {
   const cls = s === 'pass' ? 'pass' : s === 'fail' ? 'fail' : 'skip';
   const text = s === 'pass' ? 'PASS' : s === 'fail' ? 'FAIL' : s === 'warn' ? 'WARN' : s === 'partial' ? 'PARTIAL' : 'N/R';
   return `<span class="regression-badge ${cls}">${text}</span>`;
+}
+
+function renderVisionVisualizer(data) {
+  const metaEl = document.getElementById('vision-visualizer-meta');
+  const statusEl = document.getElementById('vision-visualizer-status');
+  const passedEl = document.getElementById('vision-visualizer-passed');
+  const failedEl = document.getElementById('vision-visualizer-failed');
+  const totalEl = document.getElementById('vision-visualizer-total');
+  const tbody = document.getElementById('vision-visualizer-tbody');
+  if (!metaEl || !statusEl || !passedEl || !failedEl || !totalEl || !tbody) return;
+
+  if (!data) {
+    metaEl.textContent = 'make v8-visualizer-vision-artifacts status is not available in this report yet.';
+    statusEl.textContent = '-';
+    passedEl.textContent = '0';
+    failedEl.textContent = '0';
+    totalEl.textContent = '0';
+    tbody.innerHTML = '<tr><td colspan="3" class="updated-time">No vision visualizer artifact data published in this report.</td></tr>';
+    return;
+  }
+
+  const summary = data.summary || {};
+  const status = String(data.status || 'unknown').toUpperCase();
+  metaEl.textContent = `${data.schema || 'ck.v8.vision_visualizer_harness'} · generated ${data.generated_at || 'unknown time'}`;
+  statusEl.textContent = status;
+  statusEl.className = status === 'PASS' ? 'value test-pass' : 'value test-fail';
+  passedEl.textContent = summary.passed || 0;
+  failedEl.textContent = summary.failed || 0;
+  totalEl.textContent = summary.total || 0;
+
+  const checks = Array.isArray(data.checks) ? data.checks : [];
+  if (checks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="updated-time">No vision visualizer checks were published.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = checks.map(row => {
+    const rowStatus = String(row.status || '').toUpperCase();
+    const badgeClass = rowStatus === 'PASS' ? 'pass' : (rowStatus === 'SKIP' ? 'skip' : 'fail');
+    return `
+      <tr>
+        <td><span class="regression-badge ${badgeClass}">${escapeHtml(rowStatus)}</span></td>
+        <td>${escapeHtml(row.name || '-')}</td>
+        <td class="regression-family-note">${escapeHtml(row.detail || '')}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderArchitectureContracts(data) {
