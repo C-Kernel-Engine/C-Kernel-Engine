@@ -160,6 +160,8 @@ Functions</h2></td></tr>
 <tr class="separator:a616166a7b2d278032964e9120d2b1be9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0682ad34fba6fad7f8d57eb75e7be390" id="r_a0682ad34fba6fad7f8d57eb75e7be390"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deepseek__kernels_8c.html#a0682ad34fba6fad7f8d57eb75e7be390">deepseek_mla_partial_rope_concat_f32</a> (const float *q_nope, const float *q_pe, const float *k_nope, const float *k_pe, const float *cos, const float *sin, float *query, float *key, int tokens, int heads, int qk_nope_dim, int qk_rope_dim)</td></tr>
 <tr class="separator:a0682ad34fba6fad7f8d57eb75e7be390"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acc09ddbe71dd245541cf5b6dd50daf6f" id="r_acc09ddbe71dd245541cf5b6dd50daf6f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deepseek__kernels_8c.html#acc09ddbe71dd245541cf5b6dd50daf6f">deepseek_mla_partial_rope_concat_packed_f32</a> (const float *q_packed, const float *k_nope, const float *kv_a_packed, const float *cos, const float *sin, float *query, float *key, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int qk_rope_dim)</td></tr>
+<tr class="separator:acc09ddbe71dd245541cf5b6dd50daf6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a42069d74cf9da1df1e67b745cc299e11" id="r_a42069d74cf9da1df1e67b745cc299e11"><td class="memItemLeft" align="right" valign="top">static size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deepseek__kernels_8c.html#a42069d74cf9da1df1e67b745cc299e11">ds_mhc_idx</a> (int t, int s, int d, int n_streams, int dim)</td></tr>
 <tr class="separator:a42069d74cf9da1df1e67b745cc299e11"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a055589c2ea54c496e37add9646657afc" id="r_a055589c2ea54c496e37add9646657afc"><td class="memItemLeft" align="right" valign="top">static size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc">ds_mix_idx</a> (int t, int out_s, int in_s, int n_streams)</td></tr>
@@ -288,56 +290,56 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00355">355</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  370</span>{</div>
-<div class="line"><span class="lineno">  371</span>    <span class="keywordflow">if</span> (!d_out || !q || !k || !v || !indices || !attn || !d_q || !d_k || !d_v ||</div>
-<div class="line"><span class="lineno">  372</span>        query_tokens &lt;= 0 || key_tokens &lt;= 0 || heads &lt;= 0 || dim &lt;= 0 || top_k &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  373</span> </div>
-<div class="line"><span class="lineno">  374</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_count = (size_t)query_tokens * (<span class="keywordtype">size_t</span>)heads * (size_t)dim;</div>
-<div class="line"><span class="lineno">  375</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_count = (size_t)key_tokens * (<span class="keywordtype">size_t</span>)heads * (size_t)dim;</div>
-<div class="line"><span class="lineno">  376</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q_count; ++i) d_q[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  377</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; kv_count; ++i) {</div>
-<div class="line"><span class="lineno">  378</span>        d_k[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  379</span>        d_v[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  380</span>    }</div>
-<div class="line"><span class="lineno">  381</span> </div>
-<div class="line"><span class="lineno">  382</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
-<div class="line"><span class="lineno">  383</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
-<div class="line"><span class="lineno">  384</span>            <span class="keywordtype">float</span> d_attn[top_k];</div>
-<div class="line"><span class="lineno">  385</span>            <span class="keywordtype">float</span> attn_dot = 0.0f;</div>
-<div class="line"><span class="lineno">  386</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
-<div class="line"><span class="lineno">  387</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  388</span>                <span class="keywordtype">float</span> da = 0.0f;</div>
-<div class="line"><span class="lineno">  389</span>                <span class="keywordflow">if</span> (tk &gt;= 0 &amp;&amp; tk &lt; key_tokens) {</div>
-<div class="line"><span class="lineno">  390</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> a = attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  391</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  392</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> go = d_out[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  393</span>                        da += go * v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  394</span>                        d_v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)] += a * go;</div>
-<div class="line"><span class="lineno">  395</span>                    }</div>
-<div class="line"><span class="lineno">  396</span>                    attn_dot += a * da;</div>
-<div class="line"><span class="lineno">  397</span>                }</div>
-<div class="line"><span class="lineno">  398</span>                d_attn[j] = da;</div>
-<div class="line"><span class="lineno">  399</span>            }</div>
-<div class="line"><span class="lineno">  400</span> </div>
-<div class="line"><span class="lineno">  401</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
-<div class="line"><span class="lineno">  402</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  403</span>                <span class="keywordflow">if</span> (tk &lt; 0 || tk &gt;= key_tokens) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  404</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> a = attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  405</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_score = a * (d_attn[j] - attn_dot);</div>
-<div class="line"><span class="lineno">  406</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  407</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> qv = q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  408</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> kv = k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  409</span>                    d_q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] += scale * d_score * kv;</div>
-<div class="line"><span class="lineno">  410</span>                    d_k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)] += scale * d_score * qv;</div>
-<div class="line"><span class="lineno">  411</span>                }</div>
-<div class="line"><span class="lineno">  412</span>            }</div>
-<div class="line"><span class="lineno">  413</span>        }</div>
-<div class="line"><span class="lineno">  414</span>    }</div>
-<div class="line"><span class="lineno">  415</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a715106bc2b7b505a7b03a77a53f4485c"><div class="ttname"><a href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a></div><div class="ttdeci">static size_t ds_qkv_idx(int token, int head, int d, int heads, int dim)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00275">deepseek_kernels.c:275</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00409">409</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  424</span>{</div>
+<div class="line"><span class="lineno">  425</span>    <span class="keywordflow">if</span> (!d_out || !q || !k || !v || !indices || !attn || !d_q || !d_k || !d_v ||</div>
+<div class="line"><span class="lineno">  426</span>        query_tokens &lt;= 0 || key_tokens &lt;= 0 || heads &lt;= 0 || dim &lt;= 0 || top_k &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  427</span> </div>
+<div class="line"><span class="lineno">  428</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_count = (size_t)query_tokens * (<span class="keywordtype">size_t</span>)heads * (size_t)dim;</div>
+<div class="line"><span class="lineno">  429</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_count = (size_t)key_tokens * (<span class="keywordtype">size_t</span>)heads * (size_t)dim;</div>
+<div class="line"><span class="lineno">  430</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; q_count; ++i) d_q[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  431</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; kv_count; ++i) {</div>
+<div class="line"><span class="lineno">  432</span>        d_k[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  433</span>        d_v[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  434</span>    }</div>
+<div class="line"><span class="lineno">  435</span> </div>
+<div class="line"><span class="lineno">  436</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
+<div class="line"><span class="lineno">  437</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">  438</span>            <span class="keywordtype">float</span> d_attn[top_k];</div>
+<div class="line"><span class="lineno">  439</span>            <span class="keywordtype">float</span> attn_dot = 0.0f;</div>
+<div class="line"><span class="lineno">  440</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
+<div class="line"><span class="lineno">  441</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  442</span>                <span class="keywordtype">float</span> da = 0.0f;</div>
+<div class="line"><span class="lineno">  443</span>                <span class="keywordflow">if</span> (tk &gt;= 0 &amp;&amp; tk &lt; key_tokens) {</div>
+<div class="line"><span class="lineno">  444</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> a = attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  445</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  446</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> go = d_out[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  447</span>                        da += go * v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  448</span>                        d_v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)] += a * go;</div>
+<div class="line"><span class="lineno">  449</span>                    }</div>
+<div class="line"><span class="lineno">  450</span>                    attn_dot += a * da;</div>
+<div class="line"><span class="lineno">  451</span>                }</div>
+<div class="line"><span class="lineno">  452</span>                d_attn[j] = da;</div>
+<div class="line"><span class="lineno">  453</span>            }</div>
+<div class="line"><span class="lineno">  454</span> </div>
+<div class="line"><span class="lineno">  455</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
+<div class="line"><span class="lineno">  456</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  457</span>                <span class="keywordflow">if</span> (tk &lt; 0 || tk &gt;= key_tokens) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  458</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> a = attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  459</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_score = a * (d_attn[j] - attn_dot);</div>
+<div class="line"><span class="lineno">  460</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  461</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> qv = q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  462</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> kv = k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  463</span>                    d_q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] += scale * d_score * kv;</div>
+<div class="line"><span class="lineno">  464</span>                    d_k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)] += scale * d_score * qv;</div>
+<div class="line"><span class="lineno">  465</span>                }</div>
+<div class="line"><span class="lineno">  466</span>            }</div>
+<div class="line"><span class="lineno">  467</span>        }</div>
+<div class="line"><span class="lineno">  468</span>    }</div>
+<div class="line"><span class="lineno">  469</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a715106bc2b7b505a7b03a77a53f4485c"><div class="ttname"><a href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a></div><div class="ttdeci">static size_t ds_qkv_idx(int token, int head, int d, int heads, int dim)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00329">deepseek_kernels.c:329</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00275">ds_qkv_idx()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00329">ds_qkv_idx()</a>.</p>
 
 </div>
 </div>
@@ -427,58 +429,58 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00296">296</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  308</span>{</div>
-<div class="line"><span class="lineno">  309</span>    <span class="keywordflow">if</span> (!q || !k || !v || !indices || !out || query_tokens &lt;= 0 || key_tokens &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  310</span>        heads &lt;= 0 || dim &lt;= 0 || top_k &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  311</span> </div>
-<div class="line"><span class="lineno">  312</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
-<div class="line"><span class="lineno">  313</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
-<div class="line"><span class="lineno">  314</span>            <span class="keywordtype">float</span> local_scores[top_k];</div>
-<div class="line"><span class="lineno">  315</span>            <span class="keywordtype">int</span> valid = 0;</div>
-<div class="line"><span class="lineno">  316</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
-<div class="line"><span class="lineno">  317</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  318</span>                <span class="keywordflow">if</span> (tk &lt; 0 || tk &gt;= key_tokens) {</div>
-<div class="line"><span class="lineno">  319</span>                    local_scores[j] = -FLT_MAX;</div>
-<div class="line"><span class="lineno">  320</span>                    <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  321</span>                }</div>
-<div class="line"><span class="lineno">  322</span>                <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno">  323</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  324</span>                    dot += q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] * k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  325</span>                }</div>
-<div class="line"><span class="lineno">  326</span>                local_scores[j] = dot * scale;</div>
-<div class="line"><span class="lineno">  327</span>                valid++;</div>
-<div class="line"><span class="lineno">  328</span>            }</div>
-<div class="line"><span class="lineno">  329</span> </div>
-<div class="line"><span class="lineno">  330</span>            <span class="keywordtype">float</span> *out_row = out + <a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, 0, heads, dim);</div>
-<div class="line"><span class="lineno">  331</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) out_row[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  332</span>            <span class="keywordflow">if</span> (valid == 0) {</div>
-<div class="line"><span class="lineno">  333</span>                <span class="keywordflow">if</span> (attn) {</div>
-<div class="line"><span class="lineno">  334</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
-<div class="line"><span class="lineno">  335</span>                        attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j] = 0.0f;</div>
-<div class="line"><span class="lineno">  336</span>                    }</div>
-<div class="line"><span class="lineno">  337</span>                }</div>
-<div class="line"><span class="lineno">  338</span>                <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  339</span>            }</div>
-<div class="line"><span class="lineno">  340</span> </div>
-<div class="line"><span class="lineno">  341</span>            <a class="code hl_function" href="deepseek__kernels_8c.html#ab29890e7b4d9fa96c07ae46d8b0c96f6">ds_softmax</a>(local_scores, top_k);</div>
-<div class="line"><span class="lineno">  342</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
-<div class="line"><span class="lineno">  343</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
-<div class="line"><span class="lineno">  344</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> a = (tk &gt;= 0 &amp;&amp; tk &lt; key_tokens) ? local_scores[j] : 0.0f;</div>
-<div class="line"><span class="lineno">  345</span>                <span class="keywordflow">if</span> (attn) attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j] = a;</div>
-<div class="line"><span class="lineno">  346</span>                <span class="keywordflow">if</span> (a == 0.0f) <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  347</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  348</span>                    out_row[d] += a * v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
-<div class="line"><span class="lineno">  349</span>                }</div>
-<div class="line"><span class="lineno">  350</span>            }</div>
-<div class="line"><span class="lineno">  351</span>        }</div>
-<div class="line"><span class="lineno">  352</span>    }</div>
-<div class="line"><span class="lineno">  353</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_ab29890e7b4d9fa96c07ae46d8b0c96f6"><div class="ttname"><a href="deepseek__kernels_8c.html#ab29890e7b4d9fa96c07ae46d8b0c96f6">ds_softmax</a></div><div class="ttdeci">static void ds_softmax(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00280">deepseek_kernels.c:280</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00350">350</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  362</span>{</div>
+<div class="line"><span class="lineno">  363</span>    <span class="keywordflow">if</span> (!q || !k || !v || !indices || !out || query_tokens &lt;= 0 || key_tokens &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  364</span>        heads &lt;= 0 || dim &lt;= 0 || top_k &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  365</span> </div>
+<div class="line"><span class="lineno">  366</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
+<div class="line"><span class="lineno">  367</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">  368</span>            <span class="keywordtype">float</span> local_scores[top_k];</div>
+<div class="line"><span class="lineno">  369</span>            <span class="keywordtype">int</span> valid = 0;</div>
+<div class="line"><span class="lineno">  370</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
+<div class="line"><span class="lineno">  371</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  372</span>                <span class="keywordflow">if</span> (tk &lt; 0 || tk &gt;= key_tokens) {</div>
+<div class="line"><span class="lineno">  373</span>                    local_scores[j] = -FLT_MAX;</div>
+<div class="line"><span class="lineno">  374</span>                    <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  375</span>                }</div>
+<div class="line"><span class="lineno">  376</span>                <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  377</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  378</span>                    dot += q[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, d, heads, dim)] * k[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  379</span>                }</div>
+<div class="line"><span class="lineno">  380</span>                local_scores[j] = dot * scale;</div>
+<div class="line"><span class="lineno">  381</span>                valid++;</div>
+<div class="line"><span class="lineno">  382</span>            }</div>
+<div class="line"><span class="lineno">  383</span> </div>
+<div class="line"><span class="lineno">  384</span>            <span class="keywordtype">float</span> *out_row = out + <a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tq, h, 0, heads, dim);</div>
+<div class="line"><span class="lineno">  385</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) out_row[d] = 0.0f;</div>
+<div class="line"><span class="lineno">  386</span>            <span class="keywordflow">if</span> (valid == 0) {</div>
+<div class="line"><span class="lineno">  387</span>                <span class="keywordflow">if</span> (attn) {</div>
+<div class="line"><span class="lineno">  388</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
+<div class="line"><span class="lineno">  389</span>                        attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j] = 0.0f;</div>
+<div class="line"><span class="lineno">  390</span>                    }</div>
+<div class="line"><span class="lineno">  391</span>                }</div>
+<div class="line"><span class="lineno">  392</span>                <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  393</span>            }</div>
+<div class="line"><span class="lineno">  394</span> </div>
+<div class="line"><span class="lineno">  395</span>            <a class="code hl_function" href="deepseek__kernels_8c.html#ab29890e7b4d9fa96c07ae46d8b0c96f6">ds_softmax</a>(local_scores, top_k);</div>
+<div class="line"><span class="lineno">  396</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; top_k; ++j) {</div>
+<div class="line"><span class="lineno">  397</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> tk = indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j];</div>
+<div class="line"><span class="lineno">  398</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> a = (tk &gt;= 0 &amp;&amp; tk &lt; key_tokens) ? local_scores[j] : 0.0f;</div>
+<div class="line"><span class="lineno">  399</span>                <span class="keywordflow">if</span> (attn) attn[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)top_k + (<span class="keywordtype">size_t</span>)j] = a;</div>
+<div class="line"><span class="lineno">  400</span>                <span class="keywordflow">if</span> (a == 0.0f) <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  401</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  402</span>                    out_row[d] += a * v[<a class="code hl_function" href="deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c">ds_qkv_idx</a>(tk, h, d, heads, dim)];</div>
+<div class="line"><span class="lineno">  403</span>                }</div>
+<div class="line"><span class="lineno">  404</span>            }</div>
+<div class="line"><span class="lineno">  405</span>        }</div>
+<div class="line"><span class="lineno">  406</span>    }</div>
+<div class="line"><span class="lineno">  407</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_ab29890e7b4d9fa96c07ae46d8b0c96f6"><div class="ttname"><a href="deepseek__kernels_8c.html#ab29890e7b4d9fa96c07ae46d8b0c96f6">ds_softmax</a></div><div class="ttdeci">static void ds_softmax(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00334">deepseek_kernels.c:334</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00275">ds_qkv_idx()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00280">ds_softmax()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00329">ds_qkv_idx()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00334">ds_softmax()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00417">deepseek_hybrid_attention_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00471">deepseek_hybrid_attention_f32()</a>.</p>
 
 </div>
 </div>
@@ -765,28 +767,28 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00417">417</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  430</span>{</div>
-<div class="line"><span class="lineno">  431</span>    <span class="keywordflow">if</span> (mode != 0) {</div>
-<div class="line"><span class="lineno">  432</span>        <a class="code hl_function" href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a>(q, k, v, indices, out, attn,</div>
-<div class="line"><span class="lineno">  433</span>                                   query_tokens, key_tokens, heads, dim, top_k, scale);</div>
-<div class="line"><span class="lineno">  434</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  435</span>    }</div>
-<div class="line"><span class="lineno">  436</span> </div>
-<div class="line"><span class="lineno">  437</span>    <span class="keywordtype">int</span> dense_indices[query_tokens * heads * key_tokens];</div>
-<div class="line"><span class="lineno">  438</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
-<div class="line"><span class="lineno">  439</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
-<div class="line"><span class="lineno">  440</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tk = 0; tk &lt; key_tokens; ++tk) {</div>
-<div class="line"><span class="lineno">  441</span>                dense_indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)key_tokens + (<span class="keywordtype">size_t</span>)tk] = tk;</div>
-<div class="line"><span class="lineno">  442</span>            }</div>
-<div class="line"><span class="lineno">  443</span>        }</div>
-<div class="line"><span class="lineno">  444</span>    }</div>
-<div class="line"><span class="lineno">  445</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a>(q, k, v, dense_indices, out, attn,</div>
-<div class="line"><span class="lineno">  446</span>                               query_tokens, key_tokens, heads, dim, key_tokens, scale);</div>
-<div class="line"><span class="lineno">  447</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a47f29d3282fe91bd35a7fbf682cbcd10"><div class="ttname"><a href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a></div><div class="ttdeci">void deepseek_csa_attention_f32(const float *q, const float *k, const float *v, const int *indices, float *out, float *attn, int query_tokens, int key_tokens, int heads, int dim, int top_k, float scale)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00296">deepseek_kernels.c:296</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00471">471</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  484</span>{</div>
+<div class="line"><span class="lineno">  485</span>    <span class="keywordflow">if</span> (mode != 0) {</div>
+<div class="line"><span class="lineno">  486</span>        <a class="code hl_function" href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a>(q, k, v, indices, out, attn,</div>
+<div class="line"><span class="lineno">  487</span>                                   query_tokens, key_tokens, heads, dim, top_k, scale);</div>
+<div class="line"><span class="lineno">  488</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  489</span>    }</div>
+<div class="line"><span class="lineno">  490</span> </div>
+<div class="line"><span class="lineno">  491</span>    <span class="keywordtype">int</span> dense_indices[query_tokens * heads * key_tokens];</div>
+<div class="line"><span class="lineno">  492</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tq = 0; tq &lt; query_tokens; ++tq) {</div>
+<div class="line"><span class="lineno">  493</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">  494</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tk = 0; tk &lt; key_tokens; ++tk) {</div>
+<div class="line"><span class="lineno">  495</span>                dense_indices[((size_t)tq * (<span class="keywordtype">size_t</span>)heads + (size_t)h) * (size_t)key_tokens + (<span class="keywordtype">size_t</span>)tk] = tk;</div>
+<div class="line"><span class="lineno">  496</span>            }</div>
+<div class="line"><span class="lineno">  497</span>        }</div>
+<div class="line"><span class="lineno">  498</span>    }</div>
+<div class="line"><span class="lineno">  499</span>    <a class="code hl_function" href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a>(q, k, v, dense_indices, out, attn,</div>
+<div class="line"><span class="lineno">  500</span>                               query_tokens, key_tokens, heads, dim, key_tokens, scale);</div>
+<div class="line"><span class="lineno">  501</span>}</div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a47f29d3282fe91bd35a7fbf682cbcd10"><div class="ttname"><a href="deepseek__kernels_8c.html#a47f29d3282fe91bd35a7fbf682cbcd10">deepseek_csa_attention_f32</a></div><div class="ttdeci">void deepseek_csa_attention_f32(const float *q, const float *k, const float *v, const int *indices, float *out, float *attn, int query_tokens, int key_tokens, int heads, int dim, int top_k, float scale)</div><div class="ttdef"><b>Definition</b> <a href="deepseek__kernels_8c_source.html#l00350">deepseek_kernels.c:350</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00296">deepseek_csa_attention_f32()</a>.</p>
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00350">deepseek_csa_attention_f32()</a>.</p>
 
 </div>
 </div>
@@ -1181,6 +1183,139 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="acc09ddbe71dd245541cf5b6dd50daf6f" name="acc09ddbe71dd245541cf5b6dd50daf6f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc09ddbe71dd245541cf5b6dd50daf6f">&#9670;&#160;</a></span>deepseek_mla_partial_rope_concat_packed_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void deepseek_mla_partial_rope_concat_packed_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q_packed</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_nope</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>kv_a_packed</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>cos</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>sin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>query</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>kv_lora_rank</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>qk_nope_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>qk_rope_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00275">275</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  287</span>{</div>
+<div class="line"><span class="lineno">  288</span>    <span class="keywordflow">if</span> (!q_packed || !k_nope || !kv_a_packed || !cos || !sin || !query || !key ||</div>
+<div class="line"><span class="lineno">  289</span>        tokens &lt;= 0 || heads &lt;= 0 || kv_lora_rank &lt;= 0 || qk_nope_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  290</span>        qk_rope_dim &lt;= 0 || (qk_rope_dim % 2) != 0) {</div>
+<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  292</span>    }</div>
+<div class="line"><span class="lineno">  293</span> </div>
+<div class="line"><span class="lineno">  294</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_head_dim = qk_nope_dim + qk_rope_dim;</div>
+<div class="line"><span class="lineno">  295</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> kv_a_dim = kv_lora_rank + qk_rope_dim;</div>
+<div class="line"><span class="lineno">  296</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> half = qk_rope_dim / 2;</div>
+<div class="line"><span class="lineno">  297</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  298</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos + (size_t)t * (<span class="keywordtype">size_t</span>)half;</div>
+<div class="line"><span class="lineno">  299</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin + (size_t)t * (<span class="keywordtype">size_t</span>)half;</div>
+<div class="line"><span class="lineno">  300</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *kp = kv_a_packed + (size_t)t * (<span class="keywordtype">size_t</span>)kv_a_dim + (size_t)kv_lora_rank;</div>
+<div class="line"><span class="lineno">  301</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">  302</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_in = q_packed + <a class="code hl_function" href="deepseek__kernels_8c.html#a72c3e7c08b9cfa387d3b6b74837b8e22">ds_mla_thd_idx</a>(t, h, 0, heads, q_head_dim);</div>
+<div class="line"><span class="lineno">  303</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *kn = k_nope + <a class="code hl_function" href="deepseek__kernels_8c.html#a72c3e7c08b9cfa387d3b6b74837b8e22">ds_mla_thd_idx</a>(t, h, 0, heads, qk_nope_dim);</div>
+<div class="line"><span class="lineno">  304</span>            <span class="keywordtype">float</span> *q_out = query + <a class="code hl_function" href="deepseek__kernels_8c.html#a72c3e7c08b9cfa387d3b6b74837b8e22">ds_mla_thd_idx</a>(t, h, 0, heads, q_head_dim);</div>
+<div class="line"><span class="lineno">  305</span>            <span class="keywordtype">float</span> *k_out = key + <a class="code hl_function" href="deepseek__kernels_8c.html#a72c3e7c08b9cfa387d3b6b74837b8e22">ds_mla_thd_idx</a>(t, h, 0, heads, q_head_dim);</div>
+<div class="line"><span class="lineno">  306</span> </div>
+<div class="line"><span class="lineno">  307</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; qk_nope_dim; ++d) {</div>
+<div class="line"><span class="lineno">  308</span>                q_out[d] = q_in[d];</div>
+<div class="line"><span class="lineno">  309</span>                k_out[d] = kn[d];</div>
+<div class="line"><span class="lineno">  310</span>            }</div>
+<div class="line"><span class="lineno">  311</span> </div>
+<div class="line"><span class="lineno">  312</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *qp = q_in + qk_nope_dim;</div>
+<div class="line"><span class="lineno">  313</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; half; ++i) {</div>
+<div class="line"><span class="lineno">  314</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> q_first = qp[2 * i];</div>
+<div class="line"><span class="lineno">  315</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> q_second = qp[2 * i + 1];</div>
+<div class="line"><span class="lineno">  316</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_first = kp[2 * i];</div>
+<div class="line"><span class="lineno">  317</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_second = kp[2 * i + 1];</div>
+<div class="line"><span class="lineno">  318</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> c = cos_row[i];</div>
+<div class="line"><span class="lineno">  319</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> ss = sin_row[i];</div>
+<div class="line"><span class="lineno">  320</span>                q_out[qk_nope_dim + i] = q_first * c - q_second * ss;</div>
+<div class="line"><span class="lineno">  321</span>                q_out[qk_nope_dim + half + i] = q_second * c + q_first * ss;</div>
+<div class="line"><span class="lineno">  322</span>                k_out[qk_nope_dim + i] = k_first * c - k_second * ss;</div>
+<div class="line"><span class="lineno">  323</span>                k_out[qk_nope_dim + half + i] = k_second * c + k_first * ss;</div>
+<div class="line"><span class="lineno">  324</span>            }</div>
+<div class="line"><span class="lineno">  325</span>        }</div>
+<div class="line"><span class="lineno">  326</span>    }</div>
+<div class="line"><span class="lineno">  327</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deepseek__kernels_8c_source.html#l00174">ds_mla_thd_idx()</a>.</p>
+
+</div>
+</div>
 <a id="a42069d74cf9da1df1e67b745cc299e11" name="a42069d74cf9da1df1e67b745cc299e11"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a42069d74cf9da1df1e67b745cc299e11">&#9670;&#160;</a></span>ds_mhc_idx()</h2>
 
@@ -1423,7 +1558,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  176</span>    <span class="keywordflow">return</span> ((<span class="keywordtype">size_t</span>)t * (<span class="keywordtype">size_t</span>)heads + (<span class="keywordtype">size_t</span>)h) * (size_t)dim + (<span class="keywordtype">size_t</span>)d;</div>
 <div class="line"><span class="lineno">  177</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00179">deepseek_mla_kv_decompress_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00236">deepseek_mla_partial_rope_concat_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00179">deepseek_mla_kv_decompress_f32()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00236">deepseek_mla_partial_rope_concat_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00275">deepseek_mla_partial_rope_concat_packed_f32()</a>.</p>
 
 </div>
 </div>
@@ -1528,15 +1663,15 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00275">275</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  276</span>{</div>
-<div class="line"><span class="lineno">  277</span>    <span class="keywordflow">return</span> ((<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)heads + (<span class="keywordtype">size_t</span>)head) * (size_t)dim + (<span class="keywordtype">size_t</span>)d;</div>
-<div class="line"><span class="lineno">  278</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00329">329</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  330</span>{</div>
+<div class="line"><span class="lineno">  331</span>    <span class="keywordflow">return</span> ((<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> * (<span class="keywordtype">size_t</span>)heads + (<span class="keywordtype">size_t</span>)head) * (size_t)dim + (<span class="keywordtype">size_t</span>)d;</div>
+<div class="line"><span class="lineno">  332</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a7d3edfa508be401819bb24057b3c1be6"><div class="ttname"><a href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a></div><div class="ttdeci">const char * token</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00307">tokenizer.h:307</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00355">deepseek_csa_attention_backward_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00296">deepseek_csa_attention_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00409">deepseek_csa_attention_backward_f32()</a>, and <a class="el" href="deepseek__kernels_8c_source.html#l00350">deepseek_csa_attention_f32()</a>.</p>
 
 </div>
 </div>
@@ -1574,23 +1709,23 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00280">280</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  281</span>{</div>
-<div class="line"><span class="lineno">  282</span>    <span class="keywordflow">if</span> (n &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  283</span>    <span class="keywordtype">float</span> max_v = x[0];</div>
-<div class="line"><span class="lineno">  284</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; ++i) <span class="keywordflow">if</span> (x[i] &gt; max_v) max_v = x[i];</div>
-<div class="line"><span class="lineno">  285</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  286</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  287</span>        x[i] = expf(x[i] - max_v);</div>
-<div class="line"><span class="lineno">  288</span>        sum += x[i];</div>
-<div class="line"><span class="lineno">  289</span>    }</div>
-<div class="line"><span class="lineno">  290</span>    <span class="keywordflow">if</span> (sum &gt; 0.0f) {</div>
-<div class="line"><span class="lineno">  291</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / sum;</div>
-<div class="line"><span class="lineno">  292</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; ++i) x[i] *= inv;</div>
-<div class="line"><span class="lineno">  293</span>    }</div>
-<div class="line"><span class="lineno">  294</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deepseek__kernels_8c_source.html#l00334">334</a> of file <a class="el" href="deepseek__kernels_8c_source.html">deepseek_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  335</span>{</div>
+<div class="line"><span class="lineno">  336</span>    <span class="keywordflow">if</span> (n &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  337</span>    <span class="keywordtype">float</span> max_v = x[0];</div>
+<div class="line"><span class="lineno">  338</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n; ++i) <span class="keywordflow">if</span> (x[i] &gt; max_v) max_v = x[i];</div>
+<div class="line"><span class="lineno">  339</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  340</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  341</span>        x[i] = expf(x[i] - max_v);</div>
+<div class="line"><span class="lineno">  342</span>        sum += x[i];</div>
+<div class="line"><span class="lineno">  343</span>    }</div>
+<div class="line"><span class="lineno">  344</span>    <span class="keywordflow">if</span> (sum &gt; 0.0f) {</div>
+<div class="line"><span class="lineno">  345</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv = 1.0f / sum;</div>
+<div class="line"><span class="lineno">  346</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; n; ++i) x[i] *= inv;</div>
+<div class="line"><span class="lineno">  347</span>    }</div>
+<div class="line"><span class="lineno">  348</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00296">deepseek_csa_attention_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00350">deepseek_csa_attention_f32()</a>.</p>
 
 </div>
 </div>

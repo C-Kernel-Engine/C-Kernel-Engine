@@ -9,6 +9,7 @@ var deepseek__kernels_8c =
     [ "deepseek_mhc_mix_f32", "deepseek__kernels_8c.html#a5cf609c6189f831fd35aebb7b18d14da", null ],
     [ "deepseek_mla_kv_decompress_f32", "deepseek__kernels_8c.html#a616166a7b2d278032964e9120d2b1be9", null ],
     [ "deepseek_mla_partial_rope_concat_f32", "deepseek__kernels_8c.html#a0682ad34fba6fad7f8d57eb75e7be390", null ],
+    [ "deepseek_mla_partial_rope_concat_packed_f32", "deepseek__kernels_8c.html#acc09ddbe71dd245541cf5b6dd50daf6f", null ],
     [ "ds_mhc_idx", "deepseek__kernels_8c.html#a42069d74cf9da1df1e67b745cc299e11", null ],
     [ "ds_mix_idx", "deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc", null ],
     [ "ds_mla_apply_kimi_rope", "deepseek__kernels_8c.html#afde5ed3a0c7b1d8fc34069038c6f482f", null ],
