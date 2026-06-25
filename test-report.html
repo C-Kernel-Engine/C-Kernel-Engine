@@ -1196,6 +1196,32 @@
       color: var(--text-secondary);
       font-size: 0.78rem;
     }
+    .coverage-lane {
+      display: inline-block;
+      min-width: 2.4rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .coverage-lane.v7 {
+      background: rgba(72, 187, 120, 0.15);
+      border: 1px solid rgba(72, 187, 120, 0.35);
+      color: #48bb78;
+    }
+    .coverage-lane.v8 {
+      background: rgba(66, 153, 225, 0.15);
+      border: 1px solid rgba(66, 153, 225, 0.38);
+      color: #63b3ed;
+    }
+    .coverage-detail {
+      max-width: 520px;
+      white-space: normal;
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+    }
     .contract-table-wrap {
       overflow-x: auto;
       margin-top: 0.7rem;
@@ -1313,6 +1339,78 @@
       <div class="contract-accordion" id="architecture-contract-sections">
         <div class="updated-time">No architecture contract dashboard published in this report.</div>
       </div>
+    </div>
+
+    <div class="regression-section">
+      <h2>Visualizer Contract Matrix</h2>
+      <p class="regression-meta">
+        v7 remains the promoted training/backprop visualizer lane. v8 carries the same health-check contract style
+        forward for inference and adds the multimodal vision artifact lane for encoder &rarr; bridge &rarr; decoder
+        graph rendering.
+      </p>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Lane</th>
+            <th>Run Locally</th>
+            <th>What It Proves</th>
+            <th>Report Surface</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="coverage-lane v7">v7</span></td>
+            <td>Visualizer health</td>
+            <td><code>make v7-visualizer-health</code></td>
+            <td class="coverage-detail">Source-level tab, panel, render-function, and pure JS utility contracts for the v7 IR Visualizer and Dataset Viewer.</td>
+            <td>IR Visualizer, Dataset Viewer, IR Hub</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v7">v7</span></td>
+            <td>Generated E2E</td>
+            <td><code>make v7-visualizer-generated-e2e</code></td>
+            <td class="coverage-detail">Generates and validates <code>ir_report.html</code>, <code>dataset_viewer.html</code>, and <code>ir_hub.html</code> from a real run directory.</td>
+            <td>Nightly generated-file chain</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v7">v7</span></td>
+            <td>Training/backprop</td>
+            <td><code>make v7-backprop-plumbing</code><br><code>make v7-backprop-stitch-runtime</code></td>
+            <td class="coverage-detail">Validated backprop plumbing, gradient stitch runtime, training parity, and training-family regression artifacts.</td>
+            <td>Training, Parity, and Backprop report artifacts</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v8">v8</span></td>
+            <td>Visualizer health</td>
+            <td><code>make v8-visualizer-health</code></td>
+            <td class="coverage-detail">Runs the same contract-driven source and JS utility checks against the v8 visualizer/tool paths.</td>
+            <td>v8 IR Visualizer and Dataset Viewer contracts</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v8">v8</span></td>
+            <td>Generated E2E</td>
+            <td><code>make v8-visualizer-generated-e2e</code></td>
+            <td class="coverage-detail">Validates generated v8 report and hub artifacts, including embedded JSON and cross-artifact structure.</td>
+            <td>Nightly generated-file chain</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v8">v8</span></td>
+            <td>Vision/multimodal</td>
+            <td><code>make v8-visualizer-vision-artifacts</code></td>
+            <td class="coverage-detail">Synthetic Qwen3-VL-style encoder, bridge, decoder, unified kernel-flow, logical memory, and embedded HTML contracts.</td>
+            <td>Vision Visualizer Artifacts section below</td>
+          </tr>
+          <tr>
+            <td><span class="coverage-lane v8">v8</span></td>
+            <td>Backprop artifact rendering</td>
+            <td>Published run artifacts</td>
+            <td class="coverage-detail">Can load v7-style finite-difference, replay, qk-norm, parity, and stitch artifacts when present. Full v8 training runtime is not promoted yet.</td>
+            <td>Training and Parity tabs in the v8 visualizer</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="regression-section">
@@ -1642,12 +1740,14 @@
   <p>
     Contract-driven test coverage for the IR Visualizer and Dataset Viewer.
     Each component declares its tab/function/DOM contracts in JSON; tests
-    validate against those contracts at every push.
+    validate against those contracts at every push. v7 owns the promoted
+    training/backprop visualizer lane; v8 mirrors the health checks and adds
+    dedicated multimodal vision artifact coverage.
     See the <a href="v7-visualizer-test-runbook.html">full test runbook</a>.
   </p>
 
   <p style="font-size: 0.85rem; color: var(--text-muted);">
-    Run locally: <code>make v7-visualizer-health</code>
+    Run locally: <code>make v7-visualizer-health</code> · <code>make v8-visualizer-health</code> · <code>make v8-visualizer-vision-artifacts</code>
   </p>
 
   <style>
@@ -1792,9 +1892,10 @@
       <tr><td><span class="viz-level viz-l2">L2</span></td><td>IR Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
       <tr><td><span class="viz-level viz-l2">L2</span></td><td>DS Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
       <tr><td><span class="viz-level viz-l3">L3</span></td><td>Generated E2E (all 3 visualizers)</td><td class="viz-count">~24-44</td><td><code>nightly</code></td></tr>
+      <tr><td><span class="viz-level viz-l3">L3</span></td><td>v8 Vision Artifacts</td><td class="viz-count">~20</td><td><code>nightly</code></td></tr>
       <tr>
         <td colspan="2" style="text-align: right; font-weight: 700;">Total</td>
-        <td class="viz-count" style="font-size: 1rem;">~260</td>
+        <td class="viz-count" style="font-size: 1rem;">~280</td>
         <td><code>&lt; 3 seconds</code></td>
       </tr>
     </tbody>
@@ -1805,8 +1906,8 @@
     <div>
       <strong>Contract-driven:</strong> All tab, function, and test vector definitions live in
       <code>version/v7/tests/contracts/ir_visualizer_contract.json</code> and
-      <code>dataset_viewer_contract.json</code>.
-      Add a tab or function? Update the contract — tests auto-expand.
+      <code>dataset_viewer_contract.json</code>, with v8 equivalents under
+      <code>version/v8/tests/contracts/</code>. Add a tab or function? Update the contract — tests auto-expand.
     </div>
   </div>
 
@@ -1818,6 +1919,7 @@
   </p>
   <p style="font-size: 0.85rem; color: var(--text-muted);">
     Run locally: <code>make v7-visualizer-generated-e2e</code>
+    · <code>make v8-visualizer-generated-e2e</code>
     · Specific run: <code>make v7-visualizer-generated-e2e RUN=/path/to/run</code>
   </p>
 
@@ -1834,6 +1936,7 @@
       <tr><td class="viz-component">Panel Structure</td><td>Panel IDs, attnColor presence, file size</td><td>dataset_viewer.html</td></tr>
       <tr><td class="viz-component">Hub Structure</td><td>Run cards, ir_report links, navigation</td><td>ir_hub.html</td></tr>
       <tr><td class="viz-component">Cross-artifact</td><td>Run name in hub, vocab consistency, config.json</td><td>All three files</td></tr>
+      <tr><td class="viz-component">v8 Vision</td><td>Encoder, bridge, decoder, unified kernel flow, logical memory, and embedded HTML helpers</td><td>vision visualizer artifact HTML</td></tr>
     </tbody>
   </table>
 </div>
@@ -2619,7 +2722,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-25</p>
             </div>
         </div>
     </footer>
