@@ -1,6 +1,29 @@
 var gemm__kernels__q4k__q8k__vnni_8c =
 [
+    [ "accum_q4_k_packed_meta_x8_q8_k_block", "gemm__kernels__q4k__q8k__vnni_8c.html#a3be1a01da13bb696bb8d145ee2cb6095", null ],
+    [ "dot_q4_k_packed_meta_q8_k_block", "gemm__kernels__q4k__q8k__vnni_8c.html#a0f81e4a5e2d2edf4b279d4d9039a5b2e", null ],
+    [ "dot_q4_k_packed_u8_q8_k_block", "gemm__kernels__q4k__q8k__vnni_8c.html#a6116389f2ccff10f9bc640673d000391", null ],
+    [ "dot_q4_packed_u8_q8_32_ref", "gemm__kernels__q4k__q8k__vnni_8c.html#abbe09239854a27744b676ed8653c255b", null ],
+    [ "gemm_nt_q4_k_packed_meta_q8_k", "gemm__kernels__q4k__q8k__vnni_8c.html#a9301788830eda23011093b885dd53346", null ],
+    [ "gemm_nt_q4_k_packed_meta_q8_k_threaded", "gemm__kernels__q4k__q8k__vnni_8c.html#afc87d4cd688a3776a0b701545249269f", null ],
+    [ "gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit", "gemm__kernels__q4k__q8k__vnni_8c.html#aa9ee5a995a8cc3c1dd0b792096f6bd8a", null ],
+    [ "gemm_nt_q4_k_packed_meta_q8_k_tile", "gemm__kernels__q4k__q8k__vnni_8c.html#a4d96c8fbdaaa1f01ca119cd245ef4715", null ],
+    [ "gemm_nt_q4_k_packed_meta_x8_q8_k", "gemm__kernels__q4k__q8k__vnni_8c.html#a254aa095b0ce97719a619c71771da3ea", null ],
+    [ "gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile", "gemm__kernels__q4k__q8k__vnni_8c.html#ae8564fcd501a855eb082f7a7c8780f65", null ],
+    [ "gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit", "gemm__kernels__q4k__q8k__vnni_8c.html#aee6618aa49215c88f8e3591262713be2", null ],
+    [ "gemm_nt_q4_k_packed_u8_q8_k", "gemm__kernels__q4k__q8k__vnni_8c.html#a86d08703ae1e921df23eb133ded81bce", null ],
+    [ "gemm_q4_packed_meta_nsplit_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#acf063479eb843cb07ff8cc714cee10d5", null ],
+    [ "gemm_q4_packed_meta_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#ae4c983d2cd2545567eac615b8d4f6596", null ],
+    [ "gemm_q4_packed_meta_x8_mtile_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a0c95a01de4f338d776b7d0948ce3935a", null ],
+    [ "gemm_q4_packed_meta_x8_nsplit_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#adf9c6819f9541308ceef366a5d5786bb", null ],
     [ "gemv_q4_k_q8_k_avx2", "gemm__kernels__q4k__q8k__vnni_8c.html#a030c98b26ad610ccea6dabf993b60cdf", null ],
+    [ "gemv_q4_k_q8_k_parallel_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#a0ea9f437d0af65398100c4c50c85ece6", null ],
     [ "gemv_q4_k_q8_k_ref", "gemm__kernels__q4k__q8k__vnni_8c.html#ac01f8caf84e100f3c72919c71217010e", null ],
-    [ "gemv_q4_k_q8_k_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5", null ]
+    [ "gemv_q4_k_q8_k_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5", null ],
+    [ "pack_q4_k_to_packed_meta", "gemm__kernels__q4k__q8k__vnni_8c.html#a8a0df76b8082646e02a5a1d14144acb1", null ],
+    [ "pack_q4_k_to_packed_meta_x8", "gemm__kernels__q4k__q8k__vnni_8c.html#ad1a60aab0e504db17f6af651850c6e59", null ],
+    [ "pack_q4_k_to_packed_u8", "gemm__kernels__q4k__q8k__vnni_8c.html#aa0dae13c5610ee6b39871cffe53a10ea", null ],
+    [ "q4_k_packed_meta_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a473788e76eea50794416b5c035152f2d", null ],
+    [ "q4_k_packed_meta_x8_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4", null ],
+    [ "q4_k_packed_u8_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#acc8801e2ac52f0f207e7dfe425e15f42", null ]
 ];

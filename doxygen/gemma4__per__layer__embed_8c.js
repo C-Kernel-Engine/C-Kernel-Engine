@@ -1,5 +1,6 @@
 var gemma4__per__layer__embed_8c =
 [
+    [ "assistant_layer_scale_forward", "gemma4__per__layer__embed_8c.html#a93be87f3d867edd2bfecc967ef7d677f", null ],
     [ "ck_bf16_to_f32", "gemma4__per__layer__embed_8c.html#a86d5ed3bc2576b6c5b7c824aa1d6ef8e", null ],
     [ "ck_gemma4_dequant_q5_k_block", "gemma4__per__layer__embed_8c.html#a2aa87174026cb74a26c93cba1b96ba10", null ],
     [ "ck_gemma4_gelu", "gemma4__per__layer__embed_8c.html#a8df789062851b1738820b4eeecd5fded", null ],

@@ -140,6 +140,8 @@ $(document).ready(function(){initNavTree('gemma4__per__layer__embed_8c.html','')
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a93be87f3d867edd2bfecc967ef7d677f" id="r_a93be87f3d867edd2bfecc967ef7d677f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemma4__per__layer__embed_8c.html#a93be87f3d867edd2bfecc967ef7d677f">assistant_layer_scale_forward</a> (float *hidden, const float *scale, int tokens, int embed_dim)</td></tr>
+<tr class="separator:a93be87f3d867edd2bfecc967ef7d677f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a86d5ed3bc2576b6c5b7c824aa1d6ef8e" id="r_a86d5ed3bc2576b6c5b7c824aa1d6ef8e"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemma4__per__layer__embed_8c.html#a86d5ed3bc2576b6c5b7c824aa1d6ef8e">ck_bf16_to_f32</a> (uint16_t v)</td></tr>
 <tr class="separator:a86d5ed3bc2576b6c5b7c824aa1d6ef8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2aa87174026cb74a26c93cba1b96ba10" id="r_a2aa87174026cb74a26c93cba1b96ba10"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemma4__per__layer__embed_8c.html#a2aa87174026cb74a26c93cba1b96ba10">ck_gemma4_dequant_q5_k_block</a> (const ck_gemma4_block_q5_K *block, float *out)</td></tr>
@@ -162,6 +164,59 @@ Functions</h2></td></tr>
 <tr class="separator:a0020e0bc4bd80b2f2499bb960a5b4365"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a93be87f3d867edd2bfecc967ef7d677f" name="a93be87f3d867edd2bfecc967ef7d677f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a93be87f3d867edd2bfecc967ef7d677f">&#9670;&#160;</a></span>assistant_layer_scale_forward()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void assistant_layer_scale_forward </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>hidden</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>scale</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>embed_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00266">266</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  270</span>{</div>
+<div class="line"><span class="lineno">  271</span>    <span class="keywordflow">if</span> (!hidden || !scale || tokens &lt;= 0 || embed_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  273</span>    }</div>
+<div class="line"><span class="lineno">  274</span> </div>
+<div class="line"><span class="lineno">  275</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> s = scale[0];</div>
+<div class="line"><span class="lineno">  276</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> n = (size_t)tokens * (<span class="keywordtype">size_t</span>)embed_dim;</div>
+<div class="line"><span class="lineno">  277</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  278</span>        hidden[i] *= s;</div>
+<div class="line"><span class="lineno">  279</span>    }</div>
+<div class="line"><span class="lineno">  280</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="a86d5ed3bc2576b6c5b7c824aa1d6ef8e" name="a86d5ed3bc2576b6c5b7c824aa1d6ef8e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a86d5ed3bc2576b6c5b7c824aa1d6ef8e">&#9670;&#160;</a></span>ck_bf16_to_f32()</h2>
 
@@ -517,17 +572,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00266">266</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  270</span>{</div>
-<div class="line"><span class="lineno">  271</span>    <span class="keywordflow">if</span> (!logits || tokens &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0 || cap &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  273</span>    }</div>
-<div class="line"><span class="lineno">  274</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_cap = 1.0f / cap;</div>
-<div class="line"><span class="lineno">  275</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
-<div class="line"><span class="lineno">  276</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
-<div class="line"><span class="lineno">  277</span>        logits[i] = tanhf(logits[i] * inv_cap) * cap;</div>
-<div class="line"><span class="lineno">  278</span>    }</div>
-<div class="line"><span class="lineno">  279</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00282">282</a> of file <a class="el" href="gemma4__per__layer__embed_8c_source.html">gemma4_per_layer_embed.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  286</span>{</div>
+<div class="line"><span class="lineno">  287</span>    <span class="keywordflow">if</span> (!logits || tokens &lt;= 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0 || cap &lt;= 0.0f) {</div>
+<div class="line"><span class="lineno">  288</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  289</span>    }</div>
+<div class="line"><span class="lineno">  290</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_cap = 1.0f / cap;</div>
+<div class="line"><span class="lineno">  291</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)tokens * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
+<div class="line"><span class="lineno">  292</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
+<div class="line"><span class="lineno">  293</span>        logits[i] = tanhf(logits[i] * inv_cap) * cap;</div>
+<div class="line"><span class="lineno">  294</span>    }</div>
+<div class="line"><span class="lineno">  295</span>}</div>
 <div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00186">true_bpe.h:186</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00186">vocab_size</a>.</p>

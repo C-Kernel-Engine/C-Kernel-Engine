@@ -1,0 +1,234 @@
+<!-- TITLE: Gemma4 Speculative Pair Design -->
+<!-- NAV: architecture -->
+
+<h1>Gemma4 Speculative Pair Design</h1>
+
+<p>
+    This page is the implementation plan for pairing a full Gemma4 backbone with the small
+    <code>google/gemma-4-E4B-it-assistant</code> drafter model. The assistant is not a standalone
+    chatbot. It is a speculative/MTP draft decoder that consumes the backbone hidden stream and
+    proposes candidate tokens for the backbone to verify.
+</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Analogy</strong><br>
+        In the header/body/footer mental model, the backbone is the authoritative target decoder.
+        The assistant is a secondary draft decoder. The bridge between them behaves like an
+        encoder-to-decoder handoff because the backbone exports hidden state and the assistant
+        consumes it, but the backbone is still a decoder, not a vision-style encoder.
+    </div>
+</div>
+
+<h2>Target Shape</h2>
+
+<pre><code>prompt tokens
+  -&gt; Gemma4 E4B backbone prefill
+  -&gt; backbone KV cache + hidden stream
+  -&gt; decode loop:
+       backbone step exports hidden state H_t [1, 2560]
+       assistant_pre_projection(H_t) -&gt; draft stream [1, 256]
+       assistant 4-layer draft decoder proposes token candidates
+       backbone verifies proposed token(s)
+       accepted tokens are emitted; rejected token falls back to backbone</code></pre>
+
+<p>
+    The first working milestone should draft and verify one token. After that is correct, increase
+    <code>draft_tokens</code> to 2, 4, and 8 and measure acceptance rate versus throughput.
+</p>
+
+<h2>Composite Template</h2>
+
+<p>
+    The clean CKE implementation should be a composite circuit, not two unrelated model folders
+    joined through ad hoc Python. A future template can be named:
+</p>
+
+<pre><code>version/v8/templates/gemma4_speculative_pair.json</code></pre>
+
+<p>
+    The template should declare three blocks:
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Block</th>
+            <th>Role</th>
+            <th>Existing Template</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>target</code></td>
+            <td>Authoritative Gemma4 backbone that owns final correctness.</td>
+            <td><code>gemma4.json</code></td>
+        </tr>
+        <tr>
+            <td><code>draft</code></td>
+            <td>Small assistant/MTP model that proposes candidate tokens.</td>
+            <td><code>gemma4_assistant.json</code></td>
+        </tr>
+        <tr>
+            <td><code>verify</code></td>
+            <td>Accept/reject loop that compares draft tokens against target logits.</td>
+            <td>New runtime loop, not a neural layer.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Weight Namespaces</h2>
+
+<p>
+    First implementation should keep the two weight files separate for auditability:
+</p>
+
+<pre><code>/tmp/ck-gemma4-e4b-runtime/weights.bump
+/tmp/ck-gemma4-assistant-runtime/weights.bump</code></pre>
+
+<p>
+    The composite manifest can refer to both namespaces:
+</p>
+
+<pre><code>{
+  "model": "gemma4_speculative_pair",
+  "target": {
+    "template": "gemma4",
+    "weights": "target.weights.bump",
+    "hidden_export": "target_hidden_stream",
+    "hidden_size": 2560
+  },
+  "draft": {
+    "template": "gemma4_assistant",
+    "weights": "assistant.weights.bump",
+    "assistant_role": "mtp_drafter",
+    "backbone_hidden_size": 2560,
+    "hidden_size": 256
+  },
+  "bridge": {
+    "source": "target_hidden_stream",
+    "dest": "draft.backbone_stream",
+    "shape": ["T", 2560]
+  }
+}</code></pre>
+
+<p>
+    Later, the compiler can merge both into one BUMP file with target and assistant regions. That is
+    an optimization, not a requirement for the first correct runtime.
+</p>
+
+<h2>IR Contract</h2>
+
+<p>
+    The composite lowering should make the bridge explicit:
+</p>
+
+<pre><code>target.decode_step
+  outputs:
+    target_logits
+    target_hidden_stream
+    target_kv_cache
+
+draft.decode_step
+  inputs:
+    draft_token_ids
+    draft.backbone_stream &lt;- target_hidden_stream
+  outputs:
+    draft_logits
+    draft_candidate_tokens
+
+verify.step
+  inputs:
+    draft_candidate_tokens
+    target_logits
+  outputs:
+    accepted_tokens
+    rejected_token</code></pre>
+
+<p>
+    The generated C should expose explicit functions instead of hiding the protocol:
+</p>
+
+<pre><code>int ck_gemma4_pair_prefill(...);
+int ck_gemma4_pair_decode_one(...);
+int ck_gemma4_pair_draft_tokens(...);
+int ck_gemma4_pair_verify_tokens(...);
+int ck_gemma4_pair_generate_speculative(...);</code></pre>
+
+<h2>Memory Plan</h2>
+
+<p>
+    Required buffers should be visible in <code>layout_decode.json</code>:
+</p>
+
+<ul>
+    <li><code>target_main_stream</code> for Gemma4 backbone hidden state.</li>
+    <li><code>target_kv_cache</code> for the authoritative target cache.</li>
+    <li><code>draft_backbone_stream</code> for assistant input, shape <code>[T, 2560]</code>.</li>
+    <li><code>draft_main_stream</code> for assistant hidden state, shape <code>[T, 256]</code>.</li>
+    <li><code>draft_kv_cache</code> for the assistant cache.</li>
+    <li><code>draft_logits</code> and <code>target_logits</code>.</li>
+    <li><code>accepted_tokens</code>, <code>candidate_tokens</code>, and verifier scratch.</li>
+</ul>
+
+<h2>Xeon Validation Plan</h2>
+
+<p>
+    On the high-memory Xeon box, build both runtimes first:
+</p>
+
+<pre><code>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf \
+  --run /tmp/ck-gemma4-e4b-runtime \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Give me a detailed example of C code.' \
+  --chat-template gemma4 \
+  --max-tokens 64 \
+  --temperature 0.0
+
+.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://google/gemma-4-E4B-it-assistant \
+  --run /tmp/ck-gemma4-assistant-runtime \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --generate-only \
+  --chat-template none \
+  --allow-raw-prompt</code></pre>
+
+<p>
+    Then validate in this order:
+</p>
+
+<ol>
+    <li>Backbone-only coherent decode.</li>
+    <li>Assistant-only compile and load smoke. Do not expect standalone chat.</li>
+    <li>Backbone decode exports <code>target_hidden_stream</code> with shape <code>[1, 2560]</code>.</li>
+    <li>Assistant consumes that stream and produces draft logits.</li>
+    <li>One-token draft and target verification match the Python reference protocol.</li>
+    <li>Multi-token speculative loop reports drafted, accepted, rejected, and acceptance rate.</li>
+</ol>
+
+<h2>Success Metrics</h2>
+
+<p>
+    The first useful dashboard should compare:
+</p>
+
+<ul>
+    <li><code>backbone_only_tok_per_sec</code></li>
+    <li><code>speculative_tok_per_sec</code></li>
+    <li><code>draft_tokens_per_batch</code></li>
+    <li><code>accepted_tokens</code> / <code>drafted_tokens</code></li>
+    <li><code>target_verify_ms</code></li>
+    <li><code>assistant_draft_ms</code></li>
+</ul>
+
+<p>
+    A failed acceptance rate is still useful data. It means the bridge, tokenizer, positional policy,
+    or hidden-state handoff is wrong. A high acceptance rate with no speedup means the protocol is
+    correct but the verifier is still too serial.
+</p>

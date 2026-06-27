@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">CKE Throughput Unit</title>
+  <desc id="desc">A diagram showing how active bytes per token divided by token latency becomes aggregate bytes cycled per second across CPU nodes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#252525"/>
+      <stop offset="1" stop-color="#171717"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb400"/>
+      <stop offset="1" stop-color="#ff7a18"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="620" rx="18" fill="url(#bg)"/>
+  <rect x="26" y="26" width="1148" height="568" rx="14" fill="none" stroke="#454545"/>
+
+  <text x="60" y="78" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">CKE Throughput Unit</text>
+  <text x="60" y="112" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="18">How many bytes can the full system cycle per second to produce tokens?</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
+    <text x="88" y="194" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Active bytes per token</text>
+    <text x="88" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 TB</text>
+    <text x="88" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">Weights + activations + KV</text>
+    <text x="88" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">+ communication touched</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="445" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
+    <text x="473" y="194" fill="#07adf8" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Token latency target</text>
+    <text x="473" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 ms</text>
+    <text x="473" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">End-to-end prefill/decode</text>
+    <text x="473" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">system time per token</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="830" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
+    <text x="858" y="194" fill="#47b475" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Aggregate data rate</text>
+    <text x="858" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 PB/s</text>
+    <text x="858" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">1000 TB/s aggregate</text>
+    <text x="858" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">across all compute nodes</text>
+  </g>
+
+  <path d="M386 230 H424" stroke="#ffb400" stroke-width="4" stroke-linecap="round"/>
+  <path d="M424 230 l-12 -8 v16 z" fill="#ffb400"/>
+  <text x="392" y="212" fill="#808080" font-family="Inter, Arial, sans-serif" font-size="15">divided by</text>
+
+  <path d="M771 230 H809" stroke="#47b475" stroke-width="4" stroke-linecap="round"/>
+  <path d="M809 230 l-12 -8 v16 z" fill="#47b475"/>
+  <text x="770" y="212" fill="#808080" font-family="Inter, Arial, sans-serif" font-size="15">equals</text>
+
+  <rect x="145" y="360" width="910" height="98" rx="12" fill="#1f1f1f" stroke="#454545"/>
+  <text x="180" y="406" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="28">CKU = active_bytes_per_token / seconds_per_token</text>
+  <text x="180" y="438" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="16">1 PB/s means the system can cycle one terabyte of active token-path data every millisecond.</text>
+
+  <g>
+    <circle cx="235" cy="520" r="16" fill="url(#orange)"/>
+    <text x="265" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">Linux tuning</text>
+    <circle cx="410" cy="520" r="16" fill="#07adf8"/>
+    <text x="440" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">SIMD / AMX kernels</text>
+    <circle cx="630" cy="520" r="16" fill="#47b475"/>
+    <text x="660" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">NUMA + memory channels</text>
+    <circle cx="910" cy="520" r="16" fill="#b48cff"/>
+    <text x="940" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">MPI / RDMA clusters</text>
+  </g>
+</svg>
