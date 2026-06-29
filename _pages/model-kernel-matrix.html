@@ -38,6 +38,7 @@
     .model-card.mc-qwen::before   { background: #16a085; }
     .model-card.mc-gemma3::before { background: var(--blue); }
     .model-card.mc-gemma4::before { background: #f39c12; }
+    .model-card.mc-kimi::before   { background: #b48cff; }
     .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
 
@@ -627,6 +628,39 @@
         <span class="mq-chip">GGUF</span>
         <span class="mq-chip">Q4_K</span>
         <span class="mq-chip">Q8_0</span>
+      </div>
+    </div>
+
+    <!-- Kimi / MLA -->
+    <div class="model-card mc-kimi">
+      <span class="model-badge">template: kimi_vl.json</span>
+      <div class="model-title">Kimi / MLA Text Decoder</div>
+      <div class="model-arch">Multi-Head Latent Attention · partial RoPE concat · MoE path<br>Explicit prefill/decode MLA cache contract · DeepSeek-style reference kernels</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 template/lowering — explicit MLA cache store/read ops</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Kernel contract — MLA decompress, partial RoPE concat, decode cache attention</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Full Kimi smoke — high-memory host required; not a laptop CI lane</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up scope: Kimi/MLA support now lowers the latent KV path explicitly instead of hiding cache behavior inside attention. Decode inserts <code>mla_kv_cache_store</code> and switches <code>mla_attention</code> to <code>deepseek_mla_attention_decode_f32</code>; prefill inserts <code>mla_kv_cache_batch_store</code>.
+      </div>
+      <div class="model-tags">
+        <span class="tag fixed">explicit MLA decode cache</span>
+        <span class="tag fixed">BF16 kv_lora path</span>
+        <span class="tag learned">template contract tested</span>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Laptop-safe contract check</span><button class="copy-command" type="button" data-copy-command="cmd-kimi-mla">Copy</button></div>
+        <pre id="cmd-kimi-mla"><code>.venv/bin/python -m py_compile version/v8/scripts/build_ir_v8.py
+make build/libckernel_engine.so
+.venv/bin/python unittest/test_deepseek_reference_kernels.py
+.venv/bin/python -m unittest tests.test_v8_kimi_template</code></pre>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip">BF16</span>
+        <span class="mq-chip">FP32 reference</span>
+        <span class="mq-chip">MLA cache</span>
+        <span class="mq-chip">MoE</span>
       </div>
     </div>
 

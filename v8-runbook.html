@@ -898,6 +898,9 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
+                        <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
+                        <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
@@ -1127,6 +1130,20 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
     <p class="mini-note">Use this as the current Gemma4 GGUF coherence smoke. A healthy run should produce a normal long answer and stop by EOS or <code>--max-tokens</code>, not by prompt-marker echo or language corruption. The tested local Q4_K_M run generated 1024 coherent C-code tokens; performance work remains separate.</p>
 
+    <h3>Gemma 4 Assistant / MTP Drafter</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://google/gemma-4-E4B-it-assistant \
+  --run /tmp/ck-gemma4-assistant-runtime \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --generate-only \
+  --chat-template none \
+  --allow-raw-prompt</pre>
+    </div>
+    <p class="mini-note">The assistant artifact is a tiny speculative/MTP drafter, not a standalone chat model. A healthy bring-up converts safetensors directly to BUMP, lowers q-only shared-KV attention, generates C, and compiles <code>libmodel.so</code>. Real chat speedup comes only after pairing this runtime with a compatible Gemma4 backbone via <code>--speculative-draft-model-dir</code>.</p>
+
     <h3>Nemotron Nano 9B v2</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1154,6 +1171,20 @@ python -m pip install -r requirements-v8.txt</pre>
   tests/test_v8_safetensors_to_bump.py</pre>
     </div>
     <p class="mini-note">GLM4 is currently tracked as a v8 template/conversion/parity-harness lane. The patch adds GLM4 GGUF metadata handling, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK comparator. Run full real-model GLM4 smoke on a higher-memory host before promoting it to the high-memory runtime lane.</p>
+
+    <h3>Kimi / MLA Decoder Contract</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Low-memory validation lane: MLA template + explicit decode cache kernels
+.venv/bin/python -m py_compile version/v8/scripts/build_ir_v8.py
+make build/libckernel_engine.so
+.venv/bin/python unittest/test_deepseek_reference_kernels.py
+.venv/bin/python -m unittest \
+  tests.test_v8_kimi_template \
+  tests.test_v8_model_contract_inspector \
+  tests.test_v8_template_circuit_audit</pre>
+    </div>
+    <p class="mini-note">Kimi/MLA is currently a v8 compiler/kernel-contract lane. The template now declares explicit MLA decode-cache behavior, lowering inserts <code>mla_kv_cache_store</code> / <code>mla_kv_cache_batch_store</code>, and decode attention switches to <code>deepseek_mla_attention_decode_f32</code>. See <a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a> for the architecture notes. Full Kimi runtime smoke belongs on a high-memory host.</p>
 
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
@@ -1621,7 +1652,7 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-24</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-29</p>
             </div>
         </div>
     </footer>

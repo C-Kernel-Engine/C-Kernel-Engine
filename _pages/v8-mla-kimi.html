@@ -1,0 +1,231 @@
+<!-- TITLE: v8 MLA / Kimi Decode Cache -->
+<!-- NAV: ARCHITECTURE -->
+
+<style>
+.mla-hero {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0 1.25rem;
+}
+.mla-panel {
+    background: linear-gradient(145deg, rgba(7,173,248,0.09), rgba(255,180,0,0.07));
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+}
+.mla-panel h2,
+.mla-panel h3 {
+    margin-top: 0;
+}
+.mla-panel h2::before,
+.mla-panel h3::before {
+    display: none;
+}
+.mla-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+}
+.mla-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: rgba(7,173,248,0.1);
+    border: 1px solid rgba(7,173,248,0.3);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    color: var(--text-secondary);
+}
+.mla-flow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0;
+}
+.mla-step {
+    background: #0f151c;
+    border: 1px solid #263242;
+    border-radius: 10px;
+    padding: 0.85rem;
+}
+.mla-step-label {
+    color: var(--orange);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    margin-bottom: 0.35rem;
+}
+.mla-step h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+}
+.mla-table code {
+    font-size: 0.82rem;
+}
+@media (max-width: 900px) {
+    .mla-hero {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<h1>v8 MLA / Kimi Decode Cache</h1>
+
+<p>
+    This page documents the v8 implementation contract for Kimi/DeepSeek-style
+    <strong>Multi-Head Latent Attention</strong> (MLA): how the template describes the latent KV path,
+    how lowering inserts explicit prefill/decode cache operations, and which C kernels currently back the graph.
+</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Scope</strong><br>
+        This is compiler, template, and kernel-contract support. Full Kimi model smoke is a high-memory lane and is not expected to run on a constrained laptop.
+    </div>
+</div>
+
+<div class="mla-hero">
+    <div class="mla-panel">
+        <h2>Why MLA Exists</h2>
+        <p>
+            Standard attention stores full K and V vectors in the KV cache. MLA compresses the K/V path into a smaller latent representation, then reconstructs the pieces needed by attention.
+            That makes the memory contract different from ordinary GQA/MQA, especially during decode where every token reads historical cache state.
+        </p>
+        <div class="mla-chip-row">
+            <span class="mla-chip">kv_lora_rank</span>
+            <span class="mla-chip">qk_nope_head_dim</span>
+            <span class="mla-chip">qk_rope_head_dim</span>
+            <span class="mla-chip">v_head_dim</span>
+        </div>
+    </div>
+    <div class="mla-panel">
+        <h2>Implemented Surface</h2>
+        <ul>
+            <li><code>version/v8/templates/kimi_vl.json</code> declares the MLA decode cache contract.</li>
+            <li><code>build_ir_v8.py</code> inserts MLA cache store operations and switches decode attention to the MLA decode kernel.</li>
+            <li><code>deepseek_kernels.c</code> owns the reference C MLA kernels.</li>
+            <li>Focused unit tests validate the template lowering without requiring the full Kimi artifact.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="Kimi / DeepSeek-style MLA Decode Cache">
+    <img src="assets/mla-kimi-decode-cache.svg" alt="Kimi and DeepSeek-style MLA decode cache diagram showing low-rank KV compression, kv_lora_decompress, partial RoPE concat, explicit cache store, and decode attention.">
+</div>
+
+<h2>The MLA Path</h2>
+
+<div class="mla-flow">
+    <div class="mla-step">
+        <div class="mla-step-label">1 · Normalize</div>
+        <h3>Block RMSNorm</h3>
+        <p>The layer input is normalized before both the Q projection and compressed KV projection consume it.</p>
+    </div>
+    <div class="mla-step">
+        <div class="mla-step-label">2 · Project</div>
+        <h3>Q + compressed KV</h3>
+        <p><code>q_proj</code> emits Q. <code>kv_a_proj</code> emits the compressed latent KV vector instead of full K and V heads.</p>
+    </div>
+    <div class="mla-step">
+        <div class="mla-step-label">3 · Expand</div>
+        <h3>KV LoRA Decompress</h3>
+        <p><code>kv_lora_decompress</code> expands latent KV into no-position K and V scratch buffers using the manifest-selected FP32 or BF16 kernel.</p>
+    </div>
+    <div class="mla-step">
+        <div class="mla-step-label">4 · Position</div>
+        <h3>Partial RoPE concat</h3>
+        <p>The RoPE slice is positioned and concatenated with the no-position K part. This is why Kimi cannot be treated as plain full-head RoPE.</p>
+    </div>
+    <div class="mla-step">
+        <div class="mla-step-label">5 · Cache</div>
+        <h3>Explicit MLA KV store</h3>
+        <p>Prefill writes a batch cache. Decode writes the current token cache. The cache operation is explicit in IR rather than hidden inside attention.</p>
+    </div>
+    <div class="mla-step">
+        <div class="mla-step-label">6 · Attend</div>
+        <h3>MLA decode attention</h3>
+        <p>Decode attention reads the explicit MLA cache and uses <code>deepseek_mla_attention_decode_f32</code>.</p>
+    </div>
+</div>
+
+<h2>Kernel Contract</h2>
+
+<table class="mla-table">
+    <thead>
+        <tr>
+            <th>Template op</th>
+            <th>Kernel</th>
+            <th>Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>kv_lora_decompress</code></td>
+            <td><code>deepseek_mla_kv_decompress_f32</code><br><code>deepseek_mla_kv_decompress_bf16</code></td>
+            <td>Expand compressed latent KV into K-noPE and V scratch buffers. The BF16 path is selected when <code>mla_kv_b_proj</code> is BF16.</td>
+        </tr>
+        <tr>
+            <td><code>partial_rope_concat</code></td>
+            <td><code>deepseek_mla_partial_rope_concat_packed_f32</code></td>
+            <td>Apply positioned RoPE to the RoPE slice and pack the K representation expected by MLA attention.</td>
+        </tr>
+        <tr>
+            <td><code>mla_kv_cache_batch_store</code></td>
+            <td><code>deepseek_mla_kv_cache_batch_store_f32</code></td>
+            <td>Store prefill K/V scratch into the MLA decode cache for a token block.</td>
+        </tr>
+        <tr>
+            <td><code>mla_kv_cache_store</code></td>
+            <td><code>deepseek_mla_kv_cache_store_f32</code></td>
+            <td>Store the current decode token K/V scratch into the MLA decode cache.</td>
+        </tr>
+        <tr>
+            <td><code>mla_attention</code></td>
+            <td><code>deepseek_mla_attention_f32</code><br><code>deepseek_mla_attention_decode_f32</code></td>
+            <td>Prefill uses the reference MLA attention path. Decode switches to the cache-reading decode kernel.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Why the Cache Is Explicit</h2>
+
+<p>
+    Ordinary transformer lowering can often treat cache store as a generic post-RoPE helper.
+    MLA needs a clearer contract because K and V are produced through a compressed latent path and partial-RoPE concat.
+    If that cache behavior is hidden inside one opaque attention kernel, the IR visualizer cannot show what is stored, tests cannot independently validate cache placement, and future MPI/pipeline execution has no clean ownership boundary for the cache buffers.
+</p>
+
+<pre><code>prefill:
+  x -> norm -> q_proj
+  x -> norm -> kv_a_proj -> kv_a_norm -> kv_lora_decompress
+  q + k_nope + rope -> partial_rope_concat
+  k/v scratch -> mla_kv_cache_batch_store
+  q + cache -> mla_attention
+
+decode:
+  x -> norm -> q_proj
+  x -> norm -> kv_a_proj -> kv_a_norm -> kv_lora_decompress
+  q + k_nope + rope(position=t) -> partial_rope_concat
+  k/v scratch -> mla_kv_cache_store
+  q + historical cache -> mla_attention_decode</code></pre>
+
+<h2>Validation</h2>
+
+<p>
+    The current laptop-safe validation is focused on contracts and kernels, not full Kimi inference:
+</p>
+
+<pre><code>.venv/bin/python -m py_compile version/v8/scripts/build_ir_v8.py
+make build/libckernel_engine.so
+.venv/bin/python unittest/test_deepseek_reference_kernels.py
+.venv/bin/python -m unittest \
+  tests.test_v8_kimi_template \
+  tests.test_v8_model_contract_inspector \
+  tests.test_v8_template_circuit_audit</code></pre>
+
+<p>
+    A full Kimi run should be treated as a high-memory smoke on a larger CPU host. The important local guarantee is that the template resolves to the intended MLA kernels, the decode cache operations appear explicitly in IR, and existing promoted v8 families do not regress.
+</p>

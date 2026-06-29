@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Kimi / DeepSeek-style MLA decode cache contract</title>
+  <desc id="desc">Diagram showing hidden state compressed by kv_a_proj, expanded by kv_lora_decompress, combined with partial RoPE, stored into an explicit MLA cache, and consumed by decode attention.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171b22"/>
+      <stop offset="1" stop-color="#0b1016"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#07adf8"/>
+      <stop offset="1" stop-color="#64d2ff"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb400"/>
+      <stop offset="1" stop-color="#ff7a18"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#47b475"/>
+      <stop offset="1" stop-color="#9be7b6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#07adf8"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#ffb400"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#47b475"/>
+    </marker>
+    <style>
+      .title { fill:#f4f7fb; font:700 34px Inter,Arial,sans-serif; }
+      .subtitle { fill:#a9b4c0; font:400 17px Inter,Arial,sans-serif; }
+      .label { fill:#f4f7fb; font:700 17px Inter,Arial,sans-serif; }
+      .small { fill:#a9b4c0; font:400 13px Inter,Arial,sans-serif; }
+      .mono { fill:#dce6f2; font:500 13px JetBrains Mono,Consolas,monospace; }
+      .box { fill:#121922; stroke:#2b3846; stroke-width:1.2; }
+      .box-hot { fill:#1c1a11; stroke:#77590e; stroke-width:1.4; }
+      .box-cache { fill:#111c17; stroke:#2f6f45; stroke-width:1.4; }
+      .box-blue { fill:#111a22; stroke:#176d95; stroke-width:1.4; }
+      .lane { fill:none; stroke:#2b3846; stroke-width:1.2; stroke-dasharray:5 6; }
+      .arrow-blue { fill:none; stroke:#07adf8; stroke-width:3; marker-end:url(#arrow-blue); }
+      .arrow-orange { fill:none; stroke:#ffb400; stroke-width:3; marker-end:url(#arrow-orange); }
+      .arrow-green { fill:none; stroke:#47b475; stroke-width:3; marker-end:url(#arrow-green); }
+    </style>
+  </defs>
+
+  <rect width="1280" height="720" rx="18" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1224" height="664" rx="15" fill="none" stroke="#2c3540"/>
+
+  <text x="56" y="75" class="title">Kimi / DeepSeek-style MLA Decode Cache</text>
+  <text x="56" y="106" class="subtitle">The “LoRA” in kv_lora_decompress is architectural low-rank KV compression, not an external fine-tuning adapter.</text>
+
+  <rect x="52" y="138" width="1176" height="206" rx="14" class="lane"/>
+  <text x="72" y="166" fill="#ffb400" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Forward attention block</text>
+
+  <g filter="url(#shadow)">
+    <rect x="78" y="204" width="135" height="86" rx="10" class="box-blue"/>
+    <text x="104" y="235" class="label">hidden</text>
+    <text x="95" y="263" class="mono">[embed_dim]</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="260" y="166" width="165" height="72" rx="10" class="box"/>
+    <text x="293" y="196" class="label">q_proj</text>
+    <text x="285" y="219" class="mono">hidden -> Q</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="260" y="258" width="165" height="72" rx="10" class="box-hot"/>
+    <text x="289" y="288" class="label">kv_a_proj</text>
+    <text x="278" y="311" class="mono">hidden -> latent</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="472" y="258" width="178" height="72" rx="10" class="box-hot"/>
+    <text x="501" y="288" class="label">kv_a_norm</text>
+    <text x="497" y="311" class="mono">latent normalized</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="696" y="246" width="210" height="96" rx="10" class="box-hot"/>
+    <text x="731" y="280" class="label">kv_lora_decompress</text>
+    <text x="729" y="304" class="mono">B(A(hidden))</text>
+    <text x="723" y="326" class="small">expands latent -> K_noPE + V</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="696" y="146" width="210" height="76" rx="10" class="box"/>
+    <text x="735" y="177" class="label">partial RoPE</text>
+    <text x="733" y="201" class="mono">K_noPE + K_rope</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="968" y="176" width="210" height="120" rx="10" class="box-blue"/>
+    <text x="1004" y="211" class="label">mla_attention</text>
+    <text x="1000" y="236" class="mono">Q + K + V -> out</text>
+    <text x="995" y="263" class="small">prefill/reference path</text>
+  </g>
+
+  <path d="M213 230 C232 230 238 202 260 202" class="arrow-blue"/>
+  <path d="M213 264 C232 264 238 294 260 294" class="arrow-orange"/>
+  <path d="M425 294 H472" class="arrow-orange"/>
+  <path d="M650 294 H696" class="arrow-orange"/>
+  <path d="M906 286 C936 286 939 248 968 240" class="arrow-blue"/>
+  <path d="M801 246 V222" class="arrow-orange"/>
+  <path d="M906 184 H968" class="arrow-blue"/>
+  <path d="M425 202 H696" class="arrow-blue"/>
+
+  <rect x="52" y="380" width="1176" height="248" rx="14" class="lane"/>
+  <text x="72" y="408" fill="#47b475" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">Explicit v8 decode-cache contract</text>
+
+  <g filter="url(#shadow)">
+    <rect x="94" y="450" width="238" height="108" rx="10" class="box-hot"/>
+    <text x="124" y="484" class="label">partial_rope_concat</text>
+    <text x="121" y="511" class="mono">position = current token</text>
+    <text x="121" y="535" class="small">produces current K/V scratch</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="395" y="436" width="240" height="136" rx="10" class="box-cache"/>
+    <text x="436" y="471" class="label">MLA cache store</text>
+    <text x="423" y="499" class="mono">decode: mla_kv_cache_store</text>
+    <text x="423" y="524" class="mono">prefill: batch_store</text>
+    <text x="423" y="550" class="small">explicit IR op, not hidden in attention</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="708" y="430" width="220" height="150" rx="10" class="box-cache"/>
+    <text x="747" y="465" class="label">persistent cache</text>
+    <text x="736" y="493" class="mono">K_cache[KV, T, S]</text>
+    <text x="736" y="518" class="mono">V_cache[KV, T, S]</text>
+    <text x="736" y="545" class="small">separate logical K/V widths</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1000" y="440" width="190" height="130" rx="10" class="box-blue"/>
+    <text x="1024" y="475" class="label">decode attention</text>
+    <text x="1022" y="502" class="mono">deepseek_mla_</text>
+    <text x="1022" y="524" class="mono">attention_decode_f32</text>
+    <text x="1022" y="550" class="small">reads historical MLA cache</text>
+  </g>
+
+  <path d="M332 504 H395" class="arrow-green"/>
+  <path d="M635 504 H708" class="arrow-green"/>
+  <path d="M928 504 H1000" class="arrow-green"/>
+
+  <rect x="78" y="650" width="1124" height="34" rx="8" fill="#101821" stroke="#2b3846"/>
+  <text x="98" y="672" fill="#b8c4d0" font-family="Inter,Arial,sans-serif" font-size="14">
+    Training implication: kv_a_proj, kv_a_norm, and kv_b_proj are ordinary trainable model weights. Inference needs forward kernels now; full training later needs backward kernels through the same chain.
+  </text>
+</svg>
