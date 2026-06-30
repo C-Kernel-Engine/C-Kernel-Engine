@@ -208,6 +208,12 @@
 
 <p>The intended deployment model is dependency-light execution, not dependency-free development. The generated runtime can be compiled with GCC or Clang, but the preferred path is to use the strongest native CPU toolchain for the target machine: Intel oneAPI/ICX on Intel CPUs, tuned GCC/Clang on AMD CPUs, ARM toolchains on ARM systems, and standard systems libraries for cluster execution.</p>
 
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Long-Horizon Commodity Compute Bet</h3>
+    <p>CKE assumes AI execution will not remain permanently locked inside expensive accelerator stacks, because the underlying workload is still math, memory movement, and systems software. Accelerators matter, but they do not change the shape of the problem: tensors must live somewhere, bytes must move through memory hierarchies, kernels must execute, and distributed systems must coordinate the work.</p>
+    <p style="margin-bottom: 0;">If CPUs keep gaining cores, SIMD and matrix units, memory channels, NUMA controls, and fast interconnects, then a clean generated-C runtime that can orchestrate many cheap Linux nodes becomes increasingly interesting. The bet is not that one CPU beats every GPU. The bet is that commodity CPU clusters can become a practical, auditable, incrementally scalable execution substrate for a large class of AI inference and training workloads.</p>
+</div>
+
 <div class="card card-green">
     <h3 style="margin-top: 0;">Generated C, Planned Memory</h3>
     <p>C-Kernel-Engine uses C as an <strong>auditable compiler target</strong>, not as a large hand-written pointer maze. The model graph, tensor shapes, lifetimes, kernel contracts, and memory sections are resolved before code emission. The generated C then reads and writes deterministic offsets from planned buffers instead of allocating or guessing inside the hot path.</p>

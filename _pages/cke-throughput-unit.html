@@ -25,6 +25,7 @@
 <pre><code>CKU = active_bytes_per_token / seconds_per_token</code></pre>
 
 <p>
+    CKU means <strong>C-Kernel throughput unit</strong>.
     The unit is not just DRAM bandwidth from one socket and it is not just matrix FLOPS.
     It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse in order to produce tokens.
     Depending on the model and phase, that can include:
@@ -91,6 +92,22 @@
     It can be a coordinated set of CPU sockets, memory channels, NUMA domains, and Linux nodes.
 </p>
 
+<h2>What Counts as Active Bytes?</h2>
+
+<p>
+    Active bytes are the bytes that matter for the current token path.
+    They are not the total size of every file on disk and they are not necessarily the total parameter count of the model.
+    For a dense model, the active path may touch most weights every token.
+    For a Mixture-of-Experts model, only the selected experts are active.
+    For recurrent or SSM-style models, the KV-cache term may shrink or disappear for many layers, but recurrent state updates still count.
+</p>
+
+<p>
+    This makes CKU useful across model families.
+    A 5 TB model with quantization, MoE routing, and sparse activation may have a much smaller active-byte path per token than its full stored footprint.
+    CKE cares about the measured active path: which weights are actually read, which activations are produced, which cache/state buffers are updated, and which bytes cross sockets or nodes.
+</p>
+
 <h2>What CKE Optimizes</h2>
 
 <p>
@@ -105,6 +122,29 @@
     <li><strong>Linux tuning:</strong> CPU affinity, huge pages, NUMA placement, cache behavior, and perf/VTune/Advisor measurement.</li>
     <li><strong>Cluster scaling:</strong> model/layer ownership, activation movement, gradient movement, MPI/RDMA paths, and topology-aware placement.</li>
 </ul>
+
+<h2>How to Measure It</h2>
+
+<p>
+    CKU is meant to be measured, not asserted.
+    A practical report should show the model, phase, context length, batch size, active-byte estimate, token latency, and the resulting aggregate rate.
+    The same run should also show CPU utilization, memory bandwidth, cache behavior, and network transfer if the run spans nodes.
+</p>
+
+<pre><code>active_bytes_per_token = weights_touched
+                       + activations_touched
+                       + cache_or_state_touched
+                       + communication_touched
+
+seconds_per_token      = measured_wall_time / generated_tokens
+
+CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
+
+<p>
+    This is the reason CKE keeps investing in visualizers, memory layouts, kernel maps, perf counters, VTune/Advisor profiles, and future MPI lanes.
+    The generated C code is only one part of the system.
+    The larger optimization problem is arranging the full data path so the machine spends less time waiting for bytes and more time turning those bytes into useful output.
+</p>
 
 <h2>Not a FLOPS Replacement</h2>
 
@@ -123,40 +163,3 @@
         A single workstation is not expected to cycle 1 PB/s today. The point is to make the long-horizon optimization problem explicit: organize CPU kernels, memory hierarchy, Linux scheduling, and distributed nodes so aggregate active-byte throughput keeps rising.
     </div>
 </div>
-
-<h2>Tiny Gemma4 Assistant E2E Status</h2>
-
-<p>
-    The small Gemma4 assistant model is the <code>gemma4_assistant</code> / MTP drafter path, not the large Gemma4 E4B instruct lane.
-    It is intentionally marked as <code>standalone_text_inference_supported = false</code> because it is an assistant/draft model designed to bridge with a larger Gemma4 backbone, not a normal chat model that should answer prompts by itself.
-</p>
-
-<p>
-    Current local status for the tiny assistant path:
-</p>
-
-<ul>
-    <li><strong>Safetensors mapping:</strong> supported through the <code>gemma4_assistant</code> architecture map.</li>
-    <li><strong>Template/lowering:</strong> supports <code>assistant_pre_projection</code>, <code>q_norm</code>, <code>rope_q</code>, q-only shared-KV attention, <code>assistant_layer_scale</code>, and <code>assistant_post_projection</code>.</li>
-    <li><strong>Kernel parity:</strong> covered by <code>unittest/test_gemma4_assistant_kernels.py</code> and included in <code>nightly-quick</code> plus <code>nightly-kernels</code>.</li>
-    <li><strong>Compiler E2E:</strong> a synthetic tiny assistant checkpoint locally passes safetensors -> bump -> prefill/decode IR -> generated C -> compiled <code>libmodel.so</code>.</li>
-    <li><strong>Chat E2E:</strong> not expected as a standalone model; the next real E2E target is speculative/MTP pairing with a compatible Gemma4 backbone.</li>
-</ul>
-
-<p>
-    The local synthetic compiler smoke follows this shape:
-</p>
-
-<pre><code>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
-  hf://google/gemma-4-E4B-it-assistant \
-  --run /tmp/ck-gemma4-assistant-runtime \
-  --context-len 1024 \
-  --force-convert --force-compile \
-  --generate-only \
-  --chat-template none \
-  --allow-raw-prompt</code></pre>
-
-<p>
-    The next hardening step is to make the assistant useful in the runtime, not to force it to be a standalone chatbot:
-    compile the real small assistant artifact, compile the compatible target Gemma4 backbone, then run it through CKE's speculative decode path as a draft model.
-</p>
