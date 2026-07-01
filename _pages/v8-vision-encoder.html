@@ -608,15 +608,54 @@
 
 <div class="card">
     <p>
-        The next cleanup step is not to add more handwritten Qwen logic. It is to promote bridge policy into explicit contracts:
+        The Qwen3-VL bridge policy is now declared as a template contract instead of living only as host-runner convention:
     </p>
     <ul>
         <li><strong>Image preprocess contract:</strong> resize policy, alignment rule, normalization stats, channel layout</li>
-        <li><strong>Multimodal bridge contract:</strong> which activation is the prefix, how many rows it has, what grid metadata it carries, and which decoder entrypoint should consume it</li>
+        <li><strong>Multimodal bridge contract:</strong> mixed visual/text prefill, MRoPE 2D grid metadata, persistent decoder KV cache, and staged decode continuation</li>
         <li><strong>Chat contract:</strong> prompt shell, stop markers, and image marker placement</li>
     </ul>
     <p style="margin-bottom: 0;">
-        Once that happens, the bridge shell stops asking “is this Qwen3-VL?” and starts asking “what does the resolved contract say?”
+        The bridge shell can now ask “what does the resolved contract say?” and choose the staged runtime from that contract.
+    </p>
+</div>
+
+<h2>Current Speed Read</h2>
+
+<div class="card">
+    <p>
+        The latest Qwen3-VL OCR bridge speed work changes <code>decode-staged</code> into a hybrid decoder runtime:
+        decode IR with prefill-sized activations for the mixed image/text prefix, followed by safe incremental decode.
+        On the current Xeon sweep with 24 threads, 64 image tokens, and 8 decode tokens, the mixed-prefix phase dropped
+        from roughly <strong>6.8-7.2 seconds</strong> to roughly <strong>3.86-4.03 seconds</strong>.
+    </p>
+    <table>
+        <thead>
+            <tr>
+                <th>Stage</th>
+                <th>Current signal</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Vision encoder</td>
+                <td>About 4.7-5.3 seconds for the four-image OCR sweep</td>
+            </tr>
+            <tr>
+                <td>Mixed prefix</td>
+                <td>About 3.9-4.0 seconds after staged prefill hardening</td>
+            </tr>
+            <tr>
+                <td>Incremental generation</td>
+                <td>About 10 tokens/second for the short 8-token OCR smoke</td>
+            </tr>
+        </tbody>
+    </table>
+    <p style="margin-bottom: 0;">
+        The profiler now points at quantized projection kernels, especially <code>gemm_nt_q4_k_q8_k</code>
+        in <code>mlp_gate_up</code>, <code>mlp_down</code>, <code>q_proj</code>, and <code>out_proj</code>.
+        Attention is not the dominant cost in this run. The next speed target is packed/reused
+        Q4_K/Q6_K x Q8_K batched GEMM for decoder prefill.
     </p>
 </div>
 
