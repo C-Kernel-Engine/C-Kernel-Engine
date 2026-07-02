@@ -404,9 +404,9 @@
     <div class="regression-section">
       <h2>Visualizer Contract Matrix</h2>
       <p class="regression-meta">
-        v7 remains the promoted training/backprop visualizer lane. v8 carries the same health-check contract style
-        forward for inference and adds the multimodal vision artifact lane for encoder &rarr; bridge &rarr; decoder
-        graph rendering.
+        v7 remains the promoted training/backprop visualizer lane. v8 is the promoted inference and multimodal
+        observability lane: decoder-only reports, v8 run hub discovery, dataset viewer contracts, and encoder
+        &rarr; bridge &rarr; decoder graph rendering for vision artifacts.
       </p>
 
       <table class="results-table">
@@ -445,14 +445,14 @@
             <td><span class="coverage-lane v8">v8</span></td>
             <td>Visualizer health</td>
             <td><code>make v8-visualizer-health</code></td>
-            <td class="coverage-detail">Runs the same contract-driven source and JS utility checks against the v8 visualizer/tool paths.</td>
-            <td>v8 IR Visualizer and Dataset Viewer contracts</td>
+            <td class="coverage-detail">Contract-driven source and JS utility checks against v8 IR Visualizer, Dataset Viewer, and tool-path contracts.</td>
+            <td>v8 IR Visualizer, Dataset Viewer, IR Hub</td>
           </tr>
           <tr>
             <td><span class="coverage-lane v8">v8</span></td>
             <td>Generated E2E</td>
             <td><code>make v8-visualizer-generated-e2e</code></td>
-            <td class="coverage-detail">Validates generated v8 report and hub artifacts, including embedded JSON and cross-artifact structure.</td>
+            <td class="coverage-detail">Generates and validates v8 <code>ir_report.html</code>, <code>dataset_viewer.html</code>, <code>ir_hub_v8.html</code>, embedded JSON, and cross-artifact structure.</td>
             <td>Nightly generated-file chain</td>
           </tr>
           <tr>
@@ -801,8 +801,9 @@
     Contract-driven test coverage for the IR Visualizer and Dataset Viewer.
     Each component declares its tab/function/DOM contracts in JSON; tests
     validate against those contracts at every push. v7 owns the promoted
-    training/backprop visualizer lane; v8 mirrors the health checks and adds
-    dedicated multimodal vision artifact coverage.
+    training/backprop visualizer lane; v8 owns the inference and multimodal
+    observability lane with its own IR report, run hub, dataset viewer, and
+    dedicated vision artifact coverage.
     See the <a href="v7-visualizer-test-runbook.html">full test runbook</a>.
   </p>
 
@@ -974,8 +975,10 @@
   <h3>Level 3 — Generated-File E2E (Nightly)</h3>
   <p>
     Validates the full generation → validation chain: generate all three
-    visualizer HTML files from the latest training run, then run L1 health
-    checks + embedded JSON structure + cross-artifact consistency on the output.
+    visualizer HTML files from the latest run, then run L1 health checks +
+    embedded JSON structure + cross-artifact consistency on the output. The v7
+    version uses a training-capable run; the v8 version uses the v8 inference
+    cache and hub/tool wrappers.
   </p>
   <p style="font-size: 0.85rem; color: var(--text-muted);">
     Run locally: <code>make v7-visualizer-generated-e2e</code>
@@ -990,13 +993,13 @@
     <tbody>
       <tr><td class="viz-component">Generate</td><td>ir_report.html via <code>open_ir_visualizer.py</code></td><td>ir_report.html</td></tr>
       <tr><td class="viz-component">Generate</td><td>dataset_viewer.html via <code>prepare_run_viewer.py</code></td><td>dataset_viewer.html</td></tr>
-      <tr><td class="viz-component">Generate</td><td>ir_hub.html via <code>open_ir_hub.py</code></td><td>ir_hub.html</td></tr>
+      <tr><td class="viz-component">Generate</td><td>ir_hub.html / ir_hub_v8.html via <code>open_ir_hub.py</code> or <code>open_ir_hub_v8.py</code></td><td>run hub HTML</td></tr>
       <tr><td class="viz-component">L1 Health</td><td>Tabs, functions, DOM targets in generated output</td><td>All three files</td></tr>
       <tr><td class="viz-component">JSON Structure</td><td>Embedded JSON blobs (run_config, ir1_decode, layout_decode)</td><td>ir_report.html</td></tr>
       <tr><td class="viz-component">Panel Structure</td><td>Panel IDs, attnColor presence, file size</td><td>dataset_viewer.html</td></tr>
       <tr><td class="viz-component">Hub Structure</td><td>Run cards, ir_report links, navigation</td><td>ir_hub.html</td></tr>
       <tr><td class="viz-component">Cross-artifact</td><td>Run name in hub, vocab consistency, config.json</td><td>All three files</td></tr>
-      <tr><td class="viz-component">v8 Vision</td><td>Encoder, bridge, decoder, unified kernel flow, logical memory, and embedded HTML helpers</td><td>vision visualizer artifact HTML</td></tr>
+      <tr><td class="viz-component">v8 Vision</td><td>Encoder, bridge, decoder, unified kernel flow, logical memory, bridge report wiring, and embedded HTML helpers</td><td>vision visualizer artifact HTML</td></tr>
     </tbody>
   </table>
 </div>

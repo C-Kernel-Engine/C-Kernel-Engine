@@ -1014,6 +1014,28 @@
     color: var(--text-muted);
     font-size: 0.88rem;
 }
+.v8-artifact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.8rem;
+    margin: 0.9rem 0 1rem;
+}
+.v8-artifact-tile {
+    border: 1px solid var(--grey);
+    border-radius: 8px;
+    background: rgba(7,173,248,0.045);
+    padding: 0.85rem;
+}
+.v8-artifact-tile strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--text-primary);
+}
+.v8-artifact-tile p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+}
 @media (max-width: 900px) {
     .v8-runbook-hero {
         grid-template-columns: 1fr;
@@ -1350,11 +1372,42 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
 <h2>Artifacts To Inspect</h2>
 
 <div class="card">
+    <p>
+        v8 has its own operator artifact surface. It is not only a decoder dump:
+        text runs can emit an <code>ir_report.html</code>, the v8 hub indexes run directories,
+        and multimodal runs carry encoder &rarr; bridge &rarr; decoder artifacts that the visualizer can render as a single circuit.
+    </p>
+    <div class="v8-artifact-grid">
+        <div class="v8-artifact-tile">
+            <strong>IR Visualizer</strong>
+            <p><code>ir_report.html</code> shows lowered ops, memory layout, kernel flow, profile artifacts, parity notes, and generated commands for a single v8 run.</p>
+        </div>
+        <div class="v8-artifact-tile">
+            <strong>v8 IR Hub</strong>
+            <p><code>ir_hub_v8.html</code> indexes cache-backed v8 runs and links reports, bridge outputs, dataset viewers, embeddings, attention exports, and probe reports.</p>
+        </div>
+        <div class="v8-artifact-tile">
+            <strong>Vision Artifacts</strong>
+            <p>Qwen3-VL/Gemma4V bridge reports expose encoder runtime, projected visual prefix, decoder mixed prefill, generated text, and profiler summaries.</p>
+        </div>
+        <div class="v8-artifact-tile">
+            <strong>Dataset Viewer</strong>
+            <p>The v8 viewer reuses the contract-tested tab model for staged data, tokenizer, vocabulary, quality, embeddings, and attention inspection.</p>
+        </div>
+    </div>
     <table class="table v8-path-table">
         <thead>
             <tr><th>Artifact</th><th>Purpose</th></tr>
         </thead>
         <tbody>
+            <tr>
+                <td><code>~/.cache/ck-engine-v8/models/.../ir_report.html</code></td>
+                <td>Single-run v8 IR visualizer report. Generated automatically by <code>--generate-visualizer</code> or explicitly with <code>open_ir_visualizer_v8.py</code>.</td>
+            </tr>
+            <tr>
+                <td><code>~/.cache/ck-engine-v8/models/ir_hub_v8.html</code></td>
+                <td>v8 run hub for scanning all cache-backed inference, bridge, probe, and viewer artifacts.</td>
+            </tr>
             <tr>
                 <td><code>~/.cache/ck-engine-v8/models/.../multimodal_bridge/bridge_report.json</code></td>
                 <td>Final bridge status, prompt accounting, prefix grid, and generated text.</td>
@@ -1371,8 +1424,43 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
     </table>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>./build/ck-cli-v8 --list</pre>
+<pre># Generate or refresh a v8 IR visualizer report for one run.
+.venv/bin/python version/v8/tools/open_ir_visualizer_v8.py \
+  --generate --run "$RUN" --html-only --strict-run-artifacts \
+  --output "$RUN/ir_report.html"
+
+# Refresh the v8 run hub.
+.venv/bin/python version/v8/tools/open_ir_hub_v8.py \
+  --models-root "${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v8/models}" \
+  --output "${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v8/models}/ir_hub_v8.html"
+
+# List local v8 runtimes.
+./build/ck-cli-v8 --list</pre>
     </div>
+</div>
+
+<h2>Visualizer And Hub Gates</h2>
+
+<div class="card card-blue">
+    <p>
+        Use these gates when changing v8 visualizer tabs, embedded JSON, run-hub discovery, dataset viewer contracts,
+        or multimodal bridge artifacts. They are intentionally fast enough to run locally before a PR.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Source-level tab/function/DOM contracts plus pure JS utility checks.
+make v8-visualizer-health
+
+# Generate and validate ir_report.html, dataset_viewer.html, and ir_hub_v8.html.
+make v8-visualizer-generated-e2e
+
+# Validate encoder + bridge + decoder visualizer rendering for a synthetic vision run.
+make v8-visualizer-vision-artifacts</pre>
+    </div>
+    <p class="v8-note" style="margin-bottom: 0;">
+        v7 still owns the promoted training/backprop visualizer lane. v8 now owns inference and multimodal observability:
+        lowered decoder graphs, generated C metadata, logical memory, kernel-flow summaries, bridge reports, and vision-prefix dataflow.
+    </p>
 </div>
 
 <h2>Troubleshooting</h2>
@@ -1652,7 +1740,7 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-02</p>
             </div>
         </div>
     </footer>

@@ -624,38 +624,52 @@
 
 <div class="card">
     <p>
-        The latest Qwen3-VL OCR bridge speed work changes <code>decode-staged</code> into a hybrid decoder runtime:
+        The Qwen3-VL OCR speed work is now moving through measured bottlenecks instead of guessing.
+        The first large win changed <code>decode-staged</code> into a hybrid decoder runtime:
         decode IR with prefill-sized activations for the mixed image/text prefix, followed by safe incremental decode.
-        On the current Xeon sweep with 24 threads, 64 image tokens, and 8 decode tokens, the mixed-prefix phase dropped
-        from roughly <strong>6.8-7.2 seconds</strong> to roughly <strong>3.86-4.03 seconds</strong>.
+        The current patch adds CK threadpool dispatch inside <code>gemm_nt_f16</code> for large FP16 vision-encoder GEMMs.
     </p>
     <table>
         <thead>
             <tr>
                 <th>Stage</th>
-                <th>Current signal</th>
+                <th>Measured signal</th>
+                <th>What changed</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>Vision encoder</td>
-                <td>About 4.7-5.3 seconds for the four-image OCR sweep</td>
+                <td>Original OCR path</td>
+                <td>Multiple-minute end-to-end run on real SDPR-style OCR images</td>
+                <td>Correctness-first Qwen3-VL bridge and decoder path</td>
             </tr>
             <tr>
-                <td>Mixed prefix</td>
-                <td>About 3.9-4.0 seconds after staged prefill hardening</td>
+                <td>Staged bridge</td>
+                <td>Encoder about <strong>212.7s -&gt; 85.8s</strong>; mixed prefill about <strong>68.3s -&gt; 47.5s</strong>; steady path about <strong>281s -&gt; 133s</strong></td>
+                <td>Hybrid decoder runtime, staged mixed visual/text prefix, FP16 KV cache correctness, and encoder/decoder profiling</td>
             </tr>
             <tr>
-                <td>Incremental generation</td>
-                <td>About 10 tokens/second for the short 8-token OCR smoke</td>
+                <td>FP16 encoder GEMM threadpool</td>
+                <td>Encoder about <strong>85.8s -&gt; 59.0s</strong>; mixed prefill still about <strong>47s</strong>; one-token path about <strong>106s</strong></td>
+                <td>Threadpool dispatch for large <code>gemm_nt_f16</code> vision-encoder GEMMs</td>
+            </tr>
+            <tr>
+                <td>Small OCR smoke</td>
+                <td>Output remains coherent (<code>CK</code>), encoder about <strong>6.7s</strong> on the small local smoke</td>
+                <td>Regression guard for the fast path without requiring the full SDPR image workload</td>
             </tr>
         </tbody>
     </table>
+    <p>
+        This is still not llama.cpp-speed OCR, but the shape is encouraging: the path moved from many minutes toward
+        roughly a minute-class real-image run by fixing one measured bottleneck at a time. A tested Q8-contract
+        threadpool idea for the next encoder bottleneck did not materially move the real profile, so it was dropped
+        instead of carrying complexity.
+    </p>
     <p style="margin-bottom: 0;">
-        The profiler now points at quantized projection kernels, especially <code>gemm_nt_q4_k_q8_k</code>
-        in <code>mlp_gate_up</code>, <code>mlp_down</code>, <code>q_proj</code>, and <code>out_proj</code>.
-        Attention is not the dominant cost in this run. The next speed target is packed/reused
-        Q4_K/Q6_K x Q8_K batched GEMM for decoder prefill.
+        The next dominant cost is no longer the vision encoder scheduler. The profile now points at decoder mixed
+        prefill, especially <code>gemm_nt_q4_k_q8_k</code> in <code>mlp_gate_up</code> at about <strong>23.7s</strong>
+        on the real OCR image. That needs packed/reused Q4_K prefill microkernel work, not another scheduler-only patch.
     </p>
 </div>
 
