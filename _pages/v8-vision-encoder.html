@@ -130,6 +130,19 @@
     border: 1px solid rgba(7,173,248,0.3);
     color: var(--text-primary);
 }
+.v8-speed-svg-wrap {
+    margin: 1rem 0 1.15rem;
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    background: #081018;
+    overflow-x: auto;
+}
+.v8-speed-svg {
+    display: block;
+    min-width: 860px;
+    width: 100%;
+    height: auto;
+}
 @media (max-width: 1100px) {
     .v8-vision-flow {
         grid-template-columns: repeat(2, 1fr);
@@ -660,6 +673,80 @@
             </tr>
         </tbody>
     </table>
+    <div class="v8-speed-svg-wrap">
+        <svg class="v8-speed-svg" viewBox="0 0 980 360" role="img" aria-label="Qwen3-VL OCR speed ladder from original path to staged bridge to FP16 GEMM threadpool to the next Q4_K prefill microkernel target.">
+            <defs>
+                <linearGradient id="speedPanel" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#0f1b26"/>
+                    <stop offset="100%" stop-color="#10151d"/>
+                </linearGradient>
+                <linearGradient id="speedWin" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#123824"/>
+                    <stop offset="100%" stop-color="#0d2025"/>
+                </linearGradient>
+                <linearGradient id="speedNext" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#3a260c"/>
+                    <stop offset="100%" stop-color="#151820"/>
+                </linearGradient>
+                <marker id="speedArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                    <path d="M0 0 L10 5 L0 10 Z" fill="#07adf8"/>
+                </marker>
+                <style>
+                    .speed-title { fill: #f4f4f4; font: 700 22px JetBrains Mono, monospace; }
+                    .speed-sub { fill: #9aa7b5; font: 13px Inter, Arial, sans-serif; }
+                    .speed-card-title { fill: #ffffff; font: 700 15px JetBrains Mono, monospace; }
+                    .speed-card-small { fill: #b9c4cf; font: 12px Inter, Arial, sans-serif; }
+                    .speed-card-metric { fill: #ffb400; font: 700 18px JetBrains Mono, monospace; }
+                    .speed-card-green { fill: #47b475; font: 700 18px JetBrains Mono, monospace; }
+                    .speed-card-cyan { fill: #07adf8; font: 700 18px JetBrains Mono, monospace; }
+                    .speed-label { fill: #8d9aaa; font: 11px JetBrains Mono, monospace; }
+                    .speed-note { fill: #ced6df; font: 12px Inter, Arial, sans-serif; }
+                </style>
+            </defs>
+
+            <rect x="0" y="0" width="980" height="360" fill="#081018"/>
+            <text x="32" y="38" class="speed-title">Qwen3-VL OCR Speed Ladder</text>
+            <text x="32" y="62" class="speed-sub">Measured bottleneck removal: encoder bridge first, then FP16 GEMM threading, then decoder Q4_K prefill.</text>
+
+            <rect x="30" y="92" width="200" height="150" rx="12" fill="url(#speedPanel)" stroke="#2c3948"/>
+            <text x="48" y="122" class="speed-card-title">1. Original OCR</text>
+            <text x="48" y="153" class="speed-card-metric">multi-minute</text>
+            <text x="48" y="180" class="speed-card-small">Correct path existed,</text>
+            <text x="48" y="199" class="speed-card-small">but encoder + mixed</text>
+            <text x="48" y="218" class="speed-card-small">prefill were both slow.</text>
+
+            <line x1="238" y1="167" x2="283" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
+
+            <rect x="292" y="92" width="200" height="150" rx="12" fill="url(#speedWin)" stroke="#2d6a4f"/>
+            <text x="310" y="122" class="speed-card-title">2. Staged Bridge</text>
+            <text x="310" y="153" class="speed-card-green">281s -> 133s</text>
+            <text x="310" y="180" class="speed-card-small">Hybrid decoder runtime,</text>
+            <text x="310" y="199" class="speed-card-small">FP16 KV cache copy,</text>
+            <text x="310" y="218" class="speed-card-small">encoder/decoder profile.</text>
+
+            <line x1="500" y1="167" x2="545" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
+
+            <rect x="554" y="92" width="200" height="150" rx="12" fill="url(#speedWin)" stroke="#2d6a4f"/>
+            <text x="572" y="122" class="speed-card-title">3. F16 GEMM Pool</text>
+            <text x="572" y="153" class="speed-card-green">85.8s -> 59.0s</text>
+            <text x="572" y="180" class="speed-card-small">Large vision encoder</text>
+            <text x="572" y="199" class="speed-card-small">GEMMs dispatch through</text>
+            <text x="572" y="218" class="speed-card-small">the CK threadpool.</text>
+
+            <line x1="762" y1="167" x2="807" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
+
+            <rect x="816" y="92" width="134" height="150" rx="12" fill="url(#speedNext)" stroke="#ffb400"/>
+            <text x="833" y="122" class="speed-card-title">4. Next</text>
+            <text x="833" y="153" class="speed-card-cyan">Q4_K prefill</text>
+            <text x="833" y="180" class="speed-card-small">mlp_gate_up</text>
+            <text x="833" y="199" class="speed-card-small">about 23.7s</text>
+            <text x="833" y="218" class="speed-card-small">needs packed tile.</text>
+
+            <rect x="32" y="278" width="916" height="44" rx="10" fill="#0c141d" stroke="#263242"/>
+            <text x="52" y="305" class="speed-note">Rule from the profile: do not add scheduler complexity unless it moves real OCR time. Q8 threadpool did not, so it was dropped.</text>
+            <text x="52" y="340" class="speed-label">Current state: encoder improved; decoder mixed prefill is now the dominant wall.</text>
+        </svg>
+    </div>
     <p>
         This is still not llama.cpp-speed OCR, but the shape is encouraging: the path moved from many minutes toward
         roughly a minute-class real-image run by fixing one measured bottleneck at a time. A tested Q8-contract
