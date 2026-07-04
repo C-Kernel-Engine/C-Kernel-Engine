@@ -40,6 +40,37 @@
     <li>quantized layout conversion, repacking, and dequantization overhead</li>
 </ul>
 
+<h2>Not Just Weights</h2>
+
+<p>
+    A common shortcut is to say, "a 1 TB model at 1 ms/token needs 1 PB/s."
+    That is a useful intuition, but it is not the full CKU definition.
+    CKU is not only parameter bytes divided by token time.
+    It is the <strong>active byte path</strong> divided by token time.
+    The active byte path includes both the model data being read and the runtime
+    data being produced, consumed, stored, and moved while the token is generated.
+</p>
+
+<p>
+    In decode, weights are often the streaming bottleneck because many layers
+    repeatedly read projection and MLP weights for each new token.
+    In prefill, long prompts can make activation and KV/cache writes matter much
+    more because the system processes many token rows at once.
+    In training, activation saves, gradient writes, optimizer state, and backward
+    reads all become part of the active path.
+    In distributed execution, activation transfers, KV/state movement, gradient
+    exchange, and pipeline bubbles must be counted too.
+</p>
+
+<p>
+    This distinction matters because two runs with the same stored model size can
+    have very different CKU. A dense 1 GB model may touch nearly all weights on
+    every decode token. A sparse MoE model may store far more total weights but
+    only touch selected experts. A vision-language prefill run may move less
+    weight than expected but spend heavily on image-token activations and bridge
+    buffers. CKU asks what the system actually had to cycle for this token path.
+</p>
+
 <h2>Why 1 PB/s?</h2>
 
 <p>
@@ -108,6 +139,150 @@
     CKE cares about the measured active path: which weights are actually read, which activations are produced, which cache/state buffers are updated, and which bytes cross sockets or nodes.
 </p>
 
+<h2>Lifecycle Envelope and Concurrency</h2>
+
+<p>
+    CKU is first a <strong>single-stream lifecycle unit</strong>.
+    It asks what the runtime must cycle for one model instance serving one token
+    path at the model's intended operating envelope.
+    If a model advertises a 1 million token context length with an 8K embedding
+    dimension, the lifecycle envelope should include the memory behavior needed
+    to support that context: the active weights, the full KV/cache or recurrent
+    state footprint, the activations needed by prefill/decode, and the load/store
+    traffic required to keep the token path moving.
+</p>
+
+<p>
+    That does not mean every CKU number automatically includes every concurrent
+    user. Concurrency is a separate service-level multiplier.
+    A single-user CKU report answers, "Can this system run one full-context model
+    stream at this token rate?"
+    A service report then asks, "How many such streams can the cluster run at the
+    same time, and what token rate does each user receive?"
+</p>
+
+<pre><code>single_user_cku = active_lifecycle_bytes_per_token / seconds_per_token
+
+service_cku     = single_user_cku * concurrent_streams
+
+per_user_rate   = total_generated_tokens_per_second / concurrent_streams</code></pre>
+
+<p>
+    For example, a cluster might target 1 token/sec for 1000 concurrent users on
+    a very large model. That is a different operating point from 1000 tokens/sec
+    for one user, even if both produce 1000 aggregate tokens/sec.
+    CKU should make both cases explicit: the active lifecycle bytes per user, the
+    concurrency count, the total aggregate byte rate, and the per-user token rate.
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Byte class</th>
+            <th>Examples</th>
+            <th>When it dominates</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Weights</td>
+            <td>Q/K/V projections, MLP gate/up/down, expert weights, output head</td>
+            <td>Decode and small-batch inference, especially dense models</td>
+        </tr>
+        <tr>
+            <td>Activations</td>
+            <td>Layer inputs/outputs, normalized streams, Q8 views, fused scratch</td>
+            <td>Prefill, vision/audio encoders, large token blocks, unfused paths</td>
+        </tr>
+        <tr>
+            <td>Cache and state</td>
+            <td>KV cache reads/writes, recurrent state, Mamba/DeltaNet state</td>
+            <td>Long context, recurrent models, decode with large history</td>
+        </tr>
+        <tr>
+            <td>Training state</td>
+            <td>Saved activations, gradients, optimizer moments, checkpoints</td>
+            <td>Backward pass, fine-tuning, long-context training</td>
+        </tr>
+        <tr>
+            <td>Communication</td>
+            <td>Pipeline activations, tensor-parallel shards, MPI/RDMA transfers</td>
+            <td>Multi-node inference/training and CPU clusters</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Node Roofline Math</h2>
+
+<p>
+    CKU is not only a memory-bandwidth number and it is not only a FLOPS number.
+    A CPU node can only contribute the useful part of the slowest roof: memory
+    bandwidth, compute throughput, or network movement when the run is
+    distributed. This is why CKU belongs next to roofline analysis.
+</p>
+
+<pre><code>required_service_cku =
+    active_lifecycle_bytes_per_token
+  * tokens_per_second_per_user
+  * concurrent_streams
+
+node_memory_roof =
+    sockets
+  * memory_channels_per_socket
+  * transfer_rate_MTps
+  * 8 bytes_per_channel_transfer
+
+node_compute_roof_bytes =
+    useful_flops_per_second / arithmetic_intensity_flops_per_byte
+
+effective_node_cku =
+    min(node_memory_roof, node_compute_roof_bytes, node_network_roof)
+  * runtime_efficiency
+
+nodes_needed =
+    required_service_cku / effective_node_cku</code></pre>
+
+<p>
+    For DDR memory, a practical first-pass estimate is:
+    <code>channel_GBps = MT/s * 8 bytes / 1000</code>.
+    DDR5-6600 is about 52.8 GB/s per channel.
+    A 12-channel socket is therefore about 633.6 GB/s theoretical, and a
+    dual-socket system is about 1.27 TB/s theoretical before NUMA effects,
+    memory-controller efficiency, page placement, and OS noise.
+    At 8800 MT/s, the same 12-channel socket is about 844.8 GB/s, or about
+    1.69 TB/s for two sockets.
+</p>
+
+<p>
+    Compute has its own roof. For an AVX-512 FP32 FMA path, a rough dense-core
+    estimate is:
+    <code>cores * GHz * FMA_units_per_core * lanes_per_vector * 2 FLOPs_per_FMA</code>.
+    That estimate changes for BF16, INT8, AMX tile paths, VNNI, SVE, or Neon.
+    Quantized Q4/Q6 kernels are often limited by unpacking, metadata,
+    reductions, cache reuse, and memory traffic, so AMX is not automatically the
+    answer. In many CKE paths, AVX-512/VNNI-style layout work is the more direct
+    lever.
+</p>
+
+<p>
+    This also keeps the 1 PB/s north star honest. If a dual-socket CPU node can
+    deliver 1.2 TB/s of useful lifecycle movement, then 1 PB/s requires roughly
+    833 such nodes in the perfect case. At 60-70% useful efficiency, the number
+    is closer to 1200-1400 nodes. If quantization, MoE routing, locality, and
+    cache reuse reduce the active path to 100 GB/token at 100 tokens/sec, the
+    requirement becomes 10 TB/s, which is a very different cluster shape.
+</p>
+
+<p>
+    The CPU thesis is not that one socket beats an H100 at dense tensor math.
+    The thesis is that commodity capacity, many memory channels, many physical
+    cores, SIMD/matrix units, Linux tuning, MPI/RDMA placement, and generated C
+    scheduling can combine into a measurable aggregate byte machine. GPUs can
+    also reach enormous aggregate bandwidth, but a 1 TB resident model may need
+    many expensive HBM devices just for capacity before it even starts serving
+    traffic.
+</p>
+
 <h2>What CKE Optimizes</h2>
 
 <p>
@@ -131,14 +306,25 @@
     The same run should also show CPU utilization, memory bandwidth, cache behavior, and network transfer if the run spans nodes.
 </p>
 
-<pre><code>active_bytes_per_token = weights_touched
-                       + activations_touched
-                       + cache_or_state_touched
-                       + communication_touched
+<pre><code>active_bytes_per_token = weights_read_or_reused
+                       + activations_read_written
+                       + cache_or_state_read_written
+                       + scratch_and_layout_traffic
+                       + communication_read_written
 
 seconds_per_token      = measured_wall_time / generated_tokens
 
 CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
+
+<p>
+    A stricter report can also split <em>logical active bytes</em> from
+    <em>physical traffic</em>.
+    Logical active bytes describe the model/runtime tensors that participate in
+    the token path. Physical traffic includes cache-line rereads, layout
+    conversion, write-allocate behavior, NUMA hops, and network retransfers.
+    CKE tracks the logical path first, then uses perf, VTune, Advisor, and
+    benchmark counters to find where physical traffic is higher than it should be.
+</p>
 
 <p>
     This is the reason CKE keeps investing in visualizers, memory layouts, kernel maps, perf counters, VTune/Advisor profiles, and future MPI lanes.

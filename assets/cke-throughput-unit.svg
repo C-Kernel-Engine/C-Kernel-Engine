@@ -1,70 +1,179 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
-  <title id="title">CKE Throughput Unit</title>
-  <desc id="desc">A diagram showing how active bytes per token divided by token latency becomes aggregate bytes cycled per second across CPU nodes.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860" role="img" aria-labelledby="title desc">
+  <title id="title">CKU active-byte lifecycle across CPU nodes</title>
+  <desc id="desc">A diagram explaining CKE Throughput Unit as active lifecycle bytes per token divided by token time, with weights, activations, KV cache, CPU cores, memory channels, MPI or RDMA fabric, and service concurrency.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#252525"/>
-      <stop offset="1" stop-color="#171717"/>
+      <stop offset="0" stop-color="#262626"/>
+      <stop offset="0.55" stop-color="#1d1d1d"/>
+      <stop offset="1" stop-color="#111"/>
     </linearGradient>
-    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#ffb400"/>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffcf4a"/>
       <stop offset="1" stop-color="#ff7a18"/>
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.35"/>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#58c7ff"/>
+      <stop offset="1" stop-color="#087fc5"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#62d88d"/>
+      <stop offset="1" stop-color="#2c9f63"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c2a0ff"/>
+      <stop offset="1" stop-color="#7957d5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.38"/>
     </filter>
+    <marker id="arrowOrange" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#07adf8"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#47b475"/>
+    </marker>
+    <style>
+      .title { font: 800 36px Inter, Arial, sans-serif; fill: #f5f5f5; }
+      .subtitle { font: 500 18px Inter, Arial, sans-serif; fill: #b8b8b8; }
+      .h { font: 800 18px Inter, Arial, sans-serif; fill: #f5f5f5; }
+      .h2 { font: 700 15px Inter, Arial, sans-serif; fill: #f5f5f5; }
+      .body { font: 500 14px Inter, Arial, sans-serif; fill: #cfcfcf; }
+      .muted { font: 500 12px Inter, Arial, sans-serif; fill: #8e8e8e; }
+      .mono { font: 700 18px JetBrains Mono, Consolas, monospace; fill: #f5f5f5; }
+      .monoSmall { font: 700 13px JetBrains Mono, Consolas, monospace; fill: #f5f5f5; }
+      .panel { fill: #292929; stroke: #505050; stroke-width: 1.2; }
+      .soft { fill: #202020; stroke: #3e3e3e; stroke-width: 1; }
+      .chip { fill: #171717; stroke: #555; stroke-width: 1; }
+    </style>
   </defs>
 
-  <rect width="1200" height="620" rx="18" fill="url(#bg)"/>
-  <rect x="26" y="26" width="1148" height="568" rx="14" fill="none" stroke="#454545"/>
+  <rect width="1400" height="860" rx="22" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1344" height="804" rx="18" fill="none" stroke="#484848"/>
 
-  <text x="60" y="78" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">CKE Throughput Unit</text>
-  <text x="60" y="112" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="18">How many bytes can the full system cycle per second to produce tokens?</text>
+  <text x="60" y="78" class="title">CKU: CKE Throughput Unit</text>
+  <text x="60" y="111" class="subtitle">Active lifecycle bytes per token, cycled through CPU memory, cores, and cluster fabric.</text>
 
-  <g filter="url(#shadow)">
-    <rect x="60" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
-    <text x="88" y="194" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Active bytes per token</text>
-    <text x="88" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 TB</text>
-    <text x="88" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">Weights + activations + KV</text>
-    <text x="88" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">+ communication touched</text>
+  <g transform="translate(60 145)" filter="url(#shadow)">
+    <rect width="380" height="470" rx="14" class="panel"/>
+    <text x="28" y="42" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">1. Active lifecycle bytes</text>
+    <text x="28" y="72" class="body">The token path is not only weights.</text>
+
+    <g transform="translate(28 105)">
+      <rect width="324" height="54" rx="8" fill="#332a13" stroke="#ffb400"/>
+      <text x="18" y="23" class="h2">Weights read / reused</text>
+      <text x="18" y="43" class="muted">Q/K/V, MLP, experts, output head</text>
+    </g>
+    <g transform="translate(28 172)">
+      <rect width="324" height="54" rx="8" fill="#132b37" stroke="#07adf8"/>
+      <text x="18" y="23" class="h2">Activations read / written</text>
+      <text x="18" y="43" class="muted">prefill blocks, Q8 views, bridge buffers</text>
+    </g>
+    <g transform="translate(28 239)">
+      <rect width="324" height="54" rx="8" fill="#15301e" stroke="#47b475"/>
+      <text x="18" y="23" class="h2">KV cache / recurrent state</text>
+      <text x="18" y="43" class="muted">full context, decode history, SSM state</text>
+    </g>
+    <g transform="translate(28 306)">
+      <rect width="324" height="54" rx="8" fill="#2a2140" stroke="#a78bfa"/>
+      <text x="18" y="23" class="h2">Scratch + layout traffic</text>
+      <text x="18" y="43" class="muted">packing, dequant, load/store, spills</text>
+    </g>
+    <g transform="translate(28 373)">
+      <rect width="324" height="54" rx="8" fill="#303030" stroke="#777"/>
+      <text x="18" y="23" class="h2">Communication</text>
+      <text x="18" y="43" class="muted">MPI/RDMA, pipeline activations, shards</text>
+    </g>
   </g>
 
-  <g filter="url(#shadow)">
-    <rect x="445" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
-    <text x="473" y="194" fill="#07adf8" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Token latency target</text>
-    <text x="473" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 ms</text>
-    <text x="473" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">End-to-end prefill/decode</text>
-    <text x="473" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">system time per token</text>
+  <path d="M462 380 C515 380 515 380 565 380" stroke="#ffb400" stroke-width="4" fill="none" marker-end="url(#arrowOrange)"/>
+
+  <g transform="translate(565 145)" filter="url(#shadow)">
+    <rect width="310" height="470" rx="14" class="panel"/>
+    <text x="26" y="42" fill="#07adf8" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">2. CKE compiler/runtime</text>
+    <text x="26" y="72" class="body">Plan the byte path before execution.</text>
+
+    <g transform="translate(30 112)">
+      <rect width="250" height="56" rx="8" class="soft"/>
+      <text x="18" y="24" class="h2">Template + IR lowering</text>
+      <text x="18" y="44" class="muted">model circuit → kernel map</text>
+    </g>
+    <g transform="translate(30 188)">
+      <rect width="250" height="56" rx="8" class="soft"/>
+      <text x="18" y="24" class="h2">Memory planner</text>
+      <text x="18" y="44" class="muted">offsets, lifetimes, KV/cache</text>
+    </g>
+    <g transform="translate(30 264)">
+      <rect width="250" height="56" rx="8" class="soft"/>
+      <text x="18" y="24" class="h2">Generated C kernels</text>
+      <text x="18" y="44" class="muted">SIMD/AMX/SVE-friendly loops</text>
+    </g>
+    <g transform="translate(30 340)">
+      <rect width="250" height="56" rx="8" class="soft"/>
+      <text x="18" y="24" class="h2">Runtime schedule</text>
+      <text x="18" y="44" class="muted">prefill, decode, pipeline ranks</text>
+    </g>
+
+    <text x="34" y="440" class="monoSmall">active_bytes / token_time</text>
   </g>
 
-  <g filter="url(#shadow)">
-    <rect x="830" y="152" width="310" height="155" rx="10" fill="#303030" stroke="#555"/>
-    <text x="858" y="194" fill="#47b475" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Aggregate data rate</text>
-    <text x="858" y="232" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="30">1 PB/s</text>
-    <text x="858" y="266" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">1000 TB/s aggregate</text>
-    <text x="858" y="288" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="15">across all compute nodes</text>
+  <path d="M897 380 C940 380 940 380 982 380" stroke="#07adf8" stroke-width="4" fill="none" marker-end="url(#arrowBlue)"/>
+
+  <g transform="translate(982 145)" filter="url(#shadow)">
+    <rect width="338" height="470" rx="14" class="panel"/>
+    <text x="26" y="42" fill="#47b475" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">3. CPU node fabric</text>
+    <text x="26" y="72" class="body">CKU rises by aggregating useful channels.</text>
+
+    <g transform="translate(28 105)">
+      <rect width="282" height="88" rx="10" fill="#1b261f" stroke="#47b475"/>
+      <rect x="16" y="18" width="56" height="52" rx="6" class="chip"/>
+      <text x="31" y="51" class="monoSmall">CPU</text>
+      <g fill="#47b475">
+        <rect x="94" y="20" width="20" height="20" rx="3"/>
+        <rect x="120" y="20" width="20" height="20" rx="3"/>
+        <rect x="146" y="20" width="20" height="20" rx="3"/>
+        <rect x="172" y="20" width="20" height="20" rx="3"/>
+        <rect x="94" y="48" width="20" height="20" rx="3"/>
+        <rect x="120" y="48" width="20" height="20" rx="3"/>
+        <rect x="146" y="48" width="20" height="20" rx="3"/>
+        <rect x="172" y="48" width="20" height="20" rx="3"/>
+      </g>
+      <text x="210" y="36" class="muted">cores</text>
+      <text x="210" y="56" class="muted">SIMD/AMX</text>
+    </g>
+
+    <g transform="translate(28 218)">
+      <rect width="282" height="68" rx="10" fill="#302914" stroke="#ffb400"/>
+      <text x="18" y="28" class="h2">DDR5/DDR6 memory channels</text>
+      <text x="18" y="50" class="muted">weights + activations + cache/state</text>
+    </g>
+
+    <g transform="translate(28 312)">
+      <rect width="282" height="68" rx="10" fill="#132736" stroke="#07adf8"/>
+      <text x="18" y="28" class="h2">NIC / MPI / RDMA fabric</text>
+      <text x="18" y="50" class="muted">pipeline stages, tensor shards, ranks</text>
+    </g>
+
+    <text x="30" y="414" class="monoSmall">node CKU <= min(mem, compute, NIC)</text>
+    <text x="30" y="438" class="monoSmall">cluster CKU = sum(nodes) - stalls</text>
   </g>
 
-  <path d="M386 230 H424" stroke="#ffb400" stroke-width="4" stroke-linecap="round"/>
-  <path d="M424 230 l-12 -8 v16 z" fill="#ffb400"/>
-  <text x="392" y="212" fill="#808080" font-family="Inter, Arial, sans-serif" font-size="15">divided by</text>
+  <g transform="translate(86 662)" filter="url(#shadow)">
+    <rect width="1228" height="122" rx="16" fill="#1f1f1f" stroke="#454545"/>
+    <text x="30" y="40" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">Lifecycle envelope</text>
+    <text x="30" y="70" class="body">Single user at full intended context: weights + activations + full KV/cache/state + load/store + communication.</text>
+    <text x="30" y="100" class="mono">single_user_cku = active_lifecycle_bytes_per_token / seconds_per_token</text>
 
-  <path d="M771 230 H809" stroke="#47b475" stroke-width="4" stroke-linecap="round"/>
-  <path d="M809 230 l-12 -8 v16 z" fill="#47b475"/>
-  <text x="770" y="212" fill="#808080" font-family="Inter, Arial, sans-serif" font-size="15">equals</text>
+    <path d="M690 26 V98" stroke="#454545"/>
+    <text x="720" y="40" fill="#47b475" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">Service envelope</text>
+    <text x="720" y="70" class="body">Concurrency is explicit: 1000 users at 1 tok/s is not the same as 1 user at 1000 tok/s.</text>
+    <text x="720" y="100" class="mono">service_cku = single_user_cku × streams</text>
+  </g>
 
-  <rect x="145" y="360" width="910" height="98" rx="12" fill="#1f1f1f" stroke="#454545"/>
-  <text x="180" y="406" fill="#f5f5f5" font-family="JetBrains Mono, Consolas, monospace" font-size="28">CKU = active_bytes_per_token / seconds_per_token</text>
-  <text x="180" y="438" fill="#b0b0b0" font-family="Inter, Arial, sans-serif" font-size="16">1 PB/s means the system can cycle one terabyte of active token-path data every millisecond.</text>
-
-  <g>
-    <circle cx="235" cy="520" r="16" fill="url(#orange)"/>
-    <text x="265" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">Linux tuning</text>
-    <circle cx="410" cy="520" r="16" fill="#07adf8"/>
-    <text x="440" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">SIMD / AMX kernels</text>
-    <circle cx="630" cy="520" r="16" fill="#47b475"/>
-    <text x="660" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">NUMA + memory channels</text>
-    <circle cx="910" cy="520" r="16" fill="#b48cff"/>
-    <text x="940" y="526" fill="#d0d0d0" font-family="Inter, Arial, sans-serif" font-size="16">MPI / RDMA clusters</text>
+  <g transform="translate(82 805)">
+    <text x="0" y="0" class="muted">North-star example: 1 TB active path at 1 ms/token ⇒ 1 PB/s. Dual socket 12ch DDR5-6600 is ~1.27 TB/s theoretical, so PB/s scale is a cluster roofline problem.</text>
+    <text x="0" y="24" class="muted">nodes_needed ≈ required_CKU / effective_node_CKU, after NUMA, OS jitter, network, and kernel efficiency.</text>
   </g>
 </svg>
