@@ -14,6 +14,13 @@
         The proposed CKE unit is aggregate bytes cycled per second across the full token path.
         The north-star target is <strong>1 petabyte/sec</strong>, which is the same as <strong>1000 terabytes/sec</strong>, or <strong>1 terabyte every millisecond</strong>.
     </p>
+    <p style="font-size: 1.08em; line-height: 1.7; margin-top: 1.2rem; margin-bottom: 0;">
+        The reference CKU is <strong>useful model-math byte throughput</strong>, not a copy-bandwidth score.
+        A DSA engine can move bytes, but CKU asks whether active weights, activations, and cache/state are
+        fed through GEMM/FMA/attention work to advance the model. The clean upper-bound reference is
+        full-context prefill, where active weights are cycled through mostly GEMM. Decode is a related but
+        different path: mostly GEMV plus KV/cache reads and writes.
+    </p>
 </div>
 
 <div class="img-container svg-viewer" data-title="CKE Throughput Unit">
@@ -27,7 +34,8 @@
 <p>
     CKU means <strong>C-Kernel throughput unit</strong>.
     The unit is not just DRAM bandwidth from one socket and it is not just matrix FLOPS.
-    It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse in order to produce tokens.
+    It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse through useful model compute in order to produce tokens.
+    Plain copies are not enough; the bytes have to arrive in the right layout at the right kernel and participate in the model's math.
     Depending on the model and phase, that can include:
 </p>
 
@@ -121,6 +129,17 @@
     if the active token path is one terabyte and the target is one millisecond per token, the cumulative runtime has to behave like a one-petabyte-per-second machine.
     That machine does not have to be one CPU.
     It can be a coordinated set of CPU sockets, memory channels, NUMA domains, and Linux nodes.
+</p>
+
+<p>
+    In CKE, this is intentionally anchored to the hardest clean reference:
+    <strong>full-context prefill over the active model path</strong>.
+    Prefill is mostly GEMM-shaped work over many token rows, so the system must
+    stream active weights, reuse activations, execute reductions, and write the
+    next layer state at high rate. Decode is measured too, but it is usually a
+    different shape: mostly GEMV over one or a few token rows, plus KV/cache
+    reads and writes. That is why CKU should report the phase and workload
+    shape, not only the headline byte rate.
 </p>
 
 <h2>What Counts as Active Bytes?</h2>
