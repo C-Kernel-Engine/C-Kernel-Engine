@@ -863,6 +863,7 @@
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
             <a href="scaling.html" class="">Scaling</a>
+            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
@@ -1137,6 +1138,7 @@
         <span class="hero-stat"><strong>9+</strong> fwd + bwd kernels</span>
         <span class="hero-stat"><strong>IR1 → IR2 → IR3</strong> codegen</span>
         <span class="hero-stat"><strong>VTune / Advisor</strong> profiling</span>
+        <span class="hero-stat"><strong>CKU</strong> PB/s byte-path metric</span>
         <span class="hero-stat"><strong>C-first</strong> execution</span>
     </div>
 </div>
@@ -1154,6 +1156,14 @@
     <h3 style="margin-top: 0;">Long-Horizon Commodity Compute Bet</h3>
     <p>CKE assumes AI execution will not remain permanently locked inside expensive accelerator stacks, because the underlying workload is still math, memory movement, and systems software. Accelerators matter, but they do not change the shape of the problem: tensors must live somewhere, bytes must move through memory hierarchies, kernels must execute, and distributed systems must coordinate the work.</p>
     <p style="margin-bottom: 0;">If CPUs keep gaining cores, SIMD and matrix units, memory channels, NUMA controls, and fast interconnects, then a clean generated-C runtime that can orchestrate many cheap Linux nodes becomes increasingly interesting. The bet is not that one CPU beats every GPU. The bet is that commodity CPU clusters can become a practical, auditable, incrementally scalable execution substrate for a large class of AI inference and training workloads.</p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">CKU: CKE Throughput Unit</h3>
+    <p>CKU is the project’s north-star systems metric: active model bytes cycled through useful model math per second. It is not memcpy or DSA copy bandwidth. The reference workload is full-context prefill, where active weights and activations flow through GEMM/FMA/attention; decode is tracked separately as GEMV plus KV/cache traffic.</p>
+    <p style="margin-bottom: 0;">
+        <a href="cke-throughput-unit.html" class="btn btn-sm">Read the CKU page →</a>
+    </p>
 </div>
 
 <div class="card card-green">
@@ -1562,7 +1572,7 @@ python version/v7/scripts/ck_run_v7.py train \
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-07-04 16:32</span>
+        <span class="folder-updated">Updated: 2026-07-04 20:36</span>
     </div>
     <pre class="tree-output">
 src/kernels
