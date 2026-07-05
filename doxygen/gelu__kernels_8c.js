@@ -1,26 +1,11 @@
 var gelu__kernels_8c =
 [
-    [ "_GNU_SOURCE", "gelu__kernels_8c.html#a369266c24eacffb87046522897a570d5", null ],
-    [ "ck_gelu_ggml_cpu_init_fn", "gelu__kernels_8c.html#a93f0be0bc415f9ba50f36df3f800b85c", null ],
-    [ "ck_gelu_ggml_fp16_to_fp32_fn", "gelu__kernels_8c.html#a25b9eee043b230c304d7d44b0cfe54d4", null ],
-    [ "ck_gelu_ggml_fp32_to_fp16_fn", "gelu__kernels_8c.html#a638388379a18442d0a3c03256243a95b", null ],
-    [ "ck_gelu_ggml_runtime_init", "gelu__kernels_8c.html#a0bc5158b1cda49eb5176af325bb07bc2", null ],
-    [ "ck_gelu_ggml_table_init", "gelu__kernels_8c.html#ab2ab62212a2b2e21b12d60f9977b31b0", null ],
-    [ "ck_gelu_tanh_f32", "gelu__kernels_8c.html#ae2bf41b9b9172a7a197fc197d1e17200", null ],
-    [ "ck_gelu_tanh_ggml_f32", "gelu__kernels_8c.html#a0bef097df68d023b2c104ac68da8fa29", null ],
-    [ "ck_gelu_try_bind_runtime", "gelu__kernels_8c.html#a47aef981ac51c59b32d08bc11446d1b5", null ],
+    [ "geglu_backward_fp32", "gelu__kernels_8c.html#a44b759126bd6e478b5fc2720aa0dd2ea", null ],
+    [ "geglu_forward_bf16", "gelu__kernels_8c.html#ac2146f8009ce79891bd0b7d54e174992", null ],
+    [ "geglu_forward_fp32", "gelu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda", null ],
     [ "gelu_backward_exact", "gelu__kernels_8c.html#a3075b77764b4b408e3c1c9b89a2822ad", null ],
     [ "gelu_backward_fast", "gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478", null ],
     [ "gelu_backward_scalar", "gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763", null ],
     [ "gelu_exact_inplace", "gelu__kernels_8c.html#a315f43ac44656b5d77360d9879c5f122", null ],
-    [ "gelu_fast_inplace", "gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365", null ],
-    [ "gelu_ggml_inplace", "gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb", null ],
-    [ "ck_gelu_ggml_runtime_once", "gelu__kernels_8c.html#adca08cfc740df10ac2ef0f0c895f50b8", null ],
-    [ "ck_gelu_ggml_table_f16", "gelu__kernels_8c.html#ab3debc2a69f7f85c072ab78453ec5565", null ],
-    [ "ck_gelu_ggml_table_once", "gelu__kernels_8c.html#a5eafec0c7299984eb731b697944ebdaa", null ],
-    [ "ck_gelu_runtime_fp16_to_fp32", "gelu__kernels_8c.html#a874db4408c347018b2eaafc7bc9e4dde", null ],
-    [ "ck_gelu_runtime_fp32_to_fp16", "gelu__kernels_8c.html#a767033c1118c22705a32726c7f29440f", null ],
-    [ "ck_gelu_runtime_handle", "gelu__kernels_8c.html#a12449dfff2a4607d9b678188e98cac8e", null ],
-    [ "ck_gelu_runtime_ready", "gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683", null ],
-    [ "ck_gelu_runtime_table_f16", "gelu__kernels_8c.html#a28b32095708fdb6304b1b7d322942e42", null ]
+    [ "gelu_fast_inplace", "gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365", null ]
 ];
