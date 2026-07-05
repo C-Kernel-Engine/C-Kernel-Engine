@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">CKU node roofline math</title>
+  <desc id="desc">A diagram explaining how required service CKU is compared with effective node CKU, where a CPU node is limited by memory bandwidth, useful compute throughput, and network movement, then divided to estimate nodes needed.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#282828"/>
+      <stop offset="0.55" stop-color="#1d1d1d"/>
+      <stop offset="1" stop-color="#101010"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd35a"/>
+      <stop offset="1" stop-color="#ff8b1f"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66d4ff"/>
+      <stop offset="1" stop-color="#0a85d8"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#69df95"/>
+      <stop offset="1" stop-color="#2a9f64"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c4a7ff"/>
+      <stop offset="1" stop-color="#7756d8"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-20%" width="136%" height="145%">
+      <feDropShadow dx="0" dy="12" stdDeviation="13" flood-color="#000" flood-opacity="0.38"/>
+    </filter>
+    <marker id="arrowGold" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#ffb400"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#27b8ff"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M1,1 L12,7 L1,13 Z" fill="#47b475"/>
+    </marker>
+    <style>
+      .title { font: 800 36px Inter, Arial, sans-serif; fill: #f5f5f5; }
+      .subtitle { font: 500 18px Inter, Arial, sans-serif; fill: #bebebe; }
+      .section { font: 800 21px Inter, Arial, sans-serif; fill: #f6f6f6; }
+      .h { font: 800 17px Inter, Arial, sans-serif; fill: #f7f7f7; }
+      .body { font: 500 14px Inter, Arial, sans-serif; fill: #d0d0d0; }
+      .muted { font: 500 12px Inter, Arial, sans-serif; fill: #939393; }
+      .mono { font: 700 18px JetBrains Mono, Consolas, monospace; fill: #f5f5f5; }
+      .monoSmall { font: 700 13px JetBrains Mono, Consolas, monospace; fill: #f5f5f5; }
+      .panel { fill: #292929; stroke: #505050; stroke-width: 1.2; }
+      .inner { fill: #202020; stroke: #404040; stroke-width: 1; }
+      .pill { fill: #171717; stroke: #555; stroke-width: 1; }
+      .eq { font: 800 24px Inter, Arial, sans-serif; fill: #ffb400; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="820" rx="22" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1344" height="764" rx="18" fill="none" stroke="#484848"/>
+
+  <text x="60" y="78" class="title">CKU Node Roofline Math</text>
+  <text x="60" y="111" class="subtitle">How the 1 PB/s target becomes a concrete CPU cluster sizing problem.</text>
+  <text x="60" y="136" class="muted">CKU counts useful model-math bytes: weights, activations, KV/cache/state, load/store traffic, and communication that feed GEMM/FMA/attention work.</text>
+
+  <g transform="translate(60 170)" filter="url(#shadow)">
+    <rect width="370" height="420" rx="15" class="panel"/>
+    <text x="28" y="42" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="800">1. Required service CKU</text>
+    <text x="28" y="72" class="body">Start with the model path you promise to serve.</text>
+
+    <g transform="translate(28 104)">
+      <rect width="314" height="62" rx="9" fill="#332a13" stroke="#ffb400"/>
+      <text x="18" y="25" class="h">Active lifecycle bytes / token</text>
+      <text x="18" y="46" class="muted">weights + activations + KV/cache + stores</text>
+    </g>
+    <text x="176" y="190" class="eq">x</text>
+    <g transform="translate(28 212)">
+      <rect width="314" height="62" rx="9" fill="#132b37" stroke="#27b8ff"/>
+      <text x="18" y="25" class="h">Tokens / second / user</text>
+      <text x="18" y="46" class="muted">latency target: 1 ms/token = 1000 tok/s</text>
+    </g>
+    <text x="176" y="298" class="eq">x</text>
+    <g transform="translate(28 320)">
+      <rect width="314" height="62" rx="9" fill="#2a2140" stroke="#a78bfa"/>
+      <text x="18" y="25" class="h">Concurrent streams</text>
+      <text x="18" y="46" class="muted">single-user CKU or service CKU</text>
+    </g>
+  </g>
+
+  <path d="M456 380 C495 380 495 380 536 380" stroke="#ffb400" stroke-width="4" fill="none" marker-end="url(#arrowGold)"/>
+
+  <g transform="translate(536 170)" filter="url(#shadow)">
+    <rect width="420" height="420" rx="15" class="panel"/>
+    <text x="28" y="42" fill="#27b8ff" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="800">2. Effective node CKU</text>
+    <text x="28" y="72" class="body">A node contributes only the useful part of its slowest roof.</text>
+
+    <g transform="translate(28 104)">
+      <rect width="364" height="70" rx="9" fill="#302914" stroke="#ffb400"/>
+      <text x="18" y="25" class="h">Memory roof</text>
+      <text x="18" y="47" class="monoSmall">sockets x channels x MT/s x 8 bytes</text>
+      <text x="18" y="64" class="muted">example: dual 12ch DDR5-6600 is ~1.27 TB/s theoretical</text>
+    </g>
+
+    <g transform="translate(28 192)">
+      <rect width="364" height="70" rx="9" fill="#182c36" stroke="#27b8ff"/>
+      <text x="18" y="25" class="h">Compute roof in byte terms</text>
+      <text x="18" y="47" class="monoSmall">useful FLOP/s / arithmetic intensity</text>
+      <text x="18" y="64" class="muted">FMA, VNNI, AMX, SVE, unpacking, reductions</text>
+    </g>
+
+    <g transform="translate(28 280)">
+      <rect width="364" height="70" rx="9" fill="#15301e" stroke="#47b475"/>
+      <text x="18" y="25" class="h">Network roof</text>
+      <text x="18" y="47" class="monoSmall">usable NIC/RDMA bytes/s</text>
+      <text x="18" y="64" class="muted">pipeline activations, tensor shards, MPI ranks</text>
+    </g>
+
+    <text x="32" y="382" class="monoSmall">effective_node_cku = min(mem, compute, net) x efficiency</text>
+  </g>
+
+  <path d="M982 380 C1020 380 1020 380 1060 380" stroke="#27b8ff" stroke-width="4" fill="none" marker-end="url(#arrowCyan)"/>
+
+  <g transform="translate(1060 170)" filter="url(#shadow)">
+    <rect width="280" height="420" rx="15" class="panel"/>
+    <text x="24" y="42" fill="#47b475" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="800">3. Nodes needed</text>
+    <text x="24" y="72" class="body">Divide the service target by the effective node contribution.</text>
+
+    <g transform="translate(24 116)">
+      <rect width="232" height="88" rx="10" fill="#1b261f" stroke="#47b475"/>
+      <text x="18" y="34" class="mono">nodes_needed</text>
+      <text x="18" y="62" class="monoSmall">= required_service_cku</text>
+      <text x="32" y="80" class="monoSmall">/ effective_node_cku</text>
+    </g>
+
+    <g transform="translate(24 236)">
+      <rect width="232" height="112" rx="10" fill="#242424" stroke="#626262"/>
+      <text x="18" y="28" class="h">North-star example</text>
+      <text x="18" y="52" class="monoSmall">1 TB at 1 ms</text>
+      <text x="18" y="74" class="monoSmall">= 1 PB/s</text>
+      <text x="18" y="96" class="muted">not one socket: a cluster roof</text>
+    </g>
+
+    <text x="28" y="384" class="muted">If runtime efficiency is 60-70%,</text>
+    <text x="28" y="405" class="muted">the node count rises accordingly.</text>
+  </g>
+
+  <g transform="translate(72 640)" filter="url(#shadow)">
+    <rect width="1256" height="108" rx="16" fill="#1f1f1f" stroke="#474747"/>
+    <text x="30" y="38" fill="#ffb400" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="800">Interpretation</text>
+    <text x="30" y="68" class="body">CKU is not a theoretical memcpy score. DSA can copy bytes; CKU asks whether those bytes are consumed by kernels that advance the model.</text>
+    <text x="30" y="94" class="body">Prefill is the clean reference because it stresses full-context GEMM/FMA/attention. Decode is usually GEMV plus KV/cache traffic and should be measured as its own path.</text>
+  </g>
+
+  <g transform="translate(76 775)">
+    <text x="0" y="0" class="muted">Practical estimate: required_service_cku / effective_node_cku, then validate with perf, VTune/Advisor roofline, NUMA placement, and end-to-end token timing.</text>
+  </g>
+</svg>
