@@ -1,5 +1,8 @@
 var NAVTREEINDEX16 =
 {
+"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd":[1,0,69,0],
+"structNUMATopology.html#a4f4876ca34eed1e6c7732e611a13a674":[1,0,69,1],
+"structNUMATopology.html#ab0befa19cd4b9b08a68d901f301e9de7":[1,0,69,2],
 "structNetworkInterface.html":[1,0,66],
 "structNetworkInterface.html#a156a7eee11ff7323838f53326e25d730":[1,0,66,10],
 "structNetworkInterface.html#a260f76fbda4cab4180579f1bf506bf76":[1,0,66,7],
@@ -246,8 +249,5 @@ var NAVTREEINDEX16 =
 "system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446a2c69bb37dc1534af0986f7fb4a63f83b":[2,0,0,31,23,3],
 "system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e":[2,0,0,31,23,1],
 "system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446a86e1aa77256345474354d36dade4c2cc":[2,0,0,31,23,0],
-"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba":[2,0,0,31,23,2],
-"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446ab4c62d868d6055729709c1e2b51bf688":[2,0,0,31,23,4],
-"system__topology_8h.html#ac739fbe17c86f1c7e9da9c6ad2a8b176":[2,0,0,31,35],
-"system__topology_8h.html#adaa69e0d4a8c8c3b9e50adcd45db083b":[2,0,0,31,44]
+"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446aa27b104e8216e409c0e049077a3259ba":[2,0,0,31,23,2]
 };

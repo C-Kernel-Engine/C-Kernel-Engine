@@ -1016,7 +1016,7 @@
 
 
 <details open>
-    <summary>GEMM (Matrix Multiplication) (175)</summary>
+    <summary>GEMM (Matrix Multiplication) (177)</summary>
     <div class="accordion-content">
 
 
@@ -1952,6 +1952,16 @@
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse(const void * A_q8, const void * B_packed_x8, const float * bias, float * C, int M, int N, int K, int tile_m, int active_threads)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -2476,6 +2486,16 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_q4_packed_meta_x16_mtile_thread_fn(int ith, int nth, void * args)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_q4_packed_meta_x8_mreuse_thread_fn</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_q4_packed_meta_x8_mreuse_thread_fn(int ith, int nth, void * args)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5909,7 +5929,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1132)</summary>
+    <summary>Other Functions (1133)</summary>
     <div class="accordion-content">
 
 
@@ -5969,6 +5989,16 @@ test_rope.py::TestRoPECache::test_cache_values</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void accum_q4_k_packed_meta_x8_q8_k_block(float acc, const block_q4_K_packed_meta_x8 * w, int active, const block_q8_K * x)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">accum_q4_k_packed_meta_x8_q8_k_block_mreuse</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void accum_q4_k_packed_meta_x8_q8_k_block_mreuse(float acc, const block_q4_K_packed_meta_x8 * w, int active, const block_q8_K * A, int blocks_per_vec, int block_index, int m0, int m_count)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

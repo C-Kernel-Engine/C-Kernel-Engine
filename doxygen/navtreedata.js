@@ -61,18 +61,18 @@ var NAVTREEINDEX =
 "ckernel__orchestration_8h.html#aae6b6e1796c190320ef20f0476dc2e9d",
 "functions_r.html",
 "gemm__kernels__q4k__q8k_8c.html#ab9e702b60341c1566dff759f806faaa9",
-"gemm__microkernel_8c.html#adcc8293c7a06a4f12c2acfccb8d3cac0",
-"mega__fused__attention_8h.html#a7b2cd3664e2858631e67aebb6576b1e2",
-"recurrent__gate__kernels_8c.html#ae4d0d6861eb48e7e667044bfd536277d",
-"structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410",
-"structCKLayerForwardParamsQ4K.html#a7ea6e14a98a47d72837f92f2a5601566",
-"structCKModelConfig.html#a902b19335449fa61c1e532d9999aa342",
-"structNetworkInterface.html",
-"system__topology_8h.html#ae2a6ad58442a4e6de7cdfa4aeea1ec02",
-"utf8_8c.html#a99351866c99dd535b491e8143169f52b",
-"v6_85_2test__generated_2int8__q4k__test_8c.html#ab70d618edaf131d06ed3efa0eab989dc",
-"v6_86_2generated_2ck-kernel-inference_8h.html#aff12b46bae31528d8538b89a5633fb72",
-"v6_86_2test__generated_2qwen2__int8_8c.html#a16afbb17d8fc5d06bc746711b2c2b15e"
+"gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74",
+"mega__fused__attention_8h.html#a37f0664c9146b0e5a80624fdaffbb1f5",
+"recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf",
+"structCKBumpHeaderV5.html#aa6180be6914b09dc9d1466caa7402c75",
+"structCKLayerForwardParamsQ4K.html#a7871fd5d96ccc288a12c6e08415c82dc",
+"structCKModelConfig.html#a5d3ef4cd4a7f401a8f6cca7bab276869",
+"structNUMATopology.html#a2a61e03ff57dd6feb35b92d1e03c0cdd",
+"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446ab4c62d868d6055729709c1e2b51bf688",
+"utf8_8c.html#a77837f31824e662ea801692c952185fa",
+"v6_85_2test__generated_2int8__q4k__test_8c.html#aa8ca4457ed45b249070902104b81b607",
+"v6_86_2generated_2ck-kernel-inference_8h.html#aea4ed8cac30a0aa493b05e717316b57b",
+"v6_86_2test__generated_2qwen2__int8_8c.html#a0cfd0d104b622b5158f9add5c66330c8"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
