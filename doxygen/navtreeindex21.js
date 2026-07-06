@@ -1,5 +1,7 @@
 var NAVTREEINDEX21 =
 {
+"v6_86_2test__generated_2qwen2__int8_8c.html#a04b2f4fbbf4b58951807d9abc141ffd8":[2,0,1,7,1,4,62],
+"v6_86_2test__generated_2qwen2__int8_8c.html#a0510fee3ff5d11afcae9436c01636ebc":[2,0,1,7,1,4,51],
 "v6_86_2test__generated_2qwen2__int8_8c.html#a0cfd0d104b622b5158f9add5c66330c8":[2,0,1,7,1,4,35],
 "v6_86_2test__generated_2qwen2__int8_8c.html#a103089856415dfa7dcf06968b94a55ee":[2,0,1,7,1,4,31],
 "v6_86_2test__generated_2qwen2__int8_8c.html#a168af438bba2c00fa0050a11e2356b07":[2,0,1,7,1,4,42],
