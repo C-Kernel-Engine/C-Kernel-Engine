@@ -137,35 +137,22 @@ $(document).ready(function(){initNavTree('quantize__row__q8__k__avx2_8c_source.h
 <div class="line"><a id="l00002" name="l00002"></a><span class="lineno">    2</span><span class="comment"> * @file quantize_row_q8_k_avx2.c</span></div>
 <div class="line"><a id="l00003" name="l00003"></a><span class="lineno">    3</span><span class="comment"> * @brief AVX2 entrypoint for exact Q8_K row quantization</span></div>
 <div class="line"><a id="l00004" name="l00004"></a><span class="lineno">    4</span><span class="comment"> *</span></div>
-<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="comment"> * CK-ENGINE KERNEL RULES:</span></div>
-<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="comment"> * =======================</span></div>
-<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment"> * 1. NO malloc/free - memory via bump allocator, pointers passed in</span></div>
-<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment"> * 2. NO OpenMP - parallelization at orchestrator/codegen layer</span></div>
-<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="comment"> * 3. API must define: inputs, outputs, workspace, and memory layouts</span></div>
-<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="comment"> * 4. Pure computation - deterministic, no side effects</span></div>
-<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span><span class="comment"> *</span></div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="comment"> * After changes: make test &amp;&amp; make llamacpp-parity-full</span></div>
-<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span><span class="comment"> */</span></div>
-<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span> </div>
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
-<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span> </div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k);</div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k);</div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span> </div>
-<div class="foldopen" id="foldopen00020" data-start="{" data-end="}">
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__q8k_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">   20</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">quantize_row_q8_k_avx2</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k) {</div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>    <span class="comment">/* Reuse the parity-clean SIMD implementation until a wider AVX2 variant is</span></div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span><span class="comment">     * worth maintaining separately. */</span></div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="preprocessor">#if defined(__SSE4_1__)</span></div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>    <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a>(x, vy, k);</div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>    <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>}</div>
+<div class="line"><a id="l00005" name="l00005"></a><span class="lineno">    5</span><span class="comment"> * The previous AVX2 entrypoint delegated to the SSE implementation. On this</span></div>
+<div class="line"><a id="l00006" name="l00006"></a><span class="lineno">    6</span><span class="comment"> * CPU the scalar reference compiles into a faster loop than both the SSE body</span></div>
+<div class="line"><a id="l00007" name="l00007"></a><span class="lineno">    7</span><span class="comment"> * and a hand-written AVX2 pack path, while preserving byte-exact Q8_K output.</span></div>
+<div class="line"><a id="l00008" name="l00008"></a><span class="lineno">    8</span><span class="comment"> */</span></div>
+<div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span> </div>
+<div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
+<div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span> </div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k);</div>
+<div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span> </div>
+<div class="foldopen" id="foldopen00014" data-start="{" data-end="}">
+<div class="line"><a id="l00014" name="l00014"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__q8k_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">   14</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">quantize_row_q8_k_avx2</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *x, <span class="keywordtype">void</span> *vy, <span class="keywordtype">int</span> k) {</div>
+<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span>    <a class="code hl_function" href="quantize__row__q8__k__avx2_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
+<div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span>}</div>
 </div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
-<div class="ttc" id="aquantize__row__q8__k__avx2_8c_html_a4dcada19df0f80a18a9c5ebd2c4b9a35"><div class="ttname"><a href="quantize__row__q8__k__avx2_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">quantize_row_q8_k_avx2</a></div><div class="ttdeci">void quantize_row_q8_k_avx2(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__avx2_8c_source.html#l00020">quantize_row_q8_k_avx2.c:20</a></div></div>
-<div class="ttc" id="aquantize__row__q8__k__avx2_8c_html_ad7fa7d735b58b52c90cbd6160676e86f"><div class="ttname"><a href="quantize__row__q8__k__avx2_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a></div><div class="ttdeci">void quantize_row_q8_k_sse(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00022">quantize_row_q8_k_sse.c:22</a></div></div>
+<div class="ttc" id="aquantize__row__q8__k__avx2_8c_html_a4dcada19df0f80a18a9c5ebd2c4b9a35"><div class="ttname"><a href="quantize__row__q8__k__avx2_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35">quantize_row_q8_k_avx2</a></div><div class="ttdeci">void quantize_row_q8_k_avx2(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__avx2_8c_source.html#l00014">quantize_row_q8_k_avx2.c:14</a></div></div>
 <div class="ttc" id="aquantize__row__q8__k__avx2_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="quantize__row__q8__k__avx2_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00055">gemm_kernels_q4k_q8k.c:55</a></div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
