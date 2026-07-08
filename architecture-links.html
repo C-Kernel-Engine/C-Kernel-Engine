@@ -899,6 +899,7 @@
                         <div class="menu-heading">Optimization</div>
                         <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>VTune, Advisor, roofline, parity gates</small></a>
                         <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
                         <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
@@ -910,6 +911,7 @@
                         <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
@@ -1053,6 +1055,16 @@
         <a class="runbook-link" href="v7-profiling.html">Open v7 Profiling</a>
     </div>
     <div class="runbook-card">
+        <h3>Kernel Tuning Methodology</h3>
+        <p>CPU-node tuning loop for v8/v7 kernels: practical coherence, fixed-token throughput, CK profile CSV, VTune, Advisor roofline, microkernel labs, and PR logs.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">VTune</span>
+            <span class="runbook-tag">Advisor roofline</span>
+            <span class="runbook-tag">CK_PROFILE</span>
+        </div>
+        <a class="runbook-link" href="kernel-tuning-methodology.html">Open Methodology</a>
+    </div>
+    <div class="runbook-card">
         <h3>v7 SVG Dataset Runbook</h3>
         <p>Operator workflow to generate Stage A pretraining and Stage B midtraining SVG corpora from <code>docs/site/assets/*.svg</code>, then hand off to v7 training.</p>
         <div class="runbook-tags">
@@ -1140,6 +1152,8 @@
                 <span class="subtitle">IR3 memory + parallel execution plan</span></li>
             <li><a href="gemm-optimization.html#v7-threadpool-playbook">Threadpool GEMM Playbook</a>
                 <span class="subtitle">Split M/N/K policy for training</span></li>
+            <li><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>
+                <span class="subtitle">VTune, Advisor, roofline, CK profile, parity, and benchmark log discipline</span></li>
             <li><a href="simd-architecture.html">SIMD Architecture</a>
                 <span class="subtitle">AVX-512, VNNI, AMX</span></li>
             <li><a href="flash_attention.html">Flash Attention Analysis</a>
@@ -1156,6 +1170,8 @@
                 <span class="subtitle">RDMA, interpretability</span></li>
             <li><a href="profiling.html">Profiling Guide</a>
                 <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
+            <li><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>
+                <span class="subtitle">CPU-node roofline workflow for v8/v7 kernel performance work</span></li>
             <li><a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>
                 <span class="subtitle">Validated decoder/mmproj workflow for multimodal inference</span></li>
             <li><a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>
@@ -1221,11 +1237,11 @@
         </tr>
         <tr>
             <td><strong>Performance optimization</strong></td>
-            <td><a href="gemm-memory-layout.html">GEMM Layout</a>, <a href="gemm-memory-layout.html#v7-train-parallel-plan">v7 Train Layout+Dispatch</a>, <a href="gemm-optimization.html#v7-threadpool-playbook">Threadpool Playbook</a>, <a href="simd-architecture.html">SIMD</a></td>
+            <td><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>, <a href="gemm-memory-layout.html">GEMM Layout</a>, <a href="gemm-memory-layout.html#v7-train-parallel-plan">v7 Train Layout+Dispatch</a>, <a href="gemm-optimization.html#v7-threadpool-playbook">Threadpool Playbook</a>, <a href="simd-architecture.html">SIMD</a></td>
         </tr>
             <tr>
                 <td><strong>Debugging & profiling</strong></td>
-                <td><a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>, <a href="v7-runbook.html">v7 Runbook</a>, <a href="v7-python-authoring.html">v7 Python Authoring Guide</a></td>
+                <td><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>, <a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>, <a href="v7-runbook.html">v7 Runbook</a>, <a href="v7-python-authoring.html">v7 Python Authoring Guide</a></td>
             </tr>
             <tr>
                 <td><strong>Operator train + compute workflow</strong></td>
@@ -1461,7 +1477,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-08</p>
             </div>
         </div>
     </footer>
