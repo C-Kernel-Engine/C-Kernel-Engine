@@ -51,7 +51,7 @@ var searchData=
   ['ck_5fir_5fv2_5fmax_5fdims_48',['CK_IR_V2_MAX_DIMS',['../ckernel__ir__v2_8h.html#a058176b4def706d5a0e1e2e37f472ede',1,'ckernel_ir_v2.h']]],
   ['ck_5fir_5fv2_5fmax_5finputs_49',['CK_IR_V2_MAX_INPUTS',['../ckernel__ir__v2_8h.html#aaabbb4fa50030e014cc46c48ac42c25d',1,'ckernel_ir_v2.h']]],
   ['ck_5fir_5fv2_5fmax_5foutputs_50',['CK_IR_V2_MAX_OUTPUTS',['../ckernel__ir__v2_8h.html#a20a2600398e0320fbef06ee7ce4682ec',1,'ckernel_ir_v2.h']]],
-  ['ck_5flayer_51',['ck_layer',['../ckernel__memory__layout_8h.html#ab71d40d0a04a0bdda4dd754953078d00',1,'CK_LAYER:&#160;ckernel_memory_layout.h'],['../ckernel__section__layout_8h.html#abc25629d856fc301f5dcb0af8a63d03c',1,'CK_LAYER:&#160;ckernel_section_layout.h']]],
+  ['ck_5flayer_51',['ck_layer',['../ckernel__section__layout_8h.html#abc25629d856fc301f5dcb0af8a63d03c',1,'CK_LAYER:&#160;ckernel_section_layout.h'],['../ckernel__memory__layout_8h.html#ab71d40d0a04a0bdda4dd754953078d00',1,'CK_LAYER:&#160;ckernel_memory_layout.h']]],
   ['ck_5flayer_5fgrad_52',['CK_LAYER_GRAD',['../ckernel__section__layout_8h.html#ac3349598b4a574599247b50fd72e0be6',1,'ckernel_section_layout.h']]],
   ['ck_5fmax_5ftoken_5flen_53',['CK_MAX_TOKEN_LEN',['../ck__tokenizer_8h.html#abb08eb27f9bc2409d72e7062f332feeb',1,'ck_tokenizer.h']]],
   ['ck_5fmax_5fvocab_5fsize_54',['CK_MAX_VOCAB_SIZE',['../ck__tokenizer_8h.html#a28501527109241976fb03e6118259a32',1,'ck_tokenizer.h']]],
@@ -104,7 +104,9 @@ var searchData=
   ['ck_5fv2_5fsection_5falign_101',['CK_V2_SECTION_ALIGN',['../ckernel__codegen__v2__sections_8c.html#a1810cb110e36e2fb70bd95ea62184da9',1,'ckernel_codegen_v2_sections.c']]],
   ['ck_5fvector_5fwidth_102',['CK_VECTOR_WIDTH',['../ck__features_8h.html#a5fa30d54bfa22be6b380373a7a5d82ab',1,'ck_features.h']]],
   ['ck_5fversion_103',['ck_version',['../v6_85__cli_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6.5_cli.c'],['../v6_85__inference_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6.5_inference.c'],['../v6_86__cli_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6.6_cli.c'],['../v6_86__inference_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6.6_inference.c'],['../v6__cli_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6_cli.c'],['../v6__inference_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c',1,'CK_VERSION:&#160;v6_inference.c']]],
-  ['ckernel_5fmax_5fkernel_5fsources_104',['CKERNEL_MAX_KERNEL_SOURCES',['../ckernel__kernel__specs_8h.html#a072f487d7dacdd66b7e3c7893cf1a146',1,'ckernel_kernel_specs.h']]],
-  ['copy_5fchunk_105',['COPY_CHUNK',['../ckernel__model__load__v4_8c.html#a67e84fc401bf37b246b7e4a1501ccdf6',1,'ckernel_model_load_v4.c']]],
-  ['cyan_106',['CYAN',['../show__config_8c.html#ad243f93c16bc4c1d3e0a13b84421d760',1,'show_config.c']]]
+  ['ck_5fvision_5fnoinline_104',['CK_VISION_NOINLINE',['../vision__kernels_8c.html#aed5697928aadb8733b7bca52acfcef6e',1,'vision_kernels.c']]],
+  ['ck_5fvision_5foptnone_105',['CK_VISION_OPTNONE',['../vision__kernels_8c.html#ab2cad5cea7947dbafaa25cded9b495dd',1,'vision_kernels.c']]],
+  ['ckernel_5fmax_5fkernel_5fsources_106',['CKERNEL_MAX_KERNEL_SOURCES',['../ckernel__kernel__specs_8h.html#a072f487d7dacdd66b7e3c7893cf1a146',1,'ckernel_kernel_specs.h']]],
+  ['copy_5fchunk_107',['COPY_CHUNK',['../ckernel__model__load__v4_8c.html#a67e84fc401bf37b246b7e4a1501ccdf6',1,'ckernel_model_load_v4.c']]],
+  ['cyan_108',['CYAN',['../show__config_8c.html#ad243f93c16bc4c1d3e0a13b84421d760',1,'show_config.c']]]
 ];

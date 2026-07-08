@@ -1,7 +1,10 @@
 var vision__kernels_8c =
 [
+    [ "CK_VISION_NOINLINE", "vision__kernels_8c.html#aed5697928aadb8733b7bca52acfcef6e", null ],
+    [ "CK_VISION_OPTNONE", "vision__kernels_8c.html#ab2cad5cea7947dbafaa25cded9b495dd", null ],
     [ "add_stream_inplace", "vision__kernels_8c.html#ae079db374514c445ebcfdd317dd3c15e", null ],
     [ "add_stream_reorder_2d", "vision__kernels_8c.html#a013a2d1a5679f2c8151fa7a4d87cc9ae", null ],
+    [ "ck_force_f32", "vision__kernels_8c.html#a735bc5ee5e733636839d636ea34305e8", null ],
     [ "feature_concat", "vision__kernels_8c.html#ac3987d3d95a62a769029100abbbf852a", null ],
     [ "feature_concat_2way", "vision__kernels_8c.html#a9af0dbbeb1b7fd100f99d796eaf0623f", null ],
     [ "feature_slice_copy", "vision__kernels_8c.html#a6414bc6af9c28e7baf31b434073e794f", null ],
