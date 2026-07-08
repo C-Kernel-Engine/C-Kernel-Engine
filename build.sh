@@ -102,13 +102,17 @@ if [ -f "$SCRIPT_DIR/scripts/generate_tree.sh" ]; then
 fi
 
 # Step 4: Refresh manifest-driven training history docs
-if [ -f "$REPO_ROOT/version/v7/scripts/build_spec_training_story_v7.py" ]; then
-    echo "  Refreshing spec training manifest..."
-    python3 "$REPO_ROOT/version/v7/scripts/build_spec_training_story_v7.py" || echo "  Warning: spec training manifest refresh failed"
-fi
-if [ -f "$REPO_ROOT/version/v7/scripts/build_spec_training_results_page_v7.py" ]; then
-    echo "  Rendering spec training results page..."
-    python3 "$REPO_ROOT/version/v7/scripts/build_spec_training_results_page_v7.py" || echo "  Warning: spec training results page refresh failed"
+if [ "${CK_SITE_SKIP_SPEC_TRAINING_REFRESH:-0}" = "1" ]; then
+    echo "  Skipping spec training manifest refresh (CK_SITE_SKIP_SPEC_TRAINING_REFRESH=1)"
+else
+    if [ -f "$REPO_ROOT/version/v7/scripts/build_spec_training_story_v7.py" ]; then
+        echo "  Refreshing spec training manifest..."
+        python3 "$REPO_ROOT/version/v7/scripts/build_spec_training_story_v7.py" || echo "  Warning: spec training manifest refresh failed"
+    fi
+    if [ -f "$REPO_ROOT/version/v7/scripts/build_spec_training_results_page_v7.py" ]; then
+        echo "  Rendering spec training results page..."
+        python3 "$REPO_ROOT/version/v7/scripts/build_spec_training_results_page_v7.py" || echo "  Warning: spec training results page refresh failed"
+    fi
 fi
 
 # Process each page in _pages directory

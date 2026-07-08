@@ -1,0 +1,405 @@
+<!-- TITLE: Kernel Tuning Methodology -->
+<!-- NAV: architecture -->
+
+<style>
+.method-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    gap: 1rem;
+    align-items: stretch;
+    margin: 1rem 0 1.4rem;
+}
+.method-panel {
+    border: 1px solid var(--grey);
+    border-radius: 8px;
+    background: linear-gradient(145deg, rgba(255,180,0,0.10), rgba(7,173,248,0.06));
+    padding: 1rem 1.1rem;
+}
+.method-panel h3 {
+    margin-top: 0;
+}
+.method-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+.method-card {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    padding: 1rem;
+}
+.method-card h3 {
+    margin-top: 0;
+}
+.metric-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+.metric-box {
+    border: 1px solid rgba(148,163,184,0.35);
+    border-radius: 8px;
+    padding: 0.85rem;
+    background: rgba(15,23,42,0.35);
+}
+.metric-box strong {
+    display: block;
+    color: var(--orange);
+    font-size: 1.35rem;
+    margin-bottom: 0.25rem;
+}
+.check-list li {
+    margin-bottom: 0.45rem;
+}
+.phase-table td:first-child {
+    white-space: nowrap;
+    font-weight: 600;
+}
+@media (max-width: 860px) {
+    .method-hero {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<h1>Kernel Tuning Methodology</h1>
+
+<p>C-Kernel-Engine performance work is not a benchmark stunt. The goal is to make a CPU node behave like a serious
+compute device: correct first, measurable at every layer, then pushed toward the roofline one kernel at a time.</p>
+
+<div class="method-hero">
+    <div class="method-panel">
+        <h3>North Star</h3>
+        <p>CK should make each CPU node run as close as practical to its hardware limits, then compose those nodes into
+        larger CPU-native systems. The engine is written from the ground up in C so the team can inspect, replace,
+        profile, and verify each transformer stage instead of treating inference as a black box.</p>
+        <p>The methodology is simple: prove the model is still coherent and numerically connected, profile the exact hot
+        path, isolate the slow kernel, improve one bottleneck, and rerun the same gates. No speed patch is accepted
+        because it "looks fast" in isolation.</p>
+    </div>
+    <div class="method-panel">
+        <h3>Hard Rule</h3>
+        <p>Performance changes must keep the model path valid.</p>
+        <ul class="check-list">
+            <li>First-token parity must not regress.</li>
+            <li>Multi-token mismatch must not move earlier without explanation.</li>
+            <li>Practical prompts must remain coherent, not just syntactically alive.</li>
+            <li>OCR, vision, and long-context paths must be tested with real artifacts when available.</li>
+            <li>Every meaningful PR should link benchmark logs and profiler artifacts.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="CKE Node Roofline Math">
+    <img src="assets/cke-node-roofline-math.svg" alt="CKE node roofline math">
+</div>
+
+<h2>Measurement Lanes</h2>
+
+<p>The work is split into lanes so we do not confuse different questions. A short chat prompt, a 4096-token prefill
+test, an Intel Advisor dot, and a VTune hotspot report are all useful, but they answer different things.</p>
+
+<div class="method-grid">
+    <div class="method-card">
+        <h3>Practical E2E Lane</h3>
+        <p>Run real prompts through <code>cks-v8-run</code> with the correct chat template, tokenizer, context length,
+        and decode budget. This lane answers: does the model still speak coherently, follow the prompt, and produce
+        useful output?</p>
+    </div>
+    <div class="method-card">
+        <h3>Fixed-Token Throughput Lane</h3>
+        <p>Use controlled prompt and decode token counts, such as <code>p512</code>, <code>p1024</code>,
+        <code>p2048</code>, or <code>p4096</code>. This lane answers: how fast is prefill or decode when the model
+        actually receives that many tokens?</p>
+    </div>
+    <div class="method-card">
+        <h3>Operator Profile Lane</h3>
+        <p>Enable CK profile CSV/JSON and rank time by operator. This lane answers: is the wall time in Q4/Q6 prefill,
+        Q8 projection, attention, SwiGLU, quantization, sampling, or runtime overhead?</p>
+    </div>
+    <div class="method-card">
+        <h3>Microkernel Lab</h3>
+        <p>Extract one kernel with the production dimensions and run it alone. This lane answers: can this exact kernel
+        reach the expected instruction rate before we wire it back into the full transformer?</p>
+    </div>
+    <div class="method-card">
+        <h3>Advisor Roofline Lane</h3>
+        <p>Use Intel Advisor to place loops by arithmetic intensity and throughput. This lane answers: should the next
+        patch move the kernel right by increasing reuse, or up by improving SIMD and instruction efficiency?</p>
+    </div>
+    <div class="method-card">
+        <h3>VTune Lane</h3>
+        <p>Use VTune hotspots, uarch exploration, memory access, and threading analysis. This lane answers: are we
+        retiring useful work, stuck on ports, memory-bound, cache-latency-bound, or underusing physical cores?</p>
+    </div>
+</div>
+
+<h2>Context Is Not Tokens</h2>
+
+<div class="alert alert-warning">
+    <strong>Do not treat <code>--context-len 4096</code> as a 4096-token prefill test.</strong>
+    Context length sets KV-cache capacity. It does not turn a 40-token prompt into a 4096-token workload. Long-prefill
+    performance must be measured with a tokenizer-counted prompt that actually contains the requested number of tokens.
+</div>
+
+<p>This distinction matters because prefill is GEMM-heavy and decode is usually GEMV-heavy. A short prompt with a large
+context window mostly tests runtime overhead plus decode. A true <code>p4096</code> prompt tests the batched prefill
+path, weight reuse, quantized GEMM dispatch, thread scheduling, and cache behavior.</p>
+
+<h2>Toolchain</h2>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Tool</th>
+            <th>What It Tells Us</th>
+            <th>Typical CK Decision</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>CK profile CSV</td>
+            <td>Exact operator time inside the generated runtime.</td>
+            <td>Pick the real hot kernel instead of guessing from end-to-end time.</td>
+        </tr>
+        <tr>
+            <td>Intel Advisor</td>
+            <td>Roofline position, arithmetic intensity, GFLOPS/GINTOPS, vectorization hints.</td>
+            <td>Fuse, repack, tile, or improve SIMD depending on whether the loop must move right or up.</td>
+        </tr>
+        <tr>
+            <td>Intel VTune</td>
+            <td>Hotspots, pipeline slots, retiring, front-end bound, back-end bound, memory stalls, port pressure,
+            physical-core utilization, logical-core utilization.</td>
+            <td>Change dot structure, reduce reductions, fix thread underuse, inspect cache latency, or remove
+            scalar overhead.</td>
+        </tr>
+        <tr>
+            <td><code>perf stat</code></td>
+            <td>Cycles, instructions, IPC, cache misses, branch misses, context switches, wall time.</td>
+            <td>Low-overhead regression gate before expensive profiler runs.</td>
+        </tr>
+        <tr>
+            <td>Flamegraph</td>
+            <td>Call-stack shape and whether time is in kernels, tokenization, sampling, or framework overhead.</td>
+            <td>Decide whether to optimize math, dispatch, or runtime glue.</td>
+        </tr>
+        <tr>
+            <td><code>objdump</code>, LLVM-MCA, uops.info, Intel SDE</td>
+            <td>Instruction mix, AVX2/VNNI use, estimated port pressure, latency chains, static throughput.</td>
+            <td>Replace expensive instruction sequences and prove the compiler emitted the intended ISA path.</td>
+        </tr>
+        <tr>
+            <td>Valgrind/Cachegrind</td>
+            <td>Correctness, cache access shape, allocations, and memory mistakes.</td>
+            <td>Use for debug and memory-shape validation, not final speed numbers.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>How To Read The Signals</h2>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Profiler Signal</th>
+            <th>Meaning</th>
+            <th>Likely Fix</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Low arithmetic intensity</td>
+            <td>The kernel does too little math per byte moved.</td>
+            <td>Pack weights, batch more rows, reuse activations, fuse producers/consumers, avoid scratch writes.</td>
+        </tr>
+        <tr>
+            <td>High retiring, low throughput</td>
+            <td>The CPU is doing useful work, but too many instructions are needed per result.</td>
+            <td>Reduce scalar bookkeeping, delay horizontal reductions, use wider dot instructions, precompute scale terms.</td>
+        </tr>
+        <tr>
+            <td>Port pressure</td>
+            <td>The loop is limited by execution resources, often ALU, shuffle, or load ports.</td>
+            <td>Change vector layout, reduce shuffles, unroll for independent accumulators, inspect assembly.</td>
+        </tr>
+        <tr>
+            <td>Memory bound</td>
+            <td>The loop is waiting on L1/L2/L3/DRAM rather than compute.</td>
+            <td>Retile, prefetch, reduce stores, improve packing, keep hot tiles in cache.</td>
+        </tr>
+        <tr>
+            <td>Low physical-core utilization</td>
+            <td>Threads are not doing useful work across the node.</td>
+            <td>Increase job count, use dynamic tiles, inspect affinity, reduce synchronization, avoid long tail work.</td>
+        </tr>
+        <tr>
+            <td>Coherence regression</td>
+            <td>The model circuit may no longer match the reference path.</td>
+            <td>Stop speed work and run parity: logits, layer dumps, RoPE/M-RoPE, KV-cache, quantized projection.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Kernel Iteration Loop</h2>
+
+<ol>
+    <li><strong>Reproduce</strong>: fix model, quant, prompt token count, context, threads, temperature, and runtime cache.</li>
+    <li><strong>Prove quality</strong>: run practical prompts and, when applicable, CK-vs-llama parity.</li>
+    <li><strong>Rank operators</strong>: collect CK profile CSV and identify the top one or two kernels.</li>
+    <li><strong>Profile deeply</strong>: run Advisor roofline and VTune on the exact workload or extracted kernel.</li>
+    <li><strong>Classify the bottleneck</strong>: compute-bound, memory-bound, instruction-heavy, scheduling-heavy, or parity-broken.</li>
+    <li><strong>Patch narrowly</strong>: change one kernel family, dispatcher rule, packing layout, or fusion path.</li>
+    <li><strong>Run microkernel checks</strong>: validate numerical output and isolated throughput before E2E.</li>
+    <li><strong>Run E2E again</strong>: measure practical prompts and fixed-token lanes across representative models.</li>
+    <li><strong>Attach logs</strong>: commit the commands, hardware, hashes, measured token counts, and profiler links.</li>
+</ol>
+
+<h2>Current v8 Lessons</h2>
+
+<p>The July 2026 AVX2 work produced several important lessons that should stay visible in the docs:</p>
+
+<div class="metric-strip">
+    <div class="metric-box">
+        <strong>p4096</strong>
+        Fixed-token long-prefill lanes are the right stress test for batched prefill.
+    </div>
+    <div class="metric-box">
+        <strong>Q4/Q6</strong>
+        Quantized prefill dispatch dominates many v8 text-family models.
+    </div>
+    <div class="metric-box">
+        <strong>Parity first</strong>
+        Qwen3-VL M-RoPE fixes were accuracy fixes, not speed patches.
+    </div>
+    <div class="metric-box">
+        <strong>Coherence gate</strong>
+        Qwen3 and Qwen3.5 short practical prompts remained coherent in fresh canonical runs.
+    </div>
+</div>
+
+<p>On the local AVX2 profiling host, practical short prompts showed coherent outputs and real decode speed, but they
+are not the same benchmark as fixed-token p4096 prefill. A stale p4096 table once suggested large CK wins over
+llama.cpp; a fresh recheck did not reproduce that claim. The defensible conclusion is narrower and more useful:
+the methodology caught the bad measurement trail, kept the coherent E2E signal, and forced the next pass back to
+token-counted prompts, canonical runtime paths, and profiler-backed kernel attribution.</p>
+
+<div class="alert alert-warning">
+    <strong>Benchmark discipline:</strong> do not publish a speedup table unless the exact command, runtime cache path,
+    prompt token count, llama.cpp command, and output artifact are recorded and the row reproduces in a fresh run.
+    Synthetic fixed-token throughput and interactive chat timing are both useful, but they must not be mixed.
+</div>
+
+<h2>Representative Commands</h2>
+
+<p>Use these as starting points. Record the exact model path, model hash, prompt token count, context length, thread
+count, compiler, and git commit in the log directory for the PR.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Practical Coherence Run</h3>
+    <pre><code>CK_NUM_THREADS=20 OMP_NUM_THREADS=1 \
+version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --generate-visualizer</code></pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Fixed-Token CK-vs-llama Matrix</h3>
+    <pre><code>CK_NUM_THREADS=20 OMP_NUM_THREADS=1 \
+CK_V8_DECODER_MODELS=nanbeige4.1-3b-q4_k_m,qwen2-0.5b-q4_k_m,qwen3-0.6b-q8_0,qwen35-0.8b-q4_k_m \
+CK_V8_DECODER_PROMPT=4096 \
+CK_V8_DECODER_DECODE=128 \
+CK_V8_DECODER_REPEATS=1 \
+make test-v8-decoder-matrix</code></pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Operator-Cost Prefill Profile</h3>
+    <pre><code>CK_NUM_THREADS=20 OMP_NUM_THREADS=1 \
+CK_V8_PROFILE_MODELS=nanbeige4.1-3b-q4_k_m,qwen2-0.5b-q4_k_m,qwen35-0.8b-q4_k_m \
+CK_V8_PROFILE_PROMPT=4096 \
+CK_V8_PROFILE_DECODE=1 \
+CK_V8_PROFILE_CONTEXT=4608 \
+make profile-v8-prefill-ops</code></pre>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Safe Perf Counter Lane</h3>
+    <pre><code>CK_NUM_THREADS=20 OMP_NUM_THREADS=1 \
+CK_V8_PREFILL_PERF_ENGINE=both \
+CK_V8_PREFILL_PERF_PROMPT=4096 \
+CK_V8_PREFILL_PERF_DECODE=1 \
+make profile-v8-prefill-perf-stat</code></pre>
+</div>
+
+<h2>What Gets Committed</h2>
+
+<p>A performance PR should not hide the measurement trail. Add a log directory under <code>logs/</code> when the change
+is meaningful, and reference it from the commit body.</p>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Artifact</th>
+            <th>Required Content</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>README</td>
+            <td>Hardware, compiler, git commit, model paths, hashes when available, prompt token counts, thread count,
+            context length, commands, tables, and caveats.</td>
+        </tr>
+        <tr>
+            <td>Commit message</td>
+            <td>Problem, fix, measured result, parity/coherence gate, and link to the log directory.</td>
+        </tr>
+        <tr>
+            <td>Profiler links</td>
+            <td>Advisor HTML, VTune summaries, CK profile JSON/CSV, flamegraph, or perf-stat output when used.</td>
+        </tr>
+        <tr>
+            <td>Next steps</td>
+            <td>Known remaining bottlenecks, such as Q6 prefill, Gemma routing, Qwen3/Qwen3.5 long-context accounting,
+            Qwen3-VL OCR parity, or decode GEMV improvements.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Architecture Implication</h2>
+
+<p>CK can do this work because generated C keeps the system inspectable. Kernel maps and templates can replace a
+specific sequence with a fused kernel. The threadpool can be profiled directly. Quantized prefill dispatch can be
+changed without rewriting the whole runtime. The BUMP memory path and generated model code make it possible to
+tie one profiler dot back to one function, one tensor layout, and one source patch.</p>
+
+<div class="img-container svg-viewer" data-title="Performance Balance">
+    <img src="assets/performance-balance.svg" alt="Performance balance">
+</div>
+
+<h2>Open Work</h2>
+
+<ul class="check-list">
+    <li><strong>Token-counted practical long prompts</strong>: replace approximate text-length prompts with tokenizer-counted
+    prompts at 1024, 2048, and 4096 tokens.</li>
+    <li><strong>Q4/Q6 prefill</strong>: continue moving packed Q4/Q6 GEMM loops toward roofline across Nanbeige, Qwen2,
+    Qwen3/Qwen3.5, Gemma, and Qwen3-VL decoder shapes.</li>
+    <li><strong>Fusion</strong>: test gate/up GEMM + SwiGLU + Q8_K quantization fusion where it reduces scratch writes and
+    preserves parity.</li>
+    <li><strong>Threading</strong>: keep dynamic scheduling and physical-core utilization measurable before adding complicated
+    P-core/E-core policy.</li>
+    <li><strong>Deep VTune</strong>: use signed VTune drivers or a controlled profiling boot for deeper PMU collection when
+    Secure Boot blocks out-of-tree modules.</li>
+    <li><strong>Parity harnesses</strong>: keep Qwen3-VL long-decode and OCR tests enabled while speed work continues.</li>
+</ul>
+
+<div class="alert alert-info">
+    <strong>Bottom line:</strong> CK performance claims should be reproducible from logs, visible in profiler artifacts,
+    and still produce coherent model output. That is the difference between a real CPU kernel engine and a lucky
+    timing number.
+</div>

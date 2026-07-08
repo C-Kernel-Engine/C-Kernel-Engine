@@ -5,11 +5,51 @@
 PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 OUTPUT_FILE="$(dirname "$0")/../_partials/folder_structure.html"
 
-# Run a focused tree for core source areas only.
-TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -d -L 3 --dirsfirst \
-    src/kernels version/v6.6 version/v7 \
-    -I '__pycache__|*.o|*.pyc|doxygen_output|build|.git|node_modules|*.bin|*.so' \
-    --charset=ascii 2>/dev/null)
+# Run a focused tree for core source areas only. Minimal servers may not have
+# the optional `tree` package installed, so keep a Python fallback.
+if command -v tree >/dev/null 2>&1; then
+    TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -d -L 3 --dirsfirst \
+        src/kernels version/v6.6 version/v7 \
+        -I '__pycache__|*.o|*.pyc|doxygen_output|build|.git|node_modules|*.bin|*.so' \
+        --charset=ascii 2>/dev/null)
+else
+    TREE_OUTPUT=$(cd "$PROJECT_ROOT" && python3 - <<'PY'
+from pathlib import Path
+
+roots = [Path("src/kernels"), Path("version/v6.6"), Path("version/v7")]
+ignore = {"__pycache__", "doxygen_output", "build", ".git", "node_modules"}
+max_depth = 3
+dir_count = 0
+
+def children(path):
+    try:
+        items = [p for p in path.iterdir() if p.is_dir() and p.name not in ignore]
+    except OSError:
+        return []
+    return sorted(items, key=lambda p: p.name.lower())
+
+def emit(path, prefix, depth):
+    global dir_count
+    kids = children(path) if depth < max_depth else []
+    for idx, child in enumerate(kids):
+        last = idx == len(kids) - 1
+        connector = "`-- " if last else "|-- "
+        print(f"{prefix}{connector}{child.name}")
+        dir_count += 1
+        emit(child, prefix + ("    " if last else "|   "), depth + 1)
+
+for root in roots:
+    if not root.exists():
+        continue
+    print(root.as_posix())
+    dir_count += 1
+    emit(root, "", 1)
+
+print()
+print(f"{dir_count} directories")
+PY
+)
+fi
 
 # Generate HTML partial
 cat > "$OUTPUT_FILE" << 'HEADER'
