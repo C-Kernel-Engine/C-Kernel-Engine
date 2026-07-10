@@ -916,6 +916,7 @@
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
                 </div>
@@ -1251,6 +1252,68 @@ nodes_needed =
     traffic.
 </p>
 
+<h2>Memory Placement Is a Scheduling Problem</h2>
+
+<p>
+    Capacity and throughput cannot be separated from placement. Accelerator
+    systems often move selected activations, parameters, or optimizer state
+    from scarce HBM into host DRAM. CPU-native execution removes that specific
+    host-to-device boundary for CPU-resident state, but it does not remove data
+    movement. Cache fills, DRAM traffic, NUMA hops, network transfers, and
+    storage reads still have to be placed and scheduled against useful work.
+</p>
+
+<p>
+    NVIDIA's JAX host-offloading study provides a useful measured example. On
+    its DeepSeek-V3 671B configuration, optimized activation offloading with a
+    latency-hiding scheduler and pipelined copies reached 908.2 TFLOPs/s/device,
+    compared with 578.3 TFLOPs/s/device for no offload with activation
+    rematerialization. But host offloading without those scheduling mechanisms
+    reached only 541.6 TFLOPs/s/device. The placement policy created capacity;
+    overlap determined whether that capacity translated into throughput.
+</p>
+
+<p>
+    The same study reported a smaller but equally important result for Llama
+    3.1 405B: QKV offloading with latency hiding improved throughput by 2.9%,
+    while disabling latency hiding made the offloaded run slower than the
+    no-offload baseline. The 70.9 GiB host allocation represented QKV storage
+    across all layers, while scan-based backward execution needed only one
+    layer's QKV activations resident on the GPU at a time. This is a lifetime
+    and scheduling result, not a raw bandwidth claim.
+</p>
+
+<p>CKE should apply the same discipline to CPU nodes and clusters:</p>
+
+<ul>
+    <li><strong>Place by lifetime:</strong> keep the active layer, tile, KV/state window, or optimizer shard near the compute that consumes it.</li>
+    <li><strong>Overlap explicitly:</strong> prefetch the next tile or shard while the current kernel performs useful work.</li>
+    <li><strong>Budget staging memory:</strong> double buffers and prefetched data consume capacity even when they improve throughput.</li>
+    <li><strong>Measure exposed transfer time:</strong> a transfer hidden behind compute and the same transfer on the critical path have different performance consequences.</li>
+    <li><strong>Keep rematerialization in the comparison:</strong> recomputing an activation may cost less than moving it, depending on arithmetic intensity and topology.</li>
+</ul>
+
+<pre><code>effective_step_time =
+    useful_compute_time
+  + exposed_memory_time
+  + exposed_network_time
+  + synchronization_time
+
+staging_capacity = resident_working_set + prefetched_buffers + in_flight_outputs</code></pre>
+
+<p>
+    This refines the CKU interpretation. Logical active bytes describe the
+    model state needed by the operation. Physical bytes include every movement
+    required by the chosen placement plan. A valid CKU report must state what
+    was resident, what was transferred or rematerialized, how much transfer was
+    overlapped, and which movement remained on the critical path.
+</p>
+
+<p>
+    Reference:
+    <a href="https://developer.nvidia.com/blog/reducing-high-bandwidth-memory-bottlenecks-in-jax-based-llm-training-with-host-offloading/" target="_blank" rel="noopener noreferrer">NVIDIA, Reducing High-Bandwidth Memory Bottlenecks in JAX-Based LLM Training with Host Offloading</a>.
+</p>
+
 <h2>What CKE Optimizes</h2>
 
 <p>
@@ -1261,7 +1324,7 @@ nodes_needed =
 <ul>
     <li><strong>Kernel layout:</strong> Q4/Q5/Q6/Q8 formats, packed layouts, SIMD-friendly loops, and shape-gated dispatch.</li>
     <li><strong>Memory layout:</strong> contiguous bump files, planned activation buffers, cache-aligned sections, and deterministic offsets.</li>
-    <li><strong>Runtime scheduling:</strong> prefill vs decode kernels, persistent thread pools, batching, and pipeline staging.</li>
+    <li><strong>Runtime scheduling:</strong> prefill vs decode kernels, persistent thread pools, batching, lifetime-aware placement, asynchronous prefetch, and pipeline staging.</li>
     <li><strong>Linux tuning:</strong> CPU affinity, huge pages, NUMA placement, cache behavior, and perf/VTune/Advisor measurement.</li>
     <li><strong>Cluster scaling:</strong> model/layer ownership, activation movement, gradient movement, MPI/RDMA paths, and topology-aware placement.</li>
 </ul>
@@ -1545,7 +1608,7 @@ CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
             </div>
         </div>
     </footer>
