@@ -916,6 +916,7 @@
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
                 </div>
@@ -1065,6 +1066,16 @@
         <a class="runbook-link" href="kernel-tuning-methodology.html">Open Methodology</a>
     </div>
     <div class="runbook-card">
+        <h3>Stitched Divergence Harness</h3>
+        <p>Backend parity method for finding the first CK-vs-reference tensor boundary across llama.cpp/mtmd GGUF lanes and future PyTorch adapters.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">CKDMP</span>
+            <span class="runbook-tag">llama.cpp/mtmd</span>
+            <span class="runbook-tag">first divergence</span>
+        </div>
+        <a class="runbook-link" href="divergence-harness.html">Open Harness Guide</a>
+    </div>
+    <div class="runbook-card">
         <h3>v7 SVG Dataset Runbook</h3>
         <p>Operator workflow to generate Stage A pretraining and Stage B midtraining SVG corpora from <code>docs/site/assets/*.svg</code>, then hand off to v7 training.</p>
         <div class="runbook-tags">
@@ -1184,6 +1195,8 @@
                 <span class="subtitle">Notebook-driven and module-driven authoring entrypoints for the same <code>v7</code> runtime</span></li>
             <li><a href="testing.html">Testing</a>
                 <span class="subtitle">Numerical parity verification</span></li>
+            <li><a href="divergence-harness.html">Stitched Divergence Harness</a>
+                <span class="subtitle">First failing tensor boundary across CK and reference backends</span></li>
         </ul>
     </div>
 </div>
@@ -1241,7 +1254,7 @@
         </tr>
             <tr>
                 <td><strong>Debugging & profiling</strong></td>
-                <td><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>, <a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>, <a href="v7-runbook.html">v7 Runbook</a>, <a href="v7-python-authoring.html">v7 Python Authoring Guide</a></td>
+                <td><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>, <a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="divergence-harness.html">Stitched Divergence Harness</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>, <a href="v7-runbook.html">v7 Runbook</a>, <a href="v7-python-authoring.html">v7 Python Authoring Guide</a></td>
             </tr>
             <tr>
                 <td><strong>Operator train + compute workflow</strong></td>
@@ -1477,7 +1490,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
             </div>
         </div>
     </footer>
