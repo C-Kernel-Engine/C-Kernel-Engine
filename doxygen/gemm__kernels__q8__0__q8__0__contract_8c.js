@@ -14,6 +14,7 @@ var gemm__kernels__q8__0__q8__0__contract_8c =
     [ "ck_q80_ggml_new_graph_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a6296f3866d58b42e143aaf21e2509c8f", null ],
     [ "ck_q80_ggml_new_tensor_2d_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a6c25d0733e4f9ace3a767371e49564c1", null ],
     [ "ck_nearest_int_q8_0_ref", "gemm__kernels__q8__0__q8__0__contract_8c.html#ad714da1097f9f5e5350822940e6e4c9c", null ],
+    [ "ck_q80_contract_cached_input_enabled", "gemm__kernels__q8__0__q8__0__contract_8c.html#a71038f5dbd82d788da431de92bf5c432", null ],
     [ "ck_q80_contract_dump_enabled", "gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b", null ],
     [ "ck_q80_contract_dump_tensor", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1", null ],
     [ "ck_q80_resolve_ggml_build_forward_expand", "gemm__kernels__q8__0__q8__0__contract_8c.html#add423511874de78a3bdc671bdaac6464", null ],

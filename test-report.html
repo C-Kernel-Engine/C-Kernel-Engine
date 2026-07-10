@@ -916,6 +916,7 @@
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
                 </div>
@@ -1683,9 +1684,6 @@
       </ul>
     </li>
     <li><strong>Kernel Unit Tests</strong>: Individual kernel parity with PyTorch</li>
-    <li><strong>v8 Vision Kernel Parity</strong>: Vision kernel parity for patch extraction/reconstruction, tiled position embeddings,
-      Qwen3-VL resized position interpolation order, spatial merge/reorder, feature concat/slice, and vision M-RoPE
-      (<code>make test-v8-vision-kernels</code>)</li>
     <li><strong>Llama Pairwise RoPE Contract</strong>: explicit regression for consecutive-pair RoPE layout selection plus kernel-level pairwise forward coverage and timing
       (<code>version/v7/scripts/parity/test_check_decode_attention_contract.py</code>, <code>unittest/test_rope.py</code>)</li>
     <li><strong>Sliding-Window Contract</strong>: Explicit sliding attention prefill/decode contract test
@@ -1726,7 +1724,7 @@
     <div>
       <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
-      <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, v8 vision kernel parity, published training family regression, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
+      <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, published training family regression, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
     </div>
   </div>
 
@@ -2734,7 +2732,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
             </div>
         </div>
     </footer>
