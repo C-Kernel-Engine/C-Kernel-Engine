@@ -916,6 +916,7 @@
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
                 </div>
@@ -1686,6 +1687,13 @@
     <li><strong>v8 Vision Kernel Parity</strong>: Vision kernel parity for patch extraction/reconstruction, tiled position embeddings,
       Qwen3-VL resized position interpolation order, spatial merge/reorder, feature concat/slice, and vision M-RoPE
       (<code>make test-v8-vision-kernels</code>)</li>
+    <li><strong>Qwen3-VL Template/Codegen Contracts</strong>: Synthetic GGUF/BF16-independent guards for Qwen3-VL circuit lowering,
+      align-corners position-kernel selection, valid vision M-RoPE width/sections, and bounded semantic tensor exports
+      (<code>make test-v8-qwen3vl</code>)</li>
+    <li><strong>v8 BF16 Safetensors Lowering</strong>: Synthetic BF16 conversion and lowering guard that asserts all vision weights are
+      consumed, align-corners interpolation is selected, and M-RoPE arguments remain valid through generated calls. The target builds
+      both engine and vision libraries first so hardware-independent M-RoPE checks cannot silently skip
+      (<code>make nightly-bf16</code>)</li>
     <li><strong>FP16 Attention Contracts</strong>: Named numerical guards for llama.cpp-compatible unfused causal prefill and split-KV decode,
       including FP16 Q/K rounding, FP16 probability/value reduction, FP16 online-softmax partials, FP32 ordered reduction, GQA/padding,
       the KV 511/512 semantic boundary, and the Qwen3-VL <code>KV=1058, H=32, D=128</code> shape
@@ -2743,7 +2751,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
             </div>
         </div>
     </footer>
