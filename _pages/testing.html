@@ -23,6 +23,15 @@ permalink: /testing/
     That page documents the actual failure mode, the debugging sequence, and the regressions to watch for on future encoder ports.
   </div>
 
+  <div class="alert alert-info">
+    <strong>Stitched divergence harness:</strong>
+    backend-level parity now uses a staged harness that compares CK against
+    llama.cpp/mtmd for GGUF paths and can be extended to PyTorch when a matching
+    tensor-dump adapter exists. See
+    <a href="/divergence-harness/">Stitched Divergence Harness</a> for the backend
+    contract, dump format, and first-divergence workflow.
+  </div>
+
   <div class="alert alert-warning">
     <strong>Quantized inference performance gate:</strong> BF16 kernels are primarily the
     training / BF16-serving path. Production CPU inference for GGUF models is usually

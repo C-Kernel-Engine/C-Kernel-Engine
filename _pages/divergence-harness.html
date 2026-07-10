@@ -1,0 +1,340 @@
+<!-- TITLE: Stitched Divergence Harness -->
+<!-- NAV: testing -->
+
+<div class="container">
+  <h1>Stitched Divergence Harness</h1>
+  <p class="lead">
+    How C-Kernel-Engine finds the first numerical divergence between generated C,
+    llama.cpp/mtmd, and future PyTorch adapters without guessing from end-to-end output.
+  </p>
+
+  <div class="alert alert-info">
+    <strong>Core rule:</strong>
+    the harness does not dynamically understand every backend by itself.
+    It compares backends through explicit adapters that dump the same named tensors,
+    at the same layer/op boundaries, in the same logical layout.
+  </div>
+
+  <h2>Why This Exists</h2>
+  <p>
+    Kernel unit tests prove that an isolated function can be correct. They do not prove
+    that a full model circuit is stitched correctly. A model can still fail because of
+    tensor layout, positional semantics, weight interpretation, preprocessing, quantized
+    activation contracts, residual timing, or a dump boundary mismatch.
+  </p>
+  <p>
+    The stitched divergence harness answers a narrower and more useful question:
+    <strong>where is the first boundary where CK stops matching the reference?</strong>
+    Once that boundary is known, the fix can target one kernel, one conversion rule,
+    one transpose, or one template seam instead of the whole transformer.
+  </p>
+
+  <h2>Current Backend Contract</h2>
+  <table>
+    <tr>
+      <th>Backend</th>
+      <th>Current role</th>
+      <th>How tensors are obtained</th>
+      <th>Status</th>
+    </tr>
+    <tr>
+      <td><code>CK generated C</code></td>
+      <td>Test implementation</td>
+      <td>Generated code emits <code>ck_dump_tensor(...)</code> records when built with parity dumping.</td>
+      <td>Implemented for v8 text and Qwen3-VL vision paths.</td>
+    </tr>
+    <tr>
+      <td><code>llama.cpp + mtmd</code></td>
+      <td>GGUF reference for Qwen3-VL and quantized inference</td>
+      <td>A local C++ shim links against llama.cpp/mtmd and writes selected ggml tensors into CKDMP format.</td>
+      <td>Implemented for the current Qwen3-VL GGUF lane.</td>
+    </tr>
+    <tr>
+      <td><code>llama.cpp decoder helper</code></td>
+      <td>Reference for token replay and logits</td>
+      <td>Persistent greedy replay and full replay compare CK logits/top-k against llama.cpp.</td>
+      <td>Implemented for v8 multimodal decode parity.</td>
+    </tr>
+    <tr>
+      <td><code>PyTorch / safetensors</code></td>
+      <td>BF16/full-precision reference lane</td>
+      <td>Requires a PyTorch adapter that emits the same named tensors and layouts as CKDMP.</td>
+      <td>Available in model-specific scripts, not yet the default backend for stitched Qwen3-VL GGUF parity.</td>
+    </tr>
+  </table>
+
+  <div class="alert alert-warning">
+    <strong>Do not mix reference lanes casually.</strong>
+    For Qwen3-VL AVX2 GGUF parity, enforce llama.cpp/mtmd. For BF16 safetensors
+    circuit bring-up, use PyTorch. The same harness structure can support both,
+    but only when each backend exposes equivalent tensor boundaries.
+  </div>
+
+  <h2>Does CK Patch llama.cpp?</h2>
+  <p>
+    The current Qwen3-VL GGUF lane does not rewrite llama.cpp at test time. CK builds
+    a small local adapter:
+    <code>version/v8/tools/mtmd_clip_shim.cpp</code>.
+    That shim includes the local llama.cpp/mtmd headers, initializes the mtmd clip
+    context, registers a ggml evaluation callback, and writes selected tensors to
+    the same CKDMP dump format used by generated CK code.
+  </p>
+  <p>
+    This is deliberately different from hard-forking the reference. The reference
+    remains llama.cpp's graph and weights. CK only adds an observation surface around it.
+    If upstream llama.cpp changes its private mtmd APIs or removes the callback seam,
+    the adapter must be updated, or the local llama.cpp checkout must carry the minimal
+    callback support needed for parity dumps.
+  </p>
+
+  <h2>Dump Format</h2>
+  <p>
+    Both CK and reference adapters write <code>dump.bin</code> using the CKDMP record
+    format from <code>version/v8/src/ck_parity_dump.h</code>:
+  </p>
+  <ul>
+    <li>128-byte record header</li>
+    <li><code>layer_id</code></li>
+    <li><code>op_name</code></li>
+    <li>dtype and rank metadata</li>
+    <li>shape and element count</li>
+    <li>token id for decode paths</li>
+    <li>flat tensor payload, usually converted to float32 for comparison</li>
+  </ul>
+  <p>
+    The comparison layer matches records by normalized operation name, layer, shape,
+    and candidate order. Alias handling maps names such as <code>attn_output</code>
+    to llama-side names such as <code>attn_out</code> when the two backends use
+    different labels for the same graph boundary.
+  </p>
+
+  <h2>How CK Dumps Tensors</h2>
+  <p>
+    CK is easier to instrument because the model runtime is generated C. The v8 codegen
+    path can emit dump calls at known IR boundaries:
+  </p>
+  <pre><code>ck_dump_tensor((float*)buffer, layer_id, "ffn_up_b", element_count);
+ck_dump_tensor_head_major_token_major(q_buffer, layer_id, "Qcur", heads, tokens, head_dim);</code></pre>
+  <p>
+    Environment variables constrain the dump so a full 8B model does not fill scratch:
+  </p>
+  <ul>
+    <li><code>CK_PARITY_DIR</code> selects the CK dump directory.</li>
+    <li><code>CK_PARITY_LAYER_FILTER</code> restricts layers.</li>
+    <li><code>CK_PARITY_OP_FILTER</code> restricts operation names.</li>
+    <li><code>--granular-test</code> emits dump/cutpoint metadata during codegen.</li>
+    <li><code>--ck-stop-layer</code> or <code>--ck-stop-op</code> returns early after a target boundary.</li>
+  </ul>
+
+  <h2>How llama.cpp / mtmd Dumps Tensors</h2>
+  <p>
+    The llama.cpp side is adapter-driven. The Qwen3-VL mmproj adapter compiles
+    <code>mtmd_clip_shim.cpp</code> into a shared object, loads llama.cpp
+    <code>libmtmd.so</code>, and calls <code>clip_encode_float_image</code>.
+    The shim's callback receives ggml tensors as llama.cpp evaluates the graph.
+  </p>
+  <p>
+    The shim uses these controls:
+  </p>
+  <ul>
+    <li><code>CK_LLAMA_PARITY_DIR</code> writes llama's <code>dump.bin</code>.</li>
+    <li><code>CK_LLAMA_PARITY_NAMES</code> selects tensors such as <code>Qcur</code>, <code>kqv_out</code>, or <code>attn_out</code>.</li>
+    <li><code>CK_LLAMA_PARITY_LAYER</code> restricts to one layer.</li>
+    <li><code>CK_LLAMA_PARITY_ALL=1</code> dumps every visible tensor, used only for deep diagnostics.</li>
+    <li><code>CK_LLAMA_PARITY_META=1</code> writes tensor shape/stride metadata as JSONL.</li>
+  </ul>
+  <p>
+    Quantized, fp16, bf16, and integer tensors are flattened into a comparable fp32
+    payload. That means the dump compares the logical value at the selected boundary,
+    not necessarily the raw packed bytes. Raw packed-byte checks are separate tests
+    for weight conversion and quant block contracts.
+  </p>
+
+  <h2>How PyTorch Fits</h2>
+  <p>
+    PyTorch is not automatically interchangeable with llama.cpp. It can become a
+    stitched backend only when it implements the same adapter contract:
+  </p>
+  <ol>
+    <li>Run the same canonical input and prompt.</li>
+    <li>Register hooks or use a traced graph to capture named layer/op boundaries.</li>
+    <li>Normalize layout to CK's logical comparison layout.</li>
+    <li>Write CKDMP or a format converted losslessly into CKDMP.</li>
+    <li>Use the same alias map and thresholds as the CK-vs-reference comparator.</li>
+  </ol>
+  <p>
+    For BF16/safetensors bring-up, PyTorch is the better reference because it removes
+    GGUF quantization and llama.cpp packing decisions from the equation. For GGUF
+    deployment parity, llama.cpp is the stronger reference because it exercises the
+    same file format, quantized tensor semantics, image path, and token replay behavior
+    expected in production.
+  </p>
+
+  <h2>Stitched Runner Flow</h2>
+  <p>
+    <code>version/v8/scripts/stitched_parity_v8.py</code> runs stages from cheap and
+    broad to expensive and granular:
+  </p>
+  <ol>
+    <li>
+      <strong>Bridge generation.</strong>
+      CK builds the image/text bridge and writes <code>bridge_report.json</code>
+      plus <code>prefix.f32</code>.
+    </li>
+    <li>
+      <strong>Encoder numeric parity.</strong>
+      CK's final vision prefix is compared against llama.cpp/mtmd output.
+      If this fails, decoder debugging stops because the prefix is already wrong.
+    </li>
+    <li>
+      <strong>Persistent multi-token parity.</strong>
+      If the prefix is acceptable, CK and llama.cpp run greedy token replay.
+      The report records first mismatch step, token ids, top-k overlap, cosine, RMSE,
+      and logits metrics.
+    </li>
+    <li>
+      <strong>Granular attribution.</strong>
+      If a coarse stage fails, the runner dumps selected layer/op tensors and reports
+      the first failing boundary.
+    </li>
+  </ol>
+
+  <pre><code>.venv/bin/python version/v8/scripts/stitched_parity_v8.py \
+  --template qwen3vl \
+  --mode fast \
+  --decoder-gguf models/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj-gguf models/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+  --image-path build/qwen3vl_avx2_fresh_bridge_20260708/1_81_canonical.ppm \
+  --prompt "Extract visible form fields as compact JSON." \
+  --workdir build/stitched_parity/qwen3vl_avx2_canonical \
+  --ctx-len 4096 \
+  --threads 20 \
+  --top-k 16 \
+  --max-new-tokens 64 \
+  --image-max-tokens 1024 \
+  --phase-timeout-sec 1800 \
+  --log-byte-limit 1048576</code></pre>
+
+  <h2>How It Decides Where To Break</h2>
+  <p>
+    The system does not infer a graph cut from arbitrary source code. The cutpoints
+    come from the generated IR/codegen boundary map and backend-specific dump names.
+    For Qwen3-VL vision, the useful layer boundaries include:
+  </p>
+  <ul>
+    <li><code>inp_pos_emb</code></li>
+    <li><code>patch_bias</code></li>
+    <li><code>ln1</code></li>
+    <li><code>Qcur</code>, <code>Kcur</code>, <code>Vcur</code></li>
+    <li><code>Qcur_rope</code>, <code>Kcur_rope</code></li>
+    <li><code>kqv_out</code></li>
+    <li><code>attn_out</code> / <code>attn_output</code></li>
+    <li><code>ffn_inp</code>, <code>ffn_inp_normed</code></li>
+    <li><code>ffn_up_b</code>, <code>ffn_out</code></li>
+    <li><code>layer_out</code></li>
+  </ul>
+  <p>
+    A failure like <code>kqv_out PASS</code> followed by <code>attn_output FAIL</code>
+    immediately narrows the search to the output-projection boundary, transpose/layout
+    before projection, activation quantization, weight view, residual add, or a naming
+    mismatch around that exact dump.
+  </p>
+
+  <h2>Report Semantics</h2>
+  <p>
+    A stitched report is designed to be pasted into a PR or agent handoff. Important
+    fields are:
+  </p>
+  <ul>
+    <li><code>status</code>: pass/fail/timeout.</li>
+    <li><code>failure_stage</code>: bridge, encoder_numeric, multitoken, or granular.</li>
+    <li><code>encoder_numeric_metrics</code>: cosine, RMSE, max abs, mean abs.</li>
+    <li><code>first_mismatch</code>: generated token step and CK/llama token ids.</li>
+    <li><code>first_granular_issue</code>: layer, op, diff metrics, divergent index.</li>
+    <li><code>commands.log</code>: exact subprocess commands and trimmed output.</li>
+  </ul>
+
+  <h2>Adding A New Model Or Backend</h2>
+  <p>
+    New compatibility work should add the following pieces before optimizing kernels:
+  </p>
+  <ol>
+    <li>
+      <strong>Canonical run spec:</strong> model files, checksums, prompt, context length,
+      thread count, image/audio preprocessing, and deterministic sampling settings.
+    </li>
+    <li>
+      <strong>CK dump map:</strong> generated code emits named tensors at stable IR boundaries.
+    </li>
+    <li>
+      <strong>Reference adapter:</strong> llama.cpp, PyTorch, or another backend emits the
+      same boundaries in CKDMP-compatible form.
+    </li>
+    <li>
+      <strong>Alias map:</strong> normalize names such as <code>attn_output</code> vs
+      <code>attn_out</code>, and document any boundary that is not semantically identical.
+    </li>
+    <li>
+      <strong>Layout contract:</strong> define whether the comparison is token-major,
+      head-major, row-major, packed, or unpacked logical fp32.
+    </li>
+    <li>
+      <strong>Thresholds:</strong> strict where the math should be exact, looser only where
+      the reference intentionally differs by dtype or quantization.
+    </li>
+    <li>
+      <strong>Fallback triage:</strong> if full output fails, rerun layer 0, then layer range,
+      then op-specific dumps.
+    </li>
+  </ol>
+
+  <h2>Known Failure Modes</h2>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Duplicate Tensor Names</h3>
+      <p>
+        If CK dumps both pre-projection and post-projection tensors as
+        <code>attn_output</code>, the comparator may select the wrong candidate.
+        Use unique names such as <code>attn_context</code>, <code>out_proj_in</code>,
+        and <code>attn_output</code>.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Layout Mismatch</h3>
+      <p>
+        CK often stores attention scratch in head-major layout while references expose
+        token-major tensors. Dump helpers must normalize logical order before comparison.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Reference Boundary Mismatch</h3>
+      <p>
+        A name match is not enough. Verify whether the reference tensor is before bias,
+        after bias, before residual, after residual, before activation, or after activation.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Scratch Explosion</h3>
+      <p>
+        Full-model dumps are enormous. Use layer filters, op filters, early CK stop,
+        log byte caps, and weight-pruning after each phase.
+      </p>
+    </div>
+  </div>
+
+  <h2>Operational Guidance</h2>
+  <ul>
+    <li>For AVX2 GGUF Qwen3-VL: use llama.cpp/mtmd as the enforced backend.</li>
+    <li>For BF16 safetensors template bring-up: use PyTorch as the reference backend.</li>
+    <li>Do not optimize a fast path until stitched parity identifies the first failing boundary.</li>
+    <li>Do not relax tolerances to hide a top-1 flip or long-decode drift.</li>
+    <li>When a kernel unit test passes but stitched parity fails, suspect layout, conversion, or graph semantics before rewriting the kernel.</li>
+    <li>When a reference adapter changes, record the llama.cpp commit or PyTorch model revision in the report.</li>
+  </ul>
+
+  <div class="alert alert-success">
+    <strong>What good looks like:</strong>
+    a failed run should say "layer 0, op attn_output, kqv_out passed, output projection boundary failed",
+    not merely "OCR answer is wrong". That is the difference between model debugging and guessing.
+  </div>
+</div>
