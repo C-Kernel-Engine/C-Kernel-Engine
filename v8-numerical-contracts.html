@@ -1043,6 +1043,18 @@
 
 <p>Kernel maps also declare ISA dispatch, threading runtime, possible work partitions, dispatch mechanisms, and whether scheduling can alter reduction order. Q4/Q6 GEMM and GEMV maps therefore expose serial, row, column, or output-tile policies instead of hiding threadpool behavior in generated wrappers. GraphIR records this as <code>resolved_execution</code>, and LoweredIR plus call-ready IR hard-fail if the kernel ID changes. When partitioning changes arithmetic order, the numerical contract must define the corresponding reduction and merge behavior.</p>
 
+<h2>Scalar, Production, and Threadpool Evidence</h2>
+
+<p>Quantized linear maps bind three exact functions: the scalar contract oracle, the public production function, and the threadpool dispatch function. The compiler validates these names and carries them into IR; it does not rank or guess functions from ISA, dimensions, or benchmark results. Dimensions and thread counts remain ordinary function inputs.</p>
+
+<ol>
+  <li>Compare an external backend or independent mathematical oracle with the scalar contract implementation.</li>
+  <li>Compare the optimized public function with that scalar implementation.</li>
+  <li>Compare threadpool dispatch with the same scalar implementation at representative thread counts and shapes.</li>
+</ol>
+
+<p>Independent output rows or tiles must preserve each output's reduction order. Split-K is a different numerical contract and must declare its partial accumulator, partition, and merge order. Unavailable llama.cpp or PyTorch evidence is recorded as <code>unresolved</code>, never counted as a pass.</p>
+
 <div class="contract-note contract-bad">
   <strong>Hard-fail policy:</strong> agents must fix the circuit, canonical contract, or kernel map. They must not add fallbacks, silent defaults, bypass flags, or looser tolerances to make a new model compile.
 </div>
@@ -1053,7 +1065,10 @@
 
 <h2>Validation Commands</h2>
 
+<p><code>make test-numerical-contracts</code> is an executable gate, not only a schema check. It builds the engine and runs contract resolution, full attention numerics, and FP16 split-KV reduction cases. The focused commands below remain useful when attributing a failure.</p>
+
 <pre><code>make test-numerical-contracts
+make test-threadpool-parity
 PYTHONPATH=unittest .venv/bin/python unittest/test_attention_full.py -v
 V8_QWEN3VL_ENCODER_PARITY_LLAMA_CPP_ROOT=./llama.cpp \
   make test-attention-f16-split-kv
