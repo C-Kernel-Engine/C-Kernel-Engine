@@ -1,0 +1,119 @@
+<!-- TITLE: v8 Numerical Contracts -->
+<!-- NAV: architecture-links -->
+
+<style>
+.contract-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin:1rem 0}.contract-card{border:1px solid var(--grey);border-left:4px solid var(--orange);border-radius:8px;padding:1rem;background:rgba(255,255,255,.02)}.contract-card h3{margin-top:0}.contract-flow{overflow-x:auto}.contract-flow img{display:block;width:100%;min-width:900px;height:auto}.contract-note{border:1px solid rgba(7,173,248,.45);border-radius:8px;padding:1rem;background:rgba(7,173,248,.06)}.contract-bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.06)}.contract-good{border-color:rgba(48,196,141,.55);background:rgba(48,196,141,.06)}.contract-table td:first-child{font-family:'JetBrains Mono',monospace;white-space:nowrap}
+</style>
+
+<h1>v8 Numerical Contracts</h1>
+
+<p>v8 now treats numerical behavior as compiler input. A circuit does not merely say “run attention.” It can require the query precision, K/V storage and compute precision, score accumulator, online-softmax state, value accumulator, partition threshold, partial storage, and merge order. Kernel maps state which complete contracts their implementations support. The DSL resolves one provider or fails before C is emitted.</p>
+
+<div class="contract-note contract-good">
+  <strong>Core rule:</strong> weights and shapes do not uniquely define model math. Reduction order, intermediate precision, partitioning, and public routing are part of the model contract.
+</div>
+
+<div class="img-container svg-viewer contract-flow" data-title="v8 Numerical Contract Architecture">
+  <img src="assets/v8-numerical-contracts.svg" alt="Weights, circuits, kernel maps and numerical contracts flowing through deterministic v8 lowering into generated C">
+</div>
+
+<h2>Why the Architecture Needed Hardening</h2>
+
+<p>The earlier v8 path had strong kernel maps, generated C, and E2E tests, but some numerical semantics were inferred inside runtime code. A function name established one part of the contract, an environment flag selected another part, tensor metadata implied a third part, and a sequence-length threshold could silently change the reduction algorithm. Leaf kernels could all pass while the stitched model selected the wrong public route.</p>
+
+<div class="contract-grid">
+  <div class="contract-card contract-bad"><h3>Before</h3><p>Circuits declared op order. Runtime dispatch inferred precision and partition semantics from function choice, strict mode, cache dtype, token count, and thread count.</p></div>
+  <div class="contract-card"><h3>Failure Mode</h3><p>Two mathematically different kernels looked interchangeable because both were called “attention.” Unit tests exercised a correct leaf while generated code reached another route.</p></div>
+  <div class="contract-card contract-good"><h3>After</h3><p>Circuits request complete semantic IDs. Executable kernel maps advertise complete providers. Lowering rejects missing or ambiguous matches.</p></div>
+</div>
+
+<h2>The Attention Bug That Exposed It</h2>
+
+<p>Three full-attention tests had long-standing errors of roughly <code>5.68e-4</code> to <code>1.06e-3</code>. The public full-attention contract expected FP32 Q with K/V rounded through FP16, matching the GGML-style vision path. The optimized AVX2 route consumed raw FP32 K/V. Pre-rounding only K/V reduced the error to <code>4.77e-7</code>, proving this was a contract mismatch rather than a tolerance problem.</p>
+
+<table class="contract-table">
+  <tr><th>Boundary</th><th>Required behavior</th><th>Former behavior</th><th>Guard</th></tr>
+  <tr><td>full attention Q</td><td>FP32 compute</td><td>FP32 compute</td><td>Qwen3-VL head_dim=72 test</td></tr>
+  <tr><td>full attention K/V</td><td>round through FP16</td><td>raw FP32</td><td>contiguous, strided, threaded tests</td></tr>
+  <tr><td>decode KV &lt; 512</td><td>single FP16 online range</td><td>implicit route</td><td>KV=511 oracle</td></tr>
+  <tr><td>decode KV ≥ 512</td><td>worker chunks, FP16 partials, FP32 merge</td><td>single FP32-style reduction possible</td><td>KV=512 and KV=1058 oracle</td></tr>
+</table>
+
+<h2>Compiler Inputs</h2>
+
+<div class="contract-grid">
+  <div class="contract-card"><h3>Weights</h3><p><code>weights_manifest.json</code> supplies tensor names, shapes, dtypes, quant formats, offsets, and model dimensions. It does not choose graph order.</p></div>
+  <div class="contract-card"><h3>Circuits</h3><p><code>version/v8/circuits/*.json</code> supplies operations, explicit edges, branches, stitch points, and <code>required_contracts</code>. Circuits state semantics, never a numerical implementation ID.</p></div>
+  <div class="contract-card"><h3>Kernel Maps</h3><p><code>version/v8/kernel_maps/*.json</code> supplies ABI, layouts, implementation function, <code>provides</code>, and <code>supported_reductions</code>.</p></div>
+  <div class="contract-card"><h3>Contract Registry</h3><p><code>version/v8/contracts/attention_reductions.json</code> defines each semantic ID completely so two kernels cannot reuse a name for different mathematics.</p></div>
+</div>
+
+<h2>Complete Reduction Semantics</h2>
+
+<p>A reduction ID is not a loose dtype such as <code>fp16</code> or <code>strict</code>. Those names are rejected as ambiguous. A registered contract includes:</p>
+
+<ul>
+  <li>query and key compute precision;</li>
+  <li>score accumulator and softmax-statistics precision;</li>
+  <li>value compute and accumulator precision;</li>
+  <li>partial storage and merge order;</li>
+  <li>partition kind, threshold, and chunk policy.</li>
+</ul>
+
+<pre><code>{
+  "id": "f16_online_fp32_merge",
+  "q_compute": "fp16_rounded",
+  "k_compute": "fp16",
+  "score_accumulator": "fp32",
+  "softmax_statistics": "fp32",
+  "value_accumulator": "fp16_rounded_each_update",
+  "partial_storage": "fp16",
+  "partial_merge": "fp32_chunk_order",
+  "partition": {
+    "kind": "kv_chunks_by_workers",
+    "threshold": 512
+  }
+}</code></pre>
+
+<h2>Deterministic Resolution</h2>
+
+<ol>
+  <li>The builder hydrates the current built-in circuit into cached manifests, so old converted models receive current graph and contract defaults.</li>
+  <li>The resolver reads each active <code>required_contracts</code> entry for the requested phase.</li>
+  <li>It matches op, phase, tensor dtype, layout, and complete reduction ID against executable kernel maps.</li>
+  <li>Zero providers fail as unsupported. Multiple providers fail as ambiguous.</li>
+  <li>During migration, v8 validates that legacy lowering emitted the exact selected kernel ID. This keeps generated behavior unchanged.</li>
+  <li>Production promotion additionally requires validated circuit, contract definition, implementation route, stitched parity, and E2E evidence.</li>
+</ol>
+
+<h2>Compatibility and Migration</h2>
+
+<p>The repository directory is now <code>version/v8/circuits</code>. Embedded BUMP metadata continues to use the historical <code>template</code> key, and chat templates keep their established name; changing serialized formats is not required to correct compiler architecture.</p>
+
+<p>The first integration is deliberately behavior-preserving. On the canonical Qwen3-VL artifacts, pre-contract and contracted builds produced identical <code>ir1.json</code>, <code>layout.json</code>, <code>lowered.json</code>, and <code>call.json</code> for both decoder and vision encoder. The five-family v8 regression also passed for Gemma3, Qwen2, Qwen3, Qwen3.5, and Nanbeige.</p>
+
+<div class="contract-note">
+  <strong>Migration policy:</strong> add one operator family at a time. Record current semantics, add leaf and public-route tests, declare circuit requirements, enrich real kernel maps, prove generated artifact equivalence, run stitched parity, then promote the route.
+</div>
+
+<h2>Validation Commands</h2>
+
+<pre><code>make test-numerical-contracts
+PYTHONPATH=unittest .venv/bin/python unittest/test_attention_full.py -v
+V8_QWEN3VL_ENCODER_PARITY_LLAMA_CPP_ROOT=./llama.cpp \
+  make test-attention-f16-split-kv
+make test-v8-qwen3vl
+make v8-regression-fast</code></pre>
+
+<h2>What This Prevents</h2>
+
+<ul>
+  <li>A correct leaf kernel hidden behind the wrong production wrapper.</li>
+  <li>Prefill and decode silently using different accumulation contracts.</li>
+  <li>KV=511 and KV=512 changing mathematics without a declared threshold.</li>
+  <li>Thread count changing reduction structure without a declared partition policy.</li>
+  <li>A model-specific Python conditional becoming permanent compiler architecture.</li>
+  <li>A fast path being enabled because it is faster while long-token parity is worse.</li>
+</ul>
+
+<p>Related: <a href="architecture.html">System Architecture</a>, <a href="ir-pipeline.html">IR Pipeline</a>, <a href="v8-vision-encoder.html">v8 Vision Encoder</a>, and <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>.</p>

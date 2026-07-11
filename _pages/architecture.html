@@ -13,6 +13,32 @@
     <p style="margin: 0;"><strong>Performance Methodology:</strong> See <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a> for the VTune, Advisor, roofline, CK profile, parity, and E2E workflow used to push generated kernels toward CPU-node limits.</p>
 </div>
 
+<div class="card card-accent">
+    <p style="margin: 0;"><strong>v8 Compiler Hardening:</strong> See <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> for circuits, kernel-map capabilities, explicit attention reductions, deterministic resolution, generated-artifact equivalence, and parity promotion gates.</p>
+</div>
+
+<h2>Active v8 Compiler Architecture</h2>
+
+<p>The active v8 inference compiler consumes three authoritative inputs: model weights, an architecture circuit, and executable kernel maps. The circuit owns graph structure and required semantics. Kernel maps own ABI and implementation capability. The DSL resolves and stitches; generated C does not guess.</p>
+
+<div class="img-container svg-viewer" data-title="v8 Numerical Contract Architecture">
+    <img src="assets/v8-numerical-contracts.svg" alt="v8 weights, circuits, kernel maps, numerical contract resolution, IR lowering and generated C">
+</div>
+
+<div class="grid grid-2">
+    <div class="card"><h3 style="margin-top:0;">Compiler Input</h3><pre>weights + circuits + kernel maps
+             ↓
+deterministic DSL lowering
+             ↓
+generated C</pre><p>Model definitions live in <code>version/v8/circuits/</code>. The historical embedded BUMP key remains <code>template</code> for serialized compatibility.</p></div>
+    <div class="card"><h3 style="margin-top:0;">Semantic Selection</h3><p>Precision-sensitive operations declare <code>required_contracts</code>. Real kernel maps advertise <code>provides</code> and <code>supported_reductions</code>. Missing and ambiguous providers are compile-time errors.</p></div>
+    <div class="card"><h3 style="margin-top:0;">Behavior-Preserving Migration</h3><p>The resolver verifies that legacy lowering emitted the exact selected kernel. Qwen3-VL decoder and encoder IR1, layout, lowered IR, and call-ready IR were identical before and after integration.</p></div>
+    <div class="card"><h3 style="margin-top:0;">Promotion Gate</h3><p>Leaf tests are necessary but insufficient. Public routing, threaded thresholds, stitched layer boundaries, full replay, persistent decode, and E2E behavior must agree before production validation.</p></div>
+</div>
+
+<h3>Why reduction is architecture</h3>
+<p>Attention is not fully specified by <code>softmax(QKᵀ)V</code>. Q/K rounding, score accumulation, online-softmax state, V accumulation, split thresholds, partial storage, and merge order can change logits. v8 records these as complete contracts instead of inferring them from strict-mode flags, cache dtypes, sequence lengths, or thread counts.</p>
+
 <div class="card">
     <h3 style="margin-top: 0;">The "Website" Metaphor</h3>
     <p>The engine treats LLMs like a website generator treats pages. This allows us to unroll the "Block" section efficiently in C without complex control flow.</p>

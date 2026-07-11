@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">C-Kernel-Engine v8 numerical contract architecture</title>
+  <desc id="desc">Weights, circuits, and kernel maps flow through deterministic contract resolution, GraphIR, lowering, and generated C with compile-time and parity gates.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.ok{fill:#10231d;stroke:#30c48d;stroke-width:2}.fail{fill:#27151a;stroke:#fb7185;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="900"/>
+  <text class="t" x="60" y="58">v8 deterministic compiler: semantics before implementation</text>
+  <text class="p" x="60" y="87">The DSL stays simple. Circuits request mathematics; kernel maps prove capability; lowering emits only a unique valid provider.</text>
+
+  <rect class="input" x="55" y="130" width="300" height="145" rx="8"/>
+  <text class="h" x="80" y="164">Weights + model config</text>
+  <text class="m" x="80" y="196">weights_manifest.json</text>
+  <text class="p" x="80" y="225">Shapes, dtypes, offsets, quantization</text>
+  <text class="p" x="80" y="249">No graph-order guesses</text>
+
+  <rect class="input" x="405" y="130" width="300" height="145" rx="8"/>
+  <text class="h" x="430" y="164">Circuits</text>
+  <text class="m" x="430" y="196">version/v8/circuits/*.json</text>
+  <text class="p" x="430" y="225">Ops, edges, branches, stitch points</text>
+  <text class="p" x="430" y="249">Required numerical semantics</text>
+
+  <rect class="input" x="755" y="130" width="300" height="145" rx="8"/>
+  <text class="h" x="780" y="164">Kernel maps</text>
+  <text class="m" x="780" y="196">version/v8/kernel_maps/*.json</text>
+  <text class="p" x="780" y="225">ABI, layouts, implementation function</text>
+  <text class="p" x="780" y="249">supported_reductions + provides</text>
+
+  <rect class="input" x="1105" y="130" width="280" height="145" rx="8"/>
+  <text class="h" x="1130" y="164">Contract registry</text>
+  <text class="m" x="1130" y="196">attention_reductions.json</text>
+  <text class="p" x="1130" y="225">Complete precision and partition rules</text>
+  <text class="p" x="1130" y="249">Stable semantic IDs</text>
+
+  <path class="line" d="M205 275 V330 H570"/>
+  <path class="line" d="M555 275 V330"/>
+  <path class="line" d="M905 275 V330 H680"/>
+  <path class="line" d="M1245 275 V330 H760"/>
+
+  <rect class="gate" x="390" y="330" width="660" height="170" rx="8"/>
+  <text class="h" x="420" y="370">Contract resolution</text>
+  <text class="m" x="420" y="402">op + phase + dtype + layout + reduction contract</text>
+  <text class="p" x="420" y="433">0 providers: fail before C generation</text>
+  <text class="p" x="420" y="458">2+ providers: fail as ambiguous</text>
+  <text class="p" x="420" y="483">1 provider: verify legacy lowering emits that exact kernel ID</text>
+
+  <rect class="fail" x="75" y="355" width="260" height="120" rx="8"/>
+  <text class="h" x="100" y="390">Compile-time rejection</text>
+  <text class="p" x="100" y="420">Missing contract</text>
+  <text class="p" x="100" y="444">Incompatible layout or dtype</text>
+  <path class="line" d="M390 415 H335"/>
+
+  <path class="line" d="M720 500 V555"/>
+  <rect class="panel" x="145" y="555" width="260" height="130" rx="8"/>
+  <text class="h" x="170" y="590">GraphIR</text>
+  <text class="p" x="170" y="620">Symbolic tensors and edges</text>
+  <text class="p" x="170" y="646">No addresses, no ISA choice</text>
+  <rect class="panel" x="475" y="555" width="260" height="130" rx="8"/>
+  <text class="h" x="500" y="590">LoweredIR</text>
+  <text class="p" x="500" y="620">Concrete kernels and buffers</text>
+  <text class="p" x="500" y="646">Validated contract attached</text>
+  <rect class="panel" x="805" y="555" width="260" height="130" rx="8"/>
+  <text class="h" x="830" y="590">Call-ready IR</text>
+  <text class="p" x="830" y="620">ABI arguments and dimensions</text>
+  <text class="p" x="830" y="646">Memory planner resolved</text>
+  <rect class="ok" x="1135" y="555" width="250" height="130" rx="8"/>
+  <text class="h" x="1160" y="590">Generated C</text>
+  <text class="p" x="1160" y="620">Dumb, deterministic emitter</text>
+  <text class="p" x="1160" y="646">No model-specific guessing</text>
+  <path class="line" d="M405 620 H475"/>
+  <path class="line" d="M735 620 H805"/>
+  <path class="line" d="M1065 620 H1135"/>
+
+  <rect class="gate" x="145" y="735" width="1240" height="115" rx="8"/>
+  <text class="h" x="175" y="770">Promotion gates</text>
+  <text class="p" x="175" y="802">Kernel numerical tests → public-route tests → generated artifact equivalence → stitched layer parity → E2E model parity/coherence</text>
+  <text class="small" x="175" y="829">A faster implementation may replace a provider only when it preserves the declared contract and passes the same gates.</text>
+  <path class="line" d="M1260 685 V735"/>
+</svg>

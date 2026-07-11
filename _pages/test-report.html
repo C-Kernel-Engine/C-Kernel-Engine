@@ -774,6 +774,7 @@
       including FP16 Q/K rounding, FP16 probability/value reduction, FP16 online-softmax partials, FP32 ordered reduction, GQA/padding,
       the KV 511/512 semantic boundary, and the Qwen3-VL <code>KV=1058, H=32, D=128</code> shape
       (<code>make test-attention-f16-split-kv</code>)</li>
+    <li><strong>v8 Numerical Reduction Contracts</strong>: Circuits request complete attention semantics and executable kernel maps advertise supported reductions; zero or ambiguous providers fail deterministically, while migration tests prove contract validation preserves generated artifacts (<code>make test-numerical-contracts</code>)</li>
     <li><strong>v8 Stitched Dump Alignment</strong>: Guards canonical output-projection aliases and preserves absolute CK/llama
       source-token provenance when mixed-prefix dumps are rebased for per-token comparison
       (<code>make test-v8-dump-alignment</code>)</li>
