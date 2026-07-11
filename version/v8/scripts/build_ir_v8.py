@@ -3823,6 +3823,12 @@ def _normalize_rope_layout_value(value: Any) -> str:
 
 
 def _resolve_rope_qk_kernel(config: Dict, template_kernels: Dict[str, Any]) -> str:
+    # Compatibility resolver only. Do not add model-name checks or new
+    # numerical behavior here. New RoPE/M-RoPE variants must declare a complete
+    # position-transform contract in the circuit and an exact implementation in
+    # a kernel map; lowering should consume that resolved binding. This legacy
+    # resolver remains temporarily for circuits not yet migrated to explicit
+    # RoPE contracts.
     rope_layout = _normalize_rope_layout_value(config.get("rope_layout"))
     rope_param_mode = str(config.get("rope_param_mode", "") or "").strip().lower()
     override = str(template_kernels.get("rope_qk", "") or "").strip()

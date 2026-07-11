@@ -497,6 +497,12 @@ MAKE_TARGETS = {
         "target": "test-numerical-contracts",
         "timeout_sec": 300,
     },
+    "v8_parity_bisection": {
+        "name": "v8 Canonical First-Divergence",
+        "category": "parity",
+        "target": "test-v8-parity-bisection",
+        "timeout_sec": 300,
+    },
     "v8_template_circuit_audit": {
         "name": "v8 Template Circuit/Dataflow Audit",
         "category": "inference",

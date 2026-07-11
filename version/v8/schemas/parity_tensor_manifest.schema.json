@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cke.v8.parity_tensor_manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "backend", "run", "tensors"],
+  "properties": {
+    "schema": {"const": "cke.v8.parity_tensor_manifest"},
+    "schema_version": {"const": 1},
+    "backend": {"type": "string", "minLength": 1},
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "model": {"type": "string"},
+        "source": {"type": "string"},
+        "commit": {"type": "string"},
+        "metadata": {"type": "object"}
+      }
+    },
+    "tensors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/tensor"}
+    }
+  },
+  "$defs": {
+    "tensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint", "path", "format", "dtype", "shape", "axes", "canonical_axes", "producer"],
+      "properties": {
+        "checkpoint": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "format": {"enum": ["raw", "npy"]},
+        "dtype": {"enum": ["fp32", "fp16", "bf16", "int32", "int64"]},
+        "shape": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {"type": "integer", "minimum": 1}
+        },
+        "axes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "canonical_axes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "producer": {"type": "string", "minLength": 1},
+        "layer": {"type": "integer", "minimum": -1},
+        "contract": {"type": "string", "minLength": 1},
+        "occurrence": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

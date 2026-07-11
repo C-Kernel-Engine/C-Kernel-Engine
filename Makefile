@@ -2886,6 +2886,12 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) version/v8/scripts/resolve_attention_contracts_v8.py --circuit qwen3vl --operation decoder.attention --phase decode --mode bringup --output build/v8/contracts/qwen3vl-decode.json >/dev/null
 	@echo "Resolved plans: build/v8/contracts/"
 
+.PHONY: test-v8-parity-bisection
+test-v8-parity-bisection:
+	@echo "Running v8 canonical parity ABI and first-divergence tests..."
+	@$(PYTHON) -m py_compile version/v8/scripts/parity_bisect_v8.py
+	@$(PYTHON) -m unittest tests.test_v8_parity_bisection -v
+
 v8-model-kernel-inspect:
 	@target="$${MODEL:-$${CONFIG:-}}"; \
 	if [ -z "$$target" ]; then \
