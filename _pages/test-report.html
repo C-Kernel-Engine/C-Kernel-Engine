@@ -474,6 +474,20 @@
     </div>
 
     <div class="regression-section">
+      <h2>Vision Encoder Accuracy</h2>
+      <p class="regression-meta" id="vision-encoder-accuracy-meta">
+        No fresh artifact-backed encoder result was published by this run.
+      </p>
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card"><div class="value" id="vision-encoder-accuracy-status">-</div><div class="label">Overall</div></div>
+        <div class="summary-card"><div class="value" id="vision-encoder-q4-status">-</div><div class="label">Q8_0 vs llama.cpp</div></div>
+        <div class="summary-card"><div class="value" id="vision-encoder-bf16-status">-</div><div class="label">BF16 vs PyTorch</div></div>
+        <div class="summary-card"><div class="value" id="vision-encoder-layer-count">0</div><div class="label">Layer Checkpoints</div></div>
+      </div>
+      <div id="vision-encoder-accuracy-details" class="updated-time"></div>
+    </div>
+
+    <div class="regression-section">
       <h2>Vision Visualizer Artifacts</h2>
       <p class="regression-meta" id="vision-visualizer-meta">
         `make v8-visualizer-vision-artifacts` status is not available in this report yet.
@@ -747,6 +761,15 @@
       consumed, align-corners interpolation is selected, and M-RoPE arguments remain valid through generated calls. The target builds
       both engine and vision libraries first so hardware-independent M-RoPE checks cannot silently skip
       (<code>make nightly-bf16</code>)</li>
+    <li><strong>Vision Encoder Full Accuracy Gate</strong>: One local/nightly command runs Qwen3-VL Q8_0 mmproj parity against
+      llama.cpp, then BF16 safetensors parity against PyTorch when the checkpoint and AVX-512 BF16 runtime are available. The gate uses
+      a generated public <code>1152x896</code> form-like stress image, validates sparse encoder boundaries
+      (<code>0, 8, 16, 24, 26</code>) plus the final <code>1008x16384</code>-class prefix, and removes raw tensor dumps by default.
+      Use <code>make vision-encoder-full</code>; set <code>V8_VISION_ENCODER_REQUIRE_ARTIFACTS=1</code> on provisioned runners,
+      or <code>V8_VISION_ENCODER_FULL_LAYERS=1</code> for an exhaustive local sweep.</li>
+    <li><strong>Scheduled Q4 Vision Encoder Parity</strong>: Scheduled GitHub nightly runs download the Qwen3-VL Q8_0 mmproj only
+      when at least 8 GiB RAM and 6 GiB disk are available, then invoke the same <code>vision-encoder-full</code> target. Real BF16
+      tensor parity remains a periodic AVX-512 BF16 lane; synthetic BF16 conversion/lowering guards continue on every nightly.</li>
     <li><strong>FP16 Attention Contracts</strong>: Named numerical guards for llama.cpp-compatible unfused causal prefill and split-KV decode,
       including FP16 Q/K rounding, FP16 probability/value reduction, FP16 online-softmax partials, FP32 ordered reduction, GQA/padding,
       the KV 511/512 semantic boundary, and the Qwen3-VL <code>KV=1058, H=32, D=128</code> shape
@@ -794,7 +817,7 @@
   <div class="alert alert-info" style="margin-top: 1rem;">
     <span class="alert-icon">💡</span>
     <div>
-      <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
+      <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make vision-encoder-full</code> (artifact-backed encoder parity), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
       <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, v8 vision kernel parity, published training family regression, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
     </div>
@@ -1069,6 +1092,7 @@ function renderResults(data) {
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRegressionFast(data.regression_fast || null);
   renderArchitectureContracts(data.architecture_contracts || null);
+  renderVisionEncoderAccuracy(data.vision_encoder_accuracy || null);
   renderVisionVisualizer(data.vision_visualizer || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
   renderBackpropRegression(data.backprop_regression || null);
@@ -1213,6 +1237,30 @@ function contractBadge(status) {
   const cls = s === 'pass' ? 'pass' : s === 'fail' ? 'fail' : 'skip';
   const text = s === 'pass' ? 'PASS' : s === 'fail' ? 'FAIL' : s === 'warn' ? 'WARN' : s === 'partial' ? 'PARTIAL' : 'N/R';
   return `<span class="regression-badge ${cls}">${text}</span>`;
+}
+
+function renderVisionEncoderAccuracy(data) {
+  const meta = document.getElementById('vision-encoder-accuracy-meta');
+  const status = document.getElementById('vision-encoder-accuracy-status');
+  const q4 = document.getElementById('vision-encoder-q4-status');
+  const bf16 = document.getElementById('vision-encoder-bf16-status');
+  const layers = document.getElementById('vision-encoder-layer-count');
+  const details = document.getElementById('vision-encoder-accuracy-details');
+  if (!data) return;
+
+  const phases = data.phases || {};
+  const q4Phase = phases.q8_mmproj_llamacpp || phases.q4_llamacpp || {};
+  const bf16Phase = phases.bf16_pytorch || {};
+  const layerList = Array.isArray(data.layers) ? data.layers : [];
+  status.textContent = String(data.status || '-').toUpperCase();
+  q4.textContent = String(q4Phase.status || 'skip').toUpperCase();
+  bf16.textContent = String(bf16Phase.status || 'skip').toUpperCase();
+  layers.textContent = String(layerList.length);
+  meta.textContent = `family: ${data.family || '-'} | image: ${data.image_geometry ? data.image_geometry.join('x') : 'external'} | elapsed: ${Number(data.elapsed_sec || 0).toFixed(1)}s`;
+  const failures = Array.isArray(data.failures) ? data.failures : [];
+  details.innerHTML = failures.length
+    ? `<strong>Failures:</strong> ${failures.map(escapeHtml).join(' | ')}`
+    : `Checkpoints: ${layerList.join(', ') || '-'}; raw tensor dumps cleaned after metrics.`;
 }
 
 function renderVisionVisualizer(data) {
