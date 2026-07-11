@@ -1,5 +1,6 @@
 var NAVTREEINDEX10 =
 {
+"gemm__kernels__q8__0__q8__0__contract_8c.html#a7522a539e09d34bc1298e9d5a3d09692":[2,0,1,1,43,33],
 "gemm__kernels__q8__0__q8__0__contract_8c.html#a7de54de0a60eba16519c23edd29168d7":[2,0,1,1,43,2],
 "gemm__kernels__q8__0__q8__0__contract_8c.html#a7f33b99904bf0fecb5ad68a36e493b4d":[2,0,1,1,43,23],
 "gemm__kernels__q8__0__q8__0__contract_8c.html#a838c8941d90745b4f26517050095176e":[2,0,1,1,43,26],
@@ -99,14 +100,14 @@ var NAVTREEINDEX10 =
 "ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6":[2,0,1,1,48,3],
 "ggml__runtime__compat_8h.html#af96c7de149a9dab3bc48b7d9b70c4ad8":[2,0,1,1,48,10],
 "ggml__runtime__compat_8h_source.html":[2,0,1,1,48],
-"globals.html":[2,1,0],
 "globals.html":[2,1,0,0],
+"globals.html":[2,1,0],
 "globals_a.html":[2,1,0,1],
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
 "globals_d.html":[2,1,0,4],
-"globals_defs.html":[2,1,6],
 "globals_defs.html":[2,1,6,0],
+"globals_defs.html":[2,1,6],
 "globals_defs_a.html":[2,1,6,1],
 "globals_defs_b.html":[2,1,6,2],
 "globals_defs_c.html":[2,1,6,3],
@@ -248,6 +249,5 @@ var NAVTREEINDEX10 =
 "layernorm__kernels_8c.html#aabe13737d121479113ffd94b43e58087":[2,0,1,1,51,4],
 "layernorm__kernels_8c.html#ace47573bf5278260d2652f4fb069bb9e":[2,0,1,1,51,2],
 "layernorm__kernels_8c.html#afd2e784d7b2b3ac7eb93e6f87c091fae":[2,0,1,1,51,3],
-"layernorm__kernels_8c_source.html":[2,0,1,1,51],
-"layernorm__kernels__bf16_8c.html":[2,0,1,1,52]
+"layernorm__kernels_8c_source.html":[2,0,1,1,51]
 };

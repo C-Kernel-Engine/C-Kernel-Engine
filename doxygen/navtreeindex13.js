@@ -1,5 +1,6 @@
 var NAVTREEINDEX13 =
 {
+"ssm__kernels_8c.html#ac2a4728f5217ee472cf208da9f68a994":[2,0,1,1,83,2],
 "ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f":[2,0,1,1,83,0],
 "ssm__kernels_8c_source.html":[2,0,1,1,83],
 "structAffinityInfo.html":[1,0,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX13 =
 "structCKLayerForwardParams.html#aace627c9eb6644fac5c3fc5a4748f1f4":[1,0,31,21],
 "structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6":[1,0,31,10],
 "structCKLayerForwardParams.html#ac1ce35724d91ff94c95707a6d879d0a9":[1,0,31,16],
-"structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16":[1,0,31,38],
-"structCKLayerForwardParams.html#ac4abe1c97c14c49d953ae5dd8f910c96":[1,0,31,17]
+"structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16":[1,0,31,38]
 };

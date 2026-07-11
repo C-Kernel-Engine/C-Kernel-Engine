@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,62,2],
 "structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,62,0],
 "structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,62,4],
 "structMemoryInfo.html":[1,0,64],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "system__topology_8c.html#ac3c7b781cd07570159767e034c90938a":[2,0,1,28,7],
 "system__topology_8c.html#ac739fbe17c86f1c7e9da9c6ad2a8b176":[2,0,1,28,22],
 "system__topology_8c.html#adfd7a4ea82a4bee21021195cf398e284":[2,0,1,28,6],
-"system__topology_8c.html#ae541edad293faa847014c35c8e6411a5":[2,0,1,28,20],
-"system__topology_8c.html#af347a49445c57e42f3d5edba2039591e":[2,0,1,28,12]
+"system__topology_8c.html#ae541edad293faa847014c35c8e6411a5":[2,0,1,28,20]
 };

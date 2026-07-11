@@ -1,5 +1,6 @@
 var NAVTREEINDEX15 =
 {
+"structCKMetricsContext.html#ac39d3a091252ba9b4feef6212768340f":[1,0,43,0],
 "structCKMetricsContext.html#ac8c5ff0262220f241dfe28523e72cd42":[1,0,43,12],
 "structCKMetricsContext.html#ad73dc6efeb6c25c0bf023f8eadd1a5b2":[1,0,43,7],
 "structCKMetricsContext.html#ad9d4b9a8a8efb65df155cae72eb479d1":[1,0,43,10],
@@ -248,6 +249,5 @@ var NAVTREEINDEX15 =
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,10,0],
 "structGEMMParams.html":[1,0,62],
 "structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,62,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,62,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,62,2]
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,62,3]
 };
