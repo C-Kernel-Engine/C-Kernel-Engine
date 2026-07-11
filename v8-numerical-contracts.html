@@ -1028,7 +1028,8 @@
   <li>The resolver reads each active <code>required_contracts</code> entry for the requested phase.</li>
   <li>It matches op, phase, tensor dtype, layout, and complete reduction ID against executable kernel maps.</li>
   <li>Zero providers fail as unsupported. Multiple providers fail as ambiguous.</li>
-  <li>During migration, v8 validates that legacy lowering emitted the exact selected kernel ID. This keeps generated behavior unchanged.</li>
+  <li>The resolver selects the provider before GraphIR construction. Contract-bearing operations do not consult legacy circuit overrides or heuristic dispatch.</li>
+  <li>GraphIR records requirements and the resolved kernel/contract IDs. LoweredIR and call-ready IR carry that decision and hard-fail if a later stage changes it.</li>
   <li>Production promotion additionally requires validated circuit, contract definition, implementation route, stitched parity, and E2E evidence.</li>
 </ol>
 
@@ -1036,7 +1037,15 @@
 
 <p>The repository directory is now <code>version/v8/circuits</code>. Embedded BUMP metadata continues to use the historical <code>template</code> key, and chat templates keep their established name; changing serialized formats is not required to correct compiler architecture.</p>
 
-<p>The first integration is deliberately behavior-preserving. On the canonical Qwen3-VL artifacts, pre-contract and contracted builds produced identical <code>ir1.json</code>, <code>layout.json</code>, <code>lowered.json</code>, and <code>call.json</code> for both decoder and vision encoder. The five-family v8 regression also passed for Gemma3, Qwen2, Qwen3, Qwen3.5, and Nanbeige.</p>
+<p>The authoritative migration preserves executable behavior while making the decision visible. Contract metadata is added to GraphIR, LoweredIR, and call-ready IR, while kernel IDs, memory layout, call arguments, and generated C remain unchanged. Gemma3, Qwen2, Qwen3, Qwen3.5, Nanbeige, and Qwen3-VL attention routes resolve without legacy selection.</p>
+
+<h2>Threading Is an Execution Contract</h2>
+
+<p>Kernel maps also declare ISA dispatch, threading runtime, possible work partitions, dispatch mechanisms, and whether scheduling can alter reduction order. Q4/Q6 GEMM and GEMV maps therefore expose serial, row, column, or output-tile policies instead of hiding threadpool behavior in generated wrappers. GraphIR records this as <code>resolved_execution</code>, and LoweredIR plus call-ready IR hard-fail if the kernel ID changes. When partitioning changes arithmetic order, the numerical contract must define the corresponding reduction and merge behavior.</p>
+
+<div class="contract-note contract-bad">
+  <strong>Hard-fail policy:</strong> agents must fix the circuit, canonical contract, or kernel map. They must not add fallbacks, silent defaults, bypass flags, or looser tolerances to make a new model compile.
+</div>
 
 <div class="contract-note">
   <strong>Migration policy:</strong> add one operator family at a time. Record current semantics, add leaf and public-route tests, declare circuit requirements, enrich real kernel maps, prove generated artifact equivalence, run stitched parity, then promote the route.
