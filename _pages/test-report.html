@@ -1369,6 +1369,31 @@ function renderArchitectureContracts(data) {
 }
 
 function renderContractRows(sectionId, rows) {
+  if (sectionId === 'numerical_kernel_capabilities') {
+    return `
+      <div class="contract-table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Family</th><th>Capability</th><th>Status</th><th>Input</th><th>Compute</th><th>Reduction</th><th>Output</th><th>Oracle</th><th>Shape</th><th>Threads</th><th>Max Abs</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td><code>${escapeHtml(row.kernel_family || '-')}</code></td>
+                <td><code>${escapeHtml(row.capability || '-')}</code></td>
+                <td>${contractBadge(row.status)}</td>
+                <td>${escapeHtml(row.input_storage || '-')}</td>
+                <td>${escapeHtml(row.compute || '-')}</td>
+                <td>${escapeHtml(row.reduction || '-')}</td>
+                <td>${escapeHtml(row.output_storage || '-')}</td>
+                <td>${escapeHtml(row.oracle || '-')}</td>
+                <td><code>D=${escapeHtml(row.head_dim ?? '-')}</code></td>
+                <td>${escapeHtml(row.threads || '-')}</td>
+                <td><code>${escapeHtml(row.max_abs ?? '-')}</code></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
   if (sectionId === 'model_contract_coverage') {
     return `
       <div class="contract-table-wrap">
