@@ -401,6 +401,27 @@
       </div>
     </div>
 
+    <div class="regression-section" id="v8-dsl-contract-dashboard">
+      <h2>v8 DSL &amp; Compiler Contracts</h2>
+      <p class="regression-meta" id="v8-dsl-contract-meta">
+        Waiting for the three nightly rows that compose <code>make test-v8-dsl</code>.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card"><div class="value" id="v8-dsl-contract-status">-</div><div class="label">Overall</div></div>
+        <div class="summary-card"><div class="value" id="v8-dsl-policy-status">-</div><div class="label">Zero Hardcoding</div></div>
+        <div class="summary-card"><div class="value" id="v8-dsl-numerical-status">-</div><div class="label">Numerical</div></div>
+        <div class="summary-card"><div class="value" id="v8-dsl-circuit-status">-</div><div class="label">Circuit/Dataflow</div></div>
+      </div>
+
+      <table class="results-table">
+        <thead><tr><th>Status</th><th>Nightly Row</th><th>Local Target</th><th>Duration</th></tr></thead>
+        <tbody id="v8-dsl-contract-tbody">
+          <tr><td colspan="4" class="updated-time">No DSL contract rows published in this report.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="regression-section">
       <h2>Visualizer Contract Matrix</h2>
       <p class="regression-meta">
@@ -751,6 +772,10 @@
       </ul>
     </li>
     <li><strong>Kernel Unit Tests</strong>: Individual kernel parity with PyTorch</li>
+    <li><strong>v8 DSL and Codegen Contracts</strong>: The aggregate <code>make test-v8-dsl</code> gate is reported as three
+      independently visible nightly rows so a failure identifies the responsible layer: <code>test-v8-dsl-policy</code> enforces
+      zero model/provider hardcoding and map-owned codegen capabilities, <code>test-numerical-contracts</code> validates resolved
+      numerical execution semantics, and <code>test-v8-template-circuit-audit</code> verifies circuit dataflow and lowered bindings.</li>
     <li><strong>v8 Vision Kernel Parity</strong>: Vision kernel parity for patch extraction/reconstruction, tiled position embeddings,
       Qwen3-VL resized position interpolation order, spatial merge/reorder, feature concat/slice, and vision M-RoPE
       (<code>make test-v8-vision-kernels</code>)</li>
@@ -1093,6 +1118,7 @@ function renderResults(data) {
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRegressionFast(data.regression_fast || null);
   renderArchitectureContracts(data.architecture_contracts || null);
+  renderV8DSLContracts(data.results || []);
   renderVisionEncoderAccuracy(data.vision_encoder_accuracy || null);
   renderVisionVisualizer(data.vision_visualizer || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
@@ -1238,6 +1264,48 @@ function contractBadge(status) {
   const cls = s === 'pass' ? 'pass' : s === 'fail' ? 'fail' : 'skip';
   const text = s === 'pass' ? 'PASS' : s === 'fail' ? 'FAIL' : s === 'warn' ? 'WARN' : s === 'partial' ? 'PARTIAL' : 'N/R';
   return `<span class="regression-badge ${cls}">${text}</span>`;
+}
+
+function renderV8DSLContracts(results) {
+  const definitions = [
+    {name: 'v8 DSL Zero-Hardcoding Policy', target: 'test-v8-dsl-policy', statusId: 'v8-dsl-policy-status'},
+    {name: 'v8 Numerical Kernel Contracts', target: 'test-numerical-contracts', statusId: 'v8-dsl-numerical-status'},
+    {name: 'v8 Template Circuit/Dataflow Audit', target: 'test-v8-template-circuit-audit', statusId: 'v8-dsl-circuit-status'},
+  ];
+  const byName = new Map((Array.isArray(results) ? results : []).map(row => [row.name, row]));
+  const rows = definitions.map(definition => ({...definition, result: byName.get(definition.name)}));
+  const published = rows.filter(row => row.result);
+  const statuses = published.map(row => String(row.result.status || 'skip').toLowerCase());
+  const overall = published.length !== definitions.length
+    ? 'PARTIAL'
+    : statuses.some(status => status === 'fail' || status === 'timeout')
+      ? 'FAIL'
+      : statuses.every(status => status === 'pass') ? 'PASS' : 'PARTIAL';
+
+  const overallEl = document.getElementById('v8-dsl-contract-status');
+  overallEl.textContent = overall;
+  overallEl.className = overall === 'PASS' ? 'value test-pass' : overall === 'FAIL' ? 'value test-fail' : 'value test-skip';
+  document.getElementById('v8-dsl-contract-meta').textContent =
+    `${published.length}/3 component rows published. Monitor this panel for aggregate health; expand the same rows under Test Details for diagnostics.`;
+
+  rows.forEach(row => {
+    const status = row.result ? String(row.result.status || 'skip').toUpperCase() : 'N/R';
+    const element = document.getElementById(row.statusId);
+    element.textContent = status;
+    element.className = status === 'PASS' ? 'value test-pass' : status === 'FAIL' || status === 'TIMEOUT' ? 'value test-fail' : 'value test-skip';
+  });
+
+  document.getElementById('v8-dsl-contract-tbody').innerHTML = rows.map(row => {
+    const status = row.result ? String(row.result.status || 'skip').toUpperCase() : 'N/R';
+    const badgeClass = status === 'PASS' ? 'pass' : status === 'FAIL' || status === 'TIMEOUT' ? 'fail' : 'skip';
+    const duration = row.result && row.result.duration_sec ? `${Number(row.result.duration_sec).toFixed(2)}s` : '-';
+    return `<tr>
+      <td><span class="regression-badge ${badgeClass}">${escapeHtml(status)}</span></td>
+      <td><code>${escapeHtml(row.name)}</code></td>
+      <td><code>make ${escapeHtml(row.target)}</code></td>
+      <td>${duration}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderVisionEncoderAccuracy(data) {
