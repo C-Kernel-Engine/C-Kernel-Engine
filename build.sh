@@ -161,6 +161,7 @@ for page in "$PAGES_DIR"/*.html; do
         header="${header//\{\{NAV_QUICKSTART\}\}/}"
         header="${header//\{\{NAV_DEVGUIDE\}\}/}"
         header="${header//\{\{NAV_SCALING\}\}/}"
+        header="${header//\{\{NAV_SUPPORT\}\}/}"
         header="${header//\{\{NAV_ARCHITECTURE\}\}/}"
         header="${header//\{\{NAV_FLASH_ATTENTION\}\}/}"
         header="${header//\{\{NAV_KERNELS\}\}/}"
