@@ -163,6 +163,24 @@ make v7-regression-fast</code></pre>
   <li>Publish the capability evidence in the test-report accordion and nightly artifacts before promoting the route.</li>
 </ol>
 
+<h2>Measured BF16 Vision Progression</h2>
+
+<p>The Qwen3-VL BF16 investigation demonstrates the closure rule on a real 1152&times;896 form image with 4,032 visual tokens. Each row was reached through the normal compiler and exact kernel-map resolution; no generated C was edited by hand.</p>
+
+<table>
+  <thead><tr><th>Semantic edge</th><th>Before relative RMSE</th><th>After relative RMSE</th><th>Resolved capability</th></tr></thead>
+  <tbody>
+    <tr><td>Frontend position output</td><td>1.899e-2</td><td>2.361e-5</td><td>BF16 align-corners position storage</td></tr>
+    <tr><td>Layer 0 norm1</td><td>1.225e-2</td><td>5.538e-5</td><td>BF16 storage with matched FP32 reduction</td></tr>
+    <tr><td>Packed QKV projection</td><td>Not yet isolated</td><td>7.129e-5</td><td>BF16 input/weight, FP32 dot, BF16 output</td></tr>
+    <tr><td>Q after M-RoPE</td><td>Wrong generated sections</td><td>7.811e-5</td><td>Full-width multi-section BF16 output</td></tr>
+    <tr><td>Attention context</td><td>1.744e-3</td><td>9.258e-4</td><td>BF16 Q/K/V, FP32 online reduction, BF16 output</td></tr>
+    <tr><td>Output projection</td><td>Not yet isolated</td><td>6.059e-4</td><td>BF16 input/weight, FP32 dot, BF16 output</td></tr>
+  </tbody>
+</table>
+
+<p>The next edge is always explicit. After output projection the resolver selects the BF16 residual capability, then X-ray continues through norm2, MLP, spatial merge, projector, final prefix, mixed-prefill logits, and teacher-forced generation. A green leaf test without this forward movement is evidence for a kernel only, not closure of the model bug.</p>
+
 <h2>Validation Commands</h2>
 
 <p><code>make test-numerical-contracts</code> is an executable gate, not only a schema check. It builds the engine and runs contract resolution, full attention numerics, and FP16 split-KV reduction cases. The focused commands below remain useful when attributing a failure.</p>
