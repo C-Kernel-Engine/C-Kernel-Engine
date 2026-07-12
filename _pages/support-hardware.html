@@ -44,15 +44,7 @@ body { overflow-x: hidden; }
 .support-table th { color: var(--orange); background: rgba(255,180,0,.07); }
 .support-contract { padding: 1.4rem; border-left: 4px solid var(--blue); background: rgba(7,173,248,.07); }
 .support-callout { padding: 1.4rem; border: 1px solid rgba(255,180,0,.3); border-radius: 10px; background: rgba(255,180,0,.06); }
-.support-target { margin: 1.5rem 0 2rem; padding: 1.5rem; border: 1px solid rgba(71,180,117,.38); border-radius: 12px; background: linear-gradient(135deg, rgba(71,180,117,.1), rgba(7,173,248,.05)); }
-.support-target-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.support-target-value { color: var(--green); font: 800 1.7rem 'JetBrains Mono', monospace; }
-.support-milestones { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: .45rem; margin-top: 1.2rem; }
-.support-milestone { padding: .7rem .45rem; border-top: 4px solid var(--grey-light); background: rgba(255,255,255,.025); text-align: center; }
-.support-milestone strong { display: block; color: var(--orange); font-family: 'JetBrains Mono', monospace; }
-.support-milestone span { color: var(--text-muted); font-size: .72rem; }
 @media (max-width: 850px) { .support-grid { grid-template-columns: minmax(0, 1fr); } .support-hero { padding: 2.2rem 1.25rem; } .support-actions, .support-button { box-sizing: border-box; width: 100%; } .support-table { display: block; max-width: 100%; overflow-x: auto; } }
-@media (max-width: 700px) { .support-milestones { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 </style>
 
 <section class="support-hero">
@@ -60,32 +52,14 @@ body { overflow-x: hidden; }
   <h1>Help CKE prove CPU AI on hardware engineers can inspect and own.</h1>
   <p class="support-lead">C-Kernel-Engine needs more than benchmark claims. It needs repeatable measurements across SIMD generations, memory topologies, NUMA domains, and real network links. Support expands the laboratory while keeping the code, methods, limitations, and publishable results open.</p>
   <div class="support-actions">
-    <a class="support-button primary" href="https://github.com/sponsors/antshiv">Sponsor on GitHub</a>
-    <a class="support-button" href="mailto:anthony.shivakumar@antshiv.com?subject=CKE%20hardware%20lab%20support">Contribute hardware</a>
+    <a class="support-button primary" href="mailto:anthony.shivakumar@antshiv.com?subject=CKE%20hardware%20lab%20support">Discuss hardware support</a>
     <a class="support-button" href="https://www.shivasnotes.com/work-with-us">Fund a defined investigation</a>
     <a class="support-button" href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues">Propose a reproducible test</a>
   </div>
 </section>
 
-<section class="support-target">
-  <div class="support-target-head">
-    <div><div class="support-kicker">Public program target</div><h2 style="margin:.35rem 0 0">Build the full CPU AI evidence laboratory in stages</h2></div>
-    <div class="support-target-value">CAD $30,000</div>
-  </div>
-  <p>The target is a ceiling for the complete multi-year program, not a requirement to spend everything immediately. Each CAD $5,000 milestone releases a more capable evidence lane only after the previous stage produces inspectable results.</p>
-  <div class="support-milestones" aria-label="Six five-thousand-dollar funding milestones">
-    <div class="support-milestone"><strong>$5K</strong><span>first 636 node</span></div>
-    <div class="support-milestone"><strong>$10K</strong><span>matched 636 pair</span></div>
-    <div class="support-milestone"><strong>$15K</strong><span>memory + storage</span></div>
-    <div class="support-milestone"><strong>$20K</strong><span>network + metering</span></div>
-    <div class="support-milestone"><strong>$25K</strong><span>8-channel upgrade</span></div>
-    <div class="support-milestone"><strong>$30K</strong><span>full evidence program</span></div>
-  </div>
-  <p style="margin-top:1rem"><strong>Current funding must be reported manually.</strong> Until GitHub Sponsors and in-kind contributions are reconciled into a public ledger, these markers describe capability gates rather than claiming money raised.</p>
-</section>
-
 <h2>The Immediate Goal</h2>
-<p>Founder funding establishes matched Xeon 636 nodes for native AMX BF16, AVX-512/VNNI, four-channel memory, and direct-network experiments. Sponsor support then unlocks the Xeon 600 platform's full eight-channel path through compatible 650/670-class processor upgrades and four additional matched RDIMMs per node. The resulting four-channel-versus-eight-channel comparison becomes a published experiment rather than an assumed benefit.</p>
+<p>Build a matched two-node Xeon 6 laboratory for native AMX BF16, AVX-512/VNNI, fully populated memory channels, NUMA-aware execution, and direct 100GbE experiments. The existing Core i7-14700T node remains the AVX2/AVX-VNNI commodity reference; external Xeon systems and TI TDA4VM remain cross-generation and embedded validation lanes.</p>
 
 <div class="support-grid">
   <article class="support-card">
@@ -95,22 +69,17 @@ body { overflow-x: hidden; }
     <p>Remote machine access, short-term loaners, cloud or lab credits, profiler access, and engineering contacts. This stage validates fixtures and reduces the risk of purchasing the wrong configuration.</p>
   </article>
   <article class="support-card">
-    <span class="support-status">Stage 1 · founder funded</span>
-    <h3>One Xeon 636 Evidence Node</h3>
+    <span class="support-status">Stage 1 · target</span>
+    <h3>One Xeon 6 Evidence Node</h3>
     <div class="support-price">CAD $5,500–$8,000</div>
-    <p>A balanced workstation with ECC memory across the four channels exposed by the 630-series CPU, NVMe storage, sustained cooling, power measurement, and room for a high-speed NIC. It unlocks native AMX BF16 and controlled memory work.</p>
+    <p>A balanced workstation with ECC memory across available channels, NVMe storage, sustained cooling, power measurement, and room for a high-speed NIC. It unlocks native AMX BF16 and controlled memory/NUMA work.</p>
   </article>
   <article class="support-card">
-    <span class="support-status">Stage 2 · founder target</span>
-    <h3>Matched Xeon 636 Lab</h3>
+    <span class="support-status">Stage 2 · target</span>
+    <h3>Matched Two-Node Lab</h3>
     <div class="support-price">CAD $12,500–$19,000 total</div>
     <p>A second matched node plus two 100GbE-capable NICs, a direct DAC link, storage, metering, and contingencies. A switch is deferred until a third node creates a measured need.</p>
   </article>
-</div>
-
-<div class="support-callout">
-  <h2 style="margin-top:0">Primary Sponsorship Target: The Eight-Channel Upgrade</h2>
-  <p>The W890 workstation platform has eight DIMM slots, but ASUS specifies that a Xeon 630-series processor enables only channels A, C, E, and G. The most valuable hardware sponsorship is therefore two compatible Xeon 650/670-class processors plus four additional matched RDIMMs per node. CKE will publish the controlled four-channel-versus-eight-channel result across memory bandwidth, prefill, decode, AMX BF16 kernels, power, NUMA behavior, and distributed workloads. Final CPU selection will also score cache per core, core count, topology, price, and availability; channel count alone will not decide the configuration.</p>
 </div>
 
 <p><strong>Budget discipline:</strong> these are planning ranges, not a final bill of materials. CPU availability, ECC-memory pricing, tax, cooling, chassis, PSU connectors, NIC provenance, and warranty must be quoted before purchase. Funds are released by stage; a second node is not purchased until the first-node evidence pipeline is working.</p>
@@ -148,7 +117,6 @@ body { overflow-x: hidden; }
   <li><strong>Funded investigation:</strong> sponsor a bounded model/hardware qualification, numerical investigation, kernel path, or benchmark lane.</li>
   <li><strong>Financial contribution:</strong> fund a published stage or a clearly identified component after the bill of materials is confirmed.</li>
 </ul>
-<p>Use <a href="https://github.com/sponsors/antshiv">GitHub Sponsors</a> for direct financial support. Use <a href="https://www.shivasnotes.com/work-with-us">ShivasNotes Work With Us</a> for a paid private investigation with bounded deliverables. Hardware vendors and laboratories can contact <a href="mailto:anthony.shivakumar@antshiv.com?subject=CKE%20hardware%20lab%20support">Anthony Shivakumar</a> about loaners, remote access, parts, or discounts.</p>
 
 <h2>Evidence and Disclosure Contract</h2>
 <div class="support-contract">
