@@ -40,10 +40,10 @@ not bare-metal platform limits.</p>
 
 <div class="study-grid">
     <div class="study-card">
-        <span class="study-metric">270.8 s to 28.1 s</span>
+        <span class="study-metric">270.8 s to 24.6 s</span>
         <h3>Encoder Progression</h3>
-        <p>Measured CK wall time fell by about 9.6x after native BF16 projection work, selective AMX use, and
-        independent-head attention scheduling.</p>
+        <p>Measured CK wall time fell by about 11.0x after native BF16 projection work, selective AMX use, and
+        independent-head attention scheduling, and four-row native projection tiling.</p>
     </div>
     <div class="study-card">
         <span class="study-metric">129.3 s to 12.7 s</span>
@@ -69,6 +69,7 @@ not bare-metal platform limits.</p>
         <tr><td>Original stitched encoder</td><td>~270.8 s</td><td>~12.5 s</td><td>0.99857</td><td>5.20%</td></tr>
         <tr><td>Native paired-BF16 projections</td><td>~148.3 s</td><td>9.39 s</td><td>0.99863</td><td>5.08%</td></tr>
         <tr><td>Head-parallel attention and selective AMX projectors</td><td>~28.1 s</td><td>~10.0 s</td><td>0.99858</td><td>5.09%</td></tr>
+        <tr><td>Four-row native projection reuse</td><td>~24.6 s</td><td>9.49 s</td><td>0.99858</td><td>5.09%</td></tr>
     </tbody>
 </table>
 
@@ -108,6 +109,10 @@ shape.</p>
 <p>Splitting each attention head into two query-row jobs increased the available job count but repeated V
 transposition and weakened locality. Attention regressed from approximately 12.7 seconds to 16.3 seconds. The change
 was reverted. More jobs are not automatically more parallel efficiency; the unit of work must preserve reuse.</p>
+
+<p>A shared-V query-block variant preserved the prefix exactly but regressed CK encoder time from approximately
+24.6 seconds to 25.8 seconds. A row-parallel LayerNorm variant was bit-exact in isolation but regressed encoder time
+to about 26.7 seconds. Both were rejected; the patch retains only changes that improved the full generated model.</p>
 
 <h2>Evidence Rules</h2>
 
