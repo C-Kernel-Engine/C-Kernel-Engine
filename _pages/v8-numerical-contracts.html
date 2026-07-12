@@ -93,6 +93,37 @@
 
 <p>The authoritative migration preserves executable behavior while making the decision visible. Contract metadata is added to GraphIR, LoweredIR, and call-ready IR, while kernel IDs, memory layout, call arguments, and generated C remain unchanged. Gemma3, Qwen2, Qwen3, Qwen3.5, Nanbeige, and Qwen3-VL attention routes resolve without legacy selection.</p>
 
+<h2>Compiler Policy Gate</h2>
+
+<p><code>make v8-regression-fast</code> begins with an AST-based DSL policy audit. Generic compiler and code-generation entry points may branch on exact operation IDs, resolved kernel IDs, tensor metadata, and declared capability fields. They may not branch on model, architecture, or family names. Aliasing a family value through local variables does not bypass the audit.</p>
+
+<p>The builder also treats operation families as exact inputs. A missing <code>attention_sliding</code> implementation cannot silently resolve to ordinary <code>attention</code>; missing and ambiguous routes fail with an instruction to fix the circuit or kernel map. Per-layer dimensions are validated arrays, circuit weight policies own aliases and intentionally unused tensors, and unknown policy fields fail schema validation.</p>
+
+<p>The same policy now protects v7 training and backprop through <code>make test-v7-dsl-policy</code>, which is part of <code>make v7-regression-fast</code>. This does not make v7 and v8 share one graph, but it enforces the same ownership rule: the training IR owns backward ordering and the emitter may not acquire model-family behavior.</p>
+
+<pre><code>make test-v8-dsl
+make v8-regression-fast
+make test-v7-dsl-policy
+make v7-regression-fast</code></pre>
+
+<h3>Remaining Migration Debt</h3>
+
+<table>
+  <thead><tr><th>Measured category</th><th>Before this PR</th><th>Current</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Direct family-gated predicates/assignments removed by this diff</td><td>37 identified lines</td><td>0 remain from that set</td><td>Qwen3.5, Nemotron-H, Gemma4, and Qwen3-VL decisions moved to circuits/configuration.</td></tr>
+    <tr><td>Forbidden family-dispatch findings in protected generic paths</td><td>Not enforced repository-wide</td><td>0</td><td>The AST policy now fails direct and aliased model/family dispatch.</td></tr>
+    <tr><td>Exact-function codegen predicates</td><td>Not separately tracked</td><td>39</td><td>Mostly ABI, debug, and optimized emission forms; semantic selection must continue moving upstream.</td></tr>
+    <tr><td>Generated M-RoPE call rewrites</td><td>2</td><td>2</td><td>The bridge shell still performs two semantic C-string rewrites.</td></tr>
+  </tbody>
+</table>
+
+<p>The policy gate therefore reports zero forbidden family-dispatch findings in its protected generic paths, but codegen is not yet free of all specialized emission. The remaining inventory is 41 sites: 39 exact-function predicates plus two generated M-RoPE call rewrites. These routes are covered by regression tests, but they remain migration work: bridge position advancement and deepstack behavior should become call-IR operations, while specialized emission should consume resolved capability metadata.</p>
+
+<p>This refactor prevents four concrete failure classes: model names silently changing tensor dimensions, undeclared weights being ignored by family branches, unavailable sliding attention falling back to ordinary attention, and generated runtimes enabling multimodal or quantized behavior from a family-name test instead of a hydrated capability.</p>
+
+<p>Tokenizer and format adapters may identify an external model family while translating source metadata into the canonical circuit/config representation. That knowledge must stop at hydration. It is not permission for GraphIR construction, lowering, memory planning, or codegen to select mathematics from a family name.</p>
+
 <h2>Threading Is an Execution Contract</h2>
 
 <p>Kernel maps also declare ISA dispatch, threading runtime, possible work partitions, dispatch mechanisms, and whether scheduling can alter reduction order. Q4/Q6 GEMM and GEMV maps therefore expose serial, row, column, or output-tile policies instead of hiding threadpool behavior in generated wrappers. GraphIR records this as <code>resolved_execution</code>, and LoweredIR plus call-ready IR hard-fail if the kernel ID changes. When partitioning changes arithmetic order, the numerical contract must define the corresponding reduction and merge behavior.</p>
