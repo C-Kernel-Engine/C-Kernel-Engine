@@ -1,0 +1,128 @@
+<!-- TITLE: BF16 AMX Performance Study -->
+<!-- NAV: architecture -->
+
+<style>
+.study-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+.study-card {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 8px;
+    padding: 1rem;
+    background: rgba(255,255,255,0.02);
+}
+.study-card h3 { margin-top: 0; }
+.study-metric {
+    display: block;
+    color: var(--orange);
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+.study-table td:first-child { font-weight: 600; }
+</style>
+
+<h1>BF16 AMX Performance Study</h1>
+
+<p>This study tracks the numerical and performance work used to move a Qwen3-VL BF16 vision encoder toward its
+PyTorch reference. It records unsuccessful experiments as well as accepted changes. The measurements come from a
+managed Xeon container using a local 4032-patch form fixture, so they establish software behavior on this allocation,
+not bare-metal platform limits.</p>
+
+<div class="alert alert-warning">
+    <strong>Correctness remains the gate.</strong> Every optimization is checked against the same PyTorch prefix and
+    BF16 numerical contracts. A faster kernel is rejected when it materially worsens the stitched encoder result.
+</div>
+
+<div class="study-grid">
+    <div class="study-card">
+        <span class="study-metric">270.8 s to 28.1 s</span>
+        <h3>Encoder Progression</h3>
+        <p>Measured CK wall time fell by about 9.6x after native BF16 projection work, selective AMX use, and
+        independent-head attention scheduling.</p>
+    </div>
+    <div class="study-card">
+        <span class="study-metric">129.3 s to 12.7 s</span>
+        <h3>Attention Hotspot</h3>
+        <p>Partitioning independent heads through the CK threadpool produced the largest end-to-end gain while keeping
+        each head's FP32 reduction order unchanged.</p>
+    </div>
+    <div class="study-card">
+        <span class="study-metric">8.3 ms</span>
+        <h3>AMX Projection</h3>
+        <p>The weight-reuse AMX microkernel reached 8.3 ms on the practical M=4032, N=3456, K=1152 projection,
+        compared with roughly 62 ms for the original native path and 4.6 ms for PyTorch.</p>
+    </div>
+</div>
+
+<h2>Measured Progression</h2>
+
+<table class="study-table">
+    <thead>
+        <tr><th>Configuration</th><th>CK Encoder</th><th>PyTorch</th><th>Prefix Cosine</th><th>Relative RMSE</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>Original stitched encoder</td><td>~270.8 s</td><td>~12.5 s</td><td>0.99857</td><td>5.20%</td></tr>
+        <tr><td>Native paired-BF16 projections</td><td>~148.3 s</td><td>9.39 s</td><td>0.99863</td><td>5.08%</td></tr>
+        <tr><td>Head-parallel attention and selective AMX projectors</td><td>~28.1 s</td><td>~10.0 s</td><td>0.99858</td><td>5.09%</td></tr>
+    </tbody>
+</table>
+
+<p>PyTorch reported oneDNN BRGEMM execution using an AVX-512 AMX path and blocked layouts. The CK comparison is not
+an attempt to duplicate oneDNN dispatch. CK declares exact numerical contracts and kernel identities in its circuit
+and kernel maps, then measures those implementations through the generated model.</p>
+
+<h2>Projection Microkernel</h2>
+
+<table class="study-table">
+    <thead><tr><th>Implementation</th><th>Practical Projection Time</th><th>Disposition</th></tr></thead>
+    <tbody>
+        <tr><td>Original native BF16</td><td>~62 ms</td><td>Baseline</td></tr>
+        <tr><td>Initial AMX tile kernel</td><td>~19.9 ms</td><td>Improved, but left weight reuse on the table</td></tr>
+        <tr><td>AMX with weight-tile reuse</td><td>~8.3 ms</td><td>Accepted for selected projector operations</td></tr>
+        <tr><td>PyTorch/oneDNN</td><td>~4.6 ms</td><td>Reference</td></tr>
+    </tbody>
+</table>
+
+<p>The AMX provider is additive. Its contract specifies BF16 inputs and weights, FP32 tile accumulation, ascending K
+tiles, BF16 round-to-nearest-even output storage, and independent output tiles. The circuit selects it explicitly for
+projector operations. Layer projections continue to use the native paired-BF16 provider because applying AMX to every
+layer slightly worsened final-prefix accuracy.</p>
+
+<p>The AMX entry point is fail-closed. Unsupported builds, invalid tile shapes, workspace allocation failure, or
+per-thread tile-permission failure terminate with a hard kernel-contract fault instead of silently running the native
+paired-dot reduction. Portable performance sweeps query the compiled runtime capability and report AMX as skipped
+when it is unavailable; a hardware skip is never counted as AMX numerical or performance evidence.</p>
+
+<p>A separate M=32, N=3456, K=1152 thread sweep found a best CK AMX time of 0.133 ms at 16 threads versus 0.135 ms
+for PyTorch. The output was bit-exact and invariant across the tested thread counts. This is leaf-kernel evidence, not
+an end-to-end claim: it shows that AMX instruction throughput is no longer the limiting factor for that projection
+shape.</p>
+
+<h2>Rejected Experiment</h2>
+
+<p>Splitting each attention head into two query-row jobs increased the available job count but repeated V
+transposition and weakened locality. Attention regressed from approximately 12.7 seconds to 16.3 seconds. The change
+was reverted. More jobs are not automatically more parallel efficiency; the unit of work must preserve reuse.</p>
+
+<h2>Evidence Rules</h2>
+
+<ul>
+    <li>Record commit, compiler, ISA, thread count, model shape, and container constraints.</li>
+    <li>Measure the production shape in isolation and in the generated end-to-end circuit.</li>
+    <li>Report prefix cosine and relative RMSE alongside wall time.</li>
+    <li>Keep arithmetic order and threading behavior in numerical contracts and kernel maps.</li>
+    <li>Retain rejected experiments when they explain cache, reuse, or scheduling behavior.</li>
+    <li>Do not publish private input artifacts or managed-platform identifiers.</li>
+</ul>
+
+<h2>Next Measurements</h2>
+
+<p>The remaining encoder gap is concentrated in native layer projections and attention. The next work is to profile
+those two paths with controlled thread sweeps and hardware counters where available, while keeping mixed-prefill and
+teacher-forced parity as acceptance gates. Results from managed infrastructure must remain separate from future
+privileged bare-metal AMX, NUMA, memory-channel, and power measurements.</p>
