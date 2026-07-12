@@ -967,8 +967,6 @@
 
 <p>The active v8 inference compiler consumes three authoritative inputs: model weights, an architecture circuit, and executable kernel maps. The circuit owns graph structure and required semantics. Kernel maps own ABI and implementation capability. The DSL resolves and stitches; generated C does not guess.</p>
 
-<p>This boundary is executable policy, not only documentation. The v8 and v7 DSL audits reject new model-family dispatch in generic compiler/codegen functions, including dispatch hidden behind local aliases. Exact kernel operations do not fall back to broader families, malformed per-layer dimensions fail, and circuit weight policies are schema validated. New-model support must therefore extend a circuit, a kernel map, or a tested kernel instead of accumulating another compiler conditional.</p>
-
 <div class="img-container svg-viewer" data-title="v8 Numerical Contract Architecture">
     <img src="assets/v8-numerical-contracts.svg" alt="v8 weights, circuits, kernel maps, numerical contract resolution, IR lowering and generated C">
 </div>
@@ -1260,7 +1258,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-07-12 12:50</span>
+        <span class="folder-updated">Updated: 2026-07-11 03:52</span>
     </div>
     <pre class="tree-output">
 src/kernels
@@ -1284,30 +1282,15 @@ version/v6.6
 |-- tools
 `-- unittest
 version/v7
+|-- .cache
+|   `-- reports
 |-- artifacts
 |   `-- svg_dsl
-|       |-- gen1_archive_2026-04-05
-|       `-- spec_archive_2026-04-08
 |-- contracts
 |-- data
 |   |-- eval_contracts
 |   |-- spec03
-|   |   |-- contracts
-|   |   |-- holdout
-|   |   |-- manifests
-|   |   |-- midtrain
-|   |   |-- normalized
-|   |   |-- pretrain
-|   |   |-- raw_assets
-|   |   |-- sft
-|   |   `-- tokenizer
 |   `-- spec04
-|       |-- contracts
-|       |-- holdout
-|       |-- manifests
-|       |-- normalized
-|       |-- raw_assets
-|       `-- tokenizer
 |-- docs
 |-- examples
 |-- experiments
@@ -1316,14 +1299,14 @@ version/v7
 |-- kernel_maps
 |-- regression
 |-- reports
-|   |-- spec12_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec12_gold_mappings
-|   |-- spec13b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec13b_gold_mappings
-|   |-- spec14a_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec14a_gold_mappings
-|   |-- spec14b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec14b_gold_mappings
-|   |-- spec15a_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec15a_gold_mappings
-|   |-- spec15b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec15b_gold_mappings
-|   |-- spec_broader_1_family_packs -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_family_packs
-|   `-- spec_broader_1_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_gold_mappings
+|   |-- spec12_gold_mappings
+|   |-- spec13b_gold_mappings
+|   |-- spec14a_gold_mappings
+|   |-- spec14b_gold_mappings
+|   |-- spec15a_gold_mappings
+|   |-- spec15b_gold_mappings
+|   |-- spec_broader_1_family_packs
+|   `-- spec_broader_1_gold_mappings
 |-- scripts
 |   |-- dataset
 |   `-- parity
@@ -1336,7 +1319,7 @@ version/v7
 `-- tools
     `-- src
 
-72 directories
+57 directories
 </pre>
 </div>
 
@@ -1601,7 +1584,7 @@ version/v7
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1609,14 +1592,13 @@ version/v7
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-11</p>
             </div>
         </div>
     </footer>
