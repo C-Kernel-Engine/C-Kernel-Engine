@@ -1039,6 +1039,12 @@
 
 <p>The authoritative migration preserves executable behavior while making the decision visible. Contract metadata is added to GraphIR, LoweredIR, and call-ready IR, while kernel IDs, memory layout, call arguments, and generated C remain unchanged. Gemma3, Qwen2, Qwen3, Qwen3.5, Nanbeige, and Qwen3-VL attention routes resolve without legacy selection.</p>
 
+<h3>Call ABI Ownership</h3>
+
+<p>A resolved kernel map now owns its ordered C call ABI through <code>call_abi.version</code> and <code>call_abi.params</code>. Lower 3 consumes that exact kernel-ID-owned declaration and records its owner in call-ready IR. A contract-governed operation may not fall back to <code>kernel_bindings.json</code> or <code>kernel_bindings.overlay.json</code>; missing ABI metadata, unknown source namespaces, function drift, and duplicate map/legacy ownership hard-fail.</p>
+
+<p>The two legacy binding registries remain only for uncontracted compatibility helpers while migration continues. They are not authoritative inputs for attention reductions, BF16 storage boundaries, vision M-RoPE, or Q4/Q6 numerical execution contracts.</p>
+
 <h2>Threading Is an Execution Contract</h2>
 
 <p>Kernel maps also declare ISA dispatch, threading runtime, possible work partitions, dispatch mechanisms, and whether scheduling can alter reduction order. Q4/Q6 GEMM and GEMV maps therefore expose serial, row, column, or output-tile policies instead of hiding threadpool behavior in generated wrappers. GraphIR records this as <code>resolved_execution</code>, and LoweredIR plus call-ready IR hard-fail if the kernel ID changes. When partitioning changes arithmetic order, the numerical contract must define the corresponding reduction and merge behavior.</p>

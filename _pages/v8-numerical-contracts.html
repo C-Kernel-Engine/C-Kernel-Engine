@@ -93,6 +93,12 @@
 
 <p>The authoritative migration preserves executable behavior while making the decision visible. Contract metadata is added to GraphIR, LoweredIR, and call-ready IR, while kernel IDs, memory layout, call arguments, and generated C remain unchanged. Gemma3, Qwen2, Qwen3, Qwen3.5, Nanbeige, and Qwen3-VL attention routes resolve without legacy selection.</p>
 
+<h3>Call ABI Ownership</h3>
+
+<p>A resolved kernel map now owns its ordered C call ABI through <code>call_abi.version</code> and <code>call_abi.params</code>. Lower 3 consumes that exact kernel-ID-owned declaration and records its owner in call-ready IR. A contract-governed operation may not fall back to <code>kernel_bindings.json</code> or <code>kernel_bindings.overlay.json</code>; missing ABI metadata, unknown source namespaces, function drift, and duplicate map/legacy ownership hard-fail.</p>
+
+<p>The two legacy binding registries remain only for uncontracted compatibility helpers while migration continues. They are not authoritative inputs for attention reductions, BF16 storage boundaries, vision M-RoPE, or Q4/Q6 numerical execution contracts.</p>
+
 <h2>Compiler Policy Gate</h2>
 
 <p><code>make v8-regression-fast</code> begins with an AST-based DSL policy audit. Generic compiler and code-generation entry points may branch on exact operation IDs, resolved kernel IDs, tensor metadata, and declared capability fields. They may not branch on model, architecture, or family names. Aliasing a family value through local variables does not bypass the audit.</p>
@@ -115,6 +121,8 @@ make v7-regression-fast</code></pre>
     <tr><td>Forbidden family-dispatch findings in protected generic paths</td><td>Not enforced repository-wide</td><td>0</td><td>The AST policy now fails direct and aliased model/family dispatch.</td></tr>
     <tr><td>Exact-function codegen predicates</td><td>Not separately tracked</td><td>39</td><td>Mostly ABI, debug, and optimized emission forms; semantic selection must continue moving upstream.</td></tr>
     <tr><td>Generated M-RoPE call rewrites</td><td>2</td><td>2</td><td>The bridge shell still performs two semantic C-string rewrites.</td></tr>
+    <tr><td>Contract-governed map-owned call ABIs</td><td>0</td><td>23</td><td>Attention, BF16, vision M-RoPE, and Q4/Q6 providers own their ordered arguments.</td></tr>
+    <tr><td>Governed ABI definitions duplicated in legacy registries</td><td>23</td><td>0</td><td>Split ownership is rejected before Lower 3 emits call-ready IR.</td></tr>
   </tbody>
 </table>
 

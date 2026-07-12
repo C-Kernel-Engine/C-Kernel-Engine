@@ -116,10 +116,10 @@ permalink: /vision-encoder-parity/
   <ul>
     <li>the circuit in <code>version/v8/circuits/qwen3_vl_vision.json</code></li>
     <li>kernel maps in <code>version/v8/kernel_maps/*.json</code></li>
-    <li>overlay bindings in <code>version/v8/kernel_maps/kernel_bindings.overlay.json</code></li>
+    <li>kernel-map-owned <code>call_abi</code> declarations for every contract-governed provider</li>
   </ul>
   <p>
-    That is the correct direction: model structure in the template, kernel identity in maps, runtime function binding in the registry.
+    That is the required ownership: model structure in the circuit, exact kernel identity and call ABI in kernel maps, and deterministic stitching in the compiler. Legacy binding registries are compatibility-only and cannot satisfy a resolved numerical contract.
   </p>
   <p>
     But <code>build_ir_v8.py</code> still contains real lowering policy:
