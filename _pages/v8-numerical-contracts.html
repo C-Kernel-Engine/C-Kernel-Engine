@@ -117,8 +117,8 @@ make v7-regression-fast</code></pre>
 <table>
   <thead><tr><th>Measured category</th><th>Before this PR</th><th>Current</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td>Executable model-literal AST sites</td><td>71</td><td>69</td><td>A checked-in per-file ceiling now fails on any increase. Reductions must lower the ceiling.</td></tr>
-    <tr><td>Build and IR model-literal sites</td><td>32</td><td>30</td><td>Lower 1 no longer reselects decode attention from model-specific defaults or function-name patterns.</td></tr>
+    <tr><td>Executable model-literal AST sites</td><td>78</td><td>76</td><td>A checked-in per-file ceiling now fails on any increase. Reductions must lower the ceiling.</td></tr>
+    <tr><td>Build and IR model-literal sites</td><td>39</td><td>37</td><td>Lower 1 no longer reselects decode attention from model-specific defaults or function-name patterns.</td></tr>
     <tr><td>Code-generation model-literal sites</td><td>39</td><td>39</td><td>Bridge, tokenizer, debug, and specialized emission remain the largest migration area.</td></tr>
     <tr><td>Lower-1 decode-attention reselection branches</td><td>7</td><td>0</td><td>Lower 1 validates the exact IR1 kernel and resolved contract, then only wires KV-cache inputs.</td></tr>
     <tr><td>Compiler functions governed by the no-family-dispatch policy</td><td>8</td><td>9</td><td>The authoritative decode-attention validator is now covered directly.</td></tr>
@@ -126,7 +126,7 @@ make v7-regression-fast</code></pre>
   </tbody>
 </table>
 
-<p>The 69-site inventory is deliberately broader than the previous 41-site estimate: it counts executable string literals containing model-family names across the four principal compiler and code-generation modules, while excluding comments and docstrings. Not every site selects mathematics, but every site is visible debt that cannot increase silently. The audit reports a per-function inventory so cleanup can proceed in bounded groups instead of relying on an informal grep count.</p>
+<p>The 76-site inventory is deliberately broader than the previous 41-site estimate: it counts executable module-level and function-level string literals containing model-family names across the four principal compiler and code-generation modules, while excluding comments, docstrings, and standalone documentation strings. Not every site selects mathematics, but every site is visible debt that cannot increase silently. The audit reports a per-function inventory so cleanup can proceed in bounded groups instead of relying on an informal grep count.</p>
 
 <p>The next priority is Qwen3-VL bridge generation: multimodal fallback injection, deepstack handling, M-RoPE calls, and position advancement should be explicit call-IR operations. Kimi/DeepSeek MLA decode and prefill selection follows after both phases have exact kernel-map providers. Tokenizer adapters may retain family knowledge only while hydrating external metadata into canonical configuration.</p>
 
