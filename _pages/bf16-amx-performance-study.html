@@ -120,6 +120,28 @@ was reverted. More jobs are not automatically more parallel efficiency; the unit
     <li>Do not publish private input artifacts or managed-platform identifiers.</li>
 </ul>
 
+<h2>Content and Reproduction Handoff</h2>
+
+<p>The implementation and its portable evidence are kept together in the repository. Content based on this study
+should link to the exact commit and distinguish the managed-Xeon measurements above from results reproduced on
+another machine.</p>
+
+<ul>
+    <li><code>src/kernels/gemm_kernels_bf16.c</code>: native paired-BF16 and AMX projection implementations.</li>
+    <li><code>src/kernels/attention_kernels.c</code>: independent-head BF16 attention scheduling.</li>
+    <li><code>version/v8/circuits/qwen3_vl_vision.json</code>: circuit-owned numerical requirements.</li>
+    <li><code>version/v8/kernel_maps/</code>: exact providers, arithmetic contracts, ISA and threading capabilities.</li>
+    <li><code>unittest/bf16/test_qwen3vl_performance_sweep_bf16.py</code>: deterministic thread and accuracy sweep.</li>
+    <li><code>version/v8/.cache/reports/bf16_performance_sweep_latest.json</code>: generated local report path.</li>
+</ul>
+
+<pre><code>make test-bf16-performance-sweep</code></pre>
+
+<p>The repository does not treat the summarized Xeon timings as a replacement for raw evidence. A publishable
+machine-specific package should additionally preserve the generated JSON report, exact command transcript, commit,
+CPU and compiler manifest, and sanitized profiler exports. Until that package is attached, the timings on this page
+must be described as measured managed-Xeon results, not independently reproducible bare-metal limits.</p>
+
 <h2>Next Measurements</h2>
 
 <p>The remaining encoder gap is concentrated in native layer projections and attention. The next work is to profile
