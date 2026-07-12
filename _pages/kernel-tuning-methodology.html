@@ -200,6 +200,70 @@ path, weight reuse, quantized GEMM dispatch, thread scheduling, and cache behavi
     </tbody>
 </table>
 
+<h2>Cross-Hardware Evidence Matrix</h2>
+
+<p>A kernel is not "CPU optimized" because it performed well on one host. CKE uses several hardware lanes to separate
+portable mathematics from ISA-specific implementation quality, heterogeneous scheduling, memory topology, and
+server-scale behavior.</p>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Hardware Lane</th>
+            <th>Primary Question</th>
+            <th>Tools and Evidence</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Intel Core i7, multiple generations</td>
+            <td>Do FP32 and quantized generated runtimes remain useful on commodity x86 systems?</td>
+            <td>Practical E2E, fixed-token throughput, parity, compiler and ISA inspection.</td>
+            <td>Active</td>
+        </tr>
+        <tr>
+            <td>Core i7-14700T</td>
+            <td>How close can AVX2/FMA/AVX-VNNI FP32 and Q4/Q5/Q6/Q8 kernels get to the useful roofline on a hybrid 8P + 12E CPU? Native BF16 is not claimed.</td>
+            <td>VTune hotspots/uarch/memory/threading, Advisor roofline, perf, flamegraphs, assembly, frequency and utilization.</td>
+            <td>Dedicated profiling node</td>
+        </tr>
+        <tr>
+            <td>TI TDA4VM ARM</td>
+            <td>Are FP32 and quantized contracts and kernels portable to ARM NEON and realistic embedded constraints?</td>
+            <td>Build and kernel parity, NEON path inspection, constrained-memory and practical runtime checks.</td>
+            <td>Active portability lane</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon, 2nd/3rd/5th Gen</td>
+            <td>How do FP32/quantized AVX-512/VNNI and host-gated native BF16/AMX availability affect parity and throughput across generations?</td>
+            <td>ISA-appropriate kernel tests, model parity, larger artifacts, profiler summaries, and cross-generation comparisons.</td>
+            <td>External validation lanes</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon 6</td>
+            <td>What do native AMX BF16, AVX-512/VNNI, wider memory systems, NUMA placement, sustained power, and multiple nodes enable?</td>
+            <td>Planned VTune/Advisor, native BF16, memory-channel roofline, NUMA, power, and distributed CKU experiments.</td>
+            <td>Planned; not measured</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert alert-warning">
+    <strong>Coverage is workload-specific.</strong> A platform row does not certify every model, dtype, quantization, or
+    context length. Publish the host, CPU and detected ISA flags, storage/compute dtype, memory topology, compiler, CKE commit, model hash, quantization,
+    prompt or tensor shape, thread/affinity policy, warmup/repeats, power/frequency state, raw command, and artifact path.
+</div>
+
+<h3>Publication Contract</h3>
+<ul class="check-list">
+    <li>Label the hardware lane as active, external, or planned; planned hardware has no benchmark result.</li>
+    <li>Separate portable numerical evidence from ISA-specific throughput evidence.</li>
+    <li>Compare before/after and reference runtimes on the same host with equivalent model and workload settings.</li>
+    <li>Link raw commands, logs, profiler output, and the CKE commit behind every published performance table.</li>
+    <li>Do not extrapolate one Core, Xeon, or ARM result to another generation without running that lane.</li>
+</ul>
+
 <h2>How To Read The Signals</h2>
 
 <table class="phase-table">

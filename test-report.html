@@ -1745,7 +1745,7 @@
       (<code>make v7-visualizer-health</code>)</li>
     <li><strong>v8 Inference Regression</strong>: Family bring-up gate for Gemma3, Qwen2, Qwen3, Qwen3.5, and Nanbeige with build/smoke/coherence/contract checks
       (<code>make regression-fast</code>, aliasing the promoted <code>make v8-regression-fast</code> lane)</li>
-    <li><strong>Architecture Contract Dashboard</strong>: v8 circuit, lowered IR dataflow, generated-C preservation, runtime-path equivalence, and model contract coverage summary
+    <li><strong>Architecture Contract Dashboard</strong>: v8 template/circuit, lowered IR dataflow, generated-C preservation, runtime-path equivalence, and model contract coverage summary
       (<code>make test-architecture-contracts</code>)</li>
     <li><strong>v8 Qwen3-VL Vision Smoke</strong>: Cached image → mmproj → decoder smoke for the 8B multimodal path; skips cleanly when the runner does not have the large artifacts
       (<code>make test-v8-qwen3vl-e2e-smoke</code>)</li>
@@ -2316,6 +2316,31 @@ function renderArchitectureContracts(data) {
 }
 
 function renderContractRows(sectionId, rows) {
+  if (sectionId === 'numerical_kernel_capabilities') {
+    return `
+      <div class="contract-table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Family</th><th>Capability</th><th>Status</th><th>Input</th><th>Compute</th><th>Reduction</th><th>Output</th><th>Oracle</th><th>Shape</th><th>Threads</th><th>Max Abs</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td><code>${escapeHtml(row.kernel_family || '-')}</code></td>
+                <td><code>${escapeHtml(row.capability || '-')}</code></td>
+                <td>${contractBadge(row.status)}</td>
+                <td>${escapeHtml(row.input_storage || '-')}</td>
+                <td>${escapeHtml(row.compute || '-')}</td>
+                <td>${escapeHtml(row.reduction || '-')}</td>
+                <td>${escapeHtml(row.output_storage || '-')}</td>
+                <td>${escapeHtml(row.oracle || '-')}</td>
+                <td><code>D=${escapeHtml(row.head_dim ?? '-')}</code></td>
+                <td>${escapeHtml(row.threads || '-')}</td>
+                <td><code>${escapeHtml(row.max_abs ?? '-')}</code></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
   if (sectionId === 'model_contract_coverage') {
     return `
       <div class="contract-table-wrap">
@@ -2800,7 +2825,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-12</p>
             </div>
         </div>
     </footer>

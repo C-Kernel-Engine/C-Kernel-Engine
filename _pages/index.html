@@ -431,6 +431,30 @@
 ═══════════════════════════════════════════════════════════════════════ -->
 <h2>Performance</h2>
 
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Measured Across CPU Classes</h3>
+    <p>CKE performance engineering combines numerical parity, practical end-to-end workloads, Linux <code>perf</code>, flamegraphs, assembly inspection, Intel VTune, and Intel Advisor roofline analysis. The objective is to explain the distance from each machine's useful hardware limits and close it kernel by kernel, not to infer efficiency from peak FLOPS or CPU utilization alone.</p>
+    <table class="pillar-evidence">
+        <tr>
+            <td>Intel Core i7</td>
+            <td>Multiple-generation FP32 and quantized compatibility work, including a dedicated 14th Gen Core i7-14700T AVX2/FMA/AVX-VNNI profiling node. Native BF16 is not claimed on this host.</td>
+        </tr>
+        <tr>
+            <td>TI TDA4VM ARM</td>
+            <td>FP32 and quantized ARM NEON portability under embedded memory and power constraints.</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon</td>
+            <td>External 2nd, 3rd, and 5th Gen validation lanes for FP32/quantized AVX-512 and VNNI where available, plus native BF16/AMX only when the host exposes those features.</td>
+        </tr>
+        <tr>
+            <td>Xeon 6</td>
+            <td>Planned native AMX BF16, AVX-512/VNNI, memory-channel, NUMA, power, and distributed-node laboratory. No Xeon 6 result is claimed yet.</td>
+        </tr>
+    </table>
+    <p style="margin-bottom: 0;">Coverage is reported per host, detected ISA, dtype, and workload; it does not imply every model passes every gate on every CPU. <a href="kernel-tuning-methodology.html">Read the tuning methodology</a> or <a href="profiling.html">reproduce the profiling lanes</a>.</p>
+</div>
+
 <div class="grid grid-2" style="gap: 1rem;">
     <div class="card">
         <h3 style="margin-top: 0;">Profiling + SIMD</h3>
@@ -581,7 +605,7 @@
 cd C-Kernel-Engine
 make                  # builds build/libckernel_engine.so
 make test             # runs all kernel parity tests vs PyTorch</pre>
-    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0;">Requires Linux, GCC, Python 3 + PyTorch for parity tests. AVX2 minimum; AVX-512 recommended.</p>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0;">Requires Linux, a supported C toolchain, and Python 3 + PyTorch for parity tests. AVX2 is the current x86 production baseline; ARM NEON is an active portability lane; AVX-512, VNNI, BF16, and AMX paths are enabled only where the host supports them.</p>
 </div>
 
 <div class="grid grid-2" style="gap: 1rem; margin-top: 1rem;">
