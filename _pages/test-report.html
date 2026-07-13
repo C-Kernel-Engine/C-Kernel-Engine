@@ -782,6 +782,10 @@
     <li><strong>Qwen3-VL Template/Codegen Contracts</strong>: Synthetic GGUF/BF16-independent guards for Qwen3-VL circuit lowering,
       align-corners position-kernel selection, valid vision M-RoPE width/sections, and bounded semantic tensor exports
       (<code>make test-v8-qwen3vl</code>)</li>
+    <li><strong>Qwen3-VL Methodical Layer Parity</strong>: Runs the production circuit in semantic order through position, LayerNorm,
+      Q8 QKV, M-RoPE, attention, Q8 output projection, residual, MLP-up, GELU, MLP-down, and layer output contracts. The nightly row
+      executes production-shape deterministic oracles; <code>make test-qwen3vl-methodical-parity-full</code> requires real artifacts
+      and walks all 27 encoder layers with X-ray, failing at the first divergent edge.</li>
     <li><strong>v8 BF16 Safetensors Lowering</strong>: Synthetic BF16 conversion and lowering guard that asserts all vision weights are
       consumed, align-corners interpolation is selected, and M-RoPE arguments remain valid through generated calls. The target builds
       both engine and vision libraries first so hardware-independent M-RoPE checks cannot silently skip
