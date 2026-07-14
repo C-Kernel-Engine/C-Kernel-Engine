@@ -995,6 +995,22 @@
         then a generated-C runtime that can orchestrate many cheap Linux nodes becomes increasingly valuable.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
+        The asymmetry CKE is testing is that useful model intelligence does not necessarily require total model state
+        to grow as quickly as general-purpose CPU capability and memory capacity. Dense models made parameter count
+        the visible scaling axis. Mixture-of-experts models can increase total stored capacity while activating only
+        part of that capacity for each token. Better data, routing, architecture, and training can also add capability
+        without multiplying inference state at the same rate.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
+        That matters differently for inference and training. Inference must keep the model and runtime state
+        addressable, but it may execute only a sparse path through the weights. Large CPU memory domains can make
+        that placement increasingly practical as cores, matrix instructions, channels, and bandwidth improve.
+        Training is harder because gradients, optimizer state, saved activations, and communication multiply the
+        memory and compute requirement. CKE's frontier-model bet is therefore not that training is already solved;
+        it is that inference becomes practical first, and measured CPU training capability expands as kernels,
+        memory systems, and distributed execution improve.
+    </p>
+    <p style="font-size: 1.15em; line-height: 1.7;">
         This is not a claim that CPUs always beat GPU systems on raw peak throughput.
         That is not the point.
         The real question is whether CPU-only Linux systems can become
@@ -1143,6 +1159,34 @@
     </div>
 </details>
 
+<div class="card card-accent" style="margin-top: 1.5rem;">
+    <h3 style="margin-top: 0;">The Google Precedent: Treat the Fleet as the Computer</h3>
+    <p>
+        Google's early advantage was not a processor that was individually faster than every high-end server CPU.
+        It combined commodity-class machines with fault-tolerant software and optimized the fleet for throughput,
+        price-performance, energy, and service availability. Google's cluster architecture explicitly treated peak
+        processor performance as less important than the price-performance of the complete system.
+    </p>
+    <p>
+        MapReduce then made partitioning, scheduling, data locality, inter-machine communication, and failure recovery
+        part of the runtime contract. The decisive asset was the software that kept broadly available hardware doing
+        useful work, not a benchmark showing that one commodity core was faster than a proprietary server core.
+    </p>
+    <p>
+        That is the precedent CKE follows for AI. The goal is to make circuits, kernels, memory placement, NUMA,
+        communication, and recovery explicit enough that a CPU fleet approaches its useful hardware envelope.
+        If server CPUs continue to add cores, matrix instructions, memory channels, capacity, and bandwidth while
+        frontier-model state grows more slowly, incremental hardware progress compounds into support for more models,
+        longer contexts, and larger active workloads.
+    </p>
+    <p style="margin-bottom: 0; color: #a0a0a0;">
+        Sources:
+        <a href="https://research.google.com/archive/googlecluster.html" target="_blank" rel="noopener">Google cluster architecture</a>,
+        <a href="https://research.google/pubs/mapreduce-simplified-data-processing-on-large-clusters/" target="_blank" rel="noopener">MapReduce</a>, and
+        <a href="https://research.google/pubs/power-provisioning-for-a-warehouse-sized-computer/" target="_blank" rel="noopener">warehouse-scale power provisioning</a>.
+    </p>
+</div>
+
 <h2>Principle 1: The Cost of 0 × ∞ = 0</h2>
 
 <div class="card card-accent">
@@ -1152,7 +1196,7 @@
     <p><strong>And GPUs are:</strong></p>
     <ul>
         <li><strong>Proprietary</strong> — locked to NVIDIA (CUDA), no open ecosystem</li>
-        <li><strong>Export-controlled</strong> — H100/H200 blocked in many countries, supply constrained</li>
+        <li><strong>Export-controlled</strong> — leading data-center accelerators may be restricted by destination and product class</li>
         <li><strong>Cluster-required</strong> — single GPUs can't handle large models, need NVLink infrastructure</li>
         <li><strong>Expensive</strong> — &#36;40K+ per GPU, &#36;200K+ for NVLink switches</li>
     </ul>
@@ -1331,7 +1375,7 @@ CPU Path:
     <h3 style="margin-top: 0;">GPUs Require Clusters</h3>
     <p>Here's the fundamental problem: no single GPU can handle large models. You need a cluster.</p>
     <ul>
-        <li><strong>Even the biggest GPU:</strong> 80GB VRAM max—can't fit 70B+ models</li>
+        <li><strong>Per-device memory remains finite:</strong> frontier models and long contexts can still require model and state sharding</li>
         <li><strong>Multi-GPU needed:</strong> 8-32 GPUs for practical workloads</li>
         <li><strong>NVLink required:</strong> &#36;200K+ in interconnects for fast GPU-to-GPU communication</li>
         <li><strong>DGX systems:</strong> Pre-configured clusters start at &#36;250K+</li>
@@ -1344,7 +1388,9 @@ CPU Path:
     </div>
     <div>
         <strong>The VRAM Wall</strong><br>
-        Every GPU hits the same VRAM wall. Whether 24GB or 80GB per GPU, large models require massive GPU counts in coordinated clusters. This is the fundamental constraint that CPU-only architecture bypasses entirely.
+        Every accelerator has a finite local-memory boundary. As models and context state grow beyond that boundary,
+        execution requires coordinated sharding across devices or nodes. The CPU-cluster thesis is that large,
+        addressable system memory and standard Linux distribution can provide another path through that constraint.
     </div>
 </div>
 
@@ -1586,14 +1632,17 @@ Infrastructure: Standard data center power
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
     </div>
     <div>
-        <strong>NVLink Doesn't Scale Infinitely</strong><br>
-        NVLink is 900 GB/s <em>within a single node</em>. But you can only fit 8 GPUs per node. Go beyond that? You hit Ethernet. And at the Ethernet boundary, CPUs and GPUs face the exact same constraint.
+        <strong>Local Scale-Up Fabrics Do Not Remove the Scale-Out Boundary</strong><br>
+        NVLink bandwidth and domain size vary substantially by accelerator generation and system topology.
+        Once a workload crosses the local NVLink or NVSwitch domain, it still enters a scale-out network with a
+        different bandwidth, latency, and synchronization contract. CPU and accelerator clusters must both account
+        for that boundary.
     </div>
 </div>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">The Bandwidth Reality</h3>
-    <p>Let's be precise about the numbers:</p>
+    <p>Separate topology classes instead of freezing the analysis to one accelerator generation:</p>
 </div>
 
 <div class="table-container">
@@ -1603,10 +1652,10 @@ Infrastructure: Standard data center power
         </thead>
         <tbody>
             <tr>
-                <td>NVLink 4.0</td>
-                <td>900 GB/s</td>
-                <td>GPU-to-GPU within 1 node</td>
-                <td>8 GPUs max</td>
+                <td>Local accelerator scale-up fabric</td>
+                <td>Generation and topology dependent</td>
+                <td>Device-to-device within the configured NVLink/NVSwitch domain</td>
+                <td>Bounded by the purchased system or rack topology</td>
             </tr>
             <tr>
                 <td>DDR5 (12-channel)</td>
@@ -1639,10 +1688,10 @@ Infrastructure: Standard data center power
 <div class="card card-green">
     <h3 style="margin-top: 0;">The Theory of Constraints Applied</h3>
     <pre>
-GPU Cluster at Scale:
-  Within node:  NVLink 900 GB/s (fast!)
-  Between nodes: Ethernet 50 GB/s (constraint!)
-  System speed = 50 GB/s (bottleneck)
+Accelerator Cluster at Scale:
+  Local domain:    High-bandwidth scale-up fabric
+  Between domains: Scale-out network (constraint)
+  System speed:    Limited by the active communication boundary
 
 CPU Cluster at Scale:
   Within node:  DDR5 460 GB/s
@@ -1658,8 +1707,10 @@ AT SCALE, THEY HIT THE SAME WALL.
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>Without NVLink, GPUs Are Often Slower</strong><br>
-        If you can't afford NVLink switches (&#36;200K+), your GPUs communicate over PCIe → Ethernet. That's 12.5-50 GB/s. A server-grade CPU with DDR5 has 460 GB/s to its own memory. For memory-bound workloads, the CPU wins.
+        <strong>Topology Must Be Included in the Benchmark</strong><br>
+        Accelerator results depend on whether communication stays within local device memory, crosses PCIe, uses a
+        scale-up fabric, or enters the scale-out network. CPU results likewise depend on memory channels, NUMA, and
+        network placement. A comparison that omits these boundaries is not a system comparison.
     </div>
 </div>
 
@@ -1844,34 +1895,33 @@ rdma link show
     <h3 style="margin-top: 0;">Why CPU-Only Wins at Scale</h3>
 </div>
 
-<div class="img-container svg-viewer" data-title="Scale Economics Comparison">
-    <img src="assets/scale-economics.svg" alt="Scale Economics Comparison">
-</div>
-
 <div class="grid grid-2">
     <div class="card card-blue">
         <h3 style="margin-top: 0;">GPU Cluster at Scale</h3>
         <ul>
-            <li><strong>For 1TB model:</strong> 100 GPUs minimum</li>
-            <li><strong>Total cost:</strong> $4 Billion</li>
-            <li><strong>Who can afford:</strong> 5 companies globally</li>
-            <li><strong>Result:</strong> Elite-only access</li>
+            <li><strong>Capacity:</strong> Model, optimizer, activation, and context state may span many devices</li>
+            <li><strong>Topology:</strong> Scale-up and scale-out domains must be designed together</li>
+            <li><strong>Procurement:</strong> Cost and availability depend on accelerator generation and system configuration</li>
+            <li><strong>Result:</strong> High performance with substantial infrastructure requirements</li>
         </ul>
     </div>
     <div class="card card-green">
         <h3 style="margin-top: 0;">CPU Cluster at Scale</h3>
         <ul>
-            <li><strong>For same scale:</strong> 80 servers</li>
-            <li><strong>Total cost:</strong> $240 Million</li>
-            <li><strong>Who can afford:</strong> 1000+ companies</li>
-            <li><strong>Result:</strong> Accessible to everyone</li>
+            <li><strong>Capacity:</strong> Large system-memory pools reduce the number of mandatory model shards</li>
+            <li><strong>Topology:</strong> NUMA and network boundaries remain explicit engineering constraints</li>
+            <li><strong>Procurement:</strong> Standard server, memory, Linux, and network components provide a broader supply path</li>
+            <li><strong>Result:</strong> A credible frontier-model scaling path if CKE closes kernel and communication efficiency</li>
         </ul>
     </div>
 </div>
 
 <div class="card card-green">
-    <h3 style="margin-top: 0;">The Economics: 16x Cheaper, 200x More Accessible</h3>
-    <p>While GPU costs stay high and GPU access remains limited, CPU clusters deliver the same scale at a fraction of the cost. This makes large-scale ML accessible to 1000+ companies instead of just 5.</p>
+    <h3 style="margin-top: 0;">The Economics Must Be Measured at Purchase Time</h3>
+    <p>Accelerator prices, server prices, memory prices, power, and availability change too quickly for a permanent
+    multiplier. The durable thesis is that CPU clusters use broadly available server components and large memory
+    domains. CKE must prove whether those properties produce competitive frontier-model capability and total cost
+    for a defined workload.</p>
 </div>
 
 <h2>The Hybrid Trap: CPU+GPU = CPU-Bound</h2>
@@ -2211,8 +2261,8 @@ CPU RAM budget (4TB):
     <div class="card card-green">
         <h3 style="margin-top: 0;">Market Wins</h3>
         <ul>
-            <li><strong>16x cheaper</strong> at scale</li>
-            <li><strong>200x more accessible</strong> to companies</li>
+            <li><strong>Potentially lower system cost</strong> for workloads that fit CPU memory and utilization patterns</li>
+            <li><strong>Broader procurement paths</strong> through standard server and networking channels</li>
             <li><strong>Commodity hardware</strong> - no special requirements</li>
             <li><strong>Open ecosystem</strong> - standard Linux tools</li>
         </ul>
