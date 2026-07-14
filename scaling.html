@@ -2375,11 +2375,14 @@ CPU RAM budget (4TB):
     </div>
 </div>
 
-<h2>Infinite CPU Scaling: The Internet Proof</h2>
+<h2>CPU Scaling Has Different Communication Regimes</h2>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">CPUs Scale to Infinity</h3>
-    <p>Unlike GPUs, which hit cost and availability ceilings, CPUs scale infinitely through distributed computing across the internet. Your computer is part of that infinity!</p>
+    <h3 style="margin-top: 0;">More CPUs Expand Capacity, but Communication Determines Useful Speedup</h3>
+    <p>CPU capacity can be expanded across many machines, but useful scaling is never infinite. Tightly coupled
+    model execution requires controlled, low-latency networking and enough work between synchronization points to
+    amortize communication. Amdahl's Law still applies. Adding nodes helps only while the parallel work gained is
+    greater than transfer, synchronization, scheduling, and imbalance costs.</p>
 </div>
 
 <div class="alert alert-success">
@@ -2387,28 +2390,35 @@ CPU RAM budget (4TB):
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
     </div>
     <div>
-        <strong>The Insight</strong><br>
-        Want more FLOPs? Add more CPUs + RDMA! Get your 100 PFLOPS while your friends on the other side keep bragging about their limited GPU clusters. FLOPs is just an accumulation problem that CPUs solve through clever distributed training.
+        <strong>The CKE Scaling Bet</strong><br>
+        Match the workload boundary to the communication regime. Use NUMA and local memory first, a controlled RDMA
+        fabric for tightly coupled model parallelism, and wider networks only for work that can tolerate their latency.
+        The goal is sustained useful model throughput, not an accumulated peak-FLOPS slogan.
+        The <a href="cke-throughput-unit.html">C-Kernel Throughput Unit (CKU)</a> is the measurement contract for
+        this work: active bytes cycled through useful model math per second, reported with the model phase, context,
+        concurrency, memory path, and system topology. Distributed CKU must include bytes crossing sockets and nodes,
+        so compute, memory movement, communication, and token output are evaluated as one workload rather than as
+        disconnected peak specifications.
     </div>
 </div>
 
 <div class="grid grid-2">
     <div class="card card-green">
-        <h3 style="margin-top: 0;">∞ Infinite Scaling</h3>
+        <h3 style="margin-top: 0;">Tightly Coupled Cluster</h3>
         <ul>
-            <li><strong>Internet-scale distributed computing</strong></li>
-            <li><strong>No ceiling:</strong> Add 10, 100, 1000 CPUs</li>
-            <li><strong>Your computer contributes:</strong> Every device matters</li>
-            <li><strong>Result:</strong> Unlimited FLOP accumulation</li>
+            <li><strong>Network:</strong> Controlled Ethernet, RoCE, InfiniBand, or another measured fabric</li>
+            <li><strong>Work:</strong> Pipeline, tensor, expert, and training communication</li>
+            <li><strong>Requirement:</strong> Explicit partitioning, overlap, synchronization, and failure handling</li>
+            <li><strong>Result:</strong> Speedup only when communication remains below the useful-compute gain</li>
         </ul>
     </div>
     <div class="card card-green">
-        <h3 style="margin-top: 0;">CPU Improvements Track</h3>
+        <h3 style="margin-top: 0;">Loosely Coupled Internet Fleet</h3>
         <ul>
-            <li><strong>Cores:</strong> Increasing year over year</li>
-            <li><strong>Cache:</strong> Growing bigger</li>
-            <li><strong>Efficiency:</strong> Getting better</li>
-            <li><strong>Cost:</strong> Decreasing over time</li>
+            <li><strong>Network:</strong> Variable latency, bandwidth, availability, and trust</li>
+            <li><strong>Work:</strong> Evaluation, data preparation, independent inference, search, and benchmark sweeps</li>
+            <li><strong>Requirement:</strong> Coarse tasks, durable queues, retries, validation, and result provenance</li>
+            <li><strong>Not suitable for:</strong> Assuming RDMA-like latency for synchronous model-parallel kernels</li>
         </ul>
     </div>
 </div>
@@ -2417,10 +2427,10 @@ CPU RAM budget (4TB):
     <div class="card card-green">
         <h3 style="margin-top: 0;">Memory Scaling</h3>
         <ul>
-            <li><strong>DDR5 → DDR6:</strong> 2400 GB/s → higher bandwidth</li>
-            <li><strong>Memory slots:</strong> 8 → 12 → 16 slots per node</li>
-            <li><strong>Total per node:</strong> 4TB → 8TB → 16TB RAM</li>
-            <li><strong>Cost/GB:</strong> Constantly decreasing</li>
+            <li><strong>Memory standards:</strong> New generations increase transfer rates and platform capability</li>
+            <li><strong>Channels and slots:</strong> Server platforms continue expanding memory parallelism and capacity</li>
+            <li><strong>Total per node:</strong> Larger addressable memory supports more model and runtime state</li>
+            <li><strong>System effect:</strong> Fewer mandatory shards can reduce communication pressure</li>
         </ul>
     </div>
     <div class="card card-green">
@@ -2436,12 +2446,14 @@ CPU RAM budget (4TB):
 
 <div class="card card-green">
     <h3 style="margin-top: 0;">The C-Kernel Engine Goal</h3>
-    <p>Exploit this infinite CPU scaling on server-grade CPUs. As models get smaller and CPUs get more powerful, the combination becomes unbeatable:</p>
+    <p>Exploit increasingly capable server CPUs without confusing hardware availability with linear speedup. As model
+    efficiency and CPU capability improve, CKE can support larger models and contexts on each node, then distribute
+    only the boundaries that measurements show are worth crossing:</p>
     <ul>
         <li><strong>No GPU dependency:</strong> Commodity hardware only</li>
-        <li><strong>Accessible to everyone:</strong> Your laptop contributes to the cluster</li>
-        <li><strong>Sustainable scaling:</strong> Economics favor CPU-only approach</li>
-        <li><strong>Future-proof:</strong> CPU improvements continue while GPU costs stay high</li>
+        <li><strong>Server-cluster path:</strong> Matched nodes and measured fabrics for tightly coupled execution</li>
+        <li><strong>Broader participation:</strong> Independent machines can contribute coarse, verifiable work</li>
+        <li><strong>Future path:</strong> Each CPU generation can move more work back inside the node boundary</li>
     </ul>
 </div>
 
@@ -2667,7 +2679,7 @@ CPU Kubernetes Deployment:
 
 <div class="card card-green">
     <h3 style="margin-top: 0;">Why This Matters</h3>
-    <p>Organizations can start small and scale infinitely without ever switching architectures:</p>
+    <p>Organizations can start small and scale incrementally while preserving the same Linux and generated-C architecture:</p>
     <ol>
         <li><strong>Start:</strong> Train small model on laptop (fine-tuning)</li>
         <li><strong>Grow:</strong> Move to server as model size increases</li>
@@ -3228,7 +3240,7 @@ That's it. For any model size.
     </blockquote>
     <p>Beyond the open-source concerns:</p>
     <ul>
-        <li><strong>Cost</strong> - High-end GPU cluster = $200K+. EPYC server with 2TB RAM = $15,000</li>
+        <li><strong>Cost</strong> - Compare current complete-system purchase, power, cooling, networking, utilization, and support costs for the actual workload</li>
         <li><strong>Memory</strong> - 80GB VRAM vs 2TB+ system RAM</li>
         <li><strong>Availability</strong> - Export-controlled, supply constrained vs commodity CPUs</li>
         <li><strong>Flexibility</strong> - Run anywhere: cloud, on-prem, edge, embedded</li>
