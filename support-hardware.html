@@ -136,7 +136,8 @@
             background: var(--grey);
         }
 
-        .site-nav > a.active {
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
             background: var(--orange);
             color: var(--dark);
             font-weight: 600;
@@ -216,22 +217,38 @@
 
         /* Mega menu for Architecture dropdown */
         .nav-dropdown-menu.mega-menu {
-            min-width: 580px;
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
             padding: 1.25rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem 2rem;
-            /* Position to the left so it doesn't clip right edge */
-            left: 50%;
-            transform: translateX(-60%);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
         }
 
         .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
-            transform: translateX(-60%) translateY(0);
+            transform: translateY(0);
         }
 
         .mega-menu .menu-section {
             margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
         }
 
         .mega-menu .menu-heading {
@@ -766,6 +783,8 @@
                 bottom: 0;
                 background: var(--dark);
                 flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
                 padding: 1rem;
                 gap: 0.5rem;
                 overflow-y: auto;
@@ -826,6 +845,29 @@
                 max-height: 500px;
             }
 
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
             main {
                 padding: 1rem;
             }
@@ -868,7 +910,7 @@
             <a href="support-hardware.html" class="active" style="color:var(--green)">Support Lab</a>
             <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
+                <span class="nav-trigger ">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -876,6 +918,12 @@
                             View All Architecture Docs
                             <small>Complete documentation index</small>
                         </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
                     </div>
                     <!-- Left Column -->
                     <div class="menu-section">
@@ -924,28 +972,8 @@
                     </div>
                 </div>
             </div>
-            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
             <a href="version-history.html" class="">Versions</a>
-            <a href="research.html" class="">Research</a>
-            <a href="decisions.html" class="">ADR</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
         </nav>
     </header>
     <main>

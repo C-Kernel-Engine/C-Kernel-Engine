@@ -159,6 +159,11 @@ for page in "$PAGES_DIR"/*.html; do
         if [ -n "$nav_active" ]; then
             header="${header//\{\{NAV_${nav_active^^}\}\}/active}"
         fi
+        case "$nav_active" in
+            architecture|architecture-links|parity|research|decisions|api)
+                header="${header//\{\{NAV_ARCHITECTURE\}\}/active}"
+                ;;
+        esac
 
         # Clear all remaining nav active states.
         header="${header//\{\{NAV_INDEX\}\}/}"
