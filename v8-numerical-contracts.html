@@ -265,6 +265,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -862,8 +863,10 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
@@ -1045,6 +1048,41 @@
 
 <p>The two legacy binding registries remain only for uncontracted compatibility helpers while migration continues. They are not authoritative inputs for attention reductions, BF16 storage boundaries, vision M-RoPE, or Q4/Q6 numerical execution contracts.</p>
 
+<h2>Compiler Policy Gate</h2>
+
+<p><code>make v8-regression-fast</code> begins with an AST-based DSL policy audit. Generic compiler and code-generation entry points may branch on exact operation IDs, resolved kernel IDs, tensor metadata, and declared capability fields. They may not branch on model, architecture, or family names. Aliasing a family value through local variables does not bypass the audit.</p>
+
+<p>The builder also treats operation families as exact inputs. A missing <code>attention_sliding</code> implementation cannot silently resolve to ordinary <code>attention</code>; missing and ambiguous routes fail with an instruction to fix the circuit or kernel map. Per-layer dimensions are validated arrays, circuit weight policies own aliases and intentionally unused tensors, and unknown policy fields fail schema validation.</p>
+
+<p>The same policy now protects v7 training and backprop through <code>make test-v7-dsl-policy</code>, which is part of <code>make v7-regression-fast</code>. This does not make v7 and v8 share one graph, but it enforces the same ownership rule: the training IR owns backward ordering and the emitter may not acquire model-family behavior.</p>
+
+<pre><code>make test-v8-dsl
+make v8-regression-fast
+make test-v7-dsl-policy
+make v7-regression-fast</code></pre>
+
+<h3>Remaining Migration Debt</h3>
+
+<table>
+  <thead><tr><th>Measured category</th><th>Before this PR</th><th>Current</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Executable model-literal AST sites</td><td>78</td><td>76</td><td>A checked-in per-file ceiling now fails on any increase. Reductions must lower the ceiling.</td></tr>
+    <tr><td>Build and IR model-literal sites</td><td>39</td><td>37</td><td>Lower 1 no longer reselects decode attention from model-specific defaults or function-name patterns.</td></tr>
+    <tr><td>Code-generation model-literal sites</td><td>39</td><td>39</td><td>Bridge, tokenizer, debug, and specialized emission remain the largest migration area.</td></tr>
+    <tr><td>Lower-1 decode-attention reselection branches</td><td>7</td><td>0</td><td>Lower 1 validates the exact IR1 kernel and resolved contract, then only wires KV-cache inputs.</td></tr>
+    <tr><td>Compiler functions governed by the no-family-dispatch policy</td><td>8</td><td>9</td><td>The authoritative decode-attention validator is now covered directly.</td></tr>
+    <tr><td>Forbidden family dispatch in governed generic paths</td><td>0</td><td>0</td><td>Direct and aliased model/family dispatch continues to hard-fail.</td></tr>
+  </tbody>
+</table>
+
+<p>The 76-site inventory is deliberately broader than the previous 41-site estimate: it counts executable module-level and function-level string literals containing model-family names across the four principal compiler and code-generation modules, while excluding comments, docstrings, and standalone documentation strings. Not every site selects mathematics, but every site is visible debt that cannot increase silently. The audit reports a per-function inventory so cleanup can proceed in bounded groups instead of relying on an informal grep count.</p>
+
+<p>The next priority is Qwen3-VL bridge generation: multimodal fallback injection, deepstack handling, M-RoPE calls, and position advancement should be explicit call-IR operations. Kimi/DeepSeek MLA decode and prefill selection follows after both phases have exact kernel-map providers. Tokenizer adapters may retain family knowledge only while hydrating external metadata into canonical configuration.</p>
+
+<p>This refactor prevents four concrete failure classes: model names silently changing tensor dimensions, undeclared weights being ignored by family branches, unavailable sliding attention falling back to ordinary attention, and generated runtimes enabling multimodal or quantized behavior from a family-name test instead of a hydrated capability.</p>
+
+<p>Tokenizer and format adapters may identify an external model family while translating source metadata into the canonical circuit/config representation. That knowledge must stop at hydration. It is not permission for GraphIR construction, lowering, memory planning, or codegen to select mathematics from a family name.</p>
+
 <h2>Threading Is an Execution Contract</h2>
 
 <p>Kernel maps also declare ISA dispatch, threading runtime, possible work partitions, dispatch mechanisms, and whether scheduling can alter reduction order. Q4/Q6 GEMM and GEMV maps therefore expose serial, row, column, or output-tile policies instead of hiding threadpool behavior in generated wrappers. GraphIR records this as <code>resolved_execution</code>, and LoweredIR plus call-ready IR hard-fail if the kernel ID changes. When partitioning changes arithmetic order, the numerical contract must define the corresponding reduction and merge behavior.</p>
@@ -1068,6 +1106,71 @@
 <div class="contract-note">
   <strong>Migration policy:</strong> add one operator family at a time. Record current semantics, add leaf and public-route tests, declare circuit requirements, enrich real kernel maps, prove generated artifact equivalence, run stitched parity, then promote the route.
 </div>
+
+<h2>X-Ray Fix Progression</h2>
+
+<p>Every X-ray failure follows the same additive progression. The report embeds these steps so another agent does not repeat an already diagnosed numerical bug.</p>
+
+<ol>
+  <li>Compare execution policy first: prefill segmentation, kernel batch shapes, position progression, cache reset/append behavior, and cache strides. A combined 1,307-row prefill is not numerically equivalent evidence for a backend that executes 33, 1,008, and 266-row segments.</li>
+  <li>For incremental decode, prove cache state before attention math: compare append index, current post-RoPE K/V, stored-row readback, the previous row, and hashes for every valid cache row.</li>
+  <li>Only when query and valid cache bytes agree, compare attention providers, split thresholds, worker partitions, probability/value rounding, and merge order.</li>
+  <li>Stop at the first divergent semantic edge and classify its storage, compute, reduction, position, layout, circuit, binding, and threading contract.</li>
+  <li>Resolve an exact compatible kernel-map capability. Zero or multiple providers hard-fail.</li>
+  <li>Fix the existing implementation or add one new additive variant. Do not alter unrelated numerical variants.</li>
+  <li>Extend the kernel-family matrix across input storage, compute and accumulator precision, reduction and merge order, rounding points, output storage, and threading semantics.</li>
+  <li>Test the leaf kernel against an independent formula and the requested PyTorch or llama.cpp backend oracle.</li>
+  <li>Register the exact validated function in the kernel map, then run isolated, contract-resolution, stitched-checkpoint, mixed-prefill, and teacher-forced gates.</li>
+  <li>Rerun X-ray from the last passing checkpoint. The accepted fix must move the first divergence to a later semantic edge.</li>
+  <li>Publish the capability evidence in the test-report accordion and nightly artifacts before promoting the route.</li>
+</ol>
+
+<p>The bounded execution-state comparator preserves this order in a machine-readable report:</p>
+
+<pre><code>python version/v8/scripts/xray_execution_state_v8.py \
+  --subject-trace build/xray/ck-execution-trace.json \
+  --oracle-trace build/xray/llama-execution-trace.json \
+  --output build/xray/execution-state-report.json</code></pre>
+
+<p>It stops at one of four useful boundaries: execution-policy mismatch, cache metadata/content mismatch, attention-input mismatch, or attention-arithmetic mismatch. Tensor bisection begins only after the execution and state contracts agree.</p>
+
+<h2>Measured BF16 Vision Progression</h2>
+
+<p>The Qwen3-VL BF16 investigation demonstrates the closure rule on a real 1152&times;896 form image with 4,032 visual tokens. Each row was reached through the normal compiler and exact kernel-map resolution; no generated C was edited by hand.</p>
+
+<table>
+  <thead><tr><th>Semantic edge</th><th>Before relative RMSE</th><th>After relative RMSE</th><th>Resolved capability</th></tr></thead>
+  <tbody>
+    <tr><td>Frontend position output</td><td>1.899e-2</td><td>2.361e-5</td><td>BF16 align-corners position storage</td></tr>
+    <tr><td>Layer 0 norm1</td><td>1.225e-2</td><td>5.538e-5</td><td>BF16 storage with matched FP32 reduction</td></tr>
+    <tr><td>Packed QKV projection</td><td>Not yet isolated</td><td>7.129e-5</td><td>BF16 input/weight, FP32 dot, BF16 output</td></tr>
+    <tr><td>Q after M-RoPE</td><td>Wrong generated sections</td><td>7.811e-5</td><td>Full-width multi-section BF16 output</td></tr>
+    <tr><td>Attention context</td><td>1.744e-3</td><td>9.258e-4</td><td>BF16 Q/K/V, FP32 online reduction, BF16 output</td></tr>
+    <tr><td>Output projection</td><td>Not yet isolated</td><td>6.059e-4</td><td>BF16 input/weight, FP32 dot, BF16 output</td></tr>
+  </tbody>
+</table>
+
+<p>The next edge is always explicit. After output projection the resolver selects the BF16 residual capability, then X-ray continues through norm2, MLP, spatial merge, projector, final prefix, mixed-prefill logits, and teacher-forced generation. A green leaf test without this forward movement is evidence for a kernel only, not closure of the model bug.</p>
+
+<h2>Execution-Contract X-Ray</h2>
+
+<p>Tensor parity cannot diagnose a backend that executes the same mixed prefix with a different schedule. X-ray therefore records prefill segmentation, cache transitions, position transitions, exact shared-library identity, and the manifest-map identity alongside numerical checkpoints.</p>
+
+<table>
+  <thead><tr><th>Mixed-prefix contract</th><th>Required behavior</th><th>Failure meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Segments</td><td><code>text_before -&gt; visual -&gt; text_after</code></td><td>A combined prefix changes projection reduction shape and rounding.</td></tr>
+    <tr><td>Cache transition</td><td><code>append_preserve</code></td><td>A segment must retain all prior K/V rows and append at the physical token offset.</td></tr>
+    <tr><td>Position transition</td><td><code>segment_defined</code></td><td>Physical cache position and semantic M-RoPE text position must not be conflated.</td></tr>
+    <tr><td>Runtime evidence</td><td>Exact generated library and manifest-map hashes</td><td>A stale converted manifest or rebuilt runtime invalidates attribution.</td></tr>
+  </tbody>
+</table>
+
+<p>On the 1,008-token Qwen3-VL form cases, the old single-call path diverged from llama.cpp as early as generated step 4. Circuit-driven segmented append removed the cache-state failure, but a later close-ranking flip remained. X-ray then showed that the visual M-RoPE cache was exact while only the rotated second half differed. Basis-vector replay isolated two compiler-visible rounding points: llama.cpp rounds the partner product before each <code>fmaf</code>, and its frequency recurrence uses the system <code>powf</code>, <code>sinf</code>, and <code>cosf</code> behavior. CK now names that evaluation order in the numerical contract and implements it explicitly.</p>
+
+<p>The resulting production gate is exact for both canonical OCR forms: each full <code>1008 x 16384</code> decoder-facing visual prefix matches llama.cpp across all 16,515,072 FP32 values, and both 128-token greedy runs match 128/128 top-1 tokens. Minimum logits cosine was 0.98892 and 0.99168 respectively, with at least 14/16 top-k overlap. This closes these two fixtures, not the unexecuted 40-image sweep or every multimodal family.</p>
+
+<p>The investigation also invalidated an earlier packed Q4_K&times;Q8_K diagnosis. The apparent packed-reduction failure was downstream of the M-RoPE ULP and a report that recorded the generated decoder library but not its dynamically loaded engine library. X-ray now defaults the raw llama.cpp oracle to one thread, rejects multi-threaded exact capture without an explicit opt-in, and records the engine, generated model, llama shim, and manifest identities. A downstream kernel is not blamed until exact-input replay and complete runtime provenance both pass.</p>
 
 <h2>Validation Commands</h2>
 
@@ -1307,7 +1410,8 @@ make v8-regression-fast</code></pre>
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1315,13 +1419,14 @@ make v8-regression-fast</code></pre>
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
             </div>
         </div>
     </footer>

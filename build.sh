@@ -155,13 +155,19 @@ for page in "$PAGES_DIR"/*.html; do
         header="${header//\{\{META_DESCRIPTION\}\}/$page_description}"
         header="${header//\{\{META_ROBOTS\}\}/$page_robots}"
 
-        # Clear all nav active states
+        # Mark the current page before clearing the remaining nav placeholders.
+        if [ -n "$nav_active" ]; then
+            header="${header//\{\{NAV_${nav_active^^}\}\}/active}"
+        fi
+
+        # Clear all remaining nav active states.
         header="${header//\{\{NAV_INDEX\}\}/}"
         header="${header//\{\{NAV_SPECTRUM\}\}/}"
         header="${header//\{\{NAV_QUICKSTART\}\}/}"
         header="${header//\{\{NAV_DEVGUIDE\}\}/}"
         header="${header//\{\{NAV_SCALING\}\}/}"
         header="${header//\{\{NAV_SUPPORT\}\}/}"
+        header="${header//\{\{NAV_CKU\}\}/}"
         header="${header//\{\{NAV_ARCHITECTURE\}\}/}"
         header="${header//\{\{NAV_FLASH_ATTENTION\}\}/}"
         header="${header//\{\{NAV_KERNELS\}\}/}"
@@ -181,10 +187,6 @@ for page in "$PAGES_DIR"/*.html; do
         header="${header//\{\{NAV_API\}\}/}"
         header="${header//\{\{NAV_CONTRIBUTING\}\}/}"
         header="${header//\{\{NAV_THREADPOOL\}\}/}"
-
-        if [ -n "$nav_active" ]; then
-            header="${header//\{\{NAV_${nav_active^^}\}\}/active}"
-        fi
 
         # Replace date variables in footer
         footer="${footer//\{\{YEAR\}\}/$CURRENT_YEAR}"

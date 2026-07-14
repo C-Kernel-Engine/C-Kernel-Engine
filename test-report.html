@@ -265,6 +265,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -862,8 +863,10 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
@@ -1774,7 +1777,7 @@
       (<code>make v7-visualizer-health</code>)</li>
     <li><strong>v8 Inference Regression</strong>: Family bring-up gate for Gemma3, Qwen2, Qwen3, Qwen3.5, and Nanbeige with build/smoke/coherence/contract checks
       (<code>make regression-fast</code>, aliasing the promoted <code>make v8-regression-fast</code> lane)</li>
-    <li><strong>Architecture Contract Dashboard</strong>: v8 circuit, lowered IR dataflow, generated-C preservation, runtime-path equivalence, and model contract coverage summary
+    <li><strong>Architecture Contract Dashboard</strong>: v8 template/circuit, lowered IR dataflow, generated-C preservation, runtime-path equivalence, and model contract coverage summary
       (<code>make test-architecture-contracts</code>)</li>
     <li><strong>v8 Qwen3-VL Vision Smoke</strong>: Cached image → mmproj → decoder smoke for the 8B multimodal path; skips cleanly when the runner does not have the large artifacts
       (<code>make test-v8-qwen3vl-e2e-smoke</code>)</li>
@@ -2388,6 +2391,31 @@ function renderArchitectureContracts(data) {
 }
 
 function renderContractRows(sectionId, rows) {
+  if (sectionId === 'numerical_kernel_capabilities') {
+    return `
+      <div class="contract-table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Family</th><th>Capability</th><th>Status</th><th>Input</th><th>Compute</th><th>Reduction</th><th>Output</th><th>Oracle</th><th>Shape</th><th>Threads</th><th>Max Abs</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td><code>${escapeHtml(row.kernel_family || '-')}</code></td>
+                <td><code>${escapeHtml(row.capability || '-')}</code></td>
+                <td>${contractBadge(row.status)}</td>
+                <td>${escapeHtml(row.input_storage || '-')}</td>
+                <td>${escapeHtml(row.compute || '-')}</td>
+                <td>${escapeHtml(row.reduction || '-')}</td>
+                <td>${escapeHtml(row.output_storage || '-')}</td>
+                <td>${escapeHtml(row.oracle || '-')}</td>
+                <td><code>D=${escapeHtml(row.head_dim ?? '-')}</code></td>
+                <td>${escapeHtml(row.threads || '-')}</td>
+                <td><code>${escapeHtml(row.max_abs ?? '-')}</code></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
   if (sectionId === 'model_contract_coverage') {
     return `
       <div class="contract-table-wrap">
@@ -2858,7 +2886,8 @@ document.addEventListener('DOMContentLoaded', loadResults);
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -2866,13 +2895,14 @@ document.addEventListener('DOMContentLoaded', loadResults);
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
             </div>
         </div>
     </footer>

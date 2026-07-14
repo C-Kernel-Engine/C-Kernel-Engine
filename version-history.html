@@ -265,6 +265,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -862,8 +863,10 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
@@ -1193,7 +1196,7 @@
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
-    <div class="arch-node">
+    <div class="arch-node current">
       <div class="arch-node-badge arch-v8">v8-9</div>
       <div class="arch-node-label">Vision</div>
       <div class="arch-node-dot"></div>
@@ -1757,6 +1760,49 @@
     }
   </script>
 
+  <h2>Current Execution Order</h2>
+  <p style="color: var(--text-secondary);">
+    New model families are added only after their mathematical requirements can be expressed by circuits and
+    resolved exactly through kernel capabilities. The compiler emits the resolved decision; it does not infer a
+    model-specific fallback. This keeps correctness work reusable across text, vision, and audio.
+  </p>
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>Order</th>
+        <th>Workstream</th>
+        <th>Exit Gate</th>
+        <th>State</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>v8 compiler and numerical hardening</strong><br>Circuits, kernel maps, exact resolution, bounded X-ray attribution, and zero model-family dispatch in protected compiler paths.</td>
+        <td>Supported text and vision circuits compile deterministically; incompatible or ambiguous capabilities hard-fail; stitched and end-to-end regressions remain clean.</td>
+        <td><span class="version-status status-building">Active</span></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Qwen3-VL parity closure</strong><br>Encoder checkpoints, mixed prefill, teacher-forced decode, and persistent decode against llama.cpp and PyTorch references.</td>
+        <td>First-divergence reports advance through every remaining boundary and each fix is retained by a numerical contract plus nightly coverage.</td>
+        <td><span class="version-status status-building">Active</span></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Whisper tiny/base inference</strong><br>PCM/WAV, resampling, STFT, log-Mel, Conv1D encoder stem, bidirectional encoder attention, decoder cross-attention, and audio token semantics.</td>
+        <td>Fixed public audio fixtures match PyTorch and whisper.cpp at frontend, encoder, mixed-prefill, and transcript boundaries before quantized optimization.</td>
+        <td><span class="version-status status-planned">Next</span></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>Audio performance and FP32 training</strong><br>Encoder tiling/threading, cached cross-attention K/V, then Conv1D and cross-attention backward in v7.</td>
+        <td>Inference parity is stable; performance evidence separates frontend, encoder, and autoregressive decode; FP32 backward matches PyTorch.</td>
+        <td><span class="version-status status-planned">Gated</span></td>
+      </tr>
+    </tbody>
+  </table>
+
   <!-- Detailed Roadmap Table -->
   <h2>Detailed Roadmap</h2>
   <table class="roadmap-table">
@@ -1800,30 +1846,30 @@
       </tr>
       <tr>
         <td><strong>v8.0</strong></td>
-        <td>Vision Encoder</td>
-        <td>Patch embedding lowering, image positional encoding, ViT support, and block-local multimodal stitching groundwork</td>
+        <td>Inference Compiler + Vision Encoder</td>
+        <td>Circuit-owned topology and weight policy, fail-closed kernel capability resolution, explicit numerical and threading contracts, GraphIR-to-call-IR decision preservation, bounded X-ray attribution, patch embedding, resized position encoding, M-RoPE, deepstack, and multimodal stitching</td>
         <td>v7.x training</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
       <tr>
         <td><strong>v9.0</strong></td>
-        <td>Vision Training</td>
-        <td>Backward through vision encoder, image classification fine-tuning</td>
+        <td>Vision Parity + Training</td>
+        <td>Qwen3-VL encoder, mixed-prefill, teacher-forced and persistent-decode parity; then FP32 backward through vision encoder and image fine-tuning</td>
         <td>v8.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
         <td><strong>v10.0</strong></td>
-        <td>Audio Encoder</td>
-        <td>Conformer/Whisper-style encoder, spectrogram preprocessing</td>
-        <td>v7.x training</td>
+        <td>Audio Inference</td>
+        <td>Whisper tiny/base first: PCM/WAV ingestion, resampling, STFT and log-Mel preprocessing, Conv1D stem, bidirectional encoder, cached encoder-decoder cross-attention, and transcript parity</td>
+        <td>v8 exact resolution + X-ray gates</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
         <td><strong>v11.0</strong></td>
         <td>Audio Training</td>
-        <td>Backward through audio encoder, speech recognition training</td>
-        <td>v10.0</td>
+        <td>FP32 Conv1D, encoder-attention and cross-attention backward; speech recognition training after inference parity. Log-Mel remains fixed preprocessing initially.</td>
+        <td>v10.0 inference parity</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
@@ -2395,11 +2441,11 @@
     Version numbers follow this convention:
   </p>
   <ul style="color: var(--text-secondary);">
-    <li><strong>Current priority (2026):</strong> Complete v7.x training sign-off while actively bringing up v8.x vision inference foundations before opening v15 implementation</li>
+    <li><strong>Current priority (2026):</strong> Keep v7 FP32 training parity stable, finish v8 fail-closed compiler and Qwen3-VL numerical hardening, then bring up Whisper tiny/base inference through the same circuit and kernel-contract path</li>
     <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
     <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
-    <li><strong>v8.x:</strong> Vision encoding and image training foundations, now in active bring-up</li>
-    <li><strong>v10.x:</strong> Audio encoding and audio training foundations</li>
+    <li><strong>v8.x:</strong> Deterministic inference compiler, numerical contracts, X-ray attribution, and vision encoding, now in active hardening</li>
+    <li><strong>v10.x:</strong> Whisper-style audio inference after v8 contract and parity gates; FP32 audio training follows in v11</li>
     <li><strong>v12.x:</strong> MoE architecture (efficient large models)</li>
     <li><strong>v14.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
@@ -2670,7 +2716,8 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -2678,13 +2725,14 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
             </div>
         </div>
     </footer>

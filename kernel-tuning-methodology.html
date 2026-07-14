@@ -265,6 +265,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -862,8 +863,10 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
                 <span class="nav-trigger">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
@@ -1145,6 +1148,70 @@ path, weight reuse, quantized GEMM dispatch, thread scheduling, and cache behavi
         </tr>
     </tbody>
 </table>
+
+<h2>Cross-Hardware Evidence Matrix</h2>
+
+<p>A kernel is not "CPU optimized" because it performed well on one host. CKE uses several hardware lanes to separate
+portable mathematics from ISA-specific implementation quality, heterogeneous scheduling, memory topology, and
+server-scale behavior.</p>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Hardware Lane</th>
+            <th>Primary Question</th>
+            <th>Tools and Evidence</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Intel Core i7, multiple generations</td>
+            <td>Do FP32 and quantized generated runtimes remain useful on commodity x86 systems?</td>
+            <td>Practical E2E, fixed-token throughput, parity, compiler and ISA inspection.</td>
+            <td>Active</td>
+        </tr>
+        <tr>
+            <td>Core i7-14700T</td>
+            <td>How close can AVX2/FMA/AVX-VNNI FP32 and Q4/Q5/Q6/Q8 kernels get to the useful roofline on a hybrid 8P + 12E CPU? Native BF16 is not claimed.</td>
+            <td>VTune hotspots/uarch/memory/threading, Advisor roofline, perf, flamegraphs, assembly, frequency and utilization.</td>
+            <td>Dedicated profiling node</td>
+        </tr>
+        <tr>
+            <td>TI TDA4VM ARM</td>
+            <td>Are FP32 and quantized contracts and kernels portable to ARM NEON and realistic embedded constraints?</td>
+            <td>Build and kernel parity, NEON path inspection, constrained-memory and practical runtime checks.</td>
+            <td>Active portability lane</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon, 2nd/3rd/5th Gen</td>
+            <td>How do FP32/quantized AVX-512/VNNI and host-gated native BF16/AMX availability affect parity and throughput across generations?</td>
+            <td>ISA-appropriate kernel tests, model parity, larger artifacts, profiler summaries, and cross-generation comparisons.</td>
+            <td>External validation lanes</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon 6</td>
+            <td>What do native AMX BF16, AVX-512/VNNI, wider memory systems, NUMA placement, sustained power, and multiple nodes enable?</td>
+            <td>Planned VTune/Advisor, native BF16, memory-channel roofline, NUMA, power, and distributed CKU experiments.</td>
+            <td>Planned; not measured</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert alert-warning">
+    <strong>Coverage is workload-specific.</strong> A platform row does not certify every model, dtype, quantization, or
+    context length. Publish the host, CPU and detected ISA flags, storage/compute dtype, memory topology, compiler, CKE commit, model hash, quantization,
+    prompt or tensor shape, thread/affinity policy, warmup/repeats, power/frequency state, raw command, and artifact path.
+</div>
+
+<h3>Publication Contract</h3>
+<ul class="check-list">
+    <li>Label the hardware lane as active, external, or planned; planned hardware has no benchmark result.</li>
+    <li>Separate portable numerical evidence from ISA-specific throughput evidence.</li>
+    <li>Compare before/after and reference runtimes on the same host with equivalent model and workload settings.</li>
+    <li>Link raw commands, logs, profiler output, and the CKE commit behind every published performance table.</li>
+    <li>Do not extrapolate one Core, Xeon, or ARM result to another generation without running that lane.</li>
+</ul>
 
 <h2>How To Read The Signals</h2>
 
@@ -1563,7 +1630,8 @@ tie one profiler dot back to one function, one tensor layout, and one source pat
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1571,13 +1639,14 @@ tie one profiler dot back to one function, one tensor layout, and one source pat
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
             </div>
         </div>
     </footer>
