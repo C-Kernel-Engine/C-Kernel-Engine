@@ -97,12 +97,17 @@
       "position_policy": "mrope_2d",
       "cache_policy": "persistent_decoder_kv",
       "runtime_policy": "decode_staged",
+      "prefill_schedule": {
+        "segments": ["text_before", "visual", "text_after"],
+        "cache_transition": "append_preserve",
+        "position_transition": "segment_defined"
+      },
       "image_begin_marker": "<|vision_start|>",
       "image_end_marker": "<|vision_end|>"
     }
   },
   "kernels": {
-    "rope_qk": "mrope_qk_text"
+    "rope_qk": "mrope_qk_text_imrope"
   },
   "required_contracts": {
     "decoder.attention": {
@@ -112,13 +117,14 @@
         "prefill": {
           "requires": {
             "execution.phase": "prefill",
+            "execution.prefill_batching": "segmented_append",
             "tensor.q.dtype": "fp32",
-            "tensor.kv.dtype": "fp32",
+            "tensor.kv.dtype": "fp16",
             "tensor.layout": "head_major",
-            "numerics.attention_reduction": "fp32_online"
+            "numerics.attention_reduction": "f16_online_fp32_merge"
           },
           "validation": "observed",
-          "evidence": "Mixed-prefix full replay remains the production gate; the selected causal FP32 route has leaf coverage."
+          "evidence": "Segmented mixed-prefix replay requires cache-preserving append attention; leaf and stitched parity are the production gates."
         },
         "decode": {
           "requires": {
@@ -131,6 +137,30 @@
           "validation": "observed",
           "evidence": "Public routing and llama.cpp oracle cases pass at KV 511, 512, and 1058; full multimodal parity remains the production gate."
         }
+      }
+    }
+  },
+  "required_numerical_contracts": {
+    "decoder.mrope": {
+      "op": "rope",
+      "template_ops": ["rope_qk"],
+      "phases": {
+        "prefill": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Production-width interleaved sector routing is checked against the GGML formula and stitched multimodal prefill."
+        },
+        "decode": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Exact llama Q/K inputs isolate interleaved text M-RoPE before cache append and attention."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mrope.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
       }
     }
   },

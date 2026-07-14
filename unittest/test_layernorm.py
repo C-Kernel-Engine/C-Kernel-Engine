@@ -37,6 +37,19 @@ lib.layernorm_naive_serial.argtypes = [
 ]
 lib.layernorm_naive_serial.restype = None
 
+lib.layernorm_naive_serial_matched_precision.argtypes = [
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_float,
+]
+lib.layernorm_naive_serial_matched_precision.restype = None
+
 lib.layernorm_forward_rolled_slice.argtypes = [
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
@@ -193,6 +206,84 @@ def run_c_layernorm_backward(upstream, x, gamma, mean, rstd):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tests
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def ggml_layernorm_avx2_reference(x, gamma, beta, eps):
+    """Reproduce ggml's ordered AVX2 LayerNorm arithmetic."""
+    tokens, d_model = x.shape
+    if d_model % 8:
+        raise ValueError("the AVX2 oracle requires a width divisible by 8")
+
+    sqrtf = ctypes.CDLL("libm.so.6").sqrtf
+    sqrtf.argtypes = [ctypes.c_float]
+    sqrtf.restype = ctypes.c_float
+    output = np.empty_like(x)
+
+    for token in range(tokens):
+        sum_acc = 0.0
+        for value in x[token]:
+            sum_acc += float(value)
+        mean = np.float32(np.float32(sum_acc) / np.float32(d_model))
+        centered = np.subtract(x[token], mean, dtype=np.float32)
+
+        variance_acc = 0.0
+        for offset in range(0, d_model, 8):
+            squared = np.multiply(
+                centered[offset:offset + 8],
+                centered[offset:offset + 8],
+                dtype=np.float32,
+            )
+            lanes = np.add(squared[:4], squared[4:], dtype=np.float32)
+            lanes = np.add(lanes[:2], lanes[2:], dtype=np.float32)
+            chunk_sum = np.float32(lanes[0] + lanes[1])
+            variance_acc += float(chunk_sum)
+
+        variance = np.float32(variance_acc / float(d_model))
+        variance_eps = np.float32(variance + np.float32(eps))
+        scale = np.float32(
+            np.float32(1.0) /
+            np.float32(sqrtf(ctypes.c_float(variance_eps)))
+        )
+        normalized = np.multiply(centered, scale, dtype=np.float32)
+        normalized = np.multiply(normalized, gamma, dtype=np.float32)
+        output[token] = np.add(normalized, beta, dtype=np.float32)
+
+    return output
+
+
+def test_ggml_exact_layernorm_production_width():
+    """Guard the exact provider at Qwen3-VL's production hidden width."""
+    rng = np.random.default_rng(21)
+    tokens, d_model = 32, 1152
+    x = rng.standard_normal((tokens, d_model), dtype=np.float32)
+    gamma = rng.standard_normal(d_model, dtype=np.float32)
+    beta = rng.standard_normal(d_model, dtype=np.float32)
+    output = np.empty_like(x)
+
+    lib.layernorm_naive_serial_matched_precision(
+        numpy_to_ptr(x),
+        numpy_to_ptr(gamma),
+        numpy_to_ptr(beta),
+        numpy_to_ptr(output),
+        None,
+        None,
+        tokens,
+        d_model,
+        ctypes.c_float(1e-6),
+    )
+    reference = ggml_layernorm_avx2_reference(x, gamma, beta, 1e-6)
+    differing = int(np.count_nonzero(
+        output.view(np.uint32) != reference.view(np.uint32)
+    ))
+    diff = float(np.max(np.abs(output - reference)))
+    print(
+        "GGML-exact LayerNorm 32x1152: "
+        f"different={differing}/{output.size}, max_diff={diff:.2e}"
+    )
+    if differing:
+        raise AssertionError(
+            "matched LayerNorm changed ggml's ordered AVX2 arithmetic"
+        )
+
 
 def run_forward_tests(T=32, D=128, eps=1e-5, warmup=10, iterations=1000):
     """Run forward pass tests with accuracy and timing."""
@@ -425,6 +516,8 @@ def run_backward_tests(T=32, D=128, eps=1e-5, warmup=10, iterations=1000):
 
 if __name__ == "__main__":
     print_system_info()
+
+    test_ggml_exact_layernorm_production_width()
 
     # Forward tests
     fwd_report = run_forward_tests(T=32, D=128, warmup=10, iterations=1000)

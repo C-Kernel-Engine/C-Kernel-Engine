@@ -39,6 +39,12 @@ lib.attention_forward_decode_head_major_gqa_flash_f16cache_contract.argtypes = (
     _LEGACY_ARGS + [ctypes.c_int]
 )
 lib.attention_forward_decode_head_major_gqa_flash_f16cache_contract.restype = ctypes.c_int
+lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract.argtypes = [
+    _FLOAT_P, _U16_P, _U16_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract.restype = ctypes.c_int
 lib.ck_get_num_threads.argtypes = []
 lib.ck_get_num_threads.restype = ctypes.c_int
 lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
@@ -437,6 +443,40 @@ def _run_contract(q, k, v, head_dim, reduction, fill=np.nan):
     return status, out
 
 
+def _prefill_append_matches_decode_loop_case():
+    heads, kv_heads, q_tokens, past_tokens = 4, 2, 3, 5
+    capacity, head_dim, aligned = 16, 8, 8
+    rng = np.random.default_rng(7003)
+    q = np.ascontiguousarray(rng.standard_normal((heads, q_tokens, aligned), dtype=np.float32))
+    k = _half_bits(rng.standard_normal((kv_heads, capacity, aligned), dtype=np.float32))
+    v = _half_bits(rng.standard_normal((kv_heads, capacity, aligned), dtype=np.float32))
+    actual = np.zeros_like(q)
+    status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(actual),
+        heads, kv_heads, q_tokens, past_tokens, capacity, head_dim, aligned, 1,
+    )
+    expected = np.zeros_like(q)
+    for token in range(q_tokens):
+        q_token = np.ascontiguousarray(q[:, token, :])
+        out_token = np.zeros((heads, aligned), dtype=np.float32)
+        token_status = lib.attention_forward_decode_head_major_gqa_flash_f16cache_contract(
+            _f32_ptr(q_token), _u16_ptr(k), _u16_ptr(v), _f32_ptr(out_token),
+            heads, kv_heads, past_tokens + token + 1, capacity,
+            head_dim, aligned, 1,
+        )
+        if token_status != 0:
+            status = token_status
+            break
+        expected[:, token, :] = out_token
+    diff = float(np.max(np.abs(actual - expected)))
+    return Result(
+        "prefill_append_matches_decode_loop",
+        diff if status == 0 else float("inf"),
+        0.0,
+        status == 0 and np.array_equal(actual, expected),
+    )
+
+
 @dataclass
 class Result:
     name: str
@@ -465,6 +505,7 @@ def _case(name, seed, heads, kv_heads, kv_tokens, head_dim, aligned, chunks, tol
 
 def main():
     results = []
+    results.append(_prefill_append_matches_decode_loop_case())
     results.append(_unfused_f16_causal_case())
     below, below_data = _case(
         "f16_split_below_threshold(KV=511,C=1)", 511, 8, 2, 511, 64, 64, 1, 2.0e-5,

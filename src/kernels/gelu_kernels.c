@@ -39,12 +39,6 @@ static inline float ck_gelu_tanh_f32(float x) {
     return 0.5f * x * (1.0f + tanhf(inner));
 }
 
-static inline float ck_gelu_tanh_ggml_f32(float x) {
-    const float gelu_coef_a = 0.044715f;
-    const float sqrt_2_over_pi = 0.79788456080286535588f;
-    return 0.5f * x * (1.0f + tanhf(sqrt_2_over_pi * x * (1.0f + gelu_coef_a * x * x)));
-}
-
 static ck_half ck_gelu_ggml_table_f16[1u << 16];
 static pthread_once_t ck_gelu_ggml_table_once = PTHREAD_ONCE_INIT;
 static pthread_once_t ck_gelu_ggml_runtime_once = PTHREAD_ONCE_INIT;
@@ -52,12 +46,44 @@ static pthread_once_t ck_gelu_ggml_runtime_once = PTHREAD_ONCE_INIT;
 typedef void (*ck_gelu_ggml_cpu_init_fn)(void);
 typedef ck_half (*ck_gelu_ggml_fp32_to_fp16_fn)(float);
 typedef float (*ck_gelu_ggml_fp16_to_fp32_fn)(ck_half);
+typedef float (*ck_gelu_math_f32_fn)(float);
 
 static const ck_half *ck_gelu_runtime_table_f16 = NULL;
 static ck_gelu_ggml_fp32_to_fp16_fn ck_gelu_runtime_fp32_to_fp16 = NULL;
 static ck_gelu_ggml_fp16_to_fp32_fn ck_gelu_runtime_fp16_to_fp32 = NULL;
 static void *ck_gelu_runtime_handle = NULL;
 static int ck_gelu_runtime_ready = 0;
+static ck_gelu_math_f32_fn ck_gelu_reference_tanhf = NULL;
+static pthread_once_t ck_gelu_reference_math_once = PTHREAD_ONCE_INIT;
+
+static void ck_gelu_reference_math_init(void) {
+#if defined(__linux__)
+    void *handle = dlopen("libm.so.6", RTLD_NOW | RTLD_LOCAL);
+    if (handle) {
+        ck_gelu_reference_tanhf = (ck_gelu_math_f32_fn) dlsym(handle, "tanhf");
+    }
+#endif
+}
+
+static ck_gelu_math_f32_fn ck_gelu_system_tanhf(void) {
+    pthread_once(&ck_gelu_reference_math_once, ck_gelu_reference_math_init);
+    return ck_gelu_reference_tanhf;
+}
+
+#if defined(__clang__) || defined(__INTEL_LLVM_COMPILER)
+#pragma float_control(precise, on, push)
+#endif
+static float ck_gelu_tanh_ggml_reference_f32(float x) {
+    const float gelu_coef_a = 0.044715f;
+    const float sqrt_2_over_pi = 0.79788456080286535588f;
+    ck_gelu_math_f32_fn reference_tanhf = ck_gelu_system_tanhf();
+    const float inner = sqrt_2_over_pi * x * (1.0f + gelu_coef_a * x * x);
+    const float tanh_value = reference_tanhf ? reference_tanhf(inner) : tanhf(inner);
+    return 0.5f * x * (1.0f + tanh_value);
+}
+#if defined(__clang__) || defined(__INTEL_LLVM_COMPILER)
+#pragma float_control(pop)
+#endif
 
 static void ck_gelu_try_bind_runtime(void *handle) {
     ck_gelu_ggml_cpu_init_fn cpu_init_fn =
@@ -96,7 +122,7 @@ static void ck_gelu_ggml_table_init(void) {
     for (uint32_t i = 0; i < (1u << 16); ++i) {
         const ck_half x_fp16 = (ck_half) i;
         const float x = ggml_fp16_to_fp32(x_fp16);
-        const float y = ck_gelu_tanh_ggml_f32(x);
+        const float y = ck_gelu_tanh_ggml_reference_f32(x);
         ck_gelu_ggml_table_f16[i] = ggml_fp32_to_fp16(y);
     }
 }

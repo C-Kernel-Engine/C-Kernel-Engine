@@ -89,14 +89,15 @@ def _profile_install_hints() -> list[str]:
             "# VTune on Linux may require:",
             "sudo sysctl -w kernel.yama.ptrace_scope=0",
         ]
-    if distro_id in {"arch", "manjaro", "endeavouros"} or "arch" in distro_like:
+    if distro_id in {"arch", "manjaro", "endeavouros", "cachyos"} or "arch" in distro_like:
         return [
-            "sudo pacman -S base-devel git perf valgrind flamegraph",
-            "# Intel hosts: sudo pacman -S intel-oneapi-basekit",
-            "mkdir -p FlameGraph && ln -sf /usr/bin/flamegraph FlameGraph/flamegraph.pl && ln -sf /usr/bin/stackcollapse-perf FlameGraph/stackcollapse-perf.pl",
-            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0",
-            "# VTune on Linux may require:",
-            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+            "sudo pacman -S base-devel git perf valgrind",
+            "# Intel hosts: sudo pacman -S intel-oneapi-toolkit",
+            "# Intel hosts: source /opt/intel/oneapi/setvars.sh",
+            "git clone https://github.com/brendangregg/FlameGraph.git",
+            "chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl",
+            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0 kernel.yama.ptrace_scope=0",
+
         ]
     if distro_id in {"fedora", "rhel", "centos", "rocky", "almalinux"} or any(x in distro_like for x in ("fedora", "rhel")):
         return [

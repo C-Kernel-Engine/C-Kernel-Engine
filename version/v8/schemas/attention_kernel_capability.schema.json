@@ -15,6 +15,7 @@
       "required": ["execution.phase", "tensor.q.dtype", "tensor.kv.dtype", "tensor.layout", "numerics.attention_reduction"],
       "properties": {
         "execution.phase": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["prefill", "decode"]}},
+        "execution.prefill_batching": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["full_sequence", "segmented_append"]}},
         "tensor.q.dtype": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["fp32", "fp16", "bf16"]}},
         "tensor.kv.dtype": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["fp32", "fp16", "bf16"]}},
         "tensor.layout": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["head_major", "token_major"]}},

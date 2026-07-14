@@ -27,6 +27,7 @@
     }
   },
   "checkpoint_order": [
+    "vision.frontend.patch_bias.output",
     "vision.frontend.position.output",
     "vision.layer.{layer}.norm1.output",
     "vision.layer.{layer}.q.pre_rope",
@@ -45,6 +46,14 @@
   ],
   "interval_expansions": {},
   "backend_mappings": {
+    "vision.frontend.patch_bias.output": {
+      "producer": "patch_bias_add",
+      "logical_layout": "token_major",
+      "axis_names": ["token", "channel"],
+      "capture_tensor": "patch_bias",
+      "result_tensor": "patch_bias",
+      "result_layer": -1
+    },
     "vision.frontend.position.output": {
       "producer": "position_embeddings",
       "logical_layout": "token_major",

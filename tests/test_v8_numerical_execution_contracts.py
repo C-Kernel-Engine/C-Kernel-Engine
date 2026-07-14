@@ -197,6 +197,28 @@ class NumericalExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(plan["kernel"]["id"], "mrope_qk_vision_bf16_storage")
         self.assertEqual(plan["kernel"]["function"], "mrope_qk_vision_bf16_storage")
+
+    def test_qwen35_circuit_resolves_partial_width_text_mrope(self):
+        circuit_doc = resolver.load_json(
+            ROOT / "version" / "v8" / "circuits" / "qwen35.json"
+        )
+        plan = resolver.resolve_contract(
+            circuit_doc,
+            self.contracts,
+            self.kernels,
+            "decoder.mrope",
+            "prefill",
+            mode="production",
+        )
+        self.assertEqual(
+            plan["contract"]["id"],
+            "text_mrope_fp32_input_fp32_compute_fp32_output",
+        )
+        self.assertEqual(plan["kernel"]["id"], "mrope_qk_text")
+        self.assertEqual(plan["kernel"]["function"], "mrope_qk_text")
+        position = plan["contract"]["semantics"]["position_transform"]
+        self.assertEqual(position["rotary_width"], "configured_rotary_dim")
+        self.assertEqual(position["position_rank"], 4)
         self.assertEqual(plan["template_ops"], ["rope_qk"])
 
     def test_unsupported_mrope_storage_contract_hard_fails(self):
@@ -296,6 +318,25 @@ class NumericalExecutionContractTests(unittest.TestCase):
         contracts["contracts"]["qwen_mrope_invalid"] = base
         with self.assertRaisesRegex(resolver.ContractError, "redefines rotary width"):
             resolver.validate_contract_registry(contracts)
+
+    def test_multisection_rope_accepts_interleaved_axis_selection(self):
+        contracts = copy.deepcopy(self.contracts)
+        base = copy.deepcopy(contracts["contracts"][CONTRACT_ID])
+        base["operator_family"] = "text_mrope"
+        base["position_transform"] = {
+            "pairing": "multi_section",
+            "rotary_width": "mrope_n_dims",
+            "head_width": "head_dim",
+            "position_rank": 4,
+            "axis_order": ["temporal", "height", "width", "reserved"],
+            "section_interpretation": "interleaved_axis_selection",
+            "frequency_compute": "fp32",
+            "intermediate_compute": "fp32",
+            "rounding_points": [],
+            "threading": "serial",
+        }
+        contracts["contracts"]["qwen_text_imrope"] = base
+        resolver.validate_contract_registry(contracts)
 
     def test_mrope_width_must_match_full_rotary_width(self):
         contracts = copy.deepcopy(self.contracts)

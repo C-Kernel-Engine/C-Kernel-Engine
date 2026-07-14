@@ -1,7 +1,7 @@
 {
-  "id": "mrope_qk_text",
+  "id": "mrope_qk_text_imrope",
   "op": "rope",
-  "variant": "fp32_head_major_text_mrope",
+  "variant": "fp32_head_major_text_imrope",
   "quant": {
     "weight": "none",
     "activation": "fp32",
@@ -28,13 +28,13 @@
       "name": "q",
       "dtype": "fp32",
       "shape": ["H", "T", "D"],
-      "desc": "Query tensor after text M-RoPE"
+      "desc": "Query tensor after interleaved text M-RoPE"
     },
     {
       "name": "k",
       "dtype": "fp32",
       "shape": ["KV", "T", "D"],
-      "desc": "Key tensor after text M-RoPE"
+      "desc": "Key tensor after interleaved text M-RoPE"
     }
   ],
   "scratch": [],
@@ -58,22 +58,22 @@
     {
       "name": "section_0",
       "dtype": "int32",
-      "desc": "First section width"
+      "desc": "Temporal-axis interleave width"
     },
     {
       "name": "section_1",
       "dtype": "int32",
-      "desc": "Second section width"
+      "desc": "Height-axis interleave width"
     },
     {
       "name": "section_2",
       "dtype": "int32",
-      "desc": "Third section width"
+      "desc": "Width-axis interleave width"
     },
     {
       "name": "section_3",
       "dtype": "int32",
-      "desc": "Fourth section width"
+      "desc": "Extra-axis interleave width"
     },
     {
       "name": "n_ctx_orig",
@@ -112,17 +112,17 @@
     }
   ],
   "impl": {
-    "function": "mrope_qk_text",
-    "c_declaration": "void mrope_qk_text(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+    "function": "mrope_qk_text_imrope",
+    "c_declaration": "void mrope_qk_text_imrope(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
     "sources": ["src/kernels/rope_kernels.c"]
   },
-  "notes": "Text multi-section RoPE for Q/K using implicit 1D positions expanded to the four-stream GGML contract.",
+  "notes": "Text M-RoPE using Qwen-style three-axis interleaving and an implicit [position, position, position, 0] position tuple.",
   "numerical_capabilities": [
     {
-      "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+      "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
       "status": "validated",
       "phases": ["prefill", "decode"],
-      "function": "mrope_qk_text",
+      "function": "mrope_qk_text_imrope",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "scalar",

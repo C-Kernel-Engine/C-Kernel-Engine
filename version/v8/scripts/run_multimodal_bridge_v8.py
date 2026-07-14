@@ -1289,6 +1289,30 @@ def _ensure_engine_lib(openmp: bool = False) -> None:
     _run(cmd)
 
 
+def _refresh_manifest_circuit_snapshot(
+    manifest: dict[str, Any],
+    manifest_path: Path,
+) -> dict[str, Any]:
+    template = manifest.get("template") if isinstance(manifest.get("template"), dict) else {}
+    circuit_name = str(template.get("name") or "").strip().lower()
+    if not circuit_name:
+        return manifest
+    circuit_path = SCRIPT_DIR.parent / "circuits" / f"{circuit_name}.json"
+    if not circuit_path.is_file():
+        return manifest
+    current = _json_read(circuit_path)
+    if not isinstance(current, dict):
+        raise RuntimeError(f"versioned circuit is not a JSON object: {circuit_path}")
+    if template != current:
+        manifest = dict(manifest)
+        manifest["template"] = current
+        _json_write(manifest_path, manifest)
+        _log_progress(
+            f"refreshed cached manifest circuit={circuit_name} source={circuit_path}"
+        )
+    return manifest
+
+
 def _run_converter(
     gguf_path: Path,
     output_dir: Path,
@@ -1304,6 +1328,7 @@ def _run_converter(
     if _artifacts_match_fingerprint(stamp_path, fingerprint, [bump_path, manifest_path, config_path]):
         with manifest_path.open("r", encoding="utf-8") as f:
             manifest = json.load(f)
+        manifest = _refresh_manifest_circuit_snapshot(manifest, manifest_path)
         return manifest, manifest_path, bump_path, config_path
 
     old_argv = sys.argv[:]
@@ -1328,6 +1353,7 @@ def _run_converter(
 
     with manifest_path.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
+    manifest = _refresh_manifest_circuit_snapshot(manifest, manifest_path)
     _json_write(stamp_path, fingerprint)
     return manifest, manifest_path, bump_path, config_path
 

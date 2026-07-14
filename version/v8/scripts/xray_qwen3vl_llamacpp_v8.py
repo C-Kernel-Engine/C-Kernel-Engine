@@ -154,6 +154,7 @@ def _capture_args(args: argparse.Namespace, profile: dict[str, Any], report_path
         "--ck-threads", str(args.ck_threads or args.threads),
         "--llama-dump-names", ",".join(names),
         "--llama-dump-layer", str(args.layer),
+        "--ck-dump-layer", str(args.layer),
         "--ck-stop-layer", str(args.layer),
         "--quiet",
         "--report", str(report_path),
@@ -172,7 +173,24 @@ def _capture_args(args: argparse.Namespace, profile: dict[str, Any], report_path
     return command
 
 
+def _validate_oracle_execution(args: argparse.Namespace) -> dict[str, Any]:
+    oracle_threads = int(args.threads)
+    deterministic = oracle_threads == 1
+    if not deterministic and not bool(args.allow_nondeterministic_oracle):
+        raise RuntimeError(
+            "exact llama.cpp X-ray capture requires --threads 1 because multi-threaded "
+            "GGML reductions can change dump bytes between runs; pass "
+            "--allow-nondeterministic-oracle only for explicitly non-exact diagnostics"
+        )
+    return {
+        "threads": oracle_threads,
+        "deterministic": deterministic,
+        "nondeterministic_opt_in": bool(args.allow_nondeterministic_oracle),
+    }
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
+    oracle_execution = _validate_oracle_execution(args)
     profile = xray.load_json(args.profile)
     xray.validate(profile, xray.PROFILE_SCHEMA, "llama.cpp parity profile")
     if profile["backend"] != "llamacpp":
@@ -192,6 +210,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 1,
         "backend": "llamacpp",
         "execution_mode": args.execution_mode,
+        "oracle_execution": oracle_execution,
+        "subject_execution": {"threads": int(args.ck_threads)},
         "status": report["status"],
         "rounds": [{
             "round": 0,
@@ -217,8 +237,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--image-max-tokens", type=int)
     parser.add_argument("--layer", type=int, default=0)
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
-    parser.add_argument("--threads", type=int, default=20)
-    parser.add_argument("--ck-threads", type=int)
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=1,
+        help="llama.cpp oracle threads; exact X-ray capture requires 1",
+    )
+    parser.add_argument("--ck-threads", type=int, default=20)
+    parser.add_argument(
+        "--allow-nondeterministic-oracle",
+        action="store_true",
+        help="permit a multi-threaded llama.cpp oracle for non-exact diagnostics",
+    )
     parser.add_argument(
         "--execution-mode",
         choices=("strict", "production"),

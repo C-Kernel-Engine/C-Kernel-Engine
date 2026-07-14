@@ -156,7 +156,10 @@ def _is_plausible_header(h: Dict) -> bool:
         return False
     if h["dtype"] < 0 or h["dtype"] > 16:
         return False
-    if h["elem_count"] < 0 or h["elem_count"] > (1 << 31):
+    # Instrumented tensor records are always non-empty. Rejecting a zero count
+    # prevents a corrupt/truncated header from reaching NumPy reductions as an
+    # apparently valid empty tensor.
+    if h["elem_count"] <= 0 or h["elem_count"] > (1 << 31):
         return False
     rank = int(h.get("rank", 0))
     if rank < 0 or rank > 4:

@@ -107,6 +107,30 @@ lib.rope_backward_qk_pairwise_with_rotary_dim.argtypes = [
 ]
 lib.rope_backward_qk_pairwise_with_rotary_dim.restype = None
 
+lib.mrope_qk_text_imrope.argtypes = [
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_float,
+    ctypes.c_float,
+    ctypes.c_float,
+    ctypes.c_float,
+    ctypes.c_float,
+    ctypes.c_float,
+]
+lib.mrope_qk_text_imrope.restype = None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reference implementations
@@ -991,6 +1015,109 @@ def run_pairwise_backward_tests(q_heads=20, kv_heads=4, T=16, D=128, warmup=5, i
     return report
 
 
+def _text_imrope_reference(x, pos_offset, n_dims, sections, freq_base):
+    """Qwen interleaved M-RoPE with implicit [pos, pos, pos, 0] axes."""
+    out = x.copy()
+    rope_pairs = n_dims // 2
+    theta_scale = np.float32(freq_base ** np.float32(-2.0 / n_dims))
+    section_total = sum(sections)
+    for head in range(x.shape[0]):
+        for tok in range(x.shape[1]):
+            base_pos = np.float32(pos_offset + tok)
+            theta_t = base_pos
+            theta_h = base_pos
+            theta_w = base_pos
+            theta_e = np.float32(0.0)
+            for pair in range(rope_pairs):
+                sector = pair % section_total
+                if sector % 3 == 1 and sector < 3 * sections[1]:
+                    theta = theta_h
+                elif sector % 3 == 2 and sector < 3 * sections[2]:
+                    theta = theta_w
+                elif sector % 3 == 0 and sector < 3 * sections[0]:
+                    theta = theta_t
+                else:
+                    theta = theta_e
+                cos_theta = np.float32(np.cos(theta))
+                sin_theta = np.float32(np.sin(theta))
+                x0 = x[head, tok, pair]
+                x1 = x[head, tok, pair + rope_pairs]
+                out[head, tok, pair] = np.float32(x0 * cos_theta - x1 * sin_theta)
+                out[head, tok, pair + rope_pairs] = np.float32(x0 * sin_theta + x1 * cos_theta)
+                theta_t = np.float32(theta_t * theta_scale)
+                theta_h = np.float32(theta_h * theta_scale)
+                theta_w = np.float32(theta_w * theta_scale)
+                theta_e = np.float32(theta_e * theta_scale)
+    return out
+
+
+def run_text_imrope_tests():
+    """Guard production-width Qwen text M-RoPE interleaving semantics."""
+    rng = np.random.default_rng(713)
+    q_heads, kv_heads, tokens, dim = 32, 8, 2, 128
+    sections = (24, 20, 20, 0)
+    position = 176
+    q_input = (rng.standard_normal((q_heads, tokens, dim)) * 8.0).astype(np.float32)
+    k_input = (rng.standard_normal((kv_heads, tokens, dim)) * 8.0).astype(np.float32)
+    q_output = q_input.copy()
+    k_output = k_input.copy()
+
+    lib.mrope_qk_text_imrope(
+        numpy_to_ptr(q_output),
+        numpy_to_ptr(k_output),
+        q_heads,
+        kv_heads,
+        tokens,
+        dim,
+        dim,
+        position,
+        dim,
+        *sections,
+        262144,
+        ctypes.c_float(5000000.0),
+        ctypes.c_float(1.0),
+        ctypes.c_float(0.0),
+        ctypes.c_float(1.0),
+        ctypes.c_float(0.0),
+        ctypes.c_float(0.0),
+    )
+
+    q_ref = _text_imrope_reference(q_input, position, dim, sections, 5000000.0)
+    k_ref = _text_imrope_reference(k_input, position, dim, sections, 5000000.0)
+    formula_diff = max(
+        float(np.max(np.abs(q_output - q_ref))),
+        float(np.max(np.abs(k_output - k_ref))),
+    )
+    # Pair 61 falls outside all three interleaved axes and must use the
+    # zero-valued extra position. Contiguous section routing rotates it.
+    tail_exact = bool(
+        np.array_equal(q_output[:, :, 61], q_input[:, :, 61])
+        and np.array_equal(q_output[:, :, 125], q_input[:, :, 125])
+        and np.array_equal(k_output[:, :, 61], k_input[:, :, 61])
+        and np.array_equal(k_output[:, :, 125], k_input[:, :, 125])
+    )
+
+    report = TestReport(
+        test_name="Text M-RoPE Interleaved Contract",
+        dtype="fp32",
+        shape="QH=32, KVH=8, T=2, D=128, sections=[24,20,20,0]",
+        cpu_info=get_cpu_info(),
+    )
+    report.add_result(TestResult(
+        name="Qwen interleaved formula",
+        passed=formula_diff <= 2e-5,
+        max_diff=formula_diff,
+        tolerance=2e-5,
+    ))
+    report.add_result(TestResult(
+        name="Qwen extra-axis tail routing",
+        passed=tail_exact,
+        max_diff=0.0 if tail_exact else 1.0,
+        tolerance=0.0,
+    ))
+    return report
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1048,6 +1175,10 @@ if __name__ == "__main__":
     pairwise_bwd_report = run_pairwise_backward_tests()
     pairwise_bwd_report.print_report()
     all_reports.append(pairwise_bwd_report)
+
+    text_imrope_report = run_text_imrope_tests()
+    text_imrope_report.print_report()
+    all_reports.append(text_imrope_report)
 
     # Backward tests
     bwd_report = run_backward_tests(H=8, T=64, D=64, warmup=10, iterations=500)

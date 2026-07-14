@@ -117,6 +117,30 @@
       }
     }
   },
+  "required_numerical_contracts": {
+    "decoder.mrope": {
+      "op": "rope",
+      "template_ops": ["rope_qk"],
+      "phases": {
+        "prefill": {
+          "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 regression validates configured partial-width text M-RoPE through call IR and end-to-end inference."
+        },
+        "decode": {
+          "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 regression validates configured partial-width text M-RoPE through call IR and end-to-end inference."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mrope.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    }
+  },
   "sequence": ["decoder"],
   "block_types": {
     "decoder": {

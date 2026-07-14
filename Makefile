@@ -2427,6 +2427,9 @@ llamacpp-parity-full:
 	@echo "Running composed Q8 activation/projection parity at vision dimensions..."
 	@$(MAKE) --no-print-directory test-q8-composed-llama-parity
 	@echo ""
+	@echo "Running F16 GEMM production reduction contract against llama.cpp..."
+	@$(MAKE) --no-print-directory test-f16-gemm-llama-contract
+	@echo ""
 	@echo "Running head-major Q5 out-proj parity benchmark..."
 	@$(MAKE) --no-print-directory test-head-major-q5-outproj
 	@echo ""
@@ -2439,6 +2442,11 @@ test-llamacpp-parity-full: llamacpp-parity-full
 test-q8-composed-llama-parity: $(LIB)
 	@CK_BUILD_DIR="$(BUILD_DIR)" LD_LIBRARY_PATH="$(CURDIR)/llama.cpp/build/bin:$${LD_LIBRARY_PATH}" \
 		$(PYTHON) unittest/test_q8_composed_llama_parity.py
+
+.PHONY: test-f16-gemm-llama-contract
+test-f16-gemm-llama-contract: $(LIB)
+	@CK_BUILD_DIR="$(BUILD_DIR)" LD_LIBRARY_PATH="$(CURDIR)/llama.cpp/build/bin:$${LD_LIBRARY_PATH}" \
+		$(PYTHON) unittest/test_f16_gemm_llama_contract.py
 
 # End-to-end llama.cpp compatibility suite
 # This lane is where model-family and stitched graph checks belong.
@@ -2508,6 +2516,9 @@ llamacpp-parity-nightly:
 	@echo ""
 	@echo "Running composed Q8 activation/projection parity at vision dimensions..."
 	@$(MAKE) --no-print-directory test-q8-composed-llama-parity
+	@echo ""
+	@echo "Running F16 GEMM production reduction contract against llama.cpp..."
+	@$(MAKE) --no-print-directory test-f16-gemm-llama-contract
 	@echo ""
 	@echo "Running comprehensive Q4/Q5/Q8 GEMV CK vs llama.cpp tests (quick)..."
 	@if [ -f "$(LLAMA_KERNEL_TEST)" ]; then \

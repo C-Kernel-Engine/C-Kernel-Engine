@@ -48,7 +48,9 @@
             "gemm",
             "spatial_position_interpolation",
             "vision_mrope",
+            "text_mrope",
             "layernorm",
+            "rmsnorm",
             "attention",
             "residual_add",
             "gelu"
@@ -73,6 +75,7 @@
             "input": {
               "enum": [
                 "fp32",
+                "fp64",
                 "fp16",
                 "bf16",
                 "q8_0",
@@ -132,6 +135,7 @@
             "accumulator": {
               "enum": [
                 "fp32",
+                "fp64",
                 "fp16",
                 "bf16",
                 "int32"
@@ -175,7 +179,12 @@
                   "partial_store",
                   "softmax_probability_store",
                   "partial_merge",
-                  "output_store"
+                  "output_store",
+                  "square_product",
+                  "reduction_finalize",
+                  "reciprocal_sqrt",
+                  "normalization_scale",
+                  "weight_scale"
                 ]
               }
             }
@@ -214,6 +223,7 @@
               "enum": [
                 "none",
                 "fp32",
+                "fp64",
                 "fp16",
                 "bf16",
                 "int32"
@@ -320,6 +330,7 @@
                   "enum": [
                     "not_applicable",
                     "axis_selection",
+                    "interleaved_axis_selection",
                     "contiguous_widths"
                   ]
                 },

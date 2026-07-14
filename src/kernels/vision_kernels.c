@@ -216,13 +216,13 @@ void position_embeddings_add_gemma4v_xy(float *x,
     }
 }
 
+/* GGML evaluates each interpolation sample in source traversal order and may
+ * contract only the sample*weight + accumulator expression. Use fmaf
+ * explicitly so Intel and GCC builds preserve that contract without enabling
+ * broader reassociation across source pixels. */
 #if defined(__clang__) || defined(__INTEL_LLVM_COMPILER)
-#pragma float_control(precise, off, push)
+#pragma float_control(precise, on, push)
 #endif
-/* GGML's antialiased interpolation is compiled with contraction enabled. Keep
- * that numerical contract local: forcing each intermediate to storage changes
- * Q8 activation blocks downstream even when the position error is only a few
- * ULPs. */
 CK_VISION_NOINLINE void position_embeddings_add_tiled_2d(float *x,
                                       const float *position_embd,
                                       int grid_h,
@@ -299,7 +299,7 @@ CK_VISION_NOINLINE void position_embeddings_add_tiled_2d(float *x,
                             continue;
                         }
                         const float sample = position_embd[((size_t) sy * (size_t) source_grid_size + (size_t) sx) * (size_t) embed_dim + (size_t) d];
-                        val += sample * weight;
+                        val = fmaf(sample, weight, val);
                         total_weight += weight;
                     }
                 }

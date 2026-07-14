@@ -59,11 +59,23 @@
           "additionalProperties": false,
           "required": ["kind"],
           "properties": {
-            "kind": {"enum": ["single_range", "kv_chunks_by_workers"]},
+            "kind": {"enum": ["single_range", "kv_chunks_by_workers", "query_key_tiles"]},
             "threshold": {"type": "integer", "minimum": 1},
             "below_threshold_chunks": {"type": "integer", "minimum": 1},
-            "at_or_above_threshold_chunks": {"enum": ["runtime_worker_count"]}
-          }
+            "at_or_above_threshold_chunks": {"enum": ["runtime_worker_count"]},
+            "query_tile_size": {"type": "integer", "minimum": 1},
+            "key_tile_size": {"type": "integer", "minimum": 1},
+            "softmax_sum_update": {"enum": ["fp32_add", "fp64_add_then_fp32_store"]},
+            "worker_partition": {"enum": ["contiguous_head_query_rows"]}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"kind": {"const": "query_key_tiles"}}},
+              "then": {
+                "required": ["query_tile_size", "key_tile_size", "softmax_sum_update", "worker_partition"]
+              }
+            }
+          ]
         },
         "description": {"type": "string", "minLength": 1},
         "validation": {

@@ -49,6 +49,30 @@
         "reference": "PyTorch with K/V explicitly rounded through FP16"
       }
     },
+    "f16_kv_tiled64_fp32_softmax_fp64_sum_update": {
+      "status": "validated",
+      "q_compute": "fp32",
+      "k_compute": "fp16_rounded",
+      "score_accumulator": "fp32",
+      "softmax_statistics": "fp32",
+      "value_compute": "fp16_rounded",
+      "value_accumulator": "fp32",
+      "partial_storage": "fp32",
+      "partial_merge": "fp32_chunk_order",
+      "partition": {
+        "kind": "query_key_tiles",
+        "query_tile_size": 64,
+        "key_tile_size": 64,
+        "softmax_sum_update": "fp64_add_then_fp32_store",
+        "worker_partition": "contiguous_head_query_rows"
+      },
+      "description": "Full attention with 64x64 query/key tiles, FP32 Q, FP16-rounded K/V, FP32 score and value accumulation, and an ascending key-tile online-softmax merge whose double-width sum addition is rounded back to FP32 after each tile.",
+      "validation": {
+        "test": "unittest/test_attention_full.py and version/v8/scripts/replay_attention_from_dumps_v8.py",
+        "cases": ["Qwen3-VL T=4032 H=16 D=72", "strided GQA", "threaded query ranges"],
+        "reference": "llama.cpp GGML tiled flash attention with F16 K/V and GGML_PREC_F32"
+      }
+    },
     "f16_online_single_range": {
       "status": "observed",
       "q_compute": "fp16_rounded",

@@ -278,8 +278,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
         float *v_scratch = (float*)(model->bump + A_V_SCRATCH);
         uint16_t *kv_cache = (uint16_t*)model->kv_cache_f16;
         for (int h = 0; h < Hkv; h++) {{
-            uint16_t *k_dst = {k_base_expr} + (size_t)h*cache_stride*D;
-            uint16_t *v_dst = {v_base_expr} + (size_t)h*cache_stride*D;
+            uint16_t *k_dst = {k_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D;
+            uint16_t *v_dst = {v_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D;
             const float *k_src = k_scratch + h*num_tokens*D;
             const float *v_src = v_scratch + h*num_tokens*D;
             for (int t = 0; t < num_tokens; ++t) {{
@@ -307,13 +307,13 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
             /* K: copy from scratch[h, 0:num_tokens, :] to cache[h, 0:num_tokens, :] */
             /* Scratch is compact: stride = num_tokens, Cache has stride = cache_stride */
             memcpy(
-                {k_base_expr} + (size_t)h*cache_stride*D,
+                {k_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D,
                 k_scratch + h*num_tokens*D,
                 (size_t)num_tokens * D * sizeof(float)
             );
             /* V: copy from scratch[h, 0:num_tokens, :] to cache[h, 0:num_tokens, :] */
             memcpy(
-                {v_base_expr} + (size_t)h*cache_stride*D,
+                {v_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D,
                 v_scratch + h*num_tokens*D,
                 (size_t)num_tokens * D * sizeof(float)
             );
@@ -479,6 +479,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
             expr = "num_tokens"
         elif source in ("param:seq_len", "runtime:seq_len"):
             expr = "num_tokens"
+        elif source == "runtime:prefill_start_pos":
+            expr = "prefill_start_pos"
         elif name_lc in dynamic_token_arg_names and source in {"dim:_m", "param:_m", "runtime:kv_tokens", "runtime:cache_len"}:
             expr = "num_tokens"
         elif name_lc in {"seq_len", "num_tokens", "token_count", "tokens", "rows"} and str(expr).isdigit():
@@ -1080,6 +1082,7 @@ def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False, 
  * ============================================================================ */
 static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
     if (!model || !tokens || num_tokens <= 0) return;
+    const int prefill_start_pos = 0;
 
     /* Clamp to max context */
     if (num_tokens > MAX_SEQ_LEN) num_tokens = MAX_SEQ_LEN;
@@ -1299,71 +1302,86 @@ def _has_multimodal_bridge_contract(config: Dict) -> bool:
     return bool(str(bridge.get("prefix_policy", "") or "").strip())
 
 
-def _emit_qwen3vl_prefill_bridge_helpers(config: Dict) -> str:
+def _has_segmented_append_prefill_contract(config: Dict) -> bool:
+    bridge = config.get("multimodal_bridge_contract")
+    if not isinstance(bridge, dict):
+        return False
+    schedule = bridge.get("prefill_schedule")
+    if not isinstance(schedule, dict):
+        return False
+    return (
+        schedule.get("segments") == ["text_before", "visual", "text_after"]
+        and schedule.get("cache_transition") == "append_preserve"
+        and schedule.get("position_transition") == "segment_defined"
+    )
+
+
+def _emit_multimodal_prefill_bridge_helpers(config: Dict, text_mrope_function: str) -> str:
     embed_dim = int(config.get("embed_dim", 0) or 0)
     num_deepstack_layers = int(config.get("num_deepstack_layers", 0) or 0)
     if embed_dim <= 0 or num_deepstack_layers <= 0:
         return ""
 
     return f"""
-static int g_qwen3vl_prefill_bridge_active = 0;
-static int g_qwen3vl_prefill_text_pos = 0;
-static int g_qwen3vl_prefill_total_tokens = 0;
-static int g_qwen3vl_prefill_prefix_start = 0;
-static int g_qwen3vl_prefill_prefix_tokens = 0;
-static int32_t *g_qwen3vl_prefill_positions = NULL;
-static const float *g_qwen3vl_prefill_rows = NULL;
-static int g_qwen3vl_prefill_row_dim = 0;
+static int g_multimodal_prefill_bridge_active = 0;
+static int g_multimodal_prefill_text_pos = 0;
+static int g_multimodal_prefill_total_tokens = 0;
+static int g_multimodal_prefill_prefix_start = 0;
+static int g_multimodal_prefill_prefix_tokens = 0;
+static int32_t *g_multimodal_prefill_positions = NULL;
+static const float *g_multimodal_prefill_rows = NULL;
+static int g_multimodal_prefill_row_dim = 0;
 
-static void ck_qwen3vl_prefill_bridge_clear(void) {{
-    g_qwen3vl_prefill_bridge_active = 0;
-    g_qwen3vl_prefill_text_pos = 0;
-    g_qwen3vl_prefill_total_tokens = 0;
-    g_qwen3vl_prefill_prefix_start = 0;
-    g_qwen3vl_prefill_prefix_tokens = 0;
-    free(g_qwen3vl_prefill_positions);
-    g_qwen3vl_prefill_positions = NULL;
-    g_qwen3vl_prefill_rows = NULL;
-    g_qwen3vl_prefill_row_dim = 0;
+static void ck_multimodal_prefill_bridge_clear(void) {{
+    g_multimodal_prefill_bridge_active = 0;
+    g_multimodal_prefill_text_pos = 0;
+    g_multimodal_prefill_total_tokens = 0;
+    g_multimodal_prefill_prefix_start = 0;
+    g_multimodal_prefill_prefix_tokens = 0;
+    free(g_multimodal_prefill_positions);
+    g_multimodal_prefill_positions = NULL;
+    g_multimodal_prefill_rows = NULL;
+    g_multimodal_prefill_row_dim = 0;
 }}
 
-static void ck_qwen3vl_prefill_bridge_free(void) {{
-    ck_qwen3vl_prefill_bridge_clear();
+static void ck_multimodal_prefill_bridge_free(void) {{
+    ck_multimodal_prefill_bridge_clear();
 }}
 
-static int ck_qwen3vl_prefill_bridge_text_pos(void) {{
-    return g_qwen3vl_prefill_text_pos;
+static int ck_multimodal_prefill_bridge_text_pos(void) {{
+    return g_multimodal_prefill_text_pos;
 }}
 
-static int ck_qwen3vl_prefill_bridge_next_text_pos(void) {{
-    if (!g_qwen3vl_prefill_bridge_active || g_qwen3vl_prefill_prefix_tokens <= 0) return g_qwen3vl_prefill_text_pos;
-    const int prefix_end = g_qwen3vl_prefill_prefix_start + g_qwen3vl_prefill_prefix_tokens;
-    const int suffix_tokens = g_qwen3vl_prefill_total_tokens > prefix_end ? (g_qwen3vl_prefill_total_tokens - prefix_end) : 0;
-    return g_qwen3vl_prefill_text_pos + suffix_tokens;
+static int ck_multimodal_prefill_bridge_next_text_pos(void) {{
+    if (!g_multimodal_prefill_bridge_active || g_multimodal_prefill_prefix_tokens <= 0) return g_multimodal_prefill_text_pos;
+    const int prefix_end = g_multimodal_prefill_prefix_start + g_multimodal_prefill_prefix_tokens;
+    const int suffix_tokens = g_multimodal_prefill_total_tokens > prefix_end ? (g_multimodal_prefill_total_tokens - prefix_end) : 0;
+    return g_multimodal_prefill_text_pos + suffix_tokens;
 }}
 
-static int ck_qwen3vl_prefill_bridge_is_active(void) {{
-    return g_qwen3vl_prefill_bridge_active;
+static int ck_multimodal_prefill_bridge_is_active(void) {{
+    return g_multimodal_prefill_bridge_active;
 }}
 
-static int ck_qwen3vl_prefill_bridge_prepare(const float *rows,
+static int ck_multimodal_prefill_bridge_prepare(const float *rows,
                                              int total_tokens,
                                              int prefix_start,
+                                             int position_base,
                                              int prefix_tokens,
                                              int row_dim,
                                              int grid_x,
                                              int grid_y,
                                              int text_pos) {{
-    ck_qwen3vl_prefill_bridge_clear();
+    ck_multimodal_prefill_bridge_clear();
     if (!rows || total_tokens <= 0 || prefix_tokens <= 0 || row_dim < {embed_dim}) return -1;
     if (grid_x <= 0 || grid_y <= 0) return -2;
     if (grid_x * grid_y != prefix_tokens) return -3;
     if (prefix_start < 0 || prefix_start > total_tokens) return -4;
     if (prefix_tokens > total_tokens - prefix_start) return -5;
 
-    g_qwen3vl_prefill_positions = (int32_t*)malloc((size_t)4 * (size_t)total_tokens * sizeof(int32_t));
-    if (!g_qwen3vl_prefill_positions) {{
-        ck_qwen3vl_prefill_bridge_clear();
+    g_multimodal_prefill_positions = (int32_t*)malloc((size_t)4 * (size_t)total_tokens * sizeof(int32_t));
+    if (!g_multimodal_prefill_positions) {{
+        ck_multimodal_prefill_bridge_clear();
         return -6;
     }}
 
@@ -1383,52 +1401,52 @@ static int ck_qwen3vl_prefill_bridge_prepare(const float *rows,
             const int local_tok = tok - prefix_start;
             const int x = local_tok % grid_x;
             const int y = local_tok / grid_x;
-            pos0 = prefix_start;
-            pos1 = prefix_start + y;
-            pos2 = prefix_start + x;
+            pos0 = position_base;
+            pos1 = position_base + y;
+            pos2 = position_base + x;
         }} else {{
             const int32_t pos = resolved_text_pos + (tok - prefix_end);
             pos0 = pos;
             pos1 = pos;
             pos2 = pos;
         }}
-        g_qwen3vl_prefill_positions[tok] = pos0;
-        g_qwen3vl_prefill_positions[tok + total_tokens] = pos1;
-        g_qwen3vl_prefill_positions[tok + 2 * total_tokens] = pos2;
-        g_qwen3vl_prefill_positions[tok + 3 * total_tokens] = 0;
+        g_multimodal_prefill_positions[tok] = pos0;
+        g_multimodal_prefill_positions[tok + total_tokens] = pos1;
+        g_multimodal_prefill_positions[tok + 2 * total_tokens] = pos2;
+        g_multimodal_prefill_positions[tok + 3 * total_tokens] = 0;
     }}
 
-    g_qwen3vl_prefill_rows = rows;
-    g_qwen3vl_prefill_row_dim = row_dim;
-    g_qwen3vl_prefill_total_tokens = total_tokens;
-    g_qwen3vl_prefill_prefix_start = prefix_start;
-    g_qwen3vl_prefill_prefix_tokens = prefix_tokens;
-    g_qwen3vl_prefill_text_pos = resolved_text_pos;
-    g_qwen3vl_prefill_bridge_active = 1;
+    g_multimodal_prefill_rows = rows;
+    g_multimodal_prefill_row_dim = row_dim;
+    g_multimodal_prefill_total_tokens = total_tokens;
+    g_multimodal_prefill_prefix_start = prefix_start;
+    g_multimodal_prefill_prefix_tokens = prefix_tokens;
+    g_multimodal_prefill_text_pos = resolved_text_pos;
+    g_multimodal_prefill_bridge_active = 1;
     return 0;
 }}
 
-static void ck_qwen3vl_prefill_mrope_qk(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {{
-    if (g_qwen3vl_prefill_bridge_active && g_qwen3vl_prefill_positions && g_qwen3vl_prefill_total_tokens == num_tokens) {{
-        mrope_qk_imrope_positions(q, k, g_qwen3vl_prefill_positions, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
+static void ck_multimodal_prefill_mrope_qk(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {{
+    if (g_multimodal_prefill_bridge_active && g_multimodal_prefill_positions && g_multimodal_prefill_total_tokens == num_tokens) {{
+        mrope_qk_imrope_positions(q, k, g_multimodal_prefill_positions, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
         return;
     }}
-    mrope_qk_text(q, k, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
+    {text_mrope_function}(q, k, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
 }}
 
-static void ck_qwen3vl_prefill_deepstack_add(CKModel *model, int layer, int num_tokens) {{
+static void ck_multimodal_prefill_deepstack_add(CKModel *model, int layer, int num_tokens) {{
     const char *disable_env = getenv("CK_QWEN3VL_DISABLE_PREFILL_DEEPSTACK");
     if (disable_env && atoi(disable_env) != 0) return;
-    if (!model || !g_qwen3vl_prefill_bridge_active || !g_qwen3vl_prefill_rows) return;
+    if (!model || !g_multimodal_prefill_bridge_active || !g_multimodal_prefill_rows) return;
     if (layer < 0 || layer >= {num_deepstack_layers}) return;
-    if (g_qwen3vl_prefill_prefix_tokens <= 0) return;
+    if (g_multimodal_prefill_prefix_tokens <= 0) return;
     const size_t slice_offset = (size_t){embed_dim} + (size_t)layer * (size_t){embed_dim};
     const size_t need = slice_offset + (size_t){embed_dim};
-    if ((size_t)g_qwen3vl_prefill_row_dim < need) return;
+    if ((size_t)g_multimodal_prefill_row_dim < need) return;
     float *dst = (float*)(model->bump + A_EMBEDDED_INPUT);
-    for (int tok = 0; tok < g_qwen3vl_prefill_prefix_tokens; ++tok) {{
-        const float *src = g_qwen3vl_prefill_rows + (size_t)tok * (size_t)g_qwen3vl_prefill_row_dim + slice_offset;
-        float *dst_row = dst + (size_t)(g_qwen3vl_prefill_prefix_start + tok) * (size_t){embed_dim};
+    for (int tok = 0; tok < g_multimodal_prefill_prefix_tokens; ++tok) {{
+        const float *src = g_multimodal_prefill_rows + (size_t)tok * (size_t)g_multimodal_prefill_row_dim + slice_offset;
+        float *dst_row = dst + (size_t)(g_multimodal_prefill_prefix_start + tok) * (size_t){embed_dim};
         for (int i = 0; i < {embed_dim}; ++i) {{
             dst_row[i] += src[i];
         }}
@@ -1717,8 +1735,38 @@ def emit_prefill_from_embedded_function(
     embed_scale_emitted = False
     has_multimodal_bridge = _has_multimodal_bridge_contract(config)
     q4_gateup_swiglu_x16_default = int(bool(config.get("prefill_gateup_swiglu_fusion_default", True)))
-    num_deepstack_layers = int(config.get("num_deepstack_layers", 0) or 0) if has_multimodal_bridge else 0
-    helper_block = _emit_qwen3vl_prefill_bridge_helpers(config) if has_multimodal_bridge else ""
+    text_mrope_ops = [
+        op
+        for op in ops
+        if str(op.get("op", "")) == "rope_qk"
+        and (
+            ((op.get("resolved_contract") or {}).get("semantics") or {}).get(
+                "operator_family"
+            )
+            == "text_mrope"
+        )
+    ]
+    rope_functions = {
+        str(op.get("function", "") or "").strip() for op in text_mrope_ops
+    }
+    rope_functions.discard("")
+    if text_mrope_ops and len(rope_functions) != 1:
+        raise ValueError(
+            "multimodal prefill requires exactly one resolved rope_qk function; "
+            f"got {sorted(rope_functions)}"
+        )
+    text_mrope_function = next(iter(rope_functions), "")
+    has_decoder_multimodal_bridge = has_multimodal_bridge and bool(text_mrope_function)
+    num_deepstack_layers = (
+        int(config.get("num_deepstack_layers", 0) or 0)
+        if has_decoder_multimodal_bridge
+        else 0
+    )
+    helper_block = (
+        _emit_multimodal_prefill_bridge_helpers(config, text_mrope_function)
+        if has_decoder_multimodal_bridge
+        else ""
+    )
     if helper_block:
         lines.append(helper_block)
 
@@ -1731,11 +1779,13 @@ def emit_prefill_from_embedded_function(
  *   - token rows after num_tokens are don't-care
  *   - dense_embedding_lookup must be skipped to preserve external prefixes
  * ============================================================================ */
-static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {
+static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int prefill_start_pos) {
     if (!model || num_tokens <= 0) return;
+    if (prefill_start_pos < 0 || prefill_start_pos >= MAX_SEQ_LEN) return;
 
     /* Clamp to max context */
-    if (num_tokens > MAX_SEQ_LEN) num_tokens = MAX_SEQ_LEN;
+    if (num_tokens > MAX_SEQ_LEN - prefill_start_pos) num_tokens = MAX_SEQ_LEN - prefill_start_pos;
+    const int prefill_rope_start_pos = model->rope_pos;
 
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
@@ -1783,11 +1833,11 @@ static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {
     )
     prologue = prologue.replace("CK_Q4_GATEUP_SWIGLU_X16_DEFAULT", str(q4_gateup_swiglu_x16_default))
     lines.append(prologue)
-    if has_multimodal_bridge:
+    if has_decoder_multimodal_bridge:
         lines.append(
-            """    const char *bridge_fp32_env = getenv("CK_V8_QWEN3VL_PREFILL_FP32");
+            """    const char *bridge_fp32_env = getenv("CK_V8_MULTIMODAL_PREFILL_FP32");
     int bridge_force_fp32 = bridge_fp32_env ? (atoi(bridge_fp32_env) != 0) : 0;
-    if (ck_qwen3vl_prefill_bridge_is_active() && bridge_force_fp32) {
+    if (ck_multimodal_prefill_bridge_is_active() && bridge_force_fp32) {
         debug_outproj_fp32 = 1;
         debug_mlp_down_fp32 = 1;
     }
@@ -1920,8 +1970,12 @@ static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {
             )
         else:
             op_code = emit_prefill_op(op, seq_idx, config, profile=profile, dump=dump)
-            if has_multimodal_bridge and op_type == "rope_qk":
-                op_code = op_code.replace("mrope_qk_text(", "ck_qwen3vl_prefill_mrope_qk(")
+            if has_decoder_multimodal_bridge and op_type == "rope_qk":
+                resolved_rope_function = str(op.get("function", "") or "").strip()
+                op_code = op_code.replace(
+                    f"{resolved_rope_function}(",
+                    "ck_multimodal_prefill_mrope_qk(",
+                )
         swiglu_block_guard = skip_swiglu_guard if op_type in {"silu_mul", "swiglu"} else None
         if skip_swiglu_guard and op_type in {"silu_mul", "swiglu"}:
             op_code = f"    if (!{skip_swiglu_guard}) {{\n" + "\n".join("    " + line if line else line for line in op_code.splitlines()) + "\n    }"
@@ -1966,20 +2020,25 @@ static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {
                     )
         lines.append(op_code)
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
-        if has_multimodal_bridge and op_type == "residual_add":
+        if has_decoder_multimodal_bridge and op_type == "residual_add":
             residual_add_count_total += 1
             if residual_add_count_total % 2 == 0:
                 deepstack_layer = residual_add_count_total // 2 - 1
                 if 0 <= deepstack_layer < num_deepstack_layers:
-                    lines.append(f"    ck_qwen3vl_prefill_deepstack_add(model, {deepstack_layer}, num_tokens);")
+                    lines.append(f"    ck_multimodal_prefill_deepstack_add(model, {deepstack_layer}, num_tokens);")
         lines.append("")
 
-    lines.append("    model->pos = num_tokens;")
-    if has_multimodal_bridge:
-        lines.append("    model->rope_pos = ck_qwen3vl_prefill_bridge_is_active() ? ck_qwen3vl_prefill_bridge_next_text_pos() : num_tokens;")
-        lines.append("    ck_qwen3vl_prefill_bridge_clear();")
+    lines.append("    model->pos = prefill_start_pos + num_tokens;")
+    if has_decoder_multimodal_bridge:
+        lines.append("    model->rope_pos = ck_multimodal_prefill_bridge_is_active() ? ck_multimodal_prefill_bridge_next_text_pos() : prefill_rope_start_pos + num_tokens;")
+        lines.append("    ck_multimodal_prefill_bridge_clear();")
     else:
         lines.append("    model->rope_pos = num_tokens;")
+    lines.append("}")
+    lines.append("")
+    lines.append("static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {")
+    lines.append("    if (model) model->rope_pos = 0;")
+    lines.append("    ck_prefill_from_embedded_range(model, num_tokens, 0);")
     lines.append("}")
     return "\n".join(lines)
 
@@ -2000,6 +2059,7 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
 
     config = dict(config or {})
     has_multimodal_bridge = _has_multimodal_bridge_contract(config)
+    has_segmented_append = _has_segmented_append_prefill_contract(config)
 
     token_ids_expr = _find_arg_expr(args_list, arg_name="token_ids") or "(int32_t*)(model->bump + A_TOKEN_IDS)"
     token_embeddings_expr = _find_arg_expr(args_list, arg_name="token_embeddings")
@@ -2014,15 +2074,17 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
     if not token_embeddings_expr:
         return ""
 
-    qwen_prepare_block_mixed = ""
-    qwen_prepare_block_segments = ""
+    bridge_prepare_block_mixed = ""
+    bridge_prepare_block_segments = ""
+    bridge_prepare_block_visual_segment = ""
     if has_multimodal_bridge:
-        qwen_prepare_block_mixed = """
+        bridge_prepare_block_mixed = """
         if (prefix_embed_dim > aligned_embed_dim) {
             if (prefix_grid_x > 0 && prefix_grid_y > 0) {
-                int prep_rc = ck_qwen3vl_prefill_bridge_prepare(
+                int prep_rc = ck_multimodal_prefill_bridge_prepare(
                     prefix_embeddings,
                     prefix_tokens + token_count,
+                    0,
                     0,
                     prefix_tokens,
                     prefix_embed_dim,
@@ -2034,9 +2096,10 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
             } else {
                 const int side = (int)(sqrt((double)prefix_tokens) + 0.5);
                 if (side > 0 && side * side == prefix_tokens) {
-                    int prep_rc = ck_qwen3vl_prefill_bridge_prepare(
+                    int prep_rc = ck_multimodal_prefill_bridge_prepare(
                         prefix_embeddings,
                         prefix_tokens + token_count,
+                        0,
                         0,
                         prefix_tokens,
                         prefix_embed_dim,
@@ -2049,12 +2112,13 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
             }
         }
 """
-        qwen_prepare_block_segments = """
+        bridge_prepare_block_segments = """
         if (prefix_embed_dim > aligned_embed_dim) {
             if (prefix_grid_x > 0 && prefix_grid_y > 0) {
-                int prep_rc = ck_qwen3vl_prefill_bridge_prepare(
+                int prep_rc = ck_multimodal_prefill_bridge_prepare(
                     prefix_embeddings,
                     total_tokens,
+                    tokens_before_count,
                     tokens_before_count,
                     prefix_tokens,
                     prefix_embed_dim,
@@ -2066,9 +2130,10 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
             } else {
                 const int side = (int)(sqrt((double)prefix_tokens) + 0.5);
                 if (side > 0 && side * side == prefix_tokens) {
-                    int prep_rc = ck_qwen3vl_prefill_bridge_prepare(
+                    int prep_rc = ck_multimodal_prefill_bridge_prepare(
                         prefix_embeddings,
                         total_tokens,
+                        tokens_before_count,
                         tokens_before_count,
                         prefix_tokens,
                         prefix_embed_dim,
@@ -2080,6 +2145,85 @@ def emit_multimodal_bridge_api(ops: List[Dict], config: Dict | None = None) -> s
                 }
             }
         }
+"""
+        bridge_prepare_block_visual_segment = """
+        if (prefix_embed_dim > aligned_embed_dim) {
+            if (prefix_grid_x > 0 && prefix_grid_y > 0) {
+                int prep_rc = ck_multimodal_prefill_bridge_prepare(
+                    prefix_embeddings,
+                    prefix_tokens,
+                    0,
+                    tokens_before_count,
+                    prefix_tokens,
+                    prefix_embed_dim,
+                    prefix_grid_x,
+                    prefix_grid_y,
+                    prefix_text_pos
+                );
+                if (prep_rc != 0) return prep_rc;
+            } else {
+                const int side = (int)(sqrt((double)prefix_tokens) + 0.5);
+                if (side > 0 && side * side == prefix_tokens) {
+                    int prep_rc = ck_multimodal_prefill_bridge_prepare(
+                        prefix_embeddings,
+                        prefix_tokens,
+                        0,
+                        tokens_before_count,
+                        prefix_tokens,
+                        prefix_embed_dim,
+                        side,
+                        side,
+                        tokens_before_count + side
+                    );
+                    if (prep_rc != 0) return prep_rc;
+                }
+            }
+        }
+"""
+
+    if has_segmented_append:
+        segments_execute_block = f"""
+    const int aligned_embed_dim = ({aligned_embed_dim_expr});
+    if (tokens_before_count > 0) {{
+        int rc = ck_embed_tokens_at(g_model, tokens_before, tokens_before_count, 0);
+        if (rc < 0) return rc;
+        g_model->rope_pos = 0;
+        ck_prefill_from_embedded_range(g_model, tokens_before_count, 0);
+    }}
+    if (prefix_tokens > 0) {{
+        if (prefix_embed_dim <= 0) prefix_embed_dim = aligned_embed_dim;
+        if (prefix_embed_dim < ({embed_dim_expr})) return -13;
+        int rc = ck_write_embeddings_at_ex(g_model, prefix_embeddings, prefix_tokens, prefix_embed_dim, 0);
+        if (rc < 0) return rc;
+{bridge_prepare_block_visual_segment}        g_model->rope_pos = tokens_before_count;
+        ck_prefill_from_embedded_range(g_model, prefix_tokens, tokens_before_count);
+    }}
+    if (tokens_after_count > 0) {{
+        int rc = ck_embed_tokens_at(g_model, tokens_after, tokens_after_count, 0);
+        if (rc < 0) return rc;
+        g_model->rope_pos = prefix_text_pos;
+        ck_prefill_from_embedded_range(g_model, tokens_after_count, tokens_before_count + prefix_tokens);
+    }}
+"""
+    else:
+        segments_execute_block = f"""
+    const int aligned_embed_dim = ({aligned_embed_dim_expr});
+    if (tokens_before_count > 0) {{
+        int rc = ck_embed_tokens_at(g_model, tokens_before, tokens_before_count, 0);
+        if (rc < 0) return rc;
+    }}
+    if (prefix_tokens > 0) {{
+        if (prefix_embed_dim <= 0) prefix_embed_dim = aligned_embed_dim;
+        if (prefix_embed_dim < ({embed_dim_expr})) return -13;
+        int rc = ck_write_embeddings_at_ex(g_model, prefix_embeddings, prefix_tokens, prefix_embed_dim, tokens_before_count);
+        if (rc < 0) return rc;
+{bridge_prepare_block_segments}    }}
+    if (tokens_after_count > 0) {{
+        int rc = ck_embed_tokens_at(g_model, tokens_after, tokens_after_count, tokens_before_count + prefix_tokens);
+        if (rc < 0) return rc;
+    }}
+
+    ck_prefill_from_embedded(g_model, total_tokens);
 """
 
     return f"""
@@ -2216,23 +2360,7 @@ CK_EXPORT int ck_model_forward_segments_grid_ex(const int32_t *tokens_before,
     g_model->rope_pos = 0;
     g_model->bridge_has_explicit_positions = 0;
 
-    const int aligned_embed_dim = ({aligned_embed_dim_expr});
-    if (tokens_before_count > 0) {{
-        int rc = ck_embed_tokens_at(g_model, tokens_before, tokens_before_count, 0);
-        if (rc < 0) return rc;
-    }}
-    if (prefix_tokens > 0) {{
-        if (prefix_embed_dim <= 0) prefix_embed_dim = aligned_embed_dim;
-        if (prefix_embed_dim < ({embed_dim_expr})) return -13;
-        int rc = ck_write_embeddings_at_ex(g_model, prefix_embeddings, prefix_tokens, prefix_embed_dim, tokens_before_count);
-        if (rc < 0) return rc;
-{qwen_prepare_block_segments}    }}
-    if (tokens_after_count > 0) {{
-        int rc = ck_embed_tokens_at(g_model, tokens_after, tokens_after_count, tokens_before_count + prefix_tokens);
-        if (rc < 0) return rc;
-    }}
-
-    ck_prefill_from_embedded(g_model, total_tokens);
+{segments_execute_block}
     if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));
     return 0;
 }}
@@ -2266,7 +2394,7 @@ CK_EXPORT int ck_model_forward_mixed_grid_ex(const float *prefix_embeddings,
     if (prefix_tokens > 0) {{
         if (prefix_embed_dim <= 0) prefix_embed_dim = aligned_embed_dim;
         if (prefix_embed_dim < ({embed_dim_expr})) return -11;
-{qwen_prepare_block_mixed}        int rc = ck_write_embeddings_at_ex(g_model, prefix_embeddings, prefix_tokens, prefix_embed_dim, 0);
+{bridge_prepare_block_mixed}        int rc = ck_write_embeddings_at_ex(g_model, prefix_embeddings, prefix_tokens, prefix_embed_dim, 0);
         if (rc < 0) return rc;
     }}
     if (token_count > 0) {{

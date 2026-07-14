@@ -338,6 +338,24 @@ def _is_vision_mrope_operation(operation: Dict[str, Any]) -> bool:
     return str(params.get("rope_mode", "")).strip().lower() == "vision"
 
 
+def _is_text_mrope_operation(operation: Dict[str, Any]) -> bool:
+    """Classify text M-RoPE from resolved contract semantics."""
+    resolved = operation.get("resolved_contract")
+    semantics = resolved.get("semantics") if isinstance(resolved, dict) else None
+    position = semantics.get("position_transform") if isinstance(semantics, dict) else None
+    if isinstance(semantics, dict):
+        return bool(
+            semantics.get("operator_family") == "text_mrope"
+            and isinstance(position, dict)
+            and position.get("pairing") == "multi_section"
+        )
+
+    if str(operation.get("op", "")) != "rope_qk":
+        return False
+    params = operation.get("params") if isinstance(operation.get("params"), dict) else {}
+    return str(params.get("rope_mode", "")).strip().lower() == "text_mrope"
+
+
 def _attach_semantic_checkpoints(
     template: Dict[str, Any],
     arranged_kernels: List[Dict[str, Any]],
@@ -724,6 +742,10 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
         manifest["template"] = _merge_template_defaults(built_in, template_doc)
     elif built_in:
         manifest["template"] = copy.deepcopy(built_in)
+    _validate_segmented_prefill_contract(
+        manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        source=f"manifest:{template_name or '<embedded>'}",
+    )
     _raise_on_forbidden_template_metadata(
         manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
         source=f"manifest:{template_name or '<embedded>'}",
@@ -740,6 +762,46 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
         hydrated_config["multimodal_bridge_contract"] = copy.deepcopy(bridge_contract)
     manifest["config"] = hydrated_config
     return manifest
+
+
+def _validate_segmented_prefill_contract(
+    circuit: Optional[Dict[str, Any]],
+    *,
+    source: str,
+) -> None:
+    if not isinstance(circuit, dict):
+        return
+    contract = circuit.get("contract") if isinstance(circuit.get("contract"), dict) else {}
+    bridge = contract.get("multimodal_bridge") if isinstance(contract.get("multimodal_bridge"), dict) else {}
+    schedule = bridge.get("prefill_schedule") if isinstance(bridge.get("prefill_schedule"), dict) else {}
+    schedule_is_segmented = bool(schedule) and (
+        schedule.get("segments") == ["text_before", "visual", "text_after"]
+        and schedule.get("cache_transition") == "append_preserve"
+        and schedule.get("position_transition") == "segment_defined"
+    )
+    if schedule and not schedule_is_segmented:
+        raise RuntimeError(
+            "HARD CONTRACT FAULT: unsupported mixed-prefill schedule in "
+            f"{source}. The segmented append contract requires text_before, visual, text_after; "
+            "append_preserve; and segment_defined."
+        )
+
+    required = circuit.get("required_contracts")
+    required = required if isinstance(required, dict) else {}
+    attention = required.get("decoder.attention")
+    attention = attention if isinstance(attention, dict) else {}
+    phases = attention.get("phases") if isinstance(attention.get("phases"), dict) else {}
+    prefill = phases.get("prefill") if isinstance(phases.get("prefill"), dict) else {}
+    requirements = prefill.get("requires") if isinstance(prefill.get("requires"), dict) else {}
+    attention_is_segmented = requirements.get("execution.prefill_batching") == "segmented_append"
+
+    if schedule_is_segmented != attention_is_segmented:
+        raise RuntimeError(
+            "HARD CONTRACT FAULT: segmented mixed-prefill schedule and attention provider disagree "
+            f"in {source}. Declare both multimodal_bridge.prefill_schedule.cache_transition="
+            "append_preserve and decoder.attention.prefill execution.prefill_batching="
+            "segmented_append, or declare neither."
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -7266,6 +7328,47 @@ def generate_ir_lower_1(
             # also exists.
             if op["op"] in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"):
                 layer = op["layer"]
+                required_contract = op.get("required_contract") if isinstance(op.get("required_contract"), dict) else {}
+                segmented_append = required_contract.get("execution.prefill_batching") == "segmented_append"
+                if segmented_append and not uses_kv_cache:
+                    raise RuntimeError(
+                        "HARD CONTRACT FAULT: segmented_append attention requires a persistent KV cache. "
+                        "Fix the circuit cache contract; do not fall back to full-sequence prefill."
+                    )
+                kv_batch_copy_op = None
+                if uses_kv_cache:
+                    shared_q_prefill = op["op"] in ("attn_shared_kv", "attn_sliding_shared_kv")
+                    copy_src = "q_scratch" if shared_q_prefill else "k_scratch"
+                    kv_batch_copy_op = {
+                        "idx": len(final_ops),
+                        "kernel": "kv_cache_batch_copy",
+                        "op": "kv_cache_batch_copy",
+                        "layer": layer,
+                        "section": op["section"],
+                        "function": "kv_cache_batch_copy",
+                        "weights": {},
+                        "inputs": {
+                            "k_src": {"type": "scratch", "source": copy_src},
+                            "v_src": {"type": "scratch", "source": "q_scratch" if shared_q_prefill else "v_scratch"},
+                        },
+                        "outputs": {
+                            "k_dst": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
+                            "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
+                        },
+                        "scratch": [],
+                        "params": {
+                            "num_kv_heads": int(config.get("num_kv_heads", 1)),
+                            "head_dim": int(config.get("head_dim", 1)),
+                            "seq_len": int(config.get("context_length", config.get("context_len", 1))),
+                        },
+                        "_auto_inserted": True,
+                        "_cache_append": segmented_append,
+                    }
+                if segmented_append:
+                    # The append provider reads current K/V through the persistent
+                    # cache, so store this segment immediately before attention.
+                    final_ops.insert(len(final_ops) - 1, kv_batch_copy_op)
+                    kv_store_count += 1
                 transpose_attn_out_op = {
                     "idx": len(final_ops),
                     "kernel": "transpose_attn_out_to_token_major",
@@ -7280,38 +7383,10 @@ def generate_ir_lower_1(
                     "_auto_inserted": True,
                 }
                 final_ops.append(transpose_attn_out_op)
-                if uses_kv_cache:
+                if uses_kv_cache and not segmented_append:
                     # TODO(contract): validate this op against runtime_invariants contract:
                     # _kv_copy_bytes must exist and match
                     # (num_kv_heads * head_dim * seq_len * sizeof(fp32)).
-                    shared_q_prefill = op["op"] in ("attn_shared_kv", "attn_sliding_shared_kv")
-                    copy_src = "q_scratch" if shared_q_prefill else "k_scratch"
-                    kv_batch_copy_op = {
-                        "idx": len(final_ops),
-                        "kernel": "kv_cache_batch_copy",
-                        "op": "kv_cache_batch_copy",
-                        "layer": layer,
-                        "section": op["section"],
-                        "function": "kv_cache_batch_copy",  # Codegen emits two memcpy calls (K and V)
-                        "weights": {},
-                        "inputs": {
-                            "k_src": {"type": "scratch", "source": copy_src},
-                            "v_src": {"type": "scratch", "source": "q_scratch" if shared_q_prefill else "v_scratch"},
-                        },
-                        "outputs": {
-                            "k_dst": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
-                            "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
-                        },
-                        "scratch": [],
-                        "params": {
-                            "num_kv_heads": int(config.get("num_kv_heads", 1)),
-                            "head_dim": int(config.get("head_dim", 1)),
-                            # Prefill copies a token batch into KV cache; use configured max context
-                            # as the conservative compile-time dimension for call-IR binding.
-                            "seq_len": int(config.get("context_length", config.get("context_len", 1))),
-                        },
-                        "_auto_inserted": True,
-                    }
                     final_ops.append(kv_batch_copy_op)
                     kv_store_count += 1
 
@@ -9987,7 +10062,7 @@ def generate_ir_lower_2(
             params.setdefault("beta_fast", float(config.get("vision_mrope_beta_fast", 32.0)))
             params.setdefault("beta_slow", float(config.get("vision_mrope_beta_slow", 1.0)))
             params.setdefault("n_ctx_orig", int(config.get("vision_mrope_original_context_length", 32768)))
-        if op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_text":
+        if op_type == "rope_qk" and _is_text_mrope_operation(ir_op):
             sections = config.get("mrope_sections")
             if not isinstance(sections, list) or len(sections) != 4:
                 default_section = max(1, int(params.get("head_dim", 0) or 0) // 4)
@@ -11001,6 +11076,14 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                         expr = "model->pos + 1"
                     else:
                         expr = str(params.get("seq_len", 1))
+                elif key == "prefill_start_pos":
+                    if mode != "prefill":
+                        op_errors.append(f"{func}.{name}: prefill_start_pos is invalid in {mode} mode")
+                        expr = "0"
+                    else:
+                        # Call IR names persistent runtime state, not a local
+                        # variable owned by one generated prefill function.
+                        expr = "model->pos"
                 elif key == "layer":
                     expr = str(layer)
                 else:

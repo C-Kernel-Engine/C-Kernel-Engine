@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import importlib.util
 import io
 import json
@@ -193,6 +194,41 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
                 else:
                     self.assertEqual(mrope["kernel"], "mrope_qk_vision")
 
+            generated_c = root / "qwen3vl_vision.c"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(V8_CODEGEN_PATH),
+                    "--ir",
+                    str(paths["call"]),
+                    "--layout",
+                    str(paths["layout"]),
+                    "--output",
+                    str(generated_c),
+                ],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            generated = generated_c.read_text(encoding="utf-8")
+            self.assertIn("mrope_qk_vision(", generated)
+            self.assertNotIn("ck_multimodal_prefill_mrope_qk", generated)
+            result = subprocess.run(
+                [
+                    "cc",
+                    "-fsyntax-only",
+                    "-fopenmp",
+                    "-Iinclude",
+                    "-Iversion/v8/src",
+                    str(generated_c),
+                ],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+
     def test_vision_mrope_classification_uses_semantics_not_kernel_name(self) -> None:
         operation = {
             "op": "rope_qk",
@@ -260,13 +296,19 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
 
             self.assertEqual(without_contract_metadata(contracted), without_contract_metadata(legacy))
 
-            expected_kernel = "attention_forward_full_head_major_gqa_flash_strided"
+            expected_kernel = "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided"
             for artifact in ("ir1", "lowered", "call"):
                 doc = contracted[artifact]
                 operations = doc if isinstance(doc, list) else doc.get("operations", doc.get("ops", []))
                 attn = next(item for item in operations if item.get("op") == "attn")
-                self.assertEqual(attn["required_contract"]["numerics.attention_reduction"], "f16_kv_fp32_online")
-                self.assertEqual(attn["resolved_contract"]["contract_id"], "f16_kv_fp32_online")
+                self.assertEqual(
+                    attn["required_contract"]["numerics.attention_reduction"],
+                    "f16_kv_tiled64_fp32_softmax_fp64_sum_update",
+                )
+                self.assertEqual(
+                    attn["resolved_contract"]["contract_id"],
+                    "f16_kv_tiled64_fp32_softmax_fp64_sum_update",
+                )
                 self.assertEqual(attn["resolved_contract"]["kernel_id"], expected_kernel)
                 if artifact == "call":
                     self.assertEqual(attn["function"], expected_kernel)
@@ -423,6 +465,14 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         self.assertEqual(bridge["cache_policy"], "persistent_decoder_kv")
         self.assertEqual(bridge["runtime_policy"], "decode_staged")
         self.assertEqual(
+            bridge["prefill_schedule"],
+            {
+                "segments": ["text_before", "visual", "text_after"],
+                "cache_transition": "append_preserve",
+                "position_transition": "segment_defined",
+            },
+        )
+        self.assertEqual(
             run_multimodal_bridge_v8._bridge_runtime_from_policy(bridge),
             "decode-staged",
         )
@@ -440,6 +490,56 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             run_multimodal_bridge_v8._bridge_generation_mode_from_policy({}, fallback="mixed-replay"),
             "mixed-replay",
         )
+
+    def test_cached_manifest_refreshes_circuit_without_rewriting_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            scripts = root / "scripts"
+            circuits = root / "circuits"
+            scripts.mkdir()
+            circuits.mkdir()
+            current = {"name": "fixture", "version": 2, "contract": {"mode": "current"}}
+            (circuits / "fixture.json").write_text(json.dumps(current), encoding="utf-8")
+            manifest_path = root / "weights_manifest.json"
+            manifest = {"template": {"name": "fixture", "version": 1}}
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with mock.patch.object(run_multimodal_bridge_v8, "SCRIPT_DIR", scripts):
+                refreshed = run_multimodal_bridge_v8._refresh_manifest_circuit_snapshot(
+                    manifest,
+                    manifest_path,
+                )
+
+            self.assertEqual(refreshed["template"], current)
+            self.assertEqual(
+                json.loads(manifest_path.read_text(encoding="utf-8"))["template"],
+                current,
+            )
+
+    def test_segmented_prefill_schedule_and_attention_requirement_are_atomic(self) -> None:
+        circuit = build_ir_v8._load_builtin_template_doc("qwen3vl")
+        self.assertIsNotNone(circuit)
+        build_ir_v8._validate_segmented_prefill_contract(circuit, source="test:qwen3vl")
+
+        missing_attention = copy.deepcopy(circuit)
+        del missing_attention["required_contracts"]["decoder.attention"]["phases"][
+            "prefill"
+        ]["requires"]["execution.prefill_batching"]
+        with self.assertRaisesRegex(RuntimeError, "schedule and attention provider disagree"):
+            build_ir_v8._validate_segmented_prefill_contract(
+                missing_attention,
+                source="test:missing-attention",
+            )
+
+        malformed_schedule = copy.deepcopy(circuit)
+        malformed_schedule["contract"]["multimodal_bridge"]["prefill_schedule"][
+            "segments"
+        ] = ["visual", "text_after"]
+        with self.assertRaisesRegex(RuntimeError, "unsupported mixed-prefill schedule"):
+            build_ir_v8._validate_segmented_prefill_contract(
+                malformed_schedule,
+                source="test:malformed-schedule",
+            )
 
     def test_builtin_template_declares_qwen3vl_vision_contract(self) -> None:
         doc = build_ir_v8._load_builtin_template_doc("qwen3_vl_vision")
@@ -551,7 +651,10 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         legacy = build_ir_v8._resolve_manifest_numerical_contracts(manifest, "prefill")
         execution = build_ir_v8._resolve_manifest_execution_contracts(manifest, "prefill")
         self.assertEqual(len(legacy), 1)
-        self.assertEqual(legacy[0]["kernel"]["function"], "attention_forward_full_head_major_gqa_flash_strided")
+        self.assertEqual(
+            legacy[0]["kernel"]["function"],
+            "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+        )
         self.assertNotIn("vision.layer.attention", {plan["operation"] for plan in execution})
 
     def test_template_dtype_metadata_is_rejected(self) -> None:
@@ -777,7 +880,10 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertEqual(qkv_packed_proj.get("function"), "gemm_nt_q8_0_q8_0_contract")
             self.assertNotIn("quantize_input_0", [op.get("op") for op in call_ops])
             attn = next(op for op in call_ops if op.get("op") == "attn")
-            self.assertEqual(attn.get("function"), "attention_forward_full_head_major_gqa_flash_strided")
+            self.assertEqual(
+                attn.get("function"),
+                "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+            )
             attn_idx = next(i for i, op in enumerate(call_ops) if op.get("op") == "attn")
             transpose_idx = next(i for i, op in enumerate(call_ops) if op.get("op") == "transpose_attn_out_to_token_major")
             out_proj_idx = next(i for i, op in enumerate(call_ops) if op.get("op") == "out_proj")

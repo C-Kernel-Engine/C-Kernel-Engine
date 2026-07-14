@@ -78,6 +78,8 @@ def _resolve_attention_fn(lib: ctypes.CDLL, mode: str) -> Callable[..., None]:
         fn = lib.attention_forward_full_head_major_gqa_exact_strided
     elif mode == "flash":
         fn = lib.attention_forward_full_head_major_gqa_flash_strided
+    elif mode == "tiled_f16kv":
+        fn = lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided
     else:
         raise ValueError(f"unsupported mode: {mode}")
 
@@ -110,7 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Replay full-attention kernels from parity dumps")
     ap.add_argument("--dump", type=Path, required=True, help="Path to dump.bin")
     ap.add_argument("--layer", type=int, default=0)
-    ap.add_argument("--mode", choices=("ggml", "exact", "flash"), default="ggml")
+    ap.add_argument(
+        "--mode",
+        choices=("ggml", "exact", "flash", "tiled_f16kv"),
+        default="ggml",
+    )
     ap.add_argument("--strict", action="store_true")
     ap.add_argument("--disable-multihead-oracle", action="store_true")
     ap.add_argument("--disable-regular-oracle", action="store_true")
@@ -119,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--head-dim", type=int, default=72)
     ap.add_argument("--aligned-head-dim", type=int, default=None)
     ap.add_argument("--output", type=Path, default=None)
+    ap.add_argument("--raw-output", type=Path, default=None)
     args = ap.parse_args(argv)
 
     dumps = parity_test.read_dump_file(args.dump)
@@ -185,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
 
     token_major = _to_token_major(out, num_tokens, args.num_heads, aligned_head_dim)[..., : args.head_dim]
     metrics = _metrics(token_major, ref)
+    bitwise_equal = token_major.view(np.uint32) == ref.view(np.uint32)
     worst_idx = np.unravel_index(np.argmax(np.abs(token_major - ref)), token_major.shape)
     report = {
         "mode": args.mode,
@@ -197,6 +205,11 @@ def main(argv: list[str] | None = None) -> int:
         "disable_multihead_oracle": args.disable_multihead_oracle,
         "disable_regular_oracle": args.disable_regular_oracle,
         "metrics": metrics,
+        "bitwise": {
+            "equal": int(np.count_nonzero(bitwise_equal)),
+            "different": int(bitwise_equal.size - np.count_nonzero(bitwise_equal)),
+            "total": int(bitwise_equal.size),
+        },
         "worst_index": {
             "query": int(worst_idx[0]),
             "head": int(worst_idx[1]),
@@ -209,6 +222,8 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(report, indent=2))
     if args.output is not None:
         args.output.write_text(json.dumps(report, indent=2) + "\n")
+    if args.raw_output is not None:
+        np.save(args.raw_output, token_major)
     return 0
 
 

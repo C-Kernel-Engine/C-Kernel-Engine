@@ -75,6 +75,66 @@ typedef struct ggml_cgraph *(*ck_ggml_new_graph_fn)(struct ggml_context *);
 typedef void (*ck_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
 typedef enum ggml_status (*ck_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
 typedef void *(*ck_ggml_get_data_fn)(const struct ggml_tensor *);
+typedef float (*ck_rope_math_f32_fn)(float);
+typedef float (*ck_rope_math_f32_binary_fn)(float, float);
+
+static ck_rope_math_f32_fn ck_rope_resolve_system_math_f32(const char *name)
+{
+#if defined(__linux__)
+    static void *libm_handle = NULL;
+    if (!libm_handle) {
+        libm_handle = dlopen("libm.so.6", RTLD_NOW | RTLD_LOCAL);
+    }
+    if (libm_handle) {
+        ck_rope_math_f32_fn fn = (ck_rope_math_f32_fn)dlsym(libm_handle, name);
+        if (fn) {
+            return fn;
+        }
+    }
+#else
+    (void)name;
+#endif
+    return NULL;
+}
+
+/* ICX links libimf ahead of the system math library. Its sinf/cosf results can
+ * differ from a GCC-built ggml oracle by one ULP, which is enough to alter Q8
+ * blocks downstream. Resolve the platform libm implementation explicitly for
+ * the ggml-compatible M-RoPE arithmetic contract. */
+static float ck_rope_reference_cosf(float value)
+{
+    static ck_rope_math_f32_fn fn = NULL;
+    if (!fn) {
+        fn = ck_rope_resolve_system_math_f32("cosf");
+    }
+    return fn ? fn(value) : cosf(value);
+}
+
+static float ck_rope_reference_sinf(float value)
+{
+    static ck_rope_math_f32_fn fn = NULL;
+    if (!fn) {
+        fn = ck_rope_resolve_system_math_f32("sinf");
+    }
+    return fn ? fn(value) : sinf(value);
+}
+
+static float ck_rope_reference_powf(float base, float exponent)
+{
+    static ck_rope_math_f32_binary_fn fn = NULL;
+    if (!fn) {
+#if defined(__linux__)
+        static void *libm_handle = NULL;
+        if (!libm_handle) {
+            libm_handle = dlopen("libm.so.6", RTLD_NOW | RTLD_LOCAL);
+        }
+        if (libm_handle) {
+            fn = (ck_rope_math_f32_binary_fn)dlsym(libm_handle, "powf");
+        }
+#endif
+    }
+    return fn ? fn(base, exponent) : powf(base, exponent);
+}
 
 static void ck_rope_ensure_ggml_loaded(void)
 {
@@ -1210,8 +1270,22 @@ static void vision_mrope_yarn(
         mscale *= 1.0f + 0.1f * logf(1.0f / fmaxf(freq_scale, 1e-6f));
     }
 
-    *cos_theta = cosf(theta) * mscale;
-    *sin_theta = sinf(theta) * mscale;
+    *cos_theta = ck_rope_reference_cosf(theta) * mscale;
+    *sin_theta = ck_rope_reference_sinf(theta) * mscale;
+}
+
+static inline void mrope_rotate_pair(
+    float x0,
+    float x1,
+    float cos_theta,
+    float sin_theta,
+    float *out0,
+    float *out1
+) {
+    const float x1_sin = x1 * sin_theta;
+    const float x1_cos = x1 * cos_theta;
+    *out0 = fmaf(x0, cos_theta, -x1_sin);
+    *out1 = fmaf(x0, sin_theta, x1_cos);
 }
 
 static void vision_mrope_apply_head(
@@ -1250,7 +1324,7 @@ static void vision_mrope_apply_head(
     }
 
     const int num_pos = num_tokens;
-    const float theta_scale = powf(freq_base, -2.0f / (float) rope_pairs);
+    const float theta_scale = ck_rope_reference_powf(freq_base, -2.0f / (float) rope_pairs);
     float corr_dims[2] = {0.0f, (float) (rope_pairs - 1)};
     vision_mrope_yarn_corr_dims(rope_pairs, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
 
@@ -1281,8 +1355,14 @@ static void vision_mrope_apply_head(
 
             const float x0 = row[pair];
             const float x1 = row[pair + rope_pairs];
-            row[pair] = x0 * cos_theta - x1 * sin_theta;
-            row[pair + rope_pairs] = x0 * sin_theta + x1 * cos_theta;
+            mrope_rotate_pair(
+                x0,
+                x1,
+                cos_theta,
+                sin_theta,
+                &row[pair],
+                &row[pair + rope_pairs]
+            );
 
             theta_y *= theta_scale;
             theta_x *= theta_scale;
@@ -1521,8 +1601,14 @@ static void explicit_mrope_apply_head(
 
             const float x0 = row[pair];
             const float x1 = row[pair + rope_pairs];
-            row[pair] = x0 * cos_theta - x1 * sin_theta;
-            row[pair + rope_pairs] = x0 * sin_theta + x1 * cos_theta;
+            mrope_rotate_pair(
+                x0,
+                x1,
+                cos_theta,
+                sin_theta,
+                &row[pair],
+                &row[pair + rope_pairs]
+            );
 
             theta_t *= theta_scale;
             theta_h *= theta_scale;
@@ -1546,7 +1632,8 @@ static void text_mrope_apply_head(
     float ext_factor,
     float attn_factor,
     float beta_fast,
-    float beta_slow
+    float beta_slow,
+    int is_imrope
 ) {
     if (!x || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim || n_dims <= 0) {
         return;
@@ -1580,7 +1667,15 @@ static void text_mrope_apply_head(
         for (int pair = 0; pair < rope_pairs; ++pair) {
             const int sector = sect_dims > 0 ? (pair % sect_dims) : pair;
             float theta = theta_t;
-            if (sector >= sections[0] && sector < sec_w) {
+            if (is_imrope && sector % 3 == 1 && sector < 3 * sections[1]) {
+                theta = theta_h;
+            } else if (is_imrope && sector % 3 == 2 && sector < 3 * sections[2]) {
+                theta = theta_w;
+            } else if (is_imrope && sector % 3 == 0 && sector < 3 * sections[0]) {
+                theta = theta_t;
+            } else if (is_imrope) {
+                theta = theta_e;
+            } else if (sector >= sections[0] && sector < sec_w) {
                 theta = theta_h;
             } else if (sector >= sec_w && sector < sec_e) {
                 theta = theta_w;
@@ -1603,8 +1698,14 @@ static void text_mrope_apply_head(
 
             const float x0 = row[pair];
             const float x1 = row[pair + rope_pairs];
-            row[pair] = x0 * cos_theta - x1 * sin_theta;
-            row[pair + rope_pairs] = x0 * sin_theta + x1 * cos_theta;
+            mrope_rotate_pair(
+                x0,
+                x1,
+                cos_theta,
+                sin_theta,
+                &row[pair],
+                &row[pair + rope_pairs]
+            );
 
             theta_t *= theta_scale;
             theta_h *= theta_scale;
@@ -1658,7 +1759,8 @@ void mrope_qk_text(float *q,
             ext_factor,
             attn_factor,
             beta_fast,
-            beta_slow
+            beta_slow,
+            0
         );
     }
 
@@ -1677,7 +1779,78 @@ void mrope_qk_text(float *q,
             ext_factor,
             attn_factor,
             beta_fast,
-            beta_slow
+            beta_slow,
+            0
+        );
+    }
+}
+
+void mrope_qk_text_imrope(float *q,
+                          float *k,
+                          int num_heads,
+                          int num_kv_heads,
+                          int num_tokens,
+                          int head_dim,
+                          int aligned_head_dim,
+                          int pos_offset,
+                          int n_dims,
+                          int section_0,
+                          int section_1,
+                          int section_2,
+                          int section_3,
+                          int n_ctx_orig,
+                          float freq_base,
+                          float freq_scale,
+                          float ext_factor,
+                          float attn_factor,
+                          float beta_fast,
+                          float beta_slow)
+{
+    if (!q || !k || num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+
+    const int sections[4] = {section_0, section_1, section_2, section_3};
+    const size_t q_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+    const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        text_mrope_apply_head(
+            q + (size_t) h * q_head_stride,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow,
+            1
+        );
+    }
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        text_mrope_apply_head(
+            k + (size_t) h * k_head_stride,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow,
+            1
         );
     }
 }

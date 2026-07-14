@@ -5,12 +5,12 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 200,
+      "total": 203,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 18,
+        "attention": 20,
         "attention_projection": 1,
         "attention_sliding": 6,
         "attn_gate_sigmoid_mul": 1,
@@ -73,7 +73,7 @@
         "residual_add": 2,
         "residual_save": 1,
         "rmsnorm": 2,
-        "rope": 11,
+        "rope": 12,
         "rope_backward": 2,
         "rope_init": 2,
         "rowwise_bias_add": 1,
@@ -2152,6 +2152,176 @@
       "notes": "Gemma4 no-scale causal sliding-window attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
       "name": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+      "op": "attention",
+      "variant": "causal_head_major_gqa_prefill_append_f16cache_contract",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "execution.prefill_batching": [
+          "segmented_append"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_fp32_merge"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_fp32_merge": {
+          "status": "observed",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE",
+          "notes": "Cache-preserving segmented causal prefill using the validated FP16 decode reduction contract for each query row."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "kv_chunks_by_workers"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "q_tokens",
+        "past_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "q_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "past_tokens",
+            "source": "runtime:prefill_start_pos"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+      "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract.json"
     },
     {
       "id": "attention_forward_causal_head_major_shared_kv_gemma4",
@@ -4321,6 +4491,248 @@
       },
       "name": "attention_forward_full_head_major_gqa_sdpa_bf16_storage",
       "_source_file": "attention_forward_full_head_major_gqa_sdpa_bf16_storage.json"
+    },
+    {
+      "id": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+      "op": "attention",
+      "variant": "full_tiled64_f16kv_fp32",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp32"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_kv_tiled64_fp32_softmax_fp64_sum_update"
+        ]
+      },
+      "supported_reductions": {
+        "f16_kv_tiled64_fp32_softmax_fp64_sum_update": {
+          "status": "validated",
+          "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+          "explicit_selector": true,
+          "selector": "circuit_required_contract",
+          "notes": "Exact 64x64 tiled full-attention provider with FP16-rounded K/V and the contract-defined softmax sum update."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_query_blocks"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "FP32 query tensor"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "K tensor rounded through FP16 on tile load"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "V tensor rounded through FP16 on tile load"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "FP32 attention output"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "thread_tiles",
+          "dtype": "fp32",
+          "size_bytes": "per_thread((64*D)+(64*64)+(64*D)+(64*D))",
+          "desc": "Bounded query, key, value, score, and output tiles"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "K/V token stride"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32",
+          "desc": "Logical head width"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Physical head stride"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "query_blocks"
+        ],
+        "preferred": {
+          "prefill": "query_blocks"
+        },
+        "strategies": [
+          {
+            "name": "query_blocks",
+            "partition_dim": "H*T",
+            "param_style": "ith_nth",
+            "notes": "Contiguous head/query row ranges; each query retains ascending key-tile reduction order."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 1,
+          "T": 1
+        },
+        "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens."
+      },
+      "impl": {
+        "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+        "c_declaration": "void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma",
+              "f16c"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma",
+              "-mf16c"
+            ]
+          },
+          {
+            "name": "portable",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_full.py"
+        ],
+        "oracle": [
+          "version/v8/scripts/replay_attention_from_dumps_v8.py --mode tiled_f16kv"
+        ]
+      },
+      "notes": "Contract-selected GGML-compatible tiled full attention. This provider is additive and does not replace online or BF16 SDPA contracts.",
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          }
+        ]
+      },
+      "name": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+      "_source_file": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.json"
     },
     {
       "id": "attn_gate_sigmoid_mul_backward_f32",
@@ -7931,9 +8343,59 @@
           "src/kernels/gelu_kernels.c"
         ]
       },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "gelu_fp32_input_fp16_table_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "gelu_ggml_inplace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
       "tests": {
         "unit": [
-          "unittest/test_gelu.py"
+          "unittest/test_gelu.py::GGML Qwen3-VL boundary"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "cast": "float*",
+            "name": "data",
+            "source": "output:out"
+          },
+          {
+            "name": "n",
+            "source": "dim:gelu_elems"
+          }
         ]
       },
       "notes": "GGML-compatible FP16-table GELU used for llama.cpp activation parity.",
@@ -8968,9 +9430,80 @@
           "src/kernels/gemm_kernels_f16.c"
         ]
       },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "fp16_weight_fp16_input_llamafile_avx_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "gemm_nt_f16",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "ck_threadpool_dispatch_n"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "pairwise_tree",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
       "tests": {
         "unit": [
-          "tests/test_v8_qwen3vl_template.py"
+          "unittest/test_f16_gemm_llama_contract.py"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "cast": "const float*",
+            "name": "A",
+            "source": "activation:a"
+          },
+          {
+            "name": "B",
+            "source": "weight:_first_weight"
+          },
+          {
+            "name": "bias",
+            "source": "weight_f:_bias"
+          },
+          {
+            "cast": "float*",
+            "name": "C",
+            "source": "output:c"
+          },
+          {
+            "name": "M",
+            "source": "dim:_m"
+          },
+          {
+            "name": "N",
+            "source": "dim:_output_dim"
+          },
+          {
+            "name": "K",
+            "source": "dim:_input_dim"
+          }
         ]
       },
       "notes": "Generic FP16-weight GEMM wrapper for dense NT matmul lowering.",
@@ -16841,8 +17374,392 @@
         ]
       },
       "notes": "Text multi-section RoPE for Q/K using implicit 1D positions expanded to the four-stream GGML contract.",
+      "numerical_capabilities": [
+        {
+          "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "mrope_qk_text",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "cast": "float*",
+            "name": "q",
+            "source": "output:q"
+          },
+          {
+            "cast": "float*",
+            "name": "k",
+            "source": "output:k"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "pos_offset",
+            "source": "runtime:pos"
+          },
+          {
+            "name": "n_dims",
+            "source": "dim:n_dims"
+          },
+          {
+            "name": "section_0",
+            "source": "dim:section_0"
+          },
+          {
+            "name": "section_1",
+            "source": "dim:section_1"
+          },
+          {
+            "name": "section_2",
+            "source": "dim:section_2"
+          },
+          {
+            "name": "section_3",
+            "source": "dim:section_3"
+          },
+          {
+            "name": "n_ctx_orig",
+            "source": "dim:n_ctx_orig"
+          },
+          {
+            "name": "freq_base",
+            "source": "dim:freq_base"
+          },
+          {
+            "name": "freq_scale",
+            "source": "dim:freq_scale"
+          },
+          {
+            "name": "ext_factor",
+            "source": "dim:ext_factor"
+          },
+          {
+            "name": "attn_factor",
+            "source": "dim:attn_factor"
+          },
+          {
+            "name": "beta_fast",
+            "source": "dim:beta_fast"
+          },
+          {
+            "name": "beta_slow",
+            "source": "dim:beta_slow"
+          }
+        ]
+      },
       "name": "mrope_qk_text",
       "_source_file": "mrope_qk_text.json"
+    },
+    {
+      "id": "mrope_qk_text_imrope",
+      "op": "rope",
+      "variant": "fp32_head_major_text_imrope",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim] rotated in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, tokens, head_dim] rotated in-place"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor after interleaved text M-RoPE"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor after interleaved text M-RoPE"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D",
+        "n_dims"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for scratch row stride"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Starting text position for the current token slice"
+        },
+        {
+          "name": "n_dims",
+          "dtype": "int32",
+          "desc": "Rotary width used by the text M-RoPE kernel"
+        },
+        {
+          "name": "section_0",
+          "dtype": "int32",
+          "desc": "Temporal-axis interleave width"
+        },
+        {
+          "name": "section_1",
+          "dtype": "int32",
+          "desc": "Height-axis interleave width"
+        },
+        {
+          "name": "section_2",
+          "dtype": "int32",
+          "desc": "Width-axis interleave width"
+        },
+        {
+          "name": "section_3",
+          "dtype": "int32",
+          "desc": "Extra-axis interleave width"
+        },
+        {
+          "name": "n_ctx_orig",
+          "dtype": "int32",
+          "desc": "Original context length for YaRN-style scaling"
+        },
+        {
+          "name": "freq_base",
+          "dtype": "fp32",
+          "desc": "Base rotary frequency"
+        },
+        {
+          "name": "freq_scale",
+          "dtype": "fp32",
+          "desc": "Frequency scaling factor"
+        },
+        {
+          "name": "ext_factor",
+          "dtype": "fp32",
+          "desc": "Extrapolation factor"
+        },
+        {
+          "name": "attn_factor",
+          "dtype": "fp32",
+          "desc": "Attention scaling factor"
+        },
+        {
+          "name": "beta_fast",
+          "dtype": "fp32",
+          "desc": "YaRN beta_fast"
+        },
+        {
+          "name": "beta_slow",
+          "dtype": "fp32",
+          "desc": "YaRN beta_slow"
+        }
+      ],
+      "impl": {
+        "function": "mrope_qk_text_imrope",
+        "c_declaration": "void mrope_qk_text_imrope(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ]
+      },
+      "notes": "Text M-RoPE using Qwen-style three-axis interleaving and an implicit [position, position, position, 0] position tuple.",
+      "numerical_capabilities": [
+        {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "mrope_qk_text_imrope",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "cast": "float*",
+            "name": "q",
+            "source": "output:q"
+          },
+          {
+            "cast": "float*",
+            "name": "k",
+            "source": "output:k"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "pos_offset",
+            "source": "runtime:pos"
+          },
+          {
+            "name": "n_dims",
+            "source": "dim:n_dims"
+          },
+          {
+            "name": "section_0",
+            "source": "dim:section_0"
+          },
+          {
+            "name": "section_1",
+            "source": "dim:section_1"
+          },
+          {
+            "name": "section_2",
+            "source": "dim:section_2"
+          },
+          {
+            "name": "section_3",
+            "source": "dim:section_3"
+          },
+          {
+            "name": "n_ctx_orig",
+            "source": "dim:n_ctx_orig"
+          },
+          {
+            "name": "freq_base",
+            "source": "dim:freq_base"
+          },
+          {
+            "name": "freq_scale",
+            "source": "dim:freq_scale"
+          },
+          {
+            "name": "ext_factor",
+            "source": "dim:ext_factor"
+          },
+          {
+            "name": "attn_factor",
+            "source": "dim:attn_factor"
+          },
+          {
+            "name": "beta_fast",
+            "source": "dim:beta_fast"
+          },
+          {
+            "name": "beta_slow",
+            "source": "dim:beta_slow"
+          }
+        ]
+      },
+      "name": "mrope_qk_text_imrope",
+      "_source_file": "mrope_qk_text_imrope.json"
     },
     {
       "id": "mrope_qk_vision",

@@ -274,6 +274,8 @@ def _granular_command(args: argparse.Namespace, layer: int, out_dir: Path, out_j
         "disabled" if args.execution_mode == "strict" else "enabled",
         "--llama-dump-layer",
         str(int(layer)),
+        "--ck-dump-layer",
+        str(int(layer)),
         "--ck-strict-dump-layer",
         str(int(layer)),
         "--llama-dump-names",

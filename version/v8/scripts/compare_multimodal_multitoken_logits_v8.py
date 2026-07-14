@@ -6,12 +6,13 @@ Tokenizer-free multimodal multi-token greedy parity probe.
 
 This is the multimodal counterpart to compare_multitoken_logits_v8.py.  It
 starts from a bridge_report.json + prefix.f32 produced by run_multimodal_bridge_v8,
-does one CK mixed visual/text prefill, then advances CK through real
+does the circuit-selected CK mixed visual/text prefill schedule, then advances CK through real
 ck_model_decode calls while llama.cpp replays the same generated suffix.
 """
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import re
@@ -213,6 +214,70 @@ def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace)
             "logits": logits.reshape((steps, n_vocab)),
         }
 
+def _load_exact_decoder_runtime(
+    gguf_path: Path,
+    decoder_dir: Path,
+    *,
+    so_override: Path | None,
+    manifest_map_override: Path | None,
+) -> dict[str, Any]:
+    layout_path = decoder_dir / "layout_decode.json"
+    weights_bump = decoder_dir / "weights.bump"
+    manifest_map = manifest_map_override or (decoder_dir / "weights_manifest.map")
+    so_path = so_override or (decoder_dir / "libdecoder_v8.so")
+    required = [layout_path, weights_bump, manifest_map, so_path]
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "exact decoder runtime is incomplete; refusing to regenerate or guess: "
+            + ", ".join(missing)
+        )
+
+    layout = first_token.bridge_runner_v8._load_layout(layout_path)
+    cfg = dict(layout.get("config", {}) or {})
+    embed_dim = int(cfg.get("embed_dim", 0) or 0)
+    num_deepstack_layers = int(cfg.get("num_deepstack_layers", 0) or 0)
+    input_embed_dim = int(cfg.get("input_embed_dim", 0) or 0)
+    if input_embed_dim <= 0 and embed_dim > 0 and num_deepstack_layers > 0:
+        input_embed_dim = embed_dim * (1 + num_deepstack_layers)
+    if input_embed_dim <= 0:
+        input_embed_dim = embed_dim
+    return {
+        "gguf": gguf_path,
+        "workdir": decoder_dir,
+        "so_path": so_path,
+        "weights_bump": weights_bump,
+        "manifest_map": manifest_map,
+        "decode_layout_path": layout_path,
+        "embed_dim": embed_dim,
+        "input_embed_dim": input_embed_dim,
+        "num_deepstack_layers": num_deepstack_layers,
+        "context_length": int(cfg.get("context_length", cfg.get("context_len", 0)) or 0),
+        "vocab_size": int(cfg.get("vocab_size", 0) or 0),
+    }
+
+
+def _runtime_evidence(runtime: dict[str, Any], *, exact_reuse: bool) -> dict[str, Any]:
+    def describe(path_value: Any) -> dict[str, Any]:
+        path = Path(path_value).resolve()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+        return {"path": str(path), "sha256": digest}
+
+    return {
+        "exact_reuse": bool(exact_reuse),
+        "shared_library": describe(runtime["so_path"]),
+        "engine_library": describe(REPO_ROOT / "build" / "libckernel_engine.so"),
+        "manifest_map": describe(runtime["manifest_map"]),
+        "weights_bump_path": str(Path(runtime["weights_bump"]).resolve()),
+        "context_length": int(runtime.get("context_length", 0) or 0),
+    }
+
+
+def _ck_threads(args: argparse.Namespace) -> int:
+    explicit = getattr(args, "ck_threads", None)
+    return int(args.threads if explicit is None else explicit)
+
+
 def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> dict[str, Any]:
     bridge_report = first_token._load_bridge_report(args.bridge_report.resolve())
     gguf_value = str(((bridge_report.get("decoder_runtime") or {}).get("gguf") or "")).strip()
@@ -221,7 +286,8 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
     gguf_path = Path(gguf_value).resolve()
     workdir = args.workdir.resolve()
     workdir.mkdir(parents=True, exist_ok=True)
-    if bool(getattr(args, "reuse_bridge_decoder_runtime", False)):
+    exact_runtime = bool(getattr(args, "reuse_bridge_decoder_runtime_exact", False))
+    if bool(getattr(args, "reuse_bridge_decoder_runtime", False)) or exact_runtime:
         decoder_workdir = str(((bridge_report.get("decoder_runtime") or {}).get("workdir") or "")).strip()
         if not decoder_workdir:
             raise ValueError("bridge report does not include decoder_runtime.workdir")
@@ -230,12 +296,20 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
         decoder_dir = workdir / "decoder"
 
     requested_ctx_len = int(args.ctx_len or bridge_report.get("decoder_context_len") or 256)
-    runtime = first_token.bridge_runner_v8._prepare_decoder_runtime(
-        gguf_path,
-        decoder_dir,
-        parity_dump=bool(parity_dump),
-        context_override=max(1, requested_ctx_len),
-    )
+    if exact_runtime:
+        runtime = _load_exact_decoder_runtime(
+            gguf_path,
+            decoder_dir,
+            so_override=getattr(args, "ck_runtime_so", None),
+            manifest_map_override=getattr(args, "ck_runtime_manifest_map", None),
+        )
+    else:
+        runtime = first_token.bridge_runner_v8._prepare_decoder_runtime(
+            gguf_path,
+            decoder_dir,
+            parity_dump=bool(parity_dump),
+            context_override=max(1, requested_ctx_len),
+        )
     tokenizer = GGUFTokenizer.from_gguf(str(gguf_path))
     _, tokens_before, tokens_after, prompt_meta = first_token._resolve_prompt_token_segments(
         tokenizer,
@@ -259,7 +333,14 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
     )
     total_prompt_tokens = len(tokens_before) + len(tokens_after)
     resolved_ctx_len = max(int(requested_ctx_len), int(prefix_tokens) + total_prompt_tokens, 1)
-    if resolved_ctx_len != requested_ctx_len:
+    if resolved_ctx_len != requested_ctx_len and exact_runtime:
+        effective_context = int(runtime.get("context_length", 0) or 0)
+        if effective_context < resolved_ctx_len:
+            raise RuntimeError(
+                "exact decoder runtime context is too small: "
+                f"required={resolved_ctx_len} effective={effective_context}"
+            )
+    elif resolved_ctx_len != requested_ctx_len:
         runtime = first_token.bridge_runner_v8._prepare_decoder_runtime(
             gguf_path,
             decoder_dir,
@@ -380,7 +461,7 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
             prefix_row_dim=int(inputs["prefix_row_dim"]),
             ctx_len=int(inputs["ctx_len"]),
             top_k=int(args.top_k),
-            threads=int(args.threads),
+            threads=_ck_threads(args),
             dump_root=dump_dir.resolve(),
             dump_names=str(args.dump_names),
             dump_pass=str(args.dump_pass),
@@ -754,10 +835,19 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
         "ctx_len": int(inputs["ctx_len"]),
         "requested_ctx_len": int(inputs["requested_ctx_len"]),
         "threads": int(args.threads),
+        "ck_threads": _ck_threads(args),
+        "thread_config": {
+            "llama_cpp": int(args.threads),
+            "ck_runtime": _ck_threads(args),
+        },
         "top_k": int(args.top_k),
         "llama_decode_mode": str(args.llama_decode_mode),
         "llama_greedy_generated": llama_generated,
         "append_on_divergence": str(args.append_on_divergence),
+        "ck_runtime": _runtime_evidence(
+            inputs["runtime"],
+            exact_reuse=bool(getattr(args, "reuse_bridge_decoder_runtime_exact", False)),
+        ),
         "stop_token_ids": sorted(stop_token_ids),
         "stop_reason": stop_reason,
         "prompt_tokens_before_image": inputs["tokens_before"],
@@ -798,10 +888,23 @@ def main() -> int:
     ap.add_argument("--prefix-text-pos", type=int, default=None)
     ap.add_argument("--workdir", required=True, type=Path)
     ap.add_argument("--reuse-bridge-decoder-runtime", action="store_true", help="Reuse decoder_runtime.workdir from bridge_report instead of creating a new decoder copy under --workdir")
+    ap.add_argument(
+        "--reuse-bridge-decoder-runtime-exact",
+        action="store_true",
+        help="Trust the existing bridge decoder artifacts without regeneration; fail if any required artifact is missing",
+    )
+    ap.add_argument("--ck-runtime-so", type=Path, default=None, help="Explicit CK decoder shared library for exact-runtime parity")
+    ap.add_argument("--ck-runtime-manifest-map", type=Path, default=None, help="Explicit CK decoder manifest map for exact-runtime parity")
     ap.add_argument("--ctx-len", type=int, default=None)
     ap.add_argument("--max-new-tokens", type=int, default=16)
     ap.add_argument("--top-k", type=int, default=16)
-    ap.add_argument("--threads", type=int, default=0)
+    ap.add_argument("--threads", type=int, default=1, help="llama.cpp oracle threads")
+    ap.add_argument(
+        "--ck-threads",
+        type=int,
+        default=None,
+        help="CK runtime threads; defaults to --threads when omitted",
+    )
     ap.add_argument("--llama-decode-mode", choices=["batched", "sequential"], default="sequential")
     ap.add_argument("--llama-no-repack", action="store_true", help="Disable llama.cpp CPU tensor repacking in the replay helper")
     ap.add_argument("--llama-repack-fallback", action=argparse.BooleanOptionalAction, default=True, help="Retry a failed llama replay step with --no-repack")
@@ -828,9 +931,10 @@ def main() -> int:
     ap.add_argument("--summary", action="store_true")
     args = ap.parse_args()
 
-    if args.threads > 0:
-        os.environ["CK_NUM_THREADS"] = str(int(args.threads))
-        os.environ["OMP_NUM_THREADS"] = str(int(args.threads))
+    ck_threads = _ck_threads(args)
+    if ck_threads > 0:
+        os.environ["CK_NUM_THREADS"] = str(ck_threads)
+        os.environ["OMP_NUM_THREADS"] = str(ck_threads)
     report = run_multimodal_multitoken_parity(args)
     if args.dump_step is not None:
         report["step_dump"] = _capture_step_dump(report, args)

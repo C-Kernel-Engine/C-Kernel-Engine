@@ -92,7 +92,7 @@
     "gelu": "gelu_ggml_inplace",
     "projector_gelu": "gelu_ggml_inplace",
     "branch_gelu": "gelu_ggml_inplace",
-    "attn_prefill": "attention_forward_full_head_major_gqa_flash_strided"
+    "attn_prefill": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided"
   },
   "required_contracts": {
     "vision_encoder.attention": {
@@ -107,10 +107,10 @@
             "tensor.q.dtype": "fp32",
             "tensor.kv.dtype": "fp32",
             "tensor.layout": "head_major",
-            "numerics.attention_reduction": "f16_kv_fp32_online"
+            "numerics.attention_reduction": "f16_kv_tiled64_fp32_softmax_fp64_sum_update"
           },
-          "validation": "observed",
-          "evidence": "Public full-attention routes pass contiguous, strided, threaded, and head_dim=72 numerical tests; stitched encoder parity remains the production gate."
+          "validation": "validated",
+          "evidence": "The direct llama.cpp tiled-flash oracle is byte-exact for Qwen3-VL T=4032, H=16, D=72 after FP16 K/V rounding and the FP64-add/FP32-store softmax-sum boundary."
         }
       },
       "selector": {
@@ -424,6 +424,33 @@
         ]
       }
     },
+    "vision.layer.mlp_down.fp16": {
+      "op": "gemm",
+      "template_ops": [
+        "mlp_down"
+      ],
+      "selector": {
+        "config_not_equals": {
+          "vision_projection_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "fp16_weight_fp16_input_llamafile_avx_fp32_output",
+          "validation": "validated",
+          "evidence": "unittest/test_f16_gemm_llama_contract.py and Qwen3-VL layer-0 production X-ray at 4032x4304x1152"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.layer.{layer}.mlp.down",
+        "producer": "mlp_down",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
     "vision.layer.mlp_projection": {
       "op": "gemm",
       "template_ops": [
@@ -445,6 +472,33 @@
       "checkpoint": {
         "id": "vision.layer.{layer}.mlp.projection",
         "producer": "mlp_projection",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
+    "vision.layer.mlp_activation.fp32": {
+      "op": "gelu",
+      "template_ops": [
+        "gelu"
+      ],
+      "selector": {
+        "config_not_equals": {
+          "vision_activation_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gelu_fp32_input_fp16_table_fp32_output",
+          "validation": "validated",
+          "evidence": "unittest/test_gelu.py::GGML Qwen3-VL boundary and layer-0 X-ray full-tensor equality"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.layer.{layer}.mlp.activation",
+        "producer": "gelu",
         "logical_layout": "token_major",
         "axis_names": [
           "token",

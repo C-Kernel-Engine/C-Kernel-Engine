@@ -193,6 +193,14 @@ void gemm_nt_f16(const float *A,
                  float *C,
                  int M, int N, int K);
 
+// Diagnostic oracle backed by the dynamically loaded ggml mul_mat graph.
+// Returns zero instead of falling back when the independent oracle is unavailable.
+int ck_gemm_nt_f16_ggml_oracle(const float *A,
+                               const void *B,
+                               const float *bias,
+                               float *C,
+                               int M, int N, int K);
+
 void gemm_nt_f16_clipped(const float *A,
                          const void *B,
                          const float *bias,
@@ -345,6 +353,8 @@ void quantize_row_q8_k(const float *x, void *y, int k);
 
 // Batch Q8_K quantization (row-major output for GEMM compatibility)
 void quantize_batch_q8_k(const float *x, void *y, int num_rows, int k);
+void quantize_batch_q8_k_4row_nearest_even(const float *x, void *y,
+                                            int num_rows, int k);
 
 void gemv_q4_k_q8_k(float *y,
                     const void *W,
@@ -901,6 +911,14 @@ void rmsnorm_forward(const float *input,
                      int d_model,
                      int aligned_embed_dim,
                      float eps);
+void rmsnorm_forward_fp32_square_fp64_sum(const float *input,
+                                          const float *gamma,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps);
 void rmsnorm_forward_kv_lora(const float *input,
                              const float *gamma,
                              float *output,
@@ -944,6 +962,14 @@ void qk_norm_forward(float *q,
                      int num_tokens,
                      int head_dim,
                      float eps);
+void qk_norm_forward_prefill_exact(float *q, float *k,
+                                   const float *q_gamma, const float *k_gamma,
+                                   int num_heads, int num_kv_heads,
+                                   int num_tokens, int head_dim, float eps);
+void qk_norm_forward_decode_exact(float *q, float *k,
+                                  const float *q_gamma, const float *k_gamma,
+                                  int num_heads, int num_kv_heads,
+                                  int num_tokens, int head_dim, float eps);
 void q_norm_forward(float *q,
                     const float *q_gamma,
                     int num_heads,
@@ -1370,6 +1396,18 @@ void attention_forward_full_head_major_gqa_flash_strided(const float *q,
                                                          int aligned_head_dim,
                                                          int kv_stride_tokens);
 
+void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens);
+
 void attention_forward_full_head_major_gqa_flash_strided_bf16_storage(
     const float *q, const float *k, const float *v, float *output,
     int num_heads, int num_kv_heads, int num_tokens, int head_dim,
@@ -1558,6 +1596,38 @@ ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_con
     int num_heads,
     int num_kv_heads,
     int kv_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    ck_attention_reduction_t reduction);
+
+// Causal prefill over a cache-preserving segment. Current-segment K/V rows
+// must already be appended at [past_tokens, past_tokens + q_tokens).
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    ck_attention_reduction_t reduction);
+
+// Causal prefill over a cache-preserving segment. Current-segment K/V rows
+// must already be appended at [past_tokens, past_tokens + q_tokens).
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
     int cache_capacity,
     int head_dim,
     int aligned_head_dim,
@@ -3084,6 +3154,27 @@ void mrope_qk_imrope_positions(float *q,
                                float attn_factor,
                                float beta_fast,
                                float beta_slow);
+
+void mrope_qk_text_imrope(float *q,
+                          float *k,
+                          int num_heads,
+                          int num_kv_heads,
+                          int num_tokens,
+                          int head_dim,
+                          int aligned_head_dim,
+                          int pos_offset,
+                          int n_dims,
+                          int section_0,
+                          int section_1,
+                          int section_2,
+                          int section_3,
+                          int n_ctx_orig,
+                          float freq_base,
+                          float freq_scale,
+                          float ext_factor,
+                          float attn_factor,
+                          float beta_fast,
+                          float beta_slow);
 
 void rope_forward_qk_strided(float *q,
                              float *k,

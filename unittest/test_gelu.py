@@ -36,6 +36,12 @@ lib.gelu_exact_inplace.restype = None
 lib.gelu_ggml_inplace.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
 lib.gelu_ggml_inplace.restype = None
 
+LLAMA_CPP_ROOT = Path(os.environ.get(
+    "CK_LLAMA_CPP_ROOT",
+    Path(__file__).resolve().parents[1] / "llama.cpp",
+))
+GGML_CPU_LIB = LLAMA_CPP_ROOT / "build" / "bin" / "libggml-cpu.so"
+
 lib.gelu_backward_exact.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # input
     ctypes.POINTER(ctypes.c_float),  # d_output
@@ -64,7 +70,7 @@ lib.gelu_backward_scalar.restype = None
 
 def ggml_gelu_ref(x_arr):
     """Reference ggml fp16-table GELU using the local ggml table when available."""
-    ggml_lib_path = Path(__file__).resolve().parents[1] / "llama.cpp" / "build" / "bin" / "libggml-cpu.so"
+    ggml_lib_path = GGML_CPU_LIB
     try:
         ggml = ctypes.CDLL(str(ggml_lib_path))
         ggml.ggml_cpu_init()
@@ -188,7 +194,7 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
     out_ggml = torch.from_numpy(out_ggml_np.copy())
     diff_ggml = max_diff(out_ggml, ggml_ref)
     kernel_time_ggml = time_function(c_gelu_ggml, warmup=warmup, iterations=iterations, name="C GELU GGML")
-    ggml_fp16_tol = 1e-4
+    ggml_fp16_tol = 0.0 if GGML_CPU_LIB.exists() else 1e-4
 
     report.add_result(TestResult(
         name="GGML (fp16 table)",
@@ -197,6 +203,33 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
         tolerance=ggml_fp16_tol,
         pytorch_time=None,
         kernel_time=kernel_time_ggml
+    ))
+
+    # Values taken from a real Qwen3-VL layer-0 MLP-up boundary. These inputs
+    # sit near FP16 table transitions and exposed compiler/libm differences
+    # that random normal-distribution coverage did not fail reliably.
+    fixture_input_bits = np.array([
+        0xC09F2763, 0xC06F8B31, 0xC0941286, 0xC0774EC0,
+        0xC05C36E0, 0xC07EADC0, 0xC08FF4A0, 0xC08D41A3,
+        0xC086F51E, 0xC076CD06, 0xC0A11F64, 0xC06C3B42,
+        0xC040E00C, 0xC070CC5D, 0xC08BEB77, 0xC07454BA,
+    ], dtype=np.uint32)
+    fixture_expected_bits = np.array([
+        0xB4A00000, 0xB96DE000, 0xB6280000, 0xB90B2000,
+        0xBA4AE000, 0xB8A32000, 0xB6AC0000, 0xB70B0000,
+        0xB7C68000, 0xB9102000, 0xB4400000, 0xB993E000,
+        0xBB644000, 0xB95A8000, 0xB7310000, 0xB92A4000,
+    ], dtype=np.uint32)
+    fixture = fixture_input_bits.view(np.float32).copy()
+    lib.gelu_ggml_inplace(numpy_to_ptr(fixture), ctypes.c_size_t(fixture.size))
+    fixture_diff = int(np.count_nonzero(fixture.view(np.uint32) != fixture_expected_bits))
+    report.add_result(TestResult(
+        name="GGML Qwen3-VL boundary",
+        passed=fixture_diff == 0,
+        max_diff=float(fixture_diff),
+        tolerance=0.0,
+        pytorch_time=None,
+        kernel_time=None,
     ))
 
     return report

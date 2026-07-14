@@ -46,8 +46,69 @@
     "c_declaration": "void gemm_nt_f16(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels_f16.c"]
   },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "fp16_weight_fp16_input_llamafile_avx_fp32_output",
+      "status": "validated",
+      "phases": ["prefill"],
+      "function": "gemm_nt_f16",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows"],
+          "dispatch": ["ck_threadpool_dispatch_n"],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "pairwise_tree",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
   "tests": {
-    "unit": ["tests/test_v8_qwen3vl_template.py"]
+    "unit": ["unittest/test_f16_gemm_llama_contract.py"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "cast": "const float*",
+        "name": "A",
+        "source": "activation:a"
+      },
+      {
+        "name": "B",
+        "source": "weight:_first_weight"
+      },
+      {
+        "name": "bias",
+        "source": "weight_f:_bias"
+      },
+      {
+        "cast": "float*",
+        "name": "C",
+        "source": "output:c"
+      },
+      {
+        "name": "M",
+        "source": "dim:_m"
+      },
+      {
+        "name": "N",
+        "source": "dim:_output_dim"
+      },
+      {
+        "name": "K",
+        "source": "dim:_input_dim"
+      }
+    ]
   },
   "notes": "Generic FP16-weight GEMM wrapper for dense NT matmul lowering."
 }

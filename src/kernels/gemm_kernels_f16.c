@@ -259,6 +259,17 @@ static int gemm_nt_f16_ggml_strict(const float *A,
     return ok;
 }
 
+int ck_gemm_nt_f16_ggml_oracle(const float *A,
+                               const void *B,
+                               const float *bias,
+                               float *C,
+                               int M,
+                               int N,
+                               int K)
+{
+    return gemm_nt_f16_ggml_strict(A, B, bias, C, M, N, K);
+}
+
 /* ============================================================================
  * FP16 Conversion Utilities (if not using F16C)
  * ============================================================================ */
@@ -312,11 +323,10 @@ static inline void ck_f32_to_f16_row_local(uint16_t *dst, const float *src, int 
 #if defined(__F16C__) && defined(__AVX__)
 static inline float ck_hsum256_ps(__m256 v)
 {
-    __m128 lo = _mm256_castps256_ps128(v);
-    __m128 hi = _mm256_extractf128_ps(v, 1);
-    __m128 sum = _mm_add_ps(lo, hi);
-    sum = _mm_hadd_ps(sum, sum);
-    sum = _mm_hadd_ps(sum, sum);
+    __m128 sum = _mm_add_ps(_mm256_extractf128_ps(v, 1),
+                            _mm256_castps256_ps128(v));
+    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
+    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
     return _mm_cvtss_f32(sum);
 }
 

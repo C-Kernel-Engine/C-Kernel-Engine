@@ -203,6 +203,26 @@ make v7-regression-fast</code></pre>
 
 <p>The next edge is always explicit. After output projection the resolver selects the BF16 residual capability, then X-ray continues through norm2, MLP, spatial merge, projector, final prefix, mixed-prefill logits, and teacher-forced generation. A green leaf test without this forward movement is evidence for a kernel only, not closure of the model bug.</p>
 
+<h2>Execution-Contract X-Ray</h2>
+
+<p>Tensor parity cannot diagnose a backend that executes the same mixed prefix with a different schedule. X-ray therefore records prefill segmentation, cache transitions, position transitions, exact shared-library identity, and the manifest-map identity alongside numerical checkpoints.</p>
+
+<table>
+  <thead><tr><th>Mixed-prefix contract</th><th>Required behavior</th><th>Failure meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Segments</td><td><code>text_before -&gt; visual -&gt; text_after</code></td><td>A combined prefix changes projection reduction shape and rounding.</td></tr>
+    <tr><td>Cache transition</td><td><code>append_preserve</code></td><td>A segment must retain all prior K/V rows and append at the physical token offset.</td></tr>
+    <tr><td>Position transition</td><td><code>segment_defined</code></td><td>Physical cache position and semantic M-RoPE text position must not be conflated.</td></tr>
+    <tr><td>Runtime evidence</td><td>Exact generated library and manifest-map hashes</td><td>A stale converted manifest or rebuilt runtime invalidates attribution.</td></tr>
+  </tbody>
+</table>
+
+<p>On the 1,008-token Qwen3-VL form cases, the old single-call path diverged from llama.cpp as early as generated step 4. Circuit-driven segmented append removed the cache-state failure, but a later close-ranking flip remained. X-ray then showed that the visual M-RoPE cache was exact while only the rotated second half differed. Basis-vector replay isolated two compiler-visible rounding points: llama.cpp rounds the partner product before each <code>fmaf</code>, and its frequency recurrence uses the system <code>powf</code>, <code>sinf</code>, and <code>cosf</code> behavior. CK now names that evaluation order in the numerical contract and implements it explicitly.</p>
+
+<p>The resulting production gate is exact for both canonical OCR forms: each full <code>1008 x 16384</code> decoder-facing visual prefix matches llama.cpp across all 16,515,072 FP32 values, and both 128-token greedy runs match 128/128 top-1 tokens. Minimum logits cosine was 0.98892 and 0.99168 respectively, with at least 14/16 top-k overlap. This closes these two fixtures, not the unexecuted 40-image sweep or every multimodal family.</p>
+
+<p>The investigation also invalidated an earlier packed Q4_K&times;Q8_K diagnosis. The apparent packed-reduction failure was downstream of the M-RoPE ULP and a report that recorded the generated decoder library but not its dynamically loaded engine library. X-ray now defaults the raw llama.cpp oracle to one thread, rejects multi-threaded exact capture without an explicit opt-in, and records the engine, generated model, llama shim, and manifest identities. A downstream kernel is not blamed until exact-input replay and complete runtime provenance both pass.</p>
+
 <h2>Validation Commands</h2>
 
 <p><code>make test-numerical-contracts</code> is an executable gate, not only a schema check. It builds the engine and runs contract resolution, full attention numerics, and FP16 split-KV reduction cases. The focused commands below remain useful when attributing a failure.</p>

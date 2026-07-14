@@ -357,7 +357,42 @@ def _extract_c_function(code: str, signature: str) -> tuple[int, int, str] | Non
     return start, end, code[start:end]
 
 
-def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, Any]) -> str:
+def _resolved_text_mrope_function(ir_obj: Dict[str, Any]) -> str:
+    matches: list[tuple[str, str, str]] = []
+    for op in list(ir_obj.get("operations") or []):
+        if str(op.get("op", "")) != "rope_qk":
+            continue
+        resolved = op.get("resolved_contract") or {}
+        semantics = resolved.get("semantics") or {}
+        if semantics.get("operator_family") != "text_mrope":
+            continue
+        matches.append(
+            (
+                str(op.get("function", "") or "").strip(),
+                str(resolved.get("function", "") or "").strip(),
+                str(resolved.get("kernel_id", "") or "").strip(),
+            )
+        )
+    unique = set(matches)
+    if len(unique) != 1:
+        raise RuntimeError(
+            "multimodal decode requires exactly one resolved text_mrope provider; "
+            f"got {sorted(unique)}"
+        )
+    function, contract_function, kernel_id = next(iter(unique))
+    if not function or function != contract_function:
+        raise RuntimeError(
+            "text_mrope call IR function does not match its resolved contract: "
+            f"call={function!r} contract={contract_function!r} kernel={kernel_id!r}"
+        )
+    return function
+
+
+def _inject_decode_runtime_multimodal_fallback(
+    code: str,
+    layout_obj: Dict[str, Any],
+    ir_obj: Dict[str, Any],
+) -> str:
     cfg = dict(layout_obj.get("config", {}) or {})
     if str(cfg.get("logits_layout", "")).lower() != "last":
         return code
@@ -378,7 +413,7 @@ def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, 
         input_embed_dim = embed_dim
     deepstack_elems = max(1, num_deepstack_layers * embed_dim)
 
-    def _inject_qwen3vl_deepstack_residuals(src: str) -> str:
+    def _inject_multimodal_deepstack_residuals(src: str) -> str:
         if not (has_multimodal_bridge and num_deepstack_layers > 0):
             return src
 
@@ -434,7 +469,7 @@ def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, 
     if decode_fn is None:
         raise RuntimeError("unable to locate ck_decode for decode-runtime multimodal fallback")
     _, decode_end, decode_src = decode_fn
-    decode_src = _inject_qwen3vl_deepstack_residuals(decode_src)
+    decode_src = _inject_multimodal_deepstack_residuals(decode_src)
     embedded_decode = decode_src.replace(
         "static void ck_decode(CKModel *model, int32_t token) {",
         "static void ck_decode_embedded(CKModel *model) {",
@@ -459,23 +494,31 @@ def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, 
     code = code[:decode_end] + "\n\n" + embedded_decode + code[decode_end:]
 
     if has_multimodal_bridge:
-        rope_wrapper = """static void ck_qwen3vl_runtime_mrope_qk(CKModel *model, float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
-    if (model && model->bridge_has_explicit_positions) {
+        text_mrope_function = _resolved_text_mrope_function(ir_obj)
+        rope_wrapper = f"""static void ck_multimodal_runtime_mrope_qk(CKModel *model, float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {{
+    if (model && model->bridge_has_explicit_positions) {{
         mrope_qk_imrope_positions(q, k, model->bridge_positions, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
         return;
-    }
-    mrope_qk_text(q, k, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
-}
+    }}
+    {text_mrope_function}(q, k, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
+}}
 """
         code = code.replace(decode_sig, rope_wrapper + "\n" + decode_sig, 1)
-        code = code.replace("mrope_qk_text(", "ck_qwen3vl_runtime_mrope_qk(model, ")
-        code = code.replace("    ck_qwen3vl_runtime_mrope_qk(model, q, k, ", "    mrope_qk_text(q, k, ", 1)
-        prefill_helper = _extract_c_function(code, "static void ck_qwen3vl_prefill_mrope_qk(")
+        code = code.replace(
+            f"{text_mrope_function}(",
+            "ck_multimodal_runtime_mrope_qk(model, ",
+        )
+        code = code.replace(
+            "    ck_multimodal_runtime_mrope_qk(model, q, k, ",
+            f"    {text_mrope_function}(q, k, ",
+            1,
+        )
+        prefill_helper = _extract_c_function(code, "static void ck_multimodal_prefill_mrope_qk(")
         if prefill_helper is not None:
             helper_start, helper_end, helper_src = prefill_helper
             helper_patched = helper_src.replace(
-                "    ck_qwen3vl_runtime_mrope_qk(model, q, k, ",
-                "    mrope_qk_text(q, k, ",
+                "    ck_multimodal_runtime_mrope_qk(model, q, k, ",
+                f"    {text_mrope_function}(q, k, ",
                 1,
             )
             code = code[:helper_start] + helper_patched + code[helper_end:]
@@ -1041,7 +1084,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             code = code + "\n\n" + prefill_code
             if args.prefill_layout is None:
-                code = _inject_decode_runtime_multimodal_fallback(code, layout_obj)
+                code = _inject_decode_runtime_multimodal_fallback(code, layout_obj, ir_obj)
         elif str(layout_obj.get("mode", "")).lower() == "prefill":
             code = _inject_prefill_multimodal_bridge(
                 code,

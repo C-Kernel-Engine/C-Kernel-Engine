@@ -1,0 +1,94 @@
+{
+  "id": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+  "op": "attention",
+  "variant": "full_tiled64_f16kv_fp32",
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "provides": {
+    "execution.phase": ["prefill"],
+    "tensor.q.dtype": ["fp32"],
+    "tensor.kv.dtype": ["fp32"],
+    "tensor.layout": ["head_major"],
+    "numerics.attention_reduction": ["f16_kv_tiled64_fp32_softmax_fp64_sum_update"]
+  },
+  "supported_reductions": {
+    "f16_kv_tiled64_fp32_softmax_fp64_sum_update": {
+      "status": "validated",
+      "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+      "explicit_selector": true,
+      "selector": "circuit_required_contract",
+      "notes": "Exact 64x64 tiled full-attention provider with FP16-rounded K/V and the contract-defined softmax sum update."
+    }
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "threading": {
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_query_blocks"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
+      "reduction_order_effect": "contract_defined"
+    }
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "FP32 query tensor"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "K tensor rounded through FP16 on tile load"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "V tensor rounded through FP16 on tile load"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "FP32 attention output"}
+  ],
+  "scratch": [
+    {"name": "thread_tiles", "dtype": "fp32", "size_bytes": "per_thread((64*D)+(64*64)+(64*D)+(64*D))", "desc": "Bounded query, key, value, score, and output tiles"}
+  ],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32", "desc": "K/V token stride"},
+    {"name": "head_dim", "dtype": "int32", "desc": "Logical head width"},
+    {"name": "aligned_head_dim", "dtype": "int32", "desc": "Physical head stride"}
+  ],
+  "parallelization": {
+    "supported": ["query_blocks"],
+    "preferred": {"prefill": "query_blocks"},
+    "strategies": [
+      {"name": "query_blocks", "partition_dim": "H*T", "param_style": "ith_nth", "notes": "Contiguous head/query row ranges; each query retains ascending key-tile reduction order."}
+    ]
+  },
+  "constraints": {
+    "alignment": {"D": 1, "T": 1},
+    "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens."
+  },
+  "impl": {
+    "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+    "c_declaration": "void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+    "sources": ["src/kernels/attention_kernels.c", "src/kernels/softmax_kernels.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma", "f16c"], "compile_flags": ["-mavx2", "-mfma", "-mf16c"]},
+      {"name": "portable", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attention_full.py"],
+    "oracle": ["version/v8/scripts/replay_attention_from_dumps_v8.py --mode tiled_f16kv"]
+  },
+  "notes": "Contract-selected GGML-compatible tiled full attention. This provider is additive and does not replace online or BF16 SDPA contracts.",
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "float*"},
+      {"name": "k", "source": "scratch:k_scratch", "cast": "float*"},
+      {"name": "v", "source": "scratch:v_scratch", "cast": "float*"},
+      {"name": "output", "source": "output:out", "cast": "float*"},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "kv_stride_tokens", "source": "dim:max_seq_len"}
+    ]
+  }
+}

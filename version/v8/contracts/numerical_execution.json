@@ -3,6 +3,36 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "rmsnorm_fp32_square_fp64_sum_fp32_output": {
+      "operator_family": "rmsnorm",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "fp32_square_then_fp64_ascending_sum_then_fp32_mean_rsqrt_scale_weight"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["square_product", "reduction_finalize", "reciprocal_sqrt", "normalization_scale", "weight_scale"]
+      },
+      "reduction": {
+        "kind": "normalization",
+        "order": "left_to_right",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "RMSNorm with FP32 square products, an ascending FP64 row sum, FP32 mean and reciprocal square root, and ordered FP32 normalization and weight multiplies."
+    },
     "bf16_weight_bf16_input_fp32_dot_fp32_output": {
       "operator_family": "gemm",
       "status": "observed",
@@ -151,13 +181,118 @@
       },
       "description": "Align-corners tiled 2D position interpolation with FP32 rational coordinates and contracted float32 evaluation order."
     },
+    "text_mrope_fp32_input_fp32_compute_fp32_output": {
+      "operator_family": "text_mrope",
+      "status": "validated",
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "glibc_powf_sinf_cosf_then_rounded_partner_product_then_fma"
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": {
+        "pairing": "multi_section",
+        "rotary_width": "configured_rotary_dim",
+        "head_width": "head_dim",
+        "position_rank": 4,
+        "axis_order": ["text", "text_copy_1", "text_copy_2", "reserved"],
+        "section_interpretation": "axis_selection",
+        "frequency_compute": "fp32",
+        "intermediate_compute": "fp32",
+        "rounding_points": [
+          "partner_sin_product",
+          "partner_cos_product",
+          "fma_output"
+        ],
+        "threading": "serial"
+      },
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "rounding": {
+        "mode": "none",
+        "points": []
+      },
+      "description": "Text M-RoPE rotates the configured prefix of each head using one semantic text position expanded across four axis-selection streams."
+    },
+    "text_imrope_fp32_input_fp32_compute_fp32_output": {
+      "operator_family": "text_mrope",
+      "status": "validated",
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "glibc_powf_sinf_cosf_then_rounded_partner_product_then_fma"
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": {
+        "pairing": "multi_section",
+        "rotary_width": "head_dim",
+        "head_width": "head_dim",
+        "position_rank": 4,
+        "axis_order": [
+          "temporal",
+          "height",
+          "width",
+          "reserved"
+        ],
+        "section_interpretation": "interleaved_axis_selection",
+        "frequency_compute": "fp32",
+        "intermediate_compute": "fp32",
+        "rounding_points": [
+          "partner_sin_product",
+          "partner_cos_product",
+          "fma_output"
+        ],
+        "threading": "serial"
+      },
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "rounding": {
+        "mode": "none",
+        "points": []
+      },
+      "description": "Text M-RoPE uses full-width split-half rotation with Qwen-style interleaved temporal, height, width, and reserved-axis selection."
+    },
     "vision_mrope_fp32_input_fp32_compute_fp32_output": {
       "operator_family": "vision_mrope",
       "status": "validated",
       "compute": {
         "input": "fp32",
         "weight": "fp32",
-        "accumulator": "fp32"
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "glibc_powf_sinf_cosf_then_rounded_partner_product_then_fma"
       },
       "reduction": {
         "kind": "none",
@@ -185,7 +320,11 @@
         "section_interpretation": "axis_selection",
         "frequency_compute": "fp32",
         "intermediate_compute": "fp32",
-        "rounding_points": [],
+        "rounding_points": [
+          "partner_sin_product",
+          "partner_cos_product",
+          "fma_output"
+        ],
         "threading": "serial"
       },
       "storage": {
@@ -205,7 +344,9 @@
       "compute": {
         "input": "fp32",
         "weight": "fp32",
-        "accumulator": "fp32"
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "glibc_powf_sinf_cosf_then_rounded_partner_product_then_fma"
       },
       "reduction": {
         "kind": "none",
@@ -233,7 +374,11 @@
         "section_interpretation": "axis_selection",
         "frequency_compute": "fp32",
         "intermediate_compute": "fp32",
-        "rounding_points": [],
+        "rounding_points": [
+          "partner_sin_product",
+          "partner_cos_product",
+          "fma_output"
+        ],
         "threading": "serial"
       },
       "storage": {
@@ -255,7 +400,9 @@
       "compute": {
         "input": "fp32",
         "weight": "fp32",
-        "accumulator": "fp32"
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "glibc_powf_sinf_cosf_then_rounded_partner_product_then_fma"
       },
       "reduction": {
         "kind": "none",
@@ -283,7 +430,11 @@
         "section_interpretation": "axis_selection",
         "frequency_compute": "fp32",
         "intermediate_compute": "fp32",
-        "rounding_points": [],
+        "rounding_points": [
+          "partner_sin_product",
+          "partner_cos_product",
+          "fma_output"
+        ],
         "threading": "serial"
       },
       "storage": {
@@ -578,6 +729,80 @@
       },
       "position_transform": null,
       "description": "PyTorch tanh-approximate GELU over BF16-valued inputs with FP32 elementwise compute and BF16 RNE output storage."
+    },
+    "gelu_fp32_input_fp16_table_fp32_output": {
+      "operator_family": "gelu",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp16_rne",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "fp16_rne_input_then_ggml_fp16_lookup_table_then_fp32_widen"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "llama.cpp CPU GELU semantics: round FP32 input to FP16, index the GGML FP16 GELU table, then widen the FP16 result to FP32."
+    },
+    "fp16_weight_fp16_input_llamafile_avx_fp32_output": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp16",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp16_rne",
+        "weight": "fp16",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "single_simd_accumulator_ascending_k_then_llamafile_avx_movehl_movehdup_horizontal_reduce"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "reduction_finalize"
+        ]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "ascending_k",
+        "partial_accumulator": "fp32",
+        "merge_order": "pairwise_tree"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "FP16-weight GEMM matching llama.cpp's AVX llamafile path, including FP16-RNE activation conversion, FMA lane accumulation, and movehl/movehdup horizontal reduction."
     },
     "bf16_weight_bf16_input_amx_tile32_dot_bf16_output": {
       "status": "validated",

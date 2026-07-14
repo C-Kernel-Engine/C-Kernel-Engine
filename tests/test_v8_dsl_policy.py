@@ -60,7 +60,10 @@ def lower():
 
     def test_model_literal_site_limit_is_fail_closed(self) -> None:
         policy = json.loads(audit.DEFAULT_POLICY.read_text(encoding="utf-8"))
-        policy["model_literal_site_limits"]["version/v8/scripts/codegen_v8.py"] = 4
+        relative_path = "version/v8/scripts/codegen_prefill_v8.py"
+        current = audit.audit()["model_literal_inventory"][relative_path]["sites"]
+        self.assertGreater(current, 0)
+        policy["model_literal_site_limits"][relative_path] = current - 1
         with tempfile.TemporaryDirectory() as temp:
             path = pathlib.Path(temp) / "policy.json"
             path.write_text(json.dumps(policy), encoding="utf-8")

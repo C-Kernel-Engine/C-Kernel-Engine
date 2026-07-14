@@ -40,7 +40,7 @@ void layernorm_naive_serial_matched_precision(const float *input,
                                               int tokens, int d_model, float eps);
 
 #if defined(__clang__) || defined(__INTEL_LLVM_COMPILER)
-#pragma float_control(precise, off, push)
+#pragma float_control(precise, on, push)
 #endif
 static void layernorm_forward_ggml_exact(const float *input,
                                          const float *gamma,

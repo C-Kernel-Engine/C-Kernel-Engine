@@ -17,6 +17,7 @@ llamacpp`` so checkpoint ordering and reports use the standard X-ray surface.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -43,6 +44,31 @@ import parity_test  # type: ignore  # noqa: E402
 
 def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
     subprocess.run(cmd, cwd=str(cwd or REPO_ROOT), env=env, check=True)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _binary_provenance(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise RuntimeError(f"required X-ray binary is missing: {path}")
+    comment = subprocess.run(
+        ["readelf", "-p", ".comment", str(path)],
+        cwd=str(REPO_ROOT),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "path": str(path.resolve()),
+        "sha256": _sha256(path),
+        "elf_comment": comment.stdout.strip() if comment.returncode == 0 else None,
+    }
 
 
 def _compile_generated_dump_model(output_dir: Path, c_path: Path) -> Path:
@@ -168,6 +194,7 @@ def _run_generated_encoder_with_dump(
     dump_dir: Path,
     strict_parity: bool,
     strict_dump_layer: int | None,
+    dump_layer: int | None,
     ck_stop_op: int | None,
     dump_names: str | None,
 ) -> None:
@@ -186,6 +213,13 @@ def _run_generated_encoder_with_dump(
         "CK_STRICT_ATTN_DUMP_LAYER",
         None if strict_dump_layer is None else str(strict_dump_layer),
     )
+    # Keep global frontend checkpoints and the requested transformer layer.
+    # Without this bound, a late-layer X-ray emits every prior layer and can
+    # produce multi-gigabyte dumps before attribution begins.
+    old_layer_filter = _with_env_var(
+        "CK_PARITY_LAYER_FILTER",
+        None if dump_layer is None else f"-1,{int(dump_layer)}",
+    )
     old_stop_op = _with_env_var("CK_STOP_OP", None if ck_stop_op is None else str(int(ck_stop_op)))
     old_filter = _with_env_var("CK_PARITY_OP_FILTER", dump_names)
     try:
@@ -200,6 +234,7 @@ def _run_generated_encoder_with_dump(
     finally:
         _restore_env_var("CK_PARITY_OP_FILTER", old_filter)
         _restore_env_var("CK_STOP_OP", old_stop_op)
+        _restore_env_var("CK_PARITY_LAYER_FILTER", old_layer_filter)
         _restore_env_var("CK_STRICT_ATTN_DUMP_LAYER", old_dump_layer)
         _restore_env_var("CK_PARITY_DIR", old_dump)
 
@@ -290,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional comma-separated llama dump filter, e.g. patch_bias,inp_pos_emb,ln1,Qcur,Qcur_rope,Kcur,Kcur_rope,Vcur,kqv_out,attn_out",
     )
     ap.add_argument("--llama-dump-layer", type=int, default=None, help="Optional exact llama layer id filter; globals remain included")
+    ap.add_argument("--ck-dump-layer", type=int, default=None, help="Optional exact CK layer id filter; global frontend checkpoints remain included")
     ap.add_argument("--ck-strict-dump-layer", type=int, default=None, help="Optional exact CK strict-attention dump layer filter")
     ap.add_argument(
         "--ck-dump-names",
@@ -319,6 +355,12 @@ def main(argv: list[str] | None = None) -> int:
     ck_stop_op = _resolve_ck_stop_op(output_dir, args.ck_stop_op, args.ck_stop_layer)
     model_so = _compile_generated_dump_model(output_dir, c_path)
     shim_so = npv8._compile_mtmd_shim(output_dir)
+    engine_so = BUILD_DIR / "libckernel_engine.so"
+    binary_provenance = {
+        "engine": _binary_provenance(engine_so),
+        "generated_model": _binary_provenance(model_so),
+        "llama_shim": _binary_provenance(shim_so),
+    }
 
     config = report["config"]
     height = int(config.get("image_height", config.get("image_size")))
@@ -351,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
         dump_dir=ck_dump_dir,
         strict_parity=bool(args.strict_parity),
         strict_dump_layer=args.ck_strict_dump_layer,
+        dump_layer=args.ck_dump_layer,
         ck_stop_op=ck_stop_op,
         dump_names=args.ck_dump_names or args.llama_dump_names,
     )
@@ -366,6 +409,11 @@ def main(argv: list[str] | None = None) -> int:
         dump_layer=args.llama_dump_layer,
         flash_attn_type={"disabled": 0, "auto": -1, "enabled": 1}[args.llama_flash_attn],
     )
+    engine_sha_after_capture = _sha256(engine_so)
+    if engine_sha_after_capture != binary_provenance["engine"]["sha256"]:
+        raise RuntimeError(
+            "build/libckernel_engine.so changed during X-ray capture; discard the mixed-build report"
+        )
 
     ck_dump = _merge_ck_dump_artifacts(ck_dump_dir)
     ref_dump = llama_dump_dir / "dump.bin"
@@ -400,11 +448,13 @@ def main(argv: list[str] | None = None) -> int:
             "llama_cpp": args.threads,
             "ck_runtime": ck_threads,
         },
+        "binary_provenance": binary_provenance,
         "strict_parity": bool(args.strict_parity),
         "llama_flash_attn": args.llama_flash_attn,
         "llama_dump_names": args.llama_dump_names,
         "ck_dump_names": args.ck_dump_names or args.llama_dump_names,
         "llama_dump_layer": args.llama_dump_layer,
+        "ck_dump_layer": args.ck_dump_layer,
         "atol": args.atol,
         "rtol": args.rtol,
         "ck_dump": str(ck_dump),

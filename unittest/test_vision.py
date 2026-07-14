@@ -691,7 +691,7 @@ def test_position_embeddings_add_tiled_2d_qwen3vl_resize_order(
     grid_h=56,
     grid_w=72,
     source_grid_size=48,
-    embed_dim=64,
+    embed_dim=1152,
     merge_size=2,
 ):
     print(
@@ -724,10 +724,9 @@ def test_position_embeddings_add_tiled_2d_qwen3vl_resize_order(
     diff = max_diff(out_c, ref)
     print(f"Max diff: {diff:.2e}")
 
-    # The production contract permits contraction in the interpolation node,
-    # as ggml does. GCC and Intel/Clang can therefore differ by a few ULPs;
-    # the full llama X-ray gate separately requires backend-exact output.
-    if diff > 2.5e-5:
+    # This is the production Qwen3-VL geometry. The kernel uses an explicit
+    # ordered FMA contract, so compiler-dependent reassociation is a failure.
+    if diff != 0.0:
         raise AssertionError("position_embeddings_add_tiled_2d Qwen3-VL resize order mismatch!")
 
 
@@ -1073,6 +1072,60 @@ def _ref_qwen3vl_vision_mrope_qk(
     return apply(q), apply(k)
 
 
+def _ref_ggml_vision_mrope_exact(
+    x: torch.Tensor,
+    positions: torch.Tensor,
+    n_dims: int,
+    sections: list[int],
+    freq_base: float = 10000.0,
+) -> torch.Tensor:
+    """Reference ggml's FP32/libm/FMA vision M-RoPE contract."""
+    libm = ctypes.CDLL("libm.so.6")
+    cosf = libm.cosf
+    sinf = libm.sinf
+    fmaf = libm.fmaf
+    cosf.argtypes = [ctypes.c_float]
+    sinf.argtypes = [ctypes.c_float]
+    fmaf.argtypes = [ctypes.c_float, ctypes.c_float, ctypes.c_float]
+    cosf.restype = ctypes.c_float
+    sinf.restype = ctypes.c_float
+    fmaf.restype = ctypes.c_float
+
+    out = x.numpy().copy()
+    pos = positions.numpy()
+    rope_pairs = n_dims // 2
+    powf = libm.powf
+    powf.argtypes = [ctypes.c_float, ctypes.c_float]
+    powf.restype = ctypes.c_float
+    theta_scale = np.float32(powf(
+        ctypes.c_float(freq_base),
+        ctypes.c_float(np.float32(-2.0) / np.float32(rope_pairs)),
+    ))
+    for head in range(out.shape[0]):
+        for token in range(out.shape[1]):
+            theta_y = np.float32(pos[0, token])
+            theta_x = np.float32(pos[1, token])
+            for pair in range(rope_pairs):
+                if pair == sections[0]:
+                    theta_x = np.float32(pos[1, token])
+                theta = theta_x if pair >= sections[0] else theta_y
+                cosine = np.float32(cosf(ctypes.c_float(theta)))
+                sine = np.float32(sinf(ctypes.c_float(theta)))
+                x0 = np.float32(out[head, token, pair])
+                x1 = np.float32(out[head, token, pair + rope_pairs])
+                x1_sin = np.float32(x1 * sine)
+                x1_cos = np.float32(x1 * cosine)
+                out[head, token, pair] = np.float32(fmaf(
+                    ctypes.c_float(x0), ctypes.c_float(cosine), ctypes.c_float(-x1_sin)
+                ))
+                out[head, token, pair + rope_pairs] = np.float32(fmaf(
+                    ctypes.c_float(x0), ctypes.c_float(sine), ctypes.c_float(x1_cos)
+                ))
+                theta_y = np.float32(theta_y * theta_scale)
+                theta_x = np.float32(theta_x * theta_scale)
+    return torch.from_numpy(out)
+
+
 def test_vision_position_ids(grid_h=4, grid_w=4, merge_size=2):
     print(f"\n--- Testing vision_position_ids_2d_merge ({grid_h}x{grid_w}, merge {merge_size}) ---")
     ref = _ref_vision_position_ids(grid_h, grid_w, merge_size)
@@ -1150,6 +1203,28 @@ def test_mrope_qk_vision_qwen3vl_full_head():
     test_mrope_qk_vision(num_heads=2, num_kv_heads=2, num_tokens=4, head_dim=72)
 
 
+def test_mrope_qk_vision_ggml_libm_exact():
+    """Catch ICX libimf trigonometric drift at production rotary width."""
+    torch.manual_seed(713)
+    head_dim = 72
+    sections = [18, 18, 0, 0]
+    q = torch.randn(1, 72, head_dim, dtype=torch.float32)
+    k = torch.randn(1, 72, head_dim, dtype=torch.float32)
+    positions = _ref_vision_position_ids(1, 72, 1)
+    ref_q = _ref_ggml_vision_mrope_exact(q, positions, head_dim, sections)
+    ref_k = _ref_ggml_vision_mrope_exact(k, positions, head_dim, sections)
+    out_q, out_k = run_c_mrope_qk(q, k, positions, head_dim, sections)
+    q_differing = int(torch.count_nonzero(out_q.view(torch.int32) != ref_q.view(torch.int32)))
+    k_differing = int(torch.count_nonzero(out_k.view(torch.int32) != ref_k.view(torch.int32)))
+    print(
+        "GGML/libm-exact vision M-RoPE: "
+        f"Q different={q_differing}/{out_q.numel()}, "
+        f"K different={k_differing}/{out_k.numel()}"
+    )
+    if q_differing or k_differing:
+        raise AssertionError("vision M-RoPE changed the ggml system-libm contract")
+
+
 if __name__ == "__main__":
     test_im2patch()
     test_patch2im()
@@ -1169,6 +1244,7 @@ if __name__ == "__main__":
     test_feature_concat_inplace_expand()
     test_mrope_qk_vision()
     test_mrope_qk_vision_qwen3vl_full_head()
+    test_mrope_qk_vision_ggml_libm_exact()
     test_mrope_qk_vision_storage_matrix()
     
     # Test a non-multiple size just in case (though ViT usually uses multiples)

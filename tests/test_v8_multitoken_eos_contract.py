@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
@@ -47,6 +49,53 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertFalse(self.runner._is_matched_stop_token(151645, 4, stops))
         self.assertFalse(self.runner._is_matched_stop_token(4, 4, stops))
 
+    def test_exact_runtime_reuse_loads_only_declared_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            decoder_dir = Path(tmp)
+            (decoder_dir / "layout_decode.json").write_text(
+                json.dumps(
+                    {
+                        "config": {
+                            "embed_dim": 4096,
+                            "num_deepstack_layers": 3,
+                            "context_length": 4096,
+                            "vocab_size": 151936,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for name in ("weights.bump", "weights_manifest.map", "libdecoder_v8.so"):
+                (decoder_dir / name).touch()
+
+            runtime = self.runner._load_exact_decoder_runtime(
+                Path("decoder.gguf"),
+                decoder_dir,
+                so_override=None,
+                manifest_map_override=None,
+            )
+
+            self.assertEqual(runtime["embed_dim"], 4096)
+            self.assertEqual(runtime["input_embed_dim"], 16384)
+            self.assertEqual(runtime["context_length"], 4096)
+            self.assertEqual(runtime["so_path"], decoder_dir / "libdecoder_v8.so")
+            evidence = self.runner._runtime_evidence(runtime, exact_reuse=True)
+            self.assertTrue(evidence["exact_reuse"])
+            self.assertEqual(
+                evidence["shared_library"]["sha256"],
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            )
+
+    def test_exact_runtime_reuse_fails_instead_of_regenerating(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(FileNotFoundError, "refusing to regenerate or guess"):
+                self.runner._load_exact_decoder_runtime(
+                    Path("decoder.gguf"),
+                    Path(tmp),
+                    so_override=None,
+                    manifest_map_override=None,
+                )
+
     def test_runner_records_eos_step_without_decoding_past_it(self) -> None:
         class Tokenizer:
             def decode(self, tokens, skip_special=False):
@@ -78,6 +127,7 @@ class MultitokenEOSContractTests(unittest.TestCase):
             "prefix_path": Path("prefix.f32"),
             "prefix_grid": (36, 28),
             "prefix_text_pos": 41,
+            "runtime": {},
         }
         comparison = {
             "top1_ck": 151645,
@@ -112,6 +162,7 @@ class MultitokenEOSContractTests(unittest.TestCase):
              mock.patch.object(self.runner, "_run_llama_greedy_sequence", return_value=llama_sequence), \
              mock.patch.object(self.runner, "_init_ck_state", return_value=(library, object(), 3)), \
              mock.patch.object(self.runner, "_ck_logits_from_buffer", return_value=np.zeros(3, dtype=np.float32)), \
+             mock.patch.object(self.runner, "_runtime_evidence", return_value={}), \
              mock.patch.object(self.runner.first_token.compare_first_token_logits_v7, "compare_logits", return_value=comparison), \
              mock.patch.object(self.runner, "_decode_topk", return_value=[]):
             report = self.runner.run_multimodal_multitoken_parity(args)

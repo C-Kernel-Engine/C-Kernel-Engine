@@ -679,57 +679,8 @@
         }
       ]
     },
-    "gelu_ggml_inplace": {
-      "note": "GGML-compatible in-place GELU binding for llama.cpp parity-sensitive v8 paths.",
-      "params": [
-        {
-          "cast": "float*",
-          "name": "data",
-          "source": "output:out"
-        },
-        {
-          "name": "n",
-          "source": "dim:gelu_elems"
-        }
-      ]
-    },
     "gemm_naive_parallel": {
       "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
-      "params": [
-        {
-          "cast": "const float*",
-          "name": "A",
-          "source": "activation:a"
-        },
-        {
-          "name": "B",
-          "source": "weight:_first_weight"
-        },
-        {
-          "name": "bias",
-          "source": "weight_f:_bias"
-        },
-        {
-          "cast": "float*",
-          "name": "C",
-          "source": "output:c"
-        },
-        {
-          "name": "M",
-          "source": "dim:_m"
-        },
-        {
-          "name": "N",
-          "source": "dim:_output_dim"
-        },
-        {
-          "name": "K",
-          "source": "dim:_input_dim"
-        }
-      ]
-    },
-    "gemm_nt_f16": {
-      "note": "FP16-weight dense GEMM wrapper with the standard matmul ABI.",
       "params": [
         {
           "cast": "const float*",
@@ -1257,93 +1208,6 @@
         {
           "name": "eps",
           "source": "dim:rms_eps"
-        }
-      ]
-    },
-    "mrope_qk_text": {
-      "note": "Text multi-section RoPE driven by runtime token position offset.",
-      "params": [
-        {
-          "cast": "float*",
-          "name": "q",
-          "source": "output:q"
-        },
-        {
-          "cast": "float*",
-          "name": "k",
-          "source": "output:k"
-        },
-        {
-          "name": "num_heads",
-          "source": "dim:num_heads"
-        },
-        {
-          "name": "num_kv_heads",
-          "source": "dim:num_kv_heads"
-        },
-        {
-          "name": "num_tokens",
-          "source": "dim:seq_len"
-        },
-        {
-          "name": "head_dim",
-          "source": "dim:head_dim"
-        },
-        {
-          "name": "aligned_head_dim",
-          "source": "dim:head_dim"
-        },
-        {
-          "name": "pos_offset",
-          "source": "runtime:pos"
-        },
-        {
-          "name": "n_dims",
-          "source": "dim:n_dims"
-        },
-        {
-          "name": "section_0",
-          "source": "dim:section_0"
-        },
-        {
-          "name": "section_1",
-          "source": "dim:section_1"
-        },
-        {
-          "name": "section_2",
-          "source": "dim:section_2"
-        },
-        {
-          "name": "section_3",
-          "source": "dim:section_3"
-        },
-        {
-          "name": "n_ctx_orig",
-          "source": "dim:n_ctx_orig"
-        },
-        {
-          "name": "freq_base",
-          "source": "dim:freq_base"
-        },
-        {
-          "name": "freq_scale",
-          "source": "dim:freq_scale"
-        },
-        {
-          "name": "ext_factor",
-          "source": "dim:ext_factor"
-        },
-        {
-          "name": "attn_factor",
-          "source": "dim:attn_factor"
-        },
-        {
-          "name": "beta_fast",
-          "source": "dim:beta_fast"
-        },
-        {
-          "name": "beta_slow",
-          "source": "dim:beta_slow"
         }
       ]
     },

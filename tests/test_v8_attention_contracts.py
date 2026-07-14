@@ -77,8 +77,28 @@ class AttentionContractV8Tests(unittest.TestCase):
             mode="bringup",
             source_circuit_path=self.vision_circuit_path,
         )
-        self.assertEqual(result["reduction"]["id"], "f16_kv_fp32_online")
+        self.assertEqual(
+            result["reduction"]["id"],
+            "f16_kv_tiled64_fp32_softmax_fp64_sum_update",
+        )
+        self.assertEqual(
+            result["kernel"]["id"],
+            "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
+        )
+        self.assertEqual(result["production_blockers"], [])
         self.assertEqual(result["phase"], "prefill")
+
+    def test_qwen3vl_prefill_resolves_segmented_append_provider(self) -> None:
+        result = self.resolve("prefill")
+        self.assertEqual(
+            result["kernel"]["id"],
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+        )
+        self.assertEqual(
+            result["requirements"]["execution.prefill_batching"],
+            "segmented_append",
+        )
+        self.assertEqual(result["requirements"]["tensor.kv.dtype"], "fp16")
 
     def test_production_rejects_unvalidated_circuit_request(self) -> None:
         with self.assertRaisesRegex(resolver.ContractError, "Production contract resolution rejected"):
@@ -231,9 +251,9 @@ class AttentionContractV8Tests(unittest.TestCase):
             ("nemotron_h", "decoder.attention", "decode", "attention_forward_decode_head_major_gqa_flash"),
             ("llama", "decoder.attention", "prefill", "attention_forward_causal_head_major_gqa_flash_strided_f16kv"),
             ("llama", "decoder.attention", "decode", "attention_forward_decode_head_major_gqa_flash_f16kv"),
-            ("qwen3vl", "decoder.attention", "prefill", "attention_forward_causal_head_major_gqa_flash_strided"),
+            ("qwen3vl", "decoder.attention", "prefill", "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract"),
             ("qwen3vl", "decoder.attention", "decode", "attention_forward_decode_head_major_gqa_flash_f16cache"),
-            ("qwen3_vl_vision", "vision_encoder.attention", "prefill", "attention_forward_full_head_major_gqa_flash_strided"),
+            ("qwen3_vl_vision", "vision_encoder.attention", "prefill", "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided"),
         )
         for circuit_name, operation, phase, expected in cases:
             with self.subTest(circuit=circuit_name, phase=phase):

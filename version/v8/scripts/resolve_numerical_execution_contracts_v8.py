@@ -92,11 +92,15 @@ def validate_contract_registry(doc: Dict[str, Any]) -> None:
                     f"position_rank={transform['position_rank']} axis_order={transform['axis_order']}",
                     "make the position rank equal the number of named axes.",
                 )
-            if transform["pairing"] == "multi_section" and transform["section_interpretation"] != "axis_selection":
+            section_semantics = transform["section_interpretation"]
+            if transform["pairing"] == "multi_section" and section_semantics not in {
+                "axis_selection",
+                "interleaved_axis_selection",
+            }:
                 raise hard_fault(
                     f"multi-section position contract {contract_id!r} redefines rotary width",
                     "Qwen-style M-RoPE sections select position axes; rotary_width remains independent.",
-                    "set section_interpretation to axis_selection and validate the full rotary width separately.",
+                    "use axis_selection or interleaved_axis_selection and validate the full rotary width separately.",
                 )
             rotary_width = transform.get("rotary_width_value")
             head_width = transform.get("head_width_value")

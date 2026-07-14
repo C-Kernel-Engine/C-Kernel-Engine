@@ -30,8 +30,48 @@
     "c_declaration": "void gelu_ggml_inplace(float *data, size_t n);",
     "sources": ["src/kernels/gelu_kernels.c"]
   },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "gelu_fp32_input_fp16_table_fp32_output",
+      "status": "validated",
+      "phases": ["prefill"],
+      "function": "gelu_ggml_inplace",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": ["serial"],
+          "dispatch": ["inline"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
   "tests": {
-    "unit": ["unittest/test_gelu.py"]
+    "unit": ["unittest/test_gelu.py::GGML Qwen3-VL boundary"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "cast": "float*",
+        "name": "data",
+        "source": "output:out"
+      },
+      {
+        "name": "n",
+        "source": "dim:gelu_elems"
+      }
+    ]
   },
   "notes": "GGML-compatible FP16-table GELU used for llama.cpp activation parity."
 }
