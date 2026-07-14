@@ -163,6 +163,9 @@ make v7-regression-fast</code></pre>
 <p>Every X-ray failure follows the same additive progression. The report embeds these steps so another agent does not repeat an already diagnosed numerical bug.</p>
 
 <ol>
+  <li>Compare execution policy first: prefill segmentation, kernel batch shapes, position progression, cache reset/append behavior, and cache strides. A combined 1,307-row prefill is not numerically equivalent evidence for a backend that executes 33, 1,008, and 266-row segments.</li>
+  <li>For incremental decode, prove cache state before attention math: compare append index, current post-RoPE K/V, stored-row readback, the previous row, and hashes for every valid cache row.</li>
+  <li>Only when query and valid cache bytes agree, compare attention providers, split thresholds, worker partitions, probability/value rounding, and merge order.</li>
   <li>Stop at the first divergent semantic edge and classify its storage, compute, reduction, position, layout, circuit, binding, and threading contract.</li>
   <li>Resolve an exact compatible kernel-map capability. Zero or multiple providers hard-fail.</li>
   <li>Fix the existing implementation or add one new additive variant. Do not alter unrelated numerical variants.</li>
@@ -172,6 +175,15 @@ make v7-regression-fast</code></pre>
   <li>Rerun X-ray from the last passing checkpoint. The accepted fix must move the first divergence to a later semantic edge.</li>
   <li>Publish the capability evidence in the test-report accordion and nightly artifacts before promoting the route.</li>
 </ol>
+
+<p>The bounded execution-state comparator preserves this order in a machine-readable report:</p>
+
+<pre><code>python version/v8/scripts/xray_execution_state_v8.py \
+  --subject-trace build/xray/ck-execution-trace.json \
+  --oracle-trace build/xray/llama-execution-trace.json \
+  --output build/xray/execution-state-report.json</code></pre>
+
+<p>It stops at one of four useful boundaries: execution-policy mismatch, cache metadata/content mismatch, attention-input mismatch, or attention-arithmetic mismatch. Tensor bisection begins only after the execution and state contracts agree.</p>
 
 <h2>Measured BF16 Vision Progression</h2>
 
