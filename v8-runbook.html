@@ -1404,6 +1404,44 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
     <p style="margin-bottom: 0;">A healthy prompt shell uses the GGUF chat template in <code>auto</code> mode and preserves the vision markers around <code>&lt;image_embeds&gt;</code>.</p>
 </div>
 
+<h2 id="ir-hub-quick-launch">IR Hub Quick Launch</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.35rem;">
+        Generate and open the parent dashboard for all v8 runs under <code>$HOME/.cache/ck-engine-v8/models</code>.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v8/tools/open_ir_hub_v8.py --open</pre>
+    </div>
+    <p style="margin-bottom: 0;">Cache-backed inference, training, profiling, and multimodal runs appear automatically when their artifacts use the canonical v8 model root.</p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Headless Server Access</h3>
+    <p>
+        When the server has no window manager, serve the canonical model root and use an SSH tunnel.
+        Keeping the HTTP server on loopback avoids exposing unauthenticated reports to the surrounding network.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Run on the headless CKE server.
+cd "${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v8/models}"
+python3 -m http.server 7021 --bind 127.0.0.1
+
+# Run on the workstation that has a browser.
+ssh -L 7021:127.0.0.1:7021 USER@SERVER
+
+# Then open:
+http://127.0.0.1:7021/ir_hub.html</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        On a trusted LAN or Tailscale network, binding with <code>--bind 0.0.0.0</code> makes the hub reachable at
+        <code>http://SERVER_IP:7021/ir_hub.html</code>. Python's development server provides no authentication or TLS;
+        do not expose it directly to the public internet.
+    </p>
+</div>
+
 <h2>Artifacts To Inspect</h2>
 
 <div class="card">
@@ -1777,7 +1815,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>
