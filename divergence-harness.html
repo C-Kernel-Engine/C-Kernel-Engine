@@ -1006,6 +1006,29 @@
     one transpose, or one template seam instead of the whole transformer.
   </p>
 
+  <h2>Why Effective Contracts Matter</h2>
+  <p>
+    A function name is not a complete numerical identity. During Qwen3-VL parity work,
+    CK and llama.cpp invoked attention over the same FP16 cache through apparently
+    equivalent public operations, but llama.cpp selected different arithmetic at a
+    query-batch threshold. Short segments used FP16 online single-range attention;
+    batches of 64 or more queries used 64 x 64 FP32 tiles. The real mixed prefill used
+    segment sizes 5, 1008, and 14, so neither a single-range-only nor tiled-only provider
+    could match all three segments.
+  </p>
+  <p>
+    Execution-state X-ray therefore records the exact kernel ID, declared numerical
+    contract ID, and shape-selected effective contract ID for every bounded kernel
+    batch. It reports <code>KERNEL_CONTRACT_MISMATCH</code> before loading tensor dumps.
+    This prevents a downstream Q8 boundary from being blamed for an upstream dispatch
+    difference and prevents leaf-kernel parity from certifying an untested production route.
+  </p>
+  <p>
+    The complete experiment and rejected-hypothesis record is published as
+    <a href="assets/qwen3vl-q4-parity-investigation.txt">plain text</a> so future agents
+    can reuse the evidence rather than repeat the investigation.
+  </p>
+
   <h2>Current Backend Contract</h2>
   <table>
     <tr>
@@ -1545,7 +1568,7 @@ ck_dump_tensor_head_major_token_major(q_buffer, layer_id, "Qcur", heads, tokens,
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-14</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>
