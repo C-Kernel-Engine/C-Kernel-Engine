@@ -189,11 +189,11 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   13</span><span class="comment">     */</span></div>
 <div class="line"><span class="lineno">   14</span>    <a class="code hl_function" href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
 <div class="line"><span class="lineno">   15</span>}</div>
-<div class="ttc" id="aquantize__row__q8__k__avx512_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00056">gemm_kernels_q4k_q8k.c:56</a></div></div>
+<div class="ttc" id="aquantize__row__q8__k__avx512_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00061">gemm_kernels_q4k_q8k.c:61</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00056">quantize_row_q8_k_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00061">quantize_row_q8_k_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00117">quantize_row_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00121">quantize_row_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -229,62 +229,61 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00056">56</a> of file <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html">gemm_kernels_q4k_q8k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   56</span>                                                            {</div>
-<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (!x || !vy || k &lt;= 0) {</div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   59</span>    }</div>
-<div class="line"><span class="lineno">   60</span>    assert(k % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> == 0);</div>
-<div class="line"><span class="lineno">   61</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">   62</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
-<div class="line"><span class="lineno">   63</span> </div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="keywordtype">float</span> max = 0.0f;</div>
-<div class="line"><span class="lineno">   66</span>        <span class="keywordtype">float</span> amax = 0.0f;</div>
-<div class="line"><span class="lineno">   67</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; ++j) {</div>
-<div class="line"><span class="lineno">   68</span>            <span class="keywordtype">float</span> ax = fabsf(x[j]);</div>
-<div class="line"><span class="lineno">   69</span>            <span class="keywordflow">if</span> (ax &gt; amax) {</div>
-<div class="line"><span class="lineno">   70</span>                amax = ax;</div>
-<div class="line"><span class="lineno">   71</span>                max = x[j];</div>
-<div class="line"><span class="lineno">   72</span>            }</div>
-<div class="line"><span class="lineno">   73</span>        }</div>
-<div class="line"><span class="lineno">   74</span>        <span class="keywordflow">if</span> (!amax) {</div>
-<div class="line"><span class="lineno">   75</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 0.0f;</div>
-<div class="line"><span class="lineno">   76</span>            memset(y[i].qs, 0, <span class="keyword">sizeof</span>(y[i].qs));</div>
-<div class="line"><span class="lineno">   77</span>            memset(y[i].bsums, 0, <span class="keyword">sizeof</span>(y[i].bsums));</div>
-<div class="line"><span class="lineno">   78</span>            x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">   79</span>            <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">   80</span>        }</div>
-<div class="line"><span class="lineno">   81</span> </div>
-<div class="line"><span class="lineno">   82</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
-<div class="line"><span class="lineno">   83</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; ++j) {</div>
-<div class="line"><span class="lineno">   84</span>            <span class="comment">/* Keep the active llama.cpp oracle expression intact. In</span></div>
-<div class="line"><span class="lineno">   85</span><span class="comment">             * particular, do not insert a store/load rounding barrier between</span></div>
-<div class="line"><span class="lineno">   86</span><span class="comment">             * the multiply and nearest_int: that changes tie cases on AVX2. */</span></div>
-<div class="line"><span class="lineno">   87</span>            <span class="keywordtype">float</span> scaled = iscale * x[j];</div>
-<div class="line"><span class="lineno">   88</span>            <span class="keywordtype">int</span> v = <a class="code hl_function" href="gemm__kernels__q4k__q8k_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a>(scaled);</div>
-<div class="line"><span class="lineno">   89</span>            <span class="keywordflow">if</span> (v &gt; 127) {</div>
-<div class="line"><span class="lineno">   90</span>                v = 127;</div>
-<div class="line"><span class="lineno">   91</span>            }</div>
-<div class="line"><span class="lineno">   92</span>            <span class="keywordflow">if</span> (v &lt; -128) {</div>
-<div class="line"><span class="lineno">   93</span>                v = -128;</div>
-<div class="line"><span class="lineno">   94</span>            }</div>
-<div class="line"><span class="lineno">   95</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j] = (int8_t)v;</div>
-<div class="line"><span class="lineno">   96</span>        }</div>
-<div class="line"><span class="lineno">   97</span> </div>
-<div class="line"><span class="lineno">   98</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> / 16; ++j) {</div>
-<div class="line"><span class="lineno">   99</span>            <span class="keywordtype">int</span> sum = 0;</div>
-<div class="line"><span class="lineno">  100</span>            <span class="keyword">const</span> int8_t *qs = &amp;y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j * 16];</div>
-<div class="line"><span class="lineno">  101</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ii = 0; ii &lt; 16; ++ii) {</div>
-<div class="line"><span class="lineno">  102</span>                sum += qs[ii];</div>
-<div class="line"><span class="lineno">  103</span>            }</div>
-<div class="line"><span class="lineno">  104</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j] = (int16_t)sum;</div>
-<div class="line"><span class="lineno">  105</span>        }</div>
-<div class="line"><span class="lineno">  106</span> </div>
-<div class="line"><span class="lineno">  107</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
-<div class="line"><span class="lineno">  108</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">  109</span>    }</div>
-<div class="line"><span class="lineno">  110</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00061">61</a> of file <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html">gemm_kernels_q4k_q8k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   61</span>                                                            {</div>
+<div class="line"><span class="lineno">   62</span>    <span class="keywordflow">if</span> (!x || !vy || k &lt;= 0) {</div>
+<div class="line"><span class="lineno">   63</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   64</span>    }</div>
+<div class="line"><span class="lineno">   65</span>    assert(k % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> == 0);</div>
+<div class="line"><span class="lineno">   66</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">   67</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *y = (<a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)vy;</div>
+<div class="line"><span class="lineno">   68</span> </div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordtype">float</span> max = 0.0f;</div>
+<div class="line"><span class="lineno">   71</span>        <span class="keywordtype">float</span> amax = 0.0f;</div>
+<div class="line"><span class="lineno">   72</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; ++j) {</div>
+<div class="line"><span class="lineno">   73</span>            <span class="keywordtype">float</span> ax = fabsf(x[j]);</div>
+<div class="line"><span class="lineno">   74</span>            <span class="keywordflow">if</span> (ax &gt; amax) {</div>
+<div class="line"><span class="lineno">   75</span>                amax = ax;</div>
+<div class="line"><span class="lineno">   76</span>                max = x[j];</div>
+<div class="line"><span class="lineno">   77</span>            }</div>
+<div class="line"><span class="lineno">   78</span>        }</div>
+<div class="line"><span class="lineno">   79</span>        <span class="keywordflow">if</span> (!amax) {</div>
+<div class="line"><span class="lineno">   80</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 0.0f;</div>
+<div class="line"><span class="lineno">   81</span>            memset(y[i].qs, 0, <span class="keyword">sizeof</span>(y[i].qs));</div>
+<div class="line"><span class="lineno">   82</span>            memset(y[i].bsums, 0, <span class="keyword">sizeof</span>(y[i].bsums));</div>
+<div class="line"><span class="lineno">   83</span>            x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">   84</span>            <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">   85</span>        }</div>
+<div class="line"><span class="lineno">   86</span> </div>
+<div class="line"><span class="lineno">   87</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
+<div class="line"><span class="lineno">   88</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; ++j) {</div>
+<div class="line"><span class="lineno">   89</span>            <span class="comment">/* llama.cpp rounds the multiply before adding nearest_int&#39;s magic</span></div>
+<div class="line"><span class="lineno">   90</span><span class="comment">             * constant. Contracting both operations changes Q8_K tie cases. */</span></div>
+<div class="line"><span class="lineno">   91</span>            <span class="keywordtype">float</span> scaled = iscale * x[j];</div>
+<div class="line"><span class="lineno">   92</span>            <span class="keywordtype">int</span> v = <a class="code hl_function" href="gemm__kernels__q4k__q8k_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a>(scaled);</div>
+<div class="line"><span class="lineno">   93</span>            <span class="keywordflow">if</span> (v &gt; 127) {</div>
+<div class="line"><span class="lineno">   94</span>                v = 127;</div>
+<div class="line"><span class="lineno">   95</span>            }</div>
+<div class="line"><span class="lineno">   96</span>            <span class="keywordflow">if</span> (v &lt; -128) {</div>
+<div class="line"><span class="lineno">   97</span>                v = -128;</div>
+<div class="line"><span class="lineno">   98</span>            }</div>
+<div class="line"><span class="lineno">   99</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j] = (int8_t)v;</div>
+<div class="line"><span class="lineno">  100</span>        }</div>
+<div class="line"><span class="lineno">  101</span> </div>
+<div class="line"><span class="lineno">  102</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> / 16; ++j) {</div>
+<div class="line"><span class="lineno">  103</span>            <span class="keywordtype">int</span> sum = 0;</div>
+<div class="line"><span class="lineno">  104</span>            <span class="keyword">const</span> int8_t *qs = &amp;y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j * 16];</div>
+<div class="line"><span class="lineno">  105</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ii = 0; ii &lt; 16; ++ii) {</div>
+<div class="line"><span class="lineno">  106</span>                sum += qs[ii];</div>
+<div class="line"><span class="lineno">  107</span>            }</div>
+<div class="line"><span class="lineno">  108</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j] = (int16_t)sum;</div>
+<div class="line"><span class="lineno">  109</span>        }</div>
+<div class="line"><span class="lineno">  110</span> </div>
+<div class="line"><span class="lineno">  111</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
+<div class="line"><span class="lineno">  112</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">  113</span>    }</div>
+<div class="line"><span class="lineno">  114</span>}</div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00121">ckernel_quant.h:121</a></div></div>
 <div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ab5a6ee098afcfc17f8e2da12535945aa"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ab5a6ee098afcfc17f8e2da12535945aa">ck_nearest_int</a></div><div class="ttdeci">static int ck_nearest_int(float fval)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00048">gemm_kernels_q4k_q8k.c:48</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00153">ckernel_quant.h:153</a></div></div>
@@ -294,7 +293,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00156">block_q8_K::bsums</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00048">ck_nearest_int()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00154">block_q8_K::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00121">QK_K</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00155">block_q8_K::qs</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00117">quantize_row_q8_k()</a>, and <a class="el" href="quantize__row__q8__k__avx512_8c_source.html#l00008">quantize_row_q8_k_avx512()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00121">quantize_row_q8_k()</a>, and <a class="el" href="quantize__row__q8__k__avx512_8c_source.html#l00008">quantize_row_q8_k_avx512()</a>.</p>
 
 </div>
 </div>
