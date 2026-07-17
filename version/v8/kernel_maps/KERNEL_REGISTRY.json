@@ -5,12 +5,12 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 203,
+      "total": 211,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 20,
+        "attention": 22,
         "attention_projection": 1,
         "attention_sliding": 6,
         "attn_gate_sigmoid_mul": 1,
@@ -55,10 +55,10 @@
         "position_ids": 1,
         "projector_prep": 1,
         "q_norm": 1,
-        "qk_norm": 1,
+        "qk_norm": 3,
         "qk_norm_backward": 1,
         "qkv_projection": 1,
-        "quantize": 2,
+        "quantize": 3,
         "quantize_batch": 2,
         "recurrent_conv_state_update": 2,
         "recurrent_dt_gate": 1,
@@ -72,7 +72,7 @@
         "relu2": 2,
         "residual_add": 2,
         "residual_save": 1,
-        "rmsnorm": 2,
+        "rmsnorm": 4,
         "rope": 12,
         "rope_backward": 2,
         "rope_init": 2,
@@ -88,7 +88,7 @@
         "split_qkv_packed_head_major": 1,
         "ssm_conv1d": 1,
         "ssm_conv1d_backward": 1,
-        "swiglu": 3,
+        "swiglu": 4,
         "tokenizer": 1,
         "v_norm": 1,
         "vision_patchify": 1
@@ -2185,7 +2185,7 @@
           "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE",
-          "notes": "Cache-preserving segmented causal prefill using the validated FP16 decode reduction contract for each query row."
+          "notes": "Cache-preserving segmented causal prefill using the validated 256-row-padded FP16 decode reduction contract for each query row."
         }
       },
       "implementation": {
@@ -2322,6 +2322,346 @@
       },
       "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
       "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "op": "attention",
+      "variant": "causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "execution.prefill_batching": [
+          "segmented_append"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_flash_auto_qtile64"
+        ]
+      },
+      "supported_reductions": {
+        "f16_flash_auto_qtile64": {
+          "status": "validated",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
+          "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "q_tokens",
+        "past_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "q_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "past_tokens",
+            "source": "runtime:prefill_start_pos"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+      "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range",
+      "op": "attention",
+      "variant": "causal_head_major_gqa_prefill_append_f16cache_single_range",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "execution.prefill_batching": [
+          "segmented_append"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_single_range"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_single_range": {
+          "status": "validated",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE",
+          "notes": "Single-range FP16 online-softmax arithmetic matching llama.cpp batched prefill, independent of runtime worker count."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp16",
+          "shape": [
+            "num_kv_heads",
+            "cache_capacity",
+            "head_dim"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "num_heads",
+            "q_tokens",
+            "head_dim"
+          ]
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "num_kv_heads",
+        "q_tokens",
+        "past_tokens",
+        "cache_capacity",
+        "head_dim",
+        "aligned_head_dim"
+      ],
+      "params": [
+        {
+          "name": "reduction",
+          "dtype": "ck_attention_reduction_t"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "q_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "past_tokens",
+            "source": "runtime:prefill_start_pos"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range",
+      "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range.json"
     },
     {
       "id": "attention_forward_causal_head_major_shared_kv_gemma4",
@@ -2468,28 +2808,28 @@
           "head_major"
         ],
         "numerics.attention_reduction": [
-          "f16_online_fp32_merge"
+          "fp32_online"
         ]
       },
       "supported_reductions": {
-        "f16_online_fp32_merge": {
+        "fp32_online": {
           "status": "validated",
           "function": "attention_forward_decode_head_major_gqa_flash_f16cache",
           "explicit_selector": false,
-          "notes": "Current generated v8 route. The explicit selector API is validated separately and will replace this ABI after E2E promotion."
+          "notes": "Legacy single FP32 decode reduction. Numerically distinct from the explicit FP16 online/FP32 merge contract."
         }
       },
       "implementation": {
         "isa_dispatch": "runtime",
         "threading": {
-          "runtime": "ck_threadpool",
+          "runtime": "serial",
           "work_partition": [
-            "kv_chunks_by_workers"
+            "serial"
           ],
           "dispatch": [
-            "ck_threadpool_dispatch_n"
+            "inline"
           ],
-          "reduction_order_effect": "contract_defined"
+          "reduction_order_effect": "none"
         }
       },
       "quant": {
@@ -2611,6 +2951,46 @@
       "op": "attention",
       "variant": "decode_head_major_gqa_flash_f16cache_contract",
       "mode": "decode",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "decode"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp16"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "f16_online_fp32_merge"
+        ]
+      },
+      "supported_reductions": {
+        "f16_online_fp32_merge": {
+          "status": "validated",
+          "function": "attention_forward_decode_head_major_gqa_flash_f16cache_contract",
+          "explicit_selector": true,
+          "selector": "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE",
+          "notes": "FP16 Q/K and partial-value storage with a 256-row padded KV scheduling extent, worker-chunk online softmax, and ordered FP32 merge."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "kv_chunks_by_workers"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
       "quant": {
         "activation": "fp32",
         "kv_cache": "fp16",
@@ -2705,6 +3085,59 @@
         "c_declaration": "ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
         "sources": [
           "src/kernels/attention_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q_token",
+            "source": "scratch:q_scratch",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_cache",
+            "source": "runtime:kv_cache_k_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "v_cache",
+            "source": "runtime:kv_cache_v_layer_f16",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "out_token",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "kv_tokens",
+            "source": "runtime:kv_tokens"
+          },
+          {
+            "name": "cache_capacity",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "reduction",
+            "source": "const:CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE"
+          }
         ]
       },
       "name": "attention_forward_decode_head_major_gqa_flash_f16cache_contract",
@@ -9763,15 +10196,16 @@
       "op": "gemm",
       "variant": "q4_k_w_q8_k_a",
       "contract_schema_version": 1,
-      "numerical_contract": "q4_k_x_q8_k_fp32_block_order",
+      "numerical_contract": "q4_k_x_q8_k_repacked_matmul_fp32",
       "reference": {
-        "function": "gemv_q4_k_q8_k_ref",
-        "kind": "scalar_contract_oracle",
-        "adapter": "per_activation_row_then_bias",
+        "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+        "kind": "llama_repacked_graph_oracle",
+        "adapter": "direct",
         "validation": {
-          "status": "observed",
+          "status": "validated",
           "tests": [
             "unittest/test_q4_k_q8_k_matvec.py",
+            "unittest/test_q4k_q8k_llama_packed.cpp",
             "tests/test_threadpool_parity.c"
           ],
           "external_oracles": [
@@ -9781,21 +10215,22 @@
               "evidence": "unittest/test_q4_k_q8_k_matvec.py"
             },
             {
-              "backend": "llama.cpp",
-              "status": "unresolved",
-              "evidence": "No direct llama.cpp Q4_K x Q8_K GEMM oracle is currently wired."
+              "backend": "llama.cpp_ggml_cpu_graph",
+              "status": "validated",
+              "evidence": "unittest/test_q4k_q8k_llama_packed.cpp"
             }
           ]
         }
       },
       "production": {
-        "function": "gemm_nt_q4_k_q8_k",
-        "threaded_function": "gemm_nt_q4_k_q8_k_parallel_dispatch",
+        "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
+        "threaded_function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
         "reference_comparison": {
-          "requirement": "contract_tolerance",
-          "absolute_tolerance": 0.001,
-          "relative_tolerance": 0.001,
+          "requirement": "bit_exact",
+          "absolute_tolerance": 0.0,
+          "relative_tolerance": 0.0,
           "tests": [
+            "unittest/test_q4k_q8k_llama_packed.cpp",
             "tests/test_threadpool_parity.c"
           ]
         }
@@ -9834,6 +10269,10 @@
       "quant": {
         "weight": "q4_k",
         "activation": "q8_k",
+        "activation_quantization_contract": {
+          "decode": "canonical_q8_k_row_nearest",
+          "prefill": "llama_repack_q8_k_4row_nearest_even"
+        },
         "output": "fp32"
       },
       "inputs": [
@@ -9978,7 +10417,7 @@
         "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization for W2 (down) projection."
       },
       "impl": {
-        "function": "gemm_nt_q4_k_q8_k",
+        "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
         "sources": [
           "src/kernels/gemm_kernels_q4k.c"
         ],
@@ -10505,6 +10944,7 @@
           "status": "observed",
           "tests": [
             "unittest/test_q6k_q8k_parity.py",
+            "unittest/test_q6k_q8k_llama_production.cpp",
             "tests/test_threadpool_parity.c"
           ],
           "external_oracles": [
@@ -10514,9 +10954,9 @@
               "evidence": "unittest/test_q6k_q8k_parity.py"
             },
             {
-              "backend": "llama.cpp",
-              "status": "unresolved",
-              "evidence": "No direct llama.cpp Q6_K x Q8_K GEMM oracle is currently wired."
+              "backend": "llama.cpp_ggml_cpu",
+              "status": "validated",
+              "evidence": "unittest/test_q6k_q8k_llama_production.cpp"
             }
           ]
         }
@@ -10529,12 +10969,13 @@
           "absolute_tolerance": 0.0001,
           "relative_tolerance": 0.0001,
           "tests": [
+            "unittest/test_q6k_q8k_llama_production.cpp",
             "tests/test_threadpool_parity.c"
           ]
         }
       },
       "implementation": {
-        "isa_dispatch": "runtime",
+        "isa_dispatch": "compile_time",
         "weight_storage": {
           "format": "q6_k",
           "block_elements": 256,
@@ -10565,6 +11006,10 @@
       "quant": {
         "weight": "q6_k",
         "activation": "q8_k",
+        "activation_quantization_contract": {
+          "decode": "canonical_q8_k_row_nearest",
+          "prefill": "canonical_q8_k_row_nearest"
+        },
         "output": "fp32"
       },
       "inputs": [
@@ -11805,15 +12250,16 @@
       "op": "gemv",
       "variant": "q4_k_w_q8_k_a_fp32_out",
       "contract_schema_version": 1,
-      "numerical_contract": "q4_k_x_q8_k_fp32_block_order",
+      "numerical_contract": "q4_k_x_q8_k_repacked_matvec_fp32",
       "reference": {
-        "function": "gemv_q4_k_q8_k_ref",
-        "kind": "scalar_contract_oracle",
+        "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+        "kind": "llama_repacked_graph_oracle",
         "adapter": "direct",
         "validation": {
-          "status": "observed",
+          "status": "validated",
           "tests": [
             "unittest/test_q4_k_q8_k_matvec.py",
+            "unittest/test_q4k_q8k_llama_packed.cpp",
             "tests/test_threadpool_parity.c"
           ],
           "external_oracles": [
@@ -11823,21 +12269,22 @@
               "evidence": "unittest/test_q4_k_q8_k_matvec.py"
             },
             {
-              "backend": "llama.cpp",
-              "status": "unresolved",
-              "evidence": "No direct llama.cpp Q4_K x Q8_K GEMV oracle is currently wired."
+              "backend": "llama.cpp_ggml_cpu_graph",
+              "status": "validated",
+              "evidence": "unittest/test_q4k_q8k_llama_packed.cpp"
             }
           ]
         }
       },
       "production": {
-        "function": "gemv_q4_k_q8_k",
-        "threaded_function": "gemv_q4_k_q8_k_parallel_dispatch",
+        "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+        "threaded_function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
         "reference_comparison": {
-          "requirement": "contract_tolerance",
-          "absolute_tolerance": 0.001,
-          "relative_tolerance": 0.001,
+          "requirement": "bit_exact",
+          "absolute_tolerance": 0.0,
+          "relative_tolerance": 0.0,
           "tests": [
+            "unittest/test_q4k_q8k_llama_packed.cpp",
             "tests/test_threadpool_parity.c"
           ]
         }
@@ -11872,6 +12319,10 @@
       "quant": {
         "weight": "q4_k",
         "activation": "q8_k",
+        "activation_quantization_contract": {
+          "decode": "canonical_q8_k_row_nearest",
+          "prefill": "llama_repack_q8_k_4row_nearest_even"
+        },
         "output": "fp32"
       },
       "inputs": [
@@ -11935,7 +12386,7 @@
         "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization."
       },
       "impl": {
-        "function": "gemv_q4_k_q8_k",
+        "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
         "c_declaration": "void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);",
         "sources": [
           "src/kernels/gemm_kernels_q4k.c"
@@ -12632,9 +13083,11 @@
         "kind": "scalar_contract_oracle",
         "adapter": "direct",
         "validation": {
-          "status": "observed",
+          "status": "validated",
           "tests": [
             "unittest/test_q6k_q8k_parity.py",
+            "unittest/test_gemv_kernels_comprehensive.py",
+            "unittest/test_q6k_q8k_llama_production.cpp",
             "tests/test_threadpool_parity.c"
           ],
           "external_oracles": [
@@ -12644,9 +13097,9 @@
               "evidence": "unittest/test_q6k_q8k_parity.py"
             },
             {
-              "backend": "llama.cpp",
-              "status": "unresolved",
-              "evidence": "No direct llama.cpp Q6_K x Q8_K GEMV oracle is currently wired."
+              "backend": "llama.cpp_ggml_cpu",
+              "status": "validated",
+              "evidence": "unittest/test_q6k_q8k_llama_production.cpp"
             }
           ]
         }
@@ -12655,16 +13108,18 @@
         "function": "gemv_q6_k_q8_k",
         "threaded_function": "gemv_q6_k_q8_k_parallel_dispatch",
         "reference_comparison": {
-          "requirement": "contract_tolerance",
-          "absolute_tolerance": 0.0001,
-          "relative_tolerance": 0.0001,
+          "requirement": "bit_exact",
+          "absolute_tolerance": 0.0,
+          "relative_tolerance": 0.0,
           "tests": [
+            "unittest/test_q6k_q8k_llama_production.cpp",
+            "unittest/test_gemv_kernels_comprehensive.py",
             "tests/test_threadpool_parity.c"
           ]
         }
       },
       "implementation": {
-        "isa_dispatch": "runtime",
+        "isa_dispatch": "compile_time",
         "weight_storage": {
           "format": "q6_k",
           "block_elements": 256,
@@ -12693,6 +13148,10 @@
       "quant": {
         "weight": "q6_k",
         "activation": "q8_k",
+        "activation_quantization_contract": {
+          "decode": "canonical_q8_k_row_nearest",
+          "prefill": "canonical_q8_k_row_nearest"
+        },
         "output": "fp32"
       },
       "inputs": [
@@ -19587,6 +20046,338 @@
       "_source_file": "qk_norm_forward.json"
     },
     {
+      "id": "qk_norm_forward_fp64_sum",
+      "op": "qk_norm",
+      "variant": "fp32_square_fp64_sum_fp32_output",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "q_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        },
+        {
+          "name": "k_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ]
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "qk_norm_forward_fp64_sum",
+        "c_declaration": "void qk_norm_forward_fp64_sum(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/qk_norm_kernels.c",
+          "src/kernels/rmsnorm_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_fp32_square_fp64_sum_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "qk_norm_forward_fp64_sum",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "q_gamma",
+            "source": "weight_f:q_norm",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_gamma",
+            "source": "weight_f:k_norm",
+            "cast": "const float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "notes": "Per-head Q/K RMSNorm with FP32 squares and ascending FP64 row sums.",
+      "name": "qk_norm_forward_fp64_sum",
+      "_source_file": "qk_norm_forward_fp64_sum.json"
+    },
+    {
+      "id": "qk_norm_forward_llama_production",
+      "op": "qk_norm",
+      "variant": "llama_cpu_production_fp32_output",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "q_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        },
+        {
+          "name": "k_gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ]
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "qk_norm_forward_llama_production",
+        "c_declaration": "void qk_norm_forward_llama_production(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/qk_norm_kernels.c",
+          "src/kernels/rmsnorm_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "qk_norm_forward_llama_production",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "q_gamma",
+            "source": "weight_f:q_norm",
+            "cast": "const float*"
+          },
+          {
+            "name": "k_gamma",
+            "source": "weight_f:k_norm",
+            "cast": "const float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "notes": "Per-head Q/K RMSNorm matching the active llama.cpp CPU production reciprocal-square-root sequence.",
+      "name": "qk_norm_forward_llama_production",
+      "_source_file": "qk_norm_forward_llama_production.json"
+    },
+    {
       "id": "quantize_batch_q8_0",
       "op": "quantize_batch",
       "variant": "fp32_to_q8_0_batch",
@@ -19949,6 +20740,7 @@
       "impl": {
         "function": "quantize_row_q8_k",
         "sources": [
+          "src/kernels/gemm_kernels_q4k_q8k.c",
           "src/kernels/quantize_row_q8_k_sse.c"
         ],
         "variants": [
@@ -19963,6 +20755,7 @@
         "schema_version": 1,
         "operator_family": "activation_quantization",
         "function": "quantize_row_q8_k",
+        "rounding_contract": "canonical_q8_k_row_nearest",
         "output_storage": {
           "format": "q8_k",
           "block_elements": 256,
@@ -19989,6 +20782,95 @@
       "notes": "Quantize FP32 vector to Q8_K format. Used in fused kernels for MLP activations.",
       "name": "quantize_row_q8_k",
       "_source_file": "quantize_row_q8_k.json"
+    },
+    {
+      "id": "quantize_row_q8_k_llama_repack",
+      "op": "quantize",
+      "variant": "fp32_to_q8_k_llama_repack",
+      "quant": {
+        "weight": "fp32",
+        "activation": "q8_k",
+        "output": "q8_k"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Input vector [N] (FP32)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "q8_k",
+          "shape": [
+            "N"
+          ],
+          "desc": "Q8_K row storage with llama.cpp repacked-prefill arithmetic"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "N"
+      ],
+      "params": [],
+      "constraints": {
+        "alignment": {
+          "N": 256
+        },
+        "notes": "Complete groups of four rows use llama.cpp's repacked Q8_K scale and rounding order; residual rows use canonical row quantization."
+      },
+      "impl": {
+        "function": "quantize_row_q8_k",
+        "sources": [
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/quantize_row_q8_k_sse.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "codegen_capability": {
+        "schema_version": 1,
+        "operator_family": "activation_quantization",
+        "function": "quantize_row_q8_k",
+        "rounding_contract": "llama_repack_q8_k_4row_nearest_even",
+        "output_storage": {
+          "format": "q8_k",
+          "block_elements": 256,
+          "block_elements_symbol": "QK_K",
+          "c_block_type": "block_q8_K"
+        },
+        "prefill_batch": {
+          "function": "quantize_batch_q8_k_4row_nearest_even",
+          "row_group": 4,
+          "tail_function": "quantize_row_q8_k",
+          "rounding_contract": "llama_repack_q8_k_4row_nearest_even"
+        }
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_q4k_q8k_llama_packed.cpp"
+        ],
+        "parity": [
+          {
+            "kind": "llamacpp",
+            "command": "make llamacpp-parity-gemm-q4k",
+            "tolerance": "bit_exact",
+            "notes": "Compares grouped Q8_K bytes and loaded repacked Q4_K production output against llama.cpp."
+          }
+        ]
+      },
+      "notes": "Arithmetic-compatible Q8_K producer for llama.cpp repacked Q4_K prefill consumers. Decode still calls the canonical one-row function.",
+      "name": "quantize_row_q8_k_llama_repack",
+      "_source_file": "quantize_row_q8_k_llama_repack.json"
     },
     {
       "id": "recurrent_conv_state_update_backward_f32",
@@ -22262,6 +23144,292 @@
       "notes": "Root Mean Square Layer Normalization. Computes: output = input / sqrt(mean(x^2) + eps) * gamma",
       "name": "rmsnorm_forward",
       "_source_file": "rmsnorm_forward.json"
+    },
+    {
+      "id": "rmsnorm_forward_fp64_sum",
+      "op": "rmsnorm",
+      "variant": "fp32_square_fp64_sum_fp32_output",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ]
+        },
+        {
+          "name": "rstd",
+          "dtype": "fp32",
+          "shape": [
+            "T"
+          ]
+        }
+      ],
+      "dims": [
+        "T",
+        "E"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "rmsnorm_forward_fp64_sum",
+        "c_declaration": "void rmsnorm_forward_fp64_sum(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+        "sources": [
+          "src/kernels/rmsnorm_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_fp32_square_fp64_sum_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "rmsnorm_forward_fp64_sum",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*"
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "alt": [
+              "ln1_gamma",
+              "ln2_gamma",
+              "final_ln_weight"
+            ],
+            "cast": "const float*"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*"
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null"
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "d_model",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "aligned_embed_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "notes": "FP32 RMSNorm with FP32 square products and an ascending FP64 row sum.",
+      "name": "rmsnorm_forward_fp64_sum",
+      "_source_file": "rmsnorm_forward_fp64_sum.json"
+    },
+    {
+      "id": "rmsnorm_forward_llama_production",
+      "op": "rmsnorm",
+      "variant": "llama_cpu_production_fp32_output",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ]
+        },
+        {
+          "name": "rstd",
+          "dtype": "fp32",
+          "shape": [
+            "T"
+          ]
+        }
+      ],
+      "dims": [
+        "T",
+        "E"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "rmsnorm_forward_llama_production",
+        "c_declaration": "void rmsnorm_forward_llama_production(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+        "sources": [
+          "src/kernels/rmsnorm_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "rmsnorm_forward_llama_production",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*"
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "alt": [
+              "ln1_gamma",
+              "ln2_gamma",
+              "final_ln_weight"
+            ],
+            "cast": "const float*"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*"
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null"
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "d_model",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "aligned_embed_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "notes": "FP32 RMSNorm matching llama.cpp CPU production reciprocal-square-root evaluation for the active ISA.",
+      "name": "rmsnorm_forward_llama_production",
+      "_source_file": "rmsnorm_forward_llama_production.json"
     },
     {
       "id": "v_norm",
@@ -25215,6 +26383,165 @@
       "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid.",
       "name": "swiglu_forward_exact",
       "_source_file": "swiglu_forward_exact.json"
+    },
+    {
+      "id": "swiglu_forward_ggml",
+      "op": "swiglu",
+      "variant": "ggml_fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "gate_up",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "2 * I"
+          ],
+          "desc": "Contiguous gate then up projection values."
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "GGML-compatible SiLU(gate) times up output."
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "I"
+      ],
+      "parallelization": {
+        "supported": [
+          "serial"
+        ],
+        "preferred": {
+          "prefill": "serial",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "serial",
+            "partition_dim": "T",
+            "param_style": "complete_call",
+            "notes": "Elementwise ISA-vector traversal; no cross-element reduction."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "I": 1
+        },
+        "notes": "Vector-width tails use GGML scalar direct-division semantics."
+      },
+      "impl": {
+        "function": "swiglu_forward_ggml",
+        "c_declaration": "void swiglu_forward_ggml(const float *input, float *output, int tokens, int dim);",
+        "sources": [
+          "src/kernels/swiglu_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "swiglu_forward_ggml",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:gate",
+            "cast": "float*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "dim",
+            "source": "dim:intermediate_size"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_swiglu.py::GGML production-shape oracle"
+        ],
+        "bench": [],
+        "parity": [
+          "llama.cpp ggml_vec_swiglu_f32"
+        ]
+      },
+      "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic.",
+      "name": "swiglu_forward_ggml",
+      "_source_file": "swiglu_forward_ggml.json"
     },
     {
       "id": "tokenizer_bpe_trie",

@@ -8,6 +8,7 @@ contract and can change long-decode top-1 tokens.
 """
 
 import ctypes
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -88,8 +89,15 @@ static size_t tensor_offset(const ggml_tensor * t, int i0, int i1, int i2, int i
 }
 
 int main(int argc, char ** argv) {
-    if (argc != 10) {
-        fprintf(stderr, "usage: %s q.f32 k.f16 v.f16 out.f32 H Hkv KV D threads\n", argv[0]);
+    ggml_cpu_init();
+    if (argc == 2 && strcmp(argv[1], "--isa") == 0) {
+        printf("avx2=%d avx_vnni=%d avx512=%d avx512_vnni=%d\n",
+               ggml_cpu_has_avx2(), ggml_cpu_has_avx_vnni(),
+               ggml_cpu_has_avx512(), ggml_cpu_has_avx512_vnni());
+        return 0;
+    }
+    if (argc != 10 && argc != 11 && argc != 13) {
+        fprintf(stderr, "usage: %s q.f32 k.f16 v.f16 out.f32 H Hkv KV D threads [valid_KV [Q past]]\n", argv[0]);
         return 2;
     }
     const int H = atoi(argv[5]);
@@ -97,18 +105,22 @@ int main(int argc, char ** argv) {
     const int KV = atoi(argv[7]);
     const int D = atoi(argv[8]);
     const int threads = atoi(argv[9]);
-    if (H <= 0 || Hkv <= 0 || KV <= 0 || D <= 0 || threads <= 0 || H % Hkv != 0) return 2;
+    const int valid_KV = argc >= 11 ? atoi(argv[10]) : KV;
+    const int Q = argc == 13 ? atoi(argv[11]) : 1;
+    const int past = argc == 13 ? atoi(argv[12]) : 0;
+    if (H <= 0 || Hkv <= 0 || KV <= 0 || valid_KV <= 0 || valid_KV > KV ||
+        Q <= 0 || past < 0 || past + Q > valid_KV ||
+        D <= 0 || threads <= 0 || H % Hkv != 0) return 2;
 
-    const size_t q_count = (size_t) H * (size_t) D;
+    const size_t q_count = (size_t) H * (size_t) Q * (size_t) D;
     const size_t kv_count = (size_t) Hkv * (size_t) KV * (size_t) D;
     const size_t memory = 64u * 1024u * 1024u +
-                          q_count * sizeof(float) + 2u * kv_count * sizeof(ggml_fp16_t);
+                          q_count * sizeof(float) +
+                          (2u * kv_count + (size_t) KV) * sizeof(ggml_fp16_t);
     ggml_init_params init = { memory, nullptr, false };
     ggml_context * ctx = ggml_init(init);
     if (!ctx) return 3;
-    ggml_cpu_init();
-
-    ggml_tensor * q = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, D, 1, H, 1);
+    ggml_tensor * q = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, D, Q, H, 1);
     ggml_tensor * k = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, D, KV, Hkv, 1);
     ggml_tensor * v = ggml_new_tensor_4d(ctx, GGML_TYPE_F16, D, KV, Hkv, 1);
     if (!read_exact(argv[1], q->data, q_count * sizeof(float)) ||
@@ -118,8 +130,20 @@ int main(int argc, char ** argv) {
         return 4;
     }
 
+    ggml_tensor * mask = nullptr;
+    if (Q > 1 || valid_KV != KV) {
+        mask = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, KV, Q);
+        ggml_fp16_t * mask_data = (ggml_fp16_t *) mask->data;
+        for (int tq = 0; tq < Q; ++tq) {
+            const int row_limit = Q > 1 ? past + tq + 1 : valid_KV;
+            for (int i = 0; i < KV; ++i) {
+                mask_data[(size_t) tq * (size_t) KV + (size_t) i] =
+                    ggml_fp32_to_fp16(i < row_limit && i < valid_KV ? 0.0f : -INFINITY);
+            }
+        }
+    }
     ggml_tensor * out = ggml_flash_attn_ext(
-        ctx, q, k, v, nullptr, 1.0f / sqrtf((float) D), 0.0f, 0.0f);
+        ctx, q, k, v, mask, 1.0f / sqrtf((float) D), 0.0f, 0.0f);
     ggml_flash_attn_ext_set_prec(out, GGML_PREC_F32);
     ggml_cgraph * graph = ggml_new_graph(ctx);
     ggml_build_forward_expand(graph, out);
@@ -135,9 +159,11 @@ int main(int argc, char ** argv) {
     float * host = (float *) malloc(q_count * sizeof(float));
     if (!host) return 7;
     for (int h = 0; h < H; ++h) {
-        for (int d = 0; d < D; ++d) {
-            memcpy(host + (size_t) h * (size_t) D + (size_t) d,
-                   (const char *) out->data + tensor_offset(out, d, h, 0, 0), sizeof(float));
+        for (int tq = 0; tq < Q; ++tq) {
+            for (int d = 0; d < D; ++d) {
+                memcpy(host + ((size_t) h * (size_t) Q + (size_t) tq) * (size_t) D + (size_t) d,
+                       (const char *) out->data + tensor_offset(out, d, h, tq, 0), sizeof(float));
+            }
         }
     }
     const bool ok = write_exact(argv[4], host, q_count * sizeof(float));
@@ -148,6 +174,9 @@ int main(int argc, char ** argv) {
     return ok ? 0 : 8;
 }
 """
+
+
+_LLAMA_HELPER_CACHE = {}
 
 
 def _llama_root():
@@ -161,7 +190,20 @@ def _ensure_llama_helper():
     required = [bin_dir / "libggml.so", bin_dir / "libggml-cpu.so", bin_dir / "libggml-base.so"]
     if not (root / "ggml" / "include" / "ggml.h").is_file() or not all(p.is_file() for p in required):
         raise RuntimeError(f"llama.cpp GGML headers/libraries not found under {root}")
-    helper_dir = Path(tempfile.gettempdir()) / "ck_attention_f16_split_kv"
+    cache_key = (
+        str(root),
+        tuple((str(p.resolve()), p.stat().st_size, p.stat().st_mtime_ns) for p in required),
+    )
+    if cache_key in _LLAMA_HELPER_CACHE:
+        return _LLAMA_HELPER_CACHE[cache_key]
+    digest = hashlib.sha256()
+    digest.update(_LLAMA_HELPER_SOURCE.encode("utf-8"))
+    digest.update(str(root).encode("utf-8"))
+    for library in required:
+        digest.update(str(library.resolve()).encode("utf-8"))
+        digest.update(library.read_bytes())
+    fingerprint = digest.hexdigest()[:16]
+    helper_dir = Path(tempfile.gettempdir()) / f"ck_attention_f16_split_kv_{fingerprint}"
     helper_dir.mkdir(parents=True, exist_ok=True)
     source = helper_dir / "llama_f16_split_kv.cpp"
     binary = helper_dir / "llama_f16_split_kv"
@@ -178,16 +220,40 @@ def _ensure_llama_helper():
         completed = subprocess.run(command, capture_output=True, text=True)
         if completed.returncode != 0:
             raise RuntimeError(f"llama.cpp split-KV helper compile failed:\n{completed.stderr}")
-    return binary, bin_dir
+    env = os.environ.copy()
+    env["LD_LIBRARY_PATH"] = f"{bin_dir}:{env.get('LD_LIBRARY_PATH', '')}"
+    identity = subprocess.run(
+        [str(binary), "--isa"], capture_output=True, text=True, env=env,
+    )
+    if identity.returncode != 0:
+        raise RuntimeError(
+            f"llama.cpp split-KV helper ISA query failed ({identity.returncode}):\n"
+            f"{identity.stderr}"
+        )
+    isa = identity.stdout.strip()
+    if os.environ.get("CK_REQUIRE_LLAMA_AVX512", "").strip() not in ("", "0") and "avx512=1" not in isa:
+        raise RuntimeError(
+            "FP16 attention oracle requires an AVX-512 llama.cpp build, "
+            f"but helper reports: {isa}"
+        )
+    print(f"llama.cpp FP16 attention oracle: root={root} fingerprint={fingerprint} {isa}")
+    result = (binary, bin_dir)
+    _LLAMA_HELPER_CACHE[cache_key] = result
+    return result
 
 
-def _llama_split_output(q, k_bits, v_bits, head_dim, threads):
+def _llama_split_output(q, k_bits, v_bits, head_dim, threads, padded_kv_tokens=None):
     helper, bin_dir = _ensure_llama_helper()
     heads, _ = q.shape
     kv_heads, kv_tokens, _ = k_bits.shape
+    padded_kv_tokens = int(padded_kv_tokens or kv_tokens)
+    if padded_kv_tokens < kv_tokens:
+        raise ValueError("padded_kv_tokens cannot be smaller than the valid KV count")
     q_compact = np.ascontiguousarray(q[:, :head_dim], dtype=np.float32)
-    k_compact = np.ascontiguousarray(k_bits[:, :, :head_dim], dtype=np.uint16)
-    v_compact = np.ascontiguousarray(v_bits[:, :, :head_dim], dtype=np.uint16)
+    k_compact = np.zeros((kv_heads, padded_kv_tokens, head_dim), dtype=np.uint16)
+    v_compact = np.zeros((kv_heads, padded_kv_tokens, head_dim), dtype=np.uint16)
+    k_compact[:, :kv_tokens, :] = np.ascontiguousarray(k_bits[:, :, :head_dim], dtype=np.uint16)
+    v_compact[:, :kv_tokens, :] = np.ascontiguousarray(v_bits[:, :, :head_dim], dtype=np.uint16)
     with tempfile.TemporaryDirectory(prefix="ck_f16_split_kv_") as tmp:
         tmp = Path(tmp)
         q_path, k_path, v_path, out_path = [tmp / name for name in ("q.f32", "k.f16", "v.f16", "out.f32")]
@@ -196,7 +262,8 @@ def _llama_split_output(q, k_bits, v_bits, head_dim, threads):
         v_compact.tofile(v_path)
         command = [
             str(helper), str(q_path), str(k_path), str(v_path), str(out_path),
-            str(heads), str(kv_heads), str(kv_tokens), str(head_dim), str(threads),
+            str(heads), str(kv_heads), str(padded_kv_tokens), str(head_dim), str(threads),
+            str(kv_tokens),
         ]
         env = os.environ.copy()
         env["LD_LIBRARY_PATH"] = f"{bin_dir}:{env.get('LD_LIBRARY_PATH', '')}"
@@ -206,6 +273,40 @@ def _llama_split_output(q, k_bits, v_bits, head_dim, threads):
                 f"llama.cpp split-KV helper failed ({completed.returncode}):\n{completed.stderr}"
             )
         return np.fromfile(out_path, dtype=np.float32).reshape(heads, head_dim)
+
+
+def _llama_prefill_output(q, k_bits, v_bits, head_dim, past_tokens, threads):
+    helper, bin_dir = _ensure_llama_helper()
+    heads, q_tokens, _ = q.shape
+    kv_heads, kv_tokens, _ = k_bits.shape
+    q_compact = np.ascontiguousarray(q[:, :, :head_dim], dtype=np.float32)
+    k_compact = np.ascontiguousarray(k_bits[:, :, :head_dim], dtype=np.uint16)
+    v_compact = np.ascontiguousarray(v_bits[:, :, :head_dim], dtype=np.uint16)
+    with tempfile.TemporaryDirectory(prefix="ck_f16_prefill_") as tmp:
+        tmp = Path(tmp)
+        q_path, k_path, v_path, out_path = [tmp / name for name in ("q.f32", "k.f16", "v.f16", "out.f32")]
+        q_compact.tofile(q_path)
+        k_compact.tofile(k_path)
+        v_compact.tofile(v_path)
+        command = [
+            str(helper), str(q_path), str(k_path), str(v_path), str(out_path),
+            str(heads), str(kv_heads), str(kv_tokens), str(head_dim), str(threads),
+            str(kv_tokens), str(q_tokens), str(past_tokens),
+        ]
+        env = os.environ.copy()
+        env["LD_LIBRARY_PATH"] = f"{bin_dir}:{env.get('LD_LIBRARY_PATH', '')}"
+        completed = subprocess.run(command, capture_output=True, text=True, env=env)
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"llama.cpp tiled prefill helper failed ({completed.returncode}):\n{completed.stderr}"
+            )
+        return np.fromfile(out_path, dtype=np.float32).reshape(heads, q_tokens, head_dim)
+
+
+def _llama_kv_partition_extent(kv_tokens):
+    """Match llama.cpp's reusable decode-graph KV scheduling extent."""
+    kv_tokens = int(kv_tokens)
+    return ((kv_tokens + 255) // 256) * 256 if kv_tokens >= 512 else kv_tokens
 
 
 def _f32_ptr(a):
@@ -453,7 +554,7 @@ def _prefill_append_matches_decode_loop_case():
     actual = np.zeros_like(q)
     status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
         _f32_ptr(q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(actual),
-        heads, kv_heads, q_tokens, past_tokens, capacity, head_dim, aligned, 1,
+        heads, kv_heads, q_tokens, past_tokens, capacity, head_dim, aligned, 2,
     )
     expected = np.zeros_like(q)
     for token in range(q_tokens):
@@ -462,7 +563,7 @@ def _prefill_append_matches_decode_loop_case():
         token_status = lib.attention_forward_decode_head_major_gqa_flash_f16cache_contract(
             _f32_ptr(q_token), _u16_ptr(k), _u16_ptr(v), _f32_ptr(out_token),
             heads, kv_heads, past_tokens + token + 1, capacity,
-            head_dim, aligned, 1,
+            head_dim, aligned, 2,
         )
         if token_status != 0:
             status = token_status
@@ -472,6 +573,35 @@ def _prefill_append_matches_decode_loop_case():
     return Result(
         "prefill_append_matches_decode_loop",
         diff if status == 0 else float("inf"),
+        0.0,
+        status == 0 and np.array_equal(actual, expected),
+    )
+
+
+def _prefill_auto_matches_llama_case(
+    name, seed, heads, kv_heads, q_tokens, past_tokens, head_dim, threads=4
+):
+    capacity, aligned = past_tokens + q_tokens, head_dim
+    rng = np.random.default_rng(seed)
+    q = np.ascontiguousarray(
+        rng.normal(0.0, 0.55, (heads, q_tokens, aligned)).astype(np.float32)
+    )
+    k = _half_bits(
+        rng.normal(0.0, 0.55, (kv_heads, capacity, aligned)).astype(np.float32)
+    )
+    v = _half_bits(
+        rng.normal(0.0, 0.75, (kv_heads, capacity, aligned)).astype(np.float32)
+    )
+    actual = np.zeros_like(q)
+    status = lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
+        _f32_ptr(q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(actual),
+        heads, kv_heads, q_tokens, past_tokens, capacity, head_dim, aligned, 3,
+    )
+    expected = _llama_prefill_output(q, k, v, head_dim, past_tokens, threads=4)
+    diff = float(np.max(np.abs(actual - expected))) if status == 0 else math.inf
+    return Result(
+        name,
+        diff,
         0.0,
         status == 0 and np.array_equal(actual, expected),
     )
@@ -492,7 +622,9 @@ def _case(name, seed, heads, kv_heads, kv_tokens, head_dim, aligned, chunks, tol
     # contract, but its dot traversal models one ISA and is not authoritative
     # across AVX2, AVX-512, and NEON. Gate the production entry point against
     # GGML using the same worker/chunk count instead.
-    expected = _llama_split_output(q, k, v, head_dim, chunks)
+    expected = _llama_split_output(
+        q, k, v, head_dim, chunks, _llama_kv_partition_extent(kv_tokens)
+    )
     active_diff = float(np.max(np.abs(actual[:, :head_dim] - expected)))
     padding_diff = (
         float(np.max(np.abs(actual[:, head_dim:])))
@@ -506,28 +638,57 @@ def _case(name, seed, heads, kv_heads, kv_tokens, head_dim, aligned, chunks, tol
 def main():
     results = []
     results.append(_prefill_append_matches_decode_loop_case())
+    # Current llama.cpp changes flash-attention arithmetic at Q=64. Exercise
+    # both sides of that production dispatch boundary and the actual Qwen3-VL
+    # visual segment shape; leaf decode coverage cannot certify this route.
+    for case in (
+        ("flash_auto_short_text_before(Q=5)", 2026071505, 4, 2, 5, 0, 32),
+        ("flash_auto_short_text_after(Q=14)", 2026071514, 4, 2, 14, 1013, 32),
+        ("flash_auto_below_threshold(Q=63)", 2026071563, 4, 2, 63, 5, 32),
+        ("flash_auto_at_threshold(Q=64)", 2026071564, 4, 2, 64, 5, 32),
+        (
+            "flash_auto_qwen3vl_visual(Q=1008,KV=1013,H=32,Hkv=8,D=128)",
+            2026071508, 32, 8, 1008, 5, 128,
+        ),
+    ):
+        results.append(_prefill_auto_matches_llama_case(*case))
     results.append(_unfused_f16_causal_case())
     below, below_data = _case(
-        "f16_split_below_threshold(KV=511,C=1)", 511, 8, 2, 511, 64, 64, 1, 2.0e-5,
+        "f16_split_below_threshold(KV=511,C=1)", 511, 8, 2, 511, 64, 64, 1, 0.0,
     )
     results.append(below)
     threshold, threshold_data = _case(
-        "f16_split_threshold(KV=512,C=4)", 512, 8, 2, 512, 64, 64, 4, 2.0e-5,
+        "f16_split_threshold(KV=512,C=4)", 512, 8, 2, 512, 64, 64, 4, 0.0,
     )
     results.append(threshold)
     qwen, qwen_data = _case(
         "f16_split_qwen3vl(KV=1058,H=32,D=128,C=20)",
-        1058, 32, 8, 1058, 128, 128, 20, 2.0e-5,
+        1058, 32, 8, 1058, 128, 128, 20, 0.0,
     )
     results.append(qwen)
+    qwen_step20, qwen_step20_data = _case(
+        "f16_split_qwen3vl_step20(KV=1047,P=1280,H=32,D=128,C=20)",
+        1047, 32, 8, 1047, 128, 128, 20, 0.0,
+    )
+    results.append(qwen_step20)
+    qwen_step60, qwen_step60_data = _case(
+        "f16_split_qwen3vl_step60(KV=1087,P=1280,H=32,D=128,C=20)",
+        1087, 32, 8, 1087, 128, 128, 20, 0.0,
+    )
+    results.append(qwen_step60)
+    qwen_mid, qwen_mid_data = _case(
+        "f16_split_qwen3vl_mid(KV=1307,H=32,D=128,C=20)",
+        1307, 32, 8, 1307, 128, 128, 20, 0.0,
+    )
+    results.append(qwen_mid)
     qwen_long, qwen_long_data = _case(
         "f16_split_qwen3vl_long(KV=1609,H=32,D=128,C=20)",
-        1609, 32, 8, 1609, 128, 128, 20, 2.0e-5,
+        1609, 32, 8, 1609, 128, 128, 20, 0.0,
     )
     results.append(qwen_long)
     padded, _ = _case(
         "f16_split_padded_gqa(KV=513,D=80,A=128,C=4)",
-        513, 8, 2, 513, 80, 128, 4, 2.0e-5,
+        513, 8, 2, 513, 80, 128, 4, 0.0,
     )
     results.append(padded)
 
@@ -536,6 +697,9 @@ def main():
         ("explicit_contract_route_below(KV=511)", below_data),
         ("explicit_contract_route_threshold(KV=512)", threshold_data),
         ("explicit_contract_route_qwen3vl(KV=1058)", qwen_data),
+        ("explicit_contract_route_qwen3vl_step20(KV=1047,P=1280)", qwen_step20_data),
+        ("explicit_contract_route_qwen3vl_step60(KV=1087,P=1280)", qwen_step60_data),
+        ("explicit_contract_route_qwen3vl_mid(KV=1307)", qwen_mid_data),
         ("explicit_contract_route_qwen3vl_long(KV=1609)", qwen_long_data),
     ):
         q, k, v, _ = data
@@ -544,6 +708,21 @@ def main():
         status, actual = _run_contract(q, k, v, q.shape[1], 1)
         diff = float(np.max(np.abs(actual - expected))) if status == 0 else math.inf
         results.append(Result(name, diff, 0.0, status == 0 and diff == 0.0))
+
+    q, k, v, _ = qwen_step20_data
+    expected_single = _run_explicit(q, k, v, q.shape[1], 1)
+    single_status, actual_single = _run_contract(q, k, v, q.shape[1], 2)
+    single_diff = (
+        float(np.max(np.abs(actual_single - expected_single)))
+        if single_status == 0
+        else math.inf
+    )
+    results.append(Result(
+        "explicit_single_range_prefill_route_qwen3vl(KV=1047)",
+        single_diff,
+        0.0,
+        single_status == 0 and single_diff == 0.0,
+    ))
 
     q, k, v, _ = below_data
     legacy = _run_legacy(q, k, v, q.shape[1])
@@ -572,13 +751,18 @@ def main():
             ("llama_oracle_below(KV=511)", below_data, 1),
             ("llama_oracle_threshold(KV=512)", threshold_data, threads),
             ("llama_oracle_qwen3vl(KV=1058)", qwen_data, threads),
+            ("llama_oracle_qwen3vl_step20(KV=1047,P=1280)", qwen_step20_data, threads),
+            ("llama_oracle_qwen3vl_step60(KV=1087,P=1280)", qwen_step60_data, threads),
+            ("llama_oracle_qwen3vl_mid(KV=1307)", qwen_mid_data, threads),
             ("llama_oracle_qwen3vl_long(KV=1609)", qwen_long_data, threads),
         ):
             q, k, v, _ = data
             ck = _run_explicit(q, k, v, q.shape[1], chunks)
-            llama = _llama_split_output(q, k, v, q.shape[1], threads)
+            llama = _llama_split_output(
+                q, k, v, q.shape[1], threads, _llama_kv_partition_extent(k.shape[1])
+            )
             diff = float(np.max(np.abs(ck[:, :q.shape[1]] - llama)))
-            results.append(Result(name, diff, 2.0e-5, diff <= 2.0e-5))
+            results.append(Result(name, diff, 0.0, diff == 0.0))
     except RuntimeError as exc:
         print(f"llama.cpp oracle error: {exc}")
         results.append(Result("llama_oracle_available", 1.0, 0.0, False))

@@ -4,22 +4,40 @@
   "engine_contract_version": "8",
   "contracts": {
     "q4_k_x_q8_k_fp32_block_order": {
-      "status": "observed",
+      "status": "validated",
       "weight": {"format": "q4_k", "block_size": 256, "layout": "ggml_q4_k"},
       "activation": {"format": "q8_k", "block_size": 256, "layout": "ggml_q8_k", "quantization": "quantize_row_q8_k_ref"},
-      "dot": {"integer_accumulator": "int32", "block_scale_application": "q4_k_scale_and_min_after_integer_block_sums", "block_order": "ascending_k"},
-      "output": {"accumulator": "fp32", "bias": "after_complete_dot", "storage": "fp32"},
+      "dot": {"integer_accumulator": "int32", "block_scale_application": "q4_k_scale_and_min_after_integer_block_sums", "block_order": "ascending_k", "fp32_accumulator_lanes": 8, "minimum_accumulator_lanes": 4},
+      "output": {"accumulator": "fp32", "horizontal_reduction": "llama_x86_lane_order", "bias": "after_complete_dot", "storage": "fp32"},
       "parallel_reduction": {"kind": "independent_outputs", "reduction_order_effect": "none"},
-      "description": "Q4_K weights times Q8_K activations with scalar-reference block order and independent output partitioning."
+      "description": "Q4_K weights times Q8_K activations with llama-compatible x86 lane accumulation and independent output partitioning."
+    },
+    "q4_k_x_q8_k_repacked_matmul_fp32": {
+      "status": "validated",
+      "weight": {"format": "q4_k", "block_size": 256, "layout": "ggml_q4_k_repacked_x8"},
+      "activation": {"format": "q8_k", "block_size": 256, "layout": "ggml_q8_k", "quantization": "quantize_row_q8_k_ref"},
+      "dot": {"integer_accumulator": "int32", "block_scale_application": "pair_adjacent_32_element_integer_sums_then_separate_fp32_value_and_min_fma", "block_order": "ascending_k", "fp32_accumulator_lanes": 8, "minimum_accumulator_lanes": 8},
+      "output": {"accumulator": "fp32", "horizontal_reduction": "none", "bias": "after_complete_dot", "storage": "fp32"},
+      "parallel_reduction": {"kind": "independent_outputs", "reduction_order_effect": "none"},
+      "description": "Loaded-model Q4_K_8x8 matrix provider: adjacent 32-element integer-pair aggregation, separate FP32 value and minimum accumulators, and final subtraction for complete four-row groups; residual activation rows use the repacked matvec reduction."
+    },
+    "q4_k_x_q8_k_repacked_matvec_fp32": {
+      "status": "validated",
+      "weight": {"format": "q4_k", "block_size": 256, "layout": "ggml_q4_k_repacked_x8"},
+      "activation": {"format": "q8_k", "block_size": 256, "layout": "ggml_q8_k", "quantization": "quantize_row_q8_k_ref"},
+      "dot": {"integer_accumulator": "int32", "block_scale_application": "complete_256_element_superblock_integer_sum_then_separate_fp32_value_and_min_fma", "block_order": "ascending_k", "fp32_accumulator_lanes": 8, "minimum_accumulator_lanes": 8},
+      "output": {"accumulator": "fp32", "horizontal_reduction": "none", "bias": "after_complete_dot", "storage": "fp32"},
+      "parallel_reduction": {"kind": "independent_outputs", "reduction_order_effect": "none"},
+      "description": "Loaded-model Q4_K_8x8 single-row provider: all four 64-element pairs in each superblock are combined in int32 before one value FMA and one minimum FMA update the FP32 accumulators."
     },
     "q6_k_x_q8_k_fp32_block_order": {
-      "status": "observed",
+      "status": "validated",
       "weight": {"format": "q6_k", "block_size": 256, "layout": "ggml_q6_k"},
       "activation": {"format": "q8_k", "block_size": 256, "layout": "ggml_q8_k", "quantization": "quantize_row_q8_k_ref"},
-      "dot": {"integer_accumulator": "int32", "block_scale_application": "q6_k_scale_after_integer_block_sums", "block_order": "ascending_k"},
-      "output": {"accumulator": "fp32", "bias": "after_complete_dot", "storage": "fp32"},
+      "dot": {"integer_accumulator": "int32", "block_scale_application": "q6_k_scale_and_q8_bsum_correction_in_int32", "block_order": "ascending_k", "fp32_accumulator_lanes": 8},
+      "output": {"accumulator": "fp32", "horizontal_reduction": "llama_x86_lane_order", "bias": "after_complete_dot", "storage": "fp32"},
       "parallel_reduction": {"kind": "independent_outputs", "reduction_order_effect": "none"},
-      "description": "Q6_K weights times Q8_K activations with scalar-reference block order and independent output partitioning."
+      "description": "Q6_K weights times Q8_K activations with llama-compatible int32 zero-point correction, x86 lane reduction, and independent output partitioning."
     }
   }
 }

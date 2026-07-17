@@ -1,0 +1,67 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+  "op": "attention",
+  "variant": "causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "provides": {
+    "execution.phase": ["prefill"],
+    "execution.prefill_batching": ["segmented_append"],
+    "tensor.q.dtype": ["fp32"],
+    "tensor.kv.dtype": ["fp16"],
+    "tensor.layout": ["head_major"],
+    "numerics.attention_reduction": ["f16_flash_auto_qtile64"]
+  },
+  "supported_reductions": {
+    "f16_flash_auto_qtile64": {
+      "status": "validated",
+      "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+      "explicit_selector": true,
+      "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
+      "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic."
+    }
+  },
+  "implementation": {
+    "isa_dispatch": "runtime",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "contract_defined"
+    }
+  },
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["num_heads", "q_tokens", "head_dim"]},
+    {"name": "k_cache", "dtype": "fp16", "shape": ["num_kv_heads", "cache_capacity", "head_dim"]},
+    {"name": "v_cache", "dtype": "fp16", "shape": ["num_kv_heads", "cache_capacity", "head_dim"]}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["num_heads", "q_tokens", "head_dim"]}
+  ],
+  "dims": ["num_heads", "num_kv_heads", "q_tokens", "past_tokens", "cache_capacity", "head_dim", "aligned_head_dim"],
+  "params": [
+    {"name": "reduction", "dtype": "ck_attention_reduction_t"}
+  ],
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract",
+    "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction);",
+    "sources": ["src/kernels/attention_kernels.c"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "const float*"},
+      {"name": "k_cache", "source": "runtime:kv_cache_k_layer_f16", "cast": "const uint16_t*"},
+      {"name": "v_cache", "source": "runtime:kv_cache_v_layer_f16", "cast": "const uint16_t*"},
+      {"name": "output", "source": "output:out", "cast": "float*"},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "q_tokens", "source": "dim:seq_len"},
+      {"name": "past_tokens", "source": "runtime:prefill_start_pos"},
+      {"name": "cache_capacity", "source": "dim:max_seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "reduction", "source": "const:CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64"}
+    ]
+  }
+}

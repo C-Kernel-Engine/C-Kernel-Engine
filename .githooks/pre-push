@@ -37,6 +37,44 @@ fi
 
 cd "$ROOT_DIR"
 
+# Ignored Python environments are normally present only in the primary
+# checkout. Clean worktrees must run the same gates, so borrow a validated
+# environment for this hook invocation and remove the link on exit.
+PREPUSH_ENV_LINK_CREATED=0
+python_env_root="${CK_PREPUSH_PYTHON_ENV_ROOT:-}"
+if [ -z "$python_env_root" ] || [ ! -x "$python_env_root/.venv/bin/python" ]; then
+    while IFS= read -r worktree_path; do
+        if [ -x "$worktree_path/.venv/bin/python" ]; then
+            python_env_root="$worktree_path"
+            break
+        fi
+    done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
+fi
+if [ ! -e "$ROOT_DIR/.venv" ] && [ -x "$python_env_root/.venv/bin/python" ]; then
+    ln -s "$python_env_root/.venv" "$ROOT_DIR/.venv"
+    PREPUSH_ENV_LINK_CREATED=1
+fi
+
+llama_cpp_root="${CK_LLAMA_CPP_ROOT:-${LLAMA_CPP_ROOT:-$ROOT_DIR/llama.cpp}}"
+if [ -z "$llama_cpp_root" ] || [ ! -f "$llama_cpp_root/build/bin/libllama.so" ]; then
+    while IFS= read -r worktree_path; do
+        if [ -f "$worktree_path/llama.cpp/build/bin/libllama.so" ]; then
+            llama_cpp_root="$worktree_path/llama.cpp"
+            break
+        fi
+    done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
+fi
+if [ -f "$llama_cpp_root/build/bin/libllama.so" ]; then
+    export CK_LLAMA_CPP_ROOT="$llama_cpp_root"
+fi
+
+cleanup_prepush_environment() {
+    if [ "$PREPUSH_ENV_LINK_CREATED" = "1" ]; then
+        rm -f "$ROOT_DIR/.venv"
+    fi
+}
+trap cleanup_prepush_environment EXIT
+
 PREPUSH_ROOT="${CK_PREPUSH_ROOT:-${HOME:-$ROOT_DIR}/.cache/ck-engine/prepush}"
 PREPUSH_REGRESSION_ROOT="${PREPUSH_ROOT}/regression"
 PREPUSH_TRAIN_REPORT_ROOT="${PREPUSH_ROOT}/training-reports"

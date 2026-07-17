@@ -430,13 +430,15 @@ void gemm_bf16_fp32out(const uint16_t *A,
     }
 
 #if HAVE_NATIVE_BF16
+#if HAVE_AMX_BF16
     const char *amx_env = getenv("CK_BF16_AMX");
-    if (amx_env && amx_env[0] == '1' && HAVE_AMX_BF16 &&
+    if (amx_env && amx_env[0] == '1' &&
         (M % 16) == 0 && (N % 16) == 0 && (K % 32) == 0 &&
         M >= 16 && N >= 16 && K >= 32 && ck_amx_request_xtile_data()) {
         gemm_bf16_fp32out_amx(A, B, bias, C, M, N, K);
         return;
     }
+#endif
 
     #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < M; ++i) {

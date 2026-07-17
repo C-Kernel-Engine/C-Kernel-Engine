@@ -1,0 +1,62 @@
+{
+  "id": "rmsnorm_forward_llama_production",
+  "op": "rmsnorm",
+  "variant": "llama_cpu_production_fp32_output",
+  "quant": { "weight": "fp32", "activation": "fp32", "output": "fp32" },
+  "inputs": [{ "name": "input", "dtype": "fp32", "shape": ["T", "E"] }],
+  "weights": [{ "name": "gamma", "dtype": "fp32", "shape": ["E"] }],
+  "outputs": [
+    { "name": "output", "dtype": "fp32", "shape": ["T", "E"] },
+    { "name": "rstd", "dtype": "fp32", "shape": ["T"] }
+  ],
+  "dims": ["T", "E"],
+  "params": [{ "name": "eps", "dtype": "float32" }],
+  "impl": {
+    "function": "rmsnorm_forward_llama_production",
+    "c_declaration": "void rmsnorm_forward_llama_production(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+    "sources": ["src/kernels/rmsnorm_kernels.c"]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "rmsnorm_forward_llama_production",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {
+        "runtime": "serial",
+        "work_partition": ["independent_rows"],
+        "dispatch": ["inline"],
+        "reduction_order_effect": "none"
+      }
+    },
+    "arithmetic": {
+      "partial_accumulator": "fp64",
+      "merge_order": "none",
+      "deterministic": true,
+      "thread_count_changes_arithmetic_order": false,
+      "split_strategy": "independent_outputs"
+    }
+  }],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      { "name": "input", "source": "activation:input", "cast": "const float*" },
+      {
+        "name": "gamma",
+        "source": "weight:gamma",
+        "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight"],
+        "cast": "const float*"
+      },
+      { "name": "output", "source": "output:output", "cast": "float*" },
+      { "name": "rstd_cache", "source": "null" },
+      { "name": "tokens", "source": "dim:seq_len" },
+      { "name": "d_model", "source": "dim:embed_dim" },
+      { "name": "aligned_embed_dim", "source": "dim:embed_dim" },
+      { "name": "eps", "source": "dim:rms_eps" }
+    ]
+  },
+  "notes": "FP32 RMSNorm matching llama.cpp CPU production reciprocal-square-root evaluation for the active ISA.",
+  "name": "rmsnorm_forward_llama_production"
+}

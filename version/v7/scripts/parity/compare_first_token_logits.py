@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import subprocess
@@ -26,7 +27,6 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_DIR = Path(__file__).resolve().parent
 HELPER_SRC = SCRIPT_DIR / "llama_token_replay.cpp"
-HELPER_BIN = Path("/tmp/ckv7_llama_token_replay")
 
 
 def _llama_cpp_root() -> Path:
@@ -154,25 +154,39 @@ def ensure_llama_helper() -> Path:
     if not HELPER_SRC.exists():
         raise FileNotFoundError(f"Missing helper source: {HELPER_SRC}")
 
-    rebuild = True
-    if HELPER_BIN.exists():
-        try:
-            rebuild = HELPER_BIN.stat().st_mtime < HELPER_SRC.stat().st_mtime
-        except OSError:
-            rebuild = True
-    if not rebuild:
-        return HELPER_BIN
-
     llama_cpp = _llama_cpp_root()
     include_dir = llama_cpp / "include"
     ggml_include_dir = llama_cpp / "ggml" / "include"
     lib_dir = llama_cpp / "build" / "bin"
+    libraries = [
+        lib_dir / "libllama.so",
+        lib_dir / "libggml.so",
+        lib_dir / "libggml-cpu.so",
+        lib_dir / "libggml-base.so",
+    ]
     if not include_dir.exists():
         raise FileNotFoundError(f"llama include dir missing: {include_dir}")
     if not ggml_include_dir.exists():
         raise FileNotFoundError(f"ggml include dir missing: {ggml_include_dir}")
     if not lib_dir.exists():
         raise FileNotFoundError(f"llama lib dir missing: {lib_dir}")
+    missing = [path for path in libraries if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "llama shared libraries missing: " + ", ".join(str(path) for path in missing)
+        )
+
+    digest = hashlib.sha256()
+    digest.update(HELPER_SRC.read_bytes())
+    digest.update(str(llama_cpp).encode("utf-8"))
+    for library in libraries:
+        resolved = library.resolve()
+        digest.update(str(resolved).encode("utf-8"))
+        digest.update(str(resolved.stat().st_size).encode("ascii"))
+        digest.update(str(resolved.stat().st_mtime_ns).encode("ascii"))
+    helper_bin = Path(tempfile.gettempdir()) / f"ckv7_llama_token_replay_{digest.hexdigest()[:16]}"
+    if helper_bin.is_file():
+        return helper_bin
 
     cmd = [
         "g++",
@@ -193,7 +207,7 @@ def ensure_llama_helper() -> Path:
         "-pthread",
         "-ldl",
         "-o",
-        str(HELPER_BIN),
+        str(helper_bin),
     ]
     proc = _run(cmd, cwd=ROOT)
     if proc.returncode != 0:
@@ -203,8 +217,8 @@ def ensure_llama_helper() -> Path:
             f"stdout:\n{proc.stdout}\n"
             f"stderr:\n{proc.stderr}\n"
         )
-    HELPER_BIN.chmod(0o755)
-    return HELPER_BIN
+    helper_bin.chmod(0o755)
+    return helper_bin
 
 
 def run_llama_logits(gguf_path: Path, tokens: list[int], ctx_len: int, top_k: int, threads: int) -> dict[str, Any]:

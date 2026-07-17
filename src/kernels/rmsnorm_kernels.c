@@ -71,6 +71,97 @@ static void rmsnorm_forward_strict_scalar(const float *input,
     }
 }
 
+#if defined(__clang__)
+__attribute__((optnone, noinline))
+#elif defined(__GNUC__)
+__attribute__((optimize("O1,no-tree-vectorize,no-tree-slp-vectorize"), noinline))
+#endif
+void rmsnorm_forward_fp64_sum(const float *input,
+                              const float *gamma,
+                              float *output,
+                              float *rstd_cache,
+                              int tokens,
+                              int d_model,
+                              int aligned_embed_dim,
+                              float eps)
+{
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+        float *y = output + (size_t)t * (size_t)aligned_embed_dim;
+        /* This provider's contract requires an ascending scalar reduction.
+         * Keep the accumulator volatile so whole-program optimization cannot
+         * reassociate the sum or replace it with SIMD partial reductions. */
+        volatile double sum_sq = 0.0;
+        for (int d = 0; d < d_model; ++d) {
+            const float square = x[d] * x[d];
+            sum_sq = sum_sq + (double)square;
+        }
+        const float mean_sq = (float)(sum_sq / (double)d_model);
+        const float rstd = 1.0f / sqrtf(mean_sq + eps);
+        if (rstd_cache) {
+            rstd_cache[t] = rstd;
+        }
+        for (int d = 0; d < d_model; ++d) {
+            const float normalized = x[d] * rstd;
+            y[d] = normalized * gamma[d];
+        }
+        for (int d = d_model; d < aligned_embed_dim; ++d) {
+            y[d] = 0.0f;
+        }
+    }
+}
+
+static inline float rmsnorm_llama_production_rstd(float mean_eps)
+{
+#if defined(__AVX512F__)
+    const __m128 x = _mm_set_ss(mean_eps);
+    __m128 estimate = _mm_rsqrt14_ss(_mm_setzero_ps(), x);
+    __m128 correction = _mm_mul_ss(estimate, x);
+    correction = _mm_fmadd_ss(correction, estimate, _mm_set_ss(-3.0f));
+    estimate = _mm_mul_ss(estimate, _mm_set_ss(-0.5f));
+    return _mm_cvtss_f32(_mm_mul_ss(correction, estimate));
+#else
+    return 1.0f / sqrtf(mean_eps);
+#endif
+}
+
+#if defined(__clang__)
+__attribute__((optnone, noinline))
+#elif defined(__GNUC__)
+__attribute__((optimize("O1,no-tree-vectorize,no-tree-slp-vectorize"), noinline))
+#endif
+void rmsnorm_forward_llama_production(const float *input,
+                                      const float *gamma,
+                                      float *output,
+                                      float *rstd_cache,
+                                      int tokens,
+                                      int d_model,
+                                      int aligned_embed_dim,
+                                      float eps)
+{
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+        float *y = output + (size_t)t * (size_t)aligned_embed_dim;
+        volatile double sum_sq = 0.0;
+        for (int d = 0; d < d_model; ++d) {
+            const float square = x[d] * x[d];
+            sum_sq = sum_sq + (double)square;
+        }
+        const float mean_sq = (float)(sum_sq / (double)d_model);
+        const float rstd = rmsnorm_llama_production_rstd(mean_sq + eps);
+        if (rstd_cache) {
+            rstd_cache[t] = rstd;
+        }
+        for (int d = 0; d < d_model; ++d) {
+            const float normalized = x[d] * rstd;
+            y[d] = normalized * gamma[d];
+        }
+        for (int d = d_model; d < aligned_embed_dim; ++d) {
+            y[d] = 0.0f;
+        }
+    }
+}
+
 static void rmsnorm_backward_strict_scalar(const float *d_output,
                                            const float *input,
                                            const float *gamma,

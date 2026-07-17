@@ -90,14 +90,14 @@ def _profile_install_hints() -> list[str]:
             "# VTune on Linux may require:",
             "sudo sysctl -w kernel.yama.ptrace_scope=0",
         ]
-    if distro_id in {"arch", "manjaro", "endeavouros"} or "arch" in distro_like:
+    if distro_id in {"arch", "manjaro", "endeavouros", "cachyos"} or "arch" in distro_like:
         return [
-            "sudo pacman -S base-devel git perf valgrind flamegraph",
-            "# Intel hosts: sudo pacman -S intel-oneapi-basekit",
-            "mkdir -p FlameGraph && ln -sf /usr/bin/flamegraph FlameGraph/flamegraph.pl && ln -sf /usr/bin/stackcollapse-perf FlameGraph/stackcollapse-perf.pl",
-            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0",
-            "# VTune on Linux may require:",
-            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+            "sudo pacman -S base-devel git perf valgrind",
+            "# Intel hosts: sudo pacman -S intel-oneapi-toolkit",
+            "# Intel hosts: source /opt/intel/oneapi/setvars.sh",
+            "git clone https://github.com/brendangregg/FlameGraph.git",
+            "chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl",
+            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0 kernel.yama.ptrace_scope=0",
         ]
     if distro_id in {"fedora", "rhel", "centos", "rocky", "almalinux"} or any(x in distro_like for x in ("fedora", "rhel")):
         return [
@@ -124,6 +124,65 @@ def _profile_install_hints() -> list[str]:
         "# Install perf, valgrind, and FlameGraph for your Linux distribution, then retry.",
         "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
     ]
+
+
+def _likwid_install_hints() -> dict[str, object]:
+    """Return copyable LIKWID install paths without making it mandatory."""
+    os_release = _read_os_release() if sys.platform.startswith("linux") else {}
+    distro_id = (os_release.get("ID") or "").lower()
+    distro_like = (os_release.get("ID_LIKE") or "").lower()
+    family = "other"
+    if distro_id in {"ubuntu", "debian", "linuxmint", "pop"} or any(
+        value in distro_like for value in ("debian", "ubuntu")
+    ):
+        family = "ubuntu"
+    elif (
+        distro_id in {"arch", "manjaro", "endeavouros", "cachyos"}
+        or "arch" in distro_like
+    ):
+        family = "arch"
+
+    commands: dict[str, list[str]] = {
+        "ubuntu_package": [
+            "sudo apt-get update",
+            "sudo apt-get install -y likwid",
+        ],
+        "ubuntu_source": [
+            "sudo apt-get update",
+            "sudo apt-get install -y build-essential git perl gnuplot-nox",
+            "git clone --depth 1 --branch v5.5.1 https://github.com/RRZE-HPC/likwid.git",
+            "cd likwid",
+            'make -j"$(nproc)"',
+            "sudo make install",
+            "sudo ldconfig",
+        ],
+        "arch_aur": [
+            "sudo pacman -S --needed base-devel git perl gnuplot",
+            "git clone https://aur.archlinux.org/likwid.git",
+            "cd likwid",
+            "makepkg -si",
+        ],
+        "verify": [
+            "likwid-perfctr -v",
+            "sudo modprobe msr",
+            "likwid-perfctr -i",
+            "likwid-perfctr -a",
+            "likwid-topology -c",
+        ],
+    }
+    return {
+        "distro_family": family,
+        "recommended": (
+            "arch_aur" if family == "arch" else "ubuntu_source"
+        ),
+        "commands": commands,
+        "minimum_modern_version": "5.5.0",
+        "stable_source_version": "5.5.1",
+        "note": (
+            "Ubuntu repository packages can be older than current LIKWID. "
+            "Use the source path for Xeon 6, Zen 5, or other recent processors."
+        ),
+    }
 
 
 def _format_mem_gib(kb: int | None) -> str | None:
@@ -289,11 +348,13 @@ def collect_profile_tool_status() -> dict[str, object]:
     return {
         "host_platform": sys.platform,
         "install_hints": _profile_install_hints(),
+        "likwid_install_hints": _likwid_install_hints(),
         "perf": shutil.which("perf") is not None,
         "valgrind": shutil.which("valgrind") is not None,
         "cg_annotate": shutil.which("cg_annotate") is not None,
         "vtune": shutil.which("vtune") is not None,
         "advisor": shutil.which("advisor") is not None,
+        "likwid": shutil.which("likwid-perfctr") is not None,
         "xdg_open": shutil.which("xdg-open") is not None,
         "flamegraph": (
             (flamegraph_dir / "stackcollapse-perf.pl").exists()
@@ -309,7 +370,7 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     if candidate.exists():
         if not candidate.is_dir():
             raise ValueError(f"Model path is not a directory: {candidate}")
-        if candidate.name in {"ck_build", ".ck_build"}:
+        if candidate.name in {"ck_build", ".ck_build", ".ck_build_v8"}:
             ck_build = candidate
             model_root = candidate.parent
         else:
@@ -317,6 +378,8 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
                 ck_build = candidate / "ck_build"
             elif (candidate / ".ck_build").exists():
                 ck_build = candidate / ".ck_build"
+            elif (candidate / ".ck_build_v8").exists():
+                ck_build = candidate / ".ck_build_v8"
             else:
                 ck_build = candidate
             model_root = candidate
@@ -329,6 +392,10 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     dot_ck_build = CACHE_PATH / model_arg / ".ck_build"
     if dot_ck_build.exists():
         return dot_ck_build, CACHE_PATH / model_arg
+
+    dot_ck_build_v8 = CACHE_PATH / model_arg / ".ck_build_v8"
+    if dot_ck_build_v8.exists():
+        return dot_ck_build_v8, CACHE_PATH / model_arg
 
     model_dir = CACHE_PATH / model_arg
     if model_dir.exists():
@@ -551,6 +618,7 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "asan_summary.json",
         "vtune_summary.json",
         "advisor_summary.json",
+        "likwid_summary.json",
         "memory_signoff.json",
         "memory_verification_latest.json",
         "perf_gate_report.json",
@@ -726,6 +794,7 @@ def _encode_image_data_uri(path: Path) -> str | None:
         ".jpeg": "image/jpeg",
         ".webp": "image/webp",
         ".gif": "image/gif",
+        ".svg": "image/svg+xml",
     }.get(suffix)
     if mime is None:
         return None
@@ -3483,8 +3552,8 @@ def load_model_data(
         model_root = run_dir
         model_name = run_dir.name
     else:
-        model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
-        model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path
+        model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build", ".ck_build_v8"} else ck_build_path.name
+        model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build", ".ck_build_v8"} else ck_build_path
     train_runtime_available = has_train_runtime_artifacts(run_dir if run_dir is not None else model_root)
     inference_runtime_available = has_inference_runtime_artifacts(run_dir if run_dir is not None else model_root)
     bridge_dirs = _resolve_multimodal_bridge_dirs(run_dir, model_root)
@@ -3496,8 +3565,8 @@ def load_model_data(
     if bridge_decoder_root is not None:
         search_roots.append(bridge_decoder_root)
     if run_dir is not None:
-        search_roots.extend([run_dir, run_dir / "ck_build", run_dir / ".ck_build"])
-    search_roots.extend([ck_build_path, model_root, model_root / ".ck_build"])
+        search_roots.extend([run_dir, run_dir / "ck_build", run_dir / ".ck_build", run_dir / ".ck_build_v8"])
+    search_roots.extend([ck_build_path, model_root, model_root / ".ck_build", model_root / ".ck_build_v8"])
     if bridge_root is not None:
         search_roots.append(bridge_root)
     if bridge_encoder_root is not None:
@@ -3605,6 +3674,7 @@ def load_model_data(
         "asan_summary",
         "vtune_summary",
         "advisor_summary",
+        "likwid_summary",
         "memory_signoff",
         "perf_gate_report",
         "regression_ledger",
@@ -3706,6 +3776,7 @@ def load_model_data(
         "asan_summary": model_candidates("asan_summary.json") + [V8_REPORT_PATH / "asan_summary.json", V8_REPORT_PATH_LEGACY / "asan_summary.json"],
         "vtune_summary": model_candidates("vtune_summary.json") + [V8_REPORT_PATH / "vtune_summary.json", V8_REPORT_PATH_LEGACY / "vtune_summary.json"],
         "advisor_summary": model_candidates("advisor_summary.json") + [V8_REPORT_PATH / "advisor_summary.json", V8_REPORT_PATH_LEGACY / "advisor_summary.json"],
+        "likwid_summary": model_candidates("likwid_summary.json") + [V8_REPORT_PATH / "likwid_summary.json", V8_REPORT_PATH_LEGACY / "likwid_summary.json"],
         "memory_signoff": model_candidates("memory_signoff.json") + [V8_REPORT_PATH / "memory_signoff.json", V8_REPORT_PATH_LEGACY / "memory_signoff.json"],
         "perf_gate_report": model_candidates("perf_gate_report.json") + [V8_REPORT_PATH / "perf_gate_report.json", V8_REPORT_PATH_LEGACY / "perf_gate_report.json"],
         "embedding_dump": model_candidates("embedding_dump.json") + model_candidates("embedding_dump_latest.json"),
@@ -4501,6 +4572,42 @@ def load_model_data(
                 enriched.append(item2)
             advisor["artifacts"] = enriched
 
+    likwid = data["files"].get("likwid_summary")
+    if isinstance(likwid, dict):
+        artifacts = likwid.get("artifacts")
+        if isinstance(artifacts, list):
+            enriched = []
+            for item in artifacts:
+                if not isinstance(item, dict):
+                    continue
+                item2 = dict(item)
+                raw = item2.get("path")
+                if isinstance(raw, str):
+                    resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+                    if resolved:
+                        item2["resolved_path"] = str(resolved)
+                        image_data_uri = _encode_image_data_uri(resolved)
+                        if image_data_uri:
+                            item2["image_data_uri"] = image_data_uri
+                enriched.append(item2)
+            likwid["artifacts"] = enriched
+        runs = likwid.get("runs")
+        if isinstance(runs, list):
+            enriched_runs = []
+            for run in runs:
+                if not isinstance(run, dict):
+                    continue
+                run2 = dict(run)
+                for key in ("csv_path", "stdout_path", "stderr_path"):
+                    raw = run2.get(key)
+                    if not isinstance(raw, str):
+                        continue
+                    resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+                    if resolved:
+                        run2[f"{key}_resolved"] = str(resolved)
+                enriched_runs.append(run2)
+            likwid["runs"] = enriched_runs
+
     cachegrind = data["files"].get("cachegrind_summary")
     if isinstance(cachegrind, dict):
         for key in ("cachegrind_out", "annotate_path"):
@@ -4604,7 +4711,7 @@ def generate_html_report(
     """Generate standalone HTML report."""
     from datetime import datetime
 
-    model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
+    model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build", ".ck_build_v8"} else ck_build_path.name
     print(f"Generating report for: {model_name}")
 
     # Load data

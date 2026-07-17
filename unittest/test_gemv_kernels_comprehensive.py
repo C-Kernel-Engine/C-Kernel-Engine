@@ -383,6 +383,8 @@ def get_test_cases(quick: bool = False, large: bool = False) -> dict:
             "Q6_K_Q8_K": [
                 TestCase("tiny", M=1, K=256, tol=1e-5, rtol=1e-4, description="Direct Q6_KxQ8_K"),
                 TestCase("small", M=1, K=512, tol=1e-5, rtol=1e-4, description="Small direct"),
+                TestCase("qwen3vl_lm_head", M=1, K=4096, tol=0.0, rtol=0.0,
+                         description="Qwen3-VL LM-head direct vec_dot"),
             ],
             "Q5_0": [
                 TestCase("tiny", M=1, K=32, tol=1e-2, description="Minimal Q5_0"),

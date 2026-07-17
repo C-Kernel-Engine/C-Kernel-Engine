@@ -35,10 +35,38 @@ decoder_parity_v8 = _load_module("decoder_first_token_parity_v8_tests", V8_DECOD
 
 
 class V8DecoderFirstTokenParityTests(unittest.TestCase):
+    def test_llama_helper_fingerprint_tracks_root_source_and_library_content(self) -> None:
+        helper_module = decoder_parity_v8.compare_first_token_logits_v7
+        with tempfile.TemporaryDirectory(prefix="v8_llama_helper_identity_") as tmpdir:
+            root = Path(tmpdir)
+            source = root / "llama_token_replay_v8.cpp"
+            source.write_text("int main() { return 0; }\n", encoding="utf-8")
+            lib_dir = root / "build" / "bin"
+            lib_dir.mkdir(parents=True)
+            for name in ("libllama.so", "libggml.so", "libggml-cpu.so", "libggml-base.so"):
+                (lib_dir / name).write_bytes(name.encode("ascii"))
+
+            with mock.patch.object(helper_module, "LLAMA_CPP", root), mock.patch.object(
+                helper_module, "HELPER_SRC", source
+            ):
+                original = helper_module._llama_helper_fingerprint()
+                (lib_dir / "libggml-cpu.so").write_bytes(b"different provider")
+                changed_library = helper_module._llama_helper_fingerprint()
+                source.write_text("int main() { return 1; }\n", encoding="utf-8")
+                changed_source = helper_module._llama_helper_fingerprint()
+
+            self.assertNotEqual(original, changed_library)
+            self.assertNotEqual(changed_library, changed_source)
+
     def test_ck_dump_filter_names_expands_llama_aliases(self) -> None:
         self.assertEqual(
             decoder_parity_v8._ck_dump_filter_names("Qcur-0,Kcur_normed-2,ffn_inp-0,l_out-3"),
-            "Qcur-0,q_proj-0,Kcur_normed-2,kcur_normed-2,ffn_inp-0,l_out-3,layer_out-3",
+            "Qcur-0,q_proj-0,Qcur_normed-0,qcur_normed-0,Qcur_rope-0,qcur_rope-0,"
+            "Kcur_normed-2,kcur_normed-2,ffn_inp-0,l_out-3,layer_out-3",
+        )
+        self.assertEqual(
+            decoder_parity_v8._ck_dump_filter_names("Kcur-1"),
+            "Kcur-1,k_proj-1,Kcur_normed-1,kcur_normed-1,Kcur_rope-1,kcur_rope-1",
         )
 
     def test_load_llama_dump_dir_parses_jsonl_index(self) -> None:
@@ -156,6 +184,39 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
         self.assertEqual([row["op"] for row in report["results"]], ["ffn_inp", "down_proj"])
         self.assertEqual(report["first_issue"]["op"], "ffn_inp")
 
+    def test_compare_dump_sets_rejects_distinct_ambiguous_occurrences(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        report = decoder_parity_v8._compare_dump_sets(
+            [dump(0, "v_proj", np.array([1.0], dtype=np.float32), 7, "fp32")],
+            [
+                dump(0, "v_proj", np.array([1.0], dtype=np.float32), 7, "fp32"),
+                dump(0, "v_proj", np.array([2.0], dtype=np.float32), 7, "fp32"),
+            ],
+            atol=0.0,
+            rtol=0.0,
+            pass_filter="decode",
+        )
+
+        self.assertEqual(report["summary"]["error"], 1)
+        self.assertEqual(report["first_issue"]["reason"], "ambiguous_alignment")
+
+    def test_compare_dump_sets_accepts_identical_reshape_occurrences(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        values = np.array([1.0, 2.0], dtype=np.float32)
+        report = decoder_parity_v8._compare_dump_sets(
+            [dump(0, "v_proj", values.copy(), 7, "fp32")],
+            [
+                dump(0, "v_proj", values.copy(), 7, "fp32"),
+                dump(0, "v_proj", values.reshape(2, 1).copy(), 7, "fp32"),
+            ],
+            atol=0.0,
+            rtol=0.0,
+            pass_filter="decode",
+        )
+
+        self.assertEqual(report["summary"]["pass"], 1)
+        self.assertFalse(report["results"][0]["alignment_ambiguous"])
+
     def test_expand_ck_prefill_decode_dumps_splits_prompt_rows(self) -> None:
         ck_dumps = [
             decoder_parity_v8.parity_test_v7.ParityDump(
@@ -206,6 +267,50 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
         self.assertEqual([d.token_id for d in attn_rows], [0, 1])
         np.testing.assert_allclose(attn_rows[0].data, np.arange(112, 118, dtype=np.float32))
         np.testing.assert_allclose(attn_rows[1].data, np.arange(118, 124, dtype=np.float32))
+
+    def test_expand_ck_prefill_decode_dumps_selects_exact_trailing_segment(self) -> None:
+        row_elems = 4
+
+        def ck_segment(rows: int, base: float):
+            data = np.arange(rows * row_elems, dtype=np.float32) + base
+            return decoder_parity_v8.parity_test_v7.ParityDump(
+                0,
+                "q_proj",
+                data,
+                1083,
+                "fp32",
+            )
+
+        # Reproduces Qwen3-VL segmented mixed prefill: text-before, visual,
+        # then the requested text-after/generated-token replay window.
+        ck_dumps = [
+            ck_segment(5, 1000.0),
+            ck_segment(1008, 2000.0),
+            ck_segment(71, 3000.0),
+        ]
+        llama_dumps = [
+            decoder_parity_v8.parity_test_v7.ParityDump(
+                0,
+                "q_proj",
+                np.zeros(row_elems, dtype=np.float32),
+                token_id,
+                "fp32",
+            )
+            for token_id in range(71)
+        ]
+
+        expanded = decoder_parity_v8._expand_ck_prefill_decode_dumps(
+            ck_dumps,
+            llama_dumps,
+            prompt_start_token=1013,
+            prompt_token_count=71,
+        )
+
+        rows = [d for d in expanded if d.layer_id == 0 and d.op_name == "q_proj"]
+        self.assertEqual([d.token_id for d in rows], list(range(71)))
+        self.assertTrue(all(d.data.size == row_elems for d in rows))
+        np.testing.assert_allclose(rows[0].data, np.arange(4, dtype=np.float32) + 3000.0)
+        np.testing.assert_allclose(rows[-1].data, np.arange(280, 284, dtype=np.float32) + 3000.0)
 
     def test_expand_ck_prefill_decode_dumps_extracts_head_major_norm_rows(self) -> None:
         # CK stores qcur_normed head-major as [heads, tokens, dim].
@@ -336,6 +441,33 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
         self.assertEqual([d.token_id for d in q_rows], [0, 0])
         np.testing.assert_allclose(q_rows[0].data, np.array([1.0], dtype=np.float32))
         np.testing.assert_allclose(q_rows[1].data, np.array([2.0], dtype=np.float32))
+
+    def test_expand_llama_prefill_decode_dumps_selects_execution_tail_not_largest_position(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        row_elems = 4
+        llama_dumps = [
+            dump(0, "q_proj", np.arange(5 * row_elems, dtype=np.float32), 4, "fp32"),
+            dump(0, "q_proj", np.arange(1008 * row_elems, dtype=np.float32), 1012, "fp32"),
+            dump(
+                0,
+                "q_proj",
+                np.arange(59 * row_elems, dtype=np.float32) + 10000.0,
+                99,
+                "fp32",
+            ),
+        ]
+
+        expanded = decoder_parity_v8._expand_llama_prefill_decode_dumps(
+            llama_dumps,
+            prompt_token_count=59,
+        )
+
+        self.assertEqual([item.token_id for item in expanded], list(range(59)))
+        self.assertTrue(all(item.data.size == row_elems for item in expanded))
+        np.testing.assert_allclose(
+            expanded[-1].data,
+            np.arange(232, 236, dtype=np.float32) + 10000.0,
+        )
 
     def test_resolve_decode_prompt_start_tokens_uses_stage_and_rope_windows(self) -> None:
         ck_start, llama_start = decoder_parity_v8._resolve_decode_prompt_start_tokens(

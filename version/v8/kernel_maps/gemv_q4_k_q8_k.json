@@ -3,35 +3,37 @@
   "op": "gemv",
   "variant": "q4_k_w_q8_k_a_fp32_out",
   "contract_schema_version": 1,
-  "numerical_contract": "q4_k_x_q8_k_fp32_block_order",
+  "numerical_contract": "q4_k_x_q8_k_repacked_matvec_fp32",
   "reference": {
-    "function": "gemv_q4_k_q8_k_ref",
-    "kind": "scalar_contract_oracle",
+    "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+    "kind": "llama_repacked_graph_oracle",
     "adapter": "direct",
     "validation": {
-      "status": "observed",
-      "tests": ["unittest/test_q4_k_q8_k_matvec.py", "tests/test_threadpool_parity.c"],
+      "status": "validated",
+      "tests": ["unittest/test_q4_k_q8_k_matvec.py", "unittest/test_q4k_q8k_llama_packed.cpp", "tests/test_threadpool_parity.c"],
       "external_oracles": [
         {"backend": "numpy_dequantized_fp32", "status": "observed", "evidence": "unittest/test_q4_k_q8_k_matvec.py"},
-        {"backend": "llama.cpp", "status": "unresolved", "evidence": "No direct llama.cpp Q4_K x Q8_K GEMV oracle is currently wired."}
+        {"backend": "llama.cpp_ggml_cpu_graph", "status": "validated", "evidence": "unittest/test_q4k_q8k_llama_packed.cpp"}
       ]
     }
   },
   "production": {
-    "function": "gemv_q4_k_q8_k",
-    "threaded_function": "gemv_q4_k_q8_k_parallel_dispatch",
+    "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
+    "threaded_function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
     "reference_comparison": {
-      "requirement": "contract_tolerance",
-      "absolute_tolerance": 0.001,
-      "relative_tolerance": 0.001,
-      "tests": ["tests/test_threadpool_parity.c"]
+      "requirement": "bit_exact",
+      "absolute_tolerance": 0.0,
+      "relative_tolerance": 0.0,
+      "tests": ["unittest/test_q4k_q8k_llama_packed.cpp", "tests/test_threadpool_parity.c"]
     }
   },
   "implementation": {
     "isa_dispatch": "runtime",
     "weight_storage": {"format": "q4_k", "block_elements": 256, "block_bytes": 144},
     "activation_storage": {"format": "q8_k", "block_elements": 256},
-    "diagnostic_providers": {"fp32_activation": "gemv_q4_k"},
+    "diagnostic_providers": {
+      "fp32_activation": "gemv_q4_k"
+    },
     "threading": {
       "runtime": "ck_threadpool",
       "work_partition": ["serial", "independent_rows"],
@@ -42,6 +44,10 @@
   "quant": {
     "weight": "q4_k",
     "activation": "q8_k",
+    "activation_quantization_contract": {
+      "decode": "canonical_q8_k_row_nearest",
+      "prefill": "llama_repack_q8_k_4row_nearest_even"
+    },
     "output": "fp32"
   },
   "inputs": [
@@ -73,7 +79,7 @@
     "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization."
   },
   "impl": {
-    "function": "gemv_q4_k_q8_k",
+    "function": "gemv_q4_k_q8_k_repacked_parallel_dispatch",
     "c_declaration": "void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);",
     "sources": ["src/kernels/gemm_kernels_q4k.c"],
     "variants": [

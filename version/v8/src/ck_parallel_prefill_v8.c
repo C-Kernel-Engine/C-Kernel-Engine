@@ -90,6 +90,15 @@ extern void gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse(const void *A_q8,
                                                              int M, int N, int K,
                                                              int tile_m,
                                                              int threads);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K);
+extern void gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K);
 extern void gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse(const void *A_q8,
                                                               const void *B_packed_x16,
                                                               const float *bias,
@@ -143,13 +152,6 @@ void ck_parallel_prefill_init(void)
     }
 }
 
-void ck_parallel_prefill_shutdown(void)
-{
-    /* Pool is shared with decode — decode shutdown handles actual destroy.
-     * This is a no-op to avoid double-free. The global pool is destroyed
-     * once by whichever shutdown path runs last (or by ck_model_free). */
-}
-
 /* ============================================================================
  * Argument Packing Struct
  * ============================================================================ */
@@ -166,6 +168,15 @@ typedef struct {
     int          tile_m;      /* 2D scheduler token tile height */
     int          tile_n;      /* 2D scheduler output tile width */
 } gemm_args_t;
+
+typedef struct {
+    const void  *A;
+    const void  *B_packed_x8;
+    const float *bias;
+    float       *C;
+    int          N;
+    int          K;
+} q4k_repacked_gemv_args_t;
 
 static int ck_min_int(int a, int b) { return a < b ? a : b; }
 
@@ -236,6 +247,42 @@ typedef struct ck_q4k_packed_meta_x16_cache_entry {
 
 static pthread_mutex_t ck_q4k_packed_meta_x16_cache_mu = PTHREAD_MUTEX_INITIALIZER;
 static ck_q4k_packed_meta_x16_cache_entry_t *ck_q4k_packed_meta_x16_cache_head = NULL;
+
+void ck_q4k_packed_weight_cache_clear(void)
+{
+    pthread_mutex_lock(&ck_q4k_packed_meta_cache_mu);
+    while (ck_q4k_packed_meta_cache_head) {
+        ck_q4k_packed_meta_cache_entry_t *entry = ck_q4k_packed_meta_cache_head;
+        ck_q4k_packed_meta_cache_head = entry->next;
+        free(entry->packed);
+        free(entry);
+    }
+    pthread_mutex_unlock(&ck_q4k_packed_meta_cache_mu);
+
+    pthread_mutex_lock(&ck_q4k_packed_meta_x8_cache_mu);
+    while (ck_q4k_packed_meta_x8_cache_head) {
+        ck_q4k_packed_meta_x8_cache_entry_t *entry = ck_q4k_packed_meta_x8_cache_head;
+        ck_q4k_packed_meta_x8_cache_head = entry->next;
+        free(entry->packed);
+        free(entry);
+    }
+    pthread_mutex_unlock(&ck_q4k_packed_meta_x8_cache_mu);
+
+    pthread_mutex_lock(&ck_q4k_packed_meta_x16_cache_mu);
+    while (ck_q4k_packed_meta_x16_cache_head) {
+        ck_q4k_packed_meta_x16_cache_entry_t *entry = ck_q4k_packed_meta_x16_cache_head;
+        ck_q4k_packed_meta_x16_cache_head = entry->next;
+        free(entry->packed);
+        free(entry);
+    }
+    pthread_mutex_unlock(&ck_q4k_packed_meta_x16_cache_mu);
+}
+
+void ck_parallel_prefill_shutdown(void)
+{
+    /* Pool ownership remains with decode; prefill owns packed-weight caches. */
+    ck_q4k_packed_weight_cache_clear();
+}
 
 /* Q4_K packed-meta prefill experiment
  * -----------------------------------
@@ -668,6 +715,55 @@ static void work_gemm_nt_q4_k_q8_k(int ith, int nth, void *args)
     }
 }
 
+static void work_gemm_nt_q4_k_q8_k_pairwise_split_min(int ith, int nth, void *args)
+{
+    const gemm_args_t *a = (const gemm_args_t *)args;
+    const int dr = (a->M + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < a->M) ? (r0 + dr) : a->M;
+    if (r0 >= a->M) return;
+
+    if ((a->N % 16) == 0) {
+        gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
+            (const char *)a->A + (size_t)r0 * a->A_row_bytes,
+            a->B,
+            a->bias,
+            a->C + (size_t)r0 * (size_t)a->N,
+            r1 - r0, a->N, a->K
+        );
+    } else {
+        gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
+            (const char *)a->A + (size_t)r0 * a->A_row_bytes,
+            a->B,
+            a->bias,
+            a->C + (size_t)r0 * (size_t)a->N,
+            r1 - r0, a->N, a->K
+        );
+    }
+}
+
+static void work_gemv_q4_k_q8_k_repacked(int ith, int nth, void *args)
+{
+    const q4k_repacked_gemv_args_t *a = (const q4k_repacked_gemv_args_t *)args;
+    const int groups = (a->N + 7) / 8;
+    const int dg = (groups + nth - 1) / nth;
+    const int g0 = dg * ith;
+    const int g1 = ck_min_int(g0 + dg, groups);
+    if (g0 >= groups) return;
+
+    const int n0 = g0 * 8;
+    const int n1 = ck_min_int(g1 * 8, a->N);
+    const size_t packed_group_bytes =
+            (size_t)(a->K / QK_K) * q4_k_packed_meta_x8_block_size();
+    gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+        a->A,
+        (const char *)a->B_packed_x8 + (size_t)g0 * packed_group_bytes,
+        a->bias ? a->bias + n0 : NULL,
+        a->C + n0,
+        1, n1 - n0, a->K
+    );
+}
+
 static void work_gemm_nt_q6_k_q8_k(int ith, int nth, void *args)
 {
     const gemm_args_t *a = (const gemm_args_t *)args;
@@ -980,6 +1076,75 @@ void gemm_nt_q4_k_q8_k_parallel_dispatch(
     const int active = ck_select_gemm_active_threads(pool, M, N, K);
     ck_q4k_prefill_debug_dispatch("fallback_row_gemv", M, N, K, active);
     ck_threadpool_dispatch_n(pool, active, work_gemm_nt_q4_k_q8_k, &args);
+}
+
+void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+    const void *A, const void *B, const float *bias, float *C,
+    int M, int N, int K)
+{
+    if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
+
+    void *packed_x8 = ck_get_q4k_packed_meta_x8_cached(B, N, K);
+    if (!packed_x8) return;
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const size_t row_bytes = (size_t)(K / QK_K) * sizeof(block_q8_K);
+    const int packed_rows = M - (M % 4);
+    if (packed_rows > 0 &&
+        (!pool || ck_threadpool_n_threads(pool) <= 1 ||
+         ck_should_run_gemm_serial(pool, packed_rows, N, K))) {
+        if ((N % 16) == 0) {
+            gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
+                A, packed_x8, bias, C, packed_rows, N, K);
+        } else {
+            gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
+                A, packed_x8, bias, C, packed_rows, N, K);
+        }
+    } else if (packed_rows > 0) {
+        gemm_args_t args = {
+            .A = A, .B = packed_x8, .bias = bias, .C = C,
+            .M = packed_rows, .N = N, .K = K, .A_row_bytes = row_bytes
+        };
+        const int active = ck_select_gemm_active_threads(pool, packed_rows, N, K);
+        ck_threadpool_dispatch_n(
+            pool, active, work_gemm_nt_q4_k_q8_k_pairwise_split_min, &args);
+    }
+
+    /* The loaded CPU provider executes complete four-row groups through its
+     * repacked matrix kernel and routes residual rows through its repacked
+     * GEMV order. The two reduction boundaries are numerically distinct. */
+    if (packed_rows < M) {
+        gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+            (const char *)A + (size_t)packed_rows * row_bytes,
+            packed_x8, bias, C + (size_t)packed_rows * (size_t)N,
+            M - packed_rows, N, K);
+    }
+}
+
+void gemv_q4_k_q8_k_repacked_parallel_dispatch(
+    float *y, const void *W, const void *x_q8, int N, int K)
+{
+    if (!y || !W || !x_q8 || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
+
+    void *packed_x8 = ck_get_q4k_packed_meta_x8_cached(W, N, K);
+    if (!packed_x8) {
+        fprintf(stderr, "Q4_K repacked decode contract: weight packing failed\n");
+        abort();
+    }
+
+    q4k_repacked_gemv_args_t args = {
+        .A = x_q8, .B_packed_x8 = packed_x8, .bias = NULL,
+        .C = y, .N = N, .K = K
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int groups = (N + 7) / 8;
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > groups) active = groups;
+    if (active <= 1) {
+        work_gemv_q4_k_q8_k_repacked(0, 1, &args);
+        return;
+    }
+    ck_threadpool_dispatch_n(pool, active, work_gemv_q4_k_q8_k_repacked, &args);
 }
 
 void gemm_nt_q6_k_q8_k_parallel_dispatch(

@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -80,31 +81,71 @@ def _restore_process_env(saved: dict[str, str | None]) -> None:
         _set_process_env(key, value)
 
 
-def _single_hidden_file(root: Path) -> Path:
+def _hidden_token_position(path: Path) -> int | None:
+    match = re.search(r"(?:^|_)tok_(\d+)(?:_|$)", path.name)
+    return int(match.group(1)) if match else None
+
+
+def _select_final_hidden_file(files: list[Path], *, context: str) -> Path:
+    if not files:
+        raise RuntimeError(f"expected hidden dump for {context}, found 0")
+    if len(files) == 1:
+        return files[0]
+
+    positioned = [(path, _hidden_token_position(path)) for path in files]
+    if any(position is None for _, position in positioned):
+        raise RuntimeError(
+            f"multiple hidden dumps for {context} lack unambiguous token positions: "
+            + ", ".join(path.name for path, _ in positioned)
+        )
+    final_position = max(int(position) for _, position in positioned if position is not None)
+    final = [path for path, position in positioned if position == final_position]
+    if len(final) != 1:
+        raise RuntimeError(
+            f"multiple hidden dumps for {context} share final token position {final_position}: "
+            + ", ".join(path.name for path in final)
+        )
+    return final[0]
+
+
+def _hidden_named_files(root: Path, name: str | None) -> list[Path]:
     files = sorted(root.glob("*.f32"))
-    if len(files) != 1:
-        raise RuntimeError(f"expected exactly one hidden dump in {root}, found {len(files)}")
-    return files[0]
+    if name is None:
+        return files
+    suffix = f"_{name}.f32"
+    return [path for path in files if path.name.endswith(suffix)]
 
 
-def _hidden_files_by_layer(root: Path) -> dict[int, Path]:
-    out: dict[int, Path] = {}
-    for path in sorted(root.glob("*.f32")):
+def _single_hidden_file(root: Path, name: str | None = None) -> Path:
+    return _select_final_hidden_file(
+        _hidden_named_files(root, name), context=f"{name or 'hidden tensor'} in {root}"
+    )
+
+
+def _hidden_files_by_layer(root: Path, name: str | None = None) -> dict[int, Path]:
+    candidates: dict[int, list[Path]] = {}
+    for path in _hidden_named_files(root, name):
         m = re.search(r"_layer_(\d+)_", path.name)
         if not m:
             continue
         layer = int(m.group(1))
-        if layer in out:
-            raise RuntimeError(f"duplicate hidden dump for layer {layer} in {root}")
-        out[layer] = path
-    if not out:
+        candidates.setdefault(layer, []).append(path)
+    if not candidates:
         raise RuntimeError(f"expected hidden dumps in {root}, found 0")
-    return out
+    return {
+        layer: _select_final_hidden_file(paths, context=f"layer {layer} in {root}")
+        for layer, paths in candidates.items()
+    }
 
 
-def _hidden_compare_many(persistent_dir: Path, full_dir: Path) -> list[dict[str, Any]]:
-    persistent = _hidden_files_by_layer(persistent_dir)
-    full = _hidden_files_by_layer(full_dir)
+def _hidden_compare_many(
+    persistent_dir: Path,
+    full_dir: Path,
+    persistent_name: str | None = None,
+    full_name: str | None = None,
+) -> list[dict[str, Any]]:
+    persistent = _hidden_files_by_layer(persistent_dir, persistent_name)
+    full = _hidden_files_by_layer(full_dir, full_name)
     rows: list[dict[str, Any]] = []
     for layer in sorted(set(persistent) | set(full)):
         if layer not in persistent or layer not in full:
@@ -151,6 +192,59 @@ def _hidden_full_replay_name(name: str) -> str:
     if name.endswith("_last"):
         return name
     return f"{name}_last"
+
+
+_HIDDEN_EXPORT_CALL_RE = re.compile(
+    r"ck_debug_export_hidden\s*\(\s*model\s*,\s*(\d+)\s*,\s*\"([^\"]+)\""
+)
+
+
+def _hidden_export_catalog(runtime: dict[str, Any]) -> dict[str, list[int]]:
+    """Inventory the exact hidden exporters compiled into a decoder runtime."""
+    c_path_value = runtime.get("c_path")
+    if c_path_value is None:
+        c_path_value = Path(runtime["workdir"]) / "decoder_v8.c"
+    c_path = Path(c_path_value).resolve()
+    if not c_path.is_file():
+        raise FileNotFoundError(
+            "hidden-state preflight requires the generated decoder source matching the runtime: "
+            f"{c_path}"
+        )
+
+    catalog: dict[str, set[int]] = {}
+    for layer_text, name in _HIDDEN_EXPORT_CALL_RE.findall(c_path.read_text(encoding="utf-8")):
+        catalog.setdefault(name, set()).add(int(layer_text))
+    if not catalog:
+        raise RuntimeError(f"generated decoder has no hidden-state exporters: {c_path}")
+    return {name: sorted(layers) for name, layers in sorted(catalog.items())}
+
+
+def _validate_hidden_capture_request(
+    runtime: dict[str, Any], names: list[str], layer: int
+) -> dict[str, list[int]]:
+    catalog = _hidden_export_catalog(runtime)
+    issues: list[str] = []
+    for name in names:
+        replay_name = _hidden_full_replay_name(name)
+        if name not in catalog:
+            issues.append(f"decode exporter {name!r} does not exist")
+            continue
+        if replay_name not in catalog:
+            issues.append(f"full-replay exporter {replay_name!r} does not exist")
+            continue
+        if layer >= 0 and layer not in catalog[name]:
+            issues.append(f"decode exporter {name!r} is unavailable at layer {layer}")
+        if layer >= 0 and layer not in catalog[replay_name]:
+            issues.append(f"full-replay exporter {replay_name!r} is unavailable at layer {layer}")
+    if issues:
+        base_names = sorted(name for name in catalog if not name.endswith("_last"))
+        raise ValueError(
+            "hidden-state checkpoint preflight failed before model execution: "
+            + "; ".join(issues)
+            + ". Valid base names: "
+            + ",".join(base_names)
+        )
+    return catalog
 
 def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     helper = first_token.compare_first_token_logits_v7.ensure_llama_helper()
@@ -246,6 +340,7 @@ def _load_exact_decoder_runtime(
         "gguf": gguf_path,
         "workdir": decoder_dir,
         "so_path": so_path,
+        "c_path": decoder_dir / "decoder_v8.c",
         "weights_bump": weights_bump,
         "manifest_map": manifest_map,
         "decode_layout_path": layout_path,
@@ -257,25 +352,99 @@ def _load_exact_decoder_runtime(
     }
 
 
-def _runtime_evidence(runtime: dict[str, Any], *, exact_reuse: bool) -> dict[str, Any]:
+def _runtime_evidence(
+    runtime: dict[str, Any],
+    *,
+    exact_reuse: bool,
+    engine_so: Path | None = None,
+) -> dict[str, Any]:
     def describe(path_value: Any) -> dict[str, Any]:
         path = Path(path_value).resolve()
         digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
-        return {"path": str(path), "sha256": digest}
+        result: dict[str, Any] = {"path": str(path), "sha256": digest}
+        build_path = path.with_suffix(path.suffix + ".build.json")
+        if build_path.is_file():
+            try:
+                result["build"] = json.loads(build_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                result["build_metadata_error"] = str(exc)
+        if path.is_file():
+            probe = subprocess.run(
+                ["readelf", "--string-dump=.comment", str(path)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if probe.returncode == 0:
+                comments = [
+                    line.split("]", 1)[-1].strip()
+                    for line in probe.stdout.splitlines()
+                    if "]" in line and line.split("]", 1)[-1].strip()
+                ]
+                result["elf_compiler_comments"] = comments
+            else:
+                result["elf_comment_error"] = probe.stderr.strip() or f"readelf rc={probe.returncode}"
+        return result
 
+    requested_engine = Path(engine_so or REPO_ROOT / "build" / "libckernel_engine.so").resolve()
+    runtime_engine = Path(runtime["so_path"]).resolve().parent / "libckernel_engine.so"
+    if not runtime_engine.is_file():
+        runtime_engine = requested_engine
     return {
         "exact_reuse": bool(exact_reuse),
         "shared_library": describe(runtime["so_path"]),
-        "engine_library": describe(REPO_ROOT / "build" / "libckernel_engine.so"),
+        "engine_library": describe(runtime_engine),
+        "engine_library_requested": describe(requested_engine),
+        "tokenizer_library": describe(
+            Path(runtime["so_path"]).resolve().parent / "libckernel_tokenizer.so"
+        ),
         "manifest_map": describe(runtime["manifest_map"]),
         "weights_bump_path": str(Path(runtime["weights_bump"]).resolve()),
         "context_length": int(runtime.get("context_length", 0) or 0),
     }
 
 
+def _ck_environment_evidence() -> dict[str, str]:
+    evidence: dict[str, str] = {}
+    for key, value in sorted(os.environ.items()):
+        if not key.startswith("CK_"):
+            continue
+        if any(marker in key for marker in ("TOKEN", "SECRET", "PASSWORD", "API_KEY")):
+            evidence[key] = "<redacted>"
+        else:
+            evidence[key] = str(value)
+    return evidence
+
+
 def _ck_threads(args: argparse.Namespace) -> int:
     explicit = getattr(args, "ck_threads", None)
     return int(args.threads if explicit is None else explicit)
+
+
+def _resolve_decoder_runtime_request(
+    args: argparse.Namespace,
+    bridge_report: dict[str, Any],
+    workdir: Path,
+) -> tuple[Path, bool]:
+    explicit_so = getattr(args, "ck_runtime_so", None)
+    explicit_manifest = getattr(args, "ck_runtime_manifest_map", None)
+    if bool(explicit_so) != bool(explicit_manifest):
+        raise ValueError(
+            "exact runtime reuse requires both --ck-runtime-so and "
+            "--ck-runtime-manifest-map"
+        )
+    if explicit_so and explicit_manifest:
+        return Path(explicit_so).resolve().parent, True
+
+    exact_runtime = bool(getattr(args, "reuse_bridge_decoder_runtime_exact", False))
+    if bool(getattr(args, "reuse_bridge_decoder_runtime", False)) or exact_runtime:
+        decoder_workdir = str(
+            ((bridge_report.get("decoder_runtime") or {}).get("workdir") or "")
+        ).strip()
+        if not decoder_workdir:
+            raise ValueError("bridge report does not include decoder_runtime.workdir")
+        return Path(decoder_workdir).resolve(), exact_runtime
+    return workdir / "decoder", False
 
 
 def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> dict[str, Any]:
@@ -286,17 +455,12 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
     gguf_path = Path(gguf_value).resolve()
     workdir = args.workdir.resolve()
     workdir.mkdir(parents=True, exist_ok=True)
-    exact_runtime = bool(getattr(args, "reuse_bridge_decoder_runtime_exact", False))
-    if bool(getattr(args, "reuse_bridge_decoder_runtime", False)) or exact_runtime:
-        decoder_workdir = str(((bridge_report.get("decoder_runtime") or {}).get("workdir") or "")).strip()
-        if not decoder_workdir:
-            raise ValueError("bridge report does not include decoder_runtime.workdir")
-        decoder_dir = Path(decoder_workdir).resolve()
-    else:
-        decoder_dir = workdir / "decoder"
+    decoder_dir, exact_runtime = _resolve_decoder_runtime_request(
+        args, bridge_report, workdir
+    )
 
     requested_ctx_len = int(args.ctx_len or bridge_report.get("decoder_context_len") or 256)
-    if exact_runtime:
+    if exact_runtime and not parity_dump:
         runtime = _load_exact_decoder_runtime(
             gguf_path,
             decoder_dir,
@@ -348,6 +512,17 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
             context_override=resolved_ctx_len,
         )
 
+    requested_engine = getattr(args, "ck_engine_so", None)
+    if requested_engine is not None:
+        requested_engine = Path(requested_engine).resolve()
+        first_token.bridge_runner_v8._sync_runtime_engine(
+            requested_engine, Path(runtime["so_path"])
+        )
+        # The runtime dictionary is passed through replay and granular dump
+        # helpers. Preserve the requested engine here so those nested paths
+        # cannot silently fall back to the repository build library.
+        runtime["engine_so"] = str(requested_engine)
+
     bridge_grid_x = None if bridge_report.get("prefix_grid_x") is None else int(bridge_report.get("prefix_grid_x"))
     bridge_grid_y = None if bridge_report.get("prefix_grid_y") is None else int(bridge_report.get("prefix_grid_y"))
     prefix_grid = first_token._resolve_prefix_grid(
@@ -392,6 +567,7 @@ def _prepare_inputs(args: argparse.Namespace, *, parity_dump: bool = False) -> d
         "gguf_path": gguf_path,
         "workdir": workdir,
         "runtime": runtime,
+        "exact_runtime": bool(exact_runtime and not parity_dump),
         "tokenizer": tokenizer,
         "tokens_before": [int(t) for t in tokens_before],
         "tokens_after": [int(t) for t in tokens_after],
@@ -446,6 +622,12 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
         dump_dir = args.workdir / f"dump_step_{step_index:04d}"
 
     inputs = _prepare_inputs(args, parity_dump=True)
+    dump_source = Path(inputs["runtime"].get("c_path") or "")
+    if not dump_source.is_file() or "#define CK_PARITY_DUMP 1" not in dump_source.read_text(encoding="utf-8"):
+        raise RuntimeError(
+            "granular capture requires a dedicated decoder runtime compiled with CK_PARITY_DUMP; "
+            f"instrumented source is missing or invalid: {dump_source}"
+        )
     row = dict(steps[step_index])
     generated_prefix = [int(t) for t in list(row.get("generated_prefix") or [])]
     replay_tokens_after = [int(t) for t in inputs["tokens_after"]] + generated_prefix
@@ -470,6 +652,7 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
             prefix_grid=inputs["prefix_grid"],
             prefix_text_pos=int(inputs["prefix_text_pos"]),
             ck_strict_parity=bool(args.ck_strict_parity),
+            llama_decode_mode=str(args.llama_decode_mode),
         )
     finally:
         _restore_prefix_decode_policy_env(old_env)
@@ -480,7 +663,77 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
         "replay_tokens_after_count": int(len(replay_tokens_after)),
         "generated_prefix": generated_prefix,
         "ck_top1": int((ck.get("comparison") or {}).get("top1_ck", ck.get("ck_top1", -1))),
+        "instrumented_runtime": {
+            "c_path": str(dump_source.resolve()),
+            "so_path": str(Path(inputs["runtime"]["so_path"]).resolve()),
+            "parity_dump": True,
+        },
         "dump": dump_report,
+    }
+
+
+def _resolve_dump_step(
+    report: dict[str, Any], requested_step: int | None, dump_first_divergence: bool
+) -> int | None:
+    if requested_step is not None and dump_first_divergence:
+        raise ValueError("--dump-step and --dump-first-divergence are mutually exclusive")
+    if not dump_first_divergence:
+        return requested_step
+    first = report.get("first_divergence")
+    if not isinstance(first, dict) or "step" not in first:
+        raise RuntimeError("--dump-first-divergence requested, but the parity run did not diverge")
+    return int(first["step"])
+
+
+def _describe_kv_f16_difference(
+    persistent_bytes: bytes,
+    replay_bytes: bytes,
+    first_byte: int | None,
+) -> dict[str, Any] | None:
+    header_size = 8 * 4
+    if first_byte is None or first_byte < header_size:
+        return None
+    if len(persistent_bytes) < header_size or len(replay_bytes) < header_size:
+        return None
+    persistent_header = struct.unpack_from("<8I", persistent_bytes)
+    replay_header = struct.unpack_from("<8I", replay_bytes)
+    if persistent_header != replay_header or persistent_header[0] != 0x564B5843:
+        return None
+
+    _magic, version, layer, valid_tokens, num_heads, max_seq_len, head_dim, _reserved = persistent_header
+    if version != 1 or valid_tokens == 0 or num_heads == 0 or head_dim == 0:
+        return None
+    element_index = (first_byte - header_size) // 2
+    values_per_head = valid_tokens * head_dim
+    values_per_kind = num_heads * values_per_head
+    if element_index < 0 or element_index >= 2 * values_per_kind:
+        return None
+
+    kind_index, kind_offset = divmod(element_index, values_per_kind)
+    head, head_offset = divmod(kind_offset, values_per_head)
+    token, channel = divmod(head_offset, head_dim)
+    value_offset = header_size + element_index * 2
+    persistent_bits = struct.unpack_from("<H", persistent_bytes, value_offset)[0]
+    replay_bits = struct.unpack_from("<H", replay_bytes, value_offset)[0]
+    persistent_value = struct.unpack("<e", struct.pack("<H", persistent_bits))[0]
+    replay_value = struct.unpack("<e", struct.pack("<H", replay_bits))[0]
+    return {
+        "kind": "K" if kind_index == 0 else "V",
+        "layer": int(layer),
+        "head": int(head),
+        "token": int(token),
+        "channel": int(channel),
+        "element_index": int(element_index),
+        "byte_in_element": int((first_byte - header_size) % 2),
+        "persistent_fp16_bits": int(persistent_bits),
+        "full_replay_fp16_bits": int(replay_bits),
+        "fp16_bit_distance": int(abs(persistent_bits - replay_bits)),
+        "persistent_value": float(persistent_value),
+        "full_replay_value": float(replay_value),
+        "valid_tokens": int(valid_tokens),
+        "num_heads": int(num_heads),
+        "head_dim": int(head_dim),
+        "max_seq_len": int(max_seq_len),
     }
 
 
@@ -501,92 +754,184 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
     names = [item.strip() for item in str(args.hidden_state_names).split(",") if item.strip()]
     if not names:
         raise ValueError("--hidden-state-names did not contain any names")
+    catalog = _validate_hidden_capture_request(inputs["runtime"], names, layer)
     root = (args.hidden_state_dir or (args.workdir / f"hidden_state_step_{step_index:04d}")).resolve()
     root.mkdir(parents=True, exist_ok=True)
 
-    env_keys = ["CK_DEBUG_EXPORT_HIDDEN", "CK_DEBUG_EXPORT_HIDDEN_NAME", "CK_DEBUG_EXPORT_HIDDEN_LAYER"]
+    env_keys = [
+        "CK_DEBUG_EXPORT_HIDDEN",
+        "CK_DEBUG_EXPORT_HIDDEN_NAME",
+        "CK_DEBUG_EXPORT_HIDDEN_NAMES",
+        "CK_DEBUG_EXPORT_HIDDEN_LAYER",
+    ]
     saved_env = {key: os.environ.get(key) for key in env_keys}
     results: list[dict[str, Any]] = []
-    for name in names:
-        persistent_dir = root / f"persistent_{name}"
-        full_dir = root / f"full_replay_{name}"
-        if persistent_dir.exists():
-            import shutil
-            shutil.rmtree(persistent_dir)
-        if full_dir.exists():
-            import shutil
-            shutil.rmtree(full_dir)
-        persistent_dir.mkdir(parents=True, exist_ok=True)
-        full_dir.mkdir(parents=True, exist_ok=True)
+    persistent_dir = root / "persistent"
+    full_dir = root / "full_replay"
+    import shutil
+    for directory in (persistent_dir, full_dir):
+        if directory.exists():
+            shutil.rmtree(directory)
+        directory.mkdir(parents=True, exist_ok=True)
 
+    capture_error: Exception | None = None
+    kv_comparison: dict[str, Any] | None = None
+
+    def export_kv(lib: Any, path: Path) -> dict[str, Any]:
+        if not hasattr(lib, "ck_model_debug_export_kv_f16"):
+            return {
+                "status": "unavailable",
+                "reason": "runtime lacks bounded ck_model_debug_export_kv_f16 X-ray ABI",
+                "path": str(path),
+            }
+        lib.ck_model_debug_export_kv_f16.argtypes = [ctypes.c_char_p, ctypes.c_int]
+        lib.ck_model_debug_export_kv_f16.restype = ctypes.c_int
+        rc = int(lib.ck_model_debug_export_kv_f16(str(path).encode("utf-8"), int(layer)))
+        if rc != 0:
+            return {
+                "status": "error",
+                "reason": f"FP16 KV export failed rc={rc} layer={layer}",
+                "path": str(path),
+            }
+        return {"status": "ok", "path": str(path)}
+
+    persistent_kv_export: dict[str, Any] | None = None
+    replay_kv_export: dict[str, Any] | None = None
+    try:
+        _restore_process_env({key: None for key in env_keys})
+        lib, logits_buf, _vocab_size = _init_ck_state(
+            inputs, bool(args.ck_strict_parity), getattr(args, "ck_engine_so", None)
+        )
         try:
-            _restore_process_env({key: None for key in env_keys})
-            lib, logits_buf, _vocab_size = _init_ck_state(inputs, bool(args.ck_strict_parity))
-            try:
-                last_i = len(generated_prefix) - 1
-                for i, token in enumerate(generated_prefix):
-                    if i == last_i:
-                        _set_process_env("CK_DEBUG_EXPORT_HIDDEN", str(persistent_dir))
-                        _set_process_env("CK_DEBUG_EXPORT_HIDDEN_NAME", name)
-                        if layer >= 0:
-                            _set_process_env("CK_DEBUG_EXPORT_HIDDEN_LAYER", str(layer))
-                    rc = lib.ck_model_decode(ctypes.c_int32(int(token)), logits_buf)
-                    if rc != 0:
-                        raise RuntimeError(f"ck_model_decode failed rc={rc} while capturing persistent hidden state")
-                    if i == last_i:
-                        _restore_process_env({key: None for key in env_keys})
-            finally:
-                if hasattr(lib, "ck_model_free"):
-                    try:
-                        lib.ck_model_free()
-                    except Exception:
-                        pass
-
-            replay_inputs = dict(inputs)
-            replay_inputs["tokens_after"] = [int(t) for t in inputs["tokens_after"]] + generated_prefix
-            _set_process_env("CK_DEBUG_EXPORT_HIDDEN", str(full_dir))
-            _set_process_env("CK_DEBUG_EXPORT_HIDDEN_NAME", _hidden_full_replay_name(name))
-            if layer >= 0:
-                _set_process_env("CK_DEBUG_EXPORT_HIDDEN_LAYER", str(layer))
-            lib2, _logits2, _vocab2 = _init_ck_state(replay_inputs, bool(args.ck_strict_parity))
-            if hasattr(lib2, "ck_model_free"):
+            last_i = len(generated_prefix) - 1
+            for i, token in enumerate(generated_prefix):
+                if i == last_i:
+                    _set_process_env("CK_DEBUG_EXPORT_HIDDEN", str(persistent_dir))
+                    _set_process_env("CK_DEBUG_EXPORT_HIDDEN_NAMES", ",".join(names))
+                    if layer >= 0:
+                        _set_process_env("CK_DEBUG_EXPORT_HIDDEN_LAYER", str(layer))
+                rc = lib.ck_model_decode(ctypes.c_int32(int(token)), logits_buf)
+                if rc != 0:
+                    raise RuntimeError(f"ck_model_decode failed rc={rc} while capturing persistent hidden state")
+                if i == last_i:
+                    _restore_process_env({key: None for key in env_keys})
+            persistent_kv_export = export_kv(lib, persistent_dir / "kv_cache_f16.bin")
+        finally:
+            if hasattr(lib, "ck_model_free"):
                 try:
-                    lib2.ck_model_free()
+                    lib.ck_model_free()
                 except Exception:
                     pass
-            _restore_process_env({key: None for key in env_keys})
 
-            if layer < 0:
-                per_layer = _hidden_compare_many(persistent_dir, full_dir)
-                max_diff = max(float(r.get("max_abs_diff", 0.0)) for r in per_layer if r.get("status") == "ok") if per_layer else 0.0
-                first_layer_issue = next((r for r in per_layer if r.get("status") != "ok" or float(r.get("max_abs_diff", 0.0)) > float(args.hidden_state_atol)), None)
-                results.append({
-                    "name": name,
-                    "full_replay_name": _hidden_full_replay_name(name),
-                    "status": "ok" if first_layer_issue is None else "fail",
-                    "max_abs_diff": float(max_diff),
-                    "first_layer_issue": first_layer_issue,
-                    "layers": per_layer,
-                })
-            else:
-                persistent_file = _single_hidden_file(persistent_dir)
-                full_file = _single_hidden_file(full_dir)
-                results.append({
-                    "name": name,
-                    "full_replay_name": _hidden_full_replay_name(name),
-                    **_hidden_compare(persistent_file, full_file),
-                })
-        except Exception as exc:
+        replay_inputs = dict(inputs)
+        replay_inputs["tokens_after"] = [int(t) for t in inputs["tokens_after"]] + generated_prefix
+        replay_names = [_hidden_full_replay_name(name) for name in names]
+        _set_process_env("CK_DEBUG_EXPORT_HIDDEN", str(full_dir))
+        _set_process_env("CK_DEBUG_EXPORT_HIDDEN_NAMES", ",".join(replay_names))
+        if layer >= 0:
+            _set_process_env("CK_DEBUG_EXPORT_HIDDEN_LAYER", str(layer))
+        lib2, _logits2, _vocab2 = _init_ck_state(
+            replay_inputs, bool(args.ck_strict_parity), getattr(args, "ck_engine_so", None)
+        )
+        replay_kv_export = export_kv(lib2, full_dir / "kv_cache_f16.bin")
+        if hasattr(lib2, "ck_model_free"):
+            try:
+                lib2.ck_model_free()
+            except Exception:
+                pass
+        _restore_process_env({key: None for key in env_keys})
+
+    except Exception as exc:
+        capture_error = exc
+    finally:
+        _restore_process_env(saved_env)
+
+    if capture_error is not None:
+        for name in names:
             results.append({
                 "name": name,
                 "full_replay_name": _hidden_full_replay_name(name),
                 "status": "error",
-                "error": str(exc),
+                "error": str(capture_error),
                 "persistent_dir": str(persistent_dir),
                 "full_replay_dir": str(full_dir),
             })
-        finally:
-            _restore_process_env(saved_env)
+    else:
+        if (
+            persistent_kv_export is not None
+            and replay_kv_export is not None
+            and persistent_kv_export.get("status") == "ok"
+            and replay_kv_export.get("status") == "ok"
+        ):
+            persistent_kv = Path(str(persistent_kv_export["path"]))
+            replay_kv = Path(str(replay_kv_export["path"]))
+            persistent_bytes = persistent_kv.read_bytes()
+            replay_bytes = replay_kv.read_bytes()
+            first_byte = next(
+                (i for i, (a, b) in enumerate(zip(persistent_bytes, replay_bytes)) if a != b),
+                None,
+            )
+            kv_comparison = {
+                "status": "ok" if persistent_bytes == replay_bytes else "fail",
+                "persistent_path": str(persistent_kv),
+                "full_replay_path": str(replay_kv),
+                "persistent_bytes": len(persistent_bytes),
+                "full_replay_bytes": len(replay_bytes),
+                "first_differing_byte": first_byte,
+                "first_difference": _describe_kv_f16_difference(
+                    persistent_bytes, replay_bytes, first_byte
+                ),
+                "persistent_sha256": hashlib.sha256(persistent_bytes).hexdigest(),
+                "full_replay_sha256": hashlib.sha256(replay_bytes).hexdigest(),
+            }
+        else:
+            statuses = [item for item in (persistent_kv_export, replay_kv_export) if item is not None]
+            kv_comparison = {
+                "status": "error" if any(item.get("status") == "error" for item in statuses) else "unavailable",
+                "persistent": persistent_kv_export,
+                "full_replay": replay_kv_export,
+            }
+        for name in names:
+            replay_name = _hidden_full_replay_name(name)
+            try:
+                if layer < 0:
+                    per_layer = _hidden_compare_many(persistent_dir, full_dir, name, replay_name)
+                    ok_rows = [r for r in per_layer if r.get("status") == "ok"]
+                    max_diff = max(float(r.get("max_abs_diff", 0.0)) for r in ok_rows) if ok_rows else 0.0
+                    first_layer_issue = next(
+                        (
+                            r
+                            for r in per_layer
+                            if r.get("status") != "ok"
+                            or float(r.get("max_abs_diff", 0.0)) > float(args.hidden_state_atol)
+                        ),
+                        None,
+                    )
+                    results.append({
+                        "name": name,
+                        "full_replay_name": replay_name,
+                        "status": "ok" if first_layer_issue is None else "fail",
+                        "max_abs_diff": float(max_diff),
+                        "first_layer_issue": first_layer_issue,
+                        "layers": per_layer,
+                    })
+                else:
+                    persistent_file = _single_hidden_file(persistent_dir, name)
+                    full_file = _single_hidden_file(full_dir, replay_name)
+                    results.append({
+                        "name": name,
+                        "full_replay_name": replay_name,
+                        **_hidden_compare(persistent_file, full_file),
+                    })
+            except Exception as exc:
+                results.append({
+                    "name": name,
+                    "full_replay_name": replay_name,
+                    "status": "error",
+                    "error": str(exc),
+                    "persistent_dir": str(persistent_dir),
+                    "full_replay_dir": str(full_dir),
+                })
 
     first_issue = next((r for r in results if r.get("status") != "ok" or float(r.get("max_abs_diff", 0.0)) > float(args.hidden_state_atol)), None)
     return {
@@ -598,8 +943,15 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
         "llama_next": int(row.get("llama_next", -1)),
         "llama_next_text": str(row.get("llama_next_text", "")),
         "root": str(root),
+        "preflight": {
+            "status": "pass",
+            "requested_names": names,
+            "available_exporter_count": len(catalog),
+        },
+        "ck_execution_count": 2,
         "atol": float(args.hidden_state_atol),
         "first_issue": first_issue,
+        "kv_cache": kv_comparison,
         "results": results,
     }
 
@@ -622,7 +974,9 @@ def _capture_full_replay_step(report: dict[str, Any], args: argparse.Namespace) 
     llama_seq = _run_llama_greedy_sequence(inputs, llama_args)
     llama_logits = llama_seq["logits"][step_index]
 
-    lib, logits_buf, vocab_size = _init_ck_state(replay_inputs, bool(args.ck_strict_parity))
+    lib, logits_buf, vocab_size = _init_ck_state(
+        replay_inputs, bool(args.ck_strict_parity), getattr(args, "ck_engine_so", None)
+    )
     try:
         replay_logits = _ck_logits_from_buffer(logits_buf, vocab_size)
     finally:
@@ -663,7 +1017,7 @@ def _capture_full_replay_step(report: dict[str, Any], args: argparse.Namespace) 
     }
 
 
-def _set_ck_strict_parity(lib: Any, strict_parity: bool) -> None:
+def _set_ck_strict_parity(lib: Any, strict_parity: bool, engine_so: Path | None = None) -> None:
     value = 1 if strict_parity else 0
     if hasattr(lib, "ck_set_strict_parity"):
         lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
@@ -671,27 +1025,31 @@ def _set_ck_strict_parity(lib: Any, strict_parity: bool) -> None:
         lib.ck_set_strict_parity(value)
         return
 
-    engine_so = REPO_ROOT / "build" / "libckernel_engine.so"
-    if not engine_so.exists():
+    engine_path = engine_so or REPO_ROOT / "build" / "libckernel_engine.so"
+    if not engine_path.exists():
         return
-    engine = ctypes.CDLL(str(engine_so))
+    engine = ctypes.CDLL(str(engine_path))
     if hasattr(engine, "ck_set_strict_parity"):
         engine.ck_set_strict_parity.argtypes = [ctypes.c_int]
         engine.ck_set_strict_parity.restype = None
         engine.ck_set_strict_parity(value)
 
 
-def _init_ck_state(inputs: dict[str, Any], strict_parity: bool) -> tuple[Any, Any, int]:
+def _init_ck_state(
+    inputs: dict[str, Any],
+    strict_parity: bool,
+    engine_so: Path | None = None,
+) -> tuple[Any, Any, int]:
     runtime = inputs["runtime"]
     model_so = Path(runtime["so_path"])
-    lib = first_token.bridge_runner_v8._load_decoder_lib(model_so)
+    lib = first_token.bridge_runner_v8._load_decoder_lib(model_so, engine_so=engine_so)
     rc = lib.ck_model_init_with_manifest(
         str(runtime["weights_bump"]).encode(),
         str(runtime["manifest_map"]).encode(),
     )
     if rc != 0:
         raise RuntimeError(f"decoder init failed with rc={rc}")
-    _set_ck_strict_parity(lib, strict_parity)
+    _set_ck_strict_parity(lib, strict_parity, engine_so)
 
     vocab_size = int(lib.ck_model_get_vocab_size())
     if vocab_size <= 0:
@@ -756,9 +1114,18 @@ def _init_ck_state(inputs: dict[str, Any], strict_parity: bool) -> tuple[Any, An
 
 def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]:
     inputs = _prepare_inputs(args)
+    mode_contract = getattr(args, "prefill_mode_contract", None)
+    if not isinstance(mode_contract, dict):
+        mode_contract = _resolve_oracle_prefill_mode(
+            str(args.llama_decode_mode),
+            inputs["bridge_report"],
+            allow_diagnostic_mismatch=True,
+        )
     tokenizer: GGUFTokenizer = inputs["tokenizer"]
     llama_seq = _run_llama_greedy_sequence(inputs, args)
-    lib, logits_buf, vocab_size = _init_ck_state(inputs, bool(args.ck_strict_parity))
+    lib, logits_buf, vocab_size = _init_ck_state(
+        inputs, bool(args.ck_strict_parity), getattr(args, "ck_engine_so", None)
+    )
     generated: list[int] = []
     llama_generated = [int(t) for t in list((llama_seq.get("meta") or {}).get("greedy_generated", []))]
     stop_token_ids = _resolve_stop_token_ids(inputs["bridge_report"])
@@ -826,9 +1193,14 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
             except Exception:
                 pass
 
+    production_pass = first_divergence is None and bool(mode_contract["compatible"])
     return {
-        "status": "pass" if first_divergence is None else "fail",
-        "pass": first_divergence is None,
+        "status": (
+            "pass" if production_pass else
+            "diagnostic_only" if first_divergence is None else
+            "fail"
+        ),
+        "pass": production_pass,
         "bridge_report_path": str(args.bridge_report.resolve()),
         "gguf_path": str(inputs["gguf_path"]),
         "workdir": str(inputs["workdir"]),
@@ -842,11 +1214,23 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
         },
         "top_k": int(args.top_k),
         "llama_decode_mode": str(args.llama_decode_mode),
+        "execution_modes": {
+            "ck_strict_parity": bool(args.ck_strict_parity),
+            "llama_decode_mode": str(args.llama_decode_mode),
+            "llama_tensor_repack": not bool(args.llama_no_repack),
+            "diagnostic_tensor_dump": bool(
+                getattr(args, "dump_step", None) is not None
+                or getattr(args, "dump_first_divergence", False)
+            ),
+            "ck_environment": _ck_environment_evidence(),
+            "prefill_mode_contract": mode_contract,
+        },
         "llama_greedy_generated": llama_generated,
         "append_on_divergence": str(args.append_on_divergence),
         "ck_runtime": _runtime_evidence(
             inputs["runtime"],
-            exact_reuse=bool(getattr(args, "reuse_bridge_decoder_runtime_exact", False)),
+            exact_reuse=bool(inputs.get("exact_runtime", False)),
+            engine_so=getattr(args, "ck_engine_so", None),
         ),
         "stop_token_ids": sorted(stop_token_ids),
         "stop_reason": stop_reason,
@@ -878,6 +1262,83 @@ def _is_matched_stop_token(ck_token: int, llama_token: int, stop_token_ids: set[
     return ck_token == llama_token and ck_token in stop_token_ids
 
 
+def _resolve_oracle_prefill_mode(
+    requested: str,
+    bridge_report: dict[str, Any],
+    *,
+    allow_diagnostic_mismatch: bool = False,
+) -> dict[str, Any]:
+    """Fail closed when the oracle and CK execute different prefill schedules."""
+    bridge = bridge_report.get("bridge_contract")
+    bridge = bridge if isinstance(bridge, dict) else {}
+    schedule = bridge.get("prefill_schedule")
+    schedule = schedule if isinstance(schedule, dict) else {}
+    segmented_append = (
+        schedule.get("segments") == ["text_before", "visual", "text_after"]
+        and schedule.get("cache_transition") == "append_preserve"
+    )
+    required = "batched" if segmented_append else None
+    resolved = "batched" if requested == "auto" and required == "batched" else requested
+    compatible = required is None or resolved == required
+    if not compatible and not allow_diagnostic_mismatch:
+        raise RuntimeError(
+            "HARD PARITY CONTRACT FAULT: CK segmented-append prefill requires a batched "
+            f"llama.cpp oracle, but {resolved!r} was requested. Use --llama-decode-mode batched "
+            "for production parity. Sequential replay is diagnostic-only and requires "
+            "--allow-diagnostic-prefill-mode-mismatch."
+        )
+    return {
+        "requested": requested,
+        "resolved": resolved,
+        "required": required,
+        "compatible": compatible,
+        "scope": "production" if compatible else "diagnostic_only",
+    }
+
+
+def _run_requested_diagnostics(report: dict[str, Any], args: argparse.Namespace) -> bool:
+    """Run bounded diagnostics without discarding the completed coarse report."""
+    errors: list[dict[str, str]] = []
+
+    def capture(name: str, callback: Any) -> None:
+        try:
+            report[name] = callback()
+        except Exception as exc:
+            errors.append(
+                {
+                    "diagnostic": name,
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                }
+            )
+
+    try:
+        args.dump_step = _resolve_dump_step(
+            report,
+            args.dump_step,
+            bool(args.dump_first_divergence),
+        )
+    except Exception as exc:
+        errors.append(
+            {
+                "diagnostic": "step_dump",
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+            }
+        )
+    else:
+        if args.dump_step is not None:
+            capture("step_dump", lambda: _capture_step_dump(report, args))
+    if args.full_replay_step is not None:
+        capture("full_replay_step", lambda: _capture_full_replay_step(report, args))
+    if args.hidden_state_step is not None:
+        capture("hidden_state_step", lambda: _capture_hidden_state_step(report, args))
+
+    if errors:
+        report["diagnostic_errors"] = errors
+    return not errors
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Multimodal multi-token greedy parity (CK vs llama.cpp)")
     ap.add_argument("--bridge-report", required=True, type=Path)
@@ -895,6 +1356,12 @@ def main() -> int:
     )
     ap.add_argument("--ck-runtime-so", type=Path, default=None, help="Explicit CK decoder shared library for exact-runtime parity")
     ap.add_argument("--ck-runtime-manifest-map", type=Path, default=None, help="Explicit CK decoder manifest map for exact-runtime parity")
+    ap.add_argument(
+        "--ck-engine-so",
+        type=Path,
+        default=None,
+        help="Explicit CK engine shared library; the executed file is hashed into parity evidence",
+    )
     ap.add_argument("--ctx-len", type=int, default=None)
     ap.add_argument("--max-new-tokens", type=int, default=16)
     ap.add_argument("--top-k", type=int, default=16)
@@ -905,13 +1372,31 @@ def main() -> int:
         default=None,
         help="CK runtime threads; defaults to --threads when omitted",
     )
-    ap.add_argument("--llama-decode-mode", choices=["batched", "sequential"], default="sequential")
+    ap.add_argument("--llama-decode-mode", choices=["auto", "batched", "sequential"], default="auto")
+    ap.add_argument(
+        "--allow-diagnostic-prefill-mode-mismatch",
+        action="store_true",
+        help="Allow sequential llama replay against batched CK prefill; the report is diagnostic-only.",
+    )
     ap.add_argument("--llama-no-repack", action="store_true", help="Disable llama.cpp CPU tensor repacking in the replay helper")
     ap.add_argument("--llama-repack-fallback", action=argparse.BooleanOptionalAction, default=True, help="Retry a failed llama replay step with --no-repack")
     ap.add_argument("--append-on-divergence", choices=["stop", "llama", "ck"], default="stop")
-    ap.add_argument("--ck-strict-parity", action=argparse.BooleanOptionalAction, default=True)
+    ap.add_argument(
+        "--ck-strict-parity",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Enable CK's global diagnostic/reference branches. Production parity defaults this off; "
+            "strict-mode results must not be reported as production behavior."
+        ),
+    )
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--dump-step", type=int, default=None, help="Capture CK-vs-llama tensor dumps at this generated step")
+    ap.add_argument(
+        "--dump-first-divergence",
+        action="store_true",
+        help="Capture CK-vs-llama tensors at the first observed pre-EOS divergence",
+    )
     ap.add_argument("--full-replay-step", type=int, default=None, help="Compare a generated step by full mixed-prefix replay instead of incremental CK decode, without tensor dumps")
     ap.add_argument("--dump-dir", type=Path, default=None, help="Directory for --dump-step tensor dumps")
     ap.add_argument(
@@ -930,18 +1415,26 @@ def main() -> int:
     ap.add_argument("--hidden-state-atol", type=float, default=1.0e-5)
     ap.add_argument("--summary", action="store_true")
     args = ap.parse_args()
+    if args.ck_engine_so is not None:
+        args.ck_engine_so = args.ck_engine_so.resolve()
+        if not args.ck_engine_so.is_file():
+            raise FileNotFoundError(f"explicit CK engine shared library does not exist: {args.ck_engine_so}")
+
+    bridge_report = json.loads(args.bridge_report.resolve().read_text(encoding="utf-8"))
+    mode_contract = _resolve_oracle_prefill_mode(
+        str(args.llama_decode_mode),
+        bridge_report,
+        allow_diagnostic_mismatch=bool(args.allow_diagnostic_prefill_mode_mismatch),
+    )
+    args.llama_decode_mode = mode_contract["resolved"]
+    args.prefill_mode_contract = mode_contract
 
     ck_threads = _ck_threads(args)
     if ck_threads > 0:
         os.environ["CK_NUM_THREADS"] = str(ck_threads)
         os.environ["OMP_NUM_THREADS"] = str(ck_threads)
     report = run_multimodal_multitoken_parity(args)
-    if args.dump_step is not None:
-        report["step_dump"] = _capture_step_dump(report, args)
-    if args.full_replay_step is not None:
-        report["full_replay_step"] = _capture_full_replay_step(report, args)
-    if args.hidden_state_step is not None:
-        report["hidden_state_step"] = _capture_hidden_state_step(report, args)
+    diagnostics_passed = _run_requested_diagnostics(report, args)
     if args.json_out is not None:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -993,7 +1486,7 @@ def main() -> int:
             )
     else:
         print(json.dumps(report, indent=2))
-    return 0 if report.get("pass") else 3
+    return 0 if report.get("pass") and diagnostics_passed else 3
 
 
 if __name__ == "__main__":

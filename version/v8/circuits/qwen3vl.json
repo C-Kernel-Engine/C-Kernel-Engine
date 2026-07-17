@@ -121,10 +121,10 @@
             "tensor.q.dtype": "fp32",
             "tensor.kv.dtype": "fp16",
             "tensor.layout": "head_major",
-            "numerics.attention_reduction": "f16_online_fp32_merge"
+            "numerics.attention_reduction": "f16_flash_auto_qtile64"
           },
-          "validation": "observed",
-          "evidence": "Segmented mixed-prefix replay requires cache-preserving append attention; leaf and stitched parity are the production gates."
+          "validation": "validated",
+          "evidence": "llama.cpp production flash attention uses 64x64 FP32 tiles for multi-query segmented prefill; direct oracle and production-shape Qwen3-VL replay are required gates."
         },
         "decode": {
           "requires": {
@@ -141,6 +141,50 @@
     }
   },
   "required_numerical_contracts": {
+    "decoder.rmsnorm": {
+      "op": "rmsnorm",
+      "template_ops": ["rmsnorm"],
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "llama.cpp Qwen3-VL prefill uses the active CPU production reciprocal-square-root sequence after its ascending FP64 row sum."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Layer-0 exact-input attribution and the production GGML oracle require the active CPU reciprocal-square-root sequence."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rmsnorm.output",
+        "producer": "rmsnorm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.qk_norm": {
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Q/K normalization matches llama.cpp CPU production, including AVX-512 RSQRT14/Newton reciprocal-square-root behavior."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Q/K normalization uses the active llama.cpp CPU production reciprocal-square-root contract at head dimension 128."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
     "decoder.mrope": {
       "op": "rope",
       "template_ops": ["rope_qk"],
@@ -161,6 +205,28 @@
         "producer": "rope_qk",
         "logical_layout": "head_major",
         "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.swiglu": {
+      "op": "swiglu",
+      "template_ops": ["silu_mul"],
+      "phases": {
+        "prefill": {
+          "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+          "validation": "validated",
+          "evidence": "Production Qwen3-VL gate/up tensors match llama.cpp byte-for-byte before SwiGLU; the resolved provider matches all 12,288 captured outputs exactly."
+        },
+        "decode": {
+          "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+          "validation": "validated",
+          "evidence": "Layer-0 first-divergence attribution at decoder step 20 isolates GGML vector-exp and direct-division evaluation order."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.swiglu.output",
+        "producer": "silu_mul",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
       }
     }
   },

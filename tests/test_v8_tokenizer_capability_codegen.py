@@ -28,6 +28,7 @@ class TestV8TokenizerCapabilityCodegen(unittest.TestCase):
         self.assertNotIn("CK_ENABLE_FULL_BPE_TOKENIZER", c_code)
         self.assertIn("CK_EXPORT int ck_model_can_encode_text(void)", c_code)
         self.assertIn("return (g_model && g_model->tokenizer) ? 1 : 0;", c_code)
+        self.assertIn('printf("[Tokenizer] Registered special: %s -> %d\\n",', str(generated["init"]))
 
     def test_sentencepiece_exports_text_encode_capability(self) -> None:
         generated = build_ir_v8._generate_tokenizer_c_code(
@@ -42,6 +43,7 @@ class TestV8TokenizerCapabilityCodegen(unittest.TestCase):
         self.assertIn("CK_EXPORT int ck_model_has_tokenizer(void)", c_code)
         self.assertIn("CK_EXPORT int ck_model_can_encode_text(void)", c_code)
         self.assertIn("return (g_model && g_model->tokenizer) ? 1 : 0;", c_code)
+        self.assertIn('printf("[Tokenizer] Registered special: %s -> %d\\n",', str(generated["init"]))
 
 
 if __name__ == "__main__":

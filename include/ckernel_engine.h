@@ -402,6 +402,7 @@ void gemv_q6_k_q8_k(float *y,
                     const void *W,
                     const void *x_q8,
                     int M, int K);
+const char *ck_q6_k_q8_k_provider_name(void);
 
 /* Parallel Q6_K versions - caller provides ith/nth from OpenMP region */
 void gemv_q6_k_q8_k_parallel(float *y, const void *W, const void *x_q8,
@@ -911,6 +912,22 @@ void rmsnorm_forward(const float *input,
                      int d_model,
                      int aligned_embed_dim,
                      float eps);
+void rmsnorm_forward_fp64_sum(const float *input,
+                              const float *gamma,
+                              float *output,
+                              float *rstd_cache,
+                              int tokens,
+                              int d_model,
+                              int aligned_embed_dim,
+                              float eps);
+void rmsnorm_forward_llama_production(const float *input,
+                                      const float *gamma,
+                                      float *output,
+                                      float *rstd_cache,
+                                      int tokens,
+                                      int d_model,
+                                      int aligned_embed_dim,
+                                      float eps);
 void rmsnorm_forward_fp32_square_fp64_sum(const float *input,
                                           const float *gamma,
                                           float *output,
@@ -962,6 +979,24 @@ void qk_norm_forward(float *q,
                      int num_tokens,
                      int head_dim,
                      float eps);
+void qk_norm_forward_fp64_sum(float *q,
+                              float *k,
+                              const float *q_gamma,
+                              const float *k_gamma,
+                              int num_heads,
+                              int num_kv_heads,
+                              int num_tokens,
+                              int head_dim,
+                              float eps);
+void qk_norm_forward_llama_production(float *q,
+                                      float *k,
+                                      const float *q_gamma,
+                                      const float *k_gamma,
+                                      int num_heads,
+                                      int num_kv_heads,
+                                      int num_tokens,
+                                      int head_dim,
+                                      float eps);
 void qk_norm_forward_prefill_exact(float *q, float *k,
                                    const float *q_gamma, const float *k_gamma,
                                    int num_heads, int num_kv_heads,
@@ -1578,6 +1613,8 @@ void attention_forward_decode_head_major_gqa_flash_f16cache(const float *q_token
 typedef enum {
     CK_ATTN_REDUCTION_FP32_ONLINE = 0,
     CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE = 1,
+    CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE = 2,
+    CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 = 3,
 } ck_attention_reduction_t;
 
 typedef enum {
@@ -1617,25 +1654,11 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     int aligned_head_dim,
     ck_attention_reduction_t reduction);
 
-// Causal prefill over a cache-preserving segment. Current-segment K/V rows
-// must already be appended at [past_tokens, past_tokens + q_tokens).
-ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract(
-    const float *q,
-    const uint16_t *k_cache,
-    const uint16_t *v_cache,
-    float *output,
-    int num_heads,
-    int num_kv_heads,
-    int q_tokens,
-    int past_tokens,
-    int cache_capacity,
-    int head_dim,
-    int aligned_head_dim,
-    ck_attention_reduction_t reduction);
-
 // Deterministic llama.cpp-style FP16 split-KV oracle. The explicit chunk count
-// makes diagnostics independent of the host's available core count. Production
-// routing must be accepted separately by stitched model parity.
+// makes diagnostics independent of the host's available core count. At and
+// above KV=512, worker boundaries use a 256-row padded scheduling extent while
+// storage reads remain bounded by kv_tokens. Production routing must be
+// accepted separately by stitched model parity.
 void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q_token,
                                                                   const uint16_t *k_cache,
                                                                   const uint16_t *v_cache,
@@ -2398,6 +2421,11 @@ void sigmoid_backward_bf16(const uint16_t *input,
 	                          float *output,
 	                          int tokens,
 	                          int dim);
+
+	void swiglu_forward_ggml(const float *input,
+	                         float *output,
+	                         int tokens,
+	                         int dim);
 
 	void swiglu_backward_exact(const float *input,
 	                           const float *d_output,

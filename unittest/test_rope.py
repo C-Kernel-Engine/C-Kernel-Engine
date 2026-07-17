@@ -4,6 +4,8 @@ RoPE (Rotary Position Embedding) kernel unit tests with performance metrics.
 Tests forward and backward passes against PyTorch reference.
 Reports accuracy, timing, and system information.
 """
+from __future__ import annotations
+
 import ctypes
 
 import numpy as np

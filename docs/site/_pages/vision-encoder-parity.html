@@ -1,157 +1,278 @@
 ---
 layout: default
-title: Vision Encoder Parity
+title: Qwen3-VL Numerical Parity
 permalink: /vision-encoder-parity/
 ---
 
 <div class="container">
-  <h1>Vision Encoder Parity</h1>
+  <h1>Qwen3-VL Numerical Parity</h1>
   <p class="lead">
-    Qwen3-VL vision encoder parity was closed on March 30, 2026.
-    The generated C runtime now matches local llama.cpp end to end in native strict mode.
-  </p>
-
-  <div class="alert alert-success">
-    <strong>Current Result:</strong>
-    Native strict parity for the generated v8 Qwen3-VL encoder is exact:
-    <code>max_abs=0.0</code>,
-    <code>mean_abs=0.0</code>,
-    <code>rmse=0.0</code>,
-    <code>cosine=1.0</code>.
-    This is not the temporary mtmd-oracle shortcut.
-  </div>
-
-  <h2>What Was Actually Wrong</h2>
-  <p>
-    The final blocker was not patching, not deepstack stitching, and not a missing attention op.
-    We initially localized the drift to full attention because that was the first place tiny errors became visible.
-    The real remaining seed was later in the layer:
-    <strong>the GGML fp16-table GELU path was not bit-identical to llama.cpp</strong>.
-  </p>
-  <p>
-    Once layer-0 attention became exact, the first remaining mismatch showed up at
-    <code>ffn_gelu</code>, then propagated through <code>ffn_out</code>, residual addition,
-    and the remaining encoder stack.
-  </p>
-
-  <h2>Why This Took Time</h2>
-  <div class="card">
-    <h3 style="margin-top: 0;">Encoder Parity Is Not Just "Correct Math"</h3>
-    <p>
-      For decoder bring-up, mathematically correct kernels were often enough to converge quickly.
-      For this vision encoder, the target was <strong>ggml-exact graph behavior</strong>.
-      Tiny <code>fp32</code> or <code>fp16</code> rounding differences that look harmless in one row
-      compound across full attention, MLP, and 27 layers of residual accumulation.
-    </p>
-    <p>
-      The painful lesson is simple:
-      <strong>if a model is loaded from GGUF and the reference is llama.cpp, "close" is not done.</strong>
-    </p>
-  </div>
-
-  <h2>Method That Worked</h2>
-  <ol>
-    <li>Get end-to-end parity metrics first, so the failure is measurable.</li>
-    <li>Dump per-activation tensors for both CK and llama.cpp.</li>
-    <li>Find the first layer and first tensor that diverges.</li>
-    <li>Replay that tensor boundary in isolation until the drift is explained.</li>
-    <li>Fix the exact seed error, then rerun end-to-end because later layers amplify tiny misses.</li>
-  </ol>
-
-  <div class="alert alert-info">
-    <strong>Do not skip the first-divergence step.</strong>
-    Large final embedding drift does not imply a large bug.
-    In this case, a tiny fp16-table activation mismatch was enough to poison later layers.
-  </div>
-
-  <h2>Major Issues To Watch For On Future Encoder Ports</h2>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3 style="margin-top: 0;">1. GGML-Exact Activation Tables</h3>
-      <p>
-        If the reference path uses lookup-table math, especially fp16 tables,
-        do not assume a "same formula" implementation is enough.
-        The exact table and the exact fp32→fp16 conversion path matter.
-      </p>
-    </div>
-    <div class="card">
-      <h3 style="margin-top: 0;">2. Full Attention Is Less Forgiving</h3>
-      <p>
-        Full bidirectional attention spreads tiny row-level differences across the entire layer.
-        Decoder-style causal paths tend to localize drift much more naturally.
-      </p>
-    </div>
-    <div class="card">
-      <h3 style="margin-top: 0;">3. Mixed Dtype Boundaries Matter</h3>
-      <p>
-        Even when most activations are <code>fp32</code>, the decisive mismatch may come from an fp16 lookup,
-        quantized projection boundary, or a reference-only conversion convention.
-      </p>
-    </div>
-    <div class="card">
-      <h3 style="margin-top: 0;">4. Standalone Test Builds Must Track Runtime Splits</h3>
-      <p>
-        Splitting production code into new helper files is safe, but standalone libs and generated harnesses
-        must be updated too. Otherwise the main engine passes while test-only link targets fail.
-      </p>
-    </div>
-  </div>
-
-  <h2>What To Check First On The Next Encoder</h2>
-  <ul>
-    <li>Template contract: make sure the model path is expressed in the template, not hidden in lowering code.</li>
-    <li>Kernel map coverage: verify every required op resolves to a concrete kernel id before codegen.</li>
-    <li>Layer-0 first divergence: do not start with layer 12 or final embeddings.</li>
-    <li>Reference activations: dump both sides and replay isolated seams before editing kernels broadly.</li>
-    <li>Activation-table parity: GELU, RoPE tables, and any special lookup path deserve direct standalone checks.</li>
-  </ul>
-
-  <h2>Is The v8 IR Builder Hard-Coded?</h2>
-  <p>
-    Mostly no, but not perfectly no.
-  </p>
-  <p>
-    The Qwen3-VL encoder path is driven by:
-  </p>
-  <ul>
-    <li>the circuit in <code>version/v8/circuits/qwen3_vl_vision.json</code></li>
-    <li>kernel maps in <code>version/v8/kernel_maps/*.json</code></li>
-    <li>kernel-map-owned <code>call_abi</code> declarations for every contract-governed provider</li>
-  </ul>
-  <p>
-    That is the required ownership: model structure in the circuit, exact kernel identity and call ABI in kernel maps, and deterministic stitching in the compiler. Legacy binding registries are compatibility-only and cannot satisfy a resolved numerical contract.
-  </p>
-  <p>
-    But <code>build_ir_v8.py</code> still contains real lowering policy:
-    buffer contracts, generic attention selection, fallback rules, and parameter shaping for vision operators.
-    That policy is mostly <strong>generic vision lowering</strong>, not Qwen3-VL-specific hardcoding,
-    but it is still code, not pure data.
+    Qwen3-VL forced CKE to treat numerical behavior, execution schedules, cache transitions,
+    and position semantics as explicit compiler contracts. This page records what failed,
+    how X-ray attribution evolved, what is proven, and what remains open.
   </p>
 
   <div class="alert alert-warning">
-    <strong>The honest architectural answer:</strong>
-    the system is <strong>template-driven and kernel-driven</strong>, but not yet <strong>100% declarative</strong>.
-    The builder still owns some generic lowering intelligence.
+    <strong>Status on July 14, 2026:</strong> the Q8_0 vision encoder is byte-exact against
+    llama.cpp on the inspected 1008 x 16384 prefixes. Fresh, source-fingerprinted production
+    runs pass 128 generated tokens for the second OCR fixture and the public Fake 2 fixture.
+    The first OCR fixture reproducibly diverges at decoder step 20. Full replay fails at the same
+    step, isolating shared decoder arithmetic rather than persistent cache state. The 5-, 10-,
+    and 40-image gates are intentionally paused until that defect is fixed.
   </div>
 
-  <h2>Regression Gates That Matter</h2>
+  <h2>Evidence, Not A Single Parity Label</h2>
+  <p>Qwen3-VL parity has several independent levels. Passing one does not imply the next.</p>
+  <table>
+    <thead>
+      <tr><th>Level</th><th>Question</th><th>Required evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Vision geometry</td><td>Are the same patches and visual rows produced?</td><td>Grid, prefix rows, embedding width, patch order</td></tr>
+      <tr><td>Encoder values</td><td>Is every visual-prefix value identical?</td><td>Elementwise comparison and byte hash</td></tr>
+      <tr><td>Mixed prefill</td><td>Are visual and text segments executed with the same positions and cache transitions?</td><td>Segment trace, cache metadata, logits</td></tr>
+      <tr><td>Full replay</td><td>Does recomputing the complete prefix produce the same next token?</td><td>Teacher-forced ranking and logits</td></tr>
+      <tr><td>Persistent decode</td><td>Does incremental KV-cache execution stay aligned?</td><td>Token trace through EOS plus cache-state attribution</td></tr>
+      <tr><td>Application</td><td>Does OCR behavior remain aligned across varied images?</td><td>Multi-image output and accuracy sweep</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Current Multi-Image Sweep</h2>
+  <table>
+    <thead>
+      <tr><th>Fixture</th><th>Geometry</th><th>Encoder</th><th>Decoder result</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>OCR fixture 1</td><td>28 x 36, 1008 rows</td><td>Inspected prefix exact</td><td>First top-1 mismatch at step 20; full replay also fails</td></tr>
+      <tr><td>OCR fixture 2</td><td>36 x 28, 1008 rows</td><td>Inspected prefix exact</td><td>128 / 128 top-1 tokens</td></tr>
+      <tr><td>Public Fake 2 fixture</td><td>36 x 28, 1008 rows</td><td>Inspected prefix exact</td><td>128 / 128 top-1 tokens</td></tr>
+      <tr><td>Remaining OCR corpus</td><td>Varied</td><td>Not promoted</td><td>5-, 10-, and 40-image gates pending</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Top-1 equality is a behavioral gate, not a claim that every decoder logit is byte-exact.
+    The landscape run matched all 128 selected tokens while its minimum logits cosine was
+    approximately 0.9504. Close rankings can hide numerical drift until a later prompt or image
+    changes the margin. For that reason the gate records cosine, RMSE, top-k overlap, margins,
+    full replay, and the generated token trace.
+  </p>
+
+  <h2>Why An Ordinary Qwen3 Decoder Was Not Enough</h2>
+  <p>
+    Qwen3-VL reuses a Qwen-like text transformer, but its runtime contract is not simply
+    <code>vision_encoder -&gt; ordinary_Qwen3_decode</code>. The decoder must consume and preserve
+    multimodal state that a text-only Qwen3 path does not have.
+  </p>
   <ul>
-    <li><code>make test-v8-qwen3vl</code></li>
-    <li><code>make test-v8-vision-kernels</code></li>
-    <li><code>make llamacpp-parity-full</code></li>
-    <li><code>make test</code></li>
+    <li>The visual prefix contains projected embeddings, not token IDs that can be passed through the normal embedding lookup.</li>
+    <li>Deepstack streams are injected at specific decoder layers in addition to the base visual embedding.</li>
+    <li>Multimodal M-RoPE uses text, row, and column position semantics instead of ordinary one-dimensional text positions.</li>
+    <li>Physical KV-cache indices and semantic M-RoPE positions are related but not interchangeable.</li>
+    <li>llama.cpp executes <code>text_before -&gt; visual -&gt; text_after</code> as cache-preserving prefill segments.</li>
+    <li>Incremental decode must append one K/V row without modifying any previous row and must advance all position state correctly.</li>
+  </ul>
+  <p>
+    The core decoder weights may be Qwen3-shaped, but the bridge, execution schedule, position
+    contract, deepstack injection, and cache lifecycle make Qwen3-VL a distinct stitched circuit.
+  </p>
+
+  <h2>What Actually Failed</h2>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3 style="margin-top: 0;">Frontend And Geometry</h3>
+      <p>Resize policy, patch order, tiled position interpolation, and floating-point evaluation order all had to match the reference.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Vision M-RoPE</h3>
+      <p>Rotary width, pair count, split-half partner indexing, axis sections, recurrence, and rounding points were initially conflated.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Reference Math</h3>
+      <p>GGML fp16-table GELU, Q8 activation thresholds, FP16 K/V storage, online softmax, split thresholds, and merge order exposed differences hidden by formula-level tests.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Capability Identity</h3>
+      <p>A legacy FP32 decode function incorrectly advertised the FP16 online/FP32 merge capability. Resolution was deterministic but followed false metadata until the explicit contract provider became authoritative.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Bridge And Decoder State</h3>
+      <p>Combined versus segmented prefill, deepstack placement, semantic versus physical positions, append indices, cache strides, and persistent state all affected the result.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Diagnostic Artifacts</h3>
+      <p>Some Q/K/V dumps used different layouts. Internal llama.cpp dumps disabled flash attention. Stale generated libraries and incomplete runtime hashes produced misleading comparisons.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">Harness Semantics</h3>
+      <p>Comparing after both runtimes emitted EOS created a false divergence. Segmented full replay produced multiple valid checkpoint files, and unsupported checkpoint aliases previously triggered long runs that emitted nothing.</p>
+    </div>
+  </div>
+
+  <h2>Bug Stages And Fix Ownership</h2>
+  <table>
+    <thead>
+      <tr><th>Stage</th><th>Failure class</th><th>Observed example</th><th>Correct owner</th><th>Regression evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Reference harness</td><td>Invalid comparison window</td><td>Tokens were compared after both runtimes emitted EOS.</td><td>Parity runner and bridge stop-token metadata</td><td>EOS-aware multitoken tests</td></tr>
+      <tr><td>Reference adapter</td><td>Wrong tensor or backend mode</td><td>Segmented replay selected the wrong Q/K occurrence; internal llama.cpp dumps could change flash mode.</td><td>llama.cpp/PyTorch adapter and parity profile</td><td>Occurrence, alias, layout, and mode-metadata tests</td></tr>
+      <tr><td>Generated artifact</td><td>Stale or uninstrumented runtime</td><td>A cached library omitted imported compiler sources from its fingerprint or lacked <code>CK_PARITY_DUMP</code>.</td><td>Runtime builder and capture preflight</td><td>Source-set fingerprint and instrumentation rejection tests</td></tr>
+      <tr><td>Circuit</td><td>Wrong execution semantics</td><td>Combined prefill did not express <code>text_before -&gt; visual -&gt; text_after</code> cache-preserving execution.</td><td>Circuit schedule, bridge contract, and semantic positions</td><td>Segmented-prefill and call-IR tests</td></tr>
+      <tr><td>Kernel map</td><td>False capability advertisement</td><td>A legacy FP32 decode function claimed an FP16 online-softmax/FP32-merge contract.</td><td>Exact provider capability and resolver</td><td>Zero/ambiguous provider failures and resolved-function assertions</td></tr>
+      <tr><td>Kernel</td><td>Missing numerical implementation</td><td>RMSNorm/QK normalization needed an explicit ascending FP64 row-sum provider.</td><td>Leaf kernel with exact storage, arithmetic, reduction, and threading contract</td><td>Concrete scalar oracle and production-shape tests</td></tr>
+      <tr><td>Stateful execution</td><td>Cache or position mismatch</td><td>Persistent decode can differ from full replay through append index, stride, M-RoPE position, or prior-row corruption.</td><td>Execution-state X-ray and runtime state API</td><td>Bounded cache metadata, row-hash, and replay classification tests</td></tr>
+      <tr><td>Remaining arithmetic</td><td>Small seed amplified later</td><td>At image-1 step 20, Q/K first differ near 1.79e-7; post-RoPE K reaches 4.58e-5 and attention first materially fails near 1.47e-4.</td><td>Same-input primitive oracle, then kernel or capability selected by evidence</td><td>Not closed; no tolerance relaxation permitted</td></tr>
+    </tbody>
+  </table>
+  <p>
+    The harness is part of the correctness architecture, not disposable test scaffolding. A faulty
+    adapter can falsely accuse a correct kernel, while a permissive harness can conceal a real
+    circuit or reduction defect. Every diagnosed harness failure therefore receives a regression
+    test and enters the same nightly report as kernel and compiler contracts.
+  </p>
+
+  <h2>Rejected Hypotheses And Negative Results</h2>
+  <p>
+    A rejected experiment is retained as bounded evidence, not treated as wasted work. Its conclusion
+    applies only to the recorded model, tensor boundary, compiler, ISA, and execution mode.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Hypothesis or intervention</th><th>Observed result</th><th>Conclusion for this failure</th><th>Where it may still matter</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Disable AVX-512 VNNI</td><td>Native VNNI and native no-VNNI layer-0 MLP boundaries were identical; forced AVX2 still differed.</td><td>VNNI was not the source of that encoder drift.</td><td>Other quant formats, compiler versions, or kernels with different VNNI implementations.</td></tr>
+      <tr><td>Change the simple AVX2 Q8 dot-product accumulation wrapper</td><td>The layer-0 MLP-up metrics did not move.</td><td>The wrapper was not the first cause; activation quantization or the batched GEMM path remained stronger suspects.</td><td>Shapes routed directly through the wrapper rather than the batched path.</td></tr>
+      <tr><td>Force scalar/reference Q4 projection at image-1 step 20</td><td>The token mismatch and granular metrics were unchanged.</td><td>The selected Q4 SIMD provider was not responsible for the current step-20 seed.</td><td>Other layers, shapes, weight formats, ISAs, or exact-input projection failures.</td></tr>
+      <tr><td>Force reference Q6 projection</td><td>The step-20 result was unchanged.</td><td>The V projection/Q6 provider was not the current first cause.</td><td>Later Q6 MLP-down boundaries and different natural inputs.</td></tr>
+      <tr><td>Force exact M-RoPE, alone and with reference projections</td><td>The step-20 result was unchanged.</td><td>The tested M-RoPE implementation was not the remaining top-1 cause.</td><td>Different position grids, partial rotary widths, section patterns, or BF16 storage contracts.</td></tr>
+      <tr><td>Attribute the mismatch to persistent KV state</td><td>Full replay failed at the same generated step as persistent decode.</td><td>The remaining failure is shared arithmetic after the replay inputs are reconstructed.</td><td>Other images and steps where persistent decode fails but full replay matches.</td></tr>
+      <tr><td>Trust an older strict-mode pass</td><td>Source-set fingerprinting rebuilt the runtime and reproduced the failure.</td><td>The earlier pass was stale-artifact evidence and cannot support a parity claim.</td><td>Strict mode remains useful when explicitly labeled and built from the same source identity.</td></tr>
+      <tr><td>Compare production logits with an internal-dump reference run without mode metadata</td><td>Some llama.cpp internal captures can disable flash attention.</td><td>That comparison changes the oracle execution mode and cannot attribute production-flash arithmetic.</td><td>Unfused-to-unfused diagnostic comparisons when both sides declare the mode explicitly.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Future agents should rerun a rejected path only when at least one recorded condition changes.
+    A new ISA, compiler, model shape, storage dtype, backend mode, or first-divergence boundary is a
+    valid reason. Repeating the same intervention on the same evidence is not.
+  </p>
+
+  <h2>Why Small Differences Became Large Failures</h2>
+  <p>
+    The difficult bugs were rarely grossly incorrect matrix multiplication. They were differences
+    in when values were rounded, how reductions were partitioned, and which state was reused.
+    A one-ULP input change can cross a Q8 scale or code threshold. The following projection expands
+    that changed code across many outputs, residual layers accumulate it, and a close token ranking
+    can eventually flip even when cosine similarity remains high.
+  </p>
+  <p>
+    Sequence length and threading also change algorithms. At a KV threshold, a reference can move
+    from one online-softmax reduction to worker-local partials and an ordered merge. Diagnostic
+    capture can disable a production flash path. A test is valid only when backend mode, dtype,
+    thread count, partitioning, runtime libraries, positions, and input bytes are recorded together.
+    CKE's global strict flag is also an execution mode, not proof of correctness: it can select
+    diagnostic implementations that differ from the circuit-resolved production providers.
+  </p>
+
+  <h2>Three Numerical Lanes</h2>
+  <table>
+    <thead>
+      <tr><th>Lane</th><th>Reference</th><th>Primary risks</th><th>Current claim</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>AVX2 GGUF</td><td>llama.cpp</td><td>Q8 quantization, AVX2 reduction order, FP16 cache attention, persistent state</td><td>Encoder exact on tested fixtures; decoder sweep still open</td></tr>
+      <tr><td>AVX-512 GGUF</td><td>llama.cpp</td><td>ISA dispatch, VNNI/non-VNNI routing, reduction and cache contracts</td><td>Separate Xeon validation is required; results are not inferred from AVX2</td></tr>
+      <tr><td>BF16 / AMX</td><td>PyTorch</td><td>BF16 storage boundaries, SDPA tiling, LayerNorm/GEMM rounding, M-RoPE</td><td>Leaf and practical contracts are strong; full BF16 encoder and generation are not byte-exact</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How X-Ray Had To Evolve</h2>
+  <p>
+    The first X-ray implementation compared named tensors and found the first divergent layer or op.
+    That was necessary but insufficient for a stateful multimodal decoder. The current workflow checks
+    execution state before expensive tensor capture.
+  </p>
+  <ol>
+    <li>Verify runtime, model, engine, shim, manifest, compiler, ISA, thread, and attention-mode identity.</li>
+    <li>Compare prefill segmentation and the actual kernel batch shapes.</li>
+    <li>Compare physical cache count, append index, strides, and semantic positions.</li>
+    <li>Verify the newly appended FP16 K/V row round-trips and every previous row remains unchanged.</li>
+    <li>Hash and compare every valid cache row, reporting the first and worst logical coordinates.</li>
+    <li>Use full replay at the failing token to classify persistent-state versus shared arithmetic failures.</li>
+    <li>Bisect sparse layers, then every layer in the failing interval, then internal op checkpoints.</li>
+    <li>Replay identical input bytes through the suspected quantizer or kernel before changing production math.</li>
+  </ol>
+  <div class="alert alert-info">
+    <strong>Current varied-image classification:</strong> exact encoder prefixes were established for
+    four inspected fixtures. Fresh, fingerprinted production runs pass 128 tokens for the second OCR
+    image and the public Fake 2 fixture. The first OCR image has a reproducible shared-arithmetic
+    mismatch at generated step 20: persistent and full replay agree with each other but not llama.cpp.
+    An older strict-mode pass was invalidated after source-set hashing forced the stale decoder runtime
+    to regenerate. Granular replay now shows Q/K/V projection, Q/K normalization, and post-RoPE values
+    remain close, with attention output the first material amplification. Production, strict/debug,
+    flash, and diagnostic unfused results are recorded as distinct modes and are never combined into
+    one parity claim.
+  </div>
+
+  <h3>Capture Adapter Guardrails</h3>
+  <ul>
+    <li>Discover checkpoint names from the exact generated decoder source paired with the runtime.</li>
+    <li>Hard-fail unknown names, unavailable layers, or missing replay variants before model initialization.</li>
+    <li>Capture a bounded comma-separated checkpoint set in one persistent run and one replay run.</li>
+    <li>Build or reuse a dedicated parity-instrumented runtime; never expect a production library compiled without <code>CK_PARITY_DUMP</code> to emit tensors.</li>
+    <li>Select segmented files by final physical position and reject unresolved duplicates.</li>
+    <li>Fingerprint imported compiler, circuit, kernel-map, and schema sources so stale generated libraries cannot masquerade as current results.</li>
+    <li>Record strict/debug, flash, repack, threading, model, engine, generated library, and manifest identity in the report.</li>
   </ul>
 
+  <h2>Architecture Hardened By The Investigation</h2>
+  <p>The accepted ownership model is now explicit:</p>
+  <ul>
+    <li><strong>Circuits</strong> own topology, dataflow, execution phases, segmented schedules, semantic positions, required numerical contracts, and checkpoints.</li>
+    <li><strong>Kernel maps</strong> own exact function identity, call ABI, storage and compute dtype, rounding points, reduction order, threading arithmetic, ISA eligibility, and implementation metadata. Distinct functions cannot claim one contract unless both pass its numerical oracle.</li>
+    <li><strong>The resolver</strong> selects exactly one semantically compatible provider and hard-fails on zero, multiple, or incomplete matches.</li>
+    <li><strong>IR and code generation</strong> carry the resolved decision forward. They must not infer model families from function names or inject a model-specific fallback.</li>
+    <li><strong>Parity profiles</strong> own backend tensor mappings, canonical layouts, tolerances, and bounded attribution plans.</li>
+  </ul>
   <p>
-    These four are the minimum confidence set for future encoder compatibility work.
-    If a parity fix only passes one of them, it is not ready.
+    A fix belongs in the circuit when the model requires different graph or schedule semantics, in
+    the kernel map when an existing implementation has a distinct numerical capability, and in a
+    kernel when the required capability does not exist. The DSL should change only to express a
+    generic missing concept, never to special-case Qwen3-VL.
   </p>
+
+  <h2>Regression Gates</h2>
+  <pre><code>make test-v8-dsl
+make test-v8-qwen3vl
+make test-qwen3vl-methodical-parity
+make test-v8-vision-kernels
+make test-numerical-contracts
+make test-attention-f16-split-kv
+make llamacpp-parity-full</code></pre>
+  <p>
+    Artifact-backed encoder, mixed-prefill, teacher-forced, persistent decode, and OCR sweeps remain
+    resource-gated. Missing models or unsupported BF16 hardware must report <code>SKIP</code>, not
+    <code>PASS</code>. Numerical failures are hard failures; performance regressions are reported
+    separately because machine topology and thermal state affect timing.
+  </p>
+
+  <h2>What Happens Next</h2>
+  <ol>
+    <li>Close the first OCR fixture's shared layer-0 attention/reduction mismatch with a same-input production-flash oracle.</li>
+    <li>Rerun the first five fixtures through at least 128 tokens and EOS where bounded.</li>
+    <li>Expand to ten images only after the five-image gate is clean.</li>
+    <li>Run the full 40-image encoder, mixed-prefill, persistent-decode, and OCR sweep.</li>
+    <li>Publish exact artifacts, negative results, compiler and ISA identity, and application accuracy.</li>
+    <li>Resume performance tuning only after correctness remains green.</li>
+  </ol>
 
   <h2>Bottom Line</h2>
   <p>
-    The engine did not need a special-case Qwen3-VL runtime.
-    It needed one more round of exactness at the seam where GGML conventions still mattered.
-    That is a good outcome:
-    the path remained template- and kernel-driven, and the final fix improved the shared exactness story instead of adding one-off model glue.
+    Qwen3-VL was difficult because correctness spans more than kernels and more than a tensor graph.
+    It spans image geometry, dtype boundaries, evaluation order, execution schedules, position spaces,
+    cache transitions, backend modes, and persistent state. X-ray made those contracts observable and
+    converted repeated manual debugging into a bounded first-divergence process. The encoder evidence
+    is now strong, but the project will not call end-to-end parity complete until the varied-image
+    persistent-decode and OCR gates pass.
   </p>
 </div>

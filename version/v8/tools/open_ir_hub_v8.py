@@ -281,6 +281,7 @@ def _artifact_search_bases(run_dir: Path) -> list[Path]:
     bases = [
         run_dir,
         run_dir / ".ck_build",
+        run_dir / ".ck_build_v8",
         run_dir / "multimodal_bridge",
         run_dir / "multimodal_bridge" / "decoder",
         run_dir / "multimodal_bridge" / "encoder",
@@ -298,6 +299,76 @@ def _artifact_search_bases(run_dir: Path) -> list[Path]:
 
 def _find_bridge_report_path(run_dir: Path) -> Path | None:
     return _find_run_artifact(run_dir, "multimodal_bridge/bridge_report.json")
+
+
+def _resolve_likwid_artifact(run_dir: Path, raw_path: Any) -> Path | None:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    raw = Path(raw_path).expanduser()
+    candidates = [raw] if raw.is_absolute() else []
+    for base in _artifact_search_bases(run_dir):
+        candidates.extend([base / raw, base / "likwid" / raw.name])
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def _extract_likwid_summary(run_dir: Path) -> dict[str, Any]:
+    summary_path = _find_run_artifact(run_dir, "likwid_summary.json")
+    if summary_path is None:
+        return {}
+    payload = _safe_read_json(summary_path)
+    if not isinstance(payload, dict):
+        return {
+            "status": "fail",
+            "reason": "likwid_summary.json is not valid JSON",
+            "summary_path": str(summary_path),
+            "summary_uri": summary_path.resolve().as_uri(),
+        }
+
+    metrics: list[dict[str, Any]] = []
+    normalized = payload.get("normalized")
+    if isinstance(normalized, dict):
+        for group, group_metrics in normalized.items():
+            if not isinstance(group_metrics, dict):
+                continue
+            for name, value in group_metrics.items():
+                if not isinstance(value, (int, float)):
+                    continue
+                metrics.append({"group": str(group), "name": str(name), "value": float(value)})
+
+    artifacts: list[dict[str, str]] = []
+    raw_artifacts = payload.get("artifacts")
+    if isinstance(raw_artifacts, list):
+        for item in raw_artifacts:
+            if not isinstance(item, dict):
+                continue
+            resolved = _resolve_likwid_artifact(run_dir, item.get("path"))
+            if resolved is None:
+                continue
+            artifacts.append(
+                {
+                    "kind": str(item.get("kind") or "artifact"),
+                    "path": str(resolved),
+                    "uri": resolved.as_uri(),
+                }
+            )
+
+    return {
+        "status": str(payload.get("status") or "unknown").lower(),
+        "reason": str(payload.get("reason") or ""),
+        "selected_groups": [str(value) for value in payload.get("selected_groups", [])]
+        if isinstance(payload.get("selected_groups"), list)
+        else [],
+        "cpu_ids": [int(value) for value in payload.get("cpu_ids", []) if isinstance(value, int)]
+        if isinstance(payload.get("cpu_ids"), list)
+        else [],
+        "metrics": metrics[:8],
+        "summary_path": str(summary_path),
+        "summary_uri": summary_path.resolve().as_uri(),
+        "artifacts": artifacts,
+    }
 
 
 def _extract_bridge_summary(path: Path | None) -> dict[str, Any]:
@@ -968,6 +1039,7 @@ class RunRecord:
     artifact_index_path: Path | None
     bridge_report_path: Path | None
     bridge_summary: dict[str, Any]
+    likwid_summary: dict[str, Any]
     dataset_workspace: str | None
     dataset_type: str | None
     dataset_stage_mode: str | None
@@ -1048,6 +1120,7 @@ class RunRecord:
             "bridge_report_path": str(self.bridge_report_path) if self.bridge_report_path else None,
             "bridge_report_uri": self.bridge_report_path.resolve().as_uri() if self.bridge_report_path else None,
             "bridge_summary": self.bridge_summary,
+            "likwid_summary": self.likwid_summary,
             "dataset_workspace": self.dataset_workspace,
             "dataset_type": self.dataset_type,
             "dataset_stage_mode": self.dataset_stage_mode,
@@ -1286,6 +1359,7 @@ def _build_run_coverage(
                     ("cachegrind", _has_run_artifact(run_dir, "cachegrind_summary.json")),
                     ("vtune", _has_run_artifact(run_dir, "vtune_summary.json")),
                     ("advisor", _has_run_artifact(run_dir, "advisor_summary.json")),
+                    ("likwid", _has_run_artifact(run_dir, "likwid_summary.json")),
                 ],
                 core=False,
             ),
@@ -1339,7 +1413,7 @@ def discover_run_dirs(models_root: Path) -> list[Path]:
             continue
         p = current
         # If marker sits in .ck_build, map to parent run dir.
-        if p.name == ".ck_build":
+        if p.name in {".ck_build", ".ck_build_v8"}:
             p = p.parent
         if p.name in {"encoder", "decoder"} and p.parent.name == "multimodal_bridge":
             p = p.parent.parent
@@ -1357,6 +1431,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     report = _find_report_path(run_dir)
     bridge_report_path = _find_bridge_report_path(run_dir)
     bridge_summary = _extract_bridge_summary(bridge_report_path)
+    likwid_summary = _extract_likwid_summary(run_dir)
     dataset_viewer = _find_dataset_viewer_path(run_dir)
     embeddings = _find_embeddings_path(run_dir)
     attention = _find_attention_path(run_dir)
@@ -1386,7 +1461,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     latest_ckpt_step, latest_ckpt_bump, latest_ckpt_manifest, ckpt_count = _latest_checkpoint(run_dir)
 
     mtimes = []
-    for p in (report, bridge_report_path, wm, parity, loss, post_eval, run_index):
+    likwid_summary_path = _find_run_artifact(run_dir, "likwid_summary.json")
+    for p in (report, bridge_report_path, likwid_summary_path, wm, parity, loss, post_eval, run_index):
         m = _file_mtime(p)
         if m is not None:
             mtimes.append(m)
@@ -1454,6 +1530,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         artifact_index_path=artifact_index_path,
         bridge_report_path=bridge_report_path,
         bridge_summary=bridge_summary,
+        likwid_summary=likwid_summary,
         dataset_workspace=dataset_workspace,
         dataset_type=dataset_type,
         dataset_stage_mode=dataset_stage_mode,
@@ -1516,6 +1593,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
     weight_health_count = sum(1 for r in payload_runs if r.get("weight_health_path"))
     bridge_report_count = sum(1 for r in payload_runs if r.get("bridge_report_path"))
     probe_report_html_count = sum(1 for r in payload_runs if r.get("probe_report_html_path"))
+    likwid_count = sum(1 for r in payload_runs if (r.get("likwid_summary") or {}).get("status"))
     pass_count = sum(1 for r in payload_runs if (r.get("parity_regimen") or {}).get("status") in ("PASS", "PASS_REUSED"))
 
     global_viewer = REPO_ROOT / "dataset_viewer.html"
@@ -1536,6 +1614,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
             "runs_with_weight_health": weight_health_count,
             "runs_with_bridge_report": bridge_report_count,
             "runs_with_probe_report_html": probe_report_html_count,
+            "runs_with_likwid": likwid_count,
             "runs_parity_pass": pass_count,
         },
         "runs": payload_runs,
@@ -3448,6 +3527,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         scope.objective,
         run.agentBriefExcerpt,
         run.trainingBriefExcerpt,
+        (run.likwidSummary?.selected_groups || []).join(' '),
       ]
         .filter(Boolean)
         .join(' ')
@@ -3458,6 +3538,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const dims = run.dims || {};
       const parity = run.parity_regimen || {};
       const bridgeSummary = (run.bridge_summary && typeof run.bridge_summary === 'object') ? run.bridge_summary : {};
+      const likwidSummary = (run.likwid_summary && typeof run.likwid_summary === 'object') ? run.likwid_summary : {};
       const parityStatus = String(parity.status || 'MISSING').toUpperCase();
       const normalized = {
         ...run,
@@ -3481,6 +3562,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         regressionFastCmd: run.regression_fast_cmd || '',
         bridgeReportReady: Boolean(run.bridge_report_path),
         bridgeSummary,
+        likwidSummary,
         bridgeMode: bridgeSummary.bridge_mode || 'decoder_only',
         datasetViewerReady: Boolean(run.dataset_viewer_path),
         galleryReady: Boolean(run.gallery_path),
@@ -4316,6 +4398,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const weightHealthCount = summary.runs_with_weight_health || runs.filter((run) => run.weight_health_path).length;
       const bridgeReportCount = summary.runs_with_bridge_report || runs.filter((run) => run.bridgeReportReady).length;
       const probeReportCount = runs.filter((run) => run.probeReportHtmlReady).length;
+      const likwidCount = summary.runs_with_likwid || runs.filter((run) => run.likwidSummary && run.likwidSummary.status).length;
       const parityPass = summary.runs_parity_pass || runs.filter((run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED').length;
       const trainCount = summary.runs_train || runs.filter((run) => run.kind === 'train').length;
       const inferCount = runs.filter((run) => run.kind === 'inference').length;
@@ -4347,6 +4430,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         { label: '🔭 Attention', value: fmtInt(attentionCount), note: 'Runs with exported attention.json.' },
         { label: '🩺 Weight Health', value: fmtInt(weightHealthCount), note: 'Runs with weight_health_latest.json probe results.' },
         { label: '🔬 DSL Probes', value: fmtInt(probeReportCount), note: 'Runs with probe_report.html DSL output viewers.' },
+        { label: '📈 LIKWID Profiles', value: fmtInt(likwidCount), note: 'Runs with pinned cross-vendor counter artifacts.' },
         { label: 'Parity Pass', value: fmtInt(parityPass), note: 'PASS plus PASS_REUSED regimen states.' },
         { label: 'Best Loss / Checkpoints', value: `${fmtLoss(bestLoss)} / ${fmtInt(totalCheckpoints)}`, note: 'Lowest loss and total checkpoint volume.' },
       ];
@@ -4372,6 +4456,49 @@ def render_html(index_payload: dict[str, Any]) -> str:
             const state = section.present === section.total ? 'pass' : (section.present > 0 ? 'skip' : 'missing');
             return `<span class="badge ${state}">${escapeHtml(section.title)} ${escapeHtml(String(section.present))}/${escapeHtml(String(section.total))}</span>`;
           }).join('')}
+        </div>
+      `;
+    }
+
+    function likwidTone(status) {
+      if (status === 'pass') return 'pass';
+      if (status === 'fail') return 'fail';
+      if (status === 'skip') return 'skip';
+      return 'missing';
+    }
+
+    function renderLikwidSummary(run) {
+      const summary = run.likwidSummary || {};
+      const status = String(summary.status || '').toLowerCase();
+      if (!status) return '';
+      const groups = Array.isArray(summary.selected_groups) ? summary.selected_groups : [];
+      const cpus = Array.isArray(summary.cpu_ids) ? summary.cpu_ids : [];
+      const metrics = Array.isArray(summary.metrics) ? summary.metrics.slice(0, 6) : [];
+      const artifacts = Array.isArray(summary.artifacts) ? summary.artifacts.slice(0, 5) : [];
+      const metricHtml = metrics.map((metric) => {
+        const value = Number(metric.value);
+        const rendered = Number.isFinite(value)
+          ? (Math.abs(value) >= 100 ? value.toFixed(1) : value.toFixed(3))
+          : String(metric.value || '-');
+        const label = String(metric.name || 'metric').replaceAll('_', ' ');
+        return `<span class="tag"><strong>${escapeHtml(String(metric.group || '-'))}</strong> ${escapeHtml(label)}: ${escapeHtml(rendered)}</span>`;
+      }).join('');
+      const links = [
+        summary.summary_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(summary.summary_uri)}">LIKWID JSON</a>` : '',
+        ...artifacts.map((artifact) => artifact.uri
+          ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(artifact.uri)}">${escapeHtml(String(artifact.kind || 'raw'))}</a>`
+          : ''),
+      ].filter(Boolean).join('');
+      return `
+        <div class="health-note" style="margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(7,173,248,0.05);">
+          <div class="run-badges" style="margin-bottom:7px;">
+            <span class="badge ${likwidTone(status)}">LIKWID ${escapeHtml(status.toUpperCase())}</span>
+            ${groups.length ? `<span class="badge">groups ${escapeHtml(groups.join(', '))}</span>` : ''}
+            ${cpus.length ? `<span class="badge mono">CPUs ${escapeHtml(cpus.join(', '))}</span>` : ''}
+          </div>
+          ${summary.reason ? `<div style="margin-bottom:7px;">${escapeHtml(String(summary.reason))}</div>` : ''}
+          ${metricHtml ? `<div class="spotlight-tags" style="margin-bottom:7px;">${metricHtml}</div>` : ''}
+          ${links ? `<div class="run-actions">${links}</div>` : ''}
         </div>
       `;
     }
@@ -4458,6 +4585,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
             ${run.reportReady ? '<span class="badge report">report ready</span>' : ''}
             ${run.bridgeReportReady ? `<span class="badge pass">${escapeHtml(run.bridgeMode === 'encoder_decoder' ? 'vision bridge' : 'bridge')}</span>` : ''}
             ${run.datasetViewerReady ? '<span class="badge report">dataset viewer</span>' : ''}
+            ${run.likwidSummary?.status ? `<span class="badge ${likwidTone(run.likwidSummary.status)}">LIKWID ${escapeHtml(String(run.likwidSummary.status).toUpperCase())}</span>` : ''}
           </div>
         </div>
         <div class="spotlight-body">
@@ -4496,6 +4624,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
               ${renderSectionSummary(run, true)}
               <div class="health-note">Core dashboard coverage. Advanced correctness and deep profiling are tracked separately below.</div>
+              ${renderLikwidSummary(run)}
               ${renderDatasetPrepChecklist(run)}
               ${renderCommandsPanel(run)}
               <details class="detail-toggle">
@@ -4741,6 +4870,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                   ${run.bridgeReportReady ? `<span class="badge pass">${escapeHtml(run.bridgeMode === 'encoder_decoder' ? 'vl' : 'bridge')}</span>` : ''}
                   ${run.probeReportHtmlReady ? '<span class="badge pass">probe</span>' : (run.probeReportCmd ? '<span class="badge warn">probe pending</span>' : '')}
                   ${run.datasetViewerReady ? '<span class="badge report">dataset</span>' : ''}
+                  ${run.likwidSummary?.status ? `<span class="badge ${likwidTone(run.likwidSummary.status)}">LIKWID ${escapeHtml(String(run.likwidSummary.status).toUpperCase())}</span>` : ''}
                   ${(() => {
                     const tg = run.tokenizerGate || {};
                     if (tg.verdict === 'FAIL') return '<span class="badge fail" title="Tokenizer has degenerate content-embedded tokens">tok ❌</span>';
@@ -4757,6 +4887,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 <div class="health-bar"><span style="width:${Math.max(0, Math.min(100, run.healthScore))}%"></span></div>
                 ${renderSectionSummary(run, true)}
                 <div class="health-note">Measures core dashboard completeness, not model quality.</div>
+                ${renderLikwidSummary(run)}
               </div>
 
               <div class="run-stats">
@@ -4858,6 +4989,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                         ${showParityBadge(run) ? `<span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>` : ''}
                         ${run.reportReady ? '<span class="badge report">report</span>' : ''}
                         ${run.datasetViewerReady ? '<span class="badge report">dataset</span>' : ''}
+                        ${run.likwidSummary?.status ? `<span class="badge ${likwidTone(run.likwidSummary.status)}">LIKWID ${escapeHtml(String(run.likwidSummary.status).toUpperCase())}</span>` : ''}
                       </div>
                       <div class="table-secondary tight">${escapeHtml(run.healthReason || 'coverage unavailable')}</div>
                     </td>
@@ -4882,6 +5014,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                       <div class="table-actions">
                         ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
                         ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                        ${run.likwidSummary?.summary_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.likwidSummary.summary_uri)}">LIKWID</a>` : ''}
                         ${embViewerLink(run, '🧬')}
                         ${attnViewerLink(run, '🔭')}
                         ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}

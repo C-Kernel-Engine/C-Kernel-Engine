@@ -1,0 +1,68 @@
+{
+  "id": "qk_norm_forward_llama_production",
+  "op": "qk_norm",
+  "variant": "llama_cpu_production_fp32_output",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    { "name": "q", "dtype": "fp32", "shape": ["H", "T", "D"] },
+    { "name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"] }
+  ],
+  "weights": [
+    { "name": "q_gamma", "dtype": "fp32", "shape": ["D"] },
+    { "name": "k_gamma", "dtype": "fp32", "shape": ["D"] }
+  ],
+  "outputs": [
+    { "name": "q", "dtype": "fp32", "shape": ["H", "T", "D"] },
+    { "name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"] }
+  ],
+  "dims": ["H", "KV", "T", "D"],
+  "params": [{ "name": "eps", "dtype": "float32" }],
+  "impl": {
+    "function": "qk_norm_forward_llama_production",
+    "c_declaration": "void qk_norm_forward_llama_production(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+    "sources": ["src/kernels/qk_norm_kernels.c", "src/kernels/rmsnorm_kernels.c"]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "qk_norm_forward_llama_production",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {
+        "runtime": "serial",
+        "work_partition": ["independent_rows"],
+        "dispatch": ["inline"],
+        "reduction_order_effect": "none"
+      }
+    },
+    "arithmetic": {
+      "partial_accumulator": "fp64",
+      "merge_order": "none",
+      "deterministic": true,
+      "thread_count_changes_arithmetic_order": false,
+      "split_strategy": "independent_outputs"
+    }
+  }],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      { "name": "q", "source": "scratch:q_scratch", "cast": "float*" },
+      { "name": "k", "source": "scratch:k_scratch", "cast": "float*" },
+      { "name": "q_gamma", "source": "weight_f:q_norm", "cast": "const float*" },
+      { "name": "k_gamma", "source": "weight_f:k_norm", "cast": "const float*" },
+      { "name": "num_heads", "source": "dim:num_heads" },
+      { "name": "num_kv_heads", "source": "dim:num_kv_heads" },
+      { "name": "num_tokens", "source": "dim:seq_len" },
+      { "name": "head_dim", "source": "dim:head_dim" },
+      { "name": "eps", "source": "dim:rms_eps" }
+    ]
+  },
+  "notes": "Per-head Q/K RMSNorm matching the active llama.cpp CPU production reciprocal-square-root sequence.",
+  "name": "qk_norm_forward_llama_production"
+}

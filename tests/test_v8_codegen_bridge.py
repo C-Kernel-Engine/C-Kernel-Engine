@@ -281,7 +281,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
         self.assertEqual(by_op["mlp_gate_up"][0]["kernel"], "gemv_q5_0_q8_0")
         self.assertEqual(by_op["mlp_down"][0]["kernel"], "gemv_q6_k_q8_k")
 
-    def test_qwen3vl_decode_uses_interleaved_text_mrope_kernel(self) -> None:
+    def test_qwen3vl_decode_uses_resolved_mrope_and_attention_contracts(self) -> None:
         manifest = _make_qwen3vl_decoder_manifest()
 
         ir1_ops = build_ir_v8.build_ir1_direct(
@@ -295,7 +295,17 @@ class V8CodegenBridgeTests(unittest.TestCase):
             by_op.setdefault(ir_op["op"], []).append(ir_op)
 
         self.assertEqual(by_op["rope_qk"][0]["kernel"], "mrope_qk_text_imrope")
-        self.assertEqual(by_op["attn"][0]["kernel"], "attention_forward_decode_head_major_gqa_flash_f16cache")
+        self.assertEqual(by_op["attn"][0]["kernel"], "attention_forward_decode_head_major_gqa_flash_f16cache_contract")
+        self.assertTrue(by_op["rmsnorm"])
+        self.assertTrue(by_op["qk_norm"])
+        self.assertEqual(
+            {op["kernel"] for op in by_op["rmsnorm"]},
+            {"rmsnorm_forward_llama_production"},
+        )
+        self.assertEqual(
+            {op["kernel"] for op in by_op["qk_norm"]},
+            {"qk_norm_forward_llama_production"},
+        )
         self.assertEqual(
             by_op["q_proj"][0]["resolved_execution"]["implementation"]["threading"]["runtime"],
             "ck_threadpool",
@@ -306,7 +316,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
         )
         self.assertEqual(
             by_op["q_proj"][0]["resolved_execution"]["reference"]["function"],
-            "gemv_q4_k_q8_k_ref",
+            "gemv_q4_k_q8_k_repacked_parallel_dispatch",
         )
         self.assertEqual(
             by_op["q_proj"][0]["resolved_execution"]["implementation"]["weight_storage"],
@@ -353,12 +363,32 @@ class V8CodegenBridgeTests(unittest.TestCase):
             rope_call = next(op for op in call_doc["operations"] if op["op"] == "rope_qk")
             attn_call = next(op for op in call_doc["operations"] if op["op"] == "attn")
             q_proj_call = next(op for op in call_doc["operations"] if op["op"] == "q_proj")
+            rmsnorm_calls = [op for op in call_doc["operations"] if op["op"] == "rmsnorm"]
+            qk_norm_calls = [op for op in call_doc["operations"] if op["op"] == "qk_norm"]
             quantize_input_call = next(op for op in call_doc["operations"] if op["op"] == "quantize_input_0")
             mlp_down_call = next(op for op in call_doc["operations"] if op["op"] == "mlp_down")
             kv_store_call = next(op for op in call_doc["operations"] if op["op"] == "kv_cache_store")
             kv_buf = next(buf for buf in layout_doc["memory"]["activations"]["buffers"] if buf["name"] == "kv_cache")
             self.assertEqual(rope_call["function"], "mrope_qk_text_imrope")
-            self.assertEqual(attn_call["function"], "attention_forward_decode_head_major_gqa_flash_f16cache")
+            self.assertTrue(rmsnorm_calls)
+            self.assertTrue(qk_norm_calls)
+            self.assertEqual(
+                {op["function"] for op in rmsnorm_calls},
+                {"rmsnorm_forward_llama_production"},
+            )
+            for call in rmsnorm_calls:
+                gamma = next(arg for arg in call["args"] if arg["name"] == "gamma")
+                self.assertNotEqual(gamma["expr"], "NULL")
+                self.assertTrue(gamma.get("weight_ref"))
+            self.assertEqual(
+                {op["function"] for op in qk_norm_calls},
+                {"qk_norm_forward_llama_production"},
+            )
+            self.assertEqual(attn_call["function"], "attention_forward_decode_head_major_gqa_flash_f16cache_contract")
+            self.assertEqual(
+                attn_call["args"][-1]["expr"],
+                "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE",
+            )
             self.assertEqual(kv_store_call["function"], "kv_cache_store_f16")
             self.assertEqual(kv_buf["dtype"], "fp16")
             self.assertEqual(q_proj_call["resolved_execution"]["kernel_id"], "gemv_q4_k_q8_k")
@@ -378,11 +408,11 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertEqual(mlp_down_call["resolved_execution"]["kernel_id"], "gemv_q6_k_q8_k")
             self.assertEqual(
                 q_proj_call["resolved_execution"]["production"]["function"],
-                "gemv_q4_k_q8_k",
+                "gemv_q4_k_q8_k_repacked_parallel_dispatch",
             )
             self.assertEqual(
                 q_proj_call["resolved_execution"]["production"]["threaded_function"],
-                "gemv_q4_k_q8_k_parallel_dispatch",
+                "gemv_q4_k_q8_k_repacked_parallel_dispatch",
             )
             self.assertEqual(
                 q_proj_call["resolved_execution"]["implementation"]["diagnostic_providers"],

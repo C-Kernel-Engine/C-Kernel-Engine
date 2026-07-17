@@ -478,11 +478,6 @@ def _ref_position_embeddings_add_tiled_2d(
     def f32(v) -> float:
         return np.float32(v).item()
 
-    def fmaf32(a: float, b: float, c: float) -> float:
-        if hasattr(math, "fma"):
-            return f32(math.fma(float(a), float(b), float(c)))
-        return f32(float(a) * float(b) + float(c))
-
     x_np = x.detach().cpu().numpy().astype(np.float32, copy=True)
     pos_np = pos.detach().cpu().numpy().astype(np.float32, copy=False)
     tokens, embed_dim = x_np.shape
@@ -516,25 +511,32 @@ def _ref_position_embeddings_add_tiled_2d(
         x_max = min(source_grid_size, x_max)
         y_max = min(source_grid_size, y_max)
 
-        for d in range(embed_dim):
-            val = f32(0.0)
-            total_weight = f32(0.0)
-            for sy in range(y_min, y_max):
-                wy_arg = f32(f32(f32(float(sy) - y_src) + pixel_offset) * invscale_y)
-                wy = f32(max(f32(1.0 - abs(wy_arg)), 0.0))
-                if wy <= 0.0:
+        # Channels are independent and use the same interpolation weights.
+        # Vectorize that dimension while retaining the scalar oracle's
+        # FP32-FMA rounding after every source sample. float64 represents the
+        # exact product and sum of two float32 values before the explicit cast.
+        val = np.zeros(embed_dim, dtype=np.float32)
+        total_weight = f32(0.0)
+        for sy in range(y_min, y_max):
+            wy_arg = f32(f32(f32(float(sy) - y_src) + pixel_offset) * invscale_y)
+            wy = f32(max(f32(1.0 - abs(wy_arg)), 0.0))
+            if wy <= 0.0:
+                continue
+            for sx in range(x_min, x_max):
+                wx_arg = f32(f32(f32(float(sx) - x_src) + pixel_offset) * invscale_x)
+                wx = f32(max(f32(1.0 - abs(wx_arg)), 0.0))
+                weight = f32(wx * wy)
+                if weight <= 0.0:
                     continue
-                for sx in range(x_min, x_max):
-                    wx_arg = f32(f32(f32(float(sx) - x_src) + pixel_offset) * invscale_x)
-                    wx = f32(max(f32(1.0 - abs(wx_arg)), 0.0))
-                    weight = f32(wx * wy)
-                    if weight <= 0.0:
-                        continue
-                    sample = float(pos_np[sy * source_grid_size + sx, d])
-                    val = fmaf32(sample, weight, val)
-                    total_weight = f32(total_weight + weight)
-            if total_weight > 0.0:
-                x_np[tok, d] = f32(float(x_np[tok, d]) + f32(val / total_weight))
+                sample = pos_np[sy * source_grid_size + sx]
+                val = (
+                    sample.astype(np.float64) * float(weight)
+                    + val.astype(np.float64)
+                ).astype(np.float32)
+                total_weight = f32(total_weight + weight)
+        if total_weight > 0.0:
+            interpolated = (val / np.float32(total_weight)).astype(np.float32)
+            x_np[tok] = (x_np[tok] + interpolated).astype(np.float32)
     return torch.from_numpy(x_np)
 
 

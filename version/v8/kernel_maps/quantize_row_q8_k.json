@@ -35,7 +35,10 @@
   },
   "impl": {
     "function": "quantize_row_q8_k",
-    "sources": ["src/kernels/quantize_row_q8_k_sse.c"],
+    "sources": [
+      "src/kernels/gemm_kernels_q4k_q8k.c",
+      "src/kernels/quantize_row_q8_k_sse.c"
+    ],
     "variants": [
       {"name": "default", "requires": [], "compile_flags": []}
     ]
@@ -44,6 +47,7 @@
     "schema_version": 1,
     "operator_family": "activation_quantization",
     "function": "quantize_row_q8_k",
+    "rounding_contract": "canonical_q8_k_row_nearest",
     "output_storage": {
       "format": "q8_k",
       "block_elements": 256,

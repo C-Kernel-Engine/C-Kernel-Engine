@@ -301,10 +301,15 @@ def test_vec_dot_q6k_q8k(lib):
 
 
 def test_gemv_q6k_q8k(lib):
-    """Test gemv_q6_k_q8_k against FP32 reference"""
-    print(f"\n{YELLOW}Testing gemv_q6_k_q8_k...{RESET}")
+    """Test the scalar Q6_K x Q8_K contract against the Python reference.
 
-    lib.gemv_q6_k_q8_k.argtypes = [
+    Production-provider parity is owned by test_q6k_q8k_llama_production.cpp,
+    which executes llama.cpp's real CPU graph rather than this approximate
+    dequantized Python oracle.
+    """
+    print(f"\n{YELLOW}Testing gemv_q6_k_q8_k_ref...{RESET}")
+
+    lib.gemv_q6_k_q8_k_ref.argtypes = [
         ctypes.POINTER(ctypes.c_float), ctypes.c_void_p,
         ctypes.c_void_p, ctypes.c_int, ctypes.c_int
     ]
@@ -337,7 +342,7 @@ def test_gemv_q6k_q8k(lib):
 
     # CK-Engine
     y = np.zeros(M, dtype=np.float32)
-    lib.gemv_q6_k_q8_k(
+    lib.gemv_q6_k_q8_k_ref(
         y.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         (ctypes.c_ubyte * len(W_buffer)).from_buffer_copy(W_buffer),
         (ctypes.c_ubyte * len(x_block)).from_buffer_copy(x_block),

@@ -53,6 +53,8 @@ jobs:
               raise SystemExit(0)
           data = json.loads(path.read_text())
           llama = data["llama_cpp"]
+          patch_phase = data.get("phases", {}).get("patch_compatibility", {})
+          patch_status = patch_phase.get("status", "unknown").upper()
           lines = [
               "## llama.cpp rolling compatibility",
               "",
@@ -61,8 +63,11 @@ jobs:
               f"- Pinned oracle: `{llama['pinned_commit'][:12]}`",
               f"- Rolling upstream: `{llama['rolling_commit'][:12]}`",
               f"- Upstream commits since pin: {llama.get('commits_ahead_of_pin', 'unknown')}",
+              f"- Optional patch drift: **{patch_status}** (non-blocking)",
               "- Authoritative oracle changed: **no**",
           ]
+          for patch in patch_phase.get("patches", []):
+              lines.append(f"  - `{patch['path']}`: {patch['status']}")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
               stream.write("\n".join(lines) + "\n")
           PY

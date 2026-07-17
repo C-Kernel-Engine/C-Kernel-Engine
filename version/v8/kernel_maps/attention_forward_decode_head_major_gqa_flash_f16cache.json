@@ -9,23 +9,23 @@
     "tensor.q.dtype": ["fp32"],
     "tensor.kv.dtype": ["fp16"],
     "tensor.layout": ["head_major"],
-    "numerics.attention_reduction": ["f16_online_fp32_merge"]
+    "numerics.attention_reduction": ["fp32_online"]
   },
   "supported_reductions": {
-    "f16_online_fp32_merge": {
+    "fp32_online": {
       "status": "validated",
       "function": "attention_forward_decode_head_major_gqa_flash_f16cache",
       "explicit_selector": false,
-      "notes": "Current generated v8 route. The explicit selector API is validated separately and will replace this ABI after E2E promotion."
+      "notes": "Legacy single FP32 decode reduction. Numerically distinct from the explicit FP16 online/FP32 merge contract."
     }
   },
   "implementation": {
     "isa_dispatch": "runtime",
     "threading": {
-      "runtime": "ck_threadpool",
-      "work_partition": ["kv_chunks_by_workers"],
-      "dispatch": ["ck_threadpool_dispatch_n"],
-      "reduction_order_effect": "contract_defined"
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
     }
   },
   "quant": {

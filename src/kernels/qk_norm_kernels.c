@@ -52,6 +52,24 @@ void rmsnorm_forward(const float *input,
                      int aligned_embed_dim,
                      float eps);
 
+void rmsnorm_forward_fp64_sum(const float *input,
+                              const float *gamma,
+                              float *output,
+                              float *rstd_cache,
+                              int tokens,
+                              int d_model,
+                              int aligned_embed_dim,
+                              float eps);
+
+void rmsnorm_forward_llama_production(const float *input,
+                                      const float *gamma,
+                                      float *output,
+                                      float *rstd_cache,
+                                      int tokens,
+                                      int d_model,
+                                      int aligned_embed_dim,
+                                      float eps);
+
 void rmsnorm_backward(const float *d_output,
                       const float *input,
                       const float *gamma,
@@ -301,6 +319,30 @@ void qk_norm_forward(float *q, float *k,
      * Same logic, fewer rows when using GQA. */
     rmsnorm_forward(k, k_gamma, k, NULL,
                     num_kv_heads * num_tokens, head_dim, head_dim, eps);
+}
+
+void qk_norm_forward_fp64_sum(float *q, float *k,
+                              const float *q_gamma, const float *k_gamma,
+                              int num_heads, int num_kv_heads,
+                              int num_tokens, int head_dim, float eps)
+{
+    rmsnorm_forward_fp64_sum(q, q_gamma, q, NULL,
+                             num_heads * num_tokens, head_dim, head_dim, eps);
+    rmsnorm_forward_fp64_sum(k, k_gamma, k, NULL,
+                             num_kv_heads * num_tokens, head_dim, head_dim, eps);
+}
+
+void qk_norm_forward_llama_production(float *q, float *k,
+                                      const float *q_gamma, const float *k_gamma,
+                                      int num_heads, int num_kv_heads,
+                                      int num_tokens, int head_dim, float eps)
+{
+    rmsnorm_forward_llama_production(
+        q, q_gamma, q, NULL,
+        num_heads * num_tokens, head_dim, head_dim, eps);
+    rmsnorm_forward_llama_production(
+        k, k_gamma, k, NULL,
+        num_kv_heads * num_tokens, head_dim, head_dim, eps);
 }
 
 /**

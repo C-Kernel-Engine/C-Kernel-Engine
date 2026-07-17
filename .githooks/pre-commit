@@ -201,31 +201,27 @@ build_staged_snapshot() {
     SNAPSHOT_PARENT="$(mktemp -d "${SNAPSHOT_PREFIX}.XXXXXX")"
     SNAPSHOT_DIR="${SNAPSHOT_PARENT}/worktree"
     local staged_patch="${SNAPSHOT_PARENT}/staged.patch"
+    local worktree_path
     if git -C "$ROOT_DIR" rev-parse --verify HEAD >/dev/null 2>&1; then
-        git -C "$ROOT_DIR" diff --cached --binary --submodule=diff HEAD -- > "$staged_patch"
+        git -C "$ROOT_DIR" diff --cached --binary --submodule=short HEAD -- > "$staged_patch"
     else
-        git -C "$ROOT_DIR" diff --cached --binary --submodule=diff > "$staged_patch"
+        git -C "$ROOT_DIR" diff --cached --binary --submodule=short > "$staged_patch"
     fi
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
         git clone --shared --quiet --no-hardlinks "$ROOT_DIR" "$SNAPSHOT_DIR" >/dev/null 2>&1
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
         git -C "$SNAPSHOT_DIR" checkout --detach HEAD >/dev/null 2>&1
-    if [ -d "$ROOT_DIR/.venv" ] && [ ! -e "$SNAPSHOT_DIR/.venv" ]; then
-        ln -s "$ROOT_DIR/.venv" "$SNAPSHOT_DIR/.venv"
-    fi
-    local llama_cpp_root="${CK_LLAMA_CPP_ROOT:-${LLAMA_CPP_ROOT:-}}"
-    if [ -z "$llama_cpp_root" ] || [ ! -d "$llama_cpp_root/include" ]; then
-        local worktree_path
+    local python_env_root="${CK_PRECOMMIT_PYTHON_ENV_ROOT:-}"
+    if [ -z "$python_env_root" ] || [ ! -x "$python_env_root/.venv/bin/python" ]; then
         while IFS= read -r worktree_path; do
-            if [ -d "$worktree_path/llama.cpp/include" ] && [ -d "$worktree_path/llama.cpp/build/bin" ]; then
-                llama_cpp_root="$worktree_path/llama.cpp"
+            if [ -x "$worktree_path/.venv/bin/python" ]; then
+                python_env_root="$worktree_path"
                 break
             fi
         done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
     fi
-    if [ -d "$llama_cpp_root/include" ] && [ ! -d "$SNAPSHOT_DIR/llama.cpp/include" ]; then
-        rm -rf "$SNAPSHOT_DIR/llama.cpp"
-        ln -s "$llama_cpp_root" "$SNAPSHOT_DIR/llama.cpp"
+    if [ -x "$python_env_root/.venv/bin/python" ] && [ ! -e "$SNAPSHOT_DIR/.venv" ]; then
+        ln -s "$python_env_root/.venv" "$SNAPSHOT_DIR/.venv"
     fi
     if [ -s "$staged_patch" ]; then
         env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
@@ -233,6 +229,19 @@ build_staged_snapshot() {
     else
         echo -e "${RED}✗ Staged snapshot patch is unexpectedly empty${NC}" >&2
         return 1
+    fi
+    local llama_cpp_root="${CK_LLAMA_CPP_ROOT:-${LLAMA_CPP_ROOT:-$ROOT_DIR/llama.cpp}}"
+    if [ -z "$llama_cpp_root" ] || [ ! -f "$llama_cpp_root/build/bin/libllama.so" ]; then
+        while IFS= read -r worktree_path; do
+            if [ -d "$worktree_path/llama.cpp/include" ] && [ -f "$worktree_path/llama.cpp/build/bin/libllama.so" ]; then
+                llama_cpp_root="$worktree_path/llama.cpp"
+                break
+            fi
+        done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
+    fi
+    if [ -f "$llama_cpp_root/build/bin/libllama.so" ] && [ ! -d "$SNAPSHOT_DIR/llama.cpp/include" ]; then
+        rm -rf "$SNAPSHOT_DIR/llama.cpp"
+        ln -s "$llama_cpp_root" "$SNAPSHOT_DIR/llama.cpp"
     fi
 }
 

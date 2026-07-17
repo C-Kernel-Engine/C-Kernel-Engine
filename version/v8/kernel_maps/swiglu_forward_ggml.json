@@ -1,0 +1,96 @@
+{
+  "id": "swiglu_forward_ggml",
+  "op": "swiglu",
+  "variant": "ggml_fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "gate_up",
+      "dtype": "fp32",
+      "shape": ["T", "2 * I"],
+      "desc": "Contiguous gate then up projection values."
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["T", "I"],
+      "desc": "GGML-compatible SiLU(gate) times up output."
+    }
+  ],
+  "scratch": [],
+  "dims": ["T", "I"],
+  "parallelization": {
+    "supported": ["serial"],
+    "preferred": {"prefill": "serial", "decode": "serial"},
+    "strategies": [
+      {
+        "name": "serial",
+        "partition_dim": "T",
+        "param_style": "complete_call",
+        "notes": "Elementwise ISA-vector traversal; no cross-element reduction."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"I": 1},
+    "notes": "Vector-width tails use GGML scalar direct-division semantics."
+  },
+  "impl": {
+    "function": "swiglu_forward_ggml",
+    "c_declaration": "void swiglu_forward_ggml(const float *input, float *output, int tokens, int dim);",
+    "sources": ["src/kernels/swiglu_kernels.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+      "status": "validated",
+      "phases": ["prefill", "decode"],
+      "function": "swiglu_forward_ggml",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": ["serial"],
+          "dispatch": ["inline"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "input", "source": "activation:gate", "cast": "float*"},
+      {"name": "output", "source": "output:out", "cast": "float*"},
+      {"name": "tokens", "source": "dim:seq_len"},
+      {"name": "dim", "source": "dim:intermediate_size"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_swiglu.py::GGML production-shape oracle"],
+    "bench": [],
+    "parity": ["llama.cpp ggml_vec_swiglu_f32"]
+  },
+  "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic."
+}

@@ -15,6 +15,15 @@ SCHEMA = ROOT / "version" / "v8" / "schemas" / "kernel_call_abi.schema.json"
 REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
+EXPECTED_GOVERNED_MAP_COUNT = 42
+QWEN3VL_PARITY_PROVIDERS = {
+    "attention_forward_decode_head_major_gqa_flash_f16cache_contract",
+    "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
+    "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range",
+    "qk_norm_forward_fp64_sum",
+    "rmsnorm_forward_fp64_sum",
+    "swiglu_forward_ggml",
+}
 
 
 if str(BUILD_IR.parent) not in sys.path:
@@ -52,12 +61,13 @@ class V8KernelCallABITests(unittest.TestCase):
                     key=lambda error: tuple(str(part) for part in error.absolute_path),
                 )
                 self.assertEqual(errors, [])
-        self.assertEqual(governed, 34)
+        self.assertEqual(governed, EXPECTED_GOVERNED_MAP_COUNT)
 
     def test_map_owned_abis_do_not_exist_in_legacy_registries(self) -> None:
         call_abis = build_ir_v8.load_kernel_call_abis()
         legacy = build_ir_v8.load_kernel_bindings()
-        self.assertEqual(len(call_abis), 34)
+        self.assertEqual(len(call_abis), EXPECTED_GOVERNED_MAP_COUNT)
+        self.assertTrue(QWEN3VL_PARITY_PROVIDERS.issubset(call_abis))
         for kernel_id, entry in call_abis.items():
             with self.subTest(kernel=kernel_id):
                 self.assertNotIn(kernel_id, legacy)

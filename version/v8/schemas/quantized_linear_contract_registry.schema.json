@@ -49,7 +49,9 @@
           "properties": {
             "integer_accumulator": {"enum": ["int32", "none"]},
             "block_scale_application": {"type": "string", "minLength": 1},
-            "block_order": {"enum": ["ascending_k"]}
+            "block_order": {"enum": ["ascending_k"]},
+            "fp32_accumulator_lanes": {"type": "integer", "minimum": 1, "maximum": 64},
+            "minimum_accumulator_lanes": {"type": "integer", "minimum": 1, "maximum": 64}
           }
         },
         "output": {
@@ -58,6 +60,7 @@
           "required": ["accumulator", "bias", "storage"],
           "properties": {
             "accumulator": {"enum": ["fp32", "bf16", "fp16"]},
+            "horizontal_reduction": {"enum": ["llama_x86_lane_order", "scalar_ascending", "none"]},
             "bias": {"enum": ["after_complete_dot", "none"]},
             "storage": {"enum": ["fp32", "bf16", "fp16"]}
           }

@@ -13,6 +13,7 @@ Writes a compact JSON report with top-k overlap and full-logits diff stats.
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import subprocess
@@ -25,14 +26,43 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
-_LLAMA_CPP_ENV = os.environ.get("CK_LLAMA_CPP_DIR")
+_LLAMA_CPP_ENV = os.environ.get("CK_LLAMA_CPP_ROOT") or os.environ.get("CK_LLAMA_CPP_DIR")
 LLAMA_CPP = Path(_LLAMA_CPP_ENV).expanduser().resolve() if _LLAMA_CPP_ENV else ROOT / "llama.cpp"
 if not (LLAMA_CPP / "include").exists():
     _software_llama = Path("/opt/app-root/src/Software/llama.cpp")
     if (_software_llama / "include").exists():
         LLAMA_CPP = _software_llama
 HELPER_SRC = SCRIPT_DIR / "llama_token_replay_v8.cpp"
-HELPER_BIN = Path("/tmp/ckv8_llama_token_replay")
+
+
+def _hash_file(digest: Any, path: Path) -> None:
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+
+
+def _llama_helper_paths() -> tuple[Path, Path, list[Path]]:
+    llama_cpp = LLAMA_CPP.resolve()
+    lib_dir = llama_cpp / "build" / "bin"
+    libraries = [
+        lib_dir / "libllama.so",
+        lib_dir / "libggml.so",
+        lib_dir / "libggml-cpu.so",
+        lib_dir / "libggml-base.so",
+    ]
+    return llama_cpp, lib_dir, libraries
+
+
+def _llama_helper_fingerprint() -> str:
+    llama_cpp, _lib_dir, libraries = _llama_helper_paths()
+    digest = hashlib.sha256()
+    _hash_file(digest, HELPER_SRC)
+    digest.update(str(llama_cpp).encode("utf-8"))
+    for library in libraries:
+        resolved = library.resolve()
+        digest.update(str(resolved).encode("utf-8"))
+        _hash_file(digest, resolved)
+    return digest.hexdigest()[:16]
 
 
 def parse_tokens_csv(text: str) -> list[int]:
@@ -129,24 +159,24 @@ def ensure_llama_helper() -> Path:
     if not HELPER_SRC.exists():
         raise FileNotFoundError(f"Missing helper source: {HELPER_SRC}")
 
-    rebuild = True
-    if HELPER_BIN.exists():
-        try:
-            rebuild = HELPER_BIN.stat().st_mtime < HELPER_SRC.stat().st_mtime
-        except OSError:
-            rebuild = True
-    if not rebuild:
-        return HELPER_BIN
-
-    include_dir = LLAMA_CPP / "include"
-    ggml_include_dir = LLAMA_CPP / "ggml" / "include"
-    lib_dir = LLAMA_CPP / "build" / "bin"
+    llama_cpp, lib_dir, libraries = _llama_helper_paths()
+    include_dir = llama_cpp / "include"
+    ggml_include_dir = llama_cpp / "ggml" / "include"
     if not include_dir.exists():
         raise FileNotFoundError(f"llama include dir missing: {include_dir}")
     if not ggml_include_dir.exists():
         raise FileNotFoundError(f"ggml include dir missing: {ggml_include_dir}")
     if not lib_dir.exists():
         raise FileNotFoundError(f"llama lib dir missing: {lib_dir}")
+    missing = [path for path in libraries if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "llama shared libraries missing: " + ", ".join(str(path) for path in missing)
+        )
+
+    helper_bin = Path(tempfile.gettempdir()) / f"ckv8_llama_token_replay_{_llama_helper_fingerprint()}"
+    if helper_bin.is_file():
+        return helper_bin
 
     cmd = [
         "g++",
@@ -167,7 +197,7 @@ def ensure_llama_helper() -> Path:
         "-pthread",
         "-ldl",
         "-o",
-        str(HELPER_BIN),
+        str(helper_bin),
     ]
     proc = _run(cmd, cwd=ROOT)
     if proc.returncode != 0:
@@ -177,8 +207,8 @@ def ensure_llama_helper() -> Path:
             f"stdout:\n{proc.stdout}\n"
             f"stderr:\n{proc.stderr}\n"
         )
-    HELPER_BIN.chmod(0o755)
-    return HELPER_BIN
+    helper_bin.chmod(0o755)
+    return helper_bin
 
 
 def run_llama_logits(

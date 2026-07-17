@@ -237,6 +237,25 @@ def validate_contract_registry(doc: Dict[str, Any]) -> None:
         partition = contract.get("partition")
         if not isinstance(partition, dict) or not partition.get("kind"):
             raise ContractError(f"reduction contract {contract_id}.partition requires kind")
+        if partition.get("kind") == "query_tile_threshold":
+            for route in ("below_threshold", "at_or_above_threshold"):
+                referenced_id = partition[route]
+                referenced = contracts.get(referenced_id)
+                if not isinstance(referenced, dict):
+                    raise hard_contract_fault(
+                        f"reduction contract {contract_id!r} references missing {route} contract {referenced_id!r}",
+                        "A shape-dependent dispatch route has no registered arithmetic definition.",
+                        "Register and validate the exact arithmetic contract before selecting it.",
+                    )
+                if validate_state(
+                    referenced.get("status"),
+                    f"reduction contract {referenced_id}",
+                ) != "validated":
+                    raise hard_contract_fault(
+                        f"reduction contract {contract_id!r} references unvalidated {route} contract {referenced_id!r}",
+                        "A composite provider cannot be stronger than either selected arithmetic contract.",
+                        "Promote the referenced contract only after an independent numerical oracle passes.",
+                    )
 
 
 def validate_quantized_linear_contract_registry(doc: Dict[str, Any]) -> None:
@@ -274,6 +293,28 @@ def validate_quantized_linear_kernel_capability(
             "add and validate the complete contract before binding the kernel.",
         )
     production = kernel["production"]
+    reference = kernel["reference"]
+    if reference["kind"] == "scalar_contract_oracle":
+        if not reference["function"].endswith("_ref"):
+            raise hard_contract_fault(
+                f"kernel {kernel_id!r} scalar oracle is not a reference function",
+                f"reference.function={reference['function']!r}",
+                "bind a scalar _ref function or declare and validate a graph oracle.",
+            )
+    elif reference["kind"] == "llama_repacked_graph_oracle":
+        external = reference["validation"]["external_oracles"]
+        validated_llama = any(
+            item.get("backend") == "llama.cpp_ggml_cpu_graph"
+            and item.get("status") == "validated"
+            for item in external
+        )
+        comparison = production["reference_comparison"]
+        if not validated_llama or comparison["requirement"] != "bit_exact":
+            raise hard_contract_fault(
+                f"kernel {kernel_id!r} has an unproven loaded-model graph oracle",
+                "A repacked provider requires validated llama.cpp graph evidence and bit-exact comparison.",
+                "add a real production-provider oracle; do not substitute a leaf tolerance test.",
+            )
     impl_function = kernel["impl"]["function"]
     if production["function"] != impl_function:
         raise hard_contract_fault(

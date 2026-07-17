@@ -225,6 +225,69 @@ typedef struct {
     uint8_t reserved[15];
 } block_q4_K_packed_u8_x16;
 
+#if defined(__AVX2__)
+static inline float hsum256_ps_q4k_packed(__m256 v)
+{
+    __m128 sum = _mm_add_ps(_mm256_castps256_ps128(v), _mm256_extractf128_ps(v, 1));
+    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
+    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
+    return _mm_cvtss_f32(sum);
+}
+
+/* Preserve llama.cpp's Q4_K x Q8_K AVX2 arithmetic while reading the x16
+ * packed weight layout. Packing changes addresses only; it must not collapse
+ * the eight FP32 accumulation lanes or interleave minimum terms into them. */
+static inline float dot_q4_k_packed_meta_x16_q8_k_llama_avx2(
+        const block_q4_K_packed_meta_x16 *weights,
+        int blocks_per_row,
+        int lane,
+        const block_q8_K *activation)
+{
+    __m256 acc = _mm256_setzero_ps();
+    __m128 acc_min = _mm_setzero_ps();
+    const __m256i nibble_mask = _mm256_set1_epi8(0x0F);
+
+    for (int block = 0; block < blocks_per_row; ++block) {
+        const block_q4_K_packed_meta_x16 *w = &weights[block];
+        const block_q8_K *x = &activation[block];
+        const float d = CK_FP16_TO_FP32(w->d[lane]) * x->d;
+        const float dmin = -CK_FP16_TO_FP32(w->dmin[lane]) * x->d;
+
+        const __m128i mins = _mm_loadl_epi64((const __m128i *)w->m[lane]);
+        const __m128i q8_sums = _mm_hadd_epi16(
+                _mm_loadu_si128((const __m128i *)&x->bsums[0]),
+                _mm_loadu_si128((const __m128i *)&x->bsums[8]));
+        const __m128i min_products = _mm_madd_epi16(_mm_cvtepu8_epi16(mins), q8_sums);
+        acc_min = _mm_fmadd_ps(
+                _mm_set1_ps(dmin), _mm_cvtepi32_ps(min_products), acc_min);
+
+        __m256i block_sum = _mm256_setzero_si256();
+        for (int group = 0; group < QK_K / 64; ++group) {
+            const __m256i packed = _mm256_loadu_si256(
+                    (const __m256i *)&w->qs[lane][group * 32]);
+            const __m256i q4_lo = _mm256_and_si256(packed, nibble_mask);
+            const __m256i q4_hi = _mm256_and_si256(
+                    _mm256_srli_epi16(packed, 4), nibble_mask);
+            const __m256i q8_lo = _mm256_loadu_si256(
+                    (const __m256i *)&x->qs[group * 64]);
+            const __m256i q8_hi = _mm256_loadu_si256(
+                    (const __m256i *)&x->qs[group * 64 + 32]);
+            __m256i lo = _mm256_maddubs_epi16(q4_lo, q8_lo);
+            __m256i hi = _mm256_maddubs_epi16(q4_hi, q8_hi);
+            lo = _mm256_madd_epi16(_mm256_set1_epi16(w->sc[lane][2 * group]), lo);
+            hi = _mm256_madd_epi16(_mm256_set1_epi16(w->sc[lane][2 * group + 1]), hi);
+            block_sum = _mm256_add_epi32(block_sum, _mm256_add_epi32(lo, hi));
+        }
+        acc = _mm256_fmadd_ps(
+                _mm256_set1_ps(d), _mm256_cvtepi32_ps(block_sum), acc);
+    }
+
+    acc_min = _mm_add_ps(acc_min, _mm_movehl_ps(acc_min, acc_min));
+    acc_min = _mm_add_ss(acc_min, _mm_movehdup_ps(acc_min));
+    return hsum256_ps_q4k_packed(acc) + _mm_cvtss_f32(acc_min);
+}
+#endif
+
 size_t q4_k_packed_u8_block_size(void)
 {
     return sizeof(block_q4_K_packed_u8);
@@ -523,6 +586,166 @@ static inline void accum_q4_k_packed_meta_x8_q8_k_block(float acc[8],
             acc[lane] -= dmin * (float)w->m[lane][is + 1] * (float)bsum_hi;
         }
     }
+}
+
+/* Match the loaded-model Q4_Kx8 contract: each pair of 32-element subblocks
+ * is reduced in integer arithmetic, followed by one FP32 value FMA and one
+ * minimum FMA. The two FP32 accumulators remain separate until the end. */
+static inline void accum_q4_k_packed_meta_x8_q8_k_superblock(
+        float acc[8], float acc_min[8],
+        const block_q4_K_packed_meta_x8 *w, int active,
+        const block_q8_K *x)
+{
+    const float xd = x->d;
+#if defined(__AVX2__)
+    float d[8] = {0};
+    float dmin[8] = {0};
+    for (int lane = 0; lane < active; ++lane) {
+        d[lane] = CK_FP16_TO_FP32(w->d[lane]);
+        dmin[lane] = CK_FP16_TO_FP32(w->dmin[lane]);
+    }
+    const __m256 scale = _mm256_mul_ps(_mm256_loadu_ps(d), _mm256_set1_ps(xd));
+    const __m256 min_scale = _mm256_mul_ps(_mm256_loadu_ps(dmin), _mm256_set1_ps(xd));
+#endif
+
+    for (int j = 0, is = 0, q_offset = 0; j < QK_K; j += 64, is += 2, q_offset += 32) {
+        int32_t iacc[8] = {0};
+        int32_t iacc_min[8] = {0};
+        const int8_t *q8_lo_ptr = &x->qs[j];
+        const int8_t *q8_hi_ptr = &x->qs[j + 32];
+        const int32_t bsum_lo = (int32_t)x->bsums[j / 16] +
+                                (int32_t)x->bsums[j / 16 + 1];
+        const int32_t bsum_hi = (int32_t)x->bsums[(j + 32) / 16] +
+                                (int32_t)x->bsums[(j + 32) / 16 + 1];
+
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+        const __m256i q8_lo = _mm256_loadu_si256((const __m256i *)q8_lo_ptr);
+        const __m256i q8_hi = _mm256_loadu_si256((const __m256i *)q8_hi_ptr);
+#elif defined(__AVX2__)
+        const __m256i q8_lo = _mm256_loadu_si256((const __m256i *)q8_lo_ptr);
+        const __m256i q8_hi = _mm256_loadu_si256((const __m256i *)q8_hi_ptr);
+#endif
+        for (int lane = 0; lane < active; ++lane) {
+            const uint8_t *qs = &w->qs[lane][q_offset];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+            const int32_t sum_lo = dot_q4_k_q8_k_32_vnni_q8v(qs, q8_lo, 0);
+            const int32_t sum_hi = dot_q4_k_q8_k_32_vnni_q8v(qs, q8_hi, 1);
+#elif defined(__AVX2__)
+            const __m256i packed = _mm256_loadu_si256((const __m256i *)qs);
+            const __m256i q4_lo = q4_k_unpack_32_avx2_bytes(packed, 0);
+            const __m256i q4_hi = q4_k_unpack_32_avx2_bytes(packed, 1);
+            const int32_t sum_lo = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_lo, q8_lo);
+            const int32_t sum_hi = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_hi, q8_hi);
+#else
+            int32_t sum_lo = 0;
+            int32_t sum_hi = 0;
+            for (int l = 0; l < 32; ++l) {
+                sum_lo += (int32_t)(qs[l] & 0x0F) * (int32_t)q8_lo_ptr[l];
+                sum_hi += (int32_t)(qs[l] >> 4) * (int32_t)q8_hi_ptr[l];
+            }
+#endif
+            iacc[lane] = (int32_t)w->sc[lane][is] * sum_lo +
+                         (int32_t)w->sc[lane][is + 1] * sum_hi;
+            iacc_min[lane] = (int32_t)w->m[lane][is] * bsum_lo +
+                             (int32_t)w->m[lane][is + 1] * bsum_hi;
+        }
+
+#if defined(__AVX2__)
+    const __m256 acc_vec = _mm256_fmadd_ps(
+            _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc)),
+            scale,
+            _mm256_loadu_ps(acc));
+    const __m256 acc_min_vec = _mm256_fmadd_ps(
+            _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc_min)),
+            min_scale,
+            _mm256_loadu_ps(acc_min));
+    _mm256_storeu_ps(acc, acc_vec);
+    _mm256_storeu_ps(acc_min, acc_min_vec);
+#else
+    for (int lane = 0; lane < active; ++lane) {
+        const float d = CK_FP16_TO_FP32(w->d[lane]) * xd;
+        const float dmin = CK_FP16_TO_FP32(w->dmin[lane]) * xd;
+        acc[lane] = fmaf((float)iacc[lane], d, acc[lane]);
+        acc_min[lane] = fmaf((float)iacc_min[lane], dmin, acc_min[lane]);
+    }
+#endif
+    }
+}
+
+/* The repacked GEMV provider has a distinct reduction boundary from GEMM:
+ * all four 64-element pairs in one Q4_K block are combined in int32 before
+ * one value FMA and one minimum FMA update the FP32 accumulators. */
+static inline void accum_q4_k_packed_meta_x8_q8_k_gemv_block(
+        float acc[8], float acc_min[8],
+        const block_q4_K_packed_meta_x8 *w, int active,
+        const block_q8_K *x)
+{
+    int32_t iacc[8] = {0};
+    int32_t iacc_min[8] = {0};
+    for (int j = 0, is = 0, q_offset = 0; j < QK_K; j += 64, is += 2, q_offset += 32) {
+        const int8_t *q8_lo_ptr = &x->qs[j];
+        const int8_t *q8_hi_ptr = &x->qs[j + 32];
+        const int32_t bsum_lo = (int32_t)x->bsums[j / 16] +
+                                (int32_t)x->bsums[j / 16 + 1];
+        const int32_t bsum_hi = (int32_t)x->bsums[(j + 32) / 16] +
+                                (int32_t)x->bsums[(j + 32) / 16 + 1];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+        const __m256i q8_lo = _mm256_loadu_si256((const __m256i *)q8_lo_ptr);
+        const __m256i q8_hi = _mm256_loadu_si256((const __m256i *)q8_hi_ptr);
+#elif defined(__AVX2__)
+        const __m256i q8_lo = _mm256_loadu_si256((const __m256i *)q8_lo_ptr);
+        const __m256i q8_hi = _mm256_loadu_si256((const __m256i *)q8_hi_ptr);
+#endif
+        for (int lane = 0; lane < active; ++lane) {
+            const uint8_t *qs = &w->qs[lane][q_offset];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+            const int32_t sum_lo = dot_q4_k_q8_k_32_vnni_q8v(qs, q8_lo, 0);
+            const int32_t sum_hi = dot_q4_k_q8_k_32_vnni_q8v(qs, q8_hi, 1);
+#elif defined(__AVX2__)
+            const __m256i packed = _mm256_loadu_si256((const __m256i *)qs);
+            const __m256i q4_lo = q4_k_unpack_32_avx2_bytes(packed, 0);
+            const __m256i q4_hi = q4_k_unpack_32_avx2_bytes(packed, 1);
+            const int32_t sum_lo = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_lo, q8_lo);
+            const int32_t sum_hi = dot_q4_k_q8_k_32_avx2_q4v_q8v(q4_hi, q8_hi);
+#else
+            int32_t sum_lo = 0;
+            int32_t sum_hi = 0;
+            for (int l = 0; l < 32; ++l) {
+                sum_lo += (int32_t)(qs[l] & 0x0F) * (int32_t)q8_lo_ptr[l];
+                sum_hi += (int32_t)(qs[l] >> 4) * (int32_t)q8_hi_ptr[l];
+            }
+#endif
+            iacc[lane] += (int32_t)w->sc[lane][is] * sum_lo +
+                           (int32_t)w->sc[lane][is + 1] * sum_hi;
+            iacc_min[lane] += (int32_t)w->m[lane][is] * bsum_lo +
+                               (int32_t)w->m[lane][is + 1] * bsum_hi;
+        }
+    }
+
+#if defined(__AVX2__)
+    float d[8] = {0};
+    float dmin[8] = {0};
+    for (int lane = 0; lane < active; ++lane) {
+        d[lane] = CK_FP16_TO_FP32(w->d[lane]);
+        dmin[lane] = CK_FP16_TO_FP32(w->dmin[lane]);
+    }
+    const __m256 xd = _mm256_set1_ps(x->d);
+    const __m256 acc_vec = _mm256_fmadd_ps(
+            _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc)),
+            _mm256_mul_ps(_mm256_loadu_ps(d), xd), _mm256_loadu_ps(acc));
+    const __m256 min_vec = _mm256_fmadd_ps(
+            _mm256_cvtepi32_ps(_mm256_loadu_si256((const __m256i *)iacc_min)),
+            _mm256_mul_ps(_mm256_loadu_ps(dmin), xd), _mm256_loadu_ps(acc_min));
+    _mm256_storeu_ps(acc, acc_vec);
+    _mm256_storeu_ps(acc_min, min_vec);
+#else
+    for (int lane = 0; lane < active; ++lane) {
+        const float d = CK_FP16_TO_FP32(w->d[lane]) * x->d;
+        const float dmin = CK_FP16_TO_FP32(w->dmin[lane]) * x->d;
+        acc[lane] = fmaf((float)iacc[lane], d, acc[lane]);
+        acc_min[lane] = fmaf((float)iacc_min[lane], dmin, acc_min[lane]);
+    }
+#endif
 }
 
 
@@ -953,6 +1176,201 @@ void gemm_nt_q4_k_packed_meta_x8_q8_k(const void *A_q8,
             }
             for (int lane = 0; lane < active; ++lane) {
                 c_row[n0 + lane] = acc[lane];
+            }
+        }
+    }
+}
+
+void gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
+        const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+        int M, int N, int K)
+{
+    if (!A_q8 || !B_packed_x8 || !C || M <= 0 || N <= 0 || K <= 0 || (K % QK_K) != 0) {
+        return;
+    }
+    const block_q8_K *A = (const block_q8_K *)A_q8;
+    const block_q4_K_packed_meta_x8 *W = (const block_q4_K_packed_meta_x8 *)B_packed_x8;
+    const int blocks_per_row = K / QK_K;
+    const int groups = (N + 7) / 8;
+
+    for (int m = 0; m < M; ++m) {
+        const block_q8_K *a_row = A + (size_t)m * (size_t)blocks_per_row;
+        float *c_row = C + (size_t)m * (size_t)N;
+        for (int g = 0; g < groups; ++g) {
+            const int n0 = g * 8;
+            const int active = (n0 + 8 <= N) ? 8 : (N - n0);
+            float acc[8] = {0};
+            float acc_min[8] = {0};
+            for (int b = 0; b < blocks_per_row; ++b) {
+                const block_q4_K_packed_meta_x8 *w_group =
+                        W + (size_t)g * (size_t)blocks_per_row + (size_t)b;
+                accum_q4_k_packed_meta_x8_q8_k_superblock(
+                        acc, acc_min, w_group, active, &a_row[b]);
+            }
+            float values[8];
+#if defined(__AVX2__)
+            _mm256_storeu_ps(values, _mm256_sub_ps(_mm256_loadu_ps(acc), _mm256_loadu_ps(acc_min)));
+#else
+            for (int lane = 0; lane < active; ++lane) {
+                values[lane] = acc[lane] - acc_min[lane];
+            }
+#endif
+            for (int lane = 0; lane < active; ++lane) {
+                float value = values[lane];
+                if (bias) {
+                    value += bias[n0 + lane];
+                }
+                c_row[n0 + lane] = value;
+            }
+        }
+    }
+}
+
+void gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
+        const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+        int M, int N, int K)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+    if (!A_q8 || !B_packed_x8 || !C || M <= 0 || N <= 0 || K <= 0 ||
+        (K % QK_K) != 0 || (N % 16) != 0) {
+        return;
+    }
+    const block_q8_K *A = (const block_q8_K *)A_q8;
+    const block_q4_K_packed_meta_x8 *W =
+            (const block_q4_K_packed_meta_x8 *)B_packed_x8;
+    const int blocks_per_row = K / QK_K;
+
+    for (int row = 0; row < M; ++row) {
+        const block_q8_K *a_row = A + (size_t)row * (size_t)blocks_per_row;
+        float *c_row = C + (size_t)row * (size_t)N;
+        for (int n0 = 0; n0 < N; n0 += 16) {
+            const int group0 = n0 / 8;
+            __m512 acc = _mm512_setzero_ps();
+            __m512 acc_min = _mm512_setzero_ps();
+
+            for (int b = 0; b < blocks_per_row; ++b) {
+                const block_q4_K_packed_meta_x8 *w0 =
+                        W + (size_t)group0 * (size_t)blocks_per_row + (size_t)b;
+                const block_q4_K_packed_meta_x8 *w1 =
+                        W + (size_t)(group0 + 1) * (size_t)blocks_per_row + (size_t)b;
+                const block_q8_K *x = &a_row[b];
+                float d[16];
+                float dmin[16];
+                for (int lane = 0; lane < 16; ++lane) {
+                    const block_q4_K_packed_meta_x8 *w = lane < 8 ? w0 : w1;
+                    const int wl = lane & 7;
+                    d[lane] = CK_FP16_TO_FP32(w->d[wl]);
+                    dmin[lane] = CK_FP16_TO_FP32(w->dmin[wl]);
+                }
+                const __m512 scale =
+                        _mm512_mul_ps(_mm512_loadu_ps(d), _mm512_set1_ps(x->d));
+                const __m512 min_scale =
+                        _mm512_mul_ps(_mm512_loadu_ps(dmin), _mm512_set1_ps(x->d));
+
+                for (int j = 0, is = 0, q_offset = 0;
+                     j < QK_K;
+                     j += 64, is += 2, q_offset += 32) {
+                    int32_t iacc[16];
+                    int32_t iacc_min[16];
+                    const int8_t *q8_lo_ptr = &x->qs[j];
+                    const int8_t *q8_hi_ptr = &x->qs[j + 32];
+                    const int32_t bsum_lo = (int32_t)x->bsums[j / 16] +
+                                            (int32_t)x->bsums[j / 16 + 1];
+                    const int32_t bsum_hi = (int32_t)x->bsums[(j + 32) / 16] +
+                                            (int32_t)x->bsums[(j + 32) / 16 + 1];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+                    const __m256i q8_lo =
+                            _mm256_loadu_si256((const __m256i *)q8_lo_ptr);
+                    const __m256i q8_hi =
+                            _mm256_loadu_si256((const __m256i *)q8_hi_ptr);
+#endif
+                    for (int lane = 0; lane < 16; ++lane) {
+                        const block_q4_K_packed_meta_x8 *w = lane < 8 ? w0 : w1;
+                        const int wl = lane & 7;
+                        const uint8_t *qs = &w->qs[wl][q_offset];
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+                        const int32_t sum_lo =
+                                dot_q4_k_q8_k_32_vnni_q8v(qs, q8_lo, 0);
+                        const int32_t sum_hi =
+                                dot_q4_k_q8_k_32_vnni_q8v(qs, q8_hi, 1);
+#else
+                        int32_t sum_lo = 0;
+                        int32_t sum_hi = 0;
+                        for (int i = 0; i < 32; ++i) {
+                            sum_lo += (int32_t)(qs[i] & 0x0F) *
+                                      (int32_t)q8_lo_ptr[i];
+                            sum_hi += (int32_t)(qs[i] >> 4) *
+                                      (int32_t)q8_hi_ptr[i];
+                        }
+#endif
+                        /* llama.cpp's AVX-512 q4_K_8x8 provider keeps each
+                         * 32-value dot in an int16 lane through PMADDUBSW and
+                         * wrapping VPADDW operations, then widens while
+                         * applying the two sub-block scales. */
+                        const int16_t packed_sum_lo = (int16_t)sum_lo;
+                        const int16_t packed_sum_hi = (int16_t)sum_hi;
+                        iacc[lane] = (int32_t)w->sc[wl][is] * (int32_t)packed_sum_lo +
+                                     (int32_t)w->sc[wl][is + 1] * (int32_t)packed_sum_hi;
+                        iacc_min[lane] = (int32_t)w->m[wl][is] * bsum_lo +
+                                         (int32_t)w->m[wl][is + 1] * bsum_hi;
+                    }
+                    acc = _mm512_fmadd_ps(
+                            _mm512_cvtepi32_ps(_mm512_loadu_si512(iacc)),
+                            scale,
+                            acc);
+                    acc_min = _mm512_fmadd_ps(
+                            _mm512_cvtepi32_ps(_mm512_loadu_si512(iacc_min)),
+                            min_scale,
+                            acc_min);
+                }
+            }
+            __m512 value = _mm512_sub_ps(acc, acc_min);
+            if (bias) {
+                value = _mm512_add_ps(value, _mm512_loadu_ps(bias + n0));
+            }
+            _mm512_storeu_ps(c_row + n0, value);
+        }
+    }
+#else
+    gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
+            A_q8, B_packed_x8, bias, C, M, N, K);
+#endif
+}
+
+void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+        const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+        int M, int N, int K)
+{
+    if (!A_q8 || !B_packed_x8 || !C || M <= 0 || N <= 0 || K <= 0 || (K % QK_K) != 0) {
+        return;
+    }
+    const block_q8_K *A = (const block_q8_K *)A_q8;
+    const block_q4_K_packed_meta_x8 *W = (const block_q4_K_packed_meta_x8 *)B_packed_x8;
+    const int blocks_per_row = K / QK_K;
+    const int groups = (N + 7) / 8;
+    for (int m = 0; m < M; ++m) {
+        const block_q8_K *a_row = A + (size_t)m * (size_t)blocks_per_row;
+        float *c_row = C + (size_t)m * (size_t)N;
+        for (int g = 0; g < groups; ++g) {
+            const int n0 = g * 8;
+            const int active = (n0 + 8 <= N) ? 8 : (N - n0);
+            float acc[8] = {0};
+            float acc_min[8] = {0};
+            for (int b = 0; b < blocks_per_row; ++b) {
+                const block_q4_K_packed_meta_x8 *w_group =
+                        W + (size_t)g * (size_t)blocks_per_row + (size_t)b;
+                accum_q4_k_packed_meta_x8_q8_k_gemv_block(
+                        acc, acc_min, w_group, active, &a_row[b]);
+            }
+            float values[8];
+#if defined(__AVX2__)
+            _mm256_storeu_ps(values, _mm256_sub_ps(
+                    _mm256_loadu_ps(acc), _mm256_loadu_ps(acc_min)));
+#else
+            for (int lane = 0; lane < active; ++lane) values[lane] = acc[lane] - acc_min[lane];
+#endif
+            for (int lane = 0; lane < active; ++lane) {
+                c_row[n0 + lane] = values[lane] + (bias ? bias[n0 + lane] : 0.0f);
             }
         }
     }
@@ -1465,31 +1883,43 @@ static inline void gemm_q4_packed_meta_x16_mreuse_process_job(
         return;
     }
 
+#if defined(__AVX2__)
+    const block_q4_K_packed_meta_x16 *w_group =
+        a->W + (size_t)g * (size_t)a->blocks_per_row;
+    for (int m = m0; m < m1; ++m) {
+        const block_q8_K *a_row = a->A + (size_t)m * (size_t)a->blocks_per_vec;
+        float *c_row = a->C + (size_t)m * (size_t)a->N;
+        for (int lane = 0; lane < active; ++lane) {
+            float value = dot_q4_k_packed_meta_x16_q8_k_llama_avx2(
+                    w_group, a->blocks_per_row, lane, a_row);
+            c_row[n0 + lane] = value + (a->bias ? a->bias[n0 + lane] : 0.0f);
+        }
+    }
+#else
     float acc[8][16];
     for (int mt_lane = 0; mt_lane < m_count; ++mt_lane) {
         for (int lane = 0; lane < active; ++lane) {
             acc[mt_lane][lane] = a->bias ? a->bias[n0 + lane] : 0.0f;
         }
     }
-
     for (int b = 0; b < a->blocks_per_row; ++b) {
-        const block_q4_K_packed_meta_x16 *w_group =
+        const block_q4_K_packed_meta_x16 *w_block =
             a->W + (size_t)g * (size_t)a->blocks_per_row + (size_t)b;
         if (ck_q4k_x16_chunk4_enabled()) {
-            accum_q4_k_packed_meta_x16_q8_k_block_mreuse_chunk4(acc, w_group, active, a->A,
+            accum_q4_k_packed_meta_x16_q8_k_block_mreuse_chunk4(acc, w_block, active, a->A,
                                                                  a->blocks_per_vec, b, m0, m_count);
         } else {
-            accum_q4_k_packed_meta_x16_q8_k_block_mreuse(acc, w_group, active, a->A,
+            accum_q4_k_packed_meta_x16_q8_k_block_mreuse(acc, w_block, active, a->A,
                                                           a->blocks_per_vec, b, m0, m_count);
         }
     }
-
     for (int m = m0; m < m1; ++m) {
         float *c_row = a->C + (size_t)m * (size_t)a->N;
         for (int lane = 0; lane < active; ++lane) {
             c_row[n0 + lane] = acc[m - m0][lane];
         }
     }
+#endif
 }
 
 static void gemm_q4_packed_meta_x16_mreuse_thread_fn(int ith, int nth, void *args)

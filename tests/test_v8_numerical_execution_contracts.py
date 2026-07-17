@@ -198,6 +198,34 @@ class NumericalExecutionContractTests(unittest.TestCase):
         self.assertEqual(plan["kernel"]["id"], "mrope_qk_vision_bf16_storage")
         self.assertEqual(plan["kernel"]["function"], "mrope_qk_vision_bf16_storage")
 
+    def test_qwen3vl_decoder_norm_contracts_resolve_exact_providers(self):
+        circuit_doc = resolver.load_json(
+            ROOT / "version" / "v8" / "circuits" / "qwen3vl.json"
+        )
+        expected = {
+            "decoder.rmsnorm": "rmsnorm_forward_llama_production",
+            "decoder.qk_norm": "qk_norm_forward_llama_production",
+        }
+        for operation, function in expected.items():
+            for phase in ("prefill", "decode"):
+                with self.subTest(operation=operation, phase=phase):
+                    plan = resolver.resolve_contract(
+                        circuit_doc,
+                        self.contracts,
+                        self.kernels,
+                        operation,
+                        phase,
+                        mode="production",
+                    )
+                    self.assertEqual(plan["kernel"]["id"], function)
+                    self.assertEqual(plan["kernel"]["function"], function)
+                    semantics = plan["contract"]["semantics"]
+                    self.assertEqual(semantics["compute"]["accumulator"], "fp64")
+                    self.assertEqual(semantics["reduction"]["order"], "left_to_right")
+                    self.assertFalse(
+                        semantics["threading"]["thread_count_changes_arithmetic_order"]
+                    )
+
     def test_qwen35_circuit_resolves_partial_width_text_mrope(self):
         circuit_doc = resolver.load_json(
             ROOT / "version" / "v8" / "circuits" / "qwen35.json"

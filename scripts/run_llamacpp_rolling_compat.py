@@ -87,6 +87,15 @@ def patch_status(probe: pathlib.Path, relative_path: str) -> dict[str, Any]:
     }
 
 
+def compatibility_status(phases: dict[str, Any]) -> str:
+    """Treat executable compatibility as authoritative and patch drift as advisory."""
+    for phase_name in ("ck_build", "quick_parity"):
+        status = phases.get(phase_name, {}).get("status")
+        if status in {"fail", "error"}:
+            return "fail"
+    return "pass"
+
+
 def upstream_delta(probe: pathlib.Path, pinned: str, rolling: str, limit: int) -> tuple[int, list[dict[str, str]]]:
     count = int(git_output(["rev-list", "--count", f"{pinned}..{rolling}"], cwd=probe))
     lines = git_output(
@@ -163,17 +172,25 @@ def main() -> int:
             patch_status(probe, "patches/llama.patch"),
             patch_status(probe, "patches/ck-engine-parity-bench.patch"),
         ]
+        patch_drift = any(item["status"] != "applies" for item in patches)
         report["phases"]["patch_compatibility"] = {
-            "status": "pass" if all(item["status"] == "applies" for item in patches) else "fail",
+            "status": "warn" if patch_drift else "pass",
+            "blocking": False,
+            "reason": (
+                "Optional tensor-dump and benchmark patches drifted; rolling build and "
+                "quick parity determine compatibility."
+                if patch_drift
+                else "Optional patches still apply cleanly."
+            ),
             "patches": patches,
         }
 
         if args.resolve_only:
             report["phases"]["quick_parity"] = {"status": "skip", "reason": "resolve-only"}
-            report["status"] = report["phases"]["patch_compatibility"]["status"]
+            report["status"] = "pass"
             write_report(report_path, report)
             print(report_path)
-            return 0 if report["status"] == "pass" else 1
+            return 0
 
         log_path = output_dir / "quick-parity.log"
         build_log_path = output_dir / "ck-build.log"
@@ -214,12 +231,7 @@ def main() -> int:
             "log": str(log_path),
             "summary": parse_quick_log(log_path),
         }
-        report["status"] = (
-            "pass"
-            if report["phases"]["quick_parity"]["status"] == "pass"
-            and report["phases"]["patch_compatibility"]["status"] == "pass"
-            else "fail"
-        )
+        report["status"] = compatibility_status(report["phases"])
     except Exception as exc:  # Preserve diagnostics even when upstream changes break setup.
         report["status"] = "error"
         report["error"] = f"{type(exc).__name__}: {exc}"

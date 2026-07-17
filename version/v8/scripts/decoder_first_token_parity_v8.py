@@ -456,6 +456,20 @@ def _ck_dump_filter_names(dump_names: str) -> str:
         layer_id, canonical_name = parity_test_v7._normalize_layer_and_op(-1, raw_name)
         canonical_filter = f"{canonical_name}-{layer_id}" if layer_id >= 0 else canonical_name
         candidates = [raw_name, canonical_filter]
+        # llama.cpp reuses Qcur/Kcur for projection, Q/K normalization, and
+        # post-RoPE occurrences. CK gives those semantic boundaries distinct
+        # names, so requesting the llama callback must enable every matching
+        # CK exporter. The occurrence mapper will align the final tensors.
+        if canonical_name == "q_proj":
+            candidates.extend(
+                f"{name}-{layer_id}" if layer_id >= 0 else name
+                for name in ("Qcur_normed", "qcur_normed", "Qcur_rope", "qcur_rope")
+            )
+        elif canonical_name == "k_proj":
+            candidates.extend(
+                f"{name}-{layer_id}" if layer_id >= 0 else name
+                for name in ("Kcur_normed", "kcur_normed", "Kcur_rope", "kcur_rope")
+            )
         if canonical_name == "kqv_wo":
             candidates.append(f"attn_out-{layer_id}" if layer_id >= 0 else "attn_out")
         for candidate in candidates:
@@ -521,20 +535,45 @@ def _augment_legacy_kqv_aliases(dumps: list[Any]) -> list[Any]:
 
 
 def _build_llama_row_specs(llama_dumps: list[Any]) -> dict[tuple[int, str], tuple[int, tuple[int, ...]]]:
-    specs: dict[tuple[int, str], tuple[int, tuple[int, ...]]] = {}
+    grouped: dict[tuple[int, str], list[Any]] = {}
     for dump in llama_dumps:
         op_name = _canonical_dump_op_name(str(dump.op_name))
         key = (int(dump.layer_id), op_name)
-        row_elems = int(np.asarray(dump.data).size)
-        row_shape = tuple(int(x) for x in np.asarray(dump.data).shape)
-        prev = specs.get(key)
-        choose = prev is None or row_elems < prev[0]
-        if not choose and prev is not None and row_elems == prev[0]:
+        grouped.setdefault(key, []).append(dump)
+
+    specs: dict[tuple[int, str], tuple[int, tuple[int, ...]]] = {}
+    for key, dumps in grouped.items():
+        sizes = [int(np.asarray(dump.data).size) for dump in dumps]
+        row_elems = sizes[0]
+        for size in sizes[1:]:
+            row_elems = math.gcd(row_elems, size)
+
+        shapes = [tuple(int(x) for x in np.asarray(dump.data).shape) for dump in dumps]
+        row_shape: tuple[int, ...] = (row_elems,)
+        if len(shapes) > 1 and len({len(shape) for shape in shapes}) == 1:
+            varying_axes = {
+                axis
+                for axis in range(len(shapes[0]))
+                if len({shape[axis] for shape in shapes}) > 1
+            }
+            candidate = tuple(
+                extent for axis, extent in enumerate(shapes[0]) if axis not in varying_axes
+            )
+            if candidate and int(np.prod(np.array(candidate, dtype=np.int64))) == row_elems:
+                row_shape = candidate
+        elif shapes:
             shaped_qk_ops = {"qcur_normed", "kcur_normed", "qcur_rope", "kcur_rope"}
-            if op_name in shaped_qk_ops and len(row_shape) > len(prev[1]):
-                choose = True
-        if choose:
-            specs[key] = (row_elems, row_shape)
+            ordered_shapes = sorted(
+                shapes,
+                key=lambda shape: len(shape) if key[1] in shaped_qk_ops else -len(shape),
+                reverse=True,
+            )
+            for shape in ordered_shapes:
+                if int(np.prod(np.array(shape, dtype=np.int64))) == row_elems:
+                    row_shape = shape
+                    break
+
+        specs[key] = (row_elems, row_shape)
     return specs
 
 
@@ -642,13 +681,47 @@ def _expand_ck_prefill_decode_dumps(
     if not row_specs:
         return list(ck_dumps)
 
+    # A segmented multimodal prefill can emit several batched captures for the
+    # same operation (for example text-before, visual, and text-after).  The
+    # legacy dump header records only the final physical position, so all of
+    # those batches can carry the same token id.  Select the batch that exactly
+    # represents the requested trailing prompt window before expanding rows.
+    # Falling back to the last sufficiently large batch preserves support for
+    # older single-batch captures where the requested window is a suffix.
+    selected_batched_dump: dict[tuple[int, str], int] = {}
+    exact_candidates: dict[tuple[int, str], list[int]] = {}
+    suffix_candidates: dict[tuple[int, str], list[int]] = {}
+    for dump_idx, dump in enumerate(ck_dumps):
+        op_name = _canonical_dump_op_name(str(dump.op_name))
+        key = (int(dump.layer_id), op_name)
+        row_spec = row_specs.get(key)
+        if row_spec is None:
+            continue
+        row_elems, _ = row_spec
+        flat_size = int(np.asarray(dump.data).size)
+        if row_elems <= 0 or flat_size <= row_elems or flat_size % row_elems != 0:
+            continue
+        batch_rows = flat_size // row_elems
+        if batch_rows == prompt_token_count:
+            exact_candidates.setdefault(key, []).append(dump_idx)
+        elif batch_rows > prompt_token_count:
+            suffix_candidates.setdefault(key, []).append(dump_idx)
+    for key in set(exact_candidates) | set(suffix_candidates):
+        candidates = exact_candidates.get(key) or suffix_candidates.get(key) or []
+        if candidates:
+            selected_batched_dump[key] = candidates[-1]
+
     expanded: list[Any] = []
-    for dump in ck_dumps:
+    for dump_idx, dump in enumerate(ck_dumps):
         op_name = _canonical_dump_op_name(str(dump.op_name))
         key = (int(dump.layer_id), op_name)
         row_spec = row_specs.get(key)
         if row_spec is None:
             expanded.append(dump)
+            continue
+
+        selected_idx = selected_batched_dump.get(key)
+        if selected_idx is not None and dump_idx != selected_idx:
             continue
 
         row_elems, row_shape = row_spec
@@ -764,6 +837,72 @@ def _trim_llama_prefill_decode_dumps(
             )
     return trimmed
 
+
+def _expand_llama_prefill_decode_dumps(
+    llama_dumps: list[Any],
+    *,
+    prompt_token_count: int,
+    prompt_start_token: int = 0,
+) -> list[Any]:
+    """Expand the final batched llama segment into canonical logical rows.
+
+    Multimodal M-RoPE positions are not globally monotonic across the visual
+    and trailing-text segments. Selecting a batch by its final position can
+    therefore choose the visual batch instead of the last executed batch.
+    Batch extent and execution order are the stable contract here.
+    """
+    if prompt_token_count <= 0:
+        return list(llama_dumps)
+
+    row_specs = _build_llama_row_specs(llama_dumps)
+    grouped: dict[tuple[int, str], list[Any]] = {}
+    for dump in llama_dumps:
+        key = (int(dump.layer_id), _canonical_dump_op_name(str(dump.op_name)))
+        grouped.setdefault(key, []).append(dump)
+
+    expanded: list[Any] = []
+    for key, dumps in grouped.items():
+        row_spec = row_specs.get(key)
+        if row_spec is None:
+            expanded.extend(dumps)
+            continue
+        row_elems, row_shape = row_spec
+        exact = [
+            dump
+            for dump in dumps
+            if row_elems > 0
+            and int(np.asarray(dump.data).size) == row_elems * prompt_token_count
+        ]
+        selected = exact[-1] if exact else None
+        if selected is None:
+            expanded.extend(
+                _trim_llama_prefill_decode_dumps(
+                    dumps,
+                    prompt_start_token=prompt_start_token,
+                    prompt_token_count=prompt_token_count,
+                )
+            )
+            continue
+
+        flat = np.asarray(selected.data, dtype=np.float32).reshape(-1)
+        for prompt_idx in range(prompt_token_count):
+            start = prompt_idx * row_elems
+            row = flat[start : start + row_elems].copy()
+            if row_shape and int(np.prod(np.array(row_shape, dtype=np.int64))) == row.size:
+                row = row.reshape(row_shape)
+            expanded.append(
+                parity_test_v7.ParityDump(
+                    int(selected.layer_id),
+                    _canonical_dump_op_name(str(selected.op_name)),
+                    row,
+                    prompt_idx,
+                    str(selected.dtype),
+                    source_token_id=int(getattr(selected, "source_token_id", selected.token_id)),
+                    source_name=getattr(selected, "source_name", None),
+                )
+            )
+    return expanded
+
 def _compare_dump_sets(
     ck_dumps: list[Any],
     llama_dumps: list[Any],
@@ -809,6 +948,23 @@ def _compare_dump_sets(
             float(rtol),
         )
 
+        def candidates_are_equivalent(candidates: list[Any]) -> bool:
+            if len(candidates) <= 1:
+                return True
+            first = candidates[0]
+            first_token = int(getattr(first, "token_id", 0))
+            first_data = np.asarray(first.data).reshape(-1)
+            return all(
+                int(getattr(candidate, "token_id", 0)) == first_token
+                and np.array_equal(np.asarray(candidate.data).reshape(-1), first_data)
+                for candidate in candidates[1:]
+            )
+
+        ambiguous = bool(ambiguous) and not (
+            candidates_are_equivalent(ck_candidates)
+            and candidates_are_equivalent(llama_candidates)
+        )
+
         if ck_dump is None:
             results.append(
                 {
@@ -840,6 +996,26 @@ def _compare_dump_sets(
                     "ck_candidates": len(ck_candidates),
                     "llama_candidates": 0,
                     "alignment_ambiguous": bool(ambiguous),
+                }
+            )
+            continue
+
+        if ambiguous:
+            results.append(
+                {
+                    "layer": int(layer_id),
+                    "op": str(op_name),
+                    "status": "ERROR",
+                    "reason": "ambiguous_alignment",
+                    "max_abs_diff": float("inf"),
+                    "token": int(ck_dump.token_id),
+                    "ck_token": int(ck_dump.token_id),
+                    "llama_token": int(llama_dump.token_id),
+                    "ck_source_token": int(getattr(ck_dump, "source_token_id", ck_dump.token_id)),
+                    "llama_source_token": int(getattr(llama_dump, "source_token_id", llama_dump.token_id)),
+                    "ck_candidates": len(ck_candidates),
+                    "llama_candidates": len(llama_candidates),
+                    "alignment_ambiguous": True,
                 }
             )
             continue
@@ -971,6 +1147,7 @@ def _capture_dump_compare(
     prefix_grid: tuple[int, int] | None = None,
     prefix_text_pos: int | None = None,
     ck_strict_parity: bool = True,
+    llama_decode_mode: str = "sequential",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if prefix_tokens > 0:
         if str(dump_pass) != "decode":
@@ -1006,7 +1183,7 @@ def _capture_dump_compare(
         prefix_grid=prefix_grid,
         prefix_row_dim=int(prefix_row_dim),
         prefix_text_pos=prefix_text_pos,
-        decode_mode="sequential",
+        decode_mode=str(llama_decode_mode),
         dump_dir=llama_dump_dir,
         dump_names=dump_names,
     )
@@ -1068,10 +1245,10 @@ def _capture_dump_compare(
             prefix_text_pos=prefix_text_pos,
             llama_meta=dict(llama_capture.get("meta") or {}),
         )
-        llama_dumps = _trim_llama_prefill_decode_dumps(
+        llama_dumps = _expand_llama_prefill_decode_dumps(
             llama_dumps,
-            prompt_start_token=int(llama_prompt_start_token),
             prompt_token_count=len(token_ids),
+            prompt_start_token=int(llama_prompt_start_token),
         )
         ck_dumps = _expand_ck_prefill_decode_dumps(
             ck_dumps,
@@ -1103,6 +1280,9 @@ def _capture_dump_compare(
         "ck_dump_path": str(ck_dump_path),
         "llama_dump_dir": str(llama_dump_dir),
         "llama_decode_mode": str(llama_capture["meta"].get("decode_mode", "sequential")),
+        "llama_flash_attention_mode": str(
+            llama_capture["meta"].get("flash_attention_mode", "unknown")
+        ),
         "llama_dumped": int(llama_capture["meta"].get("dumped", 0)),
         "prefix_path": None if prefix_path is None else str(prefix_path),
         "tokens_before_count": int(tokens_before_count),

@@ -60,12 +60,40 @@ def resolved_activation_quantization_emission(op: Dict[str, Any]) -> Dict[str, A
         raise RuntimeError(
             "resolved activation quantization storage must define exact format and block ABI"
         )
-    return {
+    result = {
         "format": str(storage["format"]),
         "block_elements": int(storage["block_elements"]),
         "block_elements_symbol": str(storage["block_elements_symbol"]),
         "c_block_type": str(storage["c_block_type"]),
     }
+    rounding_contract = capability.get("rounding_contract")
+    if rounding_contract is not None:
+        result["rounding_contract"] = str(rounding_contract)
+    prefill_batch = capability.get("prefill_batch")
+    if prefill_batch is not None:
+        if not isinstance(prefill_batch, dict):
+            raise RuntimeError("prefill activation quantization capability must be an object")
+        required_batch = {
+            "function",
+            "row_group",
+            "tail_function",
+            "rounding_contract",
+        }
+        if set(prefill_batch) != required_batch:
+            raise RuntimeError(
+                "prefill activation quantization capability must define exact "
+                "function, row group, tail function, and rounding contract"
+            )
+        row_group = int(prefill_batch["row_group"])
+        if row_group <= 1:
+            raise RuntimeError("prefill activation quantization row_group must exceed one")
+        result["prefill_batch"] = {
+            "function": str(prefill_batch["function"]),
+            "row_group": row_group,
+            "tail_function": str(prefill_batch["tail_function"]),
+            "rounding_contract": str(prefill_batch["rounding_contract"]),
+        }
+    return result
 
 
 def activation_quantized_row_bytes_expr(

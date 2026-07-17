@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from array import array
 import ctypes
+import hashlib
 import heapq
 import json
 import math
@@ -379,8 +380,41 @@ def _compile_generated_model(output_dir: Path) -> Path:
 def _compile_mtmd_shim(output_dir: Path) -> Path:
     shim_src = V8_TOOLS / "mtmd_clip_shim.cpp"
     shim_so = output_dir / "libmtmd_clip_shim.so"
-    if shim_so.exists() and shim_so.stat().st_mtime >= shim_src.stat().st_mtime:
-        return shim_so
+    stamp_path = output_dir / "libmtmd_clip_shim.so.build.json"
+
+    clip_header = (LLAMA_CPP_ROOT / "tools" / "mtmd" / "clip.h").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+    clip_impl_header = (LLAMA_CPP_ROOT / "tools" / "mtmd" / "clip-impl.h").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+    uses_object_api = "clip_embd_nbytes_by_img" not in clip_header
+    uses_value_api = uses_object_api and "clip_image_f32_ptr" not in (
+        clip_header + clip_impl_header
+    )
+    llama_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(LLAMA_CPP_ROOT),
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    build_fingerprint = {
+        "version": 1,
+        "llama_cpp_root": str(LLAMA_CPP_ROOT),
+        "llama_cpp_commit": llama_commit,
+        "shim_sha256": hashlib.sha256(shim_src.read_bytes()).hexdigest(),
+        "clip_header_sha256": hashlib.sha256(clip_header.encode()).hexdigest(),
+        "clip_impl_header_sha256": hashlib.sha256(clip_impl_header.encode()).hexdigest(),
+        "object_api": uses_object_api,
+        "value_api": uses_value_api,
+    }
+    if shim_so.is_file() and stamp_path.is_file():
+        try:
+            if json.loads(stamp_path.read_text(encoding="utf-8")) == build_fingerprint:
+                return shim_so
+        except (OSError, json.JSONDecodeError):
+            pass
 
     cmd = [
         "g++",
@@ -388,7 +422,8 @@ def _compile_mtmd_shim(output_dir: Path) -> Path:
         "-fPIC",
         "-O2",
         "-std=c++17",
-        *(["-DCK_MTMD_CLIP_OBJECT_API=1"] if "clip_embd_nbytes_by_img" not in (LLAMA_CPP_ROOT / "tools" / "mtmd" / "clip.h").read_text(encoding="utf-8", errors="ignore") else []),
+        *(["-DCK_MTMD_CLIP_OBJECT_API=1"] if uses_object_api else []),
+        *(["-DCK_MTMD_CLIP_VALUE_API=1"] if uses_value_api else []),
         f"-I{LLAMA_CPP_ROOT / 'tools' / 'mtmd'}",
         f"-I{LLAMA_CPP_ROOT / 'ggml' / 'include'}",
         f"-I{LLAMA_CPP_ROOT / 'include'}",
@@ -400,6 +435,7 @@ def _compile_mtmd_shim(output_dir: Path) -> Path:
         str(shim_so),
     ]
     _run(cmd)
+    stamp_path.write_text(json.dumps(build_fingerprint, indent=2) + "\n", encoding="utf-8")
     return shim_so
 
 

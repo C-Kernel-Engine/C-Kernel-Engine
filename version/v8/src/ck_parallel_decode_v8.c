@@ -182,17 +182,22 @@ static void work_gemv_q4_k_q8_k(int ith, int nth, void *args)
 #if defined(CK_TARGET_ARM)
     gemv_q4_k_q8_k_parallel(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
 #else
-#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
-    const char *fast_env = getenv("CK_ENABLE_Q4K_Q8K_VNNI_FAST");
-    const int fast_disabled = fast_env && fast_env[0] && fast_env[0] == '0';
-    if (!fast_disabled && !ck_strict_parity_enabled()) {
-        gemv_q4_k_q8_k_parallel_vnni(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
-    } else {
-        gemv_q4_k_q8_k_parallel_simd(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
+    const int rows_per_worker = (a->M + nth - 1) / nth;
+    const int row_begin = rows_per_worker * ith;
+    const int row_end = (row_begin + rows_per_worker < a->M)
+        ? row_begin + rows_per_worker
+        : a->M;
+    if (row_begin >= a->M) {
+        return;
     }
-#else
-    gemv_q4_k_q8_k_parallel_simd(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
-#endif
+
+    const size_t row_bytes = (size_t)(a->K / QK_K) * sizeof(block_q4_K);
+    gemv_q4_k_q8_k(
+        a->y + row_begin,
+        (const char *)a->W + (size_t)row_begin * row_bytes,
+        a->x_q8,
+        row_end - row_begin,
+        a->K);
 #endif
 }
 

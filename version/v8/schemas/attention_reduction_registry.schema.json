@@ -46,33 +46,42 @@
       ],
       "properties": {
         "status": {"enum": ["unresolved", "observed", "validated"]},
-        "q_compute": {"enum": ["fp32", "fp16", "fp16_rounded", "bf16", "bf16_rounded"]},
+        "q_compute": {"enum": ["fp32", "fp16", "fp16_rounded", "bf16", "bf16_rounded", "shape_dependent_fp16_or_fp32"]},
         "k_compute": {"enum": ["fp32", "fp16", "fp16_rounded", "bf16", "bf16_rounded"]},
         "score_accumulator": {"enum": ["fp32", "fp16", "bf16"]},
         "softmax_statistics": {"enum": ["fp32", "fp16", "bf16"]},
         "value_compute": {"enum": ["fp32", "fp16", "fp16_rounded", "bf16", "bf16_rounded"]},
-        "value_accumulator": {"enum": ["fp32", "fp16", "fp16_rounded_each_update", "bf16", "bf16_rounded_each_update"]},
-        "partial_storage": {"enum": ["none", "fp32", "fp16", "bf16"]},
-        "partial_merge": {"enum": ["none", "fp32_chunk_order", "fp16_chunk_order", "bf16_chunk_order"]},
+        "value_accumulator": {"enum": ["fp32", "fp16", "fp16_rounded_each_update", "bf16", "bf16_rounded_each_update", "shape_dependent_fp16_or_fp32"]},
+        "partial_storage": {"enum": ["none", "fp32", "fp16", "bf16", "shape_dependent_none_or_fp32"]},
+        "partial_merge": {"enum": ["none", "fp32_chunk_order", "fp16_chunk_order", "bf16_chunk_order", "shape_dependent_single_range_or_fp32_chunk_order"]},
         "partition": {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind"],
           "properties": {
-            "kind": {"enum": ["single_range", "kv_chunks_by_workers", "query_key_tiles"]},
+            "kind": {"enum": ["single_range", "kv_chunks_by_workers", "query_key_tiles", "query_tile_threshold"]},
             "threshold": {"type": "integer", "minimum": 1},
+            "extent_alignment": {"type": "integer", "minimum": 1},
             "below_threshold_chunks": {"type": "integer", "minimum": 1},
             "at_or_above_threshold_chunks": {"enum": ["runtime_worker_count"]},
             "query_tile_size": {"type": "integer", "minimum": 1},
             "key_tile_size": {"type": "integer", "minimum": 1},
             "softmax_sum_update": {"enum": ["fp32_add", "fp64_add_then_fp32_store"]},
-            "worker_partition": {"enum": ["contiguous_head_query_rows"]}
+            "worker_partition": {"enum": ["contiguous_head_query_rows"]},
+            "below_threshold": {"type": "string", "minLength": 1},
+            "at_or_above_threshold": {"type": "string", "minLength": 1}
           },
           "allOf": [
             {
               "if": {"properties": {"kind": {"const": "query_key_tiles"}}},
               "then": {
                 "required": ["query_tile_size", "key_tile_size", "softmax_sum_update", "worker_partition"]
+              }
+            },
+            {
+              "if": {"properties": {"kind": {"const": "query_tile_threshold"}}},
+              "then": {
+                "required": ["threshold", "below_threshold", "at_or_above_threshold"]
               }
             }
           ]

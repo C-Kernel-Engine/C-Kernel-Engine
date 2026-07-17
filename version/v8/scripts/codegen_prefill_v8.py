@@ -506,9 +506,9 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
         if name_key and expr and name_key not in arg_expr_by_name:
             arg_expr_by_name[name_key] = expr
 
-    # Prefill quantization must preserve token-major row layout exactly for
-    # downstream GEMM kernels. Emit explicit per-token row quantization loops
-    # instead of batch helper calls to avoid ABI/dispatch ambiguity.
+    # Prefill quantization preserves token-major row storage. A kernel map may
+    # additionally declare a grouped arithmetic provider whose output keeps
+    # that same storage ABI.
     batch_quant_kind = quantization_emission
 
     if batch_quant_kind:
@@ -532,10 +532,19 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
                 f"        uint8_t *_y_base = (uint8_t*)({y_expr});",
                 f"        const int _k = (int)({k_expr});",
                 f"        const size_t _row_bytes = {row_bytes_expr};",
-                "        for (int _t = 0; _t < num_tokens; ++_t) {",
-                f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
-                "        }",
             ])
+            prefill_batch = batch_quant_kind.get("prefill_batch")
+            if prefill_batch:
+                lines.append(
+                    f"        {prefill_batch['function']}("
+                    "_x_base, (void*)_y_base, num_tokens, _k);"
+                )
+            else:
+                lines.extend([
+                    "        for (int _t = 0; _t < num_tokens; ++_t) {",
+                    f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
+                    "        }",
+                ])
             if profile:
                 lines.append(f'        CK_PROFILE_END("prefill", "{func}", "{op_type}", {layer});')
             lines.append("    }")
@@ -740,6 +749,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
         y_expr = args[1]
         k_expr = args[2]
         row_bytes_expr = activation_quantized_row_bytes_expr(batch_quant_kind, "_k")
+        prefill_batch = batch_quant_kind.get("prefill_batch")
         if op_type == "quantize_input_2":
             lines.append(f"    ck_debug_mlp_gate_up_fp32_input = (const float*)({x_expr});")
         if op_type == "quantize_out_proj_input":
@@ -754,14 +764,20 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
             lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
             lines.append(f"        const int _k = (int)({k_expr});")
             lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
-            lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
-            lines.append(
-                f"            {func}("
-                "_x_base + (size_t)_t * (size_t)_k, "
-                "(void*)(_y_base + (size_t)_t * _row_bytes), "
-                "_k);"
-            )
-            lines.append("        }")
+            if prefill_batch:
+                lines.append(
+                    f"        {prefill_batch['function']}("
+                    "_x_base, (void*)_y_base, num_tokens, _k);"
+                )
+            else:
+                lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
+                lines.append(
+                    f"            {func}("
+                    "_x_base + (size_t)_t * (size_t)_k, "
+                    "(void*)(_y_base + (size_t)_t * _row_bytes), "
+                    "_k);"
+                )
+                lines.append("        }")
             lines.append("    }")
         else:
             lines.append("    {")
@@ -769,14 +785,20 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
             lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
             lines.append(f"        const int _k = (int)({k_expr});")
             lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
-            lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
-            lines.append(
-                f"            {func}("
-                "_x_base + (size_t)_t * (size_t)_k, "
-                "(void*)(_y_base + (size_t)_t * _row_bytes), "
-                "_k);"
-            )
-            lines.append("        }")
+            if prefill_batch:
+                lines.append(
+                    f"        {prefill_batch['function']}("
+                    "_x_base, (void*)_y_base, num_tokens, _k);"
+                )
+            else:
+                lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
+                lines.append(
+                    f"            {func}("
+                    "_x_base + (size_t)_t * (size_t)_k, "
+                    "(void*)(_y_base + (size_t)_t * _row_bytes), "
+                    "_k);"
+                )
+                lines.append("        }")
             lines.append("    }")
     elif (
         op_type in {"attn", "attn_sliding"}
@@ -1480,10 +1502,19 @@ def _emit_prefill_quant_rows(op: Dict, seq_idx: int, *, debug_inputs: list[str] 
         f"        uint8_t *_y_base = (uint8_t*)({y_expr});",
         f"        const int _k = (int)({k_expr});",
         f"        const size_t _row_bytes = {row_bytes_expr};",
-        "        for (int _t = 0; _t < num_tokens; ++_t) {",
-        f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
-        "        }",
     ])
+    prefill_batch = quantization_emission.get("prefill_batch")
+    if prefill_batch:
+        lines.append(
+            f"        {prefill_batch['function']}("
+            "_x_base, (void*)_y_base, num_tokens, _k);"
+        )
+    else:
+        lines.extend([
+            "        for (int _t = 0; _t < num_tokens; ++_t) {",
+            f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
+            "        }",
+        ])
     if profile:
         lines.append(f'        CK_PROFILE_END("prefill", "{func}", "{op.get("op", "unknown")}", {int(op.get("layer", -1) or -1)});')
     lines.append("    }")
@@ -1517,11 +1548,22 @@ def _emit_prefill_quant_debug_override(op: Dict, seq_idx: int, config: Dict, *, 
             f"        uint8_t *_y_base = (uint8_t*)({y_expr});",
             f"        const int _k = (int)({k_expr});",
             f"        const size_t _row_bytes = {row_bytes_expr};",
-            "        for (int _t = 0; _t < num_tokens; ++_t) {",
-            f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
-            "        }",
         ]
     )
+    prefill_batch = quantization_emission.get("prefill_batch")
+    if prefill_batch:
+        lines.append(
+            f"        {prefill_batch['function']}("
+            "_x_base, (void*)_y_base, num_tokens, _k);"
+        )
+    else:
+        lines.extend(
+            [
+                "        for (int _t = 0; _t < num_tokens; ++_t) {",
+                f"            {func}(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);",
+                "        }",
+            ]
+        )
     if profile:
         lines.append(f'        CK_PROFILE_END("prefill", "{func}", "{op.get("op", "unknown")}", {int(op.get("layer", -1) or -1)});')
     lines.append("    }")

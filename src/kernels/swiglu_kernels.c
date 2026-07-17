@@ -125,6 +125,93 @@ static inline __m256 sigmoid256_fast(__m256 x) {
     __m256 one = _mm256_set1_ps(1.0f);
     return _mm256_div_ps(one, _mm256_add_ps(one, exp_neg));
 }
+
+/* GGML's parity path uses this specific vector exponential approximation. */
+static inline __m256 ck_ggml_expf_avx2(__m256 x) {
+    const __m256 r = _mm256_set1_ps(0x1.8p23f);
+    const __m256 z = _mm256_fmadd_ps(x, _mm256_set1_ps(0x1.715476p+0f), r);
+    const __m256 n = _mm256_sub_ps(z, r);
+    const __m256 b = _mm256_fnmadd_ps(
+        n,
+        _mm256_set1_ps(0x1.7f7d1cp-20f),
+        _mm256_fnmadd_ps(n, _mm256_set1_ps(0x1.62e4p-1f), x));
+    const __m256i e = _mm256_slli_epi32(_mm256_castps_si256(z), 23);
+    const __m256 k = _mm256_castsi256_ps(
+        _mm256_add_epi32(e, _mm256_castps_si256(_mm256_set1_ps(1))));
+    const __m256i c = _mm256_castps_si256(
+        _mm256_cmp_ps(_mm256_andnot_ps(_mm256_set1_ps(-0.0f), n),
+                      _mm256_set1_ps(126), _CMP_GT_OQ));
+    const __m256 u = _mm256_mul_ps(b, b);
+    const __m256 j = _mm256_fmadd_ps(
+        _mm256_fmadd_ps(
+            _mm256_fmadd_ps(_mm256_set1_ps(0x1.0e4020p-7f), b,
+                            _mm256_set1_ps(0x1.573e2ep-5f)),
+            u,
+            _mm256_fmadd_ps(_mm256_set1_ps(0x1.555e66p-3f), b,
+                            _mm256_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm256_mul_ps(_mm256_set1_ps(0x1.ffffecp-1f), b));
+    if (!_mm256_movemask_ps(_mm256_castsi256_ps(c))) {
+        return _mm256_fmadd_ps(j, k, k);
+    }
+    const __m256i g = _mm256_and_si256(
+        _mm256_castps_si256(_mm256_cmp_ps(n, _mm256_setzero_ps(), _CMP_LE_OQ)),
+        _mm256_set1_epi32((int)0x82000000u));
+    const __m256 s1 = _mm256_castsi256_ps(
+        _mm256_add_epi32(g, _mm256_set1_epi32(0x7f000000u)));
+    const __m256 s2 = _mm256_castsi256_ps(_mm256_sub_epi32(e, g));
+    const __m256i d = _mm256_castps_si256(
+        _mm256_cmp_ps(_mm256_andnot_ps(_mm256_set1_ps(-0.0f), n),
+                      _mm256_set1_ps(192), _CMP_GT_OQ));
+    return _mm256_or_ps(
+        _mm256_and_ps(_mm256_castsi256_ps(d), _mm256_mul_ps(s1, s1)),
+        _mm256_andnot_ps(
+            _mm256_castsi256_ps(d),
+            _mm256_or_ps(
+                _mm256_and_ps(_mm256_castsi256_ps(c),
+                              _mm256_mul_ps(_mm256_fmadd_ps(s2, j, s2), s1)),
+                _mm256_andnot_ps(_mm256_castsi256_ps(c),
+                                 _mm256_fmadd_ps(k, j, k)))));
+}
+#endif
+
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+/* Keep the production parity provider aligned with llama.cpp's AVX-512
+ * exponential approximation and instruction grouping. */
+static inline __m512 ck_ggml_expf_avx512(__m512 x) {
+    const __m512 r = _mm512_set1_ps(0x1.8p23f);
+    const __m512 z = _mm512_fmadd_ps(x, _mm512_set1_ps(0x1.715476p+0f), r);
+    const __m512 n = _mm512_sub_ps(z, r);
+    const __m512 b = _mm512_fnmadd_ps(
+        n, _mm512_set1_ps(0x1.7f7d1cp-20f),
+        _mm512_fnmadd_ps(n, _mm512_set1_ps(0x1.62e4p-1f), x));
+    const __mmask16 d = _mm512_cmp_ps_mask(
+        _mm512_abs_ps(n), _mm512_set1_ps(192.0f), _CMP_GT_OQ);
+    const __m512 u = _mm512_mul_ps(b, b);
+    const __m512 j = _mm512_fmadd_ps(
+        _mm512_fmadd_ps(
+            _mm512_fmadd_ps(
+                _mm512_set1_ps(0x1.0e4020p-7f), b,
+                _mm512_set1_ps(0x1.573e2ep-5f)),
+            u,
+            _mm512_fmadd_ps(
+                _mm512_set1_ps(0x1.555e66p-3f), b,
+                _mm512_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm512_fmadd_ps(
+            _mm512_set1_ps(0x1.ffffecp-1f), b,
+            _mm512_set1_ps(1.0f)));
+    const __m512 res = _mm512_scalef_ps(j, n);
+    if (_mm512_kortestz(d, d)) {
+        return res;
+    }
+    const __m512 zero = _mm512_setzero_ps();
+    const __m512 alt = _mm512_mask_blend_ps(
+        _mm512_cmp_ps_mask(n, zero, _CMP_LE_OQ),
+        _mm512_set1_ps(INFINITY),
+        zero);
+    return _mm512_mask_blend_ps(d, res, alt);
+}
 #endif
 
 /**
@@ -436,6 +523,44 @@ void swiglu_forward_exact(const float *input,
             float s = sigmoid_scalar_parity(a); // sigmoid(a)
             float silu = a * s;                 // silu(a)
             out_row[d] = silu * b;
+        }
+    }
+}
+
+void swiglu_forward_ggml(const float *input,
+                         float *output,
+                         int tokens,
+                         int dim)
+{
+    for (int t = 0; t < tokens; ++t) {
+        const float *row = input + (size_t)t * (2 * dim);
+        float *out_row = output + (size_t)t * dim;
+        int d = 0;
+
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+        for (; d + 16 <= dim; d += 16) {
+            const __m512 gate = _mm512_loadu_ps(row + d);
+            const __m512 up = _mm512_loadu_ps(row + dim + d);
+            const __m512 neg_gate = _mm512_sub_ps(_mm512_setzero_ps(), gate);
+            const __m512 denom = _mm512_add_ps(
+                _mm512_set1_ps(1.0f), ck_ggml_expf_avx512(neg_gate));
+            const __m512 silu = _mm512_div_ps(gate, denom);
+            _mm512_storeu_ps(out_row + d, _mm512_mul_ps(silu, up));
+        }
+#elif defined(__AVX2__) && defined(__FMA__)
+        for (; d + 8 <= dim; d += 8) {
+            const __m256 gate = _mm256_loadu_ps(row + d);
+            const __m256 up = _mm256_loadu_ps(row + dim + d);
+            const __m256 neg_gate = _mm256_sub_ps(_mm256_setzero_ps(), gate);
+            const __m256 denom = _mm256_add_ps(
+                _mm256_set1_ps(1.0f), ck_ggml_expf_avx2(neg_gate));
+            const __m256 silu = _mm256_div_ps(gate, denom);
+            _mm256_storeu_ps(out_row + d, _mm256_mul_ps(silu, up));
+        }
+#endif
+        for (; d < dim; ++d) {
+            const float gate = row[d];
+            out_row[d] = (gate / (1.0f + expf(-gate))) * row[dim + d];
         }
     }
 }

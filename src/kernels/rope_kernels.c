@@ -1274,6 +1274,37 @@ static void vision_mrope_yarn(
     *sin_theta = ck_rope_reference_sinf(theta) * mscale;
 }
 
+static void text_mrope_yarn(
+    float theta_extrap,
+    float freq_scale,
+    const float corr_dims[2],
+    int chan,
+    float ext_factor,
+    float attn_factor,
+    float *cos_theta,
+    float *sin_theta
+) {
+    float theta_interp = freq_scale * theta_extrap;
+    float theta = theta_interp;
+    float mscale = attn_factor;
+
+    if (ext_factor != 0.0f) {
+        const float ramp_mix =
+            vision_mrope_yarn_ramp(corr_dims[0], corr_dims[1], chan) * ext_factor;
+        theta = theta_interp * (1.0f - ramp_mix) + theta_extrap * ramp_mix;
+        mscale *= 1.0f + 0.1f * logf(1.0f / fmaxf(freq_scale, 1e-6f));
+    }
+
+    /*
+     * Decoder text M-RoPE is part of the compiler-provenance contract.
+     * Use the linked compiler math provider, exactly as ggml does. A mixed
+     * GCC/ICX run must fail provenance checks instead of substituting glibc
+     * trigonometry into an Intel-libimf production graph.
+     */
+    *cos_theta = cosf(theta) * mscale;
+    *sin_theta = sinf(theta) * mscale;
+}
+
 static inline void mrope_rotate_pair(
     float x0,
     float x1,
@@ -1685,7 +1716,7 @@ static void text_mrope_apply_head(
 
             float cos_theta = 0.0f;
             float sin_theta = 0.0f;
-            vision_mrope_yarn(
+            text_mrope_yarn(
                 theta,
                 freq_scale,
                 corr_dims,

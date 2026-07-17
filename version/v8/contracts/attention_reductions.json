@@ -73,8 +73,31 @@
         "reference": "llama.cpp GGML tiled flash attention with F16 K/V and GGML_PREC_F32"
       }
     },
+    "f16_flash_auto_qtile64": {
+      "status": "validated",
+      "q_compute": "shape_dependent_fp16_or_fp32",
+      "k_compute": "fp16",
+      "score_accumulator": "fp32",
+      "softmax_statistics": "fp32",
+      "value_compute": "fp16",
+      "value_accumulator": "shape_dependent_fp16_or_fp32",
+      "partial_storage": "shape_dependent_none_or_fp32",
+      "partial_merge": "shape_dependent_single_range_or_fp32_chunk_order",
+      "partition": {
+        "kind": "query_tile_threshold",
+        "threshold": 64,
+        "below_threshold": "f16_online_single_range",
+        "at_or_above_threshold": "f16_kv_tiled64_fp32_softmax_fp64_sum_update"
+      },
+      "description": "llama.cpp CPU flash-attention dispatch for segmented prefill: short query batches use the FP16 online single-range path; batches of 64 or more queries use 64x64 FP32 tiles.",
+      "validation": {
+        "test": "unittest/test_attention_f16_split_kv.py",
+        "cases": ["Q=5", "Q=14", "Q=64", "Q=1008 KV=1013 H=32 Hkv=8 D=128"],
+        "reference": "current llama.cpp ggml_flash_attn_ext with GGML_PREC_F32"
+      }
+    },
     "f16_online_single_range": {
-      "status": "observed",
+      "status": "validated",
       "q_compute": "fp16_rounded",
       "k_compute": "fp16_rounded",
       "score_accumulator": "fp32",
@@ -88,9 +111,9 @@
       },
       "description": "Single-range llama-compatible attention with FP16-rounded Q/K/V and FP16-rounded value updates.",
       "validation": {
-        "test": "make llamacpp-parity-full",
-        "cases": ["Nanbeige prefill", "Nanbeige decode"],
-        "reference": "llama.cpp GGML attention; promotion remains blocked on a dedicated leaf oracle"
+        "test": "unittest/test_attention_f16_split_kv.py and make llamacpp-parity-full",
+        "cases": ["Qwen3-VL Q=5", "Qwen3-VL Q=14", "Q=63 threshold boundary", "Nanbeige prefill", "Nanbeige decode"],
+        "reference": "current llama.cpp ggml_flash_attn_ext short-query path"
       }
     },
     "f16_online_fp32_merge": {
@@ -106,13 +129,14 @@
       "partition": {
         "kind": "kv_chunks_by_workers",
         "threshold": 512,
+        "extent_alignment": 256,
         "below_threshold_chunks": 1,
         "at_or_above_threshold_chunks": "runtime_worker_count"
       },
-      "description": "FP16-rounded online-softmax partials with deterministic FP32 chunk-order merge.",
+      "description": "FP16-rounded online-softmax partials with a 256-row padded scheduling extent and deterministic FP32 chunk-order merge.",
       "validation": {
         "test": "unittest/test_attention_f16_split_kv.py",
-        "cases": ["KV=511", "KV=512", "KV=1058", "padded GQA"],
+        "cases": ["KV=511", "KV=512", "Qwen3-VL KV=1047->1280", "KV=1058->1280", "KV=1609->1792", "padded GQA"],
         "reference": "llama.cpp GGML flash attention"
       }
     }

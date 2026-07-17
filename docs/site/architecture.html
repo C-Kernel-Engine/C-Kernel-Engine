@@ -136,7 +136,8 @@
             background: var(--grey);
         }
 
-        .site-nav > a.active {
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
             background: var(--orange);
             color: var(--dark);
             font-weight: 600;
@@ -216,22 +217,38 @@
 
         /* Mega menu for Architecture dropdown */
         .nav-dropdown-menu.mega-menu {
-            min-width: 580px;
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
             padding: 1.25rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem 2rem;
-            /* Position to the left so it doesn't clip right edge */
-            left: 50%;
-            transform: translateX(-60%);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
         }
 
         .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
-            transform: translateX(-60%) translateY(0);
+            transform: translateY(0);
         }
 
         .mega-menu .menu-section {
             margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
         }
 
         .mega-menu .menu-heading {
@@ -265,6 +282,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -765,6 +783,8 @@
                 bottom: 0;
                 background: var(--dark);
                 flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
                 padding: 1rem;
                 gap: 0.5rem;
                 overflow-y: auto;
@@ -825,6 +845,29 @@
                 max-height: 500px;
             }
 
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
             main {
                 padding: 1rem;
             }
@@ -862,10 +905,12 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -873,6 +918,12 @@
                             View All Architecture Docs
                             <small>Complete documentation index</small>
                         </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
                     </div>
                     <!-- Left Column -->
                     <div class="menu-section">
@@ -921,28 +972,8 @@
                     </div>
                 </div>
             </div>
-            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
             <a href="version-history.html" class="">Versions</a>
-            <a href="research.html" class="">Research</a>
-            <a href="decisions.html" class="">ADR</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
         </nav>
     </header>
     <main>
@@ -966,6 +997,8 @@
 <h2>Active v8 Compiler Architecture</h2>
 
 <p>The active v8 inference compiler consumes three authoritative inputs: model weights, an architecture circuit, and executable kernel maps. The circuit owns graph structure and required semantics. Kernel maps own ABI and implementation capability. The DSL resolves and stitches; generated C does not guess.</p>
+
+<p>This boundary is executable policy, not only documentation. The v8 and v7 DSL audits reject new model-family dispatch in generic compiler/codegen functions, including dispatch hidden behind local aliases. Exact kernel operations do not fall back to broader families, malformed per-layer dimensions fail, and circuit weight policies are schema validated. New-model support must therefore extend a circuit, a kernel map, or a tested kernel instead of accumulating another compiler conditional.</p>
 
 <div class="img-container svg-viewer" data-title="v8 Numerical Contract Architecture">
     <img src="assets/v8-numerical-contracts.svg" alt="v8 weights, circuits, kernel maps, numerical contract resolution, IR lowering and generated C">
@@ -1258,7 +1291,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-07-11 03:52</span>
+        <span class="folder-updated">Updated: 2026-07-15 09:44</span>
     </div>
     <pre class="tree-output">
 src/kernels
@@ -1282,15 +1315,30 @@ version/v6.6
 |-- tools
 `-- unittest
 version/v7
-|-- .cache
-|   `-- reports
 |-- artifacts
 |   `-- svg_dsl
+|       |-- gen1_archive_2026-04-05
+|       `-- spec_archive_2026-04-08
 |-- contracts
 |-- data
 |   |-- eval_contracts
 |   |-- spec03
+|   |   |-- contracts
+|   |   |-- holdout
+|   |   |-- manifests
+|   |   |-- midtrain
+|   |   |-- normalized
+|   |   |-- pretrain
+|   |   |-- raw_assets
+|   |   |-- sft
+|   |   `-- tokenizer
 |   `-- spec04
+|       |-- contracts
+|       |-- holdout
+|       |-- manifests
+|       |-- normalized
+|       |-- raw_assets
+|       `-- tokenizer
 |-- docs
 |-- examples
 |-- experiments
@@ -1299,14 +1347,14 @@ version/v7
 |-- kernel_maps
 |-- regression
 |-- reports
-|   |-- spec12_gold_mappings
-|   |-- spec13b_gold_mappings
-|   |-- spec14a_gold_mappings
-|   |-- spec14b_gold_mappings
-|   |-- spec15a_gold_mappings
-|   |-- spec15b_gold_mappings
-|   |-- spec_broader_1_family_packs
-|   `-- spec_broader_1_gold_mappings
+|   |-- spec12_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec12_gold_mappings
+|   |-- spec13b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec13b_gold_mappings
+|   |-- spec14a_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec14a_gold_mappings
+|   |-- spec14b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec14b_gold_mappings
+|   |-- spec15a_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec15a_gold_mappings
+|   |-- spec15b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec15b_gold_mappings
+|   |-- spec_broader_1_family_packs -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_family_packs
+|   `-- spec_broader_1_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_gold_mappings
 |-- scripts
 |   |-- dataset
 |   `-- parity
@@ -1319,7 +1367,7 @@ version/v7
 `-- tools
     `-- src
 
-57 directories
+72 directories
 </pre>
 </div>
 
@@ -1584,7 +1632,8 @@ version/v7
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1592,13 +1641,14 @@ version/v7
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>

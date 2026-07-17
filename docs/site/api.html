@@ -136,7 +136,8 @@
             background: var(--grey);
         }
 
-        .site-nav > a.active {
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
             background: var(--orange);
             color: var(--dark);
             font-weight: 600;
@@ -216,22 +217,38 @@
 
         /* Mega menu for Architecture dropdown */
         .nav-dropdown-menu.mega-menu {
-            min-width: 580px;
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
             padding: 1.25rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem 2rem;
-            /* Position to the left so it doesn't clip right edge */
-            left: 50%;
-            transform: translateX(-60%);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
         }
 
         .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
-            transform: translateX(-60%) translateY(0);
+            transform: translateY(0);
         }
 
         .mega-menu .menu-section {
             margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
         }
 
         .mega-menu .menu-heading {
@@ -265,6 +282,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -765,6 +783,8 @@
                 bottom: 0;
                 background: var(--dark);
                 flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
                 padding: 1rem;
                 gap: 0.5rem;
                 overflow-y: auto;
@@ -825,6 +845,29 @@
                 max-height: 500px;
             }
 
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
             main {
                 padding: 1rem;
             }
@@ -862,10 +905,12 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -873,6 +918,12 @@
                             View All Architecture Docs
                             <small>Complete documentation index</small>
                         </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
                     </div>
                     <!-- Left Column -->
                     <div class="menu-section">
@@ -921,28 +972,8 @@
                     </div>
                 </div>
             </div>
-            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
             <a href="version-history.html" class="">Versions</a>
-            <a href="research.html" class="">Research</a>
-            <a href="decisions.html" class="">ADR</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
         </nav>
     </header>
     <main>
@@ -1080,7 +1111,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_0(const void * weight_q5_0, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_0 GEMM - batched matrix multiply with Q5_0 weights (32-element blocks)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_0 x Q8_0 GEMM (batch matrix multiply)</p>
         </div>
 
 
@@ -1090,7 +1121,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_1(const void * weight_q5_1, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_1 GEMM - batched matrix multiply with Q5_1 weights (32-element blocks)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_1 x Q8_0 GEMM (batch matrix multiply)</p>
         </div>
 
 
@@ -1100,7 +1131,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_k(const void * weight_q5_k, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_K GEMM - batched matrix multiply with Q5_K weights (256-element super-blocks)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_K x Q8_K GEMM (batch matrix multiply)</p>
         </div>
 
 
@@ -1110,7 +1141,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q6_k(const void * weight_q6k, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q6_K GEMM - batched matrix multiply with Q6_K weights.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q6_K x Q8_K GEMM (batch matrix multiply)</p>
         </div>
 
 
@@ -1120,7 +1151,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q8_0(const void * weight_q8_0, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q8_0 GEMM - batched matrix multiply with Q8_0 weights (32-element blocks)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q8_0 x Q8_0 GEMM (batch matrix multiply)</p>
         </div>
 
 
@@ -3142,7 +3173,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode(float * output, const float * input, const float * residual, const float * ln1_gamma, const float * wq, const float * bq, const float * wk, const float * bk, const float * wv, const float * bv, const float * wo, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Full mega-fused attention for decode.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Mega-fused attention for decode mode (single token)</p>
         </div>
 
 
@@ -5257,7 +5288,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_ir_v2_parse_bool</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_parse_bool(const char * json, const char * key, const char * end, int * out)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_parse_bool(const char * json, const char * key, const char * end, int * out_val)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5367,7 +5398,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_ir_v2_parse_string</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_parse_string(const char * start, const char * end, char ** out)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_parse_string(const char * start, const char * end, char ** out_str)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5457,7 +5488,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_ir_v2_serialize_json_with_plan</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const struct CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5986,8 +6017,8 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_murmurhash3_str</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">uint32_t ck_murmurhash3_str(const char * str, uint32_t seed)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">MurmurHash3-32bit for string (null-terminated).</p>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">uint32_t ck_murmurhash3_str(const char * key, uint32_t seed)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -6507,7 +6538,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q5_0_q8_0(const void * weight_q5_0, const void * input_q8_0, float * output, int cols)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q5_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q5_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
         </div>
 
 
@@ -6517,7 +6548,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q8_0_q8_0(const void * weight_q8_0, const void * input_q8_0, float * output, int cols)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q8_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q8_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
         </div>
 
 
@@ -6646,8 +6677,8 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_tokenizer_add_merge</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_add_merge(CKTokenizer * tok, int32_t left_id, int32_t right_id, int32_t merged_id, int32_t priority)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Add a BPE merge rule.</p>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_add_merge(CKTokenizer * tok, int32_t left, int32_t right, int32_t merged)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -6666,8 +6697,8 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_tokenizer_add_token</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_add_token(CKTokenizer * tok, const char * token, int32_t id, float score)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Add a token to vocabulary.</p>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int32_t ck_tokenizer_add_token(CKTokenizer * tok, const char * token, int len)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -6717,7 +6748,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_decode(const CKTokenizer * tok, const int32_t * ids, int num_ids, char * text, int max_len)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Decode token IDs to text.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -6737,7 +6768,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_encode(const CKTokenizer * tok, const char * text, int text_len, int32_t * ids, int max_ids)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Encode text to token IDs using greedy longest-match.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -7016,7 +7047,7 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_tokenizer_lookup</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int32_t ck_tokenizer_lookup(const CKTokenizer * tok, const char * token)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int32_t ck_tokenizer_lookup(const CKTokenizer * tok, const char * token, int len)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -7236,8 +7267,8 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_tokenizer_vocab_size</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t ck_tokenizer_vocab_size(const CKTokenizer * tok)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get vocabulary size.</p>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_tokenizer_vocab_size(const CKTokenizer * tok)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -8746,7 +8777,7 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">geglu_backward_fp32</code>
                 <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void geglu_backward_fp32(const float * x, const float * d_out, float * d_x, int tokens, int dim)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void geglu_backward_fp32(const float * x, const float * d_out, float * d_x, int n_tokens, int dim)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">GeGLU backward pass (fp32) Testtest_geglu.py::TestGeGLU::test_geglu_backward_fp32</p>
         </div>
 
@@ -10778,7 +10809,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">parse_args</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">CLIArgs parse_args(int argc, char ** argv)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">bool parse_args(int argc, char ** argv, CLIOptions * opt)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -12963,7 +12994,8 @@ rmsnorm_backward(d_norm_out, input, gamma, rstd_cache, d_input, d_gamma, tokens,
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -12971,13 +13003,14 @@ rmsnorm_backward(d_norm_out, input, gamma, rstd_cache, d_input, d_gamma, tokens,
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>

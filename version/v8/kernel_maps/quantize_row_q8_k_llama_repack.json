@@ -1,0 +1,62 @@
+{
+  "id": "quantize_row_q8_k_llama_repack",
+  "op": "quantize",
+  "variant": "fp32_to_q8_k_llama_repack",
+  "quant": { "weight": "fp32", "activation": "q8_k", "output": "q8_k" },
+  "inputs": [{
+    "name": "input",
+    "dtype": "fp32",
+    "shape": ["N"],
+    "desc": "Input vector [N] (FP32)"
+  }],
+  "outputs": [{
+    "name": "output",
+    "dtype": "q8_k",
+    "shape": ["N"],
+    "desc": "Q8_K row storage with llama.cpp repacked-prefill arithmetic"
+  }],
+  "scratch": [],
+  "dims": ["N"],
+  "params": [],
+  "constraints": {
+    "alignment": { "N": 256 },
+    "notes": "Complete groups of four rows use llama.cpp's repacked Q8_K scale and rounding order; residual rows use canonical row quantization."
+  },
+  "impl": {
+    "function": "quantize_row_q8_k",
+    "sources": [
+      "src/kernels/gemm_kernels_q4k_q8k.c",
+      "src/kernels/quantize_row_q8_k_sse.c"
+    ],
+    "variants": [{ "name": "default", "requires": [], "compile_flags": [] }]
+  },
+  "codegen_capability": {
+    "schema_version": 1,
+    "operator_family": "activation_quantization",
+    "function": "quantize_row_q8_k",
+    "rounding_contract": "llama_repack_q8_k_4row_nearest_even",
+    "output_storage": {
+      "format": "q8_k",
+      "block_elements": 256,
+      "block_elements_symbol": "QK_K",
+      "c_block_type": "block_q8_K"
+    },
+    "prefill_batch": {
+      "function": "quantize_batch_q8_k_4row_nearest_even",
+      "row_group": 4,
+      "tail_function": "quantize_row_q8_k",
+      "rounding_contract": "llama_repack_q8_k_4row_nearest_even"
+    }
+  },
+  "tests": {
+    "unit": ["unittest/test_q4k_q8k_llama_packed.cpp"],
+    "parity": [{
+      "kind": "llamacpp",
+      "command": "make llamacpp-parity-gemm-q4k",
+      "tolerance": "bit_exact",
+      "notes": "Compares grouped Q8_K bytes and loaded repacked Q4_K production output against llama.cpp."
+    }]
+  },
+  "notes": "Arithmetic-compatible Q8_K producer for llama.cpp repacked Q4_K prefill consumers. Decode still calls the canonical one-row function.",
+  "name": "quantize_row_q8_k_llama_repack"
+}

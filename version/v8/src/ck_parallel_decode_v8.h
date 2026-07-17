@@ -64,6 +64,9 @@ void gemv_q6_k_q8_k_parallel_dispatch(
 void gemv_q4_k_q8_k_parallel_dispatch(
     float *y, const void *W, const void *x_q8, int M, int K);
 
+void gemv_q4_k_q8_k_repacked_parallel_dispatch(
+    float *y, const void *W, const void *x_q8, int M, int K);
+
 /**
  * Parallel gemv_q8_0_q8_0: y[M] = W[M,K] @ x_q8[K]
  * Both W and x are Q8_0 quantized.
@@ -113,7 +116,6 @@ void gemv_fused_q5_0_bias_parallel_dispatch(
 
 #define gemv_q5_0_q8_0(y, W, x, M, K)   gemv_q5_0_q8_0_parallel_dispatch(y, W, x, M, K)
 #define gemv_q6_k_q8_k(y, W, x, M, K)   gemv_q6_k_q8_k_parallel_dispatch(y, W, x, M, K)
-#define gemv_q4_k_q8_k(y, W, x, M, K)   gemv_q4_k_q8_k_parallel_dispatch(y, W, x, M, K)
 #define gemv_q8_0_q8_0(y, W, x, M, K)   gemv_q8_0_q8_0_parallel_dispatch(y, W, x, M, K)
 #define gemv_q5_1_q8_1(y, W, x, M, K)   gemv_q5_1_q8_1_parallel_dispatch(y, W, x, M, K)
 #define gemv_q5_k(y, W, x, M, K)        gemv_q5_k_parallel_dispatch(y, W, x, M, K)

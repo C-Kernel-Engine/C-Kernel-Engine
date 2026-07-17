@@ -136,7 +136,8 @@
             background: var(--grey);
         }
 
-        .site-nav > a.active {
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
             background: var(--orange);
             color: var(--dark);
             font-weight: 600;
@@ -216,22 +217,38 @@
 
         /* Mega menu for Architecture dropdown */
         .nav-dropdown-menu.mega-menu {
-            min-width: 580px;
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
             padding: 1.25rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem 2rem;
-            /* Position to the left so it doesn't clip right edge */
-            left: 50%;
-            transform: translateX(-60%);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
         }
 
         .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
-            transform: translateX(-60%) translateY(0);
+            transform: translateY(0);
         }
 
         .mega-menu .menu-section {
             margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
         }
 
         .mega-menu .menu-heading {
@@ -265,6 +282,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -765,6 +783,8 @@
                 bottom: 0;
                 background: var(--dark);
                 flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
                 padding: 1rem;
                 gap: 0.5rem;
                 overflow-y: auto;
@@ -825,6 +845,29 @@
                 max-height: 500px;
             }
 
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
             main {
                 padding: 1rem;
             }
@@ -862,10 +905,12 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -873,6 +918,12 @@
                             View All Architecture Docs
                             <small>Complete documentation index</small>
                         </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
                     </div>
                     <!-- Left Column -->
                     <div class="menu-section">
@@ -921,28 +972,8 @@
                     </div>
                 </div>
             </div>
-            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
             <a href="version-history.html" class="">Versions</a>
-            <a href="research.html" class="">Research</a>
-            <a href="decisions.html" class="">ADR</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
         </nav>
     </header>
     <main>
@@ -1145,6 +1176,70 @@ path, weight reuse, quantized GEMM dispatch, thread scheduling, and cache behavi
         </tr>
     </tbody>
 </table>
+
+<h2>Cross-Hardware Evidence Matrix</h2>
+
+<p>A kernel is not "CPU optimized" because it performed well on one host. CKE uses several hardware lanes to separate
+portable mathematics from ISA-specific implementation quality, heterogeneous scheduling, memory topology, and
+server-scale behavior.</p>
+
+<table class="phase-table">
+    <thead>
+        <tr>
+            <th>Hardware Lane</th>
+            <th>Primary Question</th>
+            <th>Tools and Evidence</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Intel Core i7, multiple generations</td>
+            <td>Do FP32 and quantized generated runtimes remain useful on commodity x86 systems?</td>
+            <td>Practical E2E, fixed-token throughput, parity, compiler and ISA inspection.</td>
+            <td>Active</td>
+        </tr>
+        <tr>
+            <td>Core i7-14700T</td>
+            <td>How close can AVX2/FMA/AVX-VNNI FP32 and Q4/Q5/Q6/Q8 kernels get to the useful roofline on a hybrid 8P + 12E CPU? Native BF16 is not claimed.</td>
+            <td>VTune hotspots/uarch/memory/threading, Advisor roofline, perf, flamegraphs, assembly, frequency and utilization.</td>
+            <td>Dedicated profiling node</td>
+        </tr>
+        <tr>
+            <td>TI TDA4VM ARM</td>
+            <td>Are FP32 and quantized contracts and kernels portable to ARM NEON and realistic embedded constraints?</td>
+            <td>Build and kernel parity, NEON path inspection, constrained-memory and practical runtime checks.</td>
+            <td>Active portability lane</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon, 2nd/3rd/5th Gen</td>
+            <td>How do FP32/quantized AVX-512/VNNI and host-gated native BF16/AMX availability affect parity and throughput across generations?</td>
+            <td>ISA-appropriate kernel tests, model parity, larger artifacts, profiler summaries, and cross-generation comparisons.</td>
+            <td>External validation lanes</td>
+        </tr>
+        <tr>
+            <td>Intel Xeon 6</td>
+            <td>What do native AMX BF16, AVX-512/VNNI, wider memory systems, NUMA placement, sustained power, and multiple nodes enable?</td>
+            <td>Planned VTune/Advisor, native BF16, memory-channel roofline, NUMA, power, and distributed CKU experiments.</td>
+            <td>Planned; not measured</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert alert-warning">
+    <strong>Coverage is workload-specific.</strong> A platform row does not certify every model, dtype, quantization, or
+    context length. Publish the host, CPU and detected ISA flags, storage/compute dtype, memory topology, compiler, CKE commit, model hash, quantization,
+    prompt or tensor shape, thread/affinity policy, warmup/repeats, power/frequency state, raw command, and artifact path.
+</div>
+
+<h3>Publication Contract</h3>
+<ul class="check-list">
+    <li>Label the hardware lane as active, external, or planned; planned hardware has no benchmark result.</li>
+    <li>Separate portable numerical evidence from ISA-specific throughput evidence.</li>
+    <li>Compare before/after and reference runtimes on the same host with equivalent model and workload settings.</li>
+    <li>Link raw commands, logs, profiler output, and the CKE commit behind every published performance table.</li>
+    <li>Do not extrapolate one Core, Xeon, or ARM result to another generation without running that lane.</li>
+</ul>
 
 <h2>How To Read The Signals</h2>
 
@@ -1563,7 +1658,8 @@ tie one profiler dot back to one function, one tensor layout, and one source pat
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1571,13 +1667,14 @@ tie one profiler dot back to one function, one tensor layout, and one source pat
             <div>
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
-                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
-                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
                 </ul>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>

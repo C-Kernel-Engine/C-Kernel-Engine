@@ -18,6 +18,21 @@
         "block_elements_symbol": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "c_block_type": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}
       }
+    },
+    "rounding_contract": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prefill_batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function", "row_group", "tail_function", "rounding_contract"],
+      "properties": {
+        "function": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "row_group": {"type": "integer", "minimum": 2},
+        "tail_function": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "rounding_contract": {"type": "string", "minLength": 1}
+      }
     }
   }
 }

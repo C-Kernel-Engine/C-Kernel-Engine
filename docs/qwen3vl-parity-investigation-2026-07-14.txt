@@ -1,0 +1,191 @@
+Qwen3-VL Q4_K_M parity investigation ledger
+Date: 2026-07-14
+PR branch: fix/v8-parity-runtime-provenance
+PR base: origin/main 216440a5
+
+Purpose
+
+This file records the experiments used to distinguish real CKE numerical bugs from parity-harness, runtime-provenance, and diagnostic-mode bugs. A result is not accepted unless the exact image, prompt, model, runtime libraries, compiler, execution mode, and pre-EOS token step are recorded.
+
+Canonical workload
+
+Model: Qwen3VL-8B-Instruct-Q4_K_M GGUF decoder with Q8_0 mmproj
+Prompt: Extract visible form fields as compact JSON.
+Image policy: image_max_tokens=1024
+Context: 4096
+Temperature: 0
+Primary promotion order: 5 images, 10 images, then 40 images
+Acceptance: exact greedy top-1 equality through the bridge-declared stop token
+
+Confirmed model/runtime fixes
+
+1. Vision position interpolation evaluation order differed from the reference path.
+Resolution: match the required interpolation coordinate and FP32 evaluation order in the vision kernel and guard it with production-shape tests.
+
+2. Qwen3-VL M-RoPE width and section semantics were interpreted incorrectly in earlier paths.
+Resolution: treat rotary width as the full head dimension and sections as the axis pattern. Validate width and section combinations instead of silently skipping rotation.
+
+3. Fused Q4 gate/up SwiGLU prefill changed parity.
+Resolution: keep the path off by default until its exact numerical contract is independently validated.
+
+4. Mixed multimodal prefill was incorrectly treated as one combined batch.
+Reference execution is text_before, visual_prefix, text_after with persistent cache append and separate physical-cache and semantic M-RoPE positions.
+Resolution: represent segmented prefill in the circuit/call IR. This fixed the former sample-2 step-108 persistent-decode failure and produced 128/128 matching tokens for that sample.
+
+5. Cache position and semantic M-RoPE position are different state variables.
+Resolution: preserve and trace both values. Do not derive semantic text position from physical cache length.
+
+6. Decode attention above the reference split threshold requires an explicit FP16 online-softmax partial and FP32 merge contract.
+Resolution: expose the reduction contract explicitly and test KV lengths 511, 512, 1047, 1058, and 1609 against the local llama.cpp GGML oracle.
+
+7. Qwen3-VL Q/K decode projections require the resolved Q4_K by Q8_K numerical provider selected by the circuit and kernel map.
+Resolution: select the provider explicitly for Q/K decode rather than routing every Q4_K operation globally.
+
+Confirmed harness and diagnostic bugs
+
+8. The multi-token runner continued comparing after both runtimes emitted EOS.
+Effect: a false step-310 failure was reported after 307 valid matching tokens.
+Resolution: stop at bridge-declared stop-token metadata. Never report post-EOS divergence.
+
+9. llama.cpp reuses Qcur and Kcur tensor names for projection, normalization, and post-RoPE occurrences.
+Effect: occurrence zero, intermediate occurrence, and final occurrence were mapped to the wrong CKE semantic boundaries.
+Resolution: occurrence zero is projection, the intermediate occurrence is Q/K normalization when present, and the final occurrence is post-RoPE. Ambiguous mappings hard-fail.
+
+10. Requesting internal llama.cpp attention score/probability dumps can disable flash attention.
+Effect: production-flash logits could be compared against an unfused diagnostic graph and incorrectly attributed to a production kernel.
+Resolution: every report records decode and flash modes. Diagnostic mode changes must be labeled and incompatible arithmetic boundaries must not certify production parity.
+
+11. Direct leaf-kernel parity was treated as sufficient evidence for production dispatch.
+Effect: the direct Q4_K by Q8_K GEMV could be exact while a packed multi-row production GEMM used a different reduction order.
+Resolution: test quantization bytes, packed activation bytes, actual production invocation, and every FP32 output separately.
+
+12. The production packed Q8_K x4 activation layout was not independently checked.
+Resolution: reconstruct the packed ABI from byte-exact row blocks and compare every packed byte before testing GEMM arithmetic.
+
+13. The parity report hashed an adjacent engine library that the generated decoder did not execute.
+Evidence: generated decoder RUNPATH pointed to /tmp/cke-qwen3vl-sweep/build while the report hashed /tmp/qwen3vl-image05-selective-qk/libckernel_engine.so.
+Observed hashes:
+reported adjacent engine: 1373f662b7fd415b1147923d4dca8afeeaef3ef5dc88e8264f4b90b19b6c040c
+actually resolved build engine: f9263e730a8c95932843a9ca1ff88b327bec0b0940dded3d5283b3c0b900fdc5
+Effect: direct primitive replay was bit-exact while the model dump differed, creating a false contradiction.
+Resolution: generated runtimes use RUNPATH=$ORIGIN, copy the exact engine beside the model, include the engine hash in the build fingerprint, and verify the resolved symbol library with dladdr before inference.
+
+14. Loading an explicit engine with RTLD_GLOBAL did not guarantee that generated-model symbols resolved to it when the model had an absolute RUNPATH dependency.
+Resolution: verify a dependency symbol through the generated model handle and hard-fail when dladdr reports a different engine path.
+
+15. Decoder tokenizer loading depended on another path having already loaded libckernel_tokenizer.so globally.
+Effect: runtime success depended on process history.
+Resolution: load the adjacent tokenizer deterministically before loading the generated decoder and include its hash in runtime evidence.
+
+16. Generated-runtime build caching did not include all executed dependency provenance.
+Effect: replacing an engine could leave a decoder linked to stale runtime assumptions.
+Resolution: include compiler, source hash, engine hash, and $ORIGIN runpath policy in the build fingerprint.
+
+17. A generated tokenizer debug printf contained an unescaped newline.
+Effect: generated C emitted a missing-terminating-quote compiler warning.
+Resolution: emit an escaped newline in build_ir_v8.py and test both BPE and SentencePiece generated initialization source. Existing stale generated C files must be regenerated before the warning disappears.
+
+18. The original granular command expected a known divergence step.
+Effect: a changed runtime moved the first divergence and made a fixed --dump-step stale.
+Resolution: --dump-first-divergence observes the production run first and captures the actual first pre-EOS failure.
+
+19. Diagnostic exceptions could prevent a useful base parity report from being written.
+Resolution: persist the coarse report, attach structured diagnostic_errors, continue independent bounded diagnostics, and return a failing exit status when any requested diagnostic fails.
+
+20. /tmp quota was exhausted by duplicate 4.7 GB weight conversions.
+Effect: conversion failed with disk quota exceeded and could be mistaken for a model failure.
+Resolution: reuse exact runtime artifacts, symlink immutable weights where appropriate, remove only failed duplicate conversions, and record disk/resource failures separately from numerical failures.
+
+21. A runtime described as GCC contained both GCC and Intel oneAPI object provenance.
+Evidence: ELF .comment contained GCC 15.2.0 and Intel oneAPI 2026.0.0.
+Resolution: label it mixed-object, not pure GCC. Record compiler comments and hashes for model, engine, and tokenizer. A clean GCC build must be measured separately.
+
+22. The automatic first-divergence dump dropped the explicitly selected CK engine.
+Effect: the coarse production comparison used the requested engine, while the nested granular replay attempted to use the repository build engine. This could attribute one runtime's logits to tensors produced by another runtime.
+Detection: the new hash and dladdr checks stopped the run before tensor comparison instead of silently accepting mixed provenance.
+Resolution: preserve engine_so in runtime state, propagate it through nested replay and dump helpers, sync the exact engine beside every generated model, and hard-fail any requested/adjacent/loaded identity disagreement.
+
+Rejected or refined hypotheses
+
+23. Hypothesis: image-5 divergence was only llama.cpp tensor repacking.
+Control: llama.cpp --no-repack diverged earlier at step 60.
+Conclusion: repacking is numerically relevant but is not the only end-to-end cause.
+
+24. Hypothesis: the layer-0 attention reduction kernel was wrong.
+Natural-path observation: kqv_out max difference 2.8885901e-4 at image-5 step 116.
+Same-input replay: exact llama Q plus all 1143 FP16 K/V cache rows through CKE differed from llama kqv_out by only 1.4901161e-8 maximum and 3.1198238e-10 RMSE across all 4096 outputs.
+Conclusion: the attention provider is correct for identical inputs. The natural-path difference is amplification of an earlier input difference or use of a different loaded runtime.
+
+25. Hypothesis: the Q8_K activation quantizer differed for the real layer-0 input.
+Experiment: use the exact real llama attn_norm vector.
+Result: CKE and llama Q8_K bytes matched exactly.
+Conclusion: the quantizer is not the first divergence for this boundary.
+
+26. Hypothesis: the Q4_K by Q8_K Q-projection primitive differed for the real weights and input.
+Experiment: run all 4096 real Q weight rows in groups of eight with identical Q8_K bytes.
+Result: CKE, llama production primitive, and llama graph Q projection matched bit-for-bit.
+Conclusion: the earlier model-dump discrepancy came from executing a different engine than the report identified, not from this primitive.
+
+27. Hypothesis: one compact eight-output FP accumulator would reproduce llama packed GEMM.
+Result: it reproduced independent GEMV order and retained the packed GEMM mismatch.
+Conclusion: the remaining packed-GEMM difference is in packed integer traversal/evaluation order. The experiment was removed.
+
+28. Hypothesis: a generic llama wrapper could directly expose the required packed primitive without ABI work.
+Result: the temporary wrapper returned invalid zero output.
+Conclusion: wrapper was removed; no result was accepted.
+
+Current exact evidence
+
+Synthetic and shape-specific FP16 split-KV attention oracle: 22/22 pass.
+Layer-0 attn_norm at image-5 step 116: 4096/4096 values bit-exact.
+Real layer-0 Q8_K quantization: byte-exact.
+Real layer-0 Q projection primitive: 4096/4096 values bit-exact.
+Real same-input attention: max difference 1.4901161e-8 across 4096 outputs.
+Packed Q4_K by packed-Q8_K production GEMM remains non-exact in the standalone gate. Example M=4,K=256: 12/32 outputs differ, maximum 2.3841858e-7. This is unresolved and must not be hidden by tolerance changes.
+
+Origin-verified image-5 rerun on 2026-07-14:
+Requested engine SHA256: 1373f662b7fd415b1147923d4dca8afeeaef3ef5dc88e8264f4b90b19b6c040c.
+Adjacent loaded engine SHA256: 1373f662b7fd415b1147923d4dca8afeeaef3ef5dc88e8264f4b90b19b6c040c.
+Generated model RUNPATH: $ORIGIN.
+First pre-EOS divergence: step 116, CKE token 12116 Have, llama.cpp token 6986 Did.
+Logit cosine: 0.9988274213. Top-16 overlap: 16/16.
+First granular failing boundary: layer-0 kqv_out, maximum absolute difference 2.8885901e-4.
+Conclusion: the runtime-provenance bug was real and is now guarded, but it did not remove this numerical divergence.
+
+Important artifact paths
+
+First-divergence report:
+/tmp/qwen3vl-image05-step119-granular/report-first.json
+
+Expanded upstream-boundary report:
+/tmp/qwen3vl-image05-step119-granular/report-upstream.json
+
+Origin-verified report after runtime-link hardening:
+/tmp/qwen3vl-image05-step119-granular/report-origin-verified.json
+
+Granular dump:
+/tmp/qwen3vl-image05-step119-granular/dump-upstream
+
+Original no-repack control:
+/tmp/qwen3vl-image05-original-norepack-128/report.json
+
+Current decoder artifacts:
+/tmp/qwen3vl-image05-step119-granular/decoder
+
+Unresolved gates
+
+1. Implement exact packed Q4_K by packed-Q8_K GEMM traversal rather than substituting independent GEMV order.
+2. Promote bounded real Q8/projection/attention fixtures through X-ray without committing private OCR data.
+3. Run focused, nightly, and rolling llama.cpp compatibility tests without relaxing tolerances.
+4. Pass 5 images, then 10, then all 40 through EOS before claiming Qwen3-VL end-to-end parity.
+
+Rules for future conclusions
+
+Do not compare checksums when every element can be compared.
+Do not call a compiler build pure when ELF provenance shows mixed objects.
+Do not trust a requested library path; verify the loaded symbol path.
+Do not compare post-EOS tokens.
+Do not compare production flash arithmetic with an unlabeled unfused dump graph.
+Do not promote a leaf-kernel result as production parity without testing the actual dispatch ABI and batch shape.
+Do not loosen numerical tolerances to make a gate green.
+Do not claim 5, 10, or 40 image parity until those sweeps have actually completed through EOS.

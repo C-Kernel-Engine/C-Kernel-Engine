@@ -136,7 +136,8 @@
             background: var(--grey);
         }
 
-        .site-nav > a.active {
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
             background: var(--orange);
             color: var(--dark);
             font-weight: 600;
@@ -216,22 +217,38 @@
 
         /* Mega menu for Architecture dropdown */
         .nav-dropdown-menu.mega-menu {
-            min-width: 580px;
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
             padding: 1.25rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem 2rem;
-            /* Position to the left so it doesn't clip right edge */
-            left: 50%;
-            transform: translateX(-60%);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
         }
 
         .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
-            transform: translateX(-60%) translateY(0);
+            transform: translateY(0);
         }
 
         .mega-menu .menu-section {
             margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
         }
 
         .mega-menu .menu-heading {
@@ -265,6 +282,7 @@
 
         /* Main Content */
         main {
+            box-sizing: border-box;
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
@@ -765,6 +783,8 @@
                 bottom: 0;
                 background: var(--dark);
                 flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
                 padding: 1rem;
                 gap: 0.5rem;
                 overflow-y: auto;
@@ -825,6 +845,29 @@
                 max-height: 500px;
             }
 
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
             main {
                 padding: 1rem;
             }
@@ -862,11 +905,12 @@
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
             <a href="quickstart.html" class="">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
-            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
-            <a href="cke-throughput-unit.html" class="{{NAV_CKU}}" style="color:var(--orange)">CKU</a>
+            <a href="support-hardware.html" class="active" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
+                <span class="nav-trigger ">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -874,6 +918,12 @@
                             View All Architecture Docs
                             <small>Complete documentation index</small>
                         </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
                     </div>
                     <!-- Left Column -->
                     <div class="menu-section">
@@ -922,28 +972,8 @@
                     </div>
                 </div>
             </div>
-            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
             <a href="version-history.html" class="">Versions</a>
-            <a href="research.html" class="">Research</a>
-            <a href="decisions.html" class="">ADR</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
         </nav>
     </header>
     <main>
@@ -998,6 +1028,10 @@ body { overflow-x: hidden; }
 .support-milestone { padding: .7rem .45rem; border-top: 4px solid var(--grey-light); background: rgba(255,255,255,.025); text-align: center; }
 .support-milestone strong { display: block; color: var(--orange); font-family: 'JetBrains Mono', monospace; }
 .support-milestone span { color: var(--text-muted); font-size: .72rem; }
+.support-investment { margin: 1.5rem 0 2rem; padding: 1.5rem; border: 1px solid rgba(7,173,248,.32); border-radius: 12px; background: linear-gradient(135deg, rgba(7,173,248,.08), rgba(71,180,117,.04)); }
+.support-investment-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.support-investment-total { color: var(--blue); font: 800 1.7rem 'JetBrains Mono', monospace; }
+.support-funded { color: var(--green); font: 700 .72rem 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 850px) { .support-grid { grid-template-columns: minmax(0, 1fr); } .support-hero { padding: 2.2rem 1.25rem; } .support-actions, .support-button { box-sizing: border-box; width: 100%; } .support-table { display: block; max-width: 100%; overflow-x: auto; } }
 @media (max-width: 700px) { .support-milestones { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 </style>
@@ -1029,6 +1063,22 @@ body { overflow-x: hidden; }
     <div class="support-milestone"><strong>$30K</strong><span>full evidence program</span></div>
   </div>
   <p style="margin-top:1rem"><strong>Current funding must be reported manually.</strong> Until GitHub Sponsors and in-kind contributions are reconciled into a public ledger, these markers describe capability gates rather than claiming money raised.</p>
+</section>
+
+<section class="support-investment">
+  <div class="support-investment-head">
+    <div><div class="support-kicker">Personal investment so far</div><h2 style="margin:.35rem 0 0">Founder-funded hardware already supporting CKE</h2></div>
+    <div class="support-investment-total">CAD $1,650</div>
+  </div>
+  <p>This is money personally spent on hardware now used for CKE development and evidence generation. It is separate from sponsor funding, donated or loaned equipment, and the future CAD $30,000 laboratory ceiling.</p>
+  <table class="support-table">
+    <thead><tr><th>Hardware</th><th>Personal cost</th><th>Research role</th><th>Funding status</th></tr></thead>
+    <tbody>
+      <tr><td>Used Lenovo ThinkPad, purchased through Craigslist</td><td>CAD $600</td><td>Portable CKE development, AVX2 testing, documentation, and content production</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Lenovo P3 Tiny, Core i7, 32 GB RAM</td><td>CAD $1,050</td><td>Dedicated minimal Ubuntu Server node for repeatable CKE execution, profiling, and unattended experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
+    </tbody>
+  </table>
+  <p><strong>Ledger scope:</strong> this total includes only the two confirmed hardware purchases above. It excludes electricity, storage or memory upgrades, warranties already included with a purchase, personal labor, and planned Xeon nodes. Future entries will separate personally funded, sponsor funded, donated, loaned, and discounted hardware.</p>
 </section>
 
 <h2>The Immediate Goal</h2>
@@ -1332,6 +1382,7 @@ body { overflow-x: hidden; }
                 <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
                 <ul style="list-style: none; padding: 0; margin: 0;">
                     <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
                     <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
                 </ul>
@@ -1346,7 +1397,7 @@ body { overflow-x: hidden; }
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-15</p>
             </div>
         </div>
     </footer>

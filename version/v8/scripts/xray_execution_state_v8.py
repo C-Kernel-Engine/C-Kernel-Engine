@@ -34,6 +34,7 @@ ROLE_STAGE = {
 
 REMEDIATIONS = {
     "EXECUTION_POLICY_MISMATCH": "Align prefill/decode segmentation and cache transitions in the circuit/runtime contract before tensor bisection.",
+    "KERNEL_CONTRACT_MISMATCH": "Align the exact resolved provider, declared numerical contract, and shape-selected effective contract before comparing tensors.",
     "KERNEL_BATCH_SHAPE_MISMATCH": "Make both backends invoke the same semantic kernel over equivalent M/N/K batches before comparing arithmetic.",
     "POSITION_STATE_MISMATCH": "Align text/M-RoPE position policy and runtime position values before attention diagnostics.",
     "CACHE_STATE_METADATA_MISMATCH": "Fix cache token count, append index, or physical strides before comparing cache bytes.",
@@ -171,6 +172,16 @@ def _kernel_batches(trace: dict[str, Any]) -> list[dict[str, Any]]:
     return [batch for call in trace["execution"]["calls"] for batch in call.get("kernel_batches", [])]
 
 
+def _kernel_contracts(batches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fields = ("checkpoint_id", "kernel_id", "numerical_contract_id", "effective_contract_id")
+    return [{field: batch[field] for field in fields} for batch in batches]
+
+
+def _kernel_shapes(batches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fields = ("checkpoint_id", "m", "n", "k")
+    return [{field: batch[field] for field in fields} for batch in batches]
+
+
 def _artifact_index(trace: dict[str, Any]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for entry in trace["artifacts"]:
@@ -259,8 +270,20 @@ def compare_traces(subject: dict[str, Any], oracle: dict[str, Any]) -> dict[str,
 
     subject_batches = _kernel_batches(subject)
     oracle_batches = _kernel_batches(oracle)
-    if subject_batches != oracle_batches:
-        checks.append(_fail("KERNEL_BATCH_SHAPE_MISMATCH", stage="kernel_batches", subject=subject_batches, oracle=oracle_batches))
+    subject_contracts = _kernel_contracts(subject_batches)
+    oracle_contracts = _kernel_contracts(oracle_batches)
+    if subject_contracts != oracle_contracts:
+        checks.append(_fail(
+            "KERNEL_CONTRACT_MISMATCH", stage="kernel_contracts",
+            subject=subject_contracts, oracle=oracle_contracts,
+        ))
+        return _report(subject, oracle, checks)
+    checks.append({"stage": "kernel_contracts", "status": "pass"})
+
+    subject_shapes = _kernel_shapes(subject_batches)
+    oracle_shapes = _kernel_shapes(oracle_batches)
+    if subject_shapes != oracle_shapes:
+        checks.append(_fail("KERNEL_BATCH_SHAPE_MISMATCH", stage="kernel_batches", subject=subject_shapes, oracle=oracle_shapes))
         return _report(subject, oracle, checks)
     checks.append({"stage": "kernel_batches", "status": "pass"})
 
@@ -342,7 +365,7 @@ def _report(subject: dict[str, Any], oracle: dict[str, Any], checks: list[dict[s
         "subject_backend": subject["backend"], "oracle_backend": oracle["backend"],
         "status": "fail" if first else "pass", "checks": checks, "first_divergence": first,
         "diagnostic_order": [
-            "execution_contract", "kernel_batches", "position_state", "cache_metadata",
+            "execution_contract", "kernel_contracts", "kernel_batches", "position_state", "cache_metadata",
             "cache_append_source", "cache_append_roundtrip", "all_valid_cache_rows",
             "attention_inputs", "attention_arithmetic", "ranking",
         ],

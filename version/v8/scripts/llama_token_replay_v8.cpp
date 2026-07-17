@@ -1078,6 +1078,9 @@ int main(int argc, char ** argv) {
     }
     std::cout << "],";
     std::cout << "\"decode_mode\":\"" << args.decode_mode << "\",";
+    std::cout << "\"flash_attention_mode\":\""
+              << (dump_attention_internals ? "disabled_for_internal_dump" : "auto")
+              << "\",";
     std::cout << "\"greedy_steps\":" << args.greedy_steps << ",";
     std::cout << "\"greedy_generated\":[";
     for (size_t i = 0; i < greedy_generated.size(); ++i) {

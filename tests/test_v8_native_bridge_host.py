@@ -257,6 +257,91 @@ def _build_tiny_decoder_runtime(workdir: Path) -> tuple[Path, Path, Path]:
 
 
 class V8NativeBridgeHostTests(unittest.TestCase):
+    def test_engine_has_canonical_soname(self) -> None:
+        dynamic = subprocess.run(
+            ["readelf", "-d", str(LIBCK)],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout
+        self.assertRegex(dynamic, r"\(SONAME\).*\[libckernel_engine\.so\]")
+
+    def test_decoder_execution_loads_runtime_selected_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            selected = root / "selected-engine.so"
+            selected.touch()
+            runtime = {
+                "so_path": root / "libdecoder_v8.so",
+                "prefill_so_path": root / "libdecoder_v8_prefill.so",
+                "engine_so": str(selected),
+            }
+            sentinel = RuntimeError("loader reached")
+            with mock.patch.object(bridge_runner_v8, "_load_decoder_lib", side_effect=sentinel) as loader:
+                with self.assertRaisesRegex(RuntimeError, "loader reached"):
+                    bridge_runner_v8._run_decoder(runtime, array("f"), 0, [])
+            loader.assert_called_once_with(runtime["prefill_so_path"], engine_so=selected)
+
+    def test_decoder_loader_hard_fails_when_tokenizer_runtime_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            model_so = root / "libdecoder_v8.so"
+            engine_so = root / "libckernel_engine.so"
+            model_so.touch()
+            engine_so.touch()
+            with mock.patch.object(bridge_runner_v8.ctypes, "CDLL", return_value=object()):
+                with mock.patch.object(bridge_runner_v8, "BUILD_DIR", root / "missing-build"):
+                    with self.assertRaisesRegex(FileNotFoundError, "requires libckernel_tokenizer"):
+                        bridge_runner_v8._load_decoder_lib(model_so, engine_so=engine_so)
+
+    def test_decoder_loader_uses_requested_engine_when_adjacent_copy_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            requested = root / "canonical" / "libckernel_engine.so"
+            adjacent = root / "runtime" / "libckernel_engine.so"
+            model_so = root / "runtime" / "libdecoder_v8.so"
+            tokenizer_so = root / "runtime" / "libckernel_tokenizer.so"
+            requested.parent.mkdir()
+            adjacent.parent.mkdir()
+            requested.write_bytes(b"same engine")
+            adjacent.write_bytes(b"same engine")
+            model_so.touch()
+            tokenizer_so.touch()
+
+            fake_lib = mock.Mock()
+            loads: list[Path] = []
+
+            def fake_cdll(path: str | None, mode: int = 0) -> object:
+                if path is not None:
+                    loads.append(Path(path).resolve())
+                return fake_lib
+
+            with mock.patch.object(bridge_runner_v8.ctypes, "CDLL", side_effect=fake_cdll):
+                with mock.patch.object(
+                    bridge_runner_v8,
+                    "_resolved_symbol_library",
+                    return_value=requested.resolve(),
+                ):
+                    bridge_runner_v8._load_decoder_lib(model_so, engine_so=requested)
+
+            self.assertEqual(loads[0], requested.resolve())
+            self.assertNotIn(adjacent.resolve(), loads)
+
+    def test_decoder_loader_rejects_mismatched_adjacent_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            requested = root / "canonical" / "libckernel_engine.so"
+            adjacent = root / "runtime" / "libckernel_engine.so"
+            model_so = root / "runtime" / "libdecoder_v8.so"
+            requested.parent.mkdir()
+            adjacent.parent.mkdir()
+            requested.write_bytes(b"canonical engine")
+            adjacent.write_bytes(b"stale engine")
+            model_so.touch()
+
+            with self.assertRaisesRegex(RuntimeError, "different adjacent CK engine"):
+                bridge_runner_v8._load_decoder_lib(model_so, engine_so=requested)
+
     def test_vision_prefix_position_policy_keeps_qwen_mrope_but_gemma_linear(self) -> None:
         self.assertEqual(
             bridge_runner_v8._vision_prefix_position_policy({"model": "qwen3_vl_vision"}),
@@ -1217,6 +1302,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 fake_decoder_gguf.resolve(),
                 workdir.resolve() / "decoder",
                 context_override=61,
+                profile=False,
             )
 
             report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
@@ -1293,13 +1379,13 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             ensure_engine.assert_called_once_with(openmp=True)
             _, decoder_kwargs = run_decoder.call_args
-            self.assertEqual(decoder_kwargs["prefix_grid"], (3, 1))
+            self.assertIsNone(decoder_kwargs["prefix_grid"])
             self.assertEqual(decoder_kwargs["prefix_text_pos"], 3)
             report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["prefix_source"], "encoder")
             self.assertEqual(report["prefix_tokens"], 3)
-            self.assertEqual(report["prefix_grid_x"], 3)
-            self.assertEqual(report["prefix_grid_y"], 1)
+            self.assertIsNone(report["prefix_grid_x"])
+            self.assertIsNone(report["prefix_grid_y"])
             self.assertEqual(report["decoder_context_len"], 32)
 
     def test_run_decoder_uses_decode_runtime_for_mixed_prefix_continuation(self) -> None:
@@ -1683,6 +1769,10 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 image_mode="checker",
                 vision_top_k=7,
                 vision_activation_pref=["out_proj=q8", "mlp_down=q8"],
+                image_min_tokens=None,
+                image_max_tokens=None,
+                bridge_runtime=None,
+                bridge_generation_mode=None,
                 max_tokens=32,
                 no_chat_template=False,
                 chat_template="auto",
@@ -1753,6 +1843,10 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 image_mode="checker",
                 vision_top_k=8,
                 vision_activation_pref=[],
+                image_min_tokens=None,
+                image_max_tokens=None,
+                bridge_runtime=None,
+                bridge_generation_mode=None,
                 max_tokens=16,
                 no_chat_template=False,
                 chat_template="auto",
@@ -2157,6 +2251,18 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(resolved_bump_path, bump_path)
         self.assertEqual(resolved_config_path, config_path)
 
+    def test_runtime_source_fingerprint_invalidates_on_imported_codegen_change(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_runtime_source_fingerprint_") as tmpdir:
+            source = Path(tmpdir) / "codegen_core.py"
+            source.write_text("VERSION = 1\n", encoding="utf-8")
+            before = bridge_runner_v8._source_set_fingerprint([source])
+            source.write_text("VERSION = 2\n", encoding="utf-8")
+            after = bridge_runner_v8._source_set_fingerprint([source])
+
+        self.assertEqual(before["file_count"], 1)
+        self.assertEqual(after["file_count"], 1)
+        self.assertNotEqual(before["sha256"], after["sha256"])
+
     def test_bridge_prepare_encoder_runtime_reuses_cached_artifacts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_bridge_encoder_reuse_") as tmpdir:
             tmp = Path(tmpdir)
@@ -2205,7 +2311,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             def fake_run_converter(path: Path, out_dir: Path, context_override: int | None = None):
                 return manifest, manifest_path, bump_path, config_path
 
-            def fake_compile_generated_model(c_src: Path, so_dst: Path) -> Path:
+            def fake_compile_generated_model(c_src: Path, so_dst: Path, *, profile: bool = False) -> Path:
                 so_dst.write_bytes(b"so")
                 return so_dst
 
@@ -2217,7 +2323,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
 
         build_ir_main.assert_not_called()
         codegen_main.assert_not_called()
-        compile_model.assert_called_once_with(c_path, so_path)
+        compile_model.assert_called_once_with(c_path, so_path, profile=False)
         self.assertEqual(runtime["embed_dim"], 1536)
         self.assertEqual(runtime["so_path"], so_path)
 
@@ -2271,7 +2377,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 c_path.write_text("/* generated */", encoding="utf-8")
                 return 0
 
-            def fake_compile_generated_model(c_src: Path, so_dst: Path) -> Path:
+            def fake_compile_generated_model(c_src: Path, so_dst: Path, *, profile: bool = False) -> Path:
                 so_dst.write_bytes(b"so")
                 return so_dst
 
@@ -2372,7 +2478,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             def fake_run_converter(path: Path, out_dir: Path, context_override: int | None = None):
                 return manifest, manifest_path, bump_path, config_path
 
-            def fake_compile_generated_model(c_src: Path, so_dst: Path) -> Path:
+            def fake_compile_generated_model(c_src: Path, so_dst: Path, *, profile: bool = False) -> Path:
                 so_dst.write_bytes(b"so")
                 return so_dst
 
@@ -2389,8 +2495,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         build_ir_main.assert_not_called()
         codegen_main.assert_not_called()
         self.assertEqual(compile_model.call_count, 2)
-        compile_model.assert_any_call(c_path, so_path)
-        compile_model.assert_any_call(prefill_c_path, prefill_so_path)
+        compile_model.assert_any_call(c_path, so_path, profile=False)
+        compile_model.assert_any_call(prefill_c_path, prefill_so_path, profile=False)
         self.assertEqual(runtime["embed_dim"], 4096)
         self.assertEqual(runtime["input_embed_dim"], 16384)
         self.assertEqual(runtime["vocab_size"], 151936)
@@ -2462,7 +2568,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 output_path.write_text("/* generated */", encoding="utf-8")
                 return 0
 
-            def fake_compile_generated_model(c_path: Path, so_path: Path) -> Path:
+            def fake_compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = False) -> Path:
                 so_path.parent.mkdir(parents=True, exist_ok=True)
                 so_path.write_bytes(b"so")
                 return so_path
@@ -2487,7 +2593,11 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             Path(decode_codegen[0][decode_codegen[0].index("--prefill") + 1]),
             output_dir / "call_prefill.json",
         )
-        self.assertNotIn("--prefill-layout", decode_codegen[0])
+        self.assertIn("--prefill-layout", decode_codegen[0])
+        self.assertEqual(
+            Path(decode_codegen[0][decode_codegen[0].index("--prefill-layout") + 1]),
+            output_dir / "layout_prefill.json",
+        )
         self.assertEqual(runtime["embed_dim"], 4096)
         self.assertEqual(runtime["input_embed_dim"], 16384)
         self.assertEqual(runtime["vocab_size"], 151936)
@@ -2500,33 +2610,65 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             stamp_path = so_path.with_suffix(so_path.suffix + ".build.json")
             c_path.write_text("/* first */", encoding="utf-8")
             so_path.write_bytes(b"so")
-            initial_hash = hashlib.sha256(c_path.read_bytes()).hexdigest()
-            stamp_path.write_text(
-                json.dumps(
-                    {
-                        "version": 1,
-                        "source_path": str(c_path.resolve()),
-                        "source_sha256": initial_hash,
-                        "source_size": c_path.stat().st_size,
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            with mock.patch.object(bridge_runner_v8, "_run") as run_cmd:
-                bridge_runner_v8._compile_generated_model(c_path, so_path)
-            run_cmd.assert_not_called()
-
-            c_path.write_text("/* second */", encoding="utf-8")
-
             def fake_run(cmd: list[str]) -> None:
                 so_path.write_bytes(b"rebuilt")
 
             with mock.patch.object(bridge_runner_v8, "_run", side_effect=fake_run) as run_cmd:
                 bridge_runner_v8._compile_generated_model(c_path, so_path)
                 run_cmd.assert_called_once()
+                self.assertIn("-Wl,-rpath,$ORIGIN", run_cmd.call_args.args[0])
+
+            with mock.patch.object(bridge_runner_v8, "_run") as run_cmd:
+                bridge_runner_v8._compile_generated_model(c_path, so_path)
+                run_cmd.assert_not_called()
+
+            initial = json.loads(stamp_path.read_text(encoding="utf-8"))
+            self.assertEqual(initial["version"], 3)
+            self.assertEqual(initial["runtime_dependency"]["runpath"], "$ORIGIN")
+            self.assertEqual(
+                initial["runtime_dependency"]["sha256"],
+                hashlib.sha256((BUILD_DIR / "libckernel_engine.so").read_bytes()).hexdigest(),
+            )
+
+            c_path.write_text("/* second */", encoding="utf-8")
+
+            with mock.patch.object(bridge_runner_v8, "_run", side_effect=fake_run) as run_cmd:
+                bridge_runner_v8._compile_generated_model(c_path, so_path)
+                run_cmd.assert_called_once()
                 updated = json.loads(stamp_path.read_text(encoding="utf-8"))
                 self.assertEqual(updated["source_sha256"], hashlib.sha256(c_path.read_bytes()).hexdigest())
+
+            changed_support = {
+                "sha256": "support-source-changed",
+                "file_count": int(initial["compiled_support_source_set"]["file_count"]),
+            }
+            with mock.patch.object(
+                bridge_runner_v8,
+                "_compiled_runtime_support_fingerprint",
+                return_value=changed_support,
+            ), mock.patch.object(bridge_runner_v8, "_run", side_effect=fake_run) as run_cmd:
+                bridge_runner_v8._compile_generated_model(c_path, so_path)
+                run_cmd.assert_called_once()
+                dependency_updated = json.loads(stamp_path.read_text(encoding="utf-8"))
+                self.assertEqual(dependency_updated["compiled_support_source_set"], changed_support)
+
+            compiler_probe = subprocess.CompletedProcess(
+                ["icx-test", "--version"], 0, stdout="icx-test 1.0\n", stderr=""
+            )
+            with mock.patch.dict("os.environ", {"CC": "icx-test"}), \
+                 mock.patch.object(
+                     bridge_runner_v8.subprocess, "run", return_value=compiler_probe
+                 ), mock.patch.object(
+                     bridge_runner_v8, "_run", side_effect=fake_run
+                 ) as run_cmd:
+                bridge_runner_v8._compile_generated_model(c_path, so_path)
+                run_cmd.assert_called_once()
+                self.assertEqual(run_cmd.call_args.args[0][0], "icx-test")
+                compiler_updated = json.loads(stamp_path.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    compiler_updated["compiler"],
+                    {"command": "icx-test", "version": "icx-test 1.0"},
+                )
 
     def test_ck_run_v8_reuses_legacy_v7_hf_gguf_cache(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_legacy_cache_") as tmpdir:

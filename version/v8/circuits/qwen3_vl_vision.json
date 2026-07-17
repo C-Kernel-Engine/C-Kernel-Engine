@@ -568,6 +568,24 @@
     "schema": "cke.semantic_checkpoint_contract",
     "schema_version": 1,
     "exports": {
+      "frontend.patch_bias": {
+        "section": "header",
+        "template_op_id": "patch_bias",
+        "op": "patch_bias_add",
+        "checkpoints": [
+          {
+            "id": "vision.frontend.patch_bias.output",
+            "producer": "patch_bias",
+            "tensor": "patch_bias",
+            "logical_layout": "token_major",
+            "axis_names": [
+              "token",
+              "channel"
+            ],
+            "storage_dtype": "bf16"
+          }
+        ]
+      },
       "frontend.position": {
         "section": "header",
         "template_op_id": "position_embeddings",

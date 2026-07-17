@@ -2793,6 +2793,22 @@ static int ck_debug_import_checkpoint(CKModel *model, int layer, const char *che
     return 1;
 }}
 
+static int ck_debug_hidden_name_in_list(const char *list, const char *name) {{
+    if (!list || !list[0] || !name) return 1;
+    const size_t name_len = strlen(name);
+    const char *cursor = list;
+    while (*cursor) {{
+        while (*cursor == ',' || *cursor == ' ' || *cursor == '\t') cursor++;
+        const char *start = cursor;
+        while (*cursor && *cursor != ',') cursor++;
+        const char *end = cursor;
+        while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
+        if ((size_t)(end - start) == name_len && memcmp(start, name, name_len) == 0) return 1;
+        if (*cursor == ',') cursor++;
+    }}
+    return 0;
+}}
+
 static void ck_debug_export_hidden(CKModel *model, int layer, const char *name, const float *data, int count) {{
     const char *dir = getenv("CK_DEBUG_EXPORT_HIDDEN");
     if (!dir || !dir[0] || !model || !name || !data || count <= 0) return;
@@ -2804,6 +2820,8 @@ static void ck_debug_export_hidden(CKModel *model, int layer, const char *name, 
     }}
     const char *name_filter = getenv("CK_DEBUG_EXPORT_HIDDEN_NAME");
     if (name_filter && name_filter[0] && strcmp(name_filter, name) != 0) return;
+    const char *name_filters = getenv("CK_DEBUG_EXPORT_HIDDEN_NAMES");
+    if (name_filters && name_filters[0] && !ck_debug_hidden_name_in_list(name_filters, name)) return;
     char path[1024];
     int n = snprintf(path, sizeof(path), "%s/tok_%04d_layer_%03d_%s.f32",
                      dir, model->pos, layer, name);
@@ -2998,6 +3016,34 @@ CK_EXPORT void ck_model_kv_cache_reset(void) {{
 CK_EXPORT int ck_model_kv_cache_enable(int capacity) {{
     /* KV cache is always enabled in v7 */
     (void)capacity;
+    return 0;
+}}
+
+/* Bounded X-ray ABI: export one layer and only currently valid FP16 KV rows.
+ * The file is diagnostic evidence, not a runtime checkpoint format. */
+CK_EXPORT int ck_model_debug_export_kv_f16(const char *path, int layer) {{
+    if (!g_model || !path || !path[0] || !g_model->kv_cache_f16) return -1;
+    if (layer < 0 || layer >= NUM_LAYERS || g_model->pos < 0 || g_model->pos > MAX_SEQ_LEN) return -2;
+    FILE *f = fopen(path, "wb");
+    if (!f) return -3;
+    const uint32_t header[8] = {{
+        UINT32_C(0x564b5843), UINT32_C(1), (uint32_t)layer, (uint32_t)g_model->pos,
+        (uint32_t)NUM_KV_HEADS, (uint32_t)MAX_SEQ_LEN, (uint32_t)HEAD_DIM, UINT32_C(0)
+    }};
+    if (fwrite(header, sizeof(header), 1, f) != 1) {{ fclose(f); return -4; }}
+    const size_t head_stride = (size_t)MAX_SEQ_LEN * (size_t)HEAD_DIM;
+    const size_t valid_bytes = (size_t)g_model->pos * (size_t)HEAD_DIM * sizeof(uint16_t);
+    const uint16_t *layer_k = g_model->kv_cache_f16 +
+        (size_t)(layer * 2) * (size_t)NUM_KV_HEADS * head_stride;
+    const uint16_t *layer_v = g_model->kv_cache_f16 +
+        (size_t)(layer * 2 + 1) * (size_t)NUM_KV_HEADS * head_stride;
+    for (int h = 0; h < NUM_KV_HEADS; ++h) {{
+        if (fwrite(layer_k + (size_t)h * head_stride, valid_bytes, 1, f) != 1) {{ fclose(f); return -5; }}
+    }}
+    for (int h = 0; h < NUM_KV_HEADS; ++h) {{
+        if (fwrite(layer_v + (size_t)h * head_stride, valid_bytes, 1, f) != 1) {{ fclose(f); return -6; }}
+    }}
+    fclose(f);
     return 0;
 }}
 

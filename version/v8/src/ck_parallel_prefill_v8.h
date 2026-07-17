@@ -37,6 +37,9 @@ extern "C" {
 void ck_parallel_prefill_init(void);
 void ck_parallel_prefill_shutdown(void);
 
+/** Release lazily repacked Q4_K weights at model/test teardown. */
+void ck_q4k_packed_weight_cache_clear(void);
+
 /* Parallel GEMM Wrappers - same signatures as serial GEMM functions */
 void gemm_nt_q5_0_q8_0_parallel_dispatch(
     const void *A, const void *B, const float *bias, float *C,
@@ -49,6 +52,13 @@ void gemm_nt_q8_0_q8_0_parallel_dispatch(
 void gemm_nt_q4_k_q8_k_parallel_dispatch(
     const void *A, const void *B, const float *bias, float *C,
     int M, int N, int K);
+
+void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+    const void *A, const void *B, const float *bias, float *C,
+    int M, int N, int K);
+
+void gemv_q4_k_q8_k_repacked_parallel_dispatch(
+    float *y, const void *W, const void *x_q8, int N, int K);
 
 void gemm_nt_q4_k_q8_k_gateup_swiglu_x16_parallel_dispatch(
     const void *A, const void *B, const float *bias, float *C,

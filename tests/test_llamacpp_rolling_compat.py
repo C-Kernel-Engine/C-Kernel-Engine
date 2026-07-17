@@ -36,6 +36,25 @@ PARITY SMOKETEST SUMMARY
             [{"ck_over_llama_speedup": 0.9, "ck_gflops": 7.26, "llama_gflops": 9.77}],
         )
 
+    def test_optional_patch_drift_does_not_fail_runtime_compatibility(self) -> None:
+        phases = {
+            "patch_compatibility": {"status": "warn", "blocking": False},
+            "ck_build": {"status": "pass"},
+            "quick_parity": {"status": "pass"},
+        }
+        self.assertEqual(MODULE.compatibility_status(phases), "pass")
+
+    def test_build_or_parity_failure_remains_blocking(self) -> None:
+        for phase_name in ("ck_build", "quick_parity"):
+            with self.subTest(phase=phase_name):
+                phases = {
+                    "patch_compatibility": {"status": "pass", "blocking": False},
+                    "ck_build": {"status": "pass"},
+                    "quick_parity": {"status": "pass"},
+                }
+                phases[phase_name]["status"] = "fail"
+                self.assertEqual(MODULE.compatibility_status(phases), "fail")
+
 
 if __name__ == "__main__":
     unittest.main()

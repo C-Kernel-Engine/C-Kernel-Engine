@@ -382,11 +382,14 @@ void ck_test_vec_dot_q4_k_q8_k(const void *weight_q4_k,
 }
 
 void ck_test_vec_dot_q6_k_q8_k(const void *weight_q6_k,
-                                const void *input_q8_k,
-                                float *output,
-                                int cols)
+                               const void *input_q8_k,
+                               float *output,
+                               int cols)
 {
-    vec_dot_q6_k_q8_k(cols, output, weight_q6_k, input_q8_k);
+    /* Exercise the production M=1 provider. The scalar vec_dot helper is an
+     * internal architecture-neutral oracle and does not preserve the x86
+     * provider's declared lane reduction order. */
+    gemv_q6_k_q8_k(output, weight_q6_k, input_q8_k, 1, cols);
 }
 
 /**

@@ -1,0 +1,73 @@
+Qwen3-VL Q4_K_M parity investigation record
+Reference: llama.cpp a5822222909b785f23ddc74ce3c8f85bd0e38562
+CK branch: test/q4k-q8k-llama-packed
+Date: 2026-07-15
+
+Scope
+
+Canonical prompt: Extract visible form fields as compact JSON.
+Visual prefix: 1008 x 16384 float32 rows from the Q8_0 vision encoder.
+Decoder: Qwen3-VL-8B-Instruct Q4_K_M GGUF.
+Goal: production CK and llama.cpp logits and greedy tokens, with no relaxed tolerance.
+
+Confirmed defects and fixes
+
+1. The parity runner compared tokens after both runtimes had emitted a bridge-declared stop token.
+   Fix: stop comparison at the shared EOS/stop token and report post-EOS differences as invalid.
+
+2. Diagnostic Q/K occurrence mapping confused projection, normalization, and post-RoPE tensors.
+   Fix: map occurrence zero to projection, occurrence one to Q/K normalization when present, and the final occurrence to post-RoPE.
+
+3. Runtime reuse could execute stale generated C or a different engine shared object.
+   Fix: exact-runtime mode requires explicit decoder, manifest, and engine paths and records hashes/compiler provenance.
+
+4. Combined mixed prefill did not reproduce llama.cpp segmented execution.
+   Fix: represent text-before, visual, and text-after as cache-preserving circuit calls with separate physical cache and semantic M-RoPE positions.
+
+5. Direct scalar Q4_K x Q8_K tests did not certify the packed multi-row production provider.
+   Fix: add current llama.cpp GGML graph oracles at decode, packed M=16, and practical Qwen3-VL dimensions. Record exact packed reduction semantics in the quantized-linear contracts and kernel maps.
+
+6. ICX contraction changed Q8_K rounding bytes at a production quantization boundary.
+   Fix: preserve the required arithmetic boundary and validate both GCC and ICX paths against llama.cpp rather than treating compiler agreement as an oracle.
+
+7. CK SwiGLU used a mathematically similar exponential/evaluation order rather than GGML's exact x86 contract.
+   Fix: add swiglu_forward_ggml, select it through the Qwen3-VL circuit and kernel map, and test the exact intermediate boundary.
+
+8. Qwen3-VL visual prefill used one attention reduction contract for every segment.
+   llama.cpp dispatches by query batch shape: Q below 64 uses FP16 online single-range arithmetic; Q at or above 64 uses 64 x 64 FP32 tiled flash attention.
+   Qwen3-VL uses Q=5, Q=1008, and Q=14 for text-before, visual, and text-after. A single-range-only implementation corrupted visual history; a tiled-only experiment corrupted both short text segments.
+   Fix: add the explicit f16_flash_auto_qtile64 composite contract. The circuit requests it, the kernel map binds it, and the kernel selects only between two independently validated arithmetic contracts at Q=64.
+
+Disproved or incomplete hypotheses
+
+1. The initial layer-0 Q/K/V Q8 quantization and projection were not the remaining failure. Natural layer-0 Q/K/V matched exactly.
+
+2. A generic Q8 amplification diagnosis was too broad. Small differences did cross later quantization boundaries, but their upstream cause was visual prefill attention dispatch.
+
+3. Persistent KV-cache corruption was not the final explanation for the canonical failure. Full replay reproduced some failures, while execution-state X-ray separately found and fixed a real segmented-prefill/cache-policy mismatch.
+
+4. Replacing all prefill attention with the 64 x 64 tiled provider improved long visual arithmetic but still failed because Q=5 and Q=14 require llama.cpp's short-query contract.
+
+5. Leaf primitive parity alone was insufficient. Production provider, batch shape, selected reduction, compiler, and runtime artifact hashes must all be part of the oracle evidence.
+
+Hardening added
+
+1. llama.cpp-backed Q4_K/Q6_K x Q8_K production graph tests in full/nightly parity.
+2. FP16 attention oracle cases at Q=5, Q=14, Q=63, Q=64, and Q=1008 with H=32, Hkv=8, D=128.
+3. Fail-closed composite attention-contract schema with missing and unvalidated route rejection.
+4. Exact circuit to kernel-map resolution for segmented prefill, decode attention, SwiGLU, and packed quantized linear providers.
+5. X-ray execution traces require kernel ID, declared numerical contract ID, and shape-selected effective contract ID.
+6. X-ray reports KERNEL_CONTRACT_MISMATCH before loading tensor dumps.
+7. EOS-aware multi-token parity and explicit runtime provenance.
+
+Measured status
+
+Direct FP16 attention oracle: 27/27 pass on current llama.cpp.
+Production visual segment Q=1008, KV=1013, H=32, Hkv=8, D=128: byte-exact.
+Canonical image: 384/384 token steps pass with RMSE 0 and identical top-16 logits. EOS was not reached within that bound.
+Five-image gate: 5/5 images pass 64/64 token steps, including prefix_text_pos 41 and 45 variants.
+The 10-image, 40-image, and per-image EOS gates remain to be run before claiming universal OCR parity.
+
+Research lesson
+
+Numerical parity is a property of an executed circuit, not a function name. Input storage, arithmetic order, rounding boundaries, batch shape, thread partition, compiler contraction, effective runtime dispatch, cache history, and stop-token semantics can each change the token path. X-ray must compare this execution state before interpreting downstream tensor error.

@@ -103,27 +103,41 @@ def _prefill_op(op_name: str, weight: str) -> dict:
     }
 
 
-def _quantize_op(op_name: str, storage: str, *, rows: str = "ROWS") -> dict:
+def _quantize_op(
+    op_name: str,
+    storage: str,
+    *,
+    rows: str = "ROWS",
+    prefill_batch: bool = False,
+) -> dict:
     is_q8_k = storage == "q8_k"
     function = f"renamed_{storage}_quantizer"
+    capability = {
+        "schema_version": 1,
+        "kernel_id": f"fake_{storage}_quantizer",
+        "operator_family": "activation_quantization",
+        "function": function,
+        "output_storage": {
+            "format": storage,
+            "block_elements": 256 if is_q8_k else 32,
+            "block_elements_symbol": "QK_K" if is_q8_k else "QK8_0",
+            "c_block_type": "block_q8_K" if is_q8_k else "block_q8_0",
+        },
+    }
+    if prefill_batch:
+        capability["prefill_batch"] = {
+            "function": "grouped_quantizer",
+            "row_group": 4,
+            "tail_function": function,
+            "rounding_contract": "test_grouped_rounding",
+        }
     return {
         "idx": 2,
         "op": op_name,
         "function": function,
         "layer": 0,
         "section": "body",
-        "resolved_codegen_capability": {
-            "schema_version": 1,
-            "kernel_id": f"fake_{storage}_quantizer",
-            "operator_family": "activation_quantization",
-            "function": function,
-            "output_storage": {
-                "format": storage,
-                "block_elements": 256 if is_q8_k else 32,
-                "block_elements_symbol": "QK_K" if is_q8_k else "QK8_0",
-                "c_block_type": "block_q8_K" if is_q8_k else "block_q8_0",
-            },
-        },
+        "resolved_codegen_capability": capability,
         "args": [
             {"name": "x", "expr": "X"},
             {"name": "y", "expr": "Y"},
@@ -223,6 +237,12 @@ class V8CodegenCapabilityTests(unittest.TestCase):
         expected = {
             "quantize_row_q8_0.json": ("q8_0", 32, "QK8_0", "block_q8_0"),
             "quantize_row_q8_k.json": ("q8_k", 256, "QK_K", "block_q8_K"),
+            "quantize_row_q8_k_llama_repack.json": (
+                "q8_k",
+                256,
+                "QK_K",
+                "block_q8_K",
+            ),
         }
         for filename, storage in expected.items():
             with self.subTest(map=filename):
@@ -273,6 +293,15 @@ class V8CodegenCapabilityTests(unittest.TestCase):
                 self.assertIn(f"renamed_{storage}_quantizer(", code)
                 self.assertIn(f"/ {symbol}) * sizeof({block_type})", code)
 
+    def test_prefill_quantization_uses_declared_grouped_provider(self) -> None:
+        op = _quantize_op("quantize_input_0", "q8_k", prefill_batch=True)
+        code = prefill.emit_prefill_op(op, 2, {})
+        self.assertIn("grouped_quantizer(_x_base, (void*)_y_base, num_tokens, _k);", code)
+        self.assertNotIn("for (int _t = 0; _t < num_tokens; ++_t)", code)
+        decode_code = core.emit_op(op)
+        self.assertIn("renamed_q8_k_quantizer(", decode_code)
+        self.assertNotIn("grouped_quantizer(", decode_code)
+
     def test_quantization_without_resolved_capability_hard_fails(self) -> None:
         op = _quantize_op("quantize_input_0", "q8_k")
         del op["resolved_codegen_capability"]
@@ -285,19 +314,75 @@ class V8CodegenCapabilityTests(unittest.TestCase):
         registry = {
             "kernels": [
                 {"id": "renamed_q8_0", "op": "quantize", "quant": {"output": "q8_0"}},
-                {"id": "renamed_q8_k", "op": "quantize", "quant": {"output": "q8_k"}},
+                {
+                    "id": "renamed_q8_k",
+                    "op": "quantize",
+                    "quant": {"output": "q8_k"},
+                    "codegen_capability": {
+                        "rounding_contract": "canonical_q8_k_row_nearest"
+                    },
+                },
+                {
+                    "id": "renamed_q8_k_grouped",
+                    "op": "quantize",
+                    "quant": {"output": "q8_k"},
+                    "codegen_capability": {
+                        "rounding_contract": "llama_repack_q8_k_4row_nearest_even"
+                    },
+                },
             ]
         }
         build_ir = _load("build_ir_v8_quant_capability_tests", SCRIPTS / "build_ir_v8.py")
         self.assertEqual(
-            build_ir.get_quantize_kernel_for_activation(registry, "q8_k"),
+            build_ir.get_quantize_kernel_for_activation(
+                registry, "q8_k", "canonical_q8_k_row_nearest"
+            ),
             "renamed_q8_k",
         )
+        self.assertEqual(
+            build_ir.get_quantize_kernel_for_activation(
+                registry,
+                "q8_k",
+                "llama_repack_q8_k_4row_nearest_even",
+            ),
+            "renamed_q8_k_grouped",
+        )
         registry["kernels"].append(
-            {"id": "ambiguous_q8_k", "op": "quantize", "quant": {"output": "q8_k"}}
+            {
+                "id": "ambiguous_q8_k",
+                "op": "quantize",
+                "quant": {"output": "q8_k"},
+                "codegen_capability": {
+                    "rounding_contract": "canonical_q8_k_row_nearest"
+                },
+            }
         )
         with self.assertRaisesRegex(RuntimeError, "resolved 2 quantization providers"):
-            build_ir.get_quantize_kernel_for_activation(registry, "q8_k")
+            build_ir.get_quantize_kernel_for_activation(
+                registry, "q8_k", "canonical_q8_k_row_nearest"
+            )
+
+    def test_q4_q6_consumers_select_phase_specific_quantization_contracts(self) -> None:
+        build_ir = _load("build_ir_v8_quant_consumer_contract_tests", SCRIPTS / "build_ir_v8.py")
+        registry = build_ir.load_kernel_registry()
+        self.assertEqual(
+            build_ir.get_kernel_activation_quantization_contract(
+                registry, "gemm_nt_q4_k_q8_k", "prefill"
+            ),
+            ("q8_k", "llama_repack_q8_k_4row_nearest_even"),
+        )
+        self.assertEqual(
+            build_ir.get_kernel_activation_quantization_contract(
+                registry, "gemm_nt_q6_k_q8_k", "prefill"
+            ),
+            ("q8_k", "canonical_q8_k_row_nearest"),
+        )
+        self.assertEqual(
+            build_ir.get_kernel_activation_quantization_contract(
+                registry, "gemv_q4_k_q8_k", "decode"
+            ),
+            ("q8_k", "canonical_q8_k_row_nearest"),
+        )
 
     def test_codegen_conditions_do_not_name_governed_q4_q6_providers(self) -> None:
         for filename in ("codegen_core_v8.py", "codegen_prefill_v8.py"):

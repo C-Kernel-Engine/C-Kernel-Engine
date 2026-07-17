@@ -63,6 +63,8 @@ class XRayExecutionStateTests(unittest.TestCase):
             "position_start": start, "cache_action": action,
             "kernel_batches": [{
                 "checkpoint_id": "decoder.layer.0.q_proj", "kernel_id": "gemm_q4k_q8k",
+                "numerical_contract_id": "q4k_q8k_independent_rows",
+                "effective_contract_id": "q4k_q8k_independent_rows",
                 "m": count, "n": 4096, "k": 4096,
             }],
         }
@@ -102,6 +104,26 @@ class XRayExecutionStateTests(unittest.TestCase):
         result = xray.compare_traces(left, right)
         self.assertEqual(result["first_divergence"]["classification"], "CACHE_STATE_METADATA_MISMATCH")
         self.assertEqual(result["first_divergence"]["field"], "append_index")
+
+    def test_effective_shape_dispatch_contract_mismatch_precedes_tensors(self):
+        left = self.trace("ck", self.segmented_calls())
+        right = self.trace("llamacpp", self.segmented_calls())
+        visual_left = left["execution"]["calls"][1]["kernel_batches"][0]
+        visual_right = right["execution"]["calls"][1]["kernel_batches"][0]
+        for batch in (visual_left, visual_right):
+            batch["kernel_id"] = "attention_prefill_f16cache_flash_auto"
+            batch["numerical_contract_id"] = "f16_flash_auto_qtile64"
+        visual_left["effective_contract_id"] = "f16_online_single_range"
+        visual_right["effective_contract_id"] = "f16_kv_tiled64_fp32_softmax_fp64_sum_update"
+
+        result = xray.compare_traces(left, right)
+        failure = result["first_divergence"]
+        self.assertEqual(failure["classification"], "KERNEL_CONTRACT_MISMATCH")
+        self.assertEqual(failure["stage"], "kernel_contracts")
+        self.assertEqual(
+            failure["subject"][1]["effective_contract_id"],
+            "f16_online_single_range",
+        )
 
     def test_first_changed_cache_row_is_reported(self):
         expected = np.arange(32, dtype=np.float16).reshape(4, 8)

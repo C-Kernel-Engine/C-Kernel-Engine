@@ -1551,7 +1551,7 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
                 if (check && strcmp(check, special_tokens[i]) == 0) {{
                     ck_true_bpe_add_special_token(g_model->tokenizer, special_tokens[i], id);
                     #ifdef CK_DEBUG_TOKENIZER
-                    printf("[Tokenizer] Registered special: %s -> %d\n", special_tokens[i], id);
+                    printf("[Tokenizer] Registered special: %s -> %d\\n", special_tokens[i], id);
                     #endif
                 }}
             }}
@@ -4642,30 +4642,85 @@ def kernel_needs_q8_activation(registry: Dict, kernel_id: str) -> bool:
     return False
 
 
-def get_quantize_kernel_for_activation(registry: Dict, activation_dtype: str) -> Optional[str]:
+def get_kernel_activation_quantization_contract(
+    registry: Dict,
+    kernel_id: str,
+    mode: str,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Return the Q8 storage and arithmetic contract required by a consumer."""
+    for kernel in registry.get("kernels", []):
+        if not isinstance(kernel, dict) or kernel.get("id") != kernel_id:
+            continue
+        quant = kernel.get("quant") if isinstance(kernel.get("quant"), dict) else {}
+        activation_dtype = str(quant.get("activation", "fp32") or "fp32")
+        if activation_dtype not in {"q8_0", "q8_k"}:
+            return None, None
+        contract_spec = quant.get("activation_quantization_contract")
+        if contract_spec is None:
+            if activation_dtype == "q8_k":
+                raise RuntimeError(
+                    f"HARD NUMERICAL CONTRACT FAULT: Q8_K consumer {kernel_id!r} "
+                    "does not declare activation_quantization_contract."
+                )
+            return activation_dtype, None
+        if isinstance(contract_spec, str):
+            contract = contract_spec.strip()
+        elif isinstance(contract_spec, dict):
+            contract = str(contract_spec.get(mode, "") or "").strip()
+        else:
+            contract = ""
+        if not contract:
+            raise RuntimeError(
+                f"HARD NUMERICAL CONTRACT FAULT: consumer {kernel_id!r} has no "
+                f"activation quantization contract for phase {mode!r}."
+            )
+        return activation_dtype, contract
+    raise RuntimeError(f"HARD KERNEL RESOLUTION FAULT: unknown kernel {kernel_id!r}.")
+
+
+def get_quantize_kernel_for_activation(
+    registry: Dict,
+    activation_dtype: str,
+    rounding_contract: Optional[str] = None,
+) -> Optional[str]:
     """
     Get the appropriate quantize kernel for the target activation dtype.
 
     Args:
         activation_dtype: Target activation dtype (e.g., "q8_0", "q8_k")
+        rounding_contract: Required arithmetic/rounding contract, when declared
 
     Returns:
         Quantize kernel ID or None if no quantization needed
     """
     if activation_dtype not in {"q8_0", "q8_k"}:
         return None
-    matches = [
-        str(kernel.get("id", ""))
-        for kernel in registry.get("kernels", [])
-        if isinstance(kernel, dict)
-        and kernel.get("op") == "quantize"
-        and (kernel.get("quant") or {}).get("output") == activation_dtype
-    ]
+    matches = []
+    for kernel in registry.get("kernels", []):
+        if (
+            not isinstance(kernel, dict)
+            or kernel.get("op") != "quantize"
+            or (kernel.get("quant") or {}).get("output") != activation_dtype
+        ):
+            continue
+        capability = (
+            kernel.get("codegen_capability")
+            if isinstance(kernel.get("codegen_capability"), dict)
+            else {}
+        )
+        provider_contract = capability.get("rounding_contract")
+        if rounding_contract is not None and provider_contract != rounding_contract:
+            continue
+        if rounding_contract is None and provider_contract is not None:
+            continue
+        matches.append(str(kernel.get("id", "")))
     if len(matches) != 1:
         raise RuntimeError(
             f"HARD CODEGEN CAPABILITY FAULT: activation storage {activation_dtype!r} "
+            f"with rounding contract {rounding_contract!r} "
             f"resolved {len(matches)} quantization providers: {matches}. "
-            "Kernel maps must provide exactly one quantize operator for the requested format."
+            "Kernel maps must provide exactly one quantize operator for the requested "
+            "storage and arithmetic contract."
         )
     return matches[0]
 
@@ -5824,6 +5879,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
                     # Track pre-norm instance for quantize insertion
                     norm_instance = 0
+                    active_pre_norm_quant_contract: Optional[str] = None
+                    active_pre_norm_quant_op_name: Optional[str] = None
+                    active_pre_norm_quant_instance = 0
 
                     for op_idx, op_item in enumerate(layer_items):
                         op = op_item["op"]
@@ -5875,8 +5933,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             if kernel_needs_q8_activation(registry, fk_id):
                                 for kreg in registry.get("kernels", []):
                                     if kreg.get("id") == fk_id:
-                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
-                                        quantize_kernel = get_quantize_kernel_for_activation(registry, act_dtype)
+                                        act_dtype, quant_contract = (
+                                            get_kernel_activation_quantization_contract(
+                                                registry, fk_id, mode
+                                            )
+                                        )
+                                        quantize_kernel = get_quantize_kernel_for_activation(
+                                            registry, act_dtype, quant_contract
+                                        )
                                         if quantize_kernel:
                                             quant_op_name = f"quantize_{op}_input"
                                             quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
@@ -5898,6 +5962,51 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 kernel_id, split_op = k
                             else:
                                 kernel_id, split_op = k, op
+
+                            # A normed FP32 stream may feed consumers that share
+                            # Q8_K storage but require different arithmetic
+                            # contracts. Re-quantize at the exact consumer
+                            # boundary instead of treating storage identity as
+                            # numerical-contract identity.
+                            if (
+                                op in PRE_NORM_Q8_DIRECT_CONSUMERS
+                                and kernel_needs_q8_activation(registry, kernel_id)
+                            ):
+                                act_dtype, required_contract = (
+                                    get_kernel_activation_quantization_contract(
+                                        registry, kernel_id, mode
+                                    )
+                                )
+                                if required_contract != active_pre_norm_quant_contract:
+                                    if not active_pre_norm_quant_op_name:
+                                        raise RuntimeError(
+                                            "HARD NUMERICAL CONTRACT FAULT: Q8 consumer "
+                                            f"{kernel_id!r} has no active pre-norm quantizer."
+                                        )
+                                    quantize_kernel = get_quantize_kernel_for_activation(
+                                        registry, act_dtype, required_contract
+                                    )
+                                    quant_op_info = get_op_info(
+                                        active_pre_norm_quant_op_name, "body", layer_idx
+                                    )
+                                    arranged_kernels.append({
+                                        "op_id": quant_op_info["op_id"],
+                                        "kernel": quantize_kernel,
+                                        "op": active_pre_norm_quant_op_name,
+                                        "template_op_id": op_item.get("id"),
+                                        "section": "body",
+                                        "layer": layer_idx,
+                                        "instance": active_pre_norm_quant_instance,
+                                        "_auto_inserted": True,
+                                    })
+                                    print(
+                                        f"      [{quant_op_info['op_id']:3d}] "
+                                        f"{active_pre_norm_quant_op_name:20s} → "
+                                        f"{quantize_kernel}  "
+                                        f"(inst: {active_pre_norm_quant_instance}) "
+                                        f"[AUTO-INSERTED contract switch]"
+                                    )
+                                    active_pre_norm_quant_contract = required_contract
 
                             # Get op_id and instance (data flow is handled in IR Lower)
                             op_info = get_op_info(split_op, "body", layer_idx)
@@ -5958,8 +6067,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                     # Get activation dtype from kernel
                                     for kreg in registry.get("kernels", []):
                                         if kreg.get("id") == nk_id:
-                                            act_dtype = kreg.get("quant", {}).get("activation", "fp32")
-                                            quantize_kernel = get_quantize_kernel_for_activation(registry, act_dtype)
+                                            act_dtype, quant_contract = (
+                                                get_kernel_activation_quantization_contract(
+                                                    registry, nk_id, mode
+                                                )
+                                            )
+                                            quantize_kernel = get_quantize_kernel_for_activation(
+                                                registry, act_dtype, quant_contract
+                                            )
                                             if quantize_kernel:
                                                 quant_op_name = f"quantize_input_{norm_instance}"
                                                 quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
@@ -5975,6 +6090,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                 if op == "block_rmsnorm":
                                                     quant_arranged["graph_slots"] = {"inputs": {"input": "layer_input"}}
                                                 arranged_kernels.append(quant_arranged)
+                                                active_pre_norm_quant_contract = quant_contract
+                                                active_pre_norm_quant_op_name = quant_op_name
+                                                active_pre_norm_quant_instance = norm_instance
                                                 print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: {norm_instance}) [AUTO-INSERTED]")
                                             break
                                     break
@@ -6024,8 +6142,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 # Get activation dtype from kernel
                                 for kreg in registry.get("kernels", []):
                                     if kreg.get("id") == k_id:
-                                        act_dtype = kreg.get("quant", {}).get("activation", "fp32")
-                                        quantize_kernel = get_quantize_kernel_for_activation(registry, act_dtype)
+                                        act_dtype, quant_contract = (
+                                            get_kernel_activation_quantization_contract(
+                                                registry, k_id, mode
+                                            )
+                                        )
+                                        quantize_kernel = get_quantize_kernel_for_activation(
+                                            registry, act_dtype, quant_contract
+                                        )
                                         if quantize_kernel:
                                             quant_op_name = "quantize_final_output"
                                             quant_op_info = get_op_info(quant_op_name, section_name, -1)
@@ -10948,7 +11072,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
 
             elif src.startswith("weight:"):
                 key = src.split(":", 1)[1]
-                sel = select_weight(key, weights)
+                sel = select_weight(key, weights, param.get("alt", None))
                 if not sel:
                     op_errors.append(f"{func}.{name}: missing weight '{key}'")
                     expr = "NULL"

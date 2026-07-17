@@ -20,6 +20,7 @@ CONTRACTS = ROOT / "version/v8/contracts/numerical_execution.json"
 KERNEL_MAPS = ROOT / "version/v8/kernel_maps"
 
 EXPECTED_LAYER_ORDER = [
+    "vision.frontend.patch_bias.output",
     "vision.frontend.position.output",
     "vision.layer.{layer}.norm1.output",
     "vision.layer.{layer}.q.pre_rope",
