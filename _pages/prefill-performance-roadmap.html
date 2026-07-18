@@ -16,6 +16,11 @@
     signal is that layout and shape-gated dispatch, not math, are the bottlenecks.
   </div>
 
+  <div class="alert alert-success">
+    <strong>Qwen3-VL AVX2 update (2026-07-18):</strong>
+    On the i7-14700T, the exact Q4_K x Q8_K provider now reuses each packed weight block across a two-token output tile while preserving llama.cpp's split-min reduction order. For the 1008-token visual mixed-prefill workload, profiled Q4 projection time fell from <code>54.32 s</code> to <code>34.75 s</code> and mixed-prefill wall time fell from <code>77.21 s</code> to <code>56.87 s</code>. The real llama.cpp production oracle remains bit-exact.
+  </div>
+
   <h2>Why Prefill Is Different</h2>
   <p>
     Decode is mostly GEMV: one activation vector times many weight rows. Prefill is GEMM: many token rows times many output rows.
@@ -69,9 +74,9 @@
       </tr>
       <tr>
         <td>Token-tile x output-tile GEMM</td>
-        <td>Add an opt-in <code>x8mt</code> lane that schedules small token tiles against eight-row output tiles.</td>
+        <td>Schedule small token tiles against eight-row output tiles, with a separate implementation for the exact repacked split-min contract.</td>
         <td>This reuses the same packed Q4_K group across multiple Q8_K token rows and is the first step toward a true register-blocked GEMM microkernel.</td>
-        <td>Experimental benchmark/runtime lane</td>
+        <td>Active for aligned, large grouped-prefill shapes; other arithmetic contracts remain separately gated</td>
       </tr>
       <tr>
         <td>Fused MLP kernels</td>
@@ -124,6 +129,25 @@
   <pre><code>for token_tile:
   for output_tile:
     compute multiple tokens x multiple output rows together</code></pre>
+
+  <h2>Exact Split-Min M-Reuse Result</h2>
+  <p>
+    The promoted Qwen3-VL path does not use the older interleaved minimum-correction kernel. It keeps two FP32 accumulators per output, traverses K blocks in ascending order, performs one final value-minus-minimum subtraction, and applies bias afterward. Only independent output scheduling changes. Complete four-row groups follow the repacked GEMM contract; residual rows continue through the distinct repacked GEMV contract.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Measurement</th><th>Before</th><th>After</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Q4 projection kernel total</td><td>54.32 s</td><td>34.75 s</td><td>36.0% lower</td></tr>
+      <tr><td>Profiled mixed prefill</td><td>77.21 s</td><td>56.87 s</td><td>26.3% lower</td></tr>
+      <tr><td>128-token production mixed prefill</td><td>85.58 s</td><td>65.84 s</td><td>23.1% lower</td></tr>
+      <tr><td>llama.cpp production oracle</td><td>Bit-exact</td><td>Bit-exact</td><td>No numerical regression</td></tr>
+    </tbody>
+  </table>
+  <p>
+    These are host-local GCC/AVX2 measurements with 20 CK worker threads and explicit hybrid-core affinity. The durable result is the provider design and exact oracle, not an expectation that every CPU will reproduce the same percentage.
+  </p>
 
   <p>
     The current experimental <code>x8mt</code> path takes the first step:
