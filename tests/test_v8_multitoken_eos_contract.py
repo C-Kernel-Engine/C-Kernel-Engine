@@ -27,6 +27,58 @@ def load_module():
 
 
 class MultitokenEOSContractTests(unittest.TestCase):
+    def test_llama_persistent_dump_targets_decode_call_before_logits_step(self) -> None:
+        observed = {}
+
+        def run_helper(command, **kwargs):
+            observed["command"] = command
+            seq_path = Path(command[command.index("--logits-seq-out") + 1])
+            logits_path = Path(command[command.index("--logits-out") + 1])
+            np.zeros((2, 3), dtype=np.float32).tofile(seq_path)
+            np.zeros(3, dtype=np.float32).tofile(logits_path)
+            payload = {"ok": True, "n_vocab": 3, "greedy_steps": 2, "greedy_generated": [1, 2]}
+            return mock.Mock(returncode=0, stdout=json.dumps(payload) + "\n", stderr="")
+
+        args = Namespace(
+            top_k=3,
+            llama_decode_mode="batched",
+            max_new_tokens=2,
+            threads=4,
+            llama_no_repack=False,
+            llama_persistent_dump_step=5,
+            llama_persistent_dump_dir=Path("persistent-dump"),
+            llama_persistent_dump_names="l_out-0",
+            llama_persistent_dump_flash_inputs=True,
+            workdir=Path("work"),
+        )
+        inputs = {
+            "gguf_path": Path("model.gguf"),
+            "ctx_len": 4096,
+            "tokens_before": [1],
+            "tokens_after": [2],
+            "llama_prefix_path": None,
+            "prefix_grid": None,
+            "prefix_row_dim": 0,
+            "prefix_text_pos": 0,
+        }
+        with mock.patch.object(
+            self.runner.first_token.compare_first_token_logits_v7,
+            "ensure_llama_helper",
+            return_value=Path("llama-helper"),
+        ), mock.patch.object(
+            self.runner,
+            "_llama_oracle_evidence",
+            return_value={"commit": "a" * 40},
+        ), mock.patch.object(self.runner.subprocess, "run", side_effect=run_helper):
+            result = self.runner._run_llama_greedy_sequence(inputs, args)
+
+        command = observed["command"]
+        index = command.index("--dump-greedy-decode-step")
+        self.assertEqual(command[index + 1], "4")
+        self.assertEqual(command[command.index("--dump-names") + 1], "l_out-0")
+        self.assertIn("--dump-flash-inputs", command)
+        self.assertEqual(result["oracle_evidence"]["commit"], "a" * 40)
+
     def test_kv_first_difference_decodes_semantic_location(self) -> None:
         header = struct.pack("<8I", 0x564B5843, 1, 3, 5, 2, 4096, 4, 0)
         values = [0] * (2 * 2 * 5 * 4)
@@ -48,6 +100,62 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertEqual(row["token"], 2)
         self.assertEqual(row["channel"], 3)
         self.assertEqual(row["fp16_bit_distance"], 1)
+
+    def test_compiler_provenance_accepts_matching_runtime(self) -> None:
+        evidence = {
+            "shared_library": {
+                "build": {"compiler": {"command": ["gcc"], "version": "gcc 15"}},
+                "elf_compiler_comments": ["GCC: 15"],
+            },
+            "engine_library": {
+                "build": {"compiler": {"command": ["gcc"], "version": "gcc 15"}},
+                "elf_compiler_comments": ["GCC: 15"],
+            },
+        }
+        result = self.runner._validate_runtime_compiler_provenance(evidence)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["decoder_family"], "gcc")
+
+    def test_compiler_provenance_rejects_gcc_decoder_with_icx_engine(self) -> None:
+        evidence = {
+            "shared_library": {
+                "build": {"compiler": {"command": "cc", "version": "gcc 15"}},
+                "elf_compiler_comments": ["GCC: 15"],
+            },
+            "engine_library": {
+                "elf_compiler_comments": [
+                    "GCC: 15",
+                    "Intel(R) oneAPI DPC++/C++ Compiler 2026.0.0",
+                ],
+            },
+        }
+        with self.assertRaisesRegex(RuntimeError, "compiler provenance"):
+            self.runner._validate_runtime_compiler_provenance(evidence)
+
+    def test_compiler_provenance_rejects_unknown_family(self) -> None:
+        evidence = {
+            "shared_library": {"elf_compiler_comments": []},
+            "engine_library": {"elf_compiler_comments": []},
+        }
+        with self.assertRaisesRegex(RuntimeError, "unknown_compiler_family"):
+            self.runner._validate_runtime_compiler_provenance(evidence)
+
+    def test_llama_oracle_isa_accepts_matching_avx512(self) -> None:
+        observed = {"avx2": True, "avx512": True}
+        self.assertEqual(
+            self.runner._validate_llama_oracle_isa(observed, "avx512"),
+            "avx512",
+        )
+
+    def test_llama_oracle_isa_rejects_avx2_for_avx512_claim(self) -> None:
+        observed = {"avx2": True, "avx512": False}
+        with self.assertRaisesRegex(RuntimeError, "oracle ISA mismatch"):
+            self.runner._validate_llama_oracle_isa(observed, "avx512")
+
+    def test_llama_oracle_isa_rejects_avx512_for_avx2_only_claim(self) -> None:
+        observed = {"avx2": True, "avx512": True}
+        with self.assertRaisesRegex(RuntimeError, "avx2-only"):
+            self.runner._validate_llama_oracle_isa(observed, "avx2")
 
     def test_dump_first_divergence_resolves_observed_step(self) -> None:
         report = {"first_divergence": {"step": 60}}
@@ -370,6 +478,75 @@ class MultitokenEOSContractTests(unittest.TestCase):
             self.assertEqual([row["status"] for row in result["results"]], ["ok", "error", "ok"])
             self.assertIn("missing rope_k", result["results"][1]["error"])
 
+    def test_hidden_capture_exports_bounded_kv_for_every_requested_layer(self) -> None:
+        class ExportKV:
+            argtypes = None
+            restype = None
+
+            def __call__(self, path, layer):
+                Path(path.decode("utf-8")).write_bytes(bytes([int(layer), 0, 1, 2]))
+                return 0
+
+        class Library:
+            def __init__(self):
+                self.ck_model_debug_export_kv_f16 = ExportKV()
+
+            def ck_model_decode(self, token, logits):
+                return 0
+
+            def ck_model_free(self):
+                return None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "decoder_v8.c"
+            source.write_text(
+                "\n".join(
+                    f'ck_debug_export_hidden(model, {layer}, "{name}", data, 128);'
+                    for layer in (0, 1)
+                    for name in ("rope_q", "rope_q_last", "attn_out", "attn_out_last")
+                ),
+                encoding="utf-8",
+            )
+            inputs = {
+                "runtime": {"workdir": root, "c_path": source},
+                "tokens_after": [1, 2],
+            }
+            report = {
+                "steps": [
+                    {},
+                    {"generated_prefix": [10, 11], "ck_next": 12, "llama_next": 12},
+                ]
+            }
+            args = Namespace(
+                hidden_state_step=1,
+                hidden_state_layer=-1,
+                hidden_state_names="rope_q,attn_out",
+                hidden_state_dir=root / "capture",
+                hidden_state_atol=1.0e-5,
+                workdir=root,
+                ck_strict_parity=False,
+            )
+            init = mock.Mock(side_effect=[(Library(), object(), 3), (Library(), object(), 3)])
+            compared = [
+                {"layer": 0, "status": "ok", "max_abs_diff": 0.0},
+                {"layer": 1, "status": "ok", "max_abs_diff": 0.0},
+            ]
+
+            with mock.patch.object(self.runner, "_prepare_inputs", return_value=inputs), \
+                 mock.patch.object(self.runner, "_init_ck_state", init), \
+                 mock.patch.object(self.runner, "_hidden_compare_many", return_value=compared):
+                result = self.runner._capture_hidden_state_step(report, args)
+
+            self.assertEqual(result["preflight"]["capture_layers"], [0, 1])
+            self.assertEqual(len(result["kv_cache"]["layers"]), 2)
+            self.assertEqual(result["kv_cache"]["status"], "ok")
+            for phase in ("persistent", "full_replay"):
+                for layer in (0, 1):
+                    self.assertTrue(
+                        (root / "capture" / phase / f"kv_cache_f16_layer_{layer:03d}.bin").is_file()
+                    )
+
     def test_granular_capture_rejects_uninstrumented_runtime_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -392,6 +569,58 @@ class MultitokenEOSContractTests(unittest.TestCase):
                     self.runner._capture_step_dump(report, args)
 
             capture.assert_not_called()
+
+    def test_multimodal_prefill_segments_use_extent_and_execution_order(self) -> None:
+        dump_type = self.runner.first_token.parity_test_v7.ParityDump
+        dumps = [
+            dump_type(0, "q_proj", np.zeros(rows * 4, dtype=np.float32), 0, "fp32")
+            for rows in (5, 1008, 14)
+        ]
+        specs = {(0, "q_proj"): (4, (4,))}
+        segments = [
+            ("text_before", 5, 0),
+            ("visual", 1008, 5),
+            ("text_after", 14, 1013),
+        ]
+
+        labeled = self.runner.first_token._label_multimodal_prefill_segments(
+            dumps, specs, segments
+        )
+
+        self.assertEqual(
+            [(row.op_name, row.token_id, row.data.size) for row in labeled],
+            [
+                ("q_proj@text_before", 0, 20),
+                ("q_proj@visual", 5, 4032),
+                ("q_proj@text_after", 1013, 56),
+            ],
+        )
+
+    def test_llama_qk_middle_occurrence_is_not_guessed_as_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rows = []
+            for occurrence, values in enumerate(([1.0, 2.0], [3.0, 4.0], [5.0, 6.0])):
+                name = f"Qcur-0-token-000000-occ-{occurrence:03d}"
+                np.asarray(values, dtype=np.float32).tofile(root / f"{name}.bin")
+                rows.append({
+                    "name": name,
+                    "base_name": "Qcur-0",
+                    "token_id": 0,
+                    "occurrence": occurrence,
+                    "elem_count": 2,
+                    "nbytes": 8,
+                    "rank": 1,
+                    "shape": [2],
+                })
+            (root / "index.json").write_text(
+                "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+            )
+
+            dumps = self.runner.first_token._load_llama_dump_dir(root)
+
+        self.assertEqual([dump.op_name for dump in dumps], ["q_proj", "qcur_rope"])
+        self.assertNotIn("qcur_normed", [dump.op_name for dump in dumps])
 
     def test_prepare_inputs_preserves_explicit_engine_for_nested_dumps(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -496,12 +725,25 @@ class MultitokenEOSContractTests(unittest.TestCase):
         llama_sequence = {
             "meta": {"greedy_generated": [151645, 7]},
             "logits": np.zeros((2, 3), dtype=np.float32),
+            "oracle_evidence": {
+                "root": "/oracle/llama.cpp",
+                "commit": "a" * 40,
+                "helper": {"sha256": "b" * 64},
+                "libraries": [{"sha256": "c" * 64}],
+            },
         }
         with mock.patch.object(self.runner, "_prepare_inputs", return_value=inputs), \
              mock.patch.object(self.runner, "_run_llama_greedy_sequence", return_value=llama_sequence), \
              mock.patch.object(self.runner, "_init_ck_state", return_value=(library, object(), 3)), \
              mock.patch.object(self.runner, "_ck_logits_from_buffer", return_value=np.zeros(3, dtype=np.float32)), \
-             mock.patch.object(self.runner, "_runtime_evidence", return_value={}), \
+             mock.patch.object(
+                 self.runner,
+                 "_runtime_evidence",
+                 return_value={
+                     "shared_library": {"elf_compiler_comments": ["GCC: 15"]},
+                     "engine_library": {"elf_compiler_comments": ["GCC: 15"]},
+                 },
+             ), \
              mock.patch.object(self.runner.first_token.compare_first_token_logits_v7, "compare_logits", return_value=comparison), \
              mock.patch.object(self.runner, "_decode_topk", return_value=[]):
             report = self.runner.run_multimodal_multitoken_parity(args)
@@ -513,6 +755,7 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertFalse(report["execution_modes"]["diagnostic_tensor_dump"])
         self.assertIsInstance(report["execution_modes"]["ck_environment"], dict)
         self.assertEqual(report["stop_reason"], "matched_stop_token")
+        self.assertEqual(report["llama_oracle"]["commit"], "a" * 40)
         self.assertEqual(len(report["steps"]), 1)
         self.assertEqual(report["steps"][0]["ck_next"], 151645)
         self.assertEqual(library.decode_calls, 0)

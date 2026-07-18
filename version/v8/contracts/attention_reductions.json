@@ -133,7 +133,7 @@
         "below_threshold_chunks": 1,
         "at_or_above_threshold_chunks": "runtime_worker_count"
       },
-      "description": "FP16-rounded online-softmax partials with a 256-row padded scheduling extent and deterministic FP32 chunk-order merge.",
+      "description": "FP16-rounded online-softmax partials over the padded physical K tensor extent with deterministic FP32 chunk-order merge.",
       "validation": {
         "test": "unittest/test_attention_f16_split_kv.py",
         "cases": ["KV=511", "KV=512", "Qwen3-VL KV=1047->1280", "KV=1058->1280", "KV=1609->1792", "padded GQA"],

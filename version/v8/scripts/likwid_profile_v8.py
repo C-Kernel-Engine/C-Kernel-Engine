@@ -29,6 +29,12 @@ AUTO_GROUP_PREFERENCE = (
     "FLOPS_SP",
 )
 
+WORKLOAD_STATUS_WRAPPER_NAME = "cke-likwid-workload"
+WORKLOAD_STATUS_SHELL = (
+    'status_file=$1; shift; "$@"; status=$?; '
+    'printf "%s\\n" "$status" > "$status_file"; exit "$status"'
+)
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -52,6 +58,8 @@ def parse_available_groups(text: str) -> list[dict[str, str]]:
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith(("-", "Group name", "Groups")):
+            continue
+        if re.match(r"^No\s+groups?\s+defined\b", line, flags=re.IGNORECASE):
             continue
         match = re.match(r"^([A-Za-z][A-Za-z0-9_]*)\s+(.*)$", line)
         if not match:
@@ -173,6 +181,27 @@ def run_metadata_command(command: list[str], output: Path) -> subprocess.Complet
     return completed
 
 
+def wrap_workload_with_status(command: list[str], status_path: Path) -> list[str]:
+    """Run a workload while preserving its exit status independently of LIKWID."""
+    return [
+        "/bin/sh",
+        "-c",
+        WORKLOAD_STATUS_SHELL,
+        WORKLOAD_STATUS_WRAPPER_NAME,
+        str(status_path),
+        *command,
+    ]
+
+
+def read_workload_status(path: Path) -> int | None:
+    """Return a recorded child status, failing closed on missing/malformed evidence."""
+    try:
+        value = int(path.read_text().strip())
+    except (OSError, ValueError):
+        return None
+    return value if 0 <= value <= 255 else None
+
+
 def write_summary(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
@@ -230,6 +259,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="preserve an exported LIKWID/perfscope SVG or raster plot (repeatable)",
     )
+    parser.add_argument(
+        "--require-output",
+        action="append",
+        default=[],
+        help=(
+            "require this literal text in the wrapped workload output before "
+            "reporting pass (repeatable)"
+        ),
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     return parser
 
@@ -261,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
         "selected_groups": [],
         "cpu_ids": [],
         "command": command,
+        "required_output": args.require_output,
         "runs": [],
         "normalized": {},
         "artifacts": [],
@@ -317,7 +356,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SKIP: {summary['reason']} ({summary_path})")
         return 0
     if not selected:
-        summary["reason"] = "none of the requested LIKWID groups are available"
+        cpu_info = info_path.read_text(errors="ignore")
+        if re.search(r"^CPU type:\s*nil\s*$", cpu_info, flags=re.MULTILINE):
+            summary["reason"] = (
+                "installed LIKWID does not recognize this processor; "
+                "no counter groups are available"
+            )
+        else:
+            summary["reason"] = "none of the requested LIKWID groups are available"
         write_summary(summary_path, summary)
         print(f"SKIP: {summary['reason']} ({summary_path})")
         return 0
@@ -328,6 +374,9 @@ def main(argv: list[str] | None = None) -> int:
         csv_path = artifact_dir / f"{slug}.csv"
         stdout_path = artifact_dir / f"{slug}.stdout.txt"
         stderr_path = artifact_dir / f"{slug}.stderr.txt"
+        status_path = artifact_dir / f"{slug}.workload_status.txt"
+        status_path.unlink(missing_ok=True)
+        workload = wrap_workload_with_status(command, status_path)
         wrapped = [
             executable,
             "-C",
@@ -337,16 +386,26 @@ def main(argv: list[str] | None = None) -> int:
             "-o",
             str(csv_path),
             "--",
-            *command,
+            *workload,
         ]
         completed = subprocess.run(wrapped, text=True, capture_output=True, check=False)
         stdout_path.write_text(completed.stdout)
         stderr_path.write_text(completed.stderr)
+        workload_returncode = read_workload_status(status_path)
+        combined_output = f"{completed.stdout}\n{completed.stderr}"
+        missing_output = [
+            required
+            for required in args.require_output
+            if required not in combined_output
+        ]
         metrics, normalized = parse_likwid_csv(csv_path)
         normalized_by_group[group] = normalized
         run = {
             "group": group,
             "returncode": completed.returncode,
+            "tool_returncode": completed.returncode,
+            "workload_returncode": workload_returncode,
+            "missing_required_output": missing_output,
             "command": wrapped,
             "csv_path": str(csv_path),
             "stdout_path": str(stdout_path),
@@ -362,11 +421,39 @@ def main(argv: list[str] | None = None) -> int:
                 {"kind": f"{group} stderr", "path": str(stderr_path)},
             ]
         )
+        if status_path.is_file():
+            summary["artifacts"].append(
+                {"kind": f"{group} workload status", "path": str(status_path)}
+            )
 
-    failed = [run for run in summary["runs"] if run["returncode"] != 0]
+    failed_tool = [run for run in summary["runs"] if run["tool_returncode"] != 0]
+    failed_workload = [
+        run for run in summary["runs"] if run["workload_returncode"] != 0
+    ]
+    failed_output = [run for run in summary["runs"] if run["missing_required_output"]]
+    failed = failed_tool or failed_workload or failed_output
     if failed:
         summary["status"] = "fail"
-        summary["reason"] = "one or more LIKWID group runs failed"
+        reasons: list[str] = []
+        if failed_tool:
+            reasons.append("one or more LIKWID counter runs failed")
+        if failed_workload:
+            reasons.append(
+                "one or more wrapped workloads failed or did not record an exit status"
+            )
+        if failed_output:
+            missing = sorted(
+                {
+                    item
+                    for run in failed_output
+                    for item in run["missing_required_output"]
+                }
+            )
+            reasons.append(
+                "wrapped workload output is missing required text: "
+                + ", ".join(repr(item) for item in missing)
+            )
+        summary["reason"] = "; ".join(reasons)
     else:
         summary["status"] = "pass"
     summary["normalized"] = normalized_by_group

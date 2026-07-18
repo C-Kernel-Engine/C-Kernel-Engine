@@ -12,6 +12,7 @@ import json
 import math
 import os
 import random
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1333,7 +1334,10 @@ def _ensure_engine_lib(openmp: bool = False) -> None:
         # BUILD_STAMP tracks compiler flags, so toggling CK_ENABLE_OPENMP only
         # rebuilds when the cached engine library was built for the wrong mode.
         cmd.append("CK_ENABLE_OPENMP=1")
-    cmd.append("build/libckernel_engine.so")
+    # Decoder runtimes link both shared libraries. Build them together before
+    # any expensive model conversion/encoder execution so a clean checkout
+    # cannot fail only when the decoder is finally loaded.
+    cmd.extend(("build/libckernel_engine.so", "build/libckernel_tokenizer.so"))
     _run(cmd)
 
 
@@ -1726,15 +1730,59 @@ def _sync_runtime_engine(engine_path: Path, model_so: Path) -> Path:
     if not source.is_file():
         raise FileNotFoundError(f"CK engine library is missing: {source}")
     destination = model_so.resolve().parent / "libckernel_engine.so"
-    if destination == source:
-        return destination
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-    if destination.is_file() and hashlib.sha256(destination.read_bytes()).hexdigest() == source_hash:
-        return destination
-    temporary = destination.with_suffix(destination.suffix + ".tmp")
-    shutil.copy2(source, temporary)
-    os.replace(temporary, destination)
+    if destination != source and (
+        not destination.is_file()
+        or hashlib.sha256(destination.read_bytes()).hexdigest() != source_hash
+    ):
+        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        shutil.copy2(source, temporary)
+        os.replace(temporary, destination)
+    source_metadata = _json_load(source.with_suffix(source.suffix + ".build.json"))
+    compiler = (
+        source_metadata.get("compiler")
+        if isinstance(source_metadata, dict) and isinstance(source_metadata.get("compiler"), dict)
+        else _engine_compiler_descriptor()
+        if source == (BUILD_DIR / "libckernel_engine.so").resolve()
+        else {"command": [], "version": "unknown; use ELF compiler evidence"}
+    )
+    _json_write(
+        destination.with_suffix(destination.suffix + ".build.json"),
+        {
+            "version": 1,
+            "compiler": compiler,
+            "source_path": str(source),
+            "sha256": source_hash,
+        },
+    )
     return destination
+
+
+def _engine_compiler_argv(stamp_path: Path | None = None) -> list[str]:
+    stamp = stamp_path or (BUILD_DIR / ".ck_build_flags")
+    if not stamp.is_file():
+        raise FileNotFoundError(
+            f"CK engine build stamp is missing: {stamp}; build libckernel_engine.so first"
+        )
+    for line in stamp.read_text(encoding="utf-8").splitlines():
+        if line.startswith("CC="):
+            argv = shlex.split(line[3:].strip())
+            if argv:
+                return argv
+    raise RuntimeError(f"CK engine build stamp does not declare CC: {stamp}")
+
+
+def _engine_compiler_descriptor(stamp_path: Path | None = None) -> dict[str, Any]:
+    argv = _engine_compiler_argv(stamp_path)
+    probe = subprocess.run(
+        [*argv, "--version"], text=True, capture_output=True, check=False
+    )
+    version = (
+        probe.stdout.splitlines()[0]
+        if probe.returncode == 0 and probe.stdout
+        else f"compiler probe failed rc={probe.returncode}"
+    )
+    return {"command": argv, "version": version}
 
 
 def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = False) -> Path:
@@ -1745,22 +1793,15 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
     engine_hash = hashlib.sha256(engine_path.read_bytes()).hexdigest()
     source_hash = hashlib.sha256(c_path.read_bytes()).hexdigest()
     source_size = int(c_path.stat().st_size)
-    compiler = os.environ.get("CC", "").strip() or "cc"
-    compiler_probe = subprocess.run(
-        [compiler, "--version"], text=True, capture_output=True, check=False
-    )
-    compiler_version = (
-        compiler_probe.stdout.splitlines()[0]
-        if compiler_probe.returncode == 0 and compiler_probe.stdout
-        else f"{compiler} probe failed rc={compiler_probe.returncode}"
-    )
+    compiler_argv = _engine_compiler_argv()
+    compiler = _engine_compiler_descriptor()
     build_fingerprint = {
         "version": 3,
         "source_path": str(c_path.resolve()),
         "source_sha256": source_hash,
         "source_size": source_size,
         "profile": bool(profile),
-        "compiler": {"command": compiler, "version": compiler_version},
+        "compiler": compiler,
         "runtime_dependency": {
             "name": "libckernel_engine.so",
             "sha256": engine_hash,
@@ -1774,7 +1815,7 @@ def _compile_generated_model(c_path: Path, so_path: Path, *, profile: bool = Fal
             _sync_runtime_engine(engine_path, so_path)
             return so_path
     cmd = [
-        compiler,
+        *compiler_argv,
         "-shared",
         "-fPIC",
         "-O3",

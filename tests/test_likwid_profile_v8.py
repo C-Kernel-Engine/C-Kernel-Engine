@@ -45,6 +45,43 @@ class LikwidProfileV8Tests(unittest.TestCase):
             ["MEM"],
         )
 
+    def test_unsupported_processor_diagnostic_is_not_a_counter_group(self) -> None:
+        available = self.module.parse_available_groups("No groups defined for nil\n")
+        self.assertEqual(available, [])
+
+    def test_unrecognized_processor_is_an_explicit_skip(self) -> None:
+        def fake_run(command, **_kwargs):
+            if "-v" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "likwid-perfctr 5.4.1\n", ""
+                )
+            if "-i" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "CPU type:\tnil\n", ""
+                )
+            if "-a" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "No groups defined for nil\n", ""
+                )
+            raise AssertionError(f"unexpected workload invocation: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            with mock.patch.object(
+                self.module.shutil, "which", return_value="/usr/bin/likwid-perfctr"
+            ), mock.patch.object(
+                self.module.subprocess, "run", side_effect=fake_run
+            ):
+                rc = self.module.main(
+                    ["--output-dir", str(output), "--", "/bin/true"]
+                )
+            summary = json.loads((output / "likwid_summary.json").read_text())
+        self.assertEqual(rc, 0)
+        self.assertEqual(summary["status"], "skip")
+        self.assertEqual(summary["available_groups"], [])
+        self.assertIn("does not recognize this processor", summary["reason"])
+        self.assertEqual(summary["runs"], [])
+
     def test_csv_metrics_are_preserved_and_normalized(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "mem.csv"
@@ -97,8 +134,11 @@ class LikwidProfileV8Tests(unittest.TestCase):
                 )
             csv_path = Path(command[command.index("-o") + 1])
             csv_path.write_text("Metric,Memory bandwidth [MBytes/s],12345\n")
+            separator = command.index("--")
+            status_path = Path(command[separator + 5])
+            status_path.write_text("0\n")
             return self.module.subprocess.CompletedProcess(
-                command, 0, "workload output\n", ""
+                command, 0, "Loading: test model\nprefill 4 tok\n", ""
             )
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -118,6 +158,10 @@ class LikwidProfileV8Tests(unittest.TestCase):
                         "1",
                         "--cpus",
                         "4,8",
+                        "--require-output",
+                        "Loading:",
+                        "--require-output",
+                        "prefill ",
                         "--",
                         "/bin/true",
                     ]
@@ -127,12 +171,105 @@ class LikwidProfileV8Tests(unittest.TestCase):
         self.assertEqual(summary["status"], "pass")
         self.assertEqual(summary["selected_groups"], ["MEM"])
         self.assertEqual(summary["cpu_ids"], [4, 8])
+        self.assertEqual(summary["runs"][0]["workload_returncode"], 0)
+        self.assertEqual(summary["runs"][0]["missing_required_output"], [])
         wrapped = next(command for command in calls if "-g" in command)
         self.assertEqual(wrapped[wrapped.index("-C") + 1], "4,8")
+        separator = wrapped.index("--")
+        self.assertEqual(wrapped[separator + 1], "/bin/sh")
+        self.assertEqual(
+            wrapped[separator + 4], self.module.WORKLOAD_STATUS_WRAPPER_NAME
+        )
         self.assertEqual(
             summary["normalized"]["MEM"]["memory_bandwidth_mbytes_per_second"],
             12345,
         )
+
+    def test_capture_fails_when_likwid_masks_workload_failure(self) -> None:
+        def fake_run(command, **_kwargs):
+            if "-a" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "MEM Main memory bandwidth\n", ""
+                )
+            if "-v" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "likwid-perfctr 5.5\n", ""
+                )
+            if "-i" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "CPU type: test\n", ""
+                )
+            csv_path = Path(command[command.index("-o") + 1])
+            csv_path.write_text("Metric,Runtime (RDTSC) [s],0.01\n")
+            separator = command.index("--")
+            Path(command[separator + 5]).write_text("2\n")
+            return self.module.subprocess.CompletedProcess(
+                command, 0, "Usage: workload [options]\n", ""
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            with mock.patch.object(
+                self.module.shutil, "which", return_value="/usr/bin/likwid-perfctr"
+            ), mock.patch.object(
+                self.module.subprocess, "run", side_effect=fake_run
+            ):
+                rc = self.module.main(
+                    [
+                        "--output-dir",
+                        str(output),
+                        "--max-groups",
+                        "1",
+                        "--require-output",
+                        "Loading:",
+                        "--require-output",
+                        "prefill ",
+                        "--",
+                        "/bin/false",
+                    ]
+                )
+            summary = json.loads((output / "likwid_summary.json").read_text())
+        self.assertEqual(rc, 1)
+        self.assertEqual(summary["status"], "fail")
+        self.assertEqual(summary["runs"][0]["tool_returncode"], 0)
+        self.assertEqual(summary["runs"][0]["workload_returncode"], 2)
+        self.assertEqual(
+            summary["runs"][0]["missing_required_output"],
+            ["Loading:", "prefill "],
+        )
+        self.assertIn("wrapped workloads failed", summary["reason"])
+        self.assertIn("missing required text", summary["reason"])
+
+    def test_capture_fails_closed_when_workload_status_is_missing(self) -> None:
+        def fake_run(command, **_kwargs):
+            if "-a" in command:
+                return self.module.subprocess.CompletedProcess(
+                    command, 0, "MEM Main memory bandwidth\n", ""
+                )
+            if "-v" in command or "-i" in command:
+                return self.module.subprocess.CompletedProcess(command, 0, "ok\n", "")
+            Path(command[command.index("-o") + 1]).write_text(
+                "Metric,Runtime (RDTSC) [s],0.01\n"
+            )
+            return self.module.subprocess.CompletedProcess(
+                command, 0, "Loading: model\nprefill 4 tok\n", ""
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            with mock.patch.object(
+                self.module.shutil, "which", return_value="/usr/bin/likwid-perfctr"
+            ), mock.patch.object(
+                self.module.subprocess, "run", side_effect=fake_run
+            ):
+                rc = self.module.main(
+                    ["--output-dir", str(output), "--max-groups", "1", "--", "/bin/true"]
+                )
+            summary = json.loads((output / "likwid_summary.json").read_text())
+        self.assertEqual(rc, 1)
+        self.assertEqual(summary["status"], "fail")
+        self.assertIsNone(summary["runs"][0]["workload_returncode"])
+        self.assertIn("did not record an exit status", summary["reason"])
 
     def test_auto_cpu_selection_stays_inside_allowed_affinity(self) -> None:
         with mock.patch.object(

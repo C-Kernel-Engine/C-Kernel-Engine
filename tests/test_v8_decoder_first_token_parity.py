@@ -131,8 +131,13 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
 
             self.assertEqual(
                 [dump.op_name for dump in dumps],
-                ["q_proj", "qcur_normed", "qcur_rope"],
+                ["q_proj", "qcur_rope"],
             )
+
+            # Occurrence 1 is an ambiguous graph alias in current llama.cpp,
+            # not a stable post-QK-normalization checkpoint. X-ray must omit
+            # it rather than manufacture a semantic identity.
+            self.assertEqual([dump.source_name for dump in dumps], [rows[0]["name"], rows[2]["name"]])
 
 
     def test_compare_dump_sets_reports_failures(self) -> None:
@@ -1237,22 +1242,49 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             self.assertEqual([d.token_id for d in ck_rows], [0, 1])
             self.assertEqual([d.token_id for d in llama_rows], [0, 1])
 
-    def test_capture_dump_compare_skips_prefix_for_prefill_pass(self) -> None:
+    def test_capture_dump_compare_runs_segmented_multimodal_prefill_pass(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_decoder_dump_prefix_skip_") as tmpdir:
             tmp = Path(tmpdir)
             prefix = array("f", [0.0] * 8)
+            dump = decoder_parity_v8.parity_test_v7.ParityDump
+            ck_dumps = [
+                dump(0, "q_proj", np.zeros((1, 4), dtype=np.float32), 0, "fp32"),
+                dump(0, "q_proj", np.zeros((2, 4), dtype=np.float32), 0, "fp32"),
+                dump(0, "q_proj", np.zeros((2, 4), dtype=np.float32), 0, "fp32"),
+            ]
+            llama_dumps = [
+                dump(0, "q_proj", np.zeros((1, 4), dtype=np.float32), 0, "fp32"),
+                dump(0, "q_proj", np.zeros((2, 4), dtype=np.float32), 0, "fp32"),
+                dump(0, "q_proj", np.zeros((2, 4), dtype=np.float32), 0, "fp32"),
+            ]
             with mock.patch.object(
                 decoder_parity_v8.bridge_runner_v8,
                 "_run_decoder",
                 return_value={"vocab_size": 4, "logits": array("f", [0.0, 0.0, 0.0, 0.0])},
-            ) as run_decoder, \
-                 mock.patch.object(decoder_parity_v8, "_run_llama_capture") as llama_capture:
+            ), mock.patch.object(
+                decoder_parity_v8,
+                "_run_llama_capture",
+                return_value={"meta": {"dumped": 1, "decode_mode": "sequential"}},
+            ) as llama_capture, mock.patch.object(
+                decoder_parity_v8,
+                "_capture_ck_dump",
+                return_value={"vocab_size": 4, "logits": array("f", [0.0, 0.0, 0.0, 0.0])},
+            ) as ck_capture, mock.patch.object(
+                decoder_parity_v8.parity_test_v7,
+                "read_dump_file",
+                return_value=ck_dumps,
+            ), mock.patch.object(
+                decoder_parity_v8,
+                "_load_llama_dump_dir",
+                return_value=llama_dumps,
+            ):
                 ck, report = decoder_parity_v8._capture_dump_compare(
                     Path("/tmp/model.gguf"),
                     {"embed_dim": 4},
                     prefix,
                     2,
                     [1, 2],
+                    tokens_before=[9],
                     prefix_row_dim=4,
                     ctx_len=8,
                     top_k=2,
@@ -1265,10 +1297,15 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
                 )
 
             self.assertEqual(ck["vocab_size"], 4)
-            self.assertEqual(report["status"], "skipped")
-            self.assertIn("dump-pass decode", report["reason"])
-            run_decoder.assert_called_once()
-            llama_capture.assert_not_called()
+            self.assertEqual(report["status"], "ok")
+            self.assertEqual(report["comparison_pass_filter"], "all")
+            self.assertEqual(report["prefill_segments"], [
+                {"name": "text_before", "rows": 1, "physical_start": 0},
+                {"name": "visual", "rows": 2, "physical_start": 1},
+                {"name": "text_after", "rows": 2, "physical_start": 3},
+            ])
+            ck_capture.assert_called_once()
+            llama_capture.assert_called_once()
 
     def test_main_replays_segmented_prompt_from_bridge_report(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_decoder_bridge_report_") as tmpdir:

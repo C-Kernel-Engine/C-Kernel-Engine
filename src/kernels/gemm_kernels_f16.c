@@ -352,6 +352,58 @@ static inline float ck_dot_f16_f16_avx(const uint16_t *w, const uint16_t *x, int
     }
     return sum;
 }
+
+static inline void ck_dot_f16_f16_avx4(const uint16_t *w,
+                                       const uint16_t *x,
+                                       int k,
+                                       float sums[4])
+{
+    int i = 0;
+    const int k8 = (k / 8) * 8;
+    __m256 acc0 = _mm256_setzero_ps();
+    __m256 acc1 = _mm256_setzero_ps();
+    __m256 acc2 = _mm256_setzero_ps();
+    __m256 acc3 = _mm256_setzero_ps();
+    const uint16_t *w1 = w + k;
+    const uint16_t *w2 = w1 + k;
+    const uint16_t *w3 = w2 + k;
+
+    for (; i < k8; i += 8) {
+        const __m128i xh = _mm_loadu_si128((const __m128i *)(x + i));
+        const __m256 xf = _mm256_cvtph_ps(xh);
+        const __m256 wf0 = _mm256_cvtph_ps(
+            _mm_loadu_si128((const __m128i *)(w + i)));
+        const __m256 wf1 = _mm256_cvtph_ps(
+            _mm_loadu_si128((const __m128i *)(w1 + i)));
+        const __m256 wf2 = _mm256_cvtph_ps(
+            _mm_loadu_si128((const __m128i *)(w2 + i)));
+        const __m256 wf3 = _mm256_cvtph_ps(
+            _mm_loadu_si128((const __m128i *)(w3 + i)));
+#ifdef __FMA__
+        acc0 = _mm256_fmadd_ps(wf0, xf, acc0);
+        acc1 = _mm256_fmadd_ps(wf1, xf, acc1);
+        acc2 = _mm256_fmadd_ps(wf2, xf, acc2);
+        acc3 = _mm256_fmadd_ps(wf3, xf, acc3);
+#else
+        acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(wf0, xf));
+        acc1 = _mm256_add_ps(acc1, _mm256_mul_ps(wf1, xf));
+        acc2 = _mm256_add_ps(acc2, _mm256_mul_ps(wf2, xf));
+        acc3 = _mm256_add_ps(acc3, _mm256_mul_ps(wf3, xf));
+#endif
+    }
+
+    sums[0] = ck_hsum256_ps(acc0);
+    sums[1] = ck_hsum256_ps(acc1);
+    sums[2] = ck_hsum256_ps(acc2);
+    sums[3] = ck_hsum256_ps(acc3);
+    for (; i < k; ++i) {
+        const float xv = fp16_to_fp32(x[i]);
+        sums[0] += fp16_to_fp32(w[i]) * xv;
+        sums[1] += fp16_to_fp32(w1[i]) * xv;
+        sums[2] += fp16_to_fp32(w2[i]) * xv;
+        sums[3] += fp16_to_fp32(w3[i]) * xv;
+    }
+}
 #endif
 
 static inline float ck_dot_f16_f16_local(const uint16_t *w, const uint16_t *x, int k)
@@ -549,7 +601,18 @@ static void gemm_f16_input_fp16_ref(float *Y,
 
         ck_f32_to_f16_row_local(x_f16, x_row, K);
 
-        for (int row = 0; row < M; ++row) {
+        int row = 0;
+#if defined(__F16C__) && defined(__AVX__)
+        for (; row + 3 < M; row += 4) {
+            float sums[4];
+            ck_dot_f16_f16_avx4(&W[(size_t)row * (size_t)K], x_f16, K, sums);
+            Y[(size_t)n * (size_t)M + (size_t)row] = sums[0];
+            Y[(size_t)n * (size_t)M + (size_t)row + 1] = sums[1];
+            Y[(size_t)n * (size_t)M + (size_t)row + 2] = sums[2];
+            Y[(size_t)n * (size_t)M + (size_t)row + 3] = sums[3];
+        }
+#endif
+        for (; row < M; ++row) {
             const uint16_t *w_row = &W[(size_t)row * (size_t)K];
             const float sum = ck_dot_f16_f16_local(w_row, x_f16, K);
             Y[(size_t)n * (size_t)M + (size_t)row] = sum;
@@ -579,7 +642,19 @@ static void ck_gemm_f16_input_fp16_work(int ith, int nth, void *opaque)
 
         ck_f32_to_f16_row_local(x_f16, x_row, K);
 
-        for (int row = 0; row < M; ++row) {
+        int row = 0;
+#if defined(__F16C__) && defined(__AVX__)
+        for (; row + 3 < M; row += 4) {
+            float sums[4];
+            ck_dot_f16_f16_avx4(
+                args->W + (size_t)row * (size_t)K, x_f16, K, sums);
+            args->Y[(size_t)n * (size_t)M + (size_t)row] = sums[0];
+            args->Y[(size_t)n * (size_t)M + (size_t)row + 1] = sums[1];
+            args->Y[(size_t)n * (size_t)M + (size_t)row + 2] = sums[2];
+            args->Y[(size_t)n * (size_t)M + (size_t)row + 3] = sums[3];
+        }
+#endif
+        for (; row < M; ++row) {
             const uint16_t *w_row = args->W + (size_t)row * (size_t)K;
             const float sum = ck_dot_f16_f16_local(w_row, x_f16, K);
             args->Y[(size_t)n * (size_t)M + (size_t)row] = sum;

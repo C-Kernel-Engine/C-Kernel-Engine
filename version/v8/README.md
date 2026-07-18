@@ -84,6 +84,11 @@ current affinity set, preserves LIKWID CSV/stdout/stderr, and writes
 more groups, or `V8_LIKWID_CPUS` with an explicit CPU list. Each group reruns the
 workload, so keep the default small when profiling large models.
 
+The wrapper records the CKE workload's exit status separately from LIKWID's
+exit status and requires the CLI's model-loading and prefill output before it
+reports `pass`. A missing status marker, failed workload, or usage-only CLI run
+fails closed instead of accepting counters collected around startup or help.
+
 The v8 IR Hub indexes the same summary and exposes its pass/skip/fail status,
 selected groups, pinned CPUs, common normalized metrics, and links to the JSON
 and preserved raw artifacts directly on each run card.

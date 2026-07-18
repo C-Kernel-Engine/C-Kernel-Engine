@@ -113,16 +113,11 @@ void rmsnorm_forward_fp64_sum(const float *input,
 
 static inline float rmsnorm_llama_production_rstd(float mean_eps)
 {
-#if defined(__AVX512F__)
-    const __m128 x = _mm_set_ss(mean_eps);
-    __m128 estimate = _mm_rsqrt14_ss(_mm_setzero_ps(), x);
-    __m128 correction = _mm_mul_ss(estimate, x);
-    correction = _mm_fmadd_ss(correction, estimate, _mm_set_ss(-3.0f));
-    estimate = _mm_mul_ss(estimate, _mm_set_ss(-0.5f));
-    return _mm_cvtss_f32(_mm_mul_ss(correction, estimate));
-#else
+    /* ggml's production RMSNorm evaluates this expression directly for every
+     * CPU ISA.  An AVX-512 rsqrt estimate, even after Newton refinement,
+     * changes Q/K normalization by a few ULPs and can be amplified by RoPE,
+     * attention, and FP16 cache storage during long multimodal decoding. */
     return 1.0f / sqrtf(mean_eps);
-#endif
 }
 
 #if defined(__clang__)

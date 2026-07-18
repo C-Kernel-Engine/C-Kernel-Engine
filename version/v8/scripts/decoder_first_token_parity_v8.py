@@ -396,10 +396,15 @@ def _load_llama_dump_dir(dump_dir: Path) -> list[Any]:
         final_occurrence = max_occurrence.get((base_name, token_id), occurrence)
         if norm_op in {"q_proj", "k_proj"} and occurrence > 0:
             stem = "qcur" if norm_op == "q_proj" else "kcur"
-            if final_occurrence >= 2 and occurrence < final_occurrence:
-                norm_op = f"{stem}_normed"
-            else:
-                norm_op = f"{stem}_rope"
+            if occurrence < final_occurrence:
+                # llama.cpp reuses Qcur/Kcur for graph aliases that are not a
+                # stable semantic boundary. In the Qwen3-VL prefill graph the
+                # middle occurrence is the pre-normalization projection alias,
+                # not CK's qcur_normed/kcur_normed checkpoint. Do not guess a
+                # semantic identity from occurrence number; the final reuse is
+                # the only occurrence established as post-RoPE by the graph.
+                continue
+            norm_op = f"{stem}_rope"
         dumps.append(
             parity_test_v7.ParityDump(
                 norm_layer,
@@ -1053,6 +1058,62 @@ def _compare_dump_sets(
     }
 
 
+def _label_multimodal_prefill_segments(
+    dumps: list[Any],
+    row_specs: dict[tuple[int, str], tuple[int, tuple[int, ...]]],
+    segments: list[tuple[str, int, int]],
+) -> list[Any]:
+    """Give batched prefill captures stable execution-segment identities.
+
+    The legacy CK dump header carries a decode token id, not a prefill pass or
+    segment id. Segmented multimodal prefill can consequently emit text-before,
+    visual, and text-after tensors with the same token id. Tensor extent plus
+    execution order is the unambiguous contract for those captures.
+    """
+    grouped: dict[tuple[int, str], list[Any]] = {}
+    key_order: list[tuple[int, str]] = []
+    for dump in dumps:
+        key = (int(dump.layer_id), _canonical_dump_op_name(str(dump.op_name)))
+        if key not in grouped:
+            key_order.append(key)
+        grouped.setdefault(key, []).append(dump)
+
+    labeled: list[Any] = []
+    for key in key_order:
+        row_spec = row_specs.get(key)
+        if row_spec is None:
+            continue
+        row_elems, _ = row_spec
+        if row_elems <= 0:
+            continue
+
+        remaining = list(segments)
+        for dump in grouped[key]:
+            flat = np.asarray(dump.data).reshape(-1)
+            if flat.size % row_elems != 0:
+                continue
+            batch_rows = int(flat.size // row_elems)
+            match_idx = next(
+                (idx for idx, (_, count, _) in enumerate(remaining) if int(count) == batch_rows),
+                None,
+            )
+            if match_idx is None:
+                continue
+            segment_name, _, segment_start = remaining.pop(match_idx)
+            labeled.append(
+                parity_test_v7.ParityDump(
+                    int(dump.layer_id),
+                    f"{key[1]}@{segment_name}",
+                    np.array(dump.data, copy=False),
+                    int(segment_start),
+                    str(dump.dtype),
+                    source_token_id=int(getattr(dump, "source_token_id", dump.token_id)),
+                    source_name=getattr(dump, "source_name", None),
+                )
+            )
+    return labeled
+
+
 def _capture_ck_dump(
     runtime: dict[str, Any],
     prefix_embeddings: array,
@@ -1066,7 +1127,9 @@ def _capture_ck_dump(
     prefix_text_pos: int | None = None,
     ck_strict_parity: bool = True,
 ) -> dict[str, Any]:
-    if dump_dir.exists():
+    target = dump_dir / "dump.bin"
+    writer_preinitialized = target.exists()
+    if dump_dir.exists() and not writer_preinitialized:
         shutil.rmtree(dump_dir)
     dump_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1100,7 +1163,6 @@ def _capture_ck_dump(
             prefix_text_pos=prefix_text_pos,
             strict_parity=ck_strict_parity,
         )
-        target = dump_dir / "dump.bin"
         fallback = fallback_dir / "dump.bin"
         if not target.exists() and fallback.exists():
             shutil.move(str(fallback), str(target))
@@ -1150,20 +1212,6 @@ def _capture_dump_compare(
     llama_decode_mode: str = "sequential",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if prefix_tokens > 0:
-        if str(dump_pass) != "decode":
-            ck = bridge_runner_v8._run_decoder(
-                runtime,
-                prefix_embeddings,
-                prefix_tokens,
-                token_ids,
-                tokens_before=tokens_before,
-                prefix_embed_dim=prefix_row_dim,
-                strict_parity=ck_strict_parity,
-            )
-            return ck, {
-                "status": "skipped",
-                "reason": "multimodal dump alignment is only implemented for decode-mode comparisons; use --dump-pass decode",
-            }
         prefix_path = dump_root / "prefix.f32"
         prefix_path.parent.mkdir(parents=True, exist_ok=True)
         prefix_path.write_bytes(prefix_embeddings.tobytes())
@@ -1238,7 +1286,9 @@ def _capture_dump_compare(
     tokens_before_count = len(list(tokens_before or []))
     ck_prompt_start_token = None
     llama_prompt_start_token = None
-    if str(dump_pass) == "decode":
+    compare_pass = str(dump_pass)
+    prefill_segments: list[dict[str, Any]] | None = None
+    if compare_pass == "decode":
         ck_prompt_start_token, llama_prompt_start_token = _resolve_decode_prompt_start_tokens(
             tokens_before_count=tokens_before_count,
             prefix_tokens=int(prefix_tokens),
@@ -1256,12 +1306,31 @@ def _capture_dump_compare(
             prompt_start_token=int(ck_prompt_start_token),
             prompt_token_count=len(token_ids),
         )
+    elif compare_pass == "prefill" and prefix_tokens > 0:
+        segment_specs = [
+            ("text_before", len(list(tokens_before or [])), 0),
+            ("visual", int(prefix_tokens), len(list(tokens_before or []))),
+            (
+                "text_after",
+                len(token_ids),
+                len(list(tokens_before or [])) + int(prefix_tokens),
+            ),
+        ]
+        segment_specs = [segment for segment in segment_specs if segment[1] > 0]
+        row_specs = _build_llama_row_specs(llama_dumps)
+        ck_dumps = _label_multimodal_prefill_segments(ck_dumps, row_specs, segment_specs)
+        llama_dumps = _label_multimodal_prefill_segments(llama_dumps, row_specs, segment_specs)
+        compare_pass = "all"
+        prefill_segments = [
+            {"name": name, "rows": int(rows), "physical_start": int(start)}
+            for name, rows, start in segment_specs
+        ]
     compare = _compare_dump_sets(
         ck_dumps,
         llama_dumps,
         atol=float(dump_atol),
         rtol=float(dump_rtol),
-        pass_filter=str(dump_pass),
+        pass_filter=compare_pass,
     )
 
     status = "ok"
@@ -1275,6 +1344,8 @@ def _capture_dump_compare(
         "dump_names": [item.strip() for item in str(dump_names).split(",") if item.strip()],
         "ck_dump_names": [item.strip() for item in ck_dump_names.split(",") if item.strip()],
         "pass_filter": str(dump_pass),
+        "comparison_pass_filter": compare_pass,
+        "prefill_segments": prefill_segments,
         "atol": float(dump_atol),
         "rtol": float(dump_rtol),
         "ck_dump_path": str(ck_dump_path),

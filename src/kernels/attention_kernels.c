@@ -5076,49 +5076,12 @@ static inline float ck_attention_f16_reduce_expf(float value)
 #endif
 }
 
-static CK_NOINLINE CK_OPTNONE float ck_attention_f16_reduce_sum(
-    float old_sum,
-    float old_scale,
-    float chunk_sum,
-    float chunk_scale)
-{
-    volatile float old_term = old_sum * old_scale;
-    volatile float chunk_term = chunk_sum * chunk_scale;
-    return old_term + chunk_term;
-}
-
 static inline float ck_attention_dot_f16_llama(const uint16_t *x,
                                                 const uint16_t *y,
                                                 int n)
 {
     int i = 0;
-#if defined(__AVX512FP16__)
-    // Match ggml's native AVX-512 FP16 path: four 32-lane FP16
-    // accumulators per 128 values, then its fixed pairwise tree.
-    __m512h sum0 = _mm512_setzero_ph();
-    __m512h sum1 = _mm512_setzero_ph();
-    __m512h sum2 = _mm512_setzero_ph();
-    __m512h sum3 = _mm512_setzero_ph();
-    const int n128 = n & ~127;
-    for (; i < n128; i += 128) {
-        const __m512h x0 = _mm512_loadu_ph(x + i);
-        const __m512h y0 = _mm512_loadu_ph(y + i);
-        const __m512h x1 = _mm512_loadu_ph(x + i + 32);
-        const __m512h y1 = _mm512_loadu_ph(y + i + 32);
-        const __m512h x2 = _mm512_loadu_ph(x + i + 64);
-        const __m512h y2 = _mm512_loadu_ph(y + i + 64);
-        const __m512h x3 = _mm512_loadu_ph(x + i + 96);
-        const __m512h y3 = _mm512_loadu_ph(y + i + 96);
-        sum0 = _mm512_fmadd_ph(x0, y0, sum0);
-        sum1 = _mm512_fmadd_ph(x1, y1, sum1);
-        sum2 = _mm512_fmadd_ph(x2, y2, sum2);
-        sum3 = _mm512_fmadd_ph(x3, y3, sum3);
-    }
-    sum0 = _mm512_add_ph(sum0, sum2);
-    sum1 = _mm512_add_ph(sum1, sum3);
-    sum0 = _mm512_add_ph(sum0, sum1);
-    const float vector_result = (float) _mm512_reduce_add_ph(sum0);
-#elif defined(__AVX512F__)
+#if defined(__AVX512F__)
     // Match ggml's AVX-512 FP16-to-FP32 path: four 16-lane
     // accumulators per 64 values, then its fixed pairwise tree.
     __m512 sum0 = _mm512_setzero_ps();
@@ -5328,7 +5291,10 @@ static void ck_attention_f16_split_work(int ith, int nth, void *opaque)
 
             ck_attention_mad_f16_llama(
                 acc_half, v_vec, value_scale, args->head_dim);
-            sum = sum * max_scale + value_scale;
+            /* Keep the online-softmax denominator on the same fused graph as
+             * llama.cpp. Relying on compiler contraction made Q=63 differ by
+             * one FP32 ULP between hosted C and C++ builds. */
+            sum = fmaf(sum, max_scale, value_scale);
         }
 
         partial[0] = max_score;
@@ -5379,11 +5345,8 @@ void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q
     const size_t resolved_count = (size_t) num_heads * (size_t) split_chunks * (size_t) partial_stride;
     float *partials = (float *) alloca(resolved_count * sizeof(float));
     /*
-     * llama.cpp keeps decode graphs reusable by padding the KV scheduling
-     * extent to at least 256 rows. Masked rows do not contribute values, but
-     * the padded extent still determines worker chunk boundaries and therefore
-     * the FP16 partial-reduction order. Keep valid storage separate from that
-     * scheduling contract: this kernel never reads rows >= kv_tokens.
+     * llama.cpp reuses a padded decode graph. Masked rows do not contribute,
+     * but the physical K tensor extent still determines worker boundaries.
      */
     const int partition_alignment = 256;
     const int partition_tokens = kv_tokens >= 512
@@ -5442,8 +5405,10 @@ void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q
                 const float chunk_term = partial[2 + d] * chunk_scale;
                 out_head[d] = fmaf(out_head[d], old_scale, chunk_term);
             }
-            final_sum = ck_attention_f16_reduce_sum(
-                final_sum, old_scale, chunk_sum, chunk_scale);
+            /* llama.cpp's production build contracts the old partial into the
+             * new chunk contribution. Keep this explicit: one FP32 ULP in the
+             * denominator crosses downstream Q8 quantization boundaries. */
+            final_sum = fmaf(final_sum, old_scale, chunk_sum * chunk_scale);
             final_max = new_max;
         }
 

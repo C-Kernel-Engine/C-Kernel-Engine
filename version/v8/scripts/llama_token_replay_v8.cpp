@@ -1,4 +1,5 @@
 #include "llama.h"
+#include "ggml-cpu.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -37,8 +38,10 @@ struct Args {
     int prefix_row_dim = 0;
     int prefix_text_pos = -1;
     int greedy_steps = 0;
+    int dump_greedy_decode_step = -1;
     bool no_repack = false;
     bool dump_list_only = false;
+    bool dump_flash_inputs = false;
 };
 
 struct DumpState {
@@ -49,6 +52,9 @@ struct DumpState {
     int dumped = 0;
     bool list_only = false;
     int32_t current_token_id = 0;
+    int current_greedy_decode_step = -1;
+    int requested_greedy_decode_step = -1;
+    bool dump_flash_inputs = false;
     std::unordered_map<std::string, int> occurrences;
 };
 
@@ -201,6 +207,12 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             args.greedy_steps = std::max(0, std::atoi(v));
             continue;
         }
+        if (a == "--dump-greedy-decode-step") {
+            const char * v = need_value("--dump-greedy-decode-step");
+            if (!v) return false;
+            args.dump_greedy_decode_step = std::atoi(v);
+            continue;
+        }
         if (a == "--embeddings-out") {
             const char * v = need_value("--embeddings-out");
             if (!v) return false;
@@ -221,6 +233,10 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
         }
         if (a == "--dump-list-only") {
             args.dump_list_only = true;
+            continue;
+        }
+        if (a == "--dump-flash-inputs") {
+            args.dump_flash_inputs = true;
             continue;
         }
         if (a == "--decode-mode") {
@@ -254,7 +270,8 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
                 << "--logits-out <path.bin> [--logits-seq-out <path.bin> --greedy-steps N] [--embeddings-out <path.f32>] [--prefix-f32 <path.f32>] "
                 << "[--prefix-grid-x N --prefix-grid-y N] [--prefix-row-dim N] [--prefix-text-pos N] [--ctx N] [--top-k K] [--threads N] "
                 << "[--decode-mode batched|sequential] [--prefix-decode-mode batched|sequential] "
-                << "[--dump-dir dir --dump-names a,b,c] [--dump-list-only] [--no-repack]\n";
+                << "[--dump-dir dir --dump-names a,b,c] [--dump-greedy-decode-step N] "
+                << "[--dump-list-only] [--no-repack]\n";
             std::exit(0);
         }
         err = "unknown arg: " + a;
@@ -290,6 +307,18 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
     }
     if (args.prefix_text_pos < -1) {
         err = "prefix text position must be >= -1";
+        return false;
+    }
+    if (args.dump_greedy_decode_step < -1) {
+        err = "dump-greedy-decode-step must be >= -1";
+        return false;
+    }
+    if (args.dump_greedy_decode_step >= args.greedy_steps) {
+        err = "dump-greedy-decode-step must be less than greedy-steps";
+        return false;
+    }
+    if (args.dump_greedy_decode_step >= 0 && args.dump_dir.empty()) {
+        err = "dump-greedy-decode-step requires --dump-dir";
         return false;
     }
     return true;
@@ -393,6 +422,10 @@ static bool should_dump_tensor(const DumpState * state, const ggml_tensor * t) {
     if (!state || state->dump_dir.empty() || !t) {
         return false;
     }
+    if (state->requested_greedy_decode_step >= 0 &&
+        state->current_greedy_decode_step != state->requested_greedy_decode_step) {
+        return false;
+    }
     const char * raw_name = ggml_get_name(t);
     if (!raw_name || !raw_name[0]) {
         return false;
@@ -464,6 +497,93 @@ static bool append_index_entry(
     return index.good();
 }
 
+static const ggml_tensor * find_flash_attention_ancestor(
+    const ggml_tensor * tensor,
+    int remaining_depth
+) {
+    if (!tensor || remaining_depth < 0) {
+        return nullptr;
+    }
+    if (tensor->op == GGML_OP_FLASH_ATTN_EXT) {
+        return tensor;
+    }
+    for (const ggml_tensor * source : tensor->src) {
+        if (const ggml_tensor * flash =
+                find_flash_attention_ancestor(source, remaining_depth - 1)) {
+            return flash;
+        }
+    }
+    return nullptr;
+}
+
+static void append_tensor_shape(std::ostream & out, const ggml_tensor * tensor) {
+    if (!tensor) {
+        out << "null";
+        return;
+    }
+    out << "[" << tensor->ne[0] << "," << tensor->ne[1] << ","
+        << tensor->ne[2] << "," << tensor->ne[3] << "]";
+}
+
+static void append_tensor_strides(std::ostream & out, const ggml_tensor * tensor) {
+    if (!tensor) {
+        out << "null";
+        return;
+    }
+    out << "[" << tensor->nb[0] << "," << tensor->nb[1] << ","
+        << tensor->nb[2] << "," << tensor->nb[3] << "]";
+}
+
+static bool dump_tensor_bytes(
+    const std::filesystem::path & path,
+    const ggml_tensor * tensor
+) {
+    if (!tensor) {
+        return true;
+    }
+    const size_t nbytes = ggml_nbytes(tensor);
+    std::vector<uint8_t> raw(nbytes);
+    ggml_backend_tensor_get(tensor, raw.data(), 0, nbytes);
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char *>(raw.data()),
+                 static_cast<std::streamsize>(raw.size()));
+    return output.good();
+}
+
+static void append_flash_attention_metadata(std::ostream & out, const ggml_tensor * tensor) {
+    // kqv_out is usually a view/permute above FLASH_ATTN_EXT. Walk only the
+    // local producer chain so diagnostics can report the production graph's
+    // physical K extent without requesting QK tensors and disabling flash.
+    const ggml_tensor * flash = find_flash_attention_ancestor(tensor, 12);
+    if (!flash) {
+        return;
+    }
+    int32_t precision = 0;
+    std::memcpy(&precision, flash->op_params + 3 * sizeof(int32_t), sizeof(precision));
+    out << ",\"flash_attention\":{";
+    out << "\"op\":\"" << json_escape(ggml_op_name(flash->op)) << "\",";
+    out << "\"precision\":" << precision << ",";
+    out << "\"q_shape\":";
+    append_tensor_shape(out, flash->src[0]);
+    out << ",\"k_shape\":";
+    append_tensor_shape(out, flash->src[1]);
+    out << ",\"v_shape\":";
+    append_tensor_shape(out, flash->src[2]);
+    out << ",\"mask_shape\":";
+    append_tensor_shape(out, flash->src[3]);
+    static const char * source_names[] = {"q", "k", "v", "mask"};
+    for (int source = 0; source < 4; ++source) {
+        if (!flash->src[source]) {
+            continue;
+        }
+        out << ",\"" << source_names[source] << "_type\":"
+            << static_cast<int>(flash->src[source]->type);
+        out << ",\"" << source_names[source] << "_strides\":";
+        append_tensor_strides(out, flash->src[source]);
+    }
+    out << "}";
+}
+
 static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_data) {
     const DumpState * state = static_cast<const DumpState *>(user_data);
     if (!should_dump_tensor(state, t)) {
@@ -516,7 +636,30 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
         meta << "\"elem_count\":" << ggml_nelements(t) << ",";
         meta << "\"ne\":[" << t->ne[0] << "," << t->ne[1] << "," << t->ne[2] << "," << t->ne[3] << "],";
         meta << "\"nb\":[" << t->nb[0] << "," << t->nb[1] << "," << t->nb[2] << "," << t->nb[3] << "]";
+        append_flash_attention_metadata(meta, t);
         meta << "}\n";
+    }
+
+    if (mut->dump_flash_inputs) {
+        const ggml_tensor * flash = find_flash_attention_ancestor(t, 12);
+        constexpr size_t max_flash_input_bytes = 64u * 1024u * 1024u;
+        size_t total_bytes = 0;
+        if (flash) {
+            for (int source = 0; source < 4 && flash->src[source]; ++source) {
+                total_bytes += ggml_nbytes(flash->src[source]);
+            }
+        }
+        if (!flash || total_bytes > max_flash_input_bytes) {
+            return false;
+        }
+        static const char * suffixes[] = {"q", "k", "v", "mask"};
+        for (int source = 0; source < 4 && flash->src[source]; ++source) {
+            if (!dump_tensor_bytes(
+                    mut->dump_dir / (dump_name + ".flash_" + suffixes[source] + ".bin"),
+                    flash->src[source])) {
+                return false;
+            }
+        }
     }
 
     if (!append_index_entry(mut, dump_name, base_name, t, occurrence)) {
@@ -727,6 +870,15 @@ static int32_t decode_prefix_embeddings(
 }
 
 int main(int argc, char ** argv) {
+    if (argc == 2 && std::string(argv[1]) == "--isa") {
+        std::cout << "{\"avx2\":" << (ggml_cpu_has_avx2() ? "true" : "false")
+                  << ",\"avx_vnni\":" << (ggml_cpu_has_avx_vnni() ? "true" : "false")
+                  << ",\"avx512\":" << (ggml_cpu_has_avx512() ? "true" : "false")
+                  << ",\"avx512_vnni\":" << (ggml_cpu_has_avx512_vnni() ? "true" : "false")
+                  << "}\n";
+        return 0;
+    }
+
     Args args;
     std::string err;
     if (!parse_args(argc, argv, args, err)) {
@@ -803,6 +955,8 @@ int main(int argc, char ** argv) {
         cparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
     }
     DumpState dump_state;
+    dump_state.requested_greedy_decode_step = args.dump_greedy_decode_step;
+    dump_state.dump_flash_inputs = args.dump_flash_inputs;
     if (!args.dump_dir.empty()) {
         dump_state.dump_dir = args.dump_dir;
         dump_state.index_path = dump_state.dump_dir / "index.json";
@@ -982,6 +1136,7 @@ int main(int argc, char ** argv) {
             if (step + 1 >= args.greedy_steps) {
                 break;
             }
+            dump_state.current_greedy_decode_step = step;
             begin_dump_batch(dump_state.dump_dir.empty() ? nullptr : &dump_state, prefix_text_pos + static_cast<int32_t>(tokens_after.size()) + step);
             llama_batch batch = llama_batch_init(1, 0, 1);
             batch.n_tokens = 1;
@@ -1082,6 +1237,7 @@ int main(int argc, char ** argv) {
               << (dump_attention_internals ? "disabled_for_internal_dump" : "auto")
               << "\",";
     std::cout << "\"greedy_steps\":" << args.greedy_steps << ",";
+    std::cout << "\"dump_greedy_decode_step\":" << args.dump_greedy_decode_step << ",";
     std::cout << "\"greedy_generated\":[";
     for (size_t i = 0; i < greedy_generated.size(); ++i) {
         if (i) std::cout << ",";

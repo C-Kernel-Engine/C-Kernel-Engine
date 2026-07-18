@@ -92,6 +92,18 @@ def _reader_thread(pipe: Any, capture: _BoundedCapture) -> None:
         pipe.close()
 
 
+def _runtime_environment(args: argparse.Namespace) -> dict[str, str]:
+    env = os.environ.copy()
+    env["CK_NUM_THREADS"] = str(int(args.threads))
+    env["OMP_NUM_THREADS"] = str(int(args.threads))
+    compiler = str(getattr(args, "compiler", "gcc"))
+    if compiler == "auto":
+        env.pop("CC", None)
+    else:
+        env["CC"] = compiler
+    return env
+
+
 def _run_logged(
     cmd: list[str],
     *,
@@ -414,11 +426,33 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--workdir", type=Path, default=REPO_ROOT / "build" / "stitched_parity" / "qwen3vl")
     ap.add_argument("--ctx-len", type=int, default=4096)
     ap.add_argument("--threads", type=int, default=20)
+    ap.add_argument(
+        "--compiler",
+        choices=("gcc", "icx", "auto"),
+        default="gcc",
+        help=(
+            "Compiler family for both the core engine and generated C. "
+            "Parity certification defaults to GCC; auto retains Makefile selection."
+        ),
+    )
     ap.add_argument("--top-k", type=int, default=16)
     ap.add_argument("--max-new-tokens", type=int, default=64)
     ap.add_argument("--image-min-tokens", type=int, default=None)
     ap.add_argument("--image-max-tokens", type=int, default=1024)
-    ap.add_argument("--skip-encoder-numeric", action="store_true", help="Skip final vision prefix numeric parity against llama.cpp")
+    ap.add_argument(
+        "--encoder-numeric-policy",
+        choices=("require", "observe", "skip"),
+        default="require",
+        help=(
+            "require final-prefix thresholds before token replay, observe and record "
+            "them without suppressing token replay, or skip the numeric phase"
+        ),
+    )
+    ap.add_argument(
+        "--skip-encoder-numeric",
+        action="store_true",
+        help="Deprecated alias for --encoder-numeric-policy skip",
+    )
     ap.add_argument("--encoder-cosine-min", type=float, default=0.9999)
     ap.add_argument("--encoder-rmse-max", type=float, default=1.0e-3)
     ap.add_argument("--encoder-max-abs-max", type=float, default=1.0e-1)
@@ -428,6 +462,14 @@ def main(argv: list[str] | None = None) -> int:
         "--keep-generated-weights",
         action="store_true",
         help="Keep generated weights.bump files from bridge/multitoken/granular phases; default prunes them to control scratch usage",
+    )
+    ap.add_argument(
+        "--prune-failed-weights",
+        action="store_true",
+        help=(
+            "Delete generated weights after a numerical/token failure. By default the "
+            "first failing runtime is retained for exact artifact replay."
+        ),
     )
     ap.add_argument("--granular-layers", type=str, default=None, help="Comma-separated activation layers to inspect after coarse mismatch")
     ap.add_argument(
@@ -450,6 +492,8 @@ def main(argv: list[str] | None = None) -> int:
     args.image_path = args.image_path.resolve()
     args.workdir = args.workdir.resolve()
 
+    encoder_numeric_policy = "skip" if args.skip_encoder_numeric else args.encoder_numeric_policy
+
     missing = [str(p) for p in (args.decoder_gguf, args.mmproj_gguf, args.image_path) if not p.exists()]
     if missing:
         print("missing required artifact(s): " + ", ".join(missing), file=sys.stderr)
@@ -459,9 +503,7 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(args.workdir)
     args.workdir.mkdir(parents=True, exist_ok=True)
 
-    env = os.environ.copy()
-    env["CK_NUM_THREADS"] = str(int(args.threads))
-    env["OMP_NUM_THREADS"] = str(int(args.threads))
+    env = _runtime_environment(args)
 
     command_log = args.workdir / "commands.log"
     bridge_dir = args.workdir / "bridge"
@@ -485,14 +527,17 @@ def main(argv: list[str] | None = None) -> int:
         "prompt": args.prompt,
         "ctx_len": int(args.ctx_len),
         "threads": int(args.threads),
+        "compiler": str(args.compiler),
         "image_min_tokens": args.image_min_tokens,
         "image_max_tokens": args.image_max_tokens,
         "command_log": str(command_log),
         "log_byte_limit": int(args.log_byte_limit),
         "keep_generated_weights": bool(args.keep_generated_weights),
+        "prune_failed_weights": bool(args.prune_failed_weights),
         "bridge_report": str(bridge_report),
         "prefix_f32": str(prefix_f32),
         "encoder_numeric_report": str(encoder_numeric_report),
+        "encoder_numeric_policy": encoder_numeric_policy,
         "multitoken_report": str(multitoken_report),
         "granular_ck_stop": bool(args.granular_ck_stop),
     }
@@ -516,7 +561,7 @@ def main(argv: list[str] | None = None) -> int:
         report["bridge_pruned_weight_bumps"] = _prune_weight_bumps(bridge_dir)
 
     encoder_ok = True
-    if not args.skip_encoder_numeric:
+    if encoder_numeric_policy != "skip":
         encoder_dir = args.workdir / "encoder_numeric"
         encoder_proc = _run_logged(
             _encoder_numeric_command(args, encoder_dir, encoder_numeric_report),
@@ -530,7 +575,7 @@ def main(argv: list[str] | None = None) -> int:
         report["encoder_numeric_exit_code"] = int(encoder_proc.returncode)
         report["encoder_numeric_metrics"] = encoder_numeric.get("metrics")
         report["encoder_numeric_pass"] = bool(encoder_ok)
-        if not encoder_ok:
+        if not encoder_ok and encoder_numeric_policy == "require":
             report["status"] = "fail"
             report["failure_stage"] = "encoder_numeric"
             if not args.no_granular:
@@ -559,8 +604,14 @@ def main(argv: list[str] | None = None) -> int:
                     {k: v for k, v in row.items() if k != "report"} for row in granular_reports
                 ]
                 report["first_granular_issue"] = _first_granular_issue(granular_reports)
-            if not args.keep_generated_weights:
+            if not args.keep_generated_weights and args.prune_failed_weights:
                 report["final_pruned_weight_bumps"] = _prune_weight_bumps(args.workdir)
+            elif not args.keep_generated_weights:
+                report["failed_weight_bumps_retained"] = [
+                    {"path": str(path), "bytes": int(path.stat().st_size)}
+                    for path in sorted(args.workdir.rglob("weights.bump"))
+                    if path.is_file()
+                ]
             _write_json(final_json, report)
             _write_markdown(report, final_md)
             issue = report.get("first_granular_issue") or {}
@@ -584,6 +635,14 @@ def main(argv: list[str] | None = None) -> int:
     report["multitoken_exit_code"] = int(multi_proc.returncode)
     report["multitoken_status"] = multitoken.get("status")
     report["first_divergence"] = multitoken.get("first_divergence")
+
+    if encoder_numeric_policy == "observe" and not encoder_ok:
+        if multitoken.get("pass") is True:
+            report["encoder_numeric_ranking_classification"] = (
+                "non_causal_for_observed_token_window"
+            )
+        else:
+            report["encoder_numeric_ranking_classification"] = "causality_unresolved"
 
     if multitoken.get("pass") is True:
         report["status"] = "pass"
@@ -622,8 +681,14 @@ def main(argv: list[str] | None = None) -> int:
         ]
         report["first_granular_issue"] = _first_granular_issue(granular_reports)
 
-    if not args.keep_generated_weights:
+    if not args.keep_generated_weights and args.prune_failed_weights:
         report["final_pruned_weight_bumps"] = _prune_weight_bumps(args.workdir)
+    elif not args.keep_generated_weights:
+        report["failed_weight_bumps_retained"] = [
+            {"path": str(path), "bytes": int(path.stat().st_size)}
+            for path in sorted(args.workdir.rglob("weights.bump"))
+            if path.is_file()
+        ]
     _write_json(final_json, report)
     _write_markdown(report, final_md)
     first = report.get("first_divergence") or {}

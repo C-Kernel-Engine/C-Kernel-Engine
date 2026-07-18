@@ -304,7 +304,7 @@ def _llama_prefill_output(q, k_bits, v_bits, head_dim, past_tokens, threads):
 
 
 def _llama_kv_partition_extent(kv_tokens):
-    """Match llama.cpp's reusable decode-graph KV scheduling extent."""
+    """Model llama.cpp's padded physical decode-graph K tensor extent."""
     kv_tokens = int(kv_tokens)
     return ((kv_tokens + 255) // 256) * 256 if kv_tokens >= 512 else kv_tokens
 
@@ -579,7 +579,7 @@ def _prefill_append_matches_decode_loop_case():
 
 
 def _prefill_auto_matches_llama_case(
-    name, seed, heads, kv_heads, q_tokens, past_tokens, head_dim, threads=4
+    name, seed, heads, kv_heads, q_tokens, past_tokens, head_dim, threads
 ):
     capacity, aligned = past_tokens + q_tokens, head_dim
     rng = np.random.default_rng(seed)
@@ -597,7 +597,7 @@ def _prefill_auto_matches_llama_case(
         _f32_ptr(q), _u16_ptr(k), _u16_ptr(v), _f32_ptr(actual),
         heads, kv_heads, q_tokens, past_tokens, capacity, head_dim, aligned, 3,
     )
-    expected = _llama_prefill_output(q, k, v, head_dim, past_tokens, threads=4)
+    expected = _llama_prefill_output(q, k, v, head_dim, past_tokens, threads=threads)
     diff = float(np.max(np.abs(actual - expected))) if status == 0 else math.inf
     return Result(
         name,
@@ -637,6 +637,7 @@ def _case(name, seed, heads, kv_heads, kv_tokens, head_dim, aligned, chunks, tol
 
 def main():
     results = []
+    threads = max(1, int(lib.ck_get_num_threads()))
     results.append(_prefill_append_matches_decode_loop_case())
     # Current llama.cpp changes flash-attention arithmetic at Q=64. Exercise
     # both sides of that production dispatch boundary and the actual Qwen3-VL
@@ -651,48 +652,53 @@ def main():
             2026071508, 32, 8, 1008, 5, 128,
         ),
     ):
-        results.append(_prefill_auto_matches_llama_case(*case))
+        results.append(_prefill_auto_matches_llama_case(*case, threads=threads))
     results.append(_unfused_f16_causal_case())
     below, below_data = _case(
         "f16_split_below_threshold(KV=511,C=1)", 511, 8, 2, 511, 64, 64, 1, 0.0,
     )
     results.append(below)
     threshold, threshold_data = _case(
-        "f16_split_threshold(KV=512,C=4)", 512, 8, 2, 512, 64, 64, 4, 0.0,
+        f"f16_split_threshold(KV=512,C={threads})",
+        512, 8, 2, 512, 64, 64, threads, 0.0,
     )
     results.append(threshold)
+    merge_rounding, _ = _case(
+        f"f16_split_merge_rounding(KV=512,H=1,D=32,C={threads})",
+        2, 1, 1, 512, 32, 32, threads, 0.0,
+    )
+    results.append(merge_rounding)
     qwen, qwen_data = _case(
-        "f16_split_qwen3vl(KV=1058,H=32,D=128,C=20)",
-        1058, 32, 8, 1058, 128, 128, 20, 0.0,
+        f"f16_split_qwen3vl(KV=1058,H=32,D=128,C={threads})",
+        1058, 32, 8, 1058, 128, 128, threads, 0.0,
     )
     results.append(qwen)
     qwen_step20, qwen_step20_data = _case(
-        "f16_split_qwen3vl_step20(KV=1047,P=1280,H=32,D=128,C=20)",
-        1047, 32, 8, 1047, 128, 128, 20, 0.0,
+        f"f16_split_qwen3vl_step20(KV=1047,P=1280,H=32,D=128,C={threads})",
+        1047, 32, 8, 1047, 128, 128, threads, 0.0,
     )
     results.append(qwen_step20)
     qwen_step60, qwen_step60_data = _case(
-        "f16_split_qwen3vl_step60(KV=1087,P=1280,H=32,D=128,C=20)",
-        1087, 32, 8, 1087, 128, 128, 20, 0.0,
+        f"f16_split_qwen3vl_step60(KV=1087,P=1280,H=32,D=128,C={threads})",
+        1087, 32, 8, 1087, 128, 128, threads, 0.0,
     )
     results.append(qwen_step60)
     qwen_mid, qwen_mid_data = _case(
-        "f16_split_qwen3vl_mid(KV=1307,H=32,D=128,C=20)",
-        1307, 32, 8, 1307, 128, 128, 20, 0.0,
+        f"f16_split_qwen3vl_mid(KV=1307,H=32,D=128,C={threads})",
+        1307, 32, 8, 1307, 128, 128, threads, 0.0,
     )
     results.append(qwen_mid)
     qwen_long, qwen_long_data = _case(
-        "f16_split_qwen3vl_long(KV=1609,H=32,D=128,C=20)",
-        1609, 32, 8, 1609, 128, 128, 20, 0.0,
+        f"f16_split_qwen3vl_long(KV=1609,H=32,D=128,C={threads})",
+        1609, 32, 8, 1609, 128, 128, threads, 0.0,
     )
     results.append(qwen_long)
     padded, _ = _case(
-        "f16_split_padded_gqa(KV=513,D=80,A=128,C=4)",
-        513, 8, 2, 513, 80, 128, 4, 0.0,
+        f"f16_split_padded_gqa(KV=513,D=80,A=128,C={threads})",
+        513, 8, 2, 513, 80, 128, threads, 0.0,
     )
     results.append(padded)
 
-    threads = max(1, int(lib.ck_get_num_threads()))
     for name, data in (
         ("explicit_contract_route_below(KV=511)", below_data),
         ("explicit_contract_route_threshold(KV=512)", threshold_data),

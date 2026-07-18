@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -248,6 +249,10 @@ def _validate_hidden_capture_request(
 
 def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     helper = first_token.compare_first_token_logits_v7.ensure_llama_helper()
+    requested_isa = str(getattr(args, "llama_required_isa", "auto") or "auto")
+    oracle_evidence = _llama_oracle_evidence(
+        helper, None if requested_isa == "auto" else requested_isa
+    )
     with tempfile.TemporaryDirectory(prefix="llama_token_replay_v8_seq_") as td:
         tmp = Path(td)
         logits_out = tmp / "llama_final.f32"
@@ -287,6 +292,27 @@ def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace)
             cmd.extend(["--threads", str(int(args.threads))])
         if bool(args.llama_no_repack):
             cmd.append("--no-repack")
+        persistent_dump_step = getattr(args, "llama_persistent_dump_step", None)
+        if persistent_dump_step is not None:
+            persistent_dump_step = int(persistent_dump_step)
+            if persistent_dump_step <= 0:
+                raise ValueError(
+                    "--llama-persistent-dump-step must be >= 1; step 0 is produced by prefill"
+                )
+            dump_dir = getattr(args, "llama_persistent_dump_dir", None)
+            if dump_dir is None:
+                dump_dir = args.workdir / f"llama_persistent_step_{persistent_dump_step:04d}"
+            dump_names = str(getattr(args, "llama_persistent_dump_names", "") or "").strip()
+            if not dump_names:
+                raise ValueError("--llama-persistent-dump-step requires --llama-persistent-dump-names")
+            cmd.extend([
+                "--dump-dir", str(Path(dump_dir).resolve()),
+                "--dump-names", dump_names,
+                # Logits row N is produced by decoding the token selected at N-1.
+                "--dump-greedy-decode-step", str(persistent_dump_step - 1),
+            ])
+            if bool(getattr(args, "llama_persistent_dump_flash_inputs", False)):
+                cmd.append("--dump-flash-inputs")
         proc = subprocess.run(cmd, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False)
         if proc.returncode != 0:
             raise RuntimeError(
@@ -306,6 +332,7 @@ def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace)
         return {
             "meta": meta,
             "logits": logits.reshape((steps, n_vocab)),
+            "oracle_evidence": oracle_evidence,
         }
 
 def _load_exact_decoder_runtime(
@@ -402,6 +429,132 @@ def _runtime_evidence(
         "weights_bump_path": str(Path(runtime["weights_bump"]).resolve()),
         "context_length": int(runtime.get("context_length", 0) or 0),
     }
+
+
+def _validate_llama_oracle_isa(
+    isa: dict[str, Any], required_isa: str | None = None
+) -> str | None:
+    required = (
+        os.environ.get("CK_EXPECT_LLAMA_ISA", "").strip().lower()
+        if required_isa is None
+        else str(required_isa).strip().lower()
+    )
+    if (
+        not required
+        and os.environ.get("CK_REQUIRE_LLAMA_AVX512", "").strip() not in ("", "0")
+    ):
+        required = "avx512"
+    if required not in ("", "avx2", "avx512"):
+        raise RuntimeError(
+            "CK_EXPECT_LLAMA_ISA must be empty, avx2, or avx512; "
+            f"got {required!r}"
+        )
+    if required == "avx512" and not bool(isa.get("avx512")):
+        raise RuntimeError(
+            f"llama.cpp oracle ISA mismatch: required avx512, observed {isa}"
+        )
+    if required == "avx2" and (
+        not bool(isa.get("avx2")) or bool(isa.get("avx512"))
+    ):
+        raise RuntimeError(
+            f"llama.cpp oracle ISA mismatch: required avx2-only, observed {isa}"
+        )
+    return required or None
+
+
+def _llama_oracle_evidence(
+    helper: Path, required_isa: str | None = None
+) -> dict[str, Any]:
+    module = first_token.compare_first_token_logits_v7
+    llama_root, _lib_dir, libraries = module._llama_helper_paths()
+
+    def describe(path: Path) -> dict[str, Any]:
+        resolved = path.resolve()
+        return {
+            "path": str(resolved),
+            "sha256": hashlib.sha256(resolved.read_bytes()).hexdigest(),
+        }
+
+    commit_probe = subprocess.run(
+        ["git", "-C", str(llama_root), "rev-parse", "HEAD"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if commit_probe.returncode != 0:
+        raise RuntimeError(
+            "cannot establish llama.cpp oracle commit provenance: "
+            + (commit_probe.stderr.strip() or f"git rc={commit_probe.returncode}")
+        )
+    isa_probe = subprocess.run(
+        [str(helper), "--isa"], text=True, capture_output=True, check=False
+    )
+    if isa_probe.returncode != 0:
+        raise RuntimeError(
+            "cannot establish llama.cpp oracle ISA provenance: "
+            + (isa_probe.stderr.strip() or f"helper rc={isa_probe.returncode}")
+        )
+    try:
+        isa = json.loads(isa_probe.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"invalid llama.cpp oracle ISA evidence: {isa_probe.stdout!r}"
+        ) from exc
+    if not isinstance(isa, dict):
+        raise RuntimeError(f"invalid llama.cpp oracle ISA evidence: {isa!r}")
+    required_isa = _validate_llama_oracle_isa(isa, required_isa)
+    return {
+        "root": str(llama_root.resolve()),
+        "commit": commit_probe.stdout.strip(),
+        "isa": isa,
+        "required_isa": required_isa,
+        "helper": describe(helper),
+        "helper_source": describe(module.HELPER_SRC),
+        "libraries": [describe(path) for path in libraries],
+    }
+
+
+def _compiler_family(description: dict[str, Any]) -> str | None:
+    compiler = description.get("build", {}).get("compiler", {})
+    values = [compiler.get("command"), compiler.get("version")]
+    values.extend(description.get("elf_compiler_comments", []))
+    text = " ".join(
+        " ".join(str(part) for part in value)
+        if isinstance(value, list)
+        else str(value or "")
+        for value in values
+    ).lower()
+    if "intel(r) oneapi" in text or re.search(r"\bicx\b", text):
+        return "intel-icx"
+    if "clang" in text:
+        return "clang"
+    if "gcc" in text or "gnu compiler" in text:
+        return "gcc"
+    return None
+
+
+def _validate_runtime_compiler_provenance(evidence: dict[str, Any]) -> dict[str, Any]:
+    decoder_family = _compiler_family(evidence["shared_library"])
+    engine_family = _compiler_family(evidence["engine_library"])
+    result = {
+        "status": "pass",
+        "decoder_family": decoder_family,
+        "engine_family": engine_family,
+    }
+    if decoder_family is None or engine_family is None:
+        result["status"] = "fail"
+        result["reason"] = "unknown_compiler_family"
+    elif decoder_family != engine_family:
+        result["status"] = "fail"
+        result["reason"] = "compiler_family_mismatch"
+    if result["status"] != "pass":
+        raise RuntimeError(
+            "HARD PARITY CONTRACT FAULT: generated decoder and core engine compiler "
+            "provenance must be known and identical; "
+            f"decoder={decoder_family!r} engine={engine_family!r} "
+            f"reason={result['reason']}"
+        )
+    return result
 
 
 def _ck_environment_evidence() -> dict[str, str]:
@@ -621,7 +774,32 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
     if dump_dir is None:
         dump_dir = args.workdir / f"dump_step_{step_index:04d}"
 
-    inputs = _prepare_inputs(args, parity_dump=True)
+    dump_dir = Path(dump_dir).resolve()
+    if dump_dir.exists():
+        shutil.rmtree(dump_dir)
+    ck_dump_dir = dump_dir / "ck"
+    ck_dump_dir.mkdir(parents=True, exist_ok=True)
+    # The generated parity library may initialize its writer while it is
+    # loaded. Publish an existing absolute directory before preparing/loading
+    # that runtime; setting CK_PARITY_DIR afterward leaves a permanently
+    # disabled writer and used to produce a misleading skipped diagnostic.
+    old_parity_dir = os.environ.get("CK_PARITY_DIR")
+    old_op_filter = os.environ.get("CK_PARITY_OP_FILTER")
+    os.environ["CK_PARITY_DIR"] = str(ck_dump_dir)
+    ck_dump_names = first_token._ck_dump_filter_names(str(getattr(args, "dump_names", "")))
+    if ck_dump_names:
+        os.environ["CK_PARITY_OP_FILTER"] = ck_dump_names
+    try:
+        inputs = _prepare_inputs(args, parity_dump=True)
+    finally:
+        if old_parity_dir is None:
+            os.environ.pop("CK_PARITY_DIR", None)
+        else:
+            os.environ["CK_PARITY_DIR"] = old_parity_dir
+        if old_op_filter is None:
+            os.environ.pop("CK_PARITY_OP_FILTER", None)
+        else:
+            os.environ["CK_PARITY_OP_FILTER"] = old_op_filter
     dump_source = Path(inputs["runtime"].get("c_path") or "")
     if not dump_source.is_file() or "#define CK_PARITY_DUMP 1" not in dump_source.read_text(encoding="utf-8"):
         raise RuntimeError(
@@ -644,7 +822,7 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
             ctx_len=int(inputs["ctx_len"]),
             top_k=int(args.top_k),
             threads=_ck_threads(args),
-            dump_root=dump_dir.resolve(),
+            dump_root=dump_dir,
             dump_names=str(args.dump_names),
             dump_pass=str(args.dump_pass),
             dump_atol=float(args.dump_atol),
@@ -656,10 +834,15 @@ def _capture_step_dump(report: dict[str, Any], args: argparse.Namespace) -> dict
         )
     finally:
         _restore_prefix_decode_policy_env(old_env)
+    if str(dump_report.get("status", "")).lower() in {"error", "skipped"}:
+        raise RuntimeError(
+            "granular capture did not produce a comparable CK/llama tensor set; "
+            f"status={dump_report.get('status')} reason={dump_report.get('reason', '')}"
+        )
     return {
         "step": int(step_index),
         "step_row": row,
-        "dump_dir": str(dump_dir.resolve()),
+        "dump_dir": str(dump_dir),
         "replay_tokens_after_count": int(len(replay_tokens_after)),
         "generated_prefix": generated_prefix,
         "ck_top1": int((ck.get("comparison") or {}).get("top1_ck", ck.get("ck_top1", -1))),
@@ -777,23 +960,55 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
     capture_error: Exception | None = None
     kv_comparison: dict[str, Any] | None = None
 
-    def export_kv(lib: Any, path: Path) -> dict[str, Any]:
+    capture_layers = (
+        [layer]
+        if layer >= 0
+        else sorted(set.intersection(*(set(catalog[name]) for name in names)))
+    )
+
+    def export_kv(lib: Any, directory: Path) -> dict[str, Any]:
         if not hasattr(lib, "ck_model_debug_export_kv_f16"):
             return {
                 "status": "unavailable",
                 "reason": "runtime lacks bounded ck_model_debug_export_kv_f16 X-ray ABI",
-                "path": str(path),
+                "directory": str(directory),
             }
         lib.ck_model_debug_export_kv_f16.argtypes = [ctypes.c_char_p, ctypes.c_int]
         lib.ck_model_debug_export_kv_f16.restype = ctypes.c_int
-        rc = int(lib.ck_model_debug_export_kv_f16(str(path).encode("utf-8"), int(layer)))
-        if rc != 0:
-            return {
-                "status": "error",
-                "reason": f"FP16 KV export failed rc={rc} layer={layer}",
+        rows: list[dict[str, Any]] = []
+        for capture_layer in capture_layers:
+            path = (
+                directory / "kv_cache_f16.bin"
+                if layer >= 0
+                else directory / f"kv_cache_f16_layer_{capture_layer:03d}.bin"
+            )
+            rc = int(
+                lib.ck_model_debug_export_kv_f16(
+                    str(path).encode("utf-8"), int(capture_layer)
+                )
+            )
+            rows.append({
+                "layer": int(capture_layer),
+                "status": "ok" if rc == 0 else "error",
                 "path": str(path),
-            }
-        return {"status": "ok", "path": str(path)}
+                "rc": int(rc),
+            })
+            if rc != 0:
+                break
+        status = "ok" if rows and all(row["status"] == "ok" for row in rows) else "error"
+        result: dict[str, Any] = {
+            "status": status,
+            "directory": str(directory),
+            "layers": rows,
+        }
+        if len(rows) == 1:
+            result["path"] = rows[0]["path"]
+        if status != "ok":
+            failed = next(row for row in rows if row["status"] != "ok")
+            result["reason"] = (
+                f"FP16 KV export failed rc={failed['rc']} layer={failed['layer']}"
+            )
+        return result
 
     persistent_kv_export: dict[str, Any] | None = None
     replay_kv_export: dict[str, Any] | None = None
@@ -815,7 +1030,7 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
                     raise RuntimeError(f"ck_model_decode failed rc={rc} while capturing persistent hidden state")
                 if i == last_i:
                     _restore_process_env({key: None for key in env_keys})
-            persistent_kv_export = export_kv(lib, persistent_dir / "kv_cache_f16.bin")
+            persistent_kv_export = export_kv(lib, persistent_dir)
         finally:
             if hasattr(lib, "ck_model_free"):
                 try:
@@ -833,7 +1048,7 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
         lib2, _logits2, _vocab2 = _init_ck_state(
             replay_inputs, bool(args.ck_strict_parity), getattr(args, "ck_engine_so", None)
         )
-        replay_kv_export = export_kv(lib2, full_dir / "kv_cache_f16.bin")
+        replay_kv_export = export_kv(lib2, full_dir)
         if hasattr(lib2, "ck_model_free"):
             try:
                 lib2.ck_model_free()
@@ -863,27 +1078,58 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
             and persistent_kv_export.get("status") == "ok"
             and replay_kv_export.get("status") == "ok"
         ):
-            persistent_kv = Path(str(persistent_kv_export["path"]))
-            replay_kv = Path(str(replay_kv_export["path"]))
-            persistent_bytes = persistent_kv.read_bytes()
-            replay_bytes = replay_kv.read_bytes()
-            first_byte = next(
-                (i for i, (a, b) in enumerate(zip(persistent_bytes, replay_bytes)) if a != b),
-                None,
-            )
-            kv_comparison = {
-                "status": "ok" if persistent_bytes == replay_bytes else "fail",
-                "persistent_path": str(persistent_kv),
-                "full_replay_path": str(replay_kv),
-                "persistent_bytes": len(persistent_bytes),
-                "full_replay_bytes": len(replay_bytes),
-                "first_differing_byte": first_byte,
-                "first_difference": _describe_kv_f16_difference(
-                    persistent_bytes, replay_bytes, first_byte
-                ),
-                "persistent_sha256": hashlib.sha256(persistent_bytes).hexdigest(),
-                "full_replay_sha256": hashlib.sha256(replay_bytes).hexdigest(),
+            persistent_by_layer = {
+                int(row["layer"]): Path(str(row["path"]))
+                for row in persistent_kv_export["layers"]
             }
+            replay_by_layer = {
+                int(row["layer"]): Path(str(row["path"]))
+                for row in replay_kv_export["layers"]
+            }
+            kv_rows: list[dict[str, Any]] = []
+            for capture_layer in sorted(set(persistent_by_layer) | set(replay_by_layer)):
+                persistent_kv = persistent_by_layer.get(capture_layer)
+                replay_kv = replay_by_layer.get(capture_layer)
+                if persistent_kv is None or replay_kv is None:
+                    kv_rows.append({
+                        "layer": int(capture_layer),
+                        "status": "missing",
+                        "persistent_path": None if persistent_kv is None else str(persistent_kv),
+                        "full_replay_path": None if replay_kv is None else str(replay_kv),
+                    })
+                    continue
+                persistent_bytes = persistent_kv.read_bytes()
+                replay_bytes = replay_kv.read_bytes()
+                first_byte = next(
+                    (i for i, (a, b) in enumerate(zip(persistent_bytes, replay_bytes)) if a != b),
+                    None,
+                )
+                kv_rows.append({
+                    "layer": int(capture_layer),
+                    "status": "ok" if persistent_bytes == replay_bytes else "fail",
+                    "persistent_path": str(persistent_kv),
+                    "full_replay_path": str(replay_kv),
+                    "persistent_bytes": len(persistent_bytes),
+                    "full_replay_bytes": len(replay_bytes),
+                    "first_differing_byte": first_byte,
+                    "first_difference": _describe_kv_f16_difference(
+                        persistent_bytes, replay_bytes, first_byte
+                    ),
+                    "persistent_sha256": hashlib.sha256(persistent_bytes).hexdigest(),
+                    "full_replay_sha256": hashlib.sha256(replay_bytes).hexdigest(),
+                })
+            first_kv_issue = next((row for row in kv_rows if row["status"] != "ok"), None)
+            kv_comparison = {
+                "status": "ok" if first_kv_issue is None else "fail",
+                "first_layer_issue": first_kv_issue,
+                "layers": kv_rows,
+            }
+            if len(kv_rows) == 1:
+                kv_comparison.update({
+                    key: value
+                    for key, value in kv_rows[0].items()
+                    if key != "status"
+                })
         else:
             statuses = [item for item in (persistent_kv_export, replay_kv_export) if item is not None]
             kv_comparison = {
@@ -946,6 +1192,7 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
         "preflight": {
             "status": "pass",
             "requested_names": names,
+            "capture_layers": capture_layers,
             "available_exporter_count": len(catalog),
         },
         "ck_execution_count": 2,
@@ -1121,6 +1368,12 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
             inputs["bridge_report"],
             allow_diagnostic_mismatch=True,
         )
+    runtime_evidence = _runtime_evidence(
+        inputs["runtime"],
+        exact_reuse=bool(inputs.get("exact_runtime", False)),
+        engine_so=getattr(args, "ck_engine_so", None),
+    )
+    compiler_provenance = _validate_runtime_compiler_provenance(runtime_evidence)
     tokenizer: GGUFTokenizer = inputs["tokenizer"]
     llama_seq = _run_llama_greedy_sequence(inputs, args)
     lib, logits_buf, vocab_size = _init_ck_state(
@@ -1226,12 +1479,10 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
             "prefill_mode_contract": mode_contract,
         },
         "llama_greedy_generated": llama_generated,
+        "llama_oracle": llama_seq["oracle_evidence"],
         "append_on_divergence": str(args.append_on_divergence),
-        "ck_runtime": _runtime_evidence(
-            inputs["runtime"],
-            exact_reuse=bool(inputs.get("exact_runtime", False)),
-            engine_so=getattr(args, "ck_engine_so", None),
-        ),
+        "ck_runtime": runtime_evidence,
+        "compiler_provenance": compiler_provenance,
         "stop_token_ids": sorted(stop_token_ids),
         "stop_reason": stop_reason,
         "prompt_tokens_before_image": inputs["tokens_before"],
@@ -1367,6 +1618,12 @@ def main() -> int:
     ap.add_argument("--top-k", type=int, default=16)
     ap.add_argument("--threads", type=int, default=1, help="llama.cpp oracle threads")
     ap.add_argument(
+        "--llama-required-isa",
+        choices=("auto", "avx2", "avx512"),
+        default="auto",
+        help="Hard-fail unless the llama.cpp production oracle exposes this ISA",
+    )
+    ap.add_argument(
         "--ck-threads",
         type=int,
         default=None,
@@ -1393,6 +1650,23 @@ def main() -> int:
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--dump-step", type=int, default=None, help="Capture CK-vs-llama tensor dumps at this generated step")
     ap.add_argument(
+        "--llama-persistent-dump-step",
+        type=int,
+        default=None,
+        help="Bound llama.cpp tensor capture to the persistent decode call that produced generated logits step N",
+    )
+    ap.add_argument("--llama-persistent-dump-dir", type=Path, default=None)
+    ap.add_argument(
+        "--llama-persistent-dump-flash-inputs",
+        action="store_true",
+        help="Boundedly capture the production flash node's Q/K/V/mask inputs",
+    )
+    ap.add_argument(
+        "--llama-persistent-dump-names",
+        default="",
+        help="Comma-separated llama.cpp graph tensor names for bounded persistent capture",
+    )
+    ap.add_argument(
         "--dump-first-divergence",
         action="store_true",
         help="Capture CK-vs-llama tensors at the first observed pre-EOS divergence",
@@ -1415,6 +1689,17 @@ def main() -> int:
     ap.add_argument("--hidden-state-atol", type=float, default=1.0e-5)
     ap.add_argument("--summary", action="store_true")
     args = ap.parse_args()
+    if args.dump_step is not None or args.dump_first_divergence:
+        early_dump_dir = args.dump_dir
+        if early_dump_dir is None:
+            requested = 0 if args.dump_step is None else int(args.dump_step)
+            early_dump_dir = args.workdir / f"dump_step_{requested:04d}"
+        early_dump_dir = Path(early_dump_dir).resolve() / "ck"
+        early_dump_dir.mkdir(parents=True, exist_ok=True)
+        # Set this before any generated parity library can be loaded. Its dump
+        # writer initializes once; a later environment change cannot recover
+        # from an initial open failure.
+        os.environ["CK_PARITY_DIR"] = str(early_dump_dir)
     if args.ck_engine_so is not None:
         args.ck_engine_so = args.ck_engine_so.resolve()
         if not args.ck_engine_so.is_file():

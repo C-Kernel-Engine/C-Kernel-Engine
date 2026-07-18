@@ -407,6 +407,18 @@ MAKE_TARGETS = {
         "target": "test-attention-f16-split-kv",
         "timeout_sec": 180,
     },
+    "q4q6_production_graph_parity": {
+        "name": "Q4/Q6 Production Graph Parity",
+        "category": "parity",
+        "target": "test-q4q6-llama-production-native",
+        "timeout_sec": 300,
+    },
+    "numerical_replay_fixture_contract": {
+        "name": "Numerical Replay Fixture Contract",
+        "category": "parity",
+        "target": "test-private-numerical-replay-runner",
+        "timeout_sec": 60,
+    },
     "v8_dump_alignment": {
         "name": "v8 Stitched Dump Alignment",
         "category": "parity",

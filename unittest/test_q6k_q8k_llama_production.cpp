@@ -8,9 +8,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <vector>
 
 extern "C" {
@@ -76,6 +78,36 @@ static bool compare_f32(const char *label, const float *a, const float *b, size_
                 "ck=%.9g llama=%.9g [FAIL]\n",
             label, different, count, first, worst, max_abs, a[worst], b[worst]);
     return false;
+}
+
+static float f32_from_bits(uint32_t bits) {
+    float value;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static bool run_q8_rounding_boundary_case() {
+    std::printf("\nq8_rounding_boundary K=%d\n", QK_K);
+    std::vector<float> input(QK_K, 0.0f);
+    input[119] = f32_from_bits(0x3e9ade7bU);
+    input[204] = f32_from_bits(0xbe508645U);
+
+    block_q8_K ck = {};
+    block_q8_K llama = {};
+    quantize_row_q8_k(input.data(), &ck, QK_K);
+    quantize_row_q8_K_ref(input.data(), &llama, QK_K);
+    return compare_bytes("Q8_K non-contracted rounding", &ck, &llama, sizeof(ck));
+}
+
+static std::vector<unsigned char> read_bytes(const char *path) {
+    std::ifstream input(path, std::ios::binary | std::ios::ate);
+    if (!input) return {};
+    const std::streamsize size = input.tellg();
+    if (size < 0) return {};
+    std::vector<unsigned char> data(static_cast<size_t>(size));
+    input.seekg(0);
+    input.read(reinterpret_cast<char *>(data.data()), size);
+    return input ? data : std::vector<unsigned char>{};
 }
 
 static bool llama_graph(const std::vector<unsigned char> &weights,
@@ -177,6 +209,49 @@ static bool run_case(const case_spec &spec) {
     return pass;
 }
 
+static bool run_xray_artifact_case() {
+    const char *input_path = std::getenv("CK_Q6_XRAY_INPUT_F32");
+    const char *weights_path = std::getenv("CK_Q6_XRAY_WEIGHTS_Q6_K");
+    const char *output_path = std::getenv("CK_Q6_XRAY_LLAMA_OUTPUT_F32");
+    if (!input_path && !weights_path && !output_path) return true;
+    if (!input_path || !weights_path || !output_path) {
+        std::fprintf(stderr, "all CK_Q6_XRAY_* paths are required together\n");
+        return false;
+    }
+
+    const int k = std::atoi(std::getenv("CK_Q6_XRAY_K") ? std::getenv("CK_Q6_XRAY_K") : "4096");
+    const int n = std::atoi(std::getenv("CK_Q6_XRAY_N") ? std::getenv("CK_Q6_XRAY_N") : "1024");
+    const auto input_bytes = read_bytes(input_path);
+    const auto weights = read_bytes(weights_path);
+    const auto output_bytes = read_bytes(output_path);
+    const size_t q6_row = static_cast<size_t>(k / QK_K) * sizeof(block_q6_K);
+    if (input_bytes.size() != static_cast<size_t>(k) * sizeof(float)
+            || weights.size() != static_cast<size_t>(n) * q6_row
+            || output_bytes.size() != static_cast<size_t>(n) * sizeof(float)) {
+        std::fprintf(stderr, "invalid Q6 X-ray artifact extents: input=%zu weights=%zu output=%zu\n",
+                input_bytes.size(), weights.size(), output_bytes.size());
+        return false;
+    }
+
+    std::vector<float> input(k), expected(n), leaf(n), graph(n), ck(n);
+    std::memcpy(input.data(), input_bytes.data(), input_bytes.size());
+    std::memcpy(expected.data(), output_bytes.data(), output_bytes.size());
+    std::vector<block_q8_K> q8(static_cast<size_t>(k / QK_K));
+    quantize_row_q8_k(input.data(), q8.data(), k);
+    for (int row = 0; row < n; ++row) {
+        ggml_vec_dot_q6_K_q8_K(k, &leaf[row], 0,
+                weights.data() + static_cast<size_t>(row) * q6_row, 0, q8.data(), 0, 1);
+    }
+    gemv_q6_k_q8_k_parallel_dispatch(ck.data(), weights.data(), q8.data(), n, k);
+    if (!llama_graph(weights, input, graph, 1, n, k, false)) return false;
+
+    std::printf("\nxray_artifact M=1 N=%d K=%d\n", n, k);
+    bool pass = compare_f32("llama leaf vs graph", leaf.data(), graph.data(), n);
+    pass &= compare_f32("CK vs llama graph", ck.data(), graph.data(), n);
+    pass &= compare_f32("llama graph vs captured V", graph.data(), expected.data(), n);
+    return pass;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -211,7 +286,9 @@ int main(int argc, char **argv) {
     const size_t count = quick ? sizeof(quick_cases) / sizeof(quick_cases[0])
                                : sizeof(full_cases) / sizeof(full_cases[0]);
     int failed = 0;
+    if (!run_q8_rounding_boundary_case()) ++failed;
     for (size_t i = 0; i < count; ++i) if (!run_case(cases[i])) ++failed;
+    if (!run_xray_artifact_case()) ++failed;
     ck_threadpool_global_destroy();
     std::printf("\nQ6_K x Q8_K llama.cpp production parity: %s (%zu cases, %d failed)\n",
             failed ? "FAIL" : "PASS", count, failed);

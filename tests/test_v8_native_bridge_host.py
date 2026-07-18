@@ -257,6 +257,59 @@ def _build_tiny_decoder_runtime(workdir: Path) -> tuple[Path, Path, Path]:
 
 
 class V8NativeBridgeHostTests(unittest.TestCase):
+    def test_generated_model_compiler_comes_from_engine_build_stamp(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stamp = Path(tmpdir) / ".ck_build_flags"
+            stamp.write_text(
+                "CC=ccache gcc\nCFLAGS=-O3 -mavx2\nLDFLAGS=\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                bridge_runner_v8._engine_compiler_argv(stamp),
+                ["ccache", "gcc"],
+            )
+
+    def test_runtime_engine_copy_records_compiler_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            build = root / "build"
+            runtime = root / "runtime"
+            build.mkdir()
+            runtime.mkdir()
+            engine = build / "libckernel_engine.so"
+            engine.write_bytes(b"engine")
+            (build / ".ck_build_flags").write_text(
+                "CC=gcc\nCFLAGS=-O3\nLDFLAGS=\n",
+                encoding="utf-8",
+            )
+            model = runtime / "libdecoder_v8.so"
+            model.touch()
+            probe = subprocess.CompletedProcess(
+                ["gcc", "--version"], 0, "gcc test compiler\n", ""
+            )
+            with mock.patch.object(bridge_runner_v8, "BUILD_DIR", build), \
+                 mock.patch.object(bridge_runner_v8.subprocess, "run", return_value=probe):
+                copied = bridge_runner_v8._sync_runtime_engine(engine, model)
+
+            metadata = json.loads(
+                copied.with_suffix(copied.suffix + ".build.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(metadata["compiler"]["command"], ["gcc"])
+            self.assertEqual(metadata["compiler"]["version"], "gcc test compiler")
+            self.assertEqual(copied.read_bytes(), b"engine")
+
+    def test_runtime_preflight_builds_engine_and_tokenizer_together(self) -> None:
+        with mock.patch.object(bridge_runner_v8, "_run") as run:
+            bridge_runner_v8._ensure_engine_lib(openmp=True)
+        run.assert_called_once_with(
+            [
+                "make",
+                "CK_ENABLE_OPENMP=1",
+                "build/libckernel_engine.so",
+                "build/libckernel_tokenizer.so",
+            ]
+        )
+
     def test_engine_has_canonical_soname(self) -> None:
         dynamic = subprocess.run(
             ["readelf", "-d", str(LIBCK)],

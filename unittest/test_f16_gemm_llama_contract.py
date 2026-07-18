@@ -29,6 +29,7 @@ def _load() -> ctypes.CDLL:
         raise RuntimeError(f"missing CK library: {ck_path}")
     ck = ctypes.CDLL(str(ck_path), mode=ctypes.RTLD_GLOBAL)
     ck.ck_set_strict_parity.argtypes = [ctypes.c_int]
+    ck.ck_set_num_threads.argtypes = [ctypes.c_int]
     ck.gemm_nt_f16.argtypes = [
         ctypes.POINTER(ctypes.c_float), ctypes.c_void_p,
         ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
@@ -56,9 +57,10 @@ def _fixture() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def _run_production(ck: ctypes.CDLL, activation: np.ndarray, weights: np.ndarray,
-                    bias: np.ndarray | None) -> np.ndarray:
+                    bias: np.ndarray | None, threads: int = 20) -> np.ndarray:
     output = np.empty((M, N), dtype=np.float32)
     ck.ck_set_strict_parity(0)
+    ck.ck_set_num_threads(threads)
     bias_ptr = (
         bias.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
         if bias is not None else None
@@ -112,10 +114,22 @@ def main() -> int:
     production_bias = _run_production(ck, activation, weights, bias)
     repeat_bias = _run_production(ck, activation, weights, bias)
 
+    thread_matrix = {
+        str(threads): _metrics(
+            _run_production(ck, activation, weights, bias, threads), oracle_bias
+        )
+        for threads in (1, 8, 20)
+    }
+
     no_bias = _metrics(production_no_bias, oracle_no_bias)
     with_bias = _metrics(production_bias, oracle_bias)
     repeat = _metrics(repeat_bias, production_bias)
-    passed = bool(no_bias["bit_exact"] and with_bias["bit_exact"] and repeat["bit_exact"])
+    passed = bool(
+        no_bias["bit_exact"]
+        and with_bias["bit_exact"]
+        and repeat["bit_exact"]
+        and all(row["bit_exact"] for row in thread_matrix.values())
+    )
     report = {
         "schema": "cke.f16_gemm_llama_contract",
         "schema_version": 1,
@@ -131,6 +145,7 @@ def main() -> int:
         "before_bias": no_bias,
         "after_bias": with_bias,
         "thread_determinism": repeat,
+        "thread_matrix": thread_matrix,
     }
     print(json.dumps(report, indent=2))
     return 0 if passed else 1

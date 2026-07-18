@@ -53,6 +53,11 @@ static inline int ck_nearest_int(float fval) {
     return (i & 0x007fffff) - 0x00400000;
 }
 
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#elif defined(__GNUC__)
+__attribute__((optimize("fp-contract=off")))
+#endif
 void quantize_row_q8_k_ref(const float *x, void *vy, int k) {
     if (!x || !vy || k <= 0) {
         return;
@@ -81,9 +86,8 @@ void quantize_row_q8_k_ref(const float *x, void *vy, int k) {
 
         const float iscale = -127.0f / max;
         for (int j = 0; j < QK_K; ++j) {
-            /* Keep the active llama.cpp oracle expression intact. In
-             * particular, do not insert a store/load rounding barrier between
-             * the multiply and nearest_int: that changes tie cases on AVX2. */
+            /* llama.cpp rounds the multiply before adding nearest_int's magic
+             * constant. Contracting both operations changes Q8_K tie cases. */
             float scaled = iscale * x[j];
             int v = ck_nearest_int(scaled);
             if (v > 127) {
@@ -142,121 +146,16 @@ void quantize_batch_q8_k_4row_nearest_even(const float *x, void *vy,
 
     block_q8_K *y = (block_q8_K *)vy;
     const int blocks_per_row = k / QK_K;
-    int row0 = 0;
 
-#if defined(__AVX2__)
-    const __m256 sign_bit = _mm256_set1_ps(-0.0f);
-    for (; row0 + 3 < num_rows; row0 += 4) {
-        for (int block = 0; block < blocks_per_row; ++block) {
-            for (int lane = 0; lane < 4; ++lane) {
-                const float *src =
-                        x + (size_t)(row0 + lane) * (size_t)k +
-                        (size_t)block * QK_K;
-                block_q8_K *dst =
-                        y + (size_t)(row0 + lane) * (size_t)blocks_per_row +
-                        (size_t)block;
-                __m256 source[QK_K / 8];
-                __m256 values0 = _mm256_loadu_ps(src);
-                __m256 values1 = _mm256_loadu_ps(src + 8);
-                __m256 values2 = _mm256_loadu_ps(src + 16);
-                __m256 values3 = _mm256_loadu_ps(src + 24);
-                __m256 max_abs = _mm256_max_ps(
-                        _mm256_andnot_ps(sign_bit, values0),
-                        _mm256_andnot_ps(sign_bit, values1));
-                max_abs = _mm256_max_ps(
-                        max_abs, _mm256_andnot_ps(sign_bit, values2));
-                max_abs = _mm256_max_ps(
-                        max_abs, _mm256_andnot_ps(sign_bit, values3));
-                __m256 signed_max_mask = _mm256_or_ps(
-                        _mm256_or_ps(
-                                _mm256_cmp_ps(max_abs, values0, _CMP_EQ_OQ),
-                                _mm256_cmp_ps(max_abs, values1, _CMP_EQ_OQ)),
-                        _mm256_or_ps(
-                                _mm256_cmp_ps(max_abs, values2, _CMP_EQ_OQ),
-                                _mm256_cmp_ps(max_abs, values3, _CMP_EQ_OQ)));
-                source[0] = values0;
-                source[1] = values1;
-                source[2] = values2;
-                source[3] = values3;
-
-                for (int subblock = 1; subblock < QK_K / 32; ++subblock) {
-                    const int vector = subblock * 4;
-                    values0 = _mm256_loadu_ps(src + subblock * 32);
-                    values1 = _mm256_loadu_ps(src + subblock * 32 + 8);
-                    values2 = _mm256_loadu_ps(src + subblock * 32 + 16);
-                    values3 = _mm256_loadu_ps(src + subblock * 32 + 24);
-                    const __m256 previous_max = max_abs;
-                    max_abs = _mm256_max_ps(
-                            max_abs, _mm256_andnot_ps(sign_bit, values0));
-                    max_abs = _mm256_max_ps(
-                            max_abs, _mm256_andnot_ps(sign_bit, values1));
-                    max_abs = _mm256_max_ps(
-                            max_abs, _mm256_andnot_ps(sign_bit, values2));
-                    max_abs = _mm256_max_ps(
-                            max_abs, _mm256_andnot_ps(sign_bit, values3));
-                    signed_max_mask = _mm256_and_ps(
-                            signed_max_mask,
-                            _mm256_cmp_ps(previous_max, max_abs, _CMP_EQ_OQ));
-                    const __m256 current_mask = _mm256_or_ps(
-                            _mm256_or_ps(
-                                    _mm256_cmp_ps(max_abs, values0, _CMP_EQ_OQ),
-                                    _mm256_cmp_ps(max_abs, values1, _CMP_EQ_OQ)),
-                            _mm256_or_ps(
-                                    _mm256_cmp_ps(max_abs, values2, _CMP_EQ_OQ),
-                                    _mm256_cmp_ps(max_abs, values3, _CMP_EQ_OQ)));
-                    signed_max_mask =
-                            _mm256_or_ps(signed_max_mask, current_mask);
-                    source[vector] = values0;
-                    source[vector + 1] = values1;
-                    source[vector + 2] = values2;
-                    source[vector + 3] = values3;
-                }
-
-                __m128 max4 = _mm_max_ps(
-                        _mm256_extractf128_ps(max_abs, 1),
-                        _mm256_castps256_ps128(max_abs));
-                max4 = _mm_max_ps(max4, _mm_movehl_ps(max4, max4));
-                max4 = _mm_max_ss(max4, _mm_movehdup_ps(max4));
-                const float max_scalar = _mm_cvtss_f32(max4);
-                const __m256 winning_lane = _mm256_cmp_ps(
-                        _mm256_set1_ps(max_scalar), max_abs, _CMP_EQ_OQ);
-                const int signed_winner = _mm256_movemask_ps(
-                        _mm256_and_ps(signed_max_mask, winning_lane));
-                volatile float inverse_max =
-                        max_scalar == 0.0f ? 0.0f : 1.0f / max_scalar;
-                volatile float iscale =
-                        inverse_max * (signed_winner ? -127.0f : 127.0f);
-                const __m256 iscale_vec = _mm256_set1_ps(iscale);
-
-                for (int vector = 0; vector < QK_K / 8; ++vector) {
-                    const __m256 rounded = _mm256_round_ps(
-                            _mm256_mul_ps(source[vector], iscale_vec),
-                            _MM_ROUND_NEAREST);
-                    const __m256i integers = _mm256_cvtps_epi32(rounded);
-                    int32_t values[8];
-                    _mm256_storeu_si256((__m256i *)values, integers);
-                    for (int i = 0; i < 8; ++i) {
-                        dst->qs[vector * 8 + i] = (int8_t)values[i];
-                    }
-                }
-
-                for (int group = 0; group < QK_K / 16; ++group) {
-                    int sum = 0;
-                    for (int i = 0; i < 16; ++i) {
-                        sum += dst->qs[group * 16 + i];
-                    }
-                    dst->bsums[group] = (int16_t)sum;
-                }
-                dst->d = max_scalar == 0.0f ? 0.0f : 1.0f / iscale;
-            }
-        }
-    }
-#endif
-
-    for (; row0 < num_rows; ++row0) {
+    /* Q8_K bytes are a numerical ABI. The previous four-row AVX2 path used
+     * a different max/scale evaluation order and changed real Qwen3-VL
+     * visual-prefix scales by one FP32 ULP. Keep this public grouped ABI on
+     * the canonical row provider until an optimized implementation is
+     * byte-exact against llama.cpp on both synthetic and production inputs. */
+    for (int row = 0; row < num_rows; ++row) {
         quantize_row_q8_k(
-                x + (size_t)row0 * (size_t)k,
-                y + (size_t)row0 * (size_t)blocks_per_row,
+                x + (size_t)row * (size_t)k,
+                y + (size_t)row * (size_t)blocks_per_row,
                 k);
     }
 }

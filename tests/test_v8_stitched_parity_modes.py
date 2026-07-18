@@ -27,6 +27,7 @@ def args_for(mode: str) -> argparse.Namespace:
         image_min_tokens=None,
         image_max_tokens=1024,
         threads=20,
+        compiler="gcc",
         execution_mode=mode,
         granular_dump_names="kqv_out",
         granular_ck_stop=True,
@@ -34,6 +35,13 @@ def args_for(mode: str) -> argparse.Namespace:
 
 
 class StitchedParityModeTests(unittest.TestCase):
+    def test_parity_runtime_uses_one_explicit_compiler_family(self) -> None:
+        args = args_for("production")
+        env = stitched._runtime_environment(args)
+        self.assertEqual(env["CC"], "gcc")
+        args.compiler = "icx"
+        self.assertEqual(stitched._runtime_environment(args)["CC"], "icx")
+
     def test_strict_mode_is_consistent_across_phases(self) -> None:
         args = args_for("strict")
         bridge = stitched._bridge_command(args, Path("bridge"), Path("prefix.f32"))
@@ -55,6 +63,16 @@ class StitchedParityModeTests(unittest.TestCase):
         self.assertNotIn("--strict-parity", granular)
         self.assertEqual(numeric[numeric.index("--llama-flash-attn") + 1], "enabled")
         self.assertEqual(granular[granular.index("--llama-flash-attn") + 1], "enabled")
+
+    def test_encoder_numeric_observe_policy_is_exposed(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('choices=("require", "observe", "skip")', source)
+        self.assertIn('"non_causal_for_observed_token_window"', source)
+
+    def test_failed_runtime_is_retained_by_default(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('"--prune-failed-weights"', source)
+        self.assertIn('"failed_weight_bumps_retained"', source)
 
 
 if __name__ == "__main__":
