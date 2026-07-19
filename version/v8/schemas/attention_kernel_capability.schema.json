@@ -44,6 +44,31 @@
       "required": ["isa_dispatch", "threading"],
       "properties": {
         "isa_dispatch": {"enum": ["runtime", "compile_time", "scalar"]},
+        "query_tiling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selection", "numerical_effect", "key_tile_size", "routes"],
+          "properties": {
+            "selection": {"const": "token_threshold"},
+            "numerical_effect": {"const": "none"},
+            "key_tile_size": {"type": "integer", "minimum": 1},
+            "routes": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["min_tokens", "max_tokens", "query_tile_size", "function"],
+                "properties": {
+                  "min_tokens": {"type": "integer", "minimum": 1},
+                  "max_tokens": {"type": ["integer", "null"], "minimum": 1},
+                  "query_tile_size": {"type": "integer", "minimum": 1},
+                  "function": {"type": "string", "minLength": 1}
+                }
+              }
+            }
+          }
+        },
         "threading": {
           "type": "object",
           "additionalProperties": false,

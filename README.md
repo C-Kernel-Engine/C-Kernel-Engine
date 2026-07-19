@@ -237,6 +237,14 @@ Depending on the circuit and model lane, generated `libmodel.so` runtimes can pr
 - Bounded semantic tensor exports for parity attribution.
 - IR and memory visualizations for inspecting the generated program.
 
+## Licensing
+
+CKE does not currently publish a root software licence. Public source access
+does not itself grant broad permission to copy, modify, redistribute, or sell
+CKE, and third-party component licences do not establish the licence for CKE's
+original code. Read the current [licensing status and release gates](LICENSING.md)
+before reusing the project or contributing code.
+
 ## Contributing
 
 CKE is deep, but a first contribution does not require understanding the entire compiler or solving multimodal numerical parity. Choose the smallest level that matches the evidence you can produce:
@@ -249,7 +257,7 @@ CKE is deep, but a first contribution does not require understanding the entire 
 | 4 | Kernel implementation and optimization | Add or tune one kernel while preserving parity, supported-ISA dispatch, and benchmark evidence |
 | 5 | Compiler, DSL, multimodal parity, and distributed execution | Change cross-layer architecture with explicit contracts, regression coverage, and end-to-end evidence |
 
-See the [Contributor Path](https://c-kernel-engine.github.io/C-Kernel-Engine/contributing.html) for bounded starter tasks, the pull-request evidence contract, Discord onboarding, and the complete contribution ladder. Small, well-supported improvements are welcome; unresolved core research is not an onboarding requirement.
+See the [Contributor Path](https://c-kernel-engine.github.io/C-Kernel-Engine/contributing.html) for bounded starter tasks, the pull-request evidence contract, contribution-rights diagram, Discord onboarding, and the complete contribution ladder. The [contributors record](CONTRIBUTORS.md) preserves recognition for merged community work, while [LICENSING.md](LICENSING.md) records the separate legal status. Small, well-supported improvements are welcome; unresolved core research is not an onboarding requirement.
 
 Useful contributions include:
 

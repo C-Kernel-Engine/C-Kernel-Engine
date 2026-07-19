@@ -2812,6 +2812,7 @@ test-gemv-omp-verbose: $(GEMV_OMP_BIN)
 
 THREADPOOL_BIN := $(BUILD_DIR)/test_threadpool_parity
 Q4K_DISPATCH_MATRIX_BIN := $(BUILD_DIR)/bench_q4k_dispatch_matrix
+Q4K_EXACT_PREFILL_BIN := $(BUILD_DIR)/bench_q4k_exact_prefill
 Q4K_Q8K_LLAMA_PACKED_BIN := $(BUILD_DIR)/test_q4k_q8k_llama_packed
 Q6K_Q8K_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_q6k_q8k_llama_production
 RMSNORM_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_rmsnorm_llama_production
@@ -2821,6 +2822,7 @@ Q4Q6_LLAMA_CPP_BIN_DIR ?= $(Q4Q6_LLAMA_CPP_DIR)/build/bin
 Q4K_Q8K_LLAMA_PACKED_PREFILL_OBJ := $(BUILD_DIR)/test_q4k_q8k_llama_prefill.o
 Q4K_Q8K_LLAMA_PACKED_DECODE_OBJ := $(BUILD_DIR)/test_q4k_q8k_llama_decode.o
 Q4K_Q8K_ISA_AVX2_OBJ := $(BUILD_DIR)/test_q4k_q8k_isa_avx2.o
+Q4K_Q8K_ISA_AVXVNNI_OBJ := $(BUILD_DIR)/test_q4k_q8k_isa_avxvnni.o
 Q4K_Q8K_ISA_AVX512_OBJ := $(BUILD_DIR)/test_q4k_q8k_isa_avx512.o
 Q6K_Q8K_ISA_AVX2_OBJ := $(BUILD_DIR)/test_q6k_q8k_isa_avx2.o
 Q6K_Q8K_ISA_AVX512_OBJ := $(BUILD_DIR)/test_q6k_q8k_isa_avx512.o
@@ -2867,8 +2869,10 @@ ifeq ($(IS_X86_ARCH),)
 	@echo "Q4_K x Q8_K ISA compile matrix: SKIP ($(UNAME_M))"
 else
 	@mkdir -p $(BUILD_DIR)
-	$(CC) -O3 -fPIC -Iinclude -mavx2 -mfma -mavxvnni -mf16c -mssse3 \
+	$(CC) -O3 -fPIC -Iinclude -mavx2 -mfma -mf16c -mssse3 \
 		-c src/kernels/gemm_kernels_q4k_q8k_vnni.c -o $(Q4K_Q8K_ISA_AVX2_OBJ)
+	$(CC) -O3 -fPIC -Iinclude -mavx2 -mfma -mavxvnni -mf16c -mssse3 \
+		-c src/kernels/gemm_kernels_q4k_q8k_vnni.c -o $(Q4K_Q8K_ISA_AVXVNNI_OBJ)
 	$(CC) -O3 -fPIC -Iinclude -mavx512f -mavx512bw -mavx512dq -mavx512vl \
 		-mfma -mavx512vnni -mavx512bf16 -mf16c -mssse3 \
 		-c src/kernels/gemm_kernels_q4k_q8k_vnni.c -o $(Q4K_Q8K_ISA_AVX512_OBJ)
@@ -2877,7 +2881,7 @@ else
 	$(CC) -O3 -fPIC -Iinclude -mavx512f -mavx512bw -mavx512dq -mavx512vl \
 		-mfma -mavx512vnni -mavx512bf16 -mf16c -mssse3 \
 		-c src/kernels/gemm_kernels_q6k_q8k.c -o $(Q6K_Q8K_ISA_AVX512_OBJ)
-	@echo "Q4_K/Q6_K x Q8_K ISA compile matrix: PASS (AVX2, AVX-512/VNNI)"
+	@echo "Q4_K/Q6_K x Q8_K ISA compile matrix: PASS (AVX2, AVX-VNNI, AVX-512/VNNI)"
 endif
 
 $(Q4K_Q8K_LLAMA_PACKED_BIN): $(LIB) unittest/test_q4k_q8k_llama_packed.cpp $(Q4K_Q8K_LLAMA_PACKED_PREFILL_OBJ) $(Q4K_Q8K_LLAMA_PACKED_DECODE_OBJ)
@@ -2965,6 +2969,20 @@ test-q4k-q8k-llama-packed-quick: $(Q4K_Q8K_LLAMA_PACKED_BIN)
 		LD_LIBRARY_PATH=$(BUILD_DIR):$(Q4Q6_LLAMA_CPP_BIN_DIR):$$LD_LIBRARY_PATH \
 		$(Q4K_Q8K_LLAMA_PACKED_BIN) --quick
 
+.PHONY: test-q4k-q8k-llama-performance
+test-q4k-q8k-llama-performance: $(Q4K_Q8K_LLAMA_PACKED_BIN)
+	@echo "Running same-host production-shape Q4_K x Q8_K performance gate against llama.cpp..."
+	CK_NUM_THREADS=$${CK_Q4K_PERF_DEFAULT_THREADS:-$${CK_Q4K_PERF_THREADS:-4}} \
+		CK_THREADPOOL_CAPACITY=$${CK_Q4K_PERF_CAPACITY_THREADS:-$${CK_Q4K_PERF_DEFAULT_THREADS:-$${CK_Q4K_PERF_THREADS:-4}}} \
+		CK_Q4K_LLAMA_THREADS=$${CK_Q4K_PERF_THREADS:-4} OMP_NUM_THREADS=1 \
+		CK_Q4K_PERF_M=$${CK_Q4K_PERF_M:-1028} \
+		CK_Q4K_PERF_N=$${CK_Q4K_PERF_N:-4096} \
+		CK_Q4K_PERF_K=$${CK_Q4K_PERF_K:-4096} \
+		CK_Q4K_PERF_REPEATS=$${CK_Q4K_PERF_REPEATS:-3} \
+		CK_Q4K_LLAMA_MAX_RATIO=$${CK_Q4K_LLAMA_MAX_RATIO:-2.5} \
+		LD_LIBRARY_PATH=$(BUILD_DIR):$(Q4Q6_LLAMA_CPP_BIN_DIR):$$LD_LIBRARY_PATH \
+		$(Q4K_Q8K_LLAMA_PACKED_BIN) --perf
+
 .PHONY: test-q6k-q8k-llama-production test-q6k-q8k-llama-production-quick
 test-q6k-q8k-llama-production: $(Q6K_Q8K_LLAMA_PRODUCTION_BIN)
 	@echo "Running Q6_K x Q8_K native production parity against llama.cpp..."
@@ -3036,6 +3054,65 @@ bench-q4k-dispatch-matrix-quick: $(Q4K_DISPATCH_MATRIX_BIN)
 	@echo "Running Q4_K dispatch matrix benchmark (quick)..."
 	LD_LIBRARY_PATH=$(BUILD_DIR):llama.cpp:$$LD_LIBRARY_PATH $(Q4K_DISPATCH_MATRIX_BIN) --quick
 
+$(Q4K_EXACT_PREFILL_BIN): $(LIB) benchmarks/bench_q4k_exact_prefill.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -g -fno-omit-frame-pointer -march=native -Iinclude \
+		benchmarks/bench_q4k_exact_prefill.c \
+		-L$(BUILD_DIR) -lckernel_engine -lm -lpthread \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o $(Q4K_EXACT_PREFILL_BIN)
+
+bench-q4k-exact-prefill: $(Q4K_EXACT_PREFILL_BIN)
+	CK_NUM_THREADS=$${CK_NUM_THREADS:-20} OMP_NUM_THREADS=1 \
+		LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(Q4K_EXACT_PREFILL_BIN)
+
+.PHONY: test-q4k-exact-prefill-4m
+test-q4k-exact-prefill-4m: $(Q4K_EXACT_PREFILL_BIN)
+	@set -e; \
+	for threads in 1 4; do \
+		for shape in "3 64 512" "4 64 512" "5 70 512" "9 512 1024" "32 512 1024"; do \
+			set -- $$shape; \
+			CK_NUM_THREADS=4 OMP_NUM_THREADS=1 \
+			LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+			$(Q4K_EXACT_PREFILL_BIN) --provider 4m \
+				--m $$1 --n $$2 --k $$3 --threads $$threads \
+				--warmup 1 --iterations 1; \
+		done; \
+	done
+
+.PHONY: test-q4k-exact-prefill-8m
+test-q4k-exact-prefill-8m: $(Q4K_EXACT_PREFILL_BIN)
+	@set -e; \
+	for threads in 1 4; do \
+		for shape in "3 64 512" "4 64 512" "5 70 512" "8 64 512" "9 512 1024" "17 512 1024" "32 512 1024"; do \
+			set -- $$shape; \
+			CK_NUM_THREADS=4 OMP_NUM_THREADS=1 \
+			LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+			$(Q4K_EXACT_PREFILL_BIN) --provider 8m \
+				--m $$1 --n $$2 --k $$3 --threads $$threads \
+				--warmup 1 --iterations 1; \
+		done; \
+	done
+
+.PHONY: test-q4k-exact-prefill-vnni-x8
+test-q4k-exact-prefill-vnni-x8: $(Q4K_EXACT_PREFILL_BIN)
+	@if grep -qw avx_vnni /proc/cpuinfo 2>/dev/null; then \
+		set -e; \
+		for threads in 1 4; do \
+			for shape in "3 64 512" "4 64 512" "5 70 512" "17 513 1024" "32 512 1024"; do \
+				set -- $$shape; \
+				CK_NUM_THREADS=4 OMP_NUM_THREADS=1 \
+				LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+				$(Q4K_EXACT_PREFILL_BIN) --provider 4m-vnni-x8 \
+					--m $$1 --n $$2 --k $$3 --threads $$threads \
+					--warmup 1 --iterations 1; \
+			done; \
+		done; \
+	else \
+		echo "Q4_K VNNI x8 exact provider: SKIP (AVX-VNNI unavailable)"; \
+	fi
+
 $(Q4K_GATEUP_SWIGLU_BIN): $(LIB) benchmarks/bench_q4k_gateup_swiglu.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 -march=native -Iinclude -I$(V8_SRC_DIR) \
@@ -3076,9 +3153,9 @@ $(QWEN3VL_ENCODER_ATTN_BIN): $(LIB) benchmarks/bench_qwen3vl_encoder_attention.c
 
 bench-qwen3vl-encoder-attention: $(QWEN3VL_ENCODER_ATTN_BIN)
 	@echo "Running Qwen3-VL encoder full-attention benchmark..."
-	CK_SPEED_PROFILE=qwen3vl_ocr_xeon_avx512 CK_NUM_THREADS=$${CK_NUM_THREADS:-20} \
+	CK_NUM_THREADS=$${CK_NUM_THREADS:-20} \
 		LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
-		$(QWEN3VL_ENCODER_ATTN_BIN) --threads $${CK_NUM_THREADS:-20} --iters $${CK_ATTN_ITERS:-3} --warmup $${CK_ATTN_WARMUP:-1} --tokens $${CK_ATTN_TOKENS:-4232}
+		$(QWEN3VL_ENCODER_ATTN_BIN) --threads $${CK_NUM_THREADS:-20} --iters $${CK_ATTN_ITERS:-3} --warmup $${CK_ATTN_WARMUP:-1} --tokens $${CK_ATTN_TOKENS:-4032}
 
 $(Q80_FP32_GEMM_BIN): $(LIB) benchmarks/bench_q8_0_fp32_gemm.c
 	@mkdir -p $(BUILD_DIR)
@@ -3212,6 +3289,9 @@ test-v8-template-circuit-audit:
 .PHONY: test-numerical-contracts
 test-numerical-contracts: $(LIB)
 	@echo "Running v8 numerical contract validation..."
+	@$(MAKE) --no-print-directory test-q4k-exact-prefill-4m
+	@$(MAKE) --no-print-directory test-q4k-exact-prefill-8m
+	@$(MAKE) --no-print-directory test-q4k-exact-prefill-vnni-x8
 	@$(PYTHON) -m py_compile version/v8/scripts/resolve_attention_contracts_v8.py
 	@$(PYTHON) -m py_compile version/v8/scripts/resolve_numerical_execution_contracts_v8.py
 	@$(PYTHON) -m py_compile version/v8/scripts/xray_numerical_parity_v8.py version/v8/scripts/xray_execution_state_v8.py version/v8/scripts/build_xray_checkpoint_manifest_v8.py

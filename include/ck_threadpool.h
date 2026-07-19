@@ -90,6 +90,20 @@ typedef struct ck_threadpool ck_threadpool_t;
 ck_threadpool_t *ck_threadpool_create(int n_threads);
 
 /**
+ * Create a pool whose ordinary dispatch width is smaller than its worker
+ * capacity. Exact providers may opt into the additional workers with
+ * ck_threadpool_dispatch_n(); ordinary dispatch remains at default_threads.
+ */
+ck_threadpool_t *ck_threadpool_create_capacity(int default_threads,
+                                                int capacity_threads);
+
+/**
+ * Compute the bounded capacity for an SMT-safe provider. The default width is
+ * preserved and at most half of the additional logical CPUs are reserved.
+ */
+int ck_threadpool_bounded_capacity(int default_threads, int logical_threads);
+
+/**
  * Destroy the thread pool. Signals all workers to exit and joins them.
  * Safe to call with NULL.
  */
@@ -164,8 +178,11 @@ void ck_threadpool_resume(ck_threadpool_t *pool);
  * Queries
  * ============================================================================ */
 
-/** Get total thread count (including main thread) */
+/** Get the ordinary/default dispatch width (including the main thread). */
 int ck_threadpool_n_threads(const ck_threadpool_t *pool);
+
+/** Get the maximum worker capacity available to explicit dispatch_n calls. */
+int ck_threadpool_capacity(const ck_threadpool_t *pool);
 
 /** Get thread index for current thread (0 = main, -1 if not in pool) */
 int ck_threadpool_thread_id(const ck_threadpool_t *pool);
@@ -177,7 +194,9 @@ int ck_threadpool_thread_id(const ck_threadpool_t *pool);
 /**
  * Get or create the global thread pool.
  * Thread-safe (uses pthread_once internally).
- * Uses ck_get_num_threads() for auto-detection.
+ * Uses ck_get_num_threads() for the default width. In automatic mode the pool
+ * may reserve a bounded subset of SMT siblings as explicit provider capacity;
+ * ordinary dispatch remains at the default width.
  *
  * @return Global pool, never NULL after successful first call.
  */

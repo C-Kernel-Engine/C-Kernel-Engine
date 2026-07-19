@@ -413,6 +413,12 @@ MAKE_TARGETS = {
         "target": "test-q4q6-llama-production-native",
         "timeout_sec": 300,
     },
+    "q4k_q8k_llama_performance": {
+        "name": "Q4_K x Q8_K vs llama.cpp Performance",
+        "category": "bench",
+        "target": "test-q4k-q8k-llama-performance",
+        "timeout_sec": 300,
+    },
     "numerical_replay_fixture_contract": {
         "name": "Numerical Replay Fixture Contract",
         "category": "parity",

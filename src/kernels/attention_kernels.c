@@ -2578,7 +2578,9 @@ static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_compute_regular(con
 /* Strict ggml-backed full-attention oracles live in attention_oracle_ggml.c. */
 
 #define CK_GGML_FA_TILE_Q 64
+#define CK_GGML_FA_TILE_Q_LARGE 336
 #define CK_GGML_FA_TILE_KV 64
+#define CK_GGML_FA_TILE_Q_LARGE_MIN_TOKENS 1536
 
 static inline void ck_vec_scale_f32_inplace(float *x, int n, float scale)
 {
@@ -3086,12 +3088,14 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
     int head_dim,
     int aligned_head_dim,
     int kv_stride_tokens,
+    int query_tile_size,
     int ith,
     int nth)
 {
     if (!q || !k || !v || !output || num_heads <= 0 || num_kv_heads <= 0 ||
         num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim ||
-        kv_stride_tokens < num_tokens || num_heads % num_kv_heads != 0) {
+        kv_stride_tokens < num_tokens || num_heads % num_kv_heads != 0 ||
+        query_tile_size <= 0) {
         return;
     }
 
@@ -3099,11 +3103,13 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
     const int T = num_tokens;
     const size_t kv_head_stride = (size_t) kv_stride_tokens * (size_t) aligned_head_dim;
 
-    float *q_tile = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+    float *q_tile = (float *) alloca((size_t) query_tile_size * (size_t) head_dim * sizeof(float));
     float *k_tile = (float *) alloca((size_t) head_dim * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
     float *v_tile = (float *) alloca((size_t) CK_GGML_FA_TILE_KV * (size_t) head_dim * sizeof(float));
-    float *kq = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
-    float *vkq = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+    float *kq = (float *) alloca((size_t) query_tile_size * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+    float *vkq = (float *) alloca((size_t) query_tile_size * (size_t) head_dim * sizeof(float));
+    float *sum_row = (float *) alloca((size_t) query_tile_size * sizeof(float));
+    float *max_row = (float *) alloca((size_t) query_tile_size * sizeof(float));
 
     const int total_rows = num_heads * T;
     const int rows_per_worker = (total_rows + nth - 1) / nth;
@@ -3116,22 +3122,19 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
         const int h = ir / T;
         const int iq = ir - h * T;
         int tile_rows = ir1 - ir;
-        if (tile_rows > CK_GGML_FA_TILE_Q) tile_rows = CK_GGML_FA_TILE_Q;
+        if (tile_rows > query_tile_size) tile_rows = query_tile_size;
         if (tile_rows > T - iq) tile_rows = T - iq;
         const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
         const float *k_head = k + (size_t) kv_head * kv_head_stride;
         const float *v_head = v + (size_t) kv_head * kv_head_stride;
 
-        float sum_row[CK_GGML_FA_TILE_Q];
-        float max_row[CK_GGML_FA_TILE_Q];
-
-        for (int tq = 0; tq < CK_GGML_FA_TILE_Q; ++tq) {
+        for (int tq = 0; tq < query_tile_size; ++tq) {
             sum_row[tq] = 0.0f;
             max_row[tq] = -INFINITY;
         }
 
-        memset(vkq, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
-        memset(q_tile, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+        memset(vkq, 0, (size_t) query_tile_size * (size_t) head_dim * sizeof(float));
+        memset(q_tile, 0, (size_t) query_tile_size * (size_t) head_dim * sizeof(float));
         memset(k_tile, 0, (size_t) head_dim * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
         memset(v_tile, 0, (size_t) CK_GGML_FA_TILE_KV * (size_t) head_dim * sizeof(float));
 
@@ -3142,7 +3145,7 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
 
         for (int ik = 0; ik < T; ik += CK_GGML_FA_TILE_KV) {
                 const int kv_tile = (T - ik) < CK_GGML_FA_TILE_KV ? (T - ik) : CK_GGML_FA_TILE_KV;
-                memset(kq, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+                memset(kq, 0, (size_t) query_tile_size * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
 
                 for (int tk = 0; tk < kv_tile; ++tk) {
                     const float *k_vec = k_head + (size_t) (ik + tk) * (size_t) aligned_head_dim;
@@ -3158,15 +3161,15 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
                 ck_attention_matmul_f32_accum(kq,
                                               q_tile,
                                               k_tile,
-                                              CK_GGML_FA_TILE_Q,
+                                              query_tile_size,
                                               head_dim,
                                               CK_GGML_FA_TILE_KV);
                 ck_vec_scale_f32_inplace(kq,
-                                         CK_GGML_FA_TILE_Q * CK_GGML_FA_TILE_KV,
+                                         query_tile_size * CK_GGML_FA_TILE_KV,
                                          scale);
 
                 if (kv_tile < CK_GGML_FA_TILE_KV) {
-                    for (int tq = 0; tq < CK_GGML_FA_TILE_Q; ++tq) {
+                    for (int tq = 0; tq < query_tile_size; ++tq) {
                         float *kq_row = kq + (size_t) tq * (size_t) CK_GGML_FA_TILE_KV;
                         for (int tk = kv_tile; tk < CK_GGML_FA_TILE_KV; ++tk) {
                             kq_row[tk] = -INFINITY;
@@ -3201,7 +3204,7 @@ static CK_NOINLINE CK_OPTNONE void ck_attention_full_tiled_f16kv_fp32_range(
                 ck_attention_matmul_f32_accum(vkq,
                                               kq,
                                               v_tile,
-                                              CK_GGML_FA_TILE_Q,
+                                              query_tile_size,
                                               CK_GGML_FA_TILE_KV,
                                               head_dim);
             }
@@ -3231,6 +3234,7 @@ typedef struct {
     int head_dim;
     int aligned_head_dim;
     int kv_stride_tokens;
+    int query_tile_size;
 } ck_attention_full_tiled_f16kv_fp32_args_t;
 
 static void ck_attention_full_tiled_f16kv_fp32_work(int ith, int nth, void *opaque)
@@ -3241,10 +3245,11 @@ static void ck_attention_full_tiled_f16kv_fp32_work(int ith, int nth, void *opaq
         args->q, args->k, args->v, args->output,
         args->num_heads, args->num_kv_heads, args->num_tokens,
         args->head_dim, args->aligned_head_dim, args->kv_stride_tokens,
+        args->query_tile_size,
         ith, nth);
 }
 
-void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+static void ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
     const float *q,
     const float *k,
     const float *v,
@@ -3254,7 +3259,8 @@ void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
     int num_tokens,
     int head_dim,
     int aligned_head_dim,
-    int kv_stride_tokens)
+    int kv_stride_tokens,
+    int query_tile_size)
 {
     if (!q || !k || !v || !output || num_heads <= 0 || num_kv_heads <= 0 ||
         num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim ||
@@ -3273,6 +3279,7 @@ void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
         .head_dim = head_dim,
         .aligned_head_dim = aligned_head_dim,
         .kv_stride_tokens = kv_stride_tokens,
+        .query_tile_size = query_tile_size,
     };
     ck_threadpool_t *pool = ck_threadpool_global();
     const int active = pool ? ck_threadpool_n_threads(pool) : 1;
@@ -3281,6 +3288,60 @@ void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
     } else {
         ck_attention_full_tiled_f16kv_fp32_work(0, 1, &args);
     }
+}
+
+void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens)
+{
+    const int query_tile_size = num_tokens >= CK_GGML_FA_TILE_Q_LARGE_MIN_TOKENS
+        ? CK_GGML_FA_TILE_Q_LARGE
+        : CK_GGML_FA_TILE_Q;
+    ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens,
+        head_dim, aligned_head_dim, kv_stride_tokens, query_tile_size);
+}
+
+void attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens)
+{
+    ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens,
+        head_dim, aligned_head_dim, kv_stride_tokens, CK_GGML_FA_TILE_Q);
+}
+
+void attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens)
+{
+    ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens,
+        head_dim, aligned_head_dim, kv_stride_tokens, CK_GGML_FA_TILE_Q_LARGE);
 }
 
 /**

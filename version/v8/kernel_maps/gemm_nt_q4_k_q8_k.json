@@ -57,7 +57,13 @@
     {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
   ],
   "scratch": [
-    {"name": "temp", "dtype": "fp32", "size_bytes": "M * N * 4", "desc": "Temporary accumulation buffer"}
+    {
+      "name": "packed_weight_cache",
+      "dtype": "u8",
+      "size_bytes": "ceil(N / 8) * (K / 256) * sizeof(q4_k_packed_vnni_x8)",
+      "lifetime": "model_runtime",
+      "desc": "Weight-identity cache for the AVX-VNNI eight-output layout; never rebuilt in the steady-state call"
+    }
   ],
   "dims": ["M", "N", "K"],
   "params": [],
@@ -118,6 +124,40 @@
           "layout": "q4_k_packed_meta",
           "promotion": "sweep_gated",
           "requires": ["packed_weight_layout", "prefill_phase"]
+        },
+        {
+          "name": "packed_meta_x8_split_min_4m8n",
+          "function": "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m",
+          "layout": "q4_k_packed_meta_x8",
+          "promotion": "parity_and_roofline_gated",
+          "requires": ["packed_weight_layout", "prefill_phase", "pairwise_split_min_reduction"]
+        },
+        {
+          "name": "packed_meta_x8_split_min_8m8n",
+          "function": "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m",
+          "layout": "q4_k_packed_meta_x8",
+          "promotion": "parity_and_roofline_gated",
+          "requires": ["packed_weight_layout", "prefill_phase", "pairwise_split_min_reduction"]
+        },
+        {
+          "name": "packed_vnni_x8_split_min_4m8n",
+          "function": "gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m",
+          "layout": "q4_k_packed_vnni_x8",
+          "activation_layout": "canonical_q8_k",
+          "threading": {
+            "default_concurrency": "physical_cores",
+            "capacity": "physical_cores_plus_half_available_smt",
+            "smt_extension": "half_available_siblings",
+            "shape_minimum": {"M": 512, "N": 4096, "K": 4096},
+            "reduction_order_effect": "none"
+          },
+          "promotion": "production_same_host_llama_ratio_gated",
+          "requires": [
+            "avx_vnni",
+            "packed_weight_layout",
+            "prefill_phase",
+            "pairwise_split_min_reduction"
+          ]
         }
       ],
       "dispatch_owner": "gemm_nt_q4_k_q8_k_parallel_dispatch",
@@ -130,14 +170,19 @@
   },
   "impl": {
     "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
-    "sources": ["src/kernels/gemm_kernels_q4k.c"],
+    "sources": [
+      "src/kernels/gemm_kernels_q4k.c",
+      "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
+    ],
     "variants": [
-      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx_vnni", "requires": ["avx2", "avx_vnni", "fma"], "compile_flags": ["-mavx2", "-mavxvnni", "-mfma"]}
     ]
   },
   "tests": {
-    "unit": ["unittest/test_gemm_q4_k.py"],
-    "bench": ["scripts/bench_gemm_q4_k.py"],
+    "unit": ["unittest/test_gemm_q4_k.py", "unittest/test_q4k_q8k_llama_packed.cpp"],
+    "bench": ["scripts/bench_gemm_q4_k.py", "benchmarks/bench_q4k_exact_prefill.c"],
     "parity": [
       {
         "kind": "numpy",
@@ -153,7 +198,7 @@
       }
     ]
   },
-  "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. Used for W2 (down) projection in MLP. High compression ratio."
+  "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. The production dispatcher preserves llama.cpp pairwise split-min arithmetic. AVX-VNNI prefill interleaves Q4 bytes across eight outputs so each vpdpbusd lane advances one output column without a horizontal reduction. The persistent weight cache removes steady-state repacking; forced AVX2 retains the exact 8M provider, and residual rows retain the distinct repacked GEMV contract."
 ,
   "call_abi": {
     "version": 1,

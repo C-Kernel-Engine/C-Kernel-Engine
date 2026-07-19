@@ -90,6 +90,21 @@ extern void gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse(const void *A_q8,
                                                              int M, int N, int K,
                                                              int tile_m,
                                                              int threads);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K, int tile_m, int threads);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K, int threads);
+extern void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m(
+    const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
+    int M, int N, int K, int threads);
+extern size_t q4_k_packed_vnni_x8_block_size(void);
+extern void pack_q4_k_to_packed_vnni_x8(
+    const void *src, void *dst, int N, int K);
+extern void gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
+    const void *A_q8, const void *B_packed_vnni_x8, const float *bias,
+    float *C, int M, int N, int K, int threads);
 extern void gemm_nt_q4_k_packed_meta_x8_q8_k_superblock_order(
     const void *A_q8, const void *B_packed_x8, const float *bias, float *C,
     int M, int N, int K);
@@ -236,6 +251,17 @@ typedef struct ck_q4k_packed_meta_x8_cache_entry {
 static pthread_mutex_t ck_q4k_packed_meta_x8_cache_mu = PTHREAD_MUTEX_INITIALIZER;
 static ck_q4k_packed_meta_x8_cache_entry_t *ck_q4k_packed_meta_x8_cache_head = NULL;
 
+typedef struct ck_q4k_packed_vnni_x8_cache_entry {
+    const void *src;
+    int N;
+    int K;
+    void *packed;
+    struct ck_q4k_packed_vnni_x8_cache_entry *next;
+} ck_q4k_packed_vnni_x8_cache_entry_t;
+
+static pthread_mutex_t ck_q4k_packed_vnni_x8_cache_mu = PTHREAD_MUTEX_INITIALIZER;
+static ck_q4k_packed_vnni_x8_cache_entry_t *ck_q4k_packed_vnni_x8_cache_head = NULL;
+
 
 typedef struct ck_q4k_packed_meta_x16_cache_entry {
     const void *src;
@@ -267,6 +293,16 @@ void ck_q4k_packed_weight_cache_clear(void)
         free(entry);
     }
     pthread_mutex_unlock(&ck_q4k_packed_meta_x8_cache_mu);
+
+    pthread_mutex_lock(&ck_q4k_packed_vnni_x8_cache_mu);
+    while (ck_q4k_packed_vnni_x8_cache_head) {
+        ck_q4k_packed_vnni_x8_cache_entry_t *entry =
+                ck_q4k_packed_vnni_x8_cache_head;
+        ck_q4k_packed_vnni_x8_cache_head = entry->next;
+        free(entry->packed);
+        free(entry);
+    }
+    pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
 
     pthread_mutex_lock(&ck_q4k_packed_meta_x16_cache_mu);
     while (ck_q4k_packed_meta_x16_cache_head) {
@@ -397,6 +433,45 @@ static void *ck_get_q4k_packed_meta_x8_cached(const void *B, int N, int K)
     entry->next = ck_q4k_packed_meta_x8_cache_head;
     ck_q4k_packed_meta_x8_cache_head = entry;
     pthread_mutex_unlock(&ck_q4k_packed_meta_x8_cache_mu);
+    return packed;
+}
+
+static void *ck_get_q4k_packed_vnni_x8_cached(const void *B, int N, int K)
+{
+    if (!B || N <= 0 || K <= 0 || (K % QK_K) != 0) return NULL;
+
+    pthread_mutex_lock(&ck_q4k_packed_vnni_x8_cache_mu);
+    for (ck_q4k_packed_vnni_x8_cache_entry_t *e =
+                 ck_q4k_packed_vnni_x8_cache_head;
+         e; e = e->next) {
+        if (e->src == B && e->N == N && e->K == K) {
+            void *packed = e->packed;
+            pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
+            return packed;
+        }
+    }
+
+    const size_t groups = (size_t)((N + 7) / 8);
+    const size_t blocks = groups * (size_t)(K / QK_K);
+    const size_t bytes = blocks * q4_k_packed_vnni_x8_block_size();
+    void *packed = malloc(bytes);
+    ck_q4k_packed_vnni_x8_cache_entry_t *entry =
+            (ck_q4k_packed_vnni_x8_cache_entry_t *)malloc(sizeof(*entry));
+    if (!packed || !entry) {
+        free(packed);
+        free(entry);
+        pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
+        return NULL;
+    }
+
+    pack_q4_k_to_packed_vnni_x8(B, packed, N, K);
+    entry->src = B;
+    entry->N = N;
+    entry->K = K;
+    entry->packed = packed;
+    entry->next = ck_q4k_packed_vnni_x8_cache_head;
+    ck_q4k_packed_vnni_x8_cache_head = entry;
+    pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
     return packed;
 }
 
@@ -640,6 +715,21 @@ static int ck_select_gemm_active_threads(const ck_threadpool_t *pool, int M, int
     if (N >= 4096 || K >= 4096) return ck_min_int(pool_threads, ck_env_int_or2("CK_GEMM_THREAD_CAP", "CK_GEMV_THREAD_CAP", 24));
     if (M >= 512) return ck_min_int(pool_threads, 24);
     return pool_threads;
+}
+
+static int ck_select_q4k_vnni_active_threads(
+        const ck_threadpool_t *pool, int M, int N, int K)
+{
+    const int base = ck_select_gemm_active_threads(pool, M, N, K);
+    const int capacity = ck_threadpool_capacity(pool);
+    if (capacity <= base || M < 512 || N < 4096 || K < 4096) {
+        return base;
+    }
+
+    /* The pool capacity already represents the bounded SMT extension selected
+     * at initialization. Ordinary kernels continue to see the physical-core
+     * default through ck_threadpool_n_threads(). */
+    return capacity;
 }
 
 static int ck_should_run_gemm_serial(const ck_threadpool_t *pool, int M, int N, int K)
@@ -1084,15 +1174,28 @@ void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
 {
     if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
 
-    void *packed_x8 = ck_get_q4k_packed_meta_x8_cached(B, N, K);
-    if (!packed_x8) return;
-
     ck_threadpool_t *pool = ck_threadpool_global();
     const size_t row_bytes = (size_t)(K / QK_K) * sizeof(block_q8_K);
     const int packed_rows = M - (M % 4);
+    const int serial = packed_rows > 0 &&
+            (!pool || ck_threadpool_n_threads(pool) <= 1 ||
+             ck_should_run_gemm_serial(pool, packed_rows, N, K));
+    void *packed_vnni = NULL;
+#if defined(__AVXVNNI__) || \
+    (defined(__AVX512VNNI__) && defined(__AVX512VL__))
+    if (!serial && packed_rows >= 16 && N >= 512 && K >= 1024 &&
+        !ck_env_enabled("CK_DISABLE_Q4K_VNNI_X8_PREFILL")) {
+        packed_vnni = ck_get_q4k_packed_vnni_x8_cached(B, N, K);
+    }
+#endif
+    void *packed_x8 = NULL;
+    if (!packed_vnni || packed_rows < M) {
+        packed_x8 = ck_get_q4k_packed_meta_x8_cached(B, N, K);
+        if (!packed_x8) return;
+    }
+
     if (packed_rows > 0 &&
-        (!pool || ck_threadpool_n_threads(pool) <= 1 ||
-         ck_should_run_gemm_serial(pool, packed_rows, N, K))) {
+        serial) {
         if ((N % 16) == 0) {
             gemm_nt_q4_k_packed_meta_x16_q8_k_llama_order(
                 A, packed_x8, bias, C, packed_rows, N, K);
@@ -1101,13 +1204,33 @@ void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
                 A, packed_x8, bias, C, packed_rows, N, K);
         }
     } else if (packed_rows > 0) {
-        gemm_args_t args = {
-            .A = A, .B = packed_x8, .bias = bias, .C = C,
-            .M = packed_rows, .N = N, .K = K, .A_row_bytes = row_bytes
-        };
-        const int active = ck_select_gemm_active_threads(pool, packed_rows, N, K);
-        ck_threadpool_dispatch_n(
-            pool, active, work_gemm_nt_q4_k_q8_k_pairwise_split_min, &args);
+        int active = ck_select_gemm_active_threads(pool, packed_rows, N, K);
+        /* The VNNI layout interleaves Q4 bytes across eight output columns,
+         * so each dot-product lane advances one output without horizontal
+         * reduction. Packing is cached by weight identity and does not occur
+         * in the steady-state call. Exact 8M remains the allocation/ISA
+         * fallback and retains the same pairwise split-min contract. */
+#if defined(__AVXVNNI__) || \
+    (defined(__AVX512VNNI__) && defined(__AVX512VL__))
+        if (packed_vnni) {
+            active = ck_select_q4k_vnni_active_threads(
+                    pool, packed_rows, N, K);
+            ck_q4k_prefill_debug_dispatch("vnni_x8_4m", M, N, K, active);
+            gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
+                    A, packed_vnni, bias, C, packed_rows, N, K, active);
+        } else
+#endif
+        if (packed_rows >= 16 && N >= 512 && (N % 16) == 0) {
+            gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m(
+                    A, packed_x8, bias, C, packed_rows, N, K, active);
+        } else {
+            gemm_args_t args = {
+                .A = A, .B = packed_x8, .bias = bias, .C = C,
+                .M = packed_rows, .N = N, .K = K, .A_row_bytes = row_bytes
+            };
+            ck_threadpool_dispatch_n(
+                pool, active, work_gemm_nt_q4_k_q8_k_pairwise_split_min, &args);
+        }
     }
 
     /* The loaded CPU provider executes complete four-row groups through its

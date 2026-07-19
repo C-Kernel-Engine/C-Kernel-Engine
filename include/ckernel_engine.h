@@ -1443,6 +1443,30 @@ void attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
     int aligned_head_dim,
     int kv_stride_tokens);
 
+void attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens);
+
+void attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens);
+
 void attention_forward_full_head_major_gqa_flash_strided_bf16_storage(
     const float *q, const float *k, const float *v, float *output,
     int num_heads, int num_kv_heads, int num_tokens, int head_dim,

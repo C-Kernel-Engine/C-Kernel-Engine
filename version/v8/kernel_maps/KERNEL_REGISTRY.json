@@ -4928,7 +4928,7 @@
     {
       "id": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
       "op": "attention",
-      "variant": "full_tiled64_f16kv_fp32",
+      "variant": "full_qtile_threshold_kvtile64_f16kv_fp32",
       "mode": "prefill",
       "contract_schema_version": 1,
       "provides": {
@@ -4959,6 +4959,25 @@
       },
       "implementation": {
         "isa_dispatch": "compile_time",
+        "query_tiling": {
+          "selection": "token_threshold",
+          "numerical_effect": "none",
+          "key_tile_size": 64,
+          "routes": [
+            {
+              "min_tokens": 1,
+              "max_tokens": 1535,
+              "query_tile_size": 64,
+              "function": "attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided"
+            },
+            {
+              "min_tokens": 1536,
+              "max_tokens": null,
+              "query_tile_size": 336,
+              "function": "attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided"
+            }
+          ]
+        },
         "threading": {
           "runtime": "ck_threadpool",
           "work_partition": [
@@ -5027,8 +5046,8 @@
         {
           "name": "thread_tiles",
           "dtype": "fp32",
-          "size_bytes": "per_thread((64*D)+(64*64)+(64*D)+(64*D))",
-          "desc": "Bounded query, key, value, score, and output tiles"
+          "size_bytes": "per_thread((336*D)+(D*64)+(64*D)+(336*64)+(336*D)+(2*336))",
+          "desc": "Maximum bounded query, key, value, score, output, and softmax-state tiles"
         }
       ],
       "dims": [
@@ -5076,7 +5095,7 @@
           "D": 1,
           "T": 1
         },
-        "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens."
+        "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens. Query tile 64 is used below 1536 tokens and query tile 336 at or above 1536; both preserve the same ascending 64-key reduction order."
       },
       "impl": {
         "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
@@ -5114,7 +5133,7 @@
           "version/v8/scripts/replay_attention_from_dumps_v8.py --mode tiled_f16kv"
         ]
       },
-      "notes": "Contract-selected GGML-compatible tiled full attention. This provider is additive and does not replace online or BF16 SDPA contracts.",
+      "notes": "Contract-selected GGML-compatible tiled full attention. Query batching uses a measured token threshold that has no numerical effect. This provider is additive and does not replace online or BF16 SDPA contracts.",
       "call_abi": {
         "version": 1,
         "params": [
@@ -10317,10 +10336,11 @@
       ],
       "scratch": [
         {
-          "name": "temp",
-          "dtype": "fp32",
-          "size_bytes": "M * N * 4",
-          "desc": "Temporary accumulation buffer"
+          "name": "packed_weight_cache",
+          "dtype": "u8",
+          "size_bytes": "ceil(N / 8) * (K / 256) * sizeof(q4_k_packed_vnni_x8)",
+          "lifetime": "model_runtime",
+          "desc": "Weight-identity cache for the AVX-VNNI eight-output layout; never rebuilt in the steady-state call"
         }
       ],
       "dims": [
@@ -10404,6 +10424,52 @@
                 "packed_weight_layout",
                 "prefill_phase"
               ]
+            },
+            {
+              "name": "packed_meta_x8_split_min_4m8n",
+              "function": "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m",
+              "layout": "q4_k_packed_meta_x8",
+              "promotion": "parity_and_roofline_gated",
+              "requires": [
+                "packed_weight_layout",
+                "prefill_phase",
+                "pairwise_split_min_reduction"
+              ]
+            },
+            {
+              "name": "packed_meta_x8_split_min_8m8n",
+              "function": "gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m",
+              "layout": "q4_k_packed_meta_x8",
+              "promotion": "parity_and_roofline_gated",
+              "requires": [
+                "packed_weight_layout",
+                "prefill_phase",
+                "pairwise_split_min_reduction"
+              ]
+            },
+            {
+              "name": "packed_vnni_x8_split_min_4m8n",
+              "function": "gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m",
+              "layout": "q4_k_packed_vnni_x8",
+              "activation_layout": "canonical_q8_k",
+              "threading": {
+                "default_concurrency": "physical_cores",
+                "capacity": "physical_cores_plus_half_available_smt",
+                "smt_extension": "half_available_siblings",
+                "shape_minimum": {
+                  "M": 512,
+                  "N": 4096,
+                  "K": 4096
+                },
+                "reduction_order_effect": "none"
+              },
+              "promotion": "production_same_host_llama_ratio_gated",
+              "requires": [
+                "avx_vnni",
+                "packed_weight_layout",
+                "prefill_phase",
+                "pairwise_split_min_reduction"
+              ]
             }
           ],
           "dispatch_owner": "gemm_nt_q4_k_q8_k_parallel_dispatch",
@@ -10419,7 +10485,9 @@
       "impl": {
         "function": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch",
         "sources": [
-          "src/kernels/gemm_kernels_q4k.c"
+          "src/kernels/gemm_kernels_q4k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
@@ -10432,15 +10500,30 @@
               "-mavx2",
               "-mfma"
             ]
+          },
+          {
+            "name": "avx_vnni",
+            "requires": [
+              "avx2",
+              "avx_vnni",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mavxvnni",
+              "-mfma"
+            ]
           }
         ]
       },
       "tests": {
         "unit": [
-          "unittest/test_gemm_q4_k.py"
+          "unittest/test_gemm_q4_k.py",
+          "unittest/test_q4k_q8k_llama_packed.cpp"
         ],
         "bench": [
-          "scripts/bench_gemm_q4_k.py"
+          "scripts/bench_gemm_q4_k.py",
+          "benchmarks/bench_q4k_exact_prefill.c"
         ],
         "parity": [
           {
@@ -10457,7 +10540,7 @@
           }
         ]
       },
-      "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. Used for W2 (down) projection in MLP. High compression ratio.",
+      "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. The production dispatcher preserves llama.cpp pairwise split-min arithmetic. AVX-VNNI prefill interleaves Q4 bytes across eight outputs so each vpdpbusd lane advances one output column without a horizontal reduction. The persistent weight cache removes steady-state repacking; forced AVX2 retains the exact 8M provider, and residual rows retain the distinct repacked GEMV contract.",
       "call_abi": {
         "version": 1,
         "params": [

@@ -130,6 +130,27 @@ class AttentionContractV8Tests(unittest.TestCase):
         )
         self.assertEqual(result["production_blockers"], [])
         self.assertEqual(result["phase"], "prefill")
+        query_tiling = result["implementation"]["query_tiling"]
+        self.assertEqual(query_tiling["selection"], "token_threshold")
+        self.assertEqual(query_tiling["numerical_effect"], "none")
+        self.assertEqual(query_tiling["key_tile_size"], 64)
+        self.assertEqual(
+            [(route["min_tokens"], route["max_tokens"], route["query_tile_size"])
+             for route in query_tiling["routes"]],
+            [(1, 1535, 64), (1536, None, 336)],
+        )
+
+    def test_query_tiling_rejects_shape_coverage_gap(self) -> None:
+        kernels = copy.deepcopy(self.kernels)
+        implementation = kernels["kernels"][
+            "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided"
+        ]["implementation"]
+        implementation["query_tiling"]["routes"][1]["min_tokens"] = 1537
+        with self.assertRaisesRegex(
+            resolver.ContractError,
+            "HARD CONTRACT FAULT:.*query-tile coverage gap or overlap",
+        ):
+            resolver.validate_kernel_overlay(kernels)
 
     def test_qwen3vl_prefill_resolves_segmented_append_provider(self) -> None:
         result = self.resolve("prefill")

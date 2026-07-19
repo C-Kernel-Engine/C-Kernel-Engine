@@ -380,6 +380,50 @@ def validate_kernel_overlay(doc: Dict[str, Any]) -> None:
             KERNEL_CAPABILITY_SCHEMA,
             f"kernel capability {kernel_id}",
         )
+        query_tiling = kernel.get("implementation", {}).get("query_tiling")
+        if query_tiling is not None:
+            routes = query_tiling["routes"]
+            expected_min = 1
+            functions = set()
+            for index, route in enumerate(routes):
+                route_min = int(route["min_tokens"])
+                route_max = route["max_tokens"]
+                if route_min != expected_min:
+                    raise hard_contract_fault(
+                        f"kernel {kernel_id!r} has a query-tile coverage gap or overlap",
+                        f"route {index} starts at {route_min}, expected {expected_min}",
+                        "make query-tile token ranges contiguous and start at token 1.",
+                    )
+                if route_max is None:
+                    if index != len(routes) - 1:
+                        raise hard_contract_fault(
+                            f"kernel {kernel_id!r} has an unbounded non-final query-tile route",
+                            f"route {index} has max_tokens=null",
+                            "only the final query-tile route may be unbounded.",
+                        )
+                else:
+                    route_max = int(route_max)
+                    if route_max < route_min:
+                        raise hard_contract_fault(
+                            f"kernel {kernel_id!r} has an invalid query-tile range",
+                            f"route {index} spans {route_min}..{route_max}",
+                            "set max_tokens greater than or equal to min_tokens.",
+                        )
+                    expected_min = route_max + 1
+                function = str(route["function"])
+                if function in functions:
+                    raise hard_contract_fault(
+                        f"kernel {kernel_id!r} repeats a query-tile leaf provider",
+                        f"function {function!r} appears more than once",
+                        "give each measured query-tile route one exact leaf function.",
+                    )
+                functions.add(function)
+            if routes[-1]["max_tokens"] is not None:
+                raise hard_contract_fault(
+                    f"kernel {kernel_id!r} leaves large token counts unresolved",
+                    "the final query-tile route has a finite max_tokens",
+                    "end the final validated route with max_tokens=null.",
+                )
         provides = kernel["provides"]
         if not isinstance(provides, dict) or not provides:
             raise ContractError(f"Kernel capability {kernel_id}.provides must be a non-empty object")

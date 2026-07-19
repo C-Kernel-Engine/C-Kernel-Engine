@@ -147,6 +147,52 @@ static int test_multi_dispatch(void)
     return 1;
 }
 
+static int test_capacity_dispatch(void)
+{
+    printf("  [3b] Default width versus explicit capacity...\n");
+
+    TEST_ASSERT(ck_threadpool_bounded_capacity(20, 20) == 20,
+                "no SMT keeps physical-core width");
+    TEST_ASSERT(ck_threadpool_bounded_capacity(20, 28) == 24,
+                "hybrid topology reserves half of SMT siblings");
+    TEST_ASSERT(ck_threadpool_bounded_capacity(16, 32) == 24,
+                "full SMT topology remains bounded");
+    TEST_ASSERT(ck_threadpool_bounded_capacity(64, 128) == 64,
+                "capacity respects compile-time maximum");
+
+    ck_threadpool_t *pool = ck_threadpool_create_capacity(3, 5);
+    TEST_ASSERT(pool != NULL, "create default=3 capacity=5");
+    TEST_ASSERT(ck_threadpool_n_threads(pool) == 3,
+                "ordinary width remains 3");
+    TEST_ASSERT(ck_threadpool_capacity(pool) == 5,
+                "explicit capacity is 5");
+
+    for (int i = 0; i < MAX_TEST_THREADS; i++) {
+        atomic_store(&g_thread_seen[i], 0);
+    }
+    int expected = 3;
+    ck_threadpool_dispatch(pool, multi_work, &expected);
+    for (int i = 0; i < expected; i++) {
+        TEST_ASSERT(atomic_load(&g_thread_seen[i]) == 1,
+                    "ordinary dispatch uses default width");
+    }
+    TEST_ASSERT(atomic_load(&g_thread_seen[3]) == 0,
+                "capacity worker remains idle by default");
+
+    for (int i = 0; i < MAX_TEST_THREADS; i++) {
+        atomic_store(&g_thread_seen[i], 0);
+    }
+    expected = 5;
+    ck_threadpool_dispatch_n(pool, expected, multi_work, &expected);
+    for (int i = 0; i < expected; i++) {
+        TEST_ASSERT(atomic_load(&g_thread_seen[i]) == 1,
+                    "explicit dispatch reaches capacity");
+    }
+
+    ck_threadpool_destroy(pool);
+    return 1;
+}
+
 /* ============================================================================
  * Test 4: Barrier Correctness
  * ============================================================================ */
@@ -465,6 +511,7 @@ int main(int argc, char **argv)
         ok &= test_create_destroy();
         ok &= test_single_dispatch();
         ok &= test_multi_dispatch();
+        ok &= test_capacity_dispatch();
         ok &= test_barrier();
         ok &= test_sequential_dispatch();
         ok &= test_pause_resume();

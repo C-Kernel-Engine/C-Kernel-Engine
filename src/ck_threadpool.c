@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 /**
  * @file ck_threadpool.c
  * @brief Persistent pthread thread pool for CK-Engine inference
@@ -19,6 +23,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
+#ifdef __linux__
+#include <sched.h>
+#endif
 
 #ifdef __x86_64__
 #include <immintrin.h>
@@ -59,7 +67,8 @@ struct ck_threadpool {
     ck_barrier_t barrier;
 
     /* Worker management */
-    int          n_threads;     /* total threads (including main) */
+    int          n_threads;       /* worker capacity (including main) */
+    int          default_threads; /* ordinary dispatch width */
     ck_worker_t  workers[CK_THREADPOOL_MAX_THREADS];
 
     /* Shutdown / pause signals */
@@ -197,32 +206,55 @@ worker_have_work:
 
 extern int ck_get_physical_cores(void);
 
-ck_threadpool_t *ck_threadpool_create(int n_threads)
+int ck_threadpool_bounded_capacity(int default_threads, int logical_threads)
 {
-    if (n_threads <= 0) {
-        n_threads = ck_get_physical_cores();
-        if (n_threads <= 0) n_threads = 1;
-        /* Cap at reasonable default for memory-bound workloads */
-        if (n_threads > 8) n_threads = 8;
+    if (default_threads < 1) default_threads = 1;
+    if (default_threads > CK_THREADPOOL_MAX_THREADS) {
+        default_threads = CK_THREADPOOL_MAX_THREADS;
     }
-    if (n_threads > CK_THREADPOOL_MAX_THREADS) {
-        n_threads = CK_THREADPOOL_MAX_THREADS;
+    if (logical_threads <= default_threads) return default_threads;
+
+    int capacity = default_threads + (logical_threads - default_threads) / 2;
+    if (capacity > CK_THREADPOOL_MAX_THREADS) {
+        capacity = CK_THREADPOOL_MAX_THREADS;
+    }
+    return capacity;
+}
+
+ck_threadpool_t *ck_threadpool_create_capacity(int default_threads,
+                                                int capacity_threads)
+{
+    if (default_threads <= 0) {
+        default_threads = ck_get_physical_cores();
+        if (default_threads <= 0) default_threads = 1;
+        /* Cap at reasonable default for memory-bound workloads */
+        if (default_threads > 8) default_threads = 8;
+    }
+    if (capacity_threads < default_threads) {
+        capacity_threads = default_threads;
+    }
+    if (capacity_threads > CK_THREADPOOL_MAX_THREADS) {
+        capacity_threads = CK_THREADPOOL_MAX_THREADS;
+    }
+    if (default_threads > capacity_threads) {
+        default_threads = capacity_threads;
     }
 
     ck_threadpool_t *pool = aligned_alloc(CK_CACHE_LINE, sizeof(ck_threadpool_t));
     if (!pool) return NULL;
     memset(pool, 0, sizeof(*pool));
 
-    pool->n_threads = n_threads;
+    pool->n_threads = capacity_threads;
+    pool->default_threads = default_threads;
     atomic_store(&pool->n_dispatch, 0);
     atomic_store(&pool->n_complete, 0);
-    atomic_store(&pool->active_threads, n_threads);
+    atomic_store(&pool->active_threads, default_threads);
     atomic_store(&pool->stop, 0);
     atomic_store(&pool->paused, 0);
     pool->work_fn = NULL;
     pool->work_args = NULL;
 
-    barrier_init(&pool->barrier, n_threads);
+    barrier_init(&pool->barrier, default_threads);
 
     pthread_mutex_init(&pool->mutex, NULL);
     pthread_cond_init(&pool->cond_dispatch, NULL);
@@ -234,7 +266,7 @@ ck_threadpool_t *ck_threadpool_create(int n_threads)
     pool->workers[0].thread = pthread_self();
 
     /* Spawn N-1 worker threads */
-    for (int i = 1; i < n_threads; i++) {
+    for (int i = 1; i < capacity_threads; i++) {
         pool->workers[i].id = i;
         pool->workers[i].pool = pool;
 
@@ -251,11 +283,17 @@ ck_threadpool_t *ck_threadpool_create(int n_threads)
     }
 
     if (pool->n_threads > 1) {
-        fprintf(stderr, "[CK threadpool] Created %d threads (1 main + %d workers)\n",
-                pool->n_threads, pool->n_threads - 1);
+        fprintf(stderr,
+                "[CK threadpool] Created %d threads (default=%d, 1 main + %d workers)\n",
+                pool->n_threads, pool->default_threads, pool->n_threads - 1);
     }
 
     return pool;
+}
+
+ck_threadpool_t *ck_threadpool_create(int n_threads)
+{
+    return ck_threadpool_create_capacity(n_threads, n_threads);
 }
 
 void ck_threadpool_destroy(ck_threadpool_t *pool)
@@ -345,7 +383,7 @@ void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work
 void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)
 {
     if (!pool) return;
-    ck_threadpool_dispatch_n(pool, pool->n_threads, fn, args);
+    ck_threadpool_dispatch_n(pool, pool->default_threads, fn, args);
 }
 
 void ck_threadpool_barrier(ck_threadpool_t *pool)
@@ -381,6 +419,11 @@ void ck_threadpool_resume(ck_threadpool_t *pool)
 
 int ck_threadpool_n_threads(const ck_threadpool_t *pool)
 {
+    return pool ? pool->default_threads : 1;
+}
+
+int ck_threadpool_capacity(const ck_threadpool_t *pool)
+{
     return pool ? pool->n_threads : 1;
 }
 
@@ -405,10 +448,47 @@ static pthread_once_t g_threadpool_once = PTHREAD_ONCE_INIT;
 
 extern int ck_get_num_threads(void);
 
+static int ck_available_logical_cpus(void)
+{
+#ifdef __linux__
+    cpu_set_t allowed;
+    if (sched_getaffinity(0, sizeof(allowed), &allowed) == 0) {
+        int count = 0;
+        for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) {
+            if (CPU_ISSET(cpu, &allowed)) ++count;
+        }
+        if (count > 0) return count;
+    }
+#endif
+    const long online = sysconf(_SC_NPROCESSORS_ONLN);
+    return online > 0 ? (int)online : 1;
+}
+
 static void global_pool_init(void)
 {
-    int n = ck_get_num_threads();
-    g_threadpool = ck_threadpool_create(n);
+    const int available_threads = ck_available_logical_cpus();
+    int physical_threads = ck_get_physical_cores();
+    if (physical_threads > available_threads) physical_threads = available_threads;
+    int default_threads = ck_get_num_threads();
+    if (default_threads > available_threads) {
+        default_threads = available_threads;
+    }
+    int capacity_threads = default_threads;
+    const char *capacity_env = getenv("CK_THREADPOOL_CAPACITY");
+    if (capacity_env && atoi(capacity_env) > 0) {
+        capacity_threads = atoi(capacity_env);
+    } else if (!getenv("CK_NUM_THREADS") &&
+               default_threads == physical_threads) {
+        /* Generated runtimes set OMP_NUM_THREADS=1 to keep OpenMP dormant and
+         * configure the CK pool separately. Do not mistake that isolation
+         * setting for a CK capacity cap. A non-physical default remains an
+         * explicit width and does not gain automatic SMT workers. */
+        capacity_threads = ck_threadpool_bounded_capacity(
+                default_threads, available_threads);
+    }
+    if (capacity_threads > available_threads) capacity_threads = available_threads;
+    g_threadpool = ck_threadpool_create_capacity(
+            default_threads, capacity_threads);
 }
 
 ck_threadpool_t *ck_threadpool_global(void)

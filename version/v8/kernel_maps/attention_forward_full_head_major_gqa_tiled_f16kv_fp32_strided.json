@@ -1,7 +1,7 @@
 {
   "id": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
   "op": "attention",
-  "variant": "full_tiled64_f16kv_fp32",
+  "variant": "full_qtile_threshold_kvtile64_f16kv_fp32",
   "mode": "prefill",
   "contract_schema_version": 1,
   "provides": {
@@ -22,6 +22,25 @@
   },
   "implementation": {
     "isa_dispatch": "compile_time",
+    "query_tiling": {
+      "selection": "token_threshold",
+      "numerical_effect": "none",
+      "key_tile_size": 64,
+      "routes": [
+        {
+          "min_tokens": 1,
+          "max_tokens": 1535,
+          "query_tile_size": 64,
+          "function": "attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided"
+        },
+        {
+          "min_tokens": 1536,
+          "max_tokens": null,
+          "query_tile_size": 336,
+          "function": "attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided"
+        }
+      ]
+    },
     "threading": {
       "runtime": "ck_threadpool",
       "work_partition": ["independent_query_blocks"],
@@ -43,7 +62,7 @@
     {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "FP32 attention output"}
   ],
   "scratch": [
-    {"name": "thread_tiles", "dtype": "fp32", "size_bytes": "per_thread((64*D)+(64*64)+(64*D)+(64*D))", "desc": "Bounded query, key, value, score, and output tiles"}
+    {"name": "thread_tiles", "dtype": "fp32", "size_bytes": "per_thread((336*D)+(D*64)+(64*D)+(336*64)+(336*D)+(2*336))", "desc": "Maximum bounded query, key, value, score, output, and softmax-state tiles"}
   ],
   "dims": ["H", "KV", "T", "S", "D"],
   "params": [
@@ -60,7 +79,7 @@
   },
   "constraints": {
     "alignment": {"D": 1, "T": 1},
-    "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens."
+    "notes": "Full bidirectional attention. num_heads must be divisible by num_kv_heads, aligned_head_dim >= head_dim, and kv_stride_tokens >= num_tokens. Query tile 64 is used below 1536 tokens and query tile 336 at or above 1536; both preserve the same ascending 64-key reduction order."
   },
   "impl": {
     "function": "attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided",
@@ -75,7 +94,7 @@
     "unit": ["unittest/test_attention_full.py"],
     "oracle": ["version/v8/scripts/replay_attention_from_dumps_v8.py --mode tiled_f16kv"]
   },
-  "notes": "Contract-selected GGML-compatible tiled full attention. This provider is additive and does not replace online or BF16 SDPA contracts.",
+  "notes": "Contract-selected GGML-compatible tiled full attention. Query batching uses a measured token threshold that has no numerical effect. This provider is additive and does not replace online or BF16 SDPA contracts.",
   "call_abi": {
     "version": 1,
     "params": [

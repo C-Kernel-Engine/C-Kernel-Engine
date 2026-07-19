@@ -18,6 +18,9 @@ from test_utils import max_diff, numpy_to_ptr
 
 lib = load_lib("libckernel_engine.so", "libckernel_attention.so")
 
+lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+lib.ck_set_num_threads.restype = None
+
 lib.attention_forward_full_head_major_gqa_flash.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # q
     ctypes.POINTER(ctypes.c_float),  # k
@@ -58,6 +61,16 @@ lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.argtypes = [
     ctypes.c_int,
 ]
 lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.restype = None
+
+lib.attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided.argtypes = list(
+    lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.argtypes
+)
+lib.attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided.restype = None
+
+lib.attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided.argtypes = list(
+    lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided.argtypes
+)
+lib.attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided.restype = None
 
 lib.attention_forward_full_head_major_gqa_exact_strided.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # q
@@ -310,6 +323,50 @@ class TestAttentionFull(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(out.view(np.uint32), repeated.view(np.uint32)))
         self.assertLessEqual(max_diff(torch.from_numpy(out), ref), 5e-5)
+
+    def test_full_tiled336_preserves_tile64_output_across_crossover(self) -> None:
+        """Query tiling may change batching and scratch use, never reduction math."""
+        rng = np.random.default_rng(47)
+        heads = 16
+        kv_heads = 16
+        head_dim = 72
+        self.addCleanup(lib.ck_set_num_threads, ctypes.c_int(20))
+
+        for tokens, threads in ((129, 1), (1536, 8), (4032, 20), (4032, 28)):
+            with self.subTest(tokens=tokens, threads=threads):
+                lib.ck_set_num_threads(ctypes.c_int(threads))
+                shape = (heads, tokens, head_dim)
+                q = rng.standard_normal(shape, dtype=np.float32)
+                k = rng.standard_normal(shape, dtype=np.float32)
+                v = rng.standard_normal(shape, dtype=np.float32)
+                tile64 = np.zeros_like(q)
+                tile336 = np.zeros_like(q)
+                args = (
+                    numpy_to_ptr(q), numpy_to_ptr(k), numpy_to_ptr(v),
+                    ctypes.c_int(heads), ctypes.c_int(kv_heads), ctypes.c_int(tokens),
+                    ctypes.c_int(head_dim), ctypes.c_int(head_dim), ctypes.c_int(tokens),
+                )
+
+                lib.attention_forward_full_head_major_gqa_tiled64_f16kv_fp32_strided(
+                    args[0], args[1], args[2], numpy_to_ptr(tile64), *args[3:]
+                )
+                lib.attention_forward_full_head_major_gqa_tiled336_f16kv_fp32_strided(
+                    args[0], args[1], args[2], numpy_to_ptr(tile336), *args[3:]
+                )
+
+                self.assertTrue(
+                    np.array_equal(tile64.view(np.uint32), tile336.view(np.uint32)),
+                    f"query-tile providers differ at T={tokens}",
+                )
+                production = np.zeros_like(q)
+                lib.attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided(
+                    args[0], args[1], args[2], numpy_to_ptr(production), *args[3:]
+                )
+                expected = tile336 if tokens >= 1536 else tile64
+                self.assertTrue(
+                    np.array_equal(production.view(np.uint32), expected.view(np.uint32)),
+                    f"production query-tile threshold selected the wrong provider at T={tokens}",
+                )
 
     def test_full_exact_strided_matches_pytorch_reference(self) -> None:
         lib.attention_forward_full_head_major_gqa_exact_strided(
