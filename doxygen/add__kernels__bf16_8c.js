@@ -7,6 +7,5 @@ var add__kernels__bf16_8c =
     [ "add_inplace_bf16", "add__kernels__bf16_8c.html#a33b5300506aebe863f2781fe7d58ae95", null ],
     [ "add_inplace_f32", "add__kernels__bf16_8c.html#a51008eb010aff17a631159e631ecbcb3", null ],
     [ "add_scaled_forward_bf16", "add__kernels__bf16_8c.html#a29182cacb5925fc3bfcef5c8db425c3f", null ],
-    [ "add_scaled_inplace_bf16", "add__kernels__bf16_8c.html#afd826861943ffdc6583156dfa789cdb7", null ],
-    [ "ck_residual_add_token_major_bf16_storage", "add__kernels__bf16_8c.html#a25d5cb6d82feccae28f7e2e1e885b39b", null ]
+    [ "add_scaled_inplace_bf16", "add__kernels__bf16_8c.html#afd826861943ffdc6583156dfa789cdb7", null ]
 ];
