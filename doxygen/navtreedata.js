@@ -61,19 +61,19 @@ var NAVTREEINDEX =
 "ckernel__model_8h.html#a0c71a82f45792351885418444cbfd5cd",
 "deltanet__kernels_8c.html#adc72112b97155ad7cd2360ab95661186",
 "gemm__kernels__f16_8c.html",
-"gemm__kernels__q5__k_8c.html#af1ba72d73c6d788f686bfc12a60281a4",
-"globals_u.html",
-"optimizer__kernels_8c.html#a017e1c756e664d84e72880c3afa3dbc2",
-"rope__kernels_8c.html#aad7c9e4161a32a364dbf503b02623ce2",
-"structCKLayerBackwardParams.html#a267b127c20c2f099f1b39e1bb618a2d1",
-"structCKLayerOffsets.html#a7f509afe9bdecb527e6e89c457420d74",
-"structCKTokenizerConfig.html#a61cf1a1974d46e1da99c1c86f43fad4b",
-"structTransformerModel.html#a15ebe2bd4db54209b7cc8e89bb1cb8fd",
-"tokenizer__spm_8c.html#a80742b73116479d68d521463c2557047",
-"v6_85_2test__generated_2ck-kernel-inference_8h.html#a431f85d6b77e3ff5dff8d2e640c44108",
-"v6_85_2test__inference__with__bump__tokenizer_8c_source.html",
-"v6_86_2test__generated_2generic__api__test_8c.html#a1c9785b07c2e2f9f6ef11c078c40172a",
-"v6_86__inference_8c.html#acbe9fadf5b08ea95ced2b5d84827ec8c"
+"gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d",
+"globals_p.html",
+"murmurhash3_8h.html#a85422d9b050958858d7d0dcbdaeba4a4",
+"rope__kernels_8c.html#a911fad1085d2300a7aa2ad506b2136c3",
+"structCKLayerBackwardParams.html#a0b2505938624d2addd57ca43e3f5c685",
+"structCKLayerOffsets.html#a6f26daba0ff5fda605b9a751ac2ba2ee",
+"structCKTokenizer.html#ae92078c4ca97a78a2fcce8d3193d4cd1",
+"structSystemTopology.html#aea0398c023b6251b7e490f65c74edc73",
+"tokenizer__spm_8c.html#a42f04c4dc0545d3dd116440fd12e8030",
+"v6_85_2test__generated_2ck-kernel-inference_8h.html#a12f076df0a5515d14d00baf7eb48cd7c",
+"v6_85_2test__generic__api_8c.html#ab18b415ece5553e9dccfeb6b4149e407",
+"v6_86_2test__generated_2generic__api__test_8c.html",
+"v6_86__inference_8c.html#a46587b83544b8e9be045bb93f644ac82"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

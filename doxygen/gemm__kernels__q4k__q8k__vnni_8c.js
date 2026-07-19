@@ -9,6 +9,8 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "accum_q4_k_packed_meta_x8_q8_k_superblock", "gemm__kernels__q4k__q8k__vnni_8c.html#a2e50db797057b40a8d73a4d1346175b8", null ],
     [ "accum_q4_k_packed_meta_x8_q8_k_superblock_rows", "gemm__kernels__q4k__q8k__vnni_8c.html#acc8b88f408b292814337f44897cce954", null ],
     [ "accum_q4_k_packed_u8_x16_q8_k_block", "gemm__kernels__q4k__q8k__vnni_8c.html#aa10a3ab701968dab7f4091bc390860e2", null ],
+    [ "accum_q4_k_packed_vnni_x8_q8_k_4m_superblock", "gemm__kernels__q4k__q8k__vnni_8c.html#afdb9211b27e323b6f839776eef0d22eb", null ],
+    [ "ck_q4k_packed_vnni_x8_available", "gemm__kernels__q4k__q8k__vnni_8c.html#a74d87b2b463e7571f6643d43125b3f02", null ],
     [ "ck_q4k_silu_f32", "gemm__kernels__q4k__q8k__vnni_8c.html#a3a40a5ae6abccd56cd0351f759b01fd7", null ],
     [ "ck_q4k_x16_chunk4_enabled", "gemm__kernels__q4k__q8k__vnni_8c.html#afba55b0782ba30fb5fed1e1cad973ebf", null ],
     [ "dot_q4_k_packed_meta_q8_k_block", "gemm__kernels__q4k__q8k__vnni_8c.html#a0f81e4a5e2d2edf4b279d4d9039a5b2e", null ],
@@ -33,6 +35,7 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit", "gemm__kernels__q4k__q8k__vnni_8c.html#aee6618aa49215c88f8e3591262713be2", null ],
     [ "gemm_nt_q4_k_packed_u8_q8_k", "gemm__kernels__q4k__q8k__vnni_8c.html#a86d08703ae1e921df23eb133ded81bce", null ],
     [ "gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile", "gemm__kernels__q4k__q8k__vnni_8c.html#adb7e5b8941c44b80d58127b960734cc2", null ],
+    [ "gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m", "gemm__kernels__q4k__q8k__vnni_8c.html#aa6e23175ad97d14113daf5299b142830", null ],
     [ "gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#af16ca131bc6fbde6337780063954f194", null ],
     [ "gemm_q4_gateup_swiglu_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#afe404a6111e79a5486377ad564a7cf46", null ],
     [ "gemm_q4_gateup_swiglu_x16_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#aff2c4bb3e5d28034d827b3688ee0c569", null ],
@@ -48,6 +51,7 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "gemm_q4_packed_meta_x8_split_min_8m_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a6e367d96cfdab0db97772adb1738b1ba", null ],
     [ "gemm_q4_packed_meta_x8_split_min_mreuse_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#ac3de2c7e5468d96797ffe45c611a962e", null ],
     [ "gemm_q4_packed_u8_x16_mtile_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a8ff0183ae64baa0fdf13f87299c669e1", null ],
+    [ "gemm_q4_packed_vnni_x8_q8k_4m_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a1a9fd5dffc1a4a4b5cab99a4856b5326", null ],
     [ "gemv_q4_k_q8_k_avx2", "gemm__kernels__q4k__q8k__vnni_8c.html#a030c98b26ad610ccea6dabf993b60cdf", null ],
     [ "gemv_q4_k_q8_k_parallel_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#a0ea9f437d0af65398100c4c50c85ece6", null ],
     [ "gemv_q4_k_q8_k_ref", "gemm__kernels__q4k__q8k__vnni_8c.html#ac01f8caf84e100f3c72919c71217010e", null ],
@@ -57,9 +61,11 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "pack_q4_k_to_packed_meta_x8", "gemm__kernels__q4k__q8k__vnni_8c.html#ad1a60aab0e504db17f6af651850c6e59", null ],
     [ "pack_q4_k_to_packed_u8", "gemm__kernels__q4k__q8k__vnni_8c.html#aa0dae13c5610ee6b39871cffe53a10ea", null ],
     [ "pack_q4_k_to_packed_u8_x16", "gemm__kernels__q4k__q8k__vnni_8c.html#a70d282b9f3aa110ba4d779246e3ad9a4", null ],
+    [ "pack_q4_k_to_packed_vnni_x8", "gemm__kernels__q4k__q8k__vnni_8c.html#a59a992525f5d17df769f5c0e52e1402f", null ],
     [ "q4_k_packed_meta_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a473788e76eea50794416b5c035152f2d", null ],
     [ "q4_k_packed_meta_x16_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a0a182d60f8c59b4cf16eac2047fa822a", null ],
     [ "q4_k_packed_meta_x8_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4", null ],
     [ "q4_k_packed_u8_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#acc8801e2ac52f0f207e7dfe425e15f42", null ],
-    [ "q4_k_packed_u8_x16_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a8c7767137cea965691066a5a0857caf7", null ]
+    [ "q4_k_packed_u8_x16_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a8c7767137cea965691066a5a0857caf7", null ],
+    [ "q4_k_packed_vnni_x8_block_size", "gemm__kernels__q4k__q8k__vnni_8c.html#a9bd27a2c248acdc0af13baacd804ebed", null ]
 ];
