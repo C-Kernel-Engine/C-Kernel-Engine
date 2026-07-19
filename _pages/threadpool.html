@@ -18,6 +18,7 @@
         <li><a href="#what-is-a-pool">What Is a "Pool"? (The Core Idea)</a></li>
         <li><a href="#why-not-openmp">The Problem: Why Not Just Use OpenMP?</a></li>
         <li><a href="#anatomy">Anatomy of CK-Engine's Thread Pool</a></li>
+        <li><a href="#bounded-smt">Default Width and Bounded SMT Capacity</a></li>
         <li><a href="#lifecycle">Lifecycle: Create &rarr; Dispatch &rarr; Destroy</a></li>
         <li><a href="#dispatch-deep">Dispatch Deep Dive: What Actually Happens</a></li>
         <li><a href="#spin-vs-sleep">Spin-Wait vs. Sleep: The Hybrid Polling Design</a></li>
@@ -153,7 +154,8 @@ completely ate the parallelism gains and then some.</p>
     ck_barrier_t barrier;
 
     /* --- Worker management --- */
-    int          n_threads;    // total (including main)
+    int          n_threads;       // maximum provider capacity
+    int          default_threads; // ordinary dispatch width
     ck_worker_t  workers[64];  // thread handles
 
     /* --- Shutdown / pause --- */
@@ -226,6 +228,88 @@ ck_threadpool_t *ck_threadpool_global(void) {
     pthread_once(&amp;g_threadpool_once, global_pool_init);
     return g_threadpool;
 }</code></pre>
+
+<h2 id="bounded-smt">Default Width and Bounded SMT Capacity</h2>
+
+<div class="card card-green">
+  <h3 style="margin-top:0;">The simple version</h3>
+  <p>CKE creates one pool with 24 available workers. For normal jobs it wakes only 20 and leaves four asleep.
+  For one proven large Q4 prefill kernel, it wakes all 24 because measurement showed that the extra four help.</p>
+  <p><strong>It is not 20 + 24 threads.</strong> It is one 24-thread pool with a normal working limit of 20.</p>
+</div>
+
+<div class="diagram">Circuit: <span class="hl">run Q4 prefill</span>
+        |
+        v
+DSL/codegen: emit the exact public dispatcher <span class="dim">(no CPU guess)</span>
+        |
+        v
+Kernel map: this provider may use bounded SMT for large shapes
+        |
+        v
+Runtime: inspect this process's available CPUs
+        |
+        +-- ordinary kernel -----------------&gt; wake 20 workers
+        |
+        +-- eligible large Q4 VNNI provider -&gt; wake 24 workers
+        |
+        +-- only 8 CPUs allowed by taskset --&gt; wake at most 8 workers</div>
+
+<p>One thread count is not optimal for every kernel. CK therefore separates the
+<strong>ordinary dispatch width</strong> from the pool's <strong>maximum provider capacity</strong>.
+Ordinary kernels call <code>ck_threadpool_dispatch()</code> and use the default width.
+Only a kernel whose map explicitly permits additional independent workers may call
+<code>ck_threadpool_dispatch_n()</code> up to the capacity.</p>
+
+<div class="diagram"><span class="hl">Lenovo P3 Tiny: Core i7-14700T</span>
+
+  physical cores       = 20  <span class="dim">(8 P-cores + 12 E-cores)</span>
+  online logical CPUs  = 28
+  additional siblings =  8
+  bounded extension    =  4  <span class="dim">(half of available siblings)</span>
+  ordinary width       = 20
+  provider capacity    = 24</div>
+
+<p>This is called <strong>bounded SMT</strong>. It does not mean "always use all logical CPUs."
+The pool reserves at most half of the logical CPUs beyond the physical-core width. A provider
+must still declare a compatible shape, independent work partition, and whether threading can
+change its numerical reduction order.</p>
+
+<table>
+  <thead><tr><th>Machine or constraint</th><th>Default</th><th>Capacity behavior</th></tr></thead>
+  <tbody>
+    <tr><td>No SMT</td><td>Physical cores</td><td>No extension; capacity equals default.</td></tr>
+    <tr><td>Homogeneous SMT CPU</td><td>Physical cores</td><td>At most half of the available sibling threads, bounded by the compiled pool maximum.</td></tr>
+    <tr><td>Hybrid P-core/E-core CPU</td><td>All detected physical cores</td><td>Only the additional logical siblings are candidates; E-cores are not falsely counted as SMT siblings.</td></tr>
+    <tr><td><code>taskset</code>, cgroup, or CI affinity</td><td>Clamped to the allowed CPU mask</td><td>Capacity cannot exceed CPUs visible to the process.</td></tr>
+    <tr><td>Explicit reproducibility run</td><td><code>CK_NUM_THREADS</code></td><td><code>CK_THREADPOOL_CAPACITY</code> sets an exact cap.</td></tr>
+  </tbody>
+</table>
+
+<div class="alert alert-warning">
+  <div class="alert-icon">!</div>
+  <div><strong>Numerical rule:</strong> extra workers are eligible only when work items are independent or the
+  declared reduction contract proves the same arithmetic. A performance result never makes a numerically different
+  provider eligible.</div>
+</div>
+
+<p>The first promoted use is the packed AVX-VNNI Q4_K&times;Q8_K prefill provider at
+<code>M&gt;=512</code>, <code>N&gt;=4096</code>, and <code>K&gt;=4096</code>. On the P3 Tiny,
+20 threads measured about 36.3 ms, 24 threads about 30.8 ms, and 28 threads about 33.0 ms.
+The full strict comparison later measured CKE at 30.757 ms and llama.cpp at 29.729 ms
+(<code>1.035x</code>), with all 4,210,688 outputs bit-exact. The 28-thread regression is why
+the policy is bounded rather than "use every logical CPU."</p>
+
+<pre><code># Reproduce an exact default/capacity/reference configuration
+CK_Q4K_PERF_DEFAULT_THREADS=20 \
+CK_Q4K_PERF_CAPACITY_THREADS=24 \
+CK_Q4K_PERF_THREADS=24 \
+CK_Q4K_LLAMA_MAX_RATIO=1.1 \
+CK_Q4K_PERF_REPEATS=15 \
+make test-q4k-q8k-llama-performance
+
+# Disable the extension for a controlled physical-core run
+CK_NUM_THREADS=20 CK_THREADPOOL_CAPACITY=20 your-cke-command</code></pre>
 
 <!-- ================================================================== -->
 <!--  5. DISPATCH DEEP DIVE                                              -->
