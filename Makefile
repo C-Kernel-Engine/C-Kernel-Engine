@@ -7215,7 +7215,7 @@ profile-v7-perf-stat:
 	fi
 
 profile-v7-cachegrind:
-	valgrind --tool=cachegrind --cachegrind-out-file=build/cachegrind_v7.out \
+	valgrind --tool=cachegrind --cache-sim=yes --trace-children=yes --cachegrind-out-file=build/cachegrind_v7.out \
 	$(PYTHON) $(PROFILE_V7_SCRIPT) run \
 		"$(V7_MODEL)" \
 		--context-len 1024 --prompt "Hello" --max-tokens 4 $(V7_RUN_ARGS)
