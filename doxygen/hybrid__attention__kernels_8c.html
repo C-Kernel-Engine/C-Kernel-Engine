@@ -212,22 +212,22 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00112">112</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  119</span>                                                   {</div>
-<div class="line"><span class="lineno">  120</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
-<div class="line"><span class="lineno">  121</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  122</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  123</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  124</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  125</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  126</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  127</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  128</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  129</span>            d_x_row[col] = d_out_row[col] * sig;</div>
-<div class="line"><span class="lineno">  130</span>            d_gate_row[col] = d_out_row[col] * x_row[col] * sig * (1.0f - sig);</div>
-<div class="line"><span class="lineno">  131</span>        }</div>
-<div class="line"><span class="lineno">  132</span>    }</div>
-<div class="line"><span class="lineno">  133</span>}</div>
+<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00105">105</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  112</span>                                                   {</div>
+<div class="line"><span class="lineno">  113</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">  114</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  115</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  116</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  117</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  118</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  119</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  121</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  122</span>            d_x_row[col] = d_out_row[col] * sig;</div>
+<div class="line"><span class="lineno">  123</span>            d_gate_row[col] = d_out_row[col] * x_row[col] * sig * (1.0f - sig);</div>
+<div class="line"><span class="lineno">  124</span>        }</div>
+<div class="line"><span class="lineno">  125</span>    }</div>
+<div class="line"><span class="lineno">  126</span>}</div>
 <div class="ttc" id="ahybrid__attention__kernels_8c_html_ad97e95c6a662d1189345d79dbf393008"><div class="ttname"><a href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a></div><div class="ttdeci">static float hybrid_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_attention_kernels.c:6</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_sigmoid()</a>.</p>
@@ -284,18 +284,18 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00095">95</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  100</span>                                                  {</div>
-<div class="line"><span class="lineno">  101</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
-<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  103</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  104</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  105</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  106</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  107</span>            out_row[col] = x_row[col] * <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  108</span>        }</div>
-<div class="line"><span class="lineno">  109</span>    }</div>
-<div class="line"><span class="lineno">  110</span>}</div>
+<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00088">88</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   93</span>                                                  {</div>
+<div class="line"><span class="lineno">   94</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">   95</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   96</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   97</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   98</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   99</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  100</span>            out_row[col] = x_row[col] * <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  101</span>        }</div>
+<div class="line"><span class="lineno">  102</span>    }</div>
+<div class="line"><span class="lineno">  103</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_sigmoid()</a>.</p>
 
@@ -329,17 +329,10 @@ Functions</h2></td></tr>
 
 <p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00006">6</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">    6</span>                                            {</div>
-<div class="line"><span class="lineno">    7</span>    <span class="keywordflow">if</span> (x &gt;= 0.0f) {</div>
-<div class="line"><span class="lineno">    8</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> z = expf(-x);</div>
-<div class="line"><span class="lineno">    9</span>        <span class="keywordflow">return</span> 1.0f / (1.0f + z);</div>
-<div class="line"><span class="lineno">   10</span>    }</div>
-<div class="line"><span class="lineno">   11</span>    {</div>
-<div class="line"><span class="lineno">   12</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> z = expf(x);</div>
-<div class="line"><span class="lineno">   13</span>        <span class="keywordflow">return</span> z / (1.0f + z);</div>
-<div class="line"><span class="lineno">   14</span>    }</div>
-<div class="line"><span class="lineno">   15</span>}</div>
+<div class="line"><span class="lineno">    7</span>    <span class="keywordflow">return</span> 1.0f / (1.0f + expf(-x));</div>
+<div class="line"><span class="lineno">    8</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="hybrid__attention__kernels_8c_source.html#l00112">attn_gate_sigmoid_mul_backward()</a>, and <a class="el" href="hybrid__attention__kernels_8c_source.html#l00095">attn_gate_sigmoid_mul_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="hybrid__attention__kernels_8c_source.html#l00105">attn_gate_sigmoid_mul_backward()</a>, and <a class="el" href="hybrid__attention__kernels_8c_source.html#l00088">attn_gate_sigmoid_mul_forward()</a>.</p>
 
 </div>
 </div>
@@ -399,39 +392,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00056">56</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   62</span>                                          {</div>
-<div class="line"><span class="lineno">   63</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + gate_dim;</div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">if</span> (!d_q || !d_gate || !d_packed_qg || rows &lt;= 0 || q_dim &lt;= 0 || gate_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   65</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   66</span>    }</div>
-<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">if</span> (group_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   68</span>        group_dim = q_dim;</div>
-<div class="line"><span class="lineno">   69</span>    }</div>
-<div class="line"><span class="lineno">   70</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_groups = q_dim / group_dim;</div>
-<div class="line"><span class="lineno">   71</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> gate_group_dim = (q_groups &gt; 0 &amp;&amp; gate_dim % q_groups == 0) ? (gate_dim / q_groups) : gate_dim;</div>
-<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   73</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dq_src = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">   74</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dg_src = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) gate_dim;</div>
-<div class="line"><span class="lineno">   75</span>        <span class="keywordtype">float</span> *dst = d_packed_qg + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
-<div class="line"><span class="lineno">   76</span>        <span class="keywordflow">if</span> (q_groups &gt; 0 &amp;&amp; q_groups * group_dim == q_dim &amp;&amp; q_groups * gate_group_dim == gate_dim) {</div>
-<div class="line"><span class="lineno">   77</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; q_groups; ++group) {</div>
-<div class="line"><span class="lineno">   78</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_group_off = (size_t) group * (<span class="keywordtype">size_t</span>) (group_dim + gate_group_dim);</div>
-<div class="line"><span class="lineno">   79</span>                memcpy(</div>
-<div class="line"><span class="lineno">   80</span>                    dst + dst_group_off,</div>
-<div class="line"><span class="lineno">   81</span>                    dq_src + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) group_dim,</div>
-<div class="line"><span class="lineno">   82</span>                    (<span class="keywordtype">size_t</span>) group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   83</span>                memcpy(</div>
-<div class="line"><span class="lineno">   84</span>                    dst + dst_group_off + (<span class="keywordtype">size_t</span>) group_dim,</div>
-<div class="line"><span class="lineno">   85</span>                    dg_src + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) gate_group_dim,</div>
-<div class="line"><span class="lineno">   86</span>                    (<span class="keywordtype">size_t</span>) gate_group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   87</span>            }</div>
-<div class="line"><span class="lineno">   88</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">   89</span>            memcpy(dst, dq_src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   90</span>            memcpy(dst + q_dim, dg_src, (<span class="keywordtype">size_t</span>) gate_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   91</span>        }</div>
-<div class="line"><span class="lineno">   92</span>    }</div>
-<div class="line"><span class="lineno">   93</span>}</div>
+<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00049">49</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   55</span>                                          {</div>
+<div class="line"><span class="lineno">   56</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + gate_dim;</div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (!d_q || !d_gate || !d_packed_qg || rows &lt;= 0 || q_dim &lt;= 0 || gate_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   59</span>    }</div>
+<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">if</span> (group_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   61</span>        group_dim = q_dim;</div>
+<div class="line"><span class="lineno">   62</span>    }</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_groups = q_dim / group_dim;</div>
+<div class="line"><span class="lineno">   64</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> gate_group_dim = (q_groups &gt; 0 &amp;&amp; gate_dim % q_groups == 0) ? (gate_dim / q_groups) : gate_dim;</div>
+<div class="line"><span class="lineno">   65</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   66</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dq_src = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
+<div class="line"><span class="lineno">   67</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dg_src = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) gate_dim;</div>
+<div class="line"><span class="lineno">   68</span>        <span class="keywordtype">float</span> *dst = d_packed_qg + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
+<div class="line"><span class="lineno">   69</span>        <span class="keywordflow">if</span> (q_groups &gt; 0 &amp;&amp; q_groups * group_dim == q_dim &amp;&amp; q_groups * gate_group_dim == gate_dim) {</div>
+<div class="line"><span class="lineno">   70</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; q_groups; ++group) {</div>
+<div class="line"><span class="lineno">   71</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_group_off = (size_t) group * (<span class="keywordtype">size_t</span>) (group_dim + gate_group_dim);</div>
+<div class="line"><span class="lineno">   72</span>                memcpy(</div>
+<div class="line"><span class="lineno">   73</span>                    dst + dst_group_off,</div>
+<div class="line"><span class="lineno">   74</span>                    dq_src + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) group_dim,</div>
+<div class="line"><span class="lineno">   75</span>                    (<span class="keywordtype">size_t</span>) group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   76</span>                memcpy(</div>
+<div class="line"><span class="lineno">   77</span>                    dst + dst_group_off + (<span class="keywordtype">size_t</span>) group_dim,</div>
+<div class="line"><span class="lineno">   78</span>                    dg_src + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) gate_group_dim,</div>
+<div class="line"><span class="lineno">   79</span>                    (<span class="keywordtype">size_t</span>) gate_group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   80</span>            }</div>
+<div class="line"><span class="lineno">   81</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">   82</span>            memcpy(dst, dq_src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   83</span>            memcpy(dst + q_dim, dg_src, (<span class="keywordtype">size_t</span>) gate_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   84</span>        }</div>
+<div class="line"><span class="lineno">   85</span>    }</div>
+<div class="line"><span class="lineno">   86</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -491,39 +484,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00017">17</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   23</span>                                         {</div>
-<div class="line"><span class="lineno">   24</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + gate_dim;</div>
-<div class="line"><span class="lineno">   25</span>    <span class="keywordflow">if</span> (!packed_qg || !q || !gate || rows &lt;= 0 || q_dim &lt;= 0 || gate_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   26</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   27</span>    }</div>
-<div class="line"><span class="lineno">   28</span>    <span class="keywordflow">if</span> (group_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   29</span>        group_dim = q_dim;</div>
-<div class="line"><span class="lineno">   30</span>    }</div>
-<div class="line"><span class="lineno">   31</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_groups = q_dim / group_dim;</div>
-<div class="line"><span class="lineno">   32</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> gate_group_dim = (q_groups &gt; 0 &amp;&amp; gate_dim % q_groups == 0) ? (gate_dim / q_groups) : gate_dim;</div>
-<div class="line"><span class="lineno">   33</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   34</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = packed_qg + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
-<div class="line"><span class="lineno">   35</span>        <span class="keywordtype">float</span> *q_dst = q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">   36</span>        <span class="keywordtype">float</span> *gate_dst = gate + (size_t) row * (<span class="keywordtype">size_t</span>) gate_dim;</div>
-<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">if</span> (q_groups &gt; 0 &amp;&amp; q_groups * group_dim == q_dim &amp;&amp; q_groups * gate_group_dim == gate_dim) {</div>
-<div class="line"><span class="lineno">   38</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; q_groups; ++group) {</div>
-<div class="line"><span class="lineno">   39</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_group_off = (size_t) group * (<span class="keywordtype">size_t</span>) (group_dim + gate_group_dim);</div>
-<div class="line"><span class="lineno">   40</span>                memcpy(</div>
-<div class="line"><span class="lineno">   41</span>                    q_dst + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) group_dim,</div>
-<div class="line"><span class="lineno">   42</span>                    src + src_group_off,</div>
-<div class="line"><span class="lineno">   43</span>                    (<span class="keywordtype">size_t</span>) group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   44</span>                memcpy(</div>
-<div class="line"><span class="lineno">   45</span>                    gate_dst + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) gate_group_dim,</div>
-<div class="line"><span class="lineno">   46</span>                    src + src_group_off + (<span class="keywordtype">size_t</span>) group_dim,</div>
-<div class="line"><span class="lineno">   47</span>                    (<span class="keywordtype">size_t</span>) gate_group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   48</span>            }</div>
-<div class="line"><span class="lineno">   49</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">   50</span>            memcpy(q_dst, src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   51</span>            memcpy(gate_dst, src + q_dim, (<span class="keywordtype">size_t</span>) gate_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   52</span>        }</div>
-<div class="line"><span class="lineno">   53</span>    }</div>
-<div class="line"><span class="lineno">   54</span>}</div>
+<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00010">10</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   16</span>                                         {</div>
+<div class="line"><span class="lineno">   17</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + gate_dim;</div>
+<div class="line"><span class="lineno">   18</span>    <span class="keywordflow">if</span> (!packed_qg || !q || !gate || rows &lt;= 0 || q_dim &lt;= 0 || gate_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   19</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   20</span>    }</div>
+<div class="line"><span class="lineno">   21</span>    <span class="keywordflow">if</span> (group_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   22</span>        group_dim = q_dim;</div>
+<div class="line"><span class="lineno">   23</span>    }</div>
+<div class="line"><span class="lineno">   24</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_groups = q_dim / group_dim;</div>
+<div class="line"><span class="lineno">   25</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> gate_group_dim = (q_groups &gt; 0 &amp;&amp; gate_dim % q_groups == 0) ? (gate_dim / q_groups) : gate_dim;</div>
+<div class="line"><span class="lineno">   26</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   27</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = packed_qg + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
+<div class="line"><span class="lineno">   28</span>        <span class="keywordtype">float</span> *q_dst = q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
+<div class="line"><span class="lineno">   29</span>        <span class="keywordtype">float</span> *gate_dst = gate + (size_t) row * (<span class="keywordtype">size_t</span>) gate_dim;</div>
+<div class="line"><span class="lineno">   30</span>        <span class="keywordflow">if</span> (q_groups &gt; 0 &amp;&amp; q_groups * group_dim == q_dim &amp;&amp; q_groups * gate_group_dim == gate_dim) {</div>
+<div class="line"><span class="lineno">   31</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; q_groups; ++group) {</div>
+<div class="line"><span class="lineno">   32</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_group_off = (size_t) group * (<span class="keywordtype">size_t</span>) (group_dim + gate_group_dim);</div>
+<div class="line"><span class="lineno">   33</span>                memcpy(</div>
+<div class="line"><span class="lineno">   34</span>                    q_dst + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) group_dim,</div>
+<div class="line"><span class="lineno">   35</span>                    src + src_group_off,</div>
+<div class="line"><span class="lineno">   36</span>                    (<span class="keywordtype">size_t</span>) group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   37</span>                memcpy(</div>
+<div class="line"><span class="lineno">   38</span>                    gate_dst + (<span class="keywordtype">size_t</span>) group * (<span class="keywordtype">size_t</span>) gate_group_dim,</div>
+<div class="line"><span class="lineno">   39</span>                    src + src_group_off + (<span class="keywordtype">size_t</span>) group_dim,</div>
+<div class="line"><span class="lineno">   40</span>                    (<span class="keywordtype">size_t</span>) gate_group_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   41</span>            }</div>
+<div class="line"><span class="lineno">   42</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">   43</span>            memcpy(q_dst, src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   44</span>            memcpy(gate_dst, src + q_dim, (<span class="keywordtype">size_t</span>) gate_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   45</span>        }</div>
+<div class="line"><span class="lineno">   46</span>    }</div>
+<div class="line"><span class="lineno">   47</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00778">ck_test_split_q_gate()</a>.</p>
 
