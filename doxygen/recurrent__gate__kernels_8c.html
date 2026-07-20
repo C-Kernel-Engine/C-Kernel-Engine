@@ -149,6 +149,8 @@ Functions</h2></td></tr>
 <tr class="separator:ae4d0d6861eb48e7e667044bfd536277d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c4bf807b61bfd9add72843468cb7b05" id="r_a8c4bf807b61bfd9add72843468cb7b05"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__gate__kernels_8c.html#a8c4bf807b61bfd9add72843468cb7b05">recurrent_silu_forward</a> (const float *x, float *out, int rows, int dim)</td></tr>
 <tr class="separator:a8c4bf807b61bfd9add72843468cb7b05"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a68d1de609142507727987cabe36fe7a6" id="r_a68d1de609142507727987cabe36fe7a6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__gate__kernels_8c.html#a68d1de609142507727987cabe36fe7a6">recurrent_silu_forward_ggml</a> (const float *x, float *out, int rows, int dim)</td></tr>
+<tr class="separator:a68d1de609142507727987cabe36fe7a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a55f0223c9af0726faa6b1bb572ba78bf" id="r_a55f0223c9af0726faa6b1bb572ba78bf"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a> (float x)</td></tr>
 <tr class="separator:a55f0223c9af0726faa6b1bb572ba78bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -221,35 +223,35 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00065">65</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   73</span>                                         {</div>
-<div class="line"><span class="lineno">   74</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">   75</span>        d_dt_bias[col] = 0.0f;</div>
-<div class="line"><span class="lineno">   76</span>        d_a[col] = 0.0f;</div>
-<div class="line"><span class="lineno">   77</span>    }</div>
-<div class="line"><span class="lineno">   78</span> </div>
-<div class="line"><span class="lineno">   79</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   80</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   81</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   82</span>        <span class="keywordtype">float</span> *d_alpha_row = d_alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   83</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">   84</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
-<div class="line"><span class="lineno">   85</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x);</div>
-<div class="line"><span class="lineno">   86</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(x);</div>
-<div class="line"><span class="lineno">   87</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_out = d_gate_row[col];</div>
-<div class="line"><span class="lineno">   88</span>            d_a[col] += d_out * sp;</div>
-<div class="line"><span class="lineno">   89</span>            {</div>
-<div class="line"><span class="lineno">   90</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_x = d_out * a[col] * sig;</div>
-<div class="line"><span class="lineno">   91</span>                d_alpha_row[col] = d_x;</div>
-<div class="line"><span class="lineno">   92</span>                d_dt_bias[col] += d_x;</div>
-<div class="line"><span class="lineno">   93</span>            }</div>
-<div class="line"><span class="lineno">   94</span>        }</div>
-<div class="line"><span class="lineno">   95</span>    }</div>
-<div class="line"><span class="lineno">   96</span>}</div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_a55f0223c9af0726faa6b1bb572ba78bf"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a></div><div class="ttdeci">static float recurrent_softplus(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00005">recurrent_gate_kernels.c:5</a></div></div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab91fc7c0631b68a01c56cc95211a5835"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a></div><div class="ttdeci">static float recurrent_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00015">recurrent_gate_kernels.c:15</a></div></div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00068">68</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   76</span>                                         {</div>
+<div class="line"><span class="lineno">   77</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">   78</span>        d_dt_bias[col] = 0.0f;</div>
+<div class="line"><span class="lineno">   79</span>        d_a[col] = 0.0f;</div>
+<div class="line"><span class="lineno">   80</span>    }</div>
+<div class="line"><span class="lineno">   81</span> </div>
+<div class="line"><span class="lineno">   82</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   83</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   84</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   85</span>        <span class="keywordtype">float</span> *d_alpha_row = d_alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">   87</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
+<div class="line"><span class="lineno">   88</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x);</div>
+<div class="line"><span class="lineno">   89</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(x);</div>
+<div class="line"><span class="lineno">   90</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_out = d_gate_row[col];</div>
+<div class="line"><span class="lineno">   91</span>            d_a[col] += d_out * sp;</div>
+<div class="line"><span class="lineno">   92</span>            {</div>
+<div class="line"><span class="lineno">   93</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_x = d_out * a[col] * sig;</div>
+<div class="line"><span class="lineno">   94</span>                d_alpha_row[col] = d_x;</div>
+<div class="line"><span class="lineno">   95</span>                d_dt_bias[col] += d_x;</div>
+<div class="line"><span class="lineno">   96</span>            }</div>
+<div class="line"><span class="lineno">   97</span>        }</div>
+<div class="line"><span class="lineno">   98</span>    }</div>
+<div class="line"><span class="lineno">   99</span>}</div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_a55f0223c9af0726faa6b1bb572ba78bf"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a></div><div class="ttdeci">static float recurrent_softplus(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00008">recurrent_gate_kernels.c:8</a></div></div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab91fc7c0631b68a01c56cc95211a5835"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a></div><div class="ttdeci">static float recurrent_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00018">recurrent_gate_kernels.c:18</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00015">recurrent_sigmoid()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00005">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00018">recurrent_sigmoid()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00008">recurrent_softplus()</a>.</p>
 
 </div>
 </div>
@@ -309,23 +311,23 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00044">44</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   50</span>                                                       {</div>
-<div class="line"><span class="lineno">   51</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   52</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads;</div>
-<div class="line"><span class="lineno">   53</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads * (size_t) state_dim;</div>
-<div class="line"><span class="lineno">   54</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">   55</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(alpha_row[h] + dt_bias[h]);</div>
-<div class="line"><span class="lineno">   56</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *a_head = a + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">   57</span>            <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">   58</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">   59</span>                gate_head[col] = sp * a_head[col];</div>
-<div class="line"><span class="lineno">   60</span>            }</div>
-<div class="line"><span class="lineno">   61</span>        }</div>
-<div class="line"><span class="lineno">   62</span>    }</div>
-<div class="line"><span class="lineno">   63</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00047">47</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   53</span>                                                       {</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   55</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads;</div>
+<div class="line"><span class="lineno">   56</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads * (size_t) state_dim;</div>
+<div class="line"><span class="lineno">   57</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(alpha_row[h] + dt_bias[h]);</div>
+<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *a_head = a + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">   60</span>            <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">   61</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">   62</span>                gate_head[col] = sp * a_head[col];</div>
+<div class="line"><span class="lineno">   63</span>            }</div>
+<div class="line"><span class="lineno">   64</span>        }</div>
+<div class="line"><span class="lineno">   65</span>    }</div>
+<div class="line"><span class="lineno">   66</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00005">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00008">recurrent_softplus()</a>.</p>
 
 </div>
 </div>
@@ -385,20 +387,20 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00026">26</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   32</span>                                              {</div>
-<div class="line"><span class="lineno">   33</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
-<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   35</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   36</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">   38</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
-<div class="line"><span class="lineno">   39</span>            gate_row[col] = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x) * a[col];</div>
-<div class="line"><span class="lineno">   40</span>        }</div>
-<div class="line"><span class="lineno">   41</span>    }</div>
-<div class="line"><span class="lineno">   42</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00029">29</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   35</span>                                              {</div>
+<div class="line"><span class="lineno">   36</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   38</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   39</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   40</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">   41</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
+<div class="line"><span class="lineno">   42</span>            gate_row[col] = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x) * a[col];</div>
+<div class="line"><span class="lineno">   43</span>        }</div>
+<div class="line"><span class="lineno">   44</span>    }</div>
+<div class="line"><span class="lineno">   45</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00005">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00008">recurrent_softplus()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00801">ck_test_recurrent_dt_gate()</a>.</p>
 
@@ -428,19 +430,19 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00015">15</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   15</span>                                               {</div>
-<div class="line"><span class="lineno">   16</span>    <span class="keywordflow">if</span> (x &gt;= 0.0f) {</div>
-<div class="line"><span class="lineno">   17</span>        <span class="keywordtype">float</span> z = expf(-x);</div>
-<div class="line"><span class="lineno">   18</span>        <span class="keywordflow">return</span> 1.0f / (1.0f + z);</div>
-<div class="line"><span class="lineno">   19</span>    }</div>
-<div class="line"><span class="lineno">   20</span>    {</div>
-<div class="line"><span class="lineno">   21</span>        <span class="keywordtype">float</span> z = expf(x);</div>
-<div class="line"><span class="lineno">   22</span>        <span class="keywordflow">return</span> z / (1.0f + z);</div>
-<div class="line"><span class="lineno">   23</span>    }</div>
-<div class="line"><span class="lineno">   24</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00018">18</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   18</span>                                               {</div>
+<div class="line"><span class="lineno">   19</span>    <span class="keywordflow">if</span> (x &gt;= 0.0f) {</div>
+<div class="line"><span class="lineno">   20</span>        <span class="keywordtype">float</span> z = expf(-x);</div>
+<div class="line"><span class="lineno">   21</span>        <span class="keywordflow">return</span> 1.0f / (1.0f + z);</div>
+<div class="line"><span class="lineno">   22</span>    }</div>
+<div class="line"><span class="lineno">   23</span>    {</div>
+<div class="line"><span class="lineno">   24</span>        <span class="keywordtype">float</span> z = expf(x);</div>
+<div class="line"><span class="lineno">   25</span>        <span class="keywordflow">return</span> z / (1.0f + z);</div>
+<div class="line"><span class="lineno">   26</span>    }</div>
+<div class="line"><span class="lineno">   27</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__gate__kernels_8c_source.html#l00065">recurrent_dt_gate_backward()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00112">recurrent_silu_backward()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00098">recurrent_silu_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__gate__kernels_8c_source.html#l00068">recurrent_dt_gate_backward()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00188">recurrent_silu_backward()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00101">recurrent_silu_forward()</a>.</p>
 
 </div>
 </div>
@@ -488,21 +490,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00112">112</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  116</span>                                      {</div>
-<div class="line"><span class="lineno">  117</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  118</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  122</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
-<div class="line"><span class="lineno">  123</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
-<div class="line"><span class="lineno">  124</span>            d_x_row[col] = d_out_row[col] * (sig + xv * sig * (1.0f - sig));</div>
-<div class="line"><span class="lineno">  125</span>        }</div>
-<div class="line"><span class="lineno">  126</span>    }</div>
-<div class="line"><span class="lineno">  127</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00188">188</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  192</span>                                      {</div>
+<div class="line"><span class="lineno">  193</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  194</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  195</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  196</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  197</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  198</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
+<div class="line"><span class="lineno">  199</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
+<div class="line"><span class="lineno">  200</span>            d_x_row[col] = d_out_row[col] * (sig + xv * sig * (1.0f - sig));</div>
+<div class="line"><span class="lineno">  201</span>        }</div>
+<div class="line"><span class="lineno">  202</span>    }</div>
+<div class="line"><span class="lineno">  203</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00015">recurrent_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00018">recurrent_sigmoid()</a>.</p>
 
 </div>
 </div>
@@ -544,22 +546,84 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00098">98</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  101</span>                                     {</div>
-<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  103</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  104</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  105</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  106</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
-<div class="line"><span class="lineno">  107</span>            out_row[col] = xv * <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
-<div class="line"><span class="lineno">  108</span>        }</div>
-<div class="line"><span class="lineno">  109</span>    }</div>
-<div class="line"><span class="lineno">  110</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00101">101</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  104</span>                                     {</div>
+<div class="line"><span class="lineno">  105</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  106</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  107</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  108</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  109</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
+<div class="line"><span class="lineno">  110</span>            out_row[col] = xv * <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
+<div class="line"><span class="lineno">  111</span>        }</div>
+<div class="line"><span class="lineno">  112</span>    }</div>
+<div class="line"><span class="lineno">  113</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00015">recurrent_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00018">recurrent_sigmoid()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00828">ck_test_recurrent_silu()</a>.</p>
 
+</div>
+</div>
+<a id="a68d1de609142507727987cabe36fe7a6" name="a68d1de609142507727987cabe36fe7a6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a68d1de609142507727987cabe36fe7a6">&#9670;&#160;</a></span>recurrent_silu_forward_ggml()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void recurrent_silu_forward_ggml </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00164">164</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  167</span>                                          {</div>
+<div class="line"><span class="lineno">  168</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  169</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  170</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  171</span>        <span class="keywordtype">int</span> col = 0;</div>
+<div class="line"><span class="lineno">  172</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><span class="lineno">  173</span>        <span class="keywordflow">for</span> (; col + 8 &lt;= dim; col += 8) {</div>
+<div class="line"><span class="lineno">  174</span>            <span class="keyword">const</span> __m256 xv = _mm256_loadu_ps(x_row + col);</div>
+<div class="line"><span class="lineno">  175</span>            <span class="keyword">const</span> __m256 neg = _mm256_sub_ps(_mm256_setzero_ps(), xv);</div>
+<div class="line"><span class="lineno">  176</span>            <span class="keyword">const</span> __m256 denom = _mm256_add_ps(</div>
+<div class="line"><span class="lineno">  177</span>                _mm256_set1_ps(1.0f), recurrent_ggml_expf_avx2(neg));</div>
+<div class="line"><span class="lineno">  178</span>            _mm256_storeu_ps(out_row + col, _mm256_div_ps(xv, denom));</div>
+<div class="line"><span class="lineno">  179</span>        }</div>
+<div class="line"><span class="lineno">  180</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  181</span>        <span class="keywordflow">for</span> (; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  182</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
+<div class="line"><span class="lineno">  183</span>            out_row[col] = xv / (1.0f + expf(-xv));</div>
+<div class="line"><span class="lineno">  184</span>        }</div>
+<div class="line"><span class="lineno">  185</span>    }</div>
+<div class="line"><span class="lineno">  186</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="a55f0223c9af0726faa6b1bb572ba78bf" name="a55f0223c9af0726faa6b1bb572ba78bf"></a>
@@ -586,18 +650,18 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00005">5</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    5</span>                                                {</div>
-<div class="line"><span class="lineno">    6</span>    <span class="keywordflow">if</span> (x &gt; 20.0f) {</div>
-<div class="line"><span class="lineno">    7</span>        <span class="keywordflow">return</span> x;</div>
-<div class="line"><span class="lineno">    8</span>    }</div>
-<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">if</span> (x &lt; -20.0f) {</div>
-<div class="line"><span class="lineno">   10</span>        <span class="keywordflow">return</span> expf(x);</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00008">8</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">    8</span>                                                {</div>
+<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">if</span> (x &gt; 20.0f) {</div>
+<div class="line"><span class="lineno">   10</span>        <span class="keywordflow">return</span> x;</div>
 <div class="line"><span class="lineno">   11</span>    }</div>
-<div class="line"><span class="lineno">   12</span>    <span class="keywordflow">return</span> logf(1.0f + expf(x));</div>
-<div class="line"><span class="lineno">   13</span>}</div>
+<div class="line"><span class="lineno">   12</span>    <span class="keywordflow">if</span> (x &lt; -20.0f) {</div>
+<div class="line"><span class="lineno">   13</span>        <span class="keywordflow">return</span> expf(x);</div>
+<div class="line"><span class="lineno">   14</span>    }</div>
+<div class="line"><span class="lineno">   15</span>    <span class="keywordflow">return</span> logf(1.0f + expf(x));</div>
+<div class="line"><span class="lineno">   16</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__gate__kernels_8c_source.html#l00065">recurrent_dt_gate_backward()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00044">recurrent_dt_gate_expanded_forward()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00026">recurrent_dt_gate_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__gate__kernels_8c_source.html#l00068">recurrent_dt_gate_backward()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00047">recurrent_dt_gate_expanded_forward()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00029">recurrent_dt_gate_forward()</a>.</p>
 
 </div>
 </div>

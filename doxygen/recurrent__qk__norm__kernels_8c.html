@@ -211,41 +211,48 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00034">34</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   40</span>                                                           {</div>
-<div class="line"><span class="lineno">   41</span>    <span class="keywordflow">if</span> (!d_out || !x || !d_x || rows &lt;= 0 || dim &lt;= 0 || head_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">   42</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   43</span>    }</div>
-<div class="line"><span class="lineno">   44</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_heads = dim / head_dim;</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_heads * head_dim != dim) {</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   47</span>    }</div>
-<div class="line"><span class="lineno">   48</span> </div>
-<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   50</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   51</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   52</span>        <span class="keywordtype">float</span> *dx_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
-<div class="line"><span class="lineno">   54</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_head = d_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">   55</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x_head = x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">   56</span>            <span class="keywordtype">float</span> *dx_head = dx_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">   57</span> </div>
-<div class="line"><span class="lineno">   58</span>            <span class="keywordtype">float</span> sum_sq = 0.0f;</div>
-<div class="line"><span class="lineno">   59</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno">   60</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">   61</span>                sum_sq += x_head[col] * x_head[col];</div>
-<div class="line"><span class="lineno">   62</span>                dot += d_head[col] * x_head[col];</div>
-<div class="line"><span class="lineno">   63</span>            }</div>
-<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_norm = 1.0f / sqrtf(sum_sq + eps);</div>
-<div class="line"><span class="lineno">   65</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> proj_scale = inv_norm * inv_norm * inv_norm * dot;</div>
-<div class="line"><span class="lineno">   66</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">   67</span>                dx_head[col] = inv_norm * d_head[col] - proj_scale * x_head[col];</div>
-<div class="line"><span class="lineno">   68</span>            }</div>
-<div class="line"><span class="lineno">   69</span>        }</div>
-<div class="line"><span class="lineno">   70</span>    }</div>
-<div class="line"><span class="lineno">   71</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00035">35</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   41</span>                                                           {</div>
+<div class="line"><span class="lineno">   42</span>    <span class="keywordflow">if</span> (!d_out || !x || !d_x || rows &lt;= 0 || dim &lt;= 0 || head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   43</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   44</span>    }</div>
+<div class="line"><span class="lineno">   45</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_heads = dim / head_dim;</div>
+<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_heads * head_dim != dim) {</div>
+<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   48</span>    }</div>
+<div class="line"><span class="lineno">   49</span> </div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   51</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   52</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keywordtype">float</span> *dx_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">   55</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_head = d_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">   56</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x_head = x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">   57</span>            <span class="keywordtype">float</span> *dx_head = dx_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">   58</span> </div>
+<div class="line"><span class="lineno">   59</span>            <span class="keywordtype">double</span> sum_sq = 0.0;</div>
+<div class="line"><span class="lineno">   60</span>            <span class="keywordtype">double</span> dot = 0.0;</div>
+<div class="line"><span class="lineno">   61</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">   62</span>                sum_sq += (double) (x_head[col] * x_head[col]);</div>
+<div class="line"><span class="lineno">   63</span>                dot += (double) (d_head[col] * x_head[col]);</div>
+<div class="line"><span class="lineno">   64</span>            }</div>
+<div class="line"><span class="lineno">   65</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> norm = sqrtf((<span class="keywordtype">float</span>) sum_sq);</div>
+<div class="line"><span class="lineno">   66</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_norm = 1.0f / fmaxf(norm, eps);</div>
+<div class="line"><span class="lineno">   67</span>            <span class="keywordflow">if</span> (norm &lt;= eps) {</div>
+<div class="line"><span class="lineno">   68</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">   69</span>                    dx_head[col] = d_head[col] / eps;</div>
+<div class="line"><span class="lineno">   70</span>                }</div>
+<div class="line"><span class="lineno">   71</span>                <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">   72</span>            }</div>
+<div class="line"><span class="lineno">   73</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> proj_scale = inv_norm * inv_norm * inv_norm * (float) dot;</div>
+<div class="line"><span class="lineno">   74</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">   75</span>                dx_head[col] = inv_norm * d_head[col] - proj_scale * x_head[col];</div>
+<div class="line"><span class="lineno">   76</span>            }</div>
+<div class="line"><span class="lineno">   77</span>        }</div>
+<div class="line"><span class="lineno">   78</span>    }</div>
+<div class="line"><span class="lineno">   79</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00084">recurrent_qk_l2_norm_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00092">recurrent_qk_l2_norm_backward()</a>.</p>
 
 </div>
 </div>
@@ -315,19 +322,20 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   19</span>        <span class="keywordtype">float</span> *row_ptr = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
 <div class="line"><span class="lineno">   20</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
 <div class="line"><span class="lineno">   21</span>            <span class="keywordtype">float</span> *head_ptr = row_ptr + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">   22</span>            <span class="keywordtype">float</span> sum_sq = 0.0f;</div>
+<div class="line"><span class="lineno">   22</span>            <span class="keywordtype">double</span> sum_sq = 0.0;</div>
 <div class="line"><span class="lineno">   23</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">   24</span>                sum_sq += head_ptr[col] * head_ptr[col];</div>
+<div class="line"><span class="lineno">   24</span>                sum_sq += (double) (head_ptr[col] * head_ptr[col]);</div>
 <div class="line"><span class="lineno">   25</span>            }</div>
-<div class="line"><span class="lineno">   26</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_norm = 1.0f / sqrtf(sum_sq + eps);</div>
-<div class="line"><span class="lineno">   27</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">   28</span>                head_ptr[col] *= inv_norm;</div>
-<div class="line"><span class="lineno">   29</span>            }</div>
-<div class="line"><span class="lineno">   30</span>        }</div>
-<div class="line"><span class="lineno">   31</span>    }</div>
-<div class="line"><span class="lineno">   32</span>}</div>
+<div class="line"><span class="lineno">   26</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> norm = sqrtf((<span class="keywordtype">float</span>) sum_sq);</div>
+<div class="line"><span class="lineno">   27</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_norm = 1.0f / fmaxf(norm, eps);</div>
+<div class="line"><span class="lineno">   28</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">   29</span>                head_ptr[col] *= inv_norm;</div>
+<div class="line"><span class="lineno">   30</span>            }</div>
+<div class="line"><span class="lineno">   31</span>        }</div>
+<div class="line"><span class="lineno">   32</span>    }</div>
+<div class="line"><span class="lineno">   33</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00073">recurrent_qk_l2_norm_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00081">recurrent_qk_l2_norm_forward()</a>.</p>
 
 </div>
 </div>
@@ -411,14 +419,14 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00084">84</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   94</span>                                              {</div>
-<div class="line"><span class="lineno">   95</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a>(d_q_out, q, d_q, rows, q_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">   96</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a>(d_k_out, k, d_k, rows, k_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">   97</span>}</div>
-<div class="ttc" id="arecurrent__qk__norm__kernels_8c_html_a0dd8cd71bd25ed57393abeea5eeec5c4"><div class="ttname"><a href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a></div><div class="ttdeci">static void recurrent_l2_norm_rows_backward_one(const float *d_out, const float *x, float *d_x, int rows, int dim, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__qk__norm__kernels_8c_source.html#l00034">recurrent_qk_norm_kernels.c:34</a></div></div>
+<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00092">92</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  102</span>                                              {</div>
+<div class="line"><span class="lineno">  103</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a>(d_q_out, q, d_q, rows, q_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  104</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a>(d_k_out, k, d_k, rows, k_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  105</span>}</div>
+<div class="ttc" id="arecurrent__qk__norm__kernels_8c_html_a0dd8cd71bd25ed57393abeea5eeec5c4"><div class="ttname"><a href="recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4">recurrent_l2_norm_rows_backward_one</a></div><div class="ttdeci">static void recurrent_l2_norm_rows_backward_one(const float *d_out, const float *x, float *d_x, int rows, int dim, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__qk__norm__kernels_8c_source.html#l00035">recurrent_qk_norm_kernels.c:35</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00034">recurrent_l2_norm_rows_backward_one()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00035">recurrent_l2_norm_rows_backward_one()</a>.</p>
 
 </div>
 </div>
@@ -478,11 +486,11 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00073">73</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   79</span>                                             {</div>
-<div class="line"><span class="lineno">   80</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27">recurrent_l2_norm_rows_forward_one</a>(q, rows, q_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">   81</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27">recurrent_l2_norm_rows_forward_one</a>(k, rows, k_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">   82</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00081">81</a> of file <a class="el" href="recurrent__qk__norm__kernels_8c_source.html">recurrent_qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   87</span>                                             {</div>
+<div class="line"><span class="lineno">   88</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27">recurrent_l2_norm_rows_forward_one</a>(q, rows, q_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">   89</span>    <a class="code hl_function" href="recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27">recurrent_l2_norm_rows_forward_one</a>(k, rows, k_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">   90</span>}</div>
 <div class="ttc" id="arecurrent__qk__norm__kernels_8c_html_a93bfaa20cdf99a99fcf3fef56d39cd27"><div class="ttname"><a href="recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27">recurrent_l2_norm_rows_forward_one</a></div><div class="ttdeci">static void recurrent_l2_norm_rows_forward_one(float *x, int rows, int dim, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__qk__norm__kernels_8c_source.html#l00005">recurrent_qk_norm_kernels.c:5</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="recurrent__qk__norm__kernels_8c_source.html#l00005">recurrent_l2_norm_rows_forward_one()</a>.</p>
