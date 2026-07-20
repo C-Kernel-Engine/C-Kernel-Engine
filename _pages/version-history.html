@@ -841,8 +841,8 @@
       </tr>
       <tr>
         <td>3</td>
-        <td><strong>Whisper tiny/base inference</strong><br>PCM/WAV, resampling, STFT, log-Mel, Conv1D encoder stem, bidirectional encoder attention, decoder cross-attention, and audio token semantics. Bring-up has started with a circuit-owned FP32 log-Mel reference provider and PyTorch oracle.</td>
-        <td>Fixed public audio fixtures match PyTorch and whisper.cpp at frontend, encoder, mixed-prefill, and transcript boundaries before quantized optimization.</td>
+        <td><strong>Whisper tiny/base inference</strong><br>The reusable primitive layer now includes signed-16 PCM conversion, rational linear resampling, precomputed-table STFT, log-Mel, two-stage Conv1D stems, channel-to-token layout conversion, and unequal-length cross-attention. Each arithmetic boundary resolves through a kernel-map contract and runs in nightly without a Whisper compiler branch.</td>
+        <td>Next: WAV container parsing, a band-limited resampler, optimized FFT, generated encoder execution, tokenizer/timestamps, then fixed public fixtures matching PyTorch and whisper.cpp through transcript output.</td>
         <td><span class="version-status status-building">Active</span></td>
       </tr>
       <tr>
@@ -912,7 +912,7 @@
       <tr>
         <td><strong>v10.0</strong></td>
         <td>Audio Inference</td>
-        <td>Whisper tiny/base first: circuit-owned PCM/WAV ingestion and resampling; validated STFT and log-Mel preprocessing; Conv1D stem, bidirectional encoder, cached encoder-decoder cross-attention, and transcript parity</td>
+        <td>Whisper tiny/base first. Contracted PCM, reference resampling, STFT/log-Mel, Conv1D stem, layout conversion, and unequal-length attention are implemented; WAV parsing, band-limited resampling, optimized FFT, generated encoder/decoder composition, timestamps, and transcript parity remain.</td>
         <td>v8 exact resolution + X-ray gates</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
