@@ -203,6 +203,27 @@ make v7-regression-fast</code></pre>
 
 <p>The next edge is always explicit. After output projection the resolver selects the BF16 residual capability, then X-ray continues through norm2, MLP, spatial merge, projector, final prefix, mixed-prefill logits, and teacher-forced generation. A green leaf test without this forward movement is evidence for a kernel only, not closure of the model bug.</p>
 
+<h2>Forward Sensitivity Before Backward Attribution</h2>
+
+<p>A small BF16 forward difference can be numerically harmless or it can be amplified by attention, normalization, or a later residual path. X-ray can now test that distinction without first trusting a CK backward kernel. The sensitivity runner sends both the PyTorch reference tensor and the CK-perturbed tensor through the same authoritative PyTorch operator, applies one deterministic upstream probe, and reports forward and vector-Jacobian-product amplification.</p>
+
+<pre><code>python version/v8/scripts/xray_attention_sensitivity_v8.py \
+  --reference-q build/xray/torch-q.f32 \
+  --reference-k build/xray/torch-k.f32 \
+  --reference-v build/xray/torch-v.f32 \
+  --subject-q build/xray/ck-q.f32 \
+  --subject-k build/xray/ck-k.f32 \
+  --subject-v build/xray/ck-v.f32 \
+  --q-shape 16 4032 72 \
+  --kv-shape 16 4032 72 \
+  --storage-dtype bf16 \
+  --query-start 0 --query-count 32 \
+  --output build/xray/attention-sensitivity.json</code></pre>
+
+<p>The report performs Q-only, K-only, V-only, and combined perturbation ablations. It records the stored input delta, downstream output delta, fixed-probe gradient delta, amplification ratios, and worst logical coordinates. Query bounding limits memory while retaining the complete K/V context for full non-causal vision attention.</p>
+
+<p>This report is diagnostic evidence, not a parity verdict. It proves which existing forward perturbation is amplified by PyTorch's downstream math. It does not prove that a CK backward provider is correct. A CK training provider must separately declare the same full-attention storage, accumulation, reduction, rounding, and threading contract and pass direct gradient parity. Pass/fail thresholds remain in parity profiles rather than circuits or the sensitivity report.</p>
+
 <h2>Execution-Contract X-Ray</h2>
 
 <p>Tensor parity cannot diagnose a backend that executes the same mixed prefix with a different schedule. X-ray therefore records prefill segmentation, cache transitions, position transitions, exact shared-library identity, and the manifest-map identity alongside numerical checkpoints.</p>
