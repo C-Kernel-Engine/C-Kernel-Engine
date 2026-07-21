@@ -1,12 +1,7 @@
 var gemm__kernels__q8__0_8c =
 [
-    [ "ck_nearest_int_q8_0", "gemm__kernels__q8__0_8c.html#a5159297f36ea1f0911125aa2f7774884", null ],
-    [ "ck_q8_0_debug_ref", "gemm__kernels__q8__0_8c.html#a954875a4cb83dc1047be856c77770525", null ],
-    [ "ck_q8_0_fp32_m4n4_enabled", "gemm__kernels__q8__0_8c.html#a2bb19fc8a223ec668dcaeee3d2353ee9", null ],
-    [ "ck_q8_0_q8_0_debug_ref", "gemm__kernels__q8__0_8c.html#a514b2b0a5fbb2074b724caa367c4403d", null ],
     [ "dot_q8_0", "gemm__kernels__q8__0_8c.html#af900f8a5b4172fadbb2342b63276e7c3", null ],
     [ "gemm_nt_q8_0", "gemm__kernels__q8__0_8c.html#a85197b983d949018f42bd43e3751478b", null ],
-    [ "gemm_nt_q8_0_rowloop", "gemm__kernels__q8__0_8c.html#a22246bf3c94891a96dd53b8478747eb9", null ],
     [ "gemm_q8_0", "gemm__kernels__q8__0_8c.html#a8085f1506d8fadd2070f5b71fedb5554", null ],
     [ "gemm_q8_0_backward", "gemm__kernels__q8__0_8c.html#a6943271d972d64d1c4bfa34524ecdad8", null ],
     [ "gemv_q8_0", "gemm__kernels__q8__0_8c.html#a3e0166eab910ca7f003602c29f428cb1", null ],
