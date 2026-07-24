@@ -9,7 +9,7 @@ var gemm__microkernel_8c =
     [ "NR", "gemm__microkernel_8c.html#af146485306ae74a2edf18636300fd107", null ],
     [ "NR_FIXED", "gemm__microkernel_8c.html#af3dd4e1707c284abe511ed15be5c4f8f", null ],
     [ "PACK_THRESHOLD", "gemm__microkernel_8c.html#a757a5b148b758bc38cbc87a99d33de9f", null ],
-    [ "gemm_get_backend", "gemm__microkernel_8c.html#a0e49b747f303da5906c81cc07cb91f11", null ],
+    [ "gemm_get_backend", "gemm__microkernel_8c.html#a3885c3bae663fe1ffb421179b9edce82", null ],
     [ "gemm_init_threads", "gemm__microkernel_8c.html#a2ecba71250e316cfb6a7415be7346f1c", null ],
     [ "gemm_microkernel", "gemm__microkernel_8c.html#a594a440cd88e67b89068125123f52c9e", null ],
     [ "gemm_microkernel_blocked", "gemm__microkernel_8c.html#ac779265214c020d37db4915eee9937c8", null ],
