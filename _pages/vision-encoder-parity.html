@@ -182,7 +182,7 @@ permalink: /vision-encoder-parity/
     <tbody>
       <tr><td>AVX2 GGUF</td><td>llama.cpp</td><td>Q8 quantization, AVX2 reduction order, FP16 cache attention, persistent state</td><td>Encoder exact on tested fixtures; decoder sweep still open</td></tr>
       <tr><td>AVX-512 GGUF</td><td>llama.cpp</td><td>ISA dispatch, VNNI/non-VNNI routing, reduction and cache contracts</td><td>Separate Xeon validation is required; results are not inferred from AVX2</td></tr>
-      <tr><td>BF16 / AMX</td><td>PyTorch</td><td>BF16 storage boundaries, SDPA tiling, LayerNorm/GEMM rounding, M-RoPE</td><td>Leaf and practical contracts are strong; full BF16 encoder and generation are not byte-exact</td></tr>
+      <tr><td>BF16 / AMX</td><td>PyTorch</td><td>BF16 storage boundaries, SDPA tiling, LayerNorm/GEMM rounding, M-RoPE</td><td>40/40 visual prefixes are byte-exact; 30/40 images pass all 64 teacher-forced ranking steps, with ten late decoder flips still under attribution</td></tr>
     </tbody>
   </table>
 
@@ -213,6 +213,13 @@ permalink: /vision-encoder-parity/
     flash, and diagnostic unfused results are recorded as distinct modes and are never combined into
     one parity claim.
   </div>
+  <div class="alert alert-info">
+    <strong>BF16 corpus result:</strong> all 40 tested images produced byte-exact CK and PyTorch
+    visual prefixes. Thirty images remained top-1 exact through all 64 teacher-forced decoder
+    positions. Ten first diverged between positions 20 and 60; every first failure retained 15 or
+    16 of the same top-16 candidates. This closes encoder and bridge attribution for this corpus and
+    moves the active boundary to accumulated decoder arithmetic.
+  </div>
 
   <h3>Capture Adapter Guardrails</h3>
   <ul>
@@ -224,6 +231,27 @@ permalink: /vision-encoder-parity/
     <li>Fingerprint imported compiler, circuit, kernel-map, and schema sources so stale generated libraries cannot masquerade as current results.</li>
     <li>Record strict/debug, flash, repack, threading, model, engine, generated library, and manifest identity in the report.</li>
   </ul>
+
+  <h3>Accumulated Drift Attribution</h3>
+  <p>
+    A BF16 run can remain inside every per-edge tolerance and still produce a late token-ranking flip.
+    X-ray therefore records two distinct boundaries: the first non-byte-exact checkpoint and the first
+    material failure. It also emits a scale-normalized relative-RMSE progression across semantic edges,
+    preserving the resolved contract, kernel ID, and function at every destination edge.
+  </p>
+  <ol>
+    <li>Normalize the corpus mixed-prefill or teacher-forced traces into one ranking report.</li>
+    <li>Find the first failed ranking position and retain its top-1 margins and top-k overlap.</li>
+    <li>If sparse tensors fail, expand the first failed interval normally.</li>
+    <li>If sparse tensors pass but drift grows, expand only the interval with the largest positive relative-RMSE increase.</li>
+    <li>If the encoder prefix is byte-exact, close the encoder phase and move directly to decoder checkpoints at the failed position.</li>
+    <li>Promote a fix only after its isolated oracle, stitched checkpoint, mixed-prefill, and teacher-forced gates pass.</li>
+  </ol>
+  <div class="alert alert-info">
+    Drift amplification is observational and adds no hidden tolerance. Thresholds remain in parity
+    profiles; circuits retain semantic execution requirements; kernel maps retain exact numerical
+    provider identity.
+  </div>
 
   <h2>Architecture Hardened By The Investigation</h2>
   <p>The accepted ownership model is now explicit:</p>
@@ -258,10 +286,11 @@ make llamacpp-parity-full</code></pre>
 
   <h2>What Happens Next</h2>
   <ol>
-    <li>Close the first OCR fixture's shared layer-0 attention/reduction mismatch with a same-input production-flash oracle.</li>
-    <li>Rerun the first five fixtures through at least 128 tokens and EOS where bounded.</li>
-    <li>Expand to ten images only after the five-image gate is clean.</li>
-    <li>Run the full 40-image encoder, mixed-prefill, persistent-decode, and OCR sweep.</li>
+    <li>Run decoder X-ray at the earliest BF16 ranking failure, preserving the exact PyTorch token history.</li>
+    <li>Compare sparse decoder layers, then expand the measured interval with the largest accumulated drift.</li>
+    <li>Register or fix only the responsible numerical provider and preserve it with a real-shape PyTorch oracle.</li>
+    <li>Rerun the ten failed BF16 images, followed by the full 40-image teacher-forced sweep.</li>
+    <li>Continue the separate GGUF AVX2 and native AVX-512 llama.cpp certification lanes.</li>
     <li>Publish exact artifacts, negative results, compiler and ISA identity, and application accuracy.</li>
     <li>Resume performance tuning only after correctness remains green.</li>
   </ol>
