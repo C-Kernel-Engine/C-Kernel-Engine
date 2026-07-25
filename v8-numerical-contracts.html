@@ -1162,6 +1162,27 @@ make v7-regression-fast</code></pre>
 
 <p>It stops at one of four useful boundaries: execution-policy mismatch, cache metadata/content mismatch, attention-input mismatch, or attention-arithmetic mismatch. Tensor bisection begins only after the execution and state contracts agree.</p>
 
+<h3>Testing the Diagnostic, Not Only the Model</h3>
+
+<p>X-ray has its own nightly injected-fault gate. The fixtures are small public two-layer vision/decoder circuits; no production kernel contains a hidden fault switch. Each fixture changes one tensor, metadata field, circuit edge, or state transition and requires X-ray to report the predetermined first semantic boundary.</p>
+
+<table>
+  <thead><tr><th>Injected fixture</th><th>Required first diagnosis</th></tr></thead>
+  <tbody>
+    <tr><td>BF16 storage boundary at encoder layer 1 attention</td><td><code>STORAGE_CONTRACT_MISMATCH</code></td></tr>
+    <tr><td>Wrong visual-prefix producer</td><td><code>CIRCUIT_PRODUCER_MISMATCH</code></td></tr>
+    <tr><td>Decoder layer output arithmetic change</td><td><code>KERNEL_IMPLEMENTATION_DIVERGENCE</code> with the exact logical coordinate</td></tr>
+    <tr><td>Combined instead of segmented mixed prefill</td><td><code>EXECUTION_POLICY_MISMATCH</code></td></tr>
+    <tr><td>Off-by-one KV-cache append index</td><td><code>CACHE_STATE_METADATA_MISMATCH</code></td></tr>
+    <tr><td>Different attention output with identical Q and cache inputs</td><td><code>ATTENTION_ARITHMETIC_DIVERGENCE</code></td></tr>
+  </tbody>
+</table>
+
+<pre><code>make test-xray-validator-selftest
+# Evidence: build/xray/validator_selftest_report.json</code></pre>
+
+<p>The gate also runs a clean control. It fails if X-ray reports an earlier false positive, accepts an incompatible execution contract, misses the injected edge, or misclassifies state corruption as kernel arithmetic. The nightly test-report publishes this as a dedicated <em>v8 X-ray Injected-Fault Validator</em> row.</p>
+
 <h2>Measured BF16 Vision Progression</h2>
 
 <p>The Qwen3-VL BF16 investigation demonstrates the closure rule on a real 1152&times;896 form image with 4,032 visual tokens. Each row was reached through the normal compiler and exact kernel-map resolution; no generated C was edited by hand.</p>
@@ -1179,6 +1200,27 @@ make v7-regression-fast</code></pre>
 </table>
 
 <p>The next edge is always explicit. After output projection the resolver selects the BF16 residual capability, then X-ray continues through norm2, MLP, spatial merge, projector, final prefix, mixed-prefill logits, and teacher-forced generation. A green leaf test without this forward movement is evidence for a kernel only, not closure of the model bug.</p>
+
+<h2>Forward Sensitivity Before Backward Attribution</h2>
+
+<p>A small BF16 forward difference can be numerically harmless or it can be amplified by attention, normalization, or a later residual path. X-ray can now test that distinction without first trusting a CK backward kernel. The sensitivity runner sends both the PyTorch reference tensor and the CK-perturbed tensor through the same authoritative PyTorch operator, applies one deterministic upstream probe, and reports forward and vector-Jacobian-product amplification.</p>
+
+<pre><code>python version/v8/scripts/xray_attention_sensitivity_v8.py \
+  --reference-q build/xray/torch-q.f32 \
+  --reference-k build/xray/torch-k.f32 \
+  --reference-v build/xray/torch-v.f32 \
+  --subject-q build/xray/ck-q.f32 \
+  --subject-k build/xray/ck-k.f32 \
+  --subject-v build/xray/ck-v.f32 \
+  --q-shape 16 4032 72 \
+  --kv-shape 16 4032 72 \
+  --storage-dtype bf16 \
+  --query-start 0 --query-count 32 \
+  --output build/xray/attention-sensitivity.json</code></pre>
+
+<p>The report performs Q-only, K-only, V-only, and combined perturbation ablations. It records the stored input delta, downstream output delta, fixed-probe gradient delta, amplification ratios, and worst logical coordinates. Query bounding limits memory while retaining the complete K/V context for full non-causal vision attention.</p>
+
+<p>This report is diagnostic evidence, not a parity verdict. It proves which existing forward perturbation is amplified by PyTorch's downstream math. It does not prove that a CK backward provider is correct. A CK training provider must separately declare the same full-attention storage, accumulation, reduction, rounding, and threading contract and pass direct gradient parity. Pass/fail thresholds remain in parity profiles rather than circuits or the sensitivity report.</p>
 
 <h2>Execution-Contract X-Ray</h2>
 
@@ -1454,7 +1496,7 @@ make v8-regression-fast</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-25</p>
             </div>
         </div>
     </footer>
