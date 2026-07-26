@@ -50,6 +50,14 @@ permalink: /v8-whisper-tiny/
     <code>model-&gt;pos + 1</code> valid KV rows. A causal prefill provider
     invoked with one active token attended only cache row zero.
   </li>
+  <li>
+    Encoder-side cross-attention K/V projections are immutable for an audio
+    segment. The circuit declares a prefill-populated, layer-major FP32 cache;
+    decode consumes the cached head-major slices instead of projecting and
+    transposing all 1,500 encoder rows for every generated token. Binding new
+    encoder memory invalidates the cache, and decode fails closed until prefill
+    repopulates it.
+  </li>
 </ol>
 
 <p>
@@ -71,9 +79,13 @@ ask what you can do for your country.</code></pre>
 <p>
   The optimized C FFT/log-Mel frontend differed from Hugging Face by
   approximately 1.54e-4 maximum absolute error and 1.37e-6 RMSE, without
-  changing any generated token. One measured run used 0.16 seconds for the
-  frontend, 11.17 seconds for the encoder, 0.75 seconds for decoder prefill,
-  and 16.57 seconds for 23 decode tokens.
+  changing any generated token. Before persistent cross-attention caching, one
+  measured run used 0.16 seconds for the frontend, 11.17 seconds for the
+  encoder, 0.75 seconds for decoder prefill, and 16.57 seconds for 23 decode
+  tokens. With the cache, the same exact token sequence used 0.12 seconds for
+  the frontend, 11.15 seconds for the encoder, 0.73 seconds for prefill, and
+  0.21 seconds for decode. Decoder time improved by approximately 79x, and
+  total time fell from 28.64 seconds to approximately 12.22 seconds.
 </p>
 
 <h2>Regression Gates</h2>
