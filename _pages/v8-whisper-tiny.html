@@ -1,0 +1,93 @@
+---
+layout: default
+title: "Whisper Tiny End-to-End"
+permalink: /v8-whisper-tiny/
+---
+
+<h1>Whisper Tiny End-to-End</h1>
+
+<p>
+  CKE v8 can run a generated FP32 Whisper Tiny encoder and decoder from a
+  PCM16 WAV file. The orchestration is Python, while WAV decoding,
+  resampling, FFT/log-Mel generation, encoder execution, decoder prefill,
+  persistent KV-cache decode, and attention execute through C kernels and
+  generated model libraries.
+</p>
+
+<h2>Run</h2>
+
+<pre><code>python version/v8/scripts/run_whisper_v8.py run \
+  --encoder-run-dir /path/to/whisper-tiny-encoder \
+  --decoder-run-dir /path/to/whisper-tiny-decoder \
+  --wav /path/to/audio.wav \
+  --language en \
+  --task transcribe \
+  --max-tokens 128 \
+  --output build/whisper-report.json</code></pre>
+
+<p>
+  Encoder and decoder execution occurs in isolated child processes. Both
+  generated artifacts export the same model ABI and shared-library symbol
+  names, so loading both into one process can bind a call to the wrong
+  artifact.
+</p>
+
+<h2>Correctness Findings</h2>
+
+<ol>
+  <li>
+    Cross-attention K/V projections must use the immutable encoder-memory
+    length. Generic prefill code previously replaced their matrix row count
+    with the active decoder-token count.
+  </li>
+  <li>
+    Cross-attention query length must use the active decoder-token count.
+    The generated prefill call previously retained the decoder's physical
+    capacity.
+  </li>
+  <li>
+    Incremental self-attention must use the decode provider and attend
+    <code>model-&gt;pos + 1</code> valid KV rows. A causal prefill provider
+    invoked with one active token attended only cache row zero.
+  </li>
+</ol>
+
+<p>
+  These dimensions are now represented in call IR and phase-specific
+  circuit contracts. Codegen consumes the resolved semantics and contains
+  no Whisper model-name branch.
+</p>
+
+<h2>Reference Evidence</h2>
+
+<p>
+  On the public JFK Whisper sample, CKE emitted the same 23 greedy text
+  tokens as Hugging Face Whisper Tiny, followed by EOS:
+</p>
+
+<pre><code>And so my fellow Americans ask not what your country can do for you
+ask what you can do for your country.</code></pre>
+
+<p>
+  The optimized C FFT/log-Mel frontend differed from Hugging Face by
+  approximately 1.54e-4 maximum absolute error and 1.37e-6 RMSE, without
+  changing any generated token. One measured run used 0.16 seconds for the
+  frontend, 11.17 seconds for the encoder, 0.75 seconds for decoder prefill,
+  and 16.57 seconds for 23 decode tokens.
+</p>
+
+<h2>Regression Gates</h2>
+
+<pre><code>make test-audio
+
+CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
+CK_WHISPER_DECODER_RUN_DIR=/path/to/decoder \
+CK_WHISPER_WAV=/path/to/jfk.wav \
+make test-whisper-e2e-auto</code></pre>
+
+<p>
+  The fast suite fixes the Slaney filter identity, forced decoder prefix,
+  projection extents, phase-specific attention providers, and generated
+  call arguments. The artifact gate requires the full reference token
+  sequence and EOS without tolerance relaxation.
+</p>
