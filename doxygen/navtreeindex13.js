@@ -1,5 +1,6 @@
 var NAVTREEINDEX13 =
 {
+"recurrent__qk__norm__kernels_8c.html#ac4af9b8924cf11e95ce1d4cbbf4e8d51":[2,0,1,1,69,2],
 "recurrent__qk__norm__kernels_8c_source.html":[2,0,1,1,69],
 "recurrent__split__kernels_8c.html":[2,0,1,1,70],
 "recurrent__split__kernels_8c.html#a147c4ce1106e978ae62cdc54eff7002d":[2,0,1,1,70,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX13 =
 "structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,15,5],
 "structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,15,0],
 "structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,15,1],
-"structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb":[1,0,15,4],
-"structCKBufferSpec.html#a81f2619d250bfb5c7401070c0345353a":[1,0,15,6]
+"structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb":[1,0,15,4]
 };

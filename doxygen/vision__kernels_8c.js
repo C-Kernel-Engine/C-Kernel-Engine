@@ -10,6 +10,7 @@ var vision__kernels_8c =
     [ "im2patch", "vision__kernels_8c.html#a86aec042bcceb0bd8955f0daf0d986c4", null ],
     [ "patch2im", "vision__kernels_8c.html#a3ffa58aab7da5c6e77096ad19385329a", null ],
     [ "position_embeddings_add", "vision__kernels_8c.html#aedf35588a71c8af25400e79faeec6dee", null ],
+    [ "position_embeddings_add_at_offset", "vision__kernels_8c.html#ace7994d37be7b565c895e0b7205baad2", null ],
     [ "position_embeddings_add_gemma4v_xy", "vision__kernels_8c.html#a067086b49d83ed153bd16f6f5816e197", null ],
     [ "position_embeddings_add_tiled_2d", "vision__kernels_8c.html#a38fa089663c3300b061508567cd18462", null ],
     [ "position_embeddings_add_tiled_2d_align_corners", "vision__kernels_8c.html#a185b544229ceca002348fd021e310715", null ],

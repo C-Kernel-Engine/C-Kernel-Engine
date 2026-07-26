@@ -838,6 +838,8 @@ Functions</h2></td></tr>
 <tr class="separator:adf6bd63a63f6f7d2bf1ef80b2c687ab2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aedf35588a71c8af25400e79faeec6dee" id="r_aedf35588a71c8af25400e79faeec6dee"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#aedf35588a71c8af25400e79faeec6dee">position_embeddings_add</a> (float *x, const float *position_embd, int num_tokens, int embed_dim, int num_positions)</td></tr>
 <tr class="separator:aedf35588a71c8af25400e79faeec6dee"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ace7994d37be7b565c895e0b7205baad2" id="r_ace7994d37be7b565c895e0b7205baad2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#ace7994d37be7b565c895e0b7205baad2">position_embeddings_add_at_offset</a> (float *x, const float *position_embd, int num_tokens, int embed_dim, int num_positions, int start_position)</td></tr>
+<tr class="separator:ace7994d37be7b565c895e0b7205baad2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a067086b49d83ed153bd16f6f5816e197" id="r_a067086b49d83ed153bd16f6f5816e197"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a067086b49d83ed153bd16f6f5816e197">position_embeddings_add_gemma4v_xy</a> (float *x, const float *position_embd, int grid_h, int grid_w, int embed_dim, int source_grid_size)</td></tr>
 <tr class="separator:a067086b49d83ed153bd16f6f5816e197"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a38fa089663c3300b061508567cd18462" id="r_a38fa089663c3300b061508567cd18462"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a38fa089663c3300b061508567cd18462">position_embeddings_add_tiled_2d</a> (float *x, const float *position_embd, int grid_h, int grid_w, int embed_dim, int merge_size, int source_grid_size)</td></tr>
@@ -2082,16 +2084,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00622">622</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  625</span>{</div>
-<div class="line"><span class="lineno">  626</span>    <span class="keywordflow">if</span> (!a || !b || n == 0) {</div>
-<div class="line"><span class="lineno">  627</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  628</span>    }</div>
-<div class="line"><span class="lineno">  629</span> </div>
-<div class="line"><span class="lineno">  630</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
-<div class="line"><span class="lineno">  631</span>        a[i] += b[i];</div>
-<div class="line"><span class="lineno">  632</span>    }</div>
-<div class="line"><span class="lineno">  633</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00644">644</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  647</span>{</div>
+<div class="line"><span class="lineno">  648</span>    <span class="keywordflow">if</span> (!a || !b || n == 0) {</div>
+<div class="line"><span class="lineno">  649</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  650</span>    }</div>
+<div class="line"><span class="lineno">  651</span> </div>
+<div class="line"><span class="lineno">  652</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; n; ++i) {</div>
+<div class="line"><span class="lineno">  653</span>        a[i] += b[i];</div>
+<div class="line"><span class="lineno">  654</span>    }</div>
+<div class="line"><span class="lineno">  655</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -2145,30 +2147,30 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00635">635</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  641</span>{</div>
-<div class="line"><span class="lineno">  642</span>    <span class="keywordflow">if</span> (!main_inout || !aux_scratch || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  643</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  644</span>    }</div>
-<div class="line"><span class="lineno">  645</span> </div>
-<div class="line"><span class="lineno">  646</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
-<div class="line"><span class="lineno">  647</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total_elems = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  648</span> </div>
-<div class="line"><span class="lineno">  649</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total_elems; ++i) {</div>
-<div class="line"><span class="lineno">  650</span>        main_inout[i] += aux_scratch[i];</div>
-<div class="line"><span class="lineno">  651</span>    }</div>
-<div class="line"><span class="lineno">  652</span> </div>
-<div class="line"><span class="lineno">  653</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">  654</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> src_tok = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
-<div class="line"><span class="lineno">  655</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_inout + (size_t) src_tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  656</span>        <span class="keywordtype">float</span> *dst = aux_scratch + (size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  657</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  658</span>            dst[d] = src_main[d];</div>
-<div class="line"><span class="lineno">  659</span>        }</div>
-<div class="line"><span class="lineno">  660</span>    }</div>
-<div class="line"><span class="lineno">  661</span> </div>
-<div class="line"><span class="lineno">  662</span>    memcpy(main_inout, aux_scratch, total_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  663</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00657">657</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  663</span>{</div>
+<div class="line"><span class="lineno">  664</span>    <span class="keywordflow">if</span> (!main_inout || !aux_scratch || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  665</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  666</span>    }</div>
+<div class="line"><span class="lineno">  667</span> </div>
+<div class="line"><span class="lineno">  668</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
+<div class="line"><span class="lineno">  669</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total_elems = (size_t) num_tokens * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  670</span> </div>
+<div class="line"><span class="lineno">  671</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total_elems; ++i) {</div>
+<div class="line"><span class="lineno">  672</span>        main_inout[i] += aux_scratch[i];</div>
+<div class="line"><span class="lineno">  673</span>    }</div>
+<div class="line"><span class="lineno">  674</span> </div>
+<div class="line"><span class="lineno">  675</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">  676</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> src_tok = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
+<div class="line"><span class="lineno">  677</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_inout + (size_t) src_tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  678</span>        <span class="keywordtype">float</span> *dst = aux_scratch + (size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  679</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  680</span>            dst[d] = src_main[d];</div>
+<div class="line"><span class="lineno">  681</span>        }</div>
+<div class="line"><span class="lineno">  682</span>    }</div>
+<div class="line"><span class="lineno">  683</span> </div>
+<div class="line"><span class="lineno">  684</span>    memcpy(main_inout, aux_scratch, total_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  685</span>}</div>
 <div class="ttc" id="avision__kernels_8c_html_a0ace950feda90616652810a699ac6dac"><div class="ttname"><a href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a></div><div class="ttdeci">static int tile_order_index_2d(int linear_idx, int grid_h, int grid_w, int merge_size)</div><div class="ttdef"><b>Definition</b> <a href="vision__kernels_8c_source.html#l00030">vision_kernels.c:30</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="vision__kernels_8c_source.html#l00030">tile_order_index_2d()</a>.</p>
@@ -14215,39 +14217,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00713">713</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  720</span>{</div>
-<div class="line"><span class="lineno">  721</span>    <span class="keywordflow">if</span> (!main_input || !output || rows &lt;= 0 || main_dim &lt; 0 || branch_slice_dim &lt; 0 || num_branch_slices &lt; 0) {</div>
-<div class="line"><span class="lineno">  722</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  723</span>    }</div>
-<div class="line"><span class="lineno">  724</span> </div>
-<div class="line"><span class="lineno">  725</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> branch_total_dim = branch_slice_dim * num_branch_slices;</div>
-<div class="line"><span class="lineno">  726</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_dim = main_dim + branch_total_dim;</div>
-<div class="line"><span class="lineno">  727</span> </div>
-<div class="line"><span class="lineno">  728</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> in_place_expand = (main_input == output) &amp;&amp; (out_dim &gt; main_dim);</div>
-<div class="line"><span class="lineno">  729</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_start = in_place_expand ? rows - 1 : 0;</div>
-<div class="line"><span class="lineno">  730</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_end = in_place_expand ? -1 : rows;</div>
-<div class="line"><span class="lineno">  731</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_step = in_place_expand ? -1 : 1;</div>
-<div class="line"><span class="lineno">  732</span> </div>
-<div class="line"><span class="lineno">  733</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = row_start; row != row_end; row += row_step) {</div>
-<div class="line"><span class="lineno">  734</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_input + (size_t) row * (<span class="keywordtype">size_t</span>) main_dim;</div>
-<div class="line"><span class="lineno">  735</span>        <span class="keywordtype">float</span> *dst_row = output + (size_t) row * (<span class="keywordtype">size_t</span>) out_dim;</div>
-<div class="line"><span class="lineno">  736</span> </div>
-<div class="line"><span class="lineno">  737</span>        <span class="keywordflow">if</span> (main_dim &gt; 0) {</div>
-<div class="line"><span class="lineno">  738</span>            memmove(dst_row, src_main, (<span class="keywordtype">size_t</span>) main_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  739</span>        }</div>
-<div class="line"><span class="lineno">  740</span> </div>
-<div class="line"><span class="lineno">  741</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> slice = 0; slice &lt; num_branch_slices; ++slice) {</div>
-<div class="line"><span class="lineno">  742</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src_branch = branch_input</div>
-<div class="line"><span class="lineno">  743</span>                + (size_t) slice * (<span class="keywordtype">size_t</span>) rows * (size_t) branch_slice_dim</div>
-<div class="line"><span class="lineno">  744</span>                + (<span class="keywordtype">size_t</span>) row * (size_t) branch_slice_dim;</div>
-<div class="line"><span class="lineno">  745</span>            <span class="keywordtype">float</span> *dst_branch = dst_row + (size_t) main_dim + (<span class="keywordtype">size_t</span>) slice * (size_t) branch_slice_dim;</div>
-<div class="line"><span class="lineno">  746</span>            <span class="keywordflow">if</span> (branch_slice_dim &gt; 0) {</div>
-<div class="line"><span class="lineno">  747</span>                memcpy(dst_branch, src_branch, (<span class="keywordtype">size_t</span>) branch_slice_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  748</span>            }</div>
-<div class="line"><span class="lineno">  749</span>        }</div>
-<div class="line"><span class="lineno">  750</span>    }</div>
-<div class="line"><span class="lineno">  751</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00735">735</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  742</span>{</div>
+<div class="line"><span class="lineno">  743</span>    <span class="keywordflow">if</span> (!main_input || !output || rows &lt;= 0 || main_dim &lt; 0 || branch_slice_dim &lt; 0 || num_branch_slices &lt; 0) {</div>
+<div class="line"><span class="lineno">  744</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  745</span>    }</div>
+<div class="line"><span class="lineno">  746</span> </div>
+<div class="line"><span class="lineno">  747</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> branch_total_dim = branch_slice_dim * num_branch_slices;</div>
+<div class="line"><span class="lineno">  748</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_dim = main_dim + branch_total_dim;</div>
+<div class="line"><span class="lineno">  749</span> </div>
+<div class="line"><span class="lineno">  750</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> in_place_expand = (main_input == output) &amp;&amp; (out_dim &gt; main_dim);</div>
+<div class="line"><span class="lineno">  751</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_start = in_place_expand ? rows - 1 : 0;</div>
+<div class="line"><span class="lineno">  752</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_end = in_place_expand ? -1 : rows;</div>
+<div class="line"><span class="lineno">  753</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row_step = in_place_expand ? -1 : 1;</div>
+<div class="line"><span class="lineno">  754</span> </div>
+<div class="line"><span class="lineno">  755</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = row_start; row != row_end; row += row_step) {</div>
+<div class="line"><span class="lineno">  756</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_input + (size_t) row * (<span class="keywordtype">size_t</span>) main_dim;</div>
+<div class="line"><span class="lineno">  757</span>        <span class="keywordtype">float</span> *dst_row = output + (size_t) row * (<span class="keywordtype">size_t</span>) out_dim;</div>
+<div class="line"><span class="lineno">  758</span> </div>
+<div class="line"><span class="lineno">  759</span>        <span class="keywordflow">if</span> (main_dim &gt; 0) {</div>
+<div class="line"><span class="lineno">  760</span>            memmove(dst_row, src_main, (<span class="keywordtype">size_t</span>) main_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  761</span>        }</div>
+<div class="line"><span class="lineno">  762</span> </div>
+<div class="line"><span class="lineno">  763</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> slice = 0; slice &lt; num_branch_slices; ++slice) {</div>
+<div class="line"><span class="lineno">  764</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src_branch = branch_input</div>
+<div class="line"><span class="lineno">  765</span>                + (size_t) slice * (<span class="keywordtype">size_t</span>) rows * (size_t) branch_slice_dim</div>
+<div class="line"><span class="lineno">  766</span>                + (<span class="keywordtype">size_t</span>) row * (size_t) branch_slice_dim;</div>
+<div class="line"><span class="lineno">  767</span>            <span class="keywordtype">float</span> *dst_branch = dst_row + (size_t) main_dim + (<span class="keywordtype">size_t</span>) slice * (size_t) branch_slice_dim;</div>
+<div class="line"><span class="lineno">  768</span>            <span class="keywordflow">if</span> (branch_slice_dim &gt; 0) {</div>
+<div class="line"><span class="lineno">  769</span>                memcpy(dst_branch, src_branch, (<span class="keywordtype">size_t</span>) branch_slice_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  770</span>            }</div>
+<div class="line"><span class="lineno">  771</span>        }</div>
+<div class="line"><span class="lineno">  772</span>    }</div>
+<div class="line"><span class="lineno">  773</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -14307,26 +14309,26 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00665">665</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  672</span>{</div>
-<div class="line"><span class="lineno">  673</span>    <span class="keywordflow">if</span> (!main_input || !branch_input || !output || rows &lt;= 0 || main_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  674</span>        branch_slice_dim &lt; 0 || num_branch_slices &lt; 0) {</div>
-<div class="line"><span class="lineno">  675</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  676</span>    }</div>
-<div class="line"><span class="lineno">  677</span> </div>
-<div class="line"><span class="lineno">  678</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> branch_dim = branch_slice_dim * num_branch_slices;</div>
-<div class="line"><span class="lineno">  679</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> main_bytes = (size_t) main_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno">  680</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> branch_bytes = (size_t) branch_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
-<div class="line"><span class="lineno">  681</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_stride = (size_t) (main_dim + branch_dim);</div>
-<div class="line"><span class="lineno">  682</span> </div>
-<div class="line"><span class="lineno">  683</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">  684</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_input + ((size_t) r * (<span class="keywordtype">size_t</span>) main_dim);</div>
-<div class="line"><span class="lineno">  685</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_branch = branch_input + ((size_t) r * (<span class="keywordtype">size_t</span>) branch_dim);</div>
-<div class="line"><span class="lineno">  686</span>        <span class="keywordtype">float</span> *dst = output + ((size_t) r * out_stride);</div>
-<div class="line"><span class="lineno">  687</span>        memcpy(dst, src_main, main_bytes);</div>
-<div class="line"><span class="lineno">  688</span>        memcpy(dst + main_dim, src_branch, branch_bytes);</div>
-<div class="line"><span class="lineno">  689</span>    }</div>
-<div class="line"><span class="lineno">  690</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00687">687</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  694</span>{</div>
+<div class="line"><span class="lineno">  695</span>    <span class="keywordflow">if</span> (!main_input || !branch_input || !output || rows &lt;= 0 || main_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  696</span>        branch_slice_dim &lt; 0 || num_branch_slices &lt; 0) {</div>
+<div class="line"><span class="lineno">  697</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  698</span>    }</div>
+<div class="line"><span class="lineno">  699</span> </div>
+<div class="line"><span class="lineno">  700</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> branch_dim = branch_slice_dim * num_branch_slices;</div>
+<div class="line"><span class="lineno">  701</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> main_bytes = (size_t) main_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  702</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> branch_bytes = (size_t) branch_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>);</div>
+<div class="line"><span class="lineno">  703</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_stride = (size_t) (main_dim + branch_dim);</div>
+<div class="line"><span class="lineno">  704</span> </div>
+<div class="line"><span class="lineno">  705</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">  706</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_main = main_input + ((size_t) r * (<span class="keywordtype">size_t</span>) main_dim);</div>
+<div class="line"><span class="lineno">  707</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_branch = branch_input + ((size_t) r * (<span class="keywordtype">size_t</span>) branch_dim);</div>
+<div class="line"><span class="lineno">  708</span>        <span class="keywordtype">float</span> *dst = output + ((size_t) r * out_stride);</div>
+<div class="line"><span class="lineno">  709</span>        memcpy(dst, src_main, main_bytes);</div>
+<div class="line"><span class="lineno">  710</span>        memcpy(dst + main_dim, src_branch, branch_bytes);</div>
+<div class="line"><span class="lineno">  711</span>    }</div>
+<div class="line"><span class="lineno">  712</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -14380,21 +14382,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00692">692</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  698</span>{</div>
-<div class="line"><span class="lineno">  699</span>    <span class="keywordflow">if</span> (!src || !dst || rows &lt;= 0 || src_dim &lt;= 0 || dst_dim &lt;= 0 || dst_feature_offset &lt; 0) {</div>
-<div class="line"><span class="lineno">  700</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  701</span>    }</div>
-<div class="line"><span class="lineno">  702</span>    <span class="keywordflow">if</span> (dst_feature_offset + src_dim &gt; dst_dim) {</div>
-<div class="line"><span class="lineno">  703</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  704</span>    }</div>
-<div class="line"><span class="lineno">  705</span> </div>
-<div class="line"><span class="lineno">  706</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  707</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_row = src + (size_t) row * (<span class="keywordtype">size_t</span>) src_dim;</div>
-<div class="line"><span class="lineno">  708</span>        <span class="keywordtype">float</span> *dst_row = dst + (size_t) row * (<span class="keywordtype">size_t</span>) dst_dim + (size_t) dst_feature_offset;</div>
-<div class="line"><span class="lineno">  709</span>        memcpy(dst_row, src_row, (<span class="keywordtype">size_t</span>) src_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  710</span>    }</div>
-<div class="line"><span class="lineno">  711</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00714">714</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  720</span>{</div>
+<div class="line"><span class="lineno">  721</span>    <span class="keywordflow">if</span> (!src || !dst || rows &lt;= 0 || src_dim &lt;= 0 || dst_dim &lt;= 0 || dst_feature_offset &lt; 0) {</div>
+<div class="line"><span class="lineno">  722</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  723</span>    }</div>
+<div class="line"><span class="lineno">  724</span>    <span class="keywordflow">if</span> (dst_feature_offset + src_dim &gt; dst_dim) {</div>
+<div class="line"><span class="lineno">  725</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  726</span>    }</div>
+<div class="line"><span class="lineno">  727</span> </div>
+<div class="line"><span class="lineno">  728</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  729</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_row = src + (size_t) row * (<span class="keywordtype">size_t</span>) src_dim;</div>
+<div class="line"><span class="lineno">  730</span>        <span class="keywordtype">float</span> *dst_row = dst + (size_t) row * (<span class="keywordtype">size_t</span>) dst_dim + (size_t) dst_feature_offset;</div>
+<div class="line"><span class="lineno">  731</span>        memcpy(dst_row, src_row, (<span class="keywordtype">size_t</span>) src_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  732</span>    }</div>
+<div class="line"><span class="lineno">  733</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -24492,24 +24494,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00542">542</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  548</span>{</div>
-<div class="line"><span class="lineno">  549</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || tokens &lt;= 0 || dim &lt;= 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  550</span>    <span class="keywordflow">if</span> (eps &lt;= 0.0f) eps = 1.0e-6f;</div>
-<div class="line"><span class="lineno">  551</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  552</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = input + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  553</span>        <span class="keywordtype">float</span> *dst = output + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  554</span>        <span class="keywordtype">double</span> ss = 0.0;</div>
-<div class="line"><span class="lineno">  555</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  556</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v = src[i] * scale;</div>
-<div class="line"><span class="lineno">  557</span>            ss += (double)v * (<span class="keywordtype">double</span>)v;</div>
-<div class="line"><span class="lineno">  558</span>        }</div>
-<div class="line"><span class="lineno">  559</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf((<span class="keywordtype">float</span>)(ss / (<span class="keywordtype">double</span>)dim) + eps);</div>
-<div class="line"><span class="lineno">  560</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
-<div class="line"><span class="lineno">  561</span>            dst[i] = (src[i] * scale) * inv_rms;</div>
-<div class="line"><span class="lineno">  562</span>        }</div>
-<div class="line"><span class="lineno">  563</span>    }</div>
-<div class="line"><span class="lineno">  564</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00564">564</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  570</span>{</div>
+<div class="line"><span class="lineno">  571</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || tokens &lt;= 0 || dim &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  572</span>    <span class="keywordflow">if</span> (eps &lt;= 0.0f) eps = 1.0e-6f;</div>
+<div class="line"><span class="lineno">  573</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  574</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = input + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  575</span>        <span class="keywordtype">float</span> *dst = output + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  576</span>        <span class="keywordtype">double</span> ss = 0.0;</div>
+<div class="line"><span class="lineno">  577</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  578</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v = src[i] * scale;</div>
+<div class="line"><span class="lineno">  579</span>            ss += (double)v * (<span class="keywordtype">double</span>)v;</div>
+<div class="line"><span class="lineno">  580</span>        }</div>
+<div class="line"><span class="lineno">  581</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf((<span class="keywordtype">float</span>)(ss / (<span class="keywordtype">double</span>)dim) + eps);</div>
+<div class="line"><span class="lineno">  582</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; dim; ++i) {</div>
+<div class="line"><span class="lineno">  583</span>            dst[i] = (src[i] * scale) * inv_rms;</div>
+<div class="line"><span class="lineno">  584</span>        }</div>
+<div class="line"><span class="lineno">  585</span>    }</div>
+<div class="line"><span class="lineno">  586</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -33860,6 +33862,75 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 </div>
 </div>
+<a id="ace7994d37be7b565c895e0b7205baad2" name="ace7994d37be7b565c895e0b7205baad2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ace7994d37be7b565c895e0b7205baad2">&#9670;&#160;</a></span>position_embeddings_add_at_offset()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void position_embeddings_add_at_offset </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>position_embd</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_positions</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>start_position</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00187">187</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  193</span>{</div>
+<div class="line"><span class="lineno">  194</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || num_tokens &lt;= 0 || embed_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  195</span>        num_positions &lt;= 0 || start_position &lt; 0 || start_position &gt;= num_positions) {</div>
+<div class="line"><span class="lineno">  196</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  197</span>    }</div>
+<div class="line"><span class="lineno">  198</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available = num_positions - start_position;</div>
+<div class="line"><span class="lineno">  199</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> limit = num_tokens &lt; available ? num_tokens : available;</div>
+<div class="line"><span class="lineno">  200</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; limit; ++tok) {</div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordtype">float</span> *dst = x + (size_t)tok * embed_dim;</div>
+<div class="line"><span class="lineno">  202</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = position_embd + (size_t)(start_position + tok) * embed_dim;</div>
+<div class="line"><span class="lineno">  203</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  204</span>            dst[d] += src[d];</div>
+<div class="line"><span class="lineno">  205</span>        }</div>
+<div class="line"><span class="lineno">  206</span>    }</div>
+<div class="line"><span class="lineno">  207</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
 <a id="a067086b49d83ed153bd16f6f5816e197" name="a067086b49d83ed153bd16f6f5816e197"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a067086b49d83ed153bd16f6f5816e197">&#9670;&#160;</a></span>position_embeddings_add_gemma4v_xy()</h2>
 
@@ -33910,32 +33981,32 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00187">187</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  193</span>{</div>
-<div class="line"><span class="lineno">  194</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  195</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  196</span>    }</div>
-<div class="line"><span class="lineno">  197</span>    <span class="keywordflow">if</span> (source_grid_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  198</span>        source_grid_size = grid_w &gt; grid_h ? grid_w : grid_h;</div>
-<div class="line"><span class="lineno">  199</span>    }</div>
-<div class="line"><span class="lineno">  200</span> </div>
-<div class="line"><span class="lineno">  201</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> table_stride = (size_t) source_grid_size * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  202</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *table_x = position_embd;</div>
-<div class="line"><span class="lineno">  203</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *table_y = position_embd + table_stride;</div>
-<div class="line"><span class="lineno">  204</span> </div>
-<div class="line"><span class="lineno">  205</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> y = 0; y &lt; grid_h; ++y) {</div>
-<div class="line"><span class="lineno">  206</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> yy = y &lt; source_grid_size ? y : (source_grid_size - 1);</div>
-<div class="line"><span class="lineno">  207</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_y = table_y + (size_t) yy * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  208</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> x_pos = 0; x_pos &lt; grid_w; ++x_pos) {</div>
-<div class="line"><span class="lineno">  209</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> xx = x_pos &lt; source_grid_size ? x_pos : (source_grid_size - 1);</div>
-<div class="line"><span class="lineno">  210</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *row_x = table_x + (size_t) xx * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  211</span>            <span class="keywordtype">float</span> *dst = x + ((size_t) y * (<span class="keywordtype">size_t</span>) grid_w + (size_t) x_pos) * (size_t) embed_dim;</div>
-<div class="line"><span class="lineno">  212</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  213</span>                dst[d] += row_x[d] + row_y[d];</div>
-<div class="line"><span class="lineno">  214</span>            }</div>
-<div class="line"><span class="lineno">  215</span>        }</div>
-<div class="line"><span class="lineno">  216</span>    }</div>
-<div class="line"><span class="lineno">  217</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00209">209</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  215</span>{</div>
+<div class="line"><span class="lineno">  216</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  217</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  218</span>    }</div>
+<div class="line"><span class="lineno">  219</span>    <span class="keywordflow">if</span> (source_grid_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  220</span>        source_grid_size = grid_w &gt; grid_h ? grid_w : grid_h;</div>
+<div class="line"><span class="lineno">  221</span>    }</div>
+<div class="line"><span class="lineno">  222</span> </div>
+<div class="line"><span class="lineno">  223</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> table_stride = (size_t) source_grid_size * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  224</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *table_x = position_embd;</div>
+<div class="line"><span class="lineno">  225</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *table_y = position_embd + table_stride;</div>
+<div class="line"><span class="lineno">  226</span> </div>
+<div class="line"><span class="lineno">  227</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> y = 0; y &lt; grid_h; ++y) {</div>
+<div class="line"><span class="lineno">  228</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> yy = y &lt; source_grid_size ? y : (source_grid_size - 1);</div>
+<div class="line"><span class="lineno">  229</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_y = table_y + (size_t) yy * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  230</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> x_pos = 0; x_pos &lt; grid_w; ++x_pos) {</div>
+<div class="line"><span class="lineno">  231</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> xx = x_pos &lt; source_grid_size ? x_pos : (source_grid_size - 1);</div>
+<div class="line"><span class="lineno">  232</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *row_x = table_x + (size_t) xx * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  233</span>            <span class="keywordtype">float</span> *dst = x + ((size_t) y * (<span class="keywordtype">size_t</span>) grid_w + (size_t) x_pos) * (size_t) embed_dim;</div>
+<div class="line"><span class="lineno">  234</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  235</span>                dst[d] += row_x[d] + row_y[d];</div>
+<div class="line"><span class="lineno">  236</span>            }</div>
+<div class="line"><span class="lineno">  237</span>        }</div>
+<div class="line"><span class="lineno">  238</span>    }</div>
+<div class="line"><span class="lineno">  239</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -33995,90 +34066,90 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00226">226</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  233</span>{</div>
-<div class="line"><span class="lineno">  234</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  235</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  236</span>    }</div>
-<div class="line"><span class="lineno">  237</span> </div>
-<div class="line"><span class="lineno">  238</span>    <span class="keywordflow">if</span> (source_grid_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  239</span>        source_grid_size = grid_h == grid_w ? grid_h : (grid_h &gt; grid_w ? grid_h : grid_w);</div>
-<div class="line"><span class="lineno">  240</span>    }</div>
-<div class="line"><span class="lineno">  241</span> </div>
-<div class="line"><span class="lineno">  242</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
-<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> source_tokens = source_grid_size * source_grid_size;</div>
-<div class="line"><span class="lineno">  244</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> needs_resize = source_grid_size != grid_h || source_grid_size != grid_w;</div>
-<div class="line"><span class="lineno">  245</span> </div>
-<div class="line"><span class="lineno">  246</span>    <span class="keywordflow">if</span> (!needs_resize) {</div>
-<div class="line"><span class="lineno">  247</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">  248</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> flat = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
-<div class="line"><span class="lineno">  249</span>            <span class="keywordflow">if</span> (flat &lt; 0 || flat &gt;= source_tokens) {</div>
-<div class="line"><span class="lineno">  250</span>                <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  251</span>            }</div>
-<div class="line"><span class="lineno">  252</span>            <span class="keywordtype">float</span> *dst = x + (size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  253</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src = position_embd + (size_t) flat * (<span class="keywordtype">size_t</span>) embed_dim;</div>
-<div class="line"><span class="lineno">  254</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  255</span>                dst[d] += src[d];</div>
-<div class="line"><span class="lineno">  256</span>            }</div>
-<div class="line"><span class="lineno">  257</span>        }</div>
-<div class="line"><span class="lineno">  258</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  259</span>    }</div>
-<div class="line"><span class="lineno">  260</span> </div>
-<div class="line"><span class="lineno">  261</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sf_x = (float) grid_w / (<span class="keywordtype">float</span>) source_grid_size;</div>
-<div class="line"><span class="lineno">  262</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sf_y = (float) grid_h / (<span class="keywordtype">float</span>) source_grid_size;</div>
-<div class="line"><span class="lineno">  263</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> pixel_offset = 0.5f;</div>
-<div class="line"><span class="lineno">  264</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> support_x = fmaxf(1.0f, 1.0f / sf_x);</div>
-<div class="line"><span class="lineno">  265</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> support_y = fmaxf(1.0f, 1.0f / sf_y);</div>
-<div class="line"><span class="lineno">  266</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> invscale_x = 1.0f / support_x;</div>
-<div class="line"><span class="lineno">  267</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> invscale_y = 1.0f / support_y;</div>
-<div class="line"><span class="lineno">  268</span> </div>
-<div class="line"><span class="lineno">  269</span>    <span class="comment">/* Preserve ggml&#39;s channel -&gt; row -&gt; column loop nesting. The destination</span></div>
-<div class="line"><span class="lineno">  270</span><span class="comment">     * index converts the row-major interpolation result directly to CK&#39;s</span></div>
-<div class="line"><span class="lineno">  271</span><span class="comment">     * merge-tiled token layout without allocating an intermediate tensor. */</span></div>
-<div class="line"><span class="lineno">  272</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  273</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dst_y = 0; dst_y &lt; grid_h; ++dst_y) {</div>
-<div class="line"><span class="lineno">  274</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> y_src = ((float) dst_y + pixel_offset) / sf_y;</div>
-<div class="line"><span class="lineno">  275</span>            <span class="keywordtype">int</span> y_min = (int) (y_src - support_y + pixel_offset);</div>
-<div class="line"><span class="lineno">  276</span>            <span class="keywordtype">int</span> y_max = (int) (y_src + support_y + pixel_offset);</div>
-<div class="line"><span class="lineno">  277</span>            <span class="keywordflow">if</span> (y_min &lt; 0) y_min = 0;</div>
-<div class="line"><span class="lineno">  278</span>            <span class="keywordflow">if</span> (y_max &gt; source_grid_size) y_max = source_grid_size;</div>
-<div class="line"><span class="lineno">  279</span> </div>
-<div class="line"><span class="lineno">  280</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dst_x = 0; dst_x &lt; grid_w; ++dst_x) {</div>
-<div class="line"><span class="lineno">  281</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x_src = ((float) dst_x + pixel_offset) / sf_x;</div>
-<div class="line"><span class="lineno">  282</span>                <span class="keywordtype">int</span> x_min = (int) (x_src - support_x + pixel_offset);</div>
-<div class="line"><span class="lineno">  283</span>                <span class="keywordtype">int</span> x_max = (int) (x_src + support_x + pixel_offset);</div>
-<div class="line"><span class="lineno">  284</span>                <span class="keywordflow">if</span> (x_min &lt; 0) x_min = 0;</div>
-<div class="line"><span class="lineno">  285</span>                <span class="keywordflow">if</span> (x_max &gt; source_grid_size) x_max = source_grid_size;</div>
-<div class="line"><span class="lineno">  286</span>                <span class="keywordtype">float</span> val = 0.0f;</div>
-<div class="line"><span class="lineno">  287</span>                <span class="keywordtype">float</span> total_weight = 0.0f;</div>
-<div class="line"><span class="lineno">  288</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sy = y_min; sy &lt; y_max; ++sy) {</div>
-<div class="line"><span class="lineno">  289</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> wy_arg = ((float) sy - y_src + pixel_offset) * invscale_y;</div>
-<div class="line"><span class="lineno">  290</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> wy = fmaxf(1.0f - fabsf(wy_arg), 0.0f);</div>
-<div class="line"><span class="lineno">  291</span>                    <span class="keywordflow">if</span> (wy &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  292</span>                        <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  293</span>                    }</div>
-<div class="line"><span class="lineno">  294</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sx = x_min; sx &lt; x_max; ++sx) {</div>
-<div class="line"><span class="lineno">  295</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> wx_arg = ((float) sx - x_src + pixel_offset) * invscale_x;</div>
-<div class="line"><span class="lineno">  296</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> wx = fmaxf(1.0f - fabsf(wx_arg), 0.0f);</div>
-<div class="line"><span class="lineno">  297</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> weight = wx * wy;</div>
-<div class="line"><span class="lineno">  298</span>                        <span class="keywordflow">if</span> (weight &lt;= 0.0f) {</div>
-<div class="line"><span class="lineno">  299</span>                            <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  300</span>                        }</div>
-<div class="line"><span class="lineno">  301</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> sample = position_embd[((size_t) sy * (<span class="keywordtype">size_t</span>) source_grid_size + (size_t) sx) * (size_t) embed_dim + (<span class="keywordtype">size_t</span>) d];</div>
-<div class="line"><span class="lineno">  302</span>                        val = fmaf(sample, weight, val);</div>
-<div class="line"><span class="lineno">  303</span>                        total_weight += weight;</div>
-<div class="line"><span class="lineno">  304</span>                    }</div>
-<div class="line"><span class="lineno">  305</span>                }</div>
-<div class="line"><span class="lineno">  306</span>                <span class="keywordflow">if</span> (total_weight &gt; 0.0f) {</div>
-<div class="line"><span class="lineno">  307</span>                    val /= total_weight;</div>
-<div class="line"><span class="lineno">  308</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> tok = <a class="code hl_function" href="vision__kernels_8c.html#a113c28d5678076d63a195cbd9133192b">tile_order_linear_index_2d</a>(</div>
-<div class="line"><span class="lineno">  309</span>                        dst_y, dst_x, grid_h, grid_w, merge_size);</div>
-<div class="line"><span class="lineno">  310</span>                    x[(size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim + (size_t) d] += val;</div>
-<div class="line"><span class="lineno">  311</span>                }</div>
-<div class="line"><span class="lineno">  312</span>            }</div>
-<div class="line"><span class="lineno">  313</span>        }</div>
-<div class="line"><span class="lineno">  314</span>    }</div>
-<div class="line"><span class="lineno">  315</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00248">248</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  255</span>{</div>
+<div class="line"><span class="lineno">  256</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  257</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  258</span>    }</div>
+<div class="line"><span class="lineno">  259</span> </div>
+<div class="line"><span class="lineno">  260</span>    <span class="keywordflow">if</span> (source_grid_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  261</span>        source_grid_size = grid_h == grid_w ? grid_h : (grid_h &gt; grid_w ? grid_h : grid_w);</div>
+<div class="line"><span class="lineno">  262</span>    }</div>
+<div class="line"><span class="lineno">  263</span> </div>
+<div class="line"><span class="lineno">  264</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
+<div class="line"><span class="lineno">  265</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> source_tokens = source_grid_size * source_grid_size;</div>
+<div class="line"><span class="lineno">  266</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> needs_resize = source_grid_size != grid_h || source_grid_size != grid_w;</div>
+<div class="line"><span class="lineno">  267</span> </div>
+<div class="line"><span class="lineno">  268</span>    <span class="keywordflow">if</span> (!needs_resize) {</div>
+<div class="line"><span class="lineno">  269</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">  270</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> flat = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
+<div class="line"><span class="lineno">  271</span>            <span class="keywordflow">if</span> (flat &lt; 0 || flat &gt;= source_tokens) {</div>
+<div class="line"><span class="lineno">  272</span>                <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  273</span>            }</div>
+<div class="line"><span class="lineno">  274</span>            <span class="keywordtype">float</span> *dst = x + (size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  275</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src = position_embd + (size_t) flat * (<span class="keywordtype">size_t</span>) embed_dim;</div>
+<div class="line"><span class="lineno">  276</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  277</span>                dst[d] += src[d];</div>
+<div class="line"><span class="lineno">  278</span>            }</div>
+<div class="line"><span class="lineno">  279</span>        }</div>
+<div class="line"><span class="lineno">  280</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  281</span>    }</div>
+<div class="line"><span class="lineno">  282</span> </div>
+<div class="line"><span class="lineno">  283</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sf_x = (float) grid_w / (<span class="keywordtype">float</span>) source_grid_size;</div>
+<div class="line"><span class="lineno">  284</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> sf_y = (float) grid_h / (<span class="keywordtype">float</span>) source_grid_size;</div>
+<div class="line"><span class="lineno">  285</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> pixel_offset = 0.5f;</div>
+<div class="line"><span class="lineno">  286</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> support_x = fmaxf(1.0f, 1.0f / sf_x);</div>
+<div class="line"><span class="lineno">  287</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> support_y = fmaxf(1.0f, 1.0f / sf_y);</div>
+<div class="line"><span class="lineno">  288</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> invscale_x = 1.0f / support_x;</div>
+<div class="line"><span class="lineno">  289</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> invscale_y = 1.0f / support_y;</div>
+<div class="line"><span class="lineno">  290</span> </div>
+<div class="line"><span class="lineno">  291</span>    <span class="comment">/* Preserve ggml&#39;s channel -&gt; row -&gt; column loop nesting. The destination</span></div>
+<div class="line"><span class="lineno">  292</span><span class="comment">     * index converts the row-major interpolation result directly to CK&#39;s</span></div>
+<div class="line"><span class="lineno">  293</span><span class="comment">     * merge-tiled token layout without allocating an intermediate tensor. */</span></div>
+<div class="line"><span class="lineno">  294</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  295</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dst_y = 0; dst_y &lt; grid_h; ++dst_y) {</div>
+<div class="line"><span class="lineno">  296</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> y_src = ((float) dst_y + pixel_offset) / sf_y;</div>
+<div class="line"><span class="lineno">  297</span>            <span class="keywordtype">int</span> y_min = (int) (y_src - support_y + pixel_offset);</div>
+<div class="line"><span class="lineno">  298</span>            <span class="keywordtype">int</span> y_max = (int) (y_src + support_y + pixel_offset);</div>
+<div class="line"><span class="lineno">  299</span>            <span class="keywordflow">if</span> (y_min &lt; 0) y_min = 0;</div>
+<div class="line"><span class="lineno">  300</span>            <span class="keywordflow">if</span> (y_max &gt; source_grid_size) y_max = source_grid_size;</div>
+<div class="line"><span class="lineno">  301</span> </div>
+<div class="line"><span class="lineno">  302</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dst_x = 0; dst_x &lt; grid_w; ++dst_x) {</div>
+<div class="line"><span class="lineno">  303</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x_src = ((float) dst_x + pixel_offset) / sf_x;</div>
+<div class="line"><span class="lineno">  304</span>                <span class="keywordtype">int</span> x_min = (int) (x_src - support_x + pixel_offset);</div>
+<div class="line"><span class="lineno">  305</span>                <span class="keywordtype">int</span> x_max = (int) (x_src + support_x + pixel_offset);</div>
+<div class="line"><span class="lineno">  306</span>                <span class="keywordflow">if</span> (x_min &lt; 0) x_min = 0;</div>
+<div class="line"><span class="lineno">  307</span>                <span class="keywordflow">if</span> (x_max &gt; source_grid_size) x_max = source_grid_size;</div>
+<div class="line"><span class="lineno">  308</span>                <span class="keywordtype">float</span> val = 0.0f;</div>
+<div class="line"><span class="lineno">  309</span>                <span class="keywordtype">float</span> total_weight = 0.0f;</div>
+<div class="line"><span class="lineno">  310</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sy = y_min; sy &lt; y_max; ++sy) {</div>
+<div class="line"><span class="lineno">  311</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> wy_arg = ((float) sy - y_src + pixel_offset) * invscale_y;</div>
+<div class="line"><span class="lineno">  312</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> wy = fmaxf(1.0f - fabsf(wy_arg), 0.0f);</div>
+<div class="line"><span class="lineno">  313</span>                    <span class="keywordflow">if</span> (wy &lt;= 0.0f) {</div>
+<div class="line"><span class="lineno">  314</span>                        <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  315</span>                    }</div>
+<div class="line"><span class="lineno">  316</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sx = x_min; sx &lt; x_max; ++sx) {</div>
+<div class="line"><span class="lineno">  317</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> wx_arg = ((float) sx - x_src + pixel_offset) * invscale_x;</div>
+<div class="line"><span class="lineno">  318</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> wx = fmaxf(1.0f - fabsf(wx_arg), 0.0f);</div>
+<div class="line"><span class="lineno">  319</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> weight = wx * wy;</div>
+<div class="line"><span class="lineno">  320</span>                        <span class="keywordflow">if</span> (weight &lt;= 0.0f) {</div>
+<div class="line"><span class="lineno">  321</span>                            <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  322</span>                        }</div>
+<div class="line"><span class="lineno">  323</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> sample = position_embd[((size_t) sy * (<span class="keywordtype">size_t</span>) source_grid_size + (size_t) sx) * (size_t) embed_dim + (<span class="keywordtype">size_t</span>) d];</div>
+<div class="line"><span class="lineno">  324</span>                        val = fmaf(sample, weight, val);</div>
+<div class="line"><span class="lineno">  325</span>                        total_weight += weight;</div>
+<div class="line"><span class="lineno">  326</span>                    }</div>
+<div class="line"><span class="lineno">  327</span>                }</div>
+<div class="line"><span class="lineno">  328</span>                <span class="keywordflow">if</span> (total_weight &gt; 0.0f) {</div>
+<div class="line"><span class="lineno">  329</span>                    val /= total_weight;</div>
+<div class="line"><span class="lineno">  330</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> tok = <a class="code hl_function" href="vision__kernels_8c.html#a113c28d5678076d63a195cbd9133192b">tile_order_linear_index_2d</a>(</div>
+<div class="line"><span class="lineno">  331</span>                        dst_y, dst_x, grid_h, grid_w, merge_size);</div>
+<div class="line"><span class="lineno">  332</span>                    x[(size_t) tok * (<span class="keywordtype">size_t</span>) embed_dim + (size_t) d] += val;</div>
+<div class="line"><span class="lineno">  333</span>                }</div>
+<div class="line"><span class="lineno">  334</span>            }</div>
+<div class="line"><span class="lineno">  335</span>        }</div>
+<div class="line"><span class="lineno">  336</span>    }</div>
+<div class="line"><span class="lineno">  337</span>}</div>
 <div class="ttc" id="avision__kernels_8c_html_a113c28d5678076d63a195cbd9133192b"><div class="ttname"><a href="vision__kernels_8c.html#a113c28d5678076d63a195cbd9133192b">tile_order_linear_index_2d</a></div><div class="ttdeci">static int tile_order_linear_index_2d(int y, int x, int grid_h, int grid_w, int merge_size)</div><div class="ttdef"><b>Definition</b> <a href="vision__kernels_8c_source.html#l00055">vision_kernels.c:55</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="vision__kernels_8c_source.html#l00030">tile_order_index_2d()</a>, and <a class="el" href="vision__kernels_8c_source.html#l00055">tile_order_linear_index_2d()</a>.</p>
@@ -34141,48 +34212,48 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00320">320</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  327</span>{</div>
-<div class="line"><span class="lineno">  328</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  329</span>        embed_dim &lt;= 0 || merge_size &lt;= 0 || source_grid_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  330</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  331</span>    }</div>
-<div class="line"><span class="lineno">  332</span> </div>
-<div class="line"><span class="lineno">  333</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> y_scale = grid_h &gt; 1</div>
-<div class="line"><span class="lineno">  334</span>        ? (float)(source_grid_size - 1) / (float)(grid_h - 1)</div>
-<div class="line"><span class="lineno">  335</span>        : 0.0f;</div>
-<div class="line"><span class="lineno">  336</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> x_scale = grid_w &gt; 1</div>
-<div class="line"><span class="lineno">  337</span>        ? (float)(source_grid_size - 1) / (float)(grid_w - 1)</div>
-<div class="line"><span class="lineno">  338</span>        : 0.0f;</div>
-<div class="line"><span class="lineno">  339</span> </div>
-<div class="line"><span class="lineno">  340</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; grid_h * grid_w; ++tok) {</div>
-<div class="line"><span class="lineno">  341</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row_major = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
-<div class="line"><span class="lineno">  342</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_y = row_major / grid_w;</div>
-<div class="line"><span class="lineno">  343</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_x = row_major % grid_w;</div>
-<div class="line"><span class="lineno">  344</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_y = (float)dst_y * y_scale;</div>
-<div class="line"><span class="lineno">  345</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_x = (float)dst_x * x_scale;</div>
-<div class="line"><span class="lineno">  346</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = (int)src_y;</div>
-<div class="line"><span class="lineno">  347</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = (int)src_x;</div>
-<div class="line"><span class="lineno">  348</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y1 = y0 + 1 &lt; source_grid_size ? y0 + 1 : y0;</div>
-<div class="line"><span class="lineno">  349</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x1 = x0 + 1 &lt; source_grid_size ? x0 + 1 : x0;</div>
-<div class="line"><span class="lineno">  350</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = src_y - (float)y0;</div>
-<div class="line"><span class="lineno">  351</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dx = src_x - (float)x0;</div>
-<div class="line"><span class="lineno">  352</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w00 = (1.0f - dy) * (1.0f - dx);</div>
-<div class="line"><span class="lineno">  353</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w01 = (1.0f - dy) * dx;</div>
-<div class="line"><span class="lineno">  354</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w10 = dy * (1.0f - dx);</div>
-<div class="line"><span class="lineno">  355</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w11 = dy * dx;</div>
-<div class="line"><span class="lineno">  356</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p00 = position_embd + ((size_t)y0 * source_grid_size + x0) * embed_dim;</div>
-<div class="line"><span class="lineno">  357</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p01 = position_embd + ((size_t)y0 * source_grid_size + x1) * embed_dim;</div>
-<div class="line"><span class="lineno">  358</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p10 = position_embd + ((size_t)y1 * source_grid_size + x0) * embed_dim;</div>
-<div class="line"><span class="lineno">  359</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p11 = position_embd + ((size_t)y1 * source_grid_size + x1) * embed_dim;</div>
-<div class="line"><span class="lineno">  360</span>        <span class="keywordtype">float</span> *dst = x + (size_t)tok * embed_dim;</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00342">342</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  349</span>{</div>
+<div class="line"><span class="lineno">  350</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  351</span>        embed_dim &lt;= 0 || merge_size &lt;= 0 || source_grid_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  352</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  353</span>    }</div>
+<div class="line"><span class="lineno">  354</span> </div>
+<div class="line"><span class="lineno">  355</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> y_scale = grid_h &gt; 1</div>
+<div class="line"><span class="lineno">  356</span>        ? (float)(source_grid_size - 1) / (float)(grid_h - 1)</div>
+<div class="line"><span class="lineno">  357</span>        : 0.0f;</div>
+<div class="line"><span class="lineno">  358</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> x_scale = grid_w &gt; 1</div>
+<div class="line"><span class="lineno">  359</span>        ? (float)(source_grid_size - 1) / (float)(grid_w - 1)</div>
+<div class="line"><span class="lineno">  360</span>        : 0.0f;</div>
 <div class="line"><span class="lineno">  361</span> </div>
-<div class="line"><span class="lineno">  362</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  363</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> pos = p00[d] * w00 + p01[d] * w01 + p10[d] * w10 + p11[d] * w11;</div>
-<div class="line"><span class="lineno">  364</span>            dst[d] += pos;</div>
-<div class="line"><span class="lineno">  365</span>        }</div>
-<div class="line"><span class="lineno">  366</span>    }</div>
-<div class="line"><span class="lineno">  367</span>}</div>
+<div class="line"><span class="lineno">  362</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; grid_h * grid_w; ++tok) {</div>
+<div class="line"><span class="lineno">  363</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row_major = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
+<div class="line"><span class="lineno">  364</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_y = row_major / grid_w;</div>
+<div class="line"><span class="lineno">  365</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_x = row_major % grid_w;</div>
+<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_y = (float)dst_y * y_scale;</div>
+<div class="line"><span class="lineno">  367</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_x = (float)dst_x * x_scale;</div>
+<div class="line"><span class="lineno">  368</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = (int)src_y;</div>
+<div class="line"><span class="lineno">  369</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = (int)src_x;</div>
+<div class="line"><span class="lineno">  370</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y1 = y0 + 1 &lt; source_grid_size ? y0 + 1 : y0;</div>
+<div class="line"><span class="lineno">  371</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x1 = x0 + 1 &lt; source_grid_size ? x0 + 1 : x0;</div>
+<div class="line"><span class="lineno">  372</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = src_y - (float)y0;</div>
+<div class="line"><span class="lineno">  373</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dx = src_x - (float)x0;</div>
+<div class="line"><span class="lineno">  374</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w00 = (1.0f - dy) * (1.0f - dx);</div>
+<div class="line"><span class="lineno">  375</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w01 = (1.0f - dy) * dx;</div>
+<div class="line"><span class="lineno">  376</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w10 = dy * (1.0f - dx);</div>
+<div class="line"><span class="lineno">  377</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w11 = dy * dx;</div>
+<div class="line"><span class="lineno">  378</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p00 = position_embd + ((size_t)y0 * source_grid_size + x0) * embed_dim;</div>
+<div class="line"><span class="lineno">  379</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p01 = position_embd + ((size_t)y0 * source_grid_size + x1) * embed_dim;</div>
+<div class="line"><span class="lineno">  380</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p10 = position_embd + ((size_t)y1 * source_grid_size + x0) * embed_dim;</div>
+<div class="line"><span class="lineno">  381</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p11 = position_embd + ((size_t)y1 * source_grid_size + x1) * embed_dim;</div>
+<div class="line"><span class="lineno">  382</span>        <span class="keywordtype">float</span> *dst = x + (size_t)tok * embed_dim;</div>
+<div class="line"><span class="lineno">  383</span> </div>
+<div class="line"><span class="lineno">  384</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  385</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> pos = p00[d] * w00 + p01[d] * w01 + p10[d] * w10 + p11[d] * w11;</div>
+<div class="line"><span class="lineno">  386</span>            dst[d] += pos;</div>
+<div class="line"><span class="lineno">  387</span>        }</div>
+<div class="line"><span class="lineno">  388</span>    }</div>
+<div class="line"><span class="lineno">  389</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="vision__kernels_8c_source.html#l00030">tile_order_index_2d()</a>.</p>
 
@@ -34244,53 +34315,53 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00375">375</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  382</span>{</div>
-<div class="line"><span class="lineno">  383</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  384</span>        embed_dim &lt;= 0 || merge_size &lt;= 0 || source_grid_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  385</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  386</span>    }</div>
-<div class="line"><span class="lineno">  387</span> </div>
-<div class="line"><span class="lineno">  388</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; grid_h * grid_w; ++tok) {</div>
-<div class="line"><span class="lineno">  389</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row_major = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
-<div class="line"><span class="lineno">  390</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_y = row_major / grid_w;</div>
-<div class="line"><span class="lineno">  391</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_x = row_major % grid_w;</div>
-<div class="line"><span class="lineno">  392</span>        <span class="comment">/* torch.linspace computes each rational coordinate before FP32 storage. */</span></div>
-<div class="line"><span class="lineno">  393</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_y = grid_h &gt; 1</div>
-<div class="line"><span class="lineno">  394</span>            ? (float)((<span class="keywordtype">double</span>)dst_y * (double)(source_grid_size - 1) / (double)(grid_h - 1))</div>
-<div class="line"><span class="lineno">  395</span>            : 0.0f;</div>
-<div class="line"><span class="lineno">  396</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_x = grid_w &gt; 1</div>
-<div class="line"><span class="lineno">  397</span>            ? (float)((<span class="keywordtype">double</span>)dst_x * (double)(source_grid_size - 1) / (double)(grid_w - 1))</div>
-<div class="line"><span class="lineno">  398</span>            : 0.0f;</div>
-<div class="line"><span class="lineno">  399</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = (int)src_y;</div>
-<div class="line"><span class="lineno">  400</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = (int)src_x;</div>
-<div class="line"><span class="lineno">  401</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y1 = y0 + 1 &lt; source_grid_size ? y0 + 1 : y0;</div>
-<div class="line"><span class="lineno">  402</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x1 = x0 + 1 &lt; source_grid_size ? x0 + 1 : x0;</div>
-<div class="line"><span class="lineno">  403</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = src_y - (float)y0;</div>
-<div class="line"><span class="lineno">  404</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dx = src_x - (float)x0;</div>
-<div class="line"><span class="lineno">  405</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w00 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((1.0f - dy) * (1.0f - dx)));</div>
-<div class="line"><span class="lineno">  406</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w01 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((1.0f - dy) * dx));</div>
-<div class="line"><span class="lineno">  407</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w10 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dy * (1.0f - dx)));</div>
-<div class="line"><span class="lineno">  408</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w11 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dy * dx));</div>
-<div class="line"><span class="lineno">  409</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p00 = position_embd + ((size_t)y0 * source_grid_size + x0) * embed_dim;</div>
-<div class="line"><span class="lineno">  410</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p01 = position_embd + ((size_t)y0 * source_grid_size + x1) * embed_dim;</div>
-<div class="line"><span class="lineno">  411</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p10 = position_embd + ((size_t)y1 * source_grid_size + x0) * embed_dim;</div>
-<div class="line"><span class="lineno">  412</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p11 = position_embd + ((size_t)y1 * source_grid_size + x1) * embed_dim;</div>
-<div class="line"><span class="lineno">  413</span>        <span class="keywordtype">float</span> *dst = x + (size_t)tok * embed_dim;</div>
-<div class="line"><span class="lineno">  414</span> </div>
-<div class="line"><span class="lineno">  415</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
-<div class="line"><span class="lineno">  416</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v00 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p00[d] * w00));</div>
-<div class="line"><span class="lineno">  417</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v01 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p01[d] * w01));</div>
-<div class="line"><span class="lineno">  418</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v10 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p10[d] * w10));</div>
-<div class="line"><span class="lineno">  419</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v11 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p11[d] * w11));</div>
-<div class="line"><span class="lineno">  420</span>            <span class="keywordtype">float</span> pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(v00 + v01));</div>
-<div class="line"><span class="lineno">  421</span>            pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(pos + v10));</div>
-<div class="line"><span class="lineno">  422</span>            pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(pos + v11));</div>
-<div class="line"><span class="lineno">  423</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> hidden = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dst[d]));</div>
-<div class="line"><span class="lineno">  424</span>            dst[d] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(hidden + pos));</div>
-<div class="line"><span class="lineno">  425</span>        }</div>
-<div class="line"><span class="lineno">  426</span>    }</div>
-<div class="line"><span class="lineno">  427</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00397">397</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  404</span>{</div>
+<div class="line"><span class="lineno">  405</span>    <span class="keywordflow">if</span> (x == NULL || position_embd == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  406</span>        embed_dim &lt;= 0 || merge_size &lt;= 0 || source_grid_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  407</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  408</span>    }</div>
+<div class="line"><span class="lineno">  409</span> </div>
+<div class="line"><span class="lineno">  410</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; grid_h * grid_w; ++tok) {</div>
+<div class="line"><span class="lineno">  411</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row_major = <a class="code hl_function" href="vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac">tile_order_index_2d</a>(tok, grid_h, grid_w, merge_size);</div>
+<div class="line"><span class="lineno">  412</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_y = row_major / grid_w;</div>
+<div class="line"><span class="lineno">  413</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> dst_x = row_major % grid_w;</div>
+<div class="line"><span class="lineno">  414</span>        <span class="comment">/* torch.linspace computes each rational coordinate before FP32 storage. */</span></div>
+<div class="line"><span class="lineno">  415</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_y = grid_h &gt; 1</div>
+<div class="line"><span class="lineno">  416</span>            ? (float)((<span class="keywordtype">double</span>)dst_y * (double)(source_grid_size - 1) / (double)(grid_h - 1))</div>
+<div class="line"><span class="lineno">  417</span>            : 0.0f;</div>
+<div class="line"><span class="lineno">  418</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> src_x = grid_w &gt; 1</div>
+<div class="line"><span class="lineno">  419</span>            ? (float)((<span class="keywordtype">double</span>)dst_x * (double)(source_grid_size - 1) / (double)(grid_w - 1))</div>
+<div class="line"><span class="lineno">  420</span>            : 0.0f;</div>
+<div class="line"><span class="lineno">  421</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = (int)src_y;</div>
+<div class="line"><span class="lineno">  422</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = (int)src_x;</div>
+<div class="line"><span class="lineno">  423</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> y1 = y0 + 1 &lt; source_grid_size ? y0 + 1 : y0;</div>
+<div class="line"><span class="lineno">  424</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> x1 = x0 + 1 &lt; source_grid_size ? x0 + 1 : x0;</div>
+<div class="line"><span class="lineno">  425</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dy = src_y - (float)y0;</div>
+<div class="line"><span class="lineno">  426</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dx = src_x - (float)x0;</div>
+<div class="line"><span class="lineno">  427</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w00 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((1.0f - dy) * (1.0f - dx)));</div>
+<div class="line"><span class="lineno">  428</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w01 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((1.0f - dy) * dx));</div>
+<div class="line"><span class="lineno">  429</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w10 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dy * (1.0f - dx)));</div>
+<div class="line"><span class="lineno">  430</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> w11 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dy * dx));</div>
+<div class="line"><span class="lineno">  431</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p00 = position_embd + ((size_t)y0 * source_grid_size + x0) * embed_dim;</div>
+<div class="line"><span class="lineno">  432</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p01 = position_embd + ((size_t)y0 * source_grid_size + x1) * embed_dim;</div>
+<div class="line"><span class="lineno">  433</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p10 = position_embd + ((size_t)y1 * source_grid_size + x0) * embed_dim;</div>
+<div class="line"><span class="lineno">  434</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *p11 = position_embd + ((size_t)y1 * source_grid_size + x1) * embed_dim;</div>
+<div class="line"><span class="lineno">  435</span>        <span class="keywordtype">float</span> *dst = x + (size_t)tok * embed_dim;</div>
+<div class="line"><span class="lineno">  436</span> </div>
+<div class="line"><span class="lineno">  437</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; embed_dim; ++d) {</div>
+<div class="line"><span class="lineno">  438</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v00 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p00[d] * w00));</div>
+<div class="line"><span class="lineno">  439</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v01 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p01[d] * w01));</div>
+<div class="line"><span class="lineno">  440</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v10 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p10[d] * w10));</div>
+<div class="line"><span class="lineno">  441</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> v11 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(p11[d] * w11));</div>
+<div class="line"><span class="lineno">  442</span>            <span class="keywordtype">float</span> pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(v00 + v01));</div>
+<div class="line"><span class="lineno">  443</span>            pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(pos + v10));</div>
+<div class="line"><span class="lineno">  444</span>            pos = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(pos + v11));</div>
+<div class="line"><span class="lineno">  445</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> hidden = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(dst[d]));</div>
+<div class="line"><span class="lineno">  446</span>            dst[d] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(hidden + pos));</div>
+<div class="line"><span class="lineno">  447</span>        }</div>
+<div class="line"><span class="lineno">  448</span>    }</div>
+<div class="line"><span class="lineno">  449</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="vision__kernels_8c_source.html#l00030">tile_order_index_2d()</a>.</p>
 
@@ -41980,19 +42051,19 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00605">605</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  609</span>{</div>
-<div class="line"><span class="lineno">  610</span>    <span class="keywordflow">if</span> (!x || !bias || rows &lt;= 0 || dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  611</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  612</span>    }</div>
-<div class="line"><span class="lineno">  613</span> </div>
-<div class="line"><span class="lineno">  614</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">  615</span>        <span class="keywordtype">float</span> *row = x + ((size_t) r * (<span class="keywordtype">size_t</span>) dim);</div>
-<div class="line"><span class="lineno">  616</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; dim; ++c) {</div>
-<div class="line"><span class="lineno">  617</span>            row[c] += bias[c];</div>
-<div class="line"><span class="lineno">  618</span>        }</div>
-<div class="line"><span class="lineno">  619</span>    }</div>
-<div class="line"><span class="lineno">  620</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00627">627</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  631</span>{</div>
+<div class="line"><span class="lineno">  632</span>    <span class="keywordflow">if</span> (!x || !bias || rows &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  633</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  634</span>    }</div>
+<div class="line"><span class="lineno">  635</span> </div>
+<div class="line"><span class="lineno">  636</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">  637</span>        <span class="keywordtype">float</span> *row = x + ((size_t) r * (<span class="keywordtype">size_t</span>) dim);</div>
+<div class="line"><span class="lineno">  638</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; dim; ++c) {</div>
+<div class="line"><span class="lineno">  639</span>            row[c] += bias[c];</div>
+<div class="line"><span class="lineno">  640</span>        }</div>
+<div class="line"><span class="lineno">  641</span>    }</div>
+<div class="line"><span class="lineno">  642</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -42623,39 +42694,39 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00566">566</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  572</span>{</div>
-<div class="line"><span class="lineno">  573</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  574</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  575</span>    }</div>
-<div class="line"><span class="lineno">  576</span> </div>
-<div class="line"><span class="lineno">  577</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_h = grid_h / merge_size;</div>
-<div class="line"><span class="lineno">  578</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_w = grid_w / merge_size;</div>
-<div class="line"><span class="lineno">  579</span>    <span class="keywordflow">if</span> (out_h &lt;= 0 || out_w &lt;= 0) {</div>
-<div class="line"><span class="lineno">  580</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  581</span>    }</div>
-<div class="line"><span class="lineno">  582</span> </div>
-<div class="line"><span class="lineno">  583</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_area = 1.0f / (float)(merge_size * merge_size);</div>
-<div class="line"><span class="lineno">  584</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> oy = 0; oy &lt; out_h; ++oy) {</div>
-<div class="line"><span class="lineno">  585</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ox = 0; ox &lt; out_w; ++ox) {</div>
-<div class="line"><span class="lineno">  586</span>            <span class="keywordtype">float</span> *dst = output + ((size_t)oy * (<span class="keywordtype">size_t</span>)out_w + (size_t)ox) * (size_t)embed_dim;</div>
-<div class="line"><span class="lineno">  587</span>            memset(dst, 0, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  588</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dy = 0; dy &lt; merge_size; ++dy) {</div>
-<div class="line"><span class="lineno">  589</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> iy = oy * merge_size + dy;</div>
-<div class="line"><span class="lineno">  590</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dx = 0; dx &lt; merge_size; ++dx) {</div>
-<div class="line"><span class="lineno">  591</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> ix = ox * merge_size + dx;</div>
-<div class="line"><span class="lineno">  592</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> *src = input + ((size_t)iy * (<span class="keywordtype">size_t</span>)grid_w + (size_t)ix) * (size_t)embed_dim;</div>
-<div class="line"><span class="lineno">  593</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; embed_dim; ++c) {</div>
-<div class="line"><span class="lineno">  594</span>                        dst[c] += src[c];</div>
-<div class="line"><span class="lineno">  595</span>                    }</div>
-<div class="line"><span class="lineno">  596</span>                }</div>
-<div class="line"><span class="lineno">  597</span>            }</div>
-<div class="line"><span class="lineno">  598</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; embed_dim; ++c) {</div>
-<div class="line"><span class="lineno">  599</span>                dst[c] *= inv_area;</div>
-<div class="line"><span class="lineno">  600</span>            }</div>
-<div class="line"><span class="lineno">  601</span>        }</div>
-<div class="line"><span class="lineno">  602</span>    }</div>
-<div class="line"><span class="lineno">  603</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00588">588</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  594</span>{</div>
+<div class="line"><span class="lineno">  595</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  596</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  597</span>    }</div>
+<div class="line"><span class="lineno">  598</span> </div>
+<div class="line"><span class="lineno">  599</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_h = grid_h / merge_size;</div>
+<div class="line"><span class="lineno">  600</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> out_w = grid_w / merge_size;</div>
+<div class="line"><span class="lineno">  601</span>    <span class="keywordflow">if</span> (out_h &lt;= 0 || out_w &lt;= 0) {</div>
+<div class="line"><span class="lineno">  602</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  603</span>    }</div>
+<div class="line"><span class="lineno">  604</span> </div>
+<div class="line"><span class="lineno">  605</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> inv_area = 1.0f / (float)(merge_size * merge_size);</div>
+<div class="line"><span class="lineno">  606</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> oy = 0; oy &lt; out_h; ++oy) {</div>
+<div class="line"><span class="lineno">  607</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ox = 0; ox &lt; out_w; ++ox) {</div>
+<div class="line"><span class="lineno">  608</span>            <span class="keywordtype">float</span> *dst = output + ((size_t)oy * (<span class="keywordtype">size_t</span>)out_w + (size_t)ox) * (size_t)embed_dim;</div>
+<div class="line"><span class="lineno">  609</span>            memset(dst, 0, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  610</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dy = 0; dy &lt; merge_size; ++dy) {</div>
+<div class="line"><span class="lineno">  611</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> iy = oy * merge_size + dy;</div>
+<div class="line"><span class="lineno">  612</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dx = 0; dx &lt; merge_size; ++dx) {</div>
+<div class="line"><span class="lineno">  613</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> ix = ox * merge_size + dx;</div>
+<div class="line"><span class="lineno">  614</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> *src = input + ((size_t)iy * (<span class="keywordtype">size_t</span>)grid_w + (size_t)ix) * (size_t)embed_dim;</div>
+<div class="line"><span class="lineno">  615</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; embed_dim; ++c) {</div>
+<div class="line"><span class="lineno">  616</span>                        dst[c] += src[c];</div>
+<div class="line"><span class="lineno">  617</span>                    }</div>
+<div class="line"><span class="lineno">  618</span>                }</div>
+<div class="line"><span class="lineno">  619</span>            }</div>
+<div class="line"><span class="lineno">  620</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> c = 0; c &lt; embed_dim; ++c) {</div>
+<div class="line"><span class="lineno">  621</span>                dst[c] *= inv_area;</div>
+<div class="line"><span class="lineno">  622</span>            }</div>
+<div class="line"><span class="lineno">  623</span>        }</div>
+<div class="line"><span class="lineno">  624</span>    }</div>
+<div class="line"><span class="lineno">  625</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -42706,40 +42777,40 @@ Functions</h2></td></tr>
 <p>Input layout: [grid_h * grid_w, embed_dim] Output layout: [(grid_h/2) * (grid_w/2), embed_dim * 4]</p>
 <p>Pack order within each merged token: top-left, top-right, bottom-left, bottom-right </p>
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00486">486</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  491</span>{</div>
-<div class="line"><span class="lineno">  492</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  493</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  494</span>    }</div>
-<div class="line"><span class="lineno">  495</span> </div>
-<div class="line"><span class="lineno">  496</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> merged_h = grid_h / 2;</div>
-<div class="line"><span class="lineno">  497</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> merged_w = grid_w / 2;</div>
-<div class="line"><span class="lineno">  498</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> token_stride = (size_t)embed_dim;</div>
-<div class="line"><span class="lineno">  499</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merged_stride = (size_t)embed_dim * 4;</div>
-<div class="line"><span class="lineno">  500</span> </div>
-<div class="line"><span class="lineno">  501</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mh = 0; mh &lt; merged_h; ++mh) {</div>
-<div class="line"><span class="lineno">  502</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mw = 0; mw &lt; merged_w; ++mw) {</div>
-<div class="line"><span class="lineno">  503</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = mh * 2;</div>
-<div class="line"><span class="lineno">  504</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = mw * 2;</div>
-<div class="line"><span class="lineno">  505</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx00 = y0 * grid_w + x0;</div>
-<div class="line"><span class="lineno">  506</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx01 = in_idx00 + 1;</div>
-<div class="line"><span class="lineno">  507</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx10 = in_idx00 + grid_w;</div>
-<div class="line"><span class="lineno">  508</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx11 = in_idx10 + 1;</div>
-<div class="line"><span class="lineno">  509</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> out_idx = mh * merged_w + mw;</div>
-<div class="line"><span class="lineno">  510</span> </div>
-<div class="line"><span class="lineno">  511</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src00 = input + (size_t)in_idx00 * token_stride;</div>
-<div class="line"><span class="lineno">  512</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src01 = input + (size_t)in_idx01 * token_stride;</div>
-<div class="line"><span class="lineno">  513</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src10 = input + (size_t)in_idx10 * token_stride;</div>
-<div class="line"><span class="lineno">  514</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src11 = input + (size_t)in_idx11 * token_stride;</div>
-<div class="line"><span class="lineno">  515</span>            <span class="keywordtype">float</span> *dst = output + (size_t)out_idx * merged_stride;</div>
-<div class="line"><span class="lineno">  516</span> </div>
-<div class="line"><span class="lineno">  517</span>            memcpy(dst + 0 * embed_dim, src00, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  518</span>            memcpy(dst + 1 * embed_dim, src01, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  519</span>            memcpy(dst + 2 * embed_dim, src10, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  520</span>            memcpy(dst + 3 * embed_dim, src11, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  521</span>        }</div>
-<div class="line"><span class="lineno">  522</span>    }</div>
-<div class="line"><span class="lineno">  523</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00508">508</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  513</span>{</div>
+<div class="line"><span class="lineno">  514</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  515</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  516</span>    }</div>
+<div class="line"><span class="lineno">  517</span> </div>
+<div class="line"><span class="lineno">  518</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> merged_h = grid_h / 2;</div>
+<div class="line"><span class="lineno">  519</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> merged_w = grid_w / 2;</div>
+<div class="line"><span class="lineno">  520</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> token_stride = (size_t)embed_dim;</div>
+<div class="line"><span class="lineno">  521</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merged_stride = (size_t)embed_dim * 4;</div>
+<div class="line"><span class="lineno">  522</span> </div>
+<div class="line"><span class="lineno">  523</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mh = 0; mh &lt; merged_h; ++mh) {</div>
+<div class="line"><span class="lineno">  524</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mw = 0; mw &lt; merged_w; ++mw) {</div>
+<div class="line"><span class="lineno">  525</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> y0 = mh * 2;</div>
+<div class="line"><span class="lineno">  526</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> x0 = mw * 2;</div>
+<div class="line"><span class="lineno">  527</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx00 = y0 * grid_w + x0;</div>
+<div class="line"><span class="lineno">  528</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx01 = in_idx00 + 1;</div>
+<div class="line"><span class="lineno">  529</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx10 = in_idx00 + grid_w;</div>
+<div class="line"><span class="lineno">  530</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> in_idx11 = in_idx10 + 1;</div>
+<div class="line"><span class="lineno">  531</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> out_idx = mh * merged_w + mw;</div>
+<div class="line"><span class="lineno">  532</span> </div>
+<div class="line"><span class="lineno">  533</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src00 = input + (size_t)in_idx00 * token_stride;</div>
+<div class="line"><span class="lineno">  534</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src01 = input + (size_t)in_idx01 * token_stride;</div>
+<div class="line"><span class="lineno">  535</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src10 = input + (size_t)in_idx10 * token_stride;</div>
+<div class="line"><span class="lineno">  536</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src11 = input + (size_t)in_idx11 * token_stride;</div>
+<div class="line"><span class="lineno">  537</span>            <span class="keywordtype">float</span> *dst = output + (size_t)out_idx * merged_stride;</div>
+<div class="line"><span class="lineno">  538</span> </div>
+<div class="line"><span class="lineno">  539</span>            memcpy(dst + 0 * embed_dim, src00, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  540</span>            memcpy(dst + 1 * embed_dim, src01, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  541</span>            memcpy(dst + 2 * embed_dim, src10, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  542</span>            memcpy(dst + 3 * embed_dim, src11, (<span class="keywordtype">size_t</span>)embed_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  543</span>        }</div>
+<div class="line"><span class="lineno">  544</span>    }</div>
+<div class="line"><span class="lineno">  545</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -42793,17 +42864,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00525">525</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  531</span>{</div>
-<div class="line"><span class="lineno">  532</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  533</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  534</span>    }</div>
-<div class="line"><span class="lineno">  535</span> </div>
-<div class="line"><span class="lineno">  536</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> num_tokens = (size_t) grid_h * (<span class="keywordtype">size_t</span>) grid_w;</div>
-<div class="line"><span class="lineno">  537</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merge_factor = (size_t) merge_size * (<span class="keywordtype">size_t</span>) merge_size;</div>
-<div class="line"><span class="lineno">  538</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merged_tokens = num_tokens / merge_factor;</div>
-<div class="line"><span class="lineno">  539</span>    memcpy(output, input, merged_tokens * (<span class="keywordtype">size_t</span>) embed_dim * merge_factor * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  540</span>}</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00547">547</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  553</span>{</div>
+<div class="line"><span class="lineno">  554</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL || grid_h &lt;= 0 || grid_w &lt;= 0 || embed_dim &lt;= 0 || merge_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  555</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  556</span>    }</div>
+<div class="line"><span class="lineno">  557</span> </div>
+<div class="line"><span class="lineno">  558</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> num_tokens = (size_t) grid_h * (<span class="keywordtype">size_t</span>) grid_w;</div>
+<div class="line"><span class="lineno">  559</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merge_factor = (size_t) merge_size * (<span class="keywordtype">size_t</span>) merge_size;</div>
+<div class="line"><span class="lineno">  560</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> merged_tokens = num_tokens / merge_factor;</div>
+<div class="line"><span class="lineno">  561</span>    memcpy(output, input, merged_tokens * (<span class="keywordtype">size_t</span>) embed_dim * merge_factor * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  562</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -45007,41 +45078,41 @@ Functions</h2></td></tr>
 <p>Output layout: [4, grid_h * grid_w] flattened as [y_stream | x_stream | y_stream_dup | x_stream_dup]</p>
 <p>Tokens are emitted in merged-tile traversal order so the position buffer matches the same 2x2 grouping used by Qwen-style vision encoders. </p>
 
-<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00438">438</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  442</span>{</div>
-<div class="line"><span class="lineno">  443</span>    <span class="keywordflow">if</span> (!positions || grid_h &lt;= 0 || grid_w &lt;= 0 || merge_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  444</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  445</span>    }</div>
-<div class="line"><span class="lineno">  446</span> </div>
-<div class="line"><span class="lineno">  447</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
-<div class="line"><span class="lineno">  448</span>    <span class="keywordtype">int</span> ptr = 0;</div>
-<div class="line"><span class="lineno">  449</span> </div>
-<div class="line"><span class="lineno">  450</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> y = 0; y &lt; grid_h; y += merge_size) {</div>
-<div class="line"><span class="lineno">  451</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> x = 0; x &lt; grid_w; x += merge_size) {</div>
-<div class="line"><span class="lineno">  452</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dy = 0; dy &lt; merge_size; ++dy) {</div>
-<div class="line"><span class="lineno">  453</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dx = 0; dx &lt; merge_size; ++dx) {</div>
-<div class="line"><span class="lineno">  454</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> yy = y + dy;</div>
-<div class="line"><span class="lineno">  455</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> xx = x + dx;</div>
-<div class="line"><span class="lineno">  456</span>                    <span class="keywordflow">if</span> (yy &gt;= grid_h || xx &gt;= grid_w || ptr &gt;= num_tokens) {</div>
-<div class="line"><span class="lineno">  457</span>                        <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  458</span>                    }</div>
-<div class="line"><span class="lineno">  459</span>                    positions[ptr] = yy;</div>
-<div class="line"><span class="lineno">  460</span>                    positions[num_tokens + ptr] = xx;</div>
-<div class="line"><span class="lineno">  461</span>                    positions[2 * num_tokens + ptr] = yy;</div>
-<div class="line"><span class="lineno">  462</span>                    positions[3 * num_tokens + ptr] = xx;</div>
-<div class="line"><span class="lineno">  463</span>                    ++ptr;</div>
-<div class="line"><span class="lineno">  464</span>                }</div>
-<div class="line"><span class="lineno">  465</span>            }</div>
-<div class="line"><span class="lineno">  466</span>        }</div>
+<p class="definition">Definition at line <a class="el" href="vision__kernels_8c_source.html#l00460">460</a> of file <a class="el" href="vision__kernels_8c_source.html">vision_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  464</span>{</div>
+<div class="line"><span class="lineno">  465</span>    <span class="keywordflow">if</span> (!positions || grid_h &lt;= 0 || grid_w &lt;= 0 || merge_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  466</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  467</span>    }</div>
 <div class="line"><span class="lineno">  468</span> </div>
-<div class="line"><span class="lineno">  469</span>    <span class="keywordflow">for</span> (; ptr &lt; num_tokens; ++ptr) {</div>
-<div class="line"><span class="lineno">  470</span>        positions[ptr] = 0;</div>
-<div class="line"><span class="lineno">  471</span>        positions[num_tokens + ptr] = 0;</div>
-<div class="line"><span class="lineno">  472</span>        positions[2 * num_tokens + ptr] = 0;</div>
-<div class="line"><span class="lineno">  473</span>        positions[3 * num_tokens + ptr] = 0;</div>
-<div class="line"><span class="lineno">  474</span>    }</div>
-<div class="line"><span class="lineno">  475</span>}</div>
+<div class="line"><span class="lineno">  469</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = grid_h * grid_w;</div>
+<div class="line"><span class="lineno">  470</span>    <span class="keywordtype">int</span> ptr = 0;</div>
+<div class="line"><span class="lineno">  471</span> </div>
+<div class="line"><span class="lineno">  472</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> y = 0; y &lt; grid_h; y += merge_size) {</div>
+<div class="line"><span class="lineno">  473</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> x = 0; x &lt; grid_w; x += merge_size) {</div>
+<div class="line"><span class="lineno">  474</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dy = 0; dy &lt; merge_size; ++dy) {</div>
+<div class="line"><span class="lineno">  475</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> dx = 0; dx &lt; merge_size; ++dx) {</div>
+<div class="line"><span class="lineno">  476</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> yy = y + dy;</div>
+<div class="line"><span class="lineno">  477</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> xx = x + dx;</div>
+<div class="line"><span class="lineno">  478</span>                    <span class="keywordflow">if</span> (yy &gt;= grid_h || xx &gt;= grid_w || ptr &gt;= num_tokens) {</div>
+<div class="line"><span class="lineno">  479</span>                        <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  480</span>                    }</div>
+<div class="line"><span class="lineno">  481</span>                    positions[ptr] = yy;</div>
+<div class="line"><span class="lineno">  482</span>                    positions[num_tokens + ptr] = xx;</div>
+<div class="line"><span class="lineno">  483</span>                    positions[2 * num_tokens + ptr] = yy;</div>
+<div class="line"><span class="lineno">  484</span>                    positions[3 * num_tokens + ptr] = xx;</div>
+<div class="line"><span class="lineno">  485</span>                    ++ptr;</div>
+<div class="line"><span class="lineno">  486</span>                }</div>
+<div class="line"><span class="lineno">  487</span>            }</div>
+<div class="line"><span class="lineno">  488</span>        }</div>
+<div class="line"><span class="lineno">  489</span>    }</div>
+<div class="line"><span class="lineno">  490</span> </div>
+<div class="line"><span class="lineno">  491</span>    <span class="keywordflow">for</span> (; ptr &lt; num_tokens; ++ptr) {</div>
+<div class="line"><span class="lineno">  492</span>        positions[ptr] = 0;</div>
+<div class="line"><span class="lineno">  493</span>        positions[num_tokens + ptr] = 0;</div>
+<div class="line"><span class="lineno">  494</span>        positions[2 * num_tokens + ptr] = 0;</div>
+<div class="line"><span class="lineno">  495</span>        positions[3 * num_tokens + ptr] = 0;</div>
+<div class="line"><span class="lineno">  496</span>    }</div>
+<div class="line"><span class="lineno">  497</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
