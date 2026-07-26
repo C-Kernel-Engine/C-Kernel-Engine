@@ -1,5 +1,13 @@
 var NAVTREEINDEX23 =
 {
+"vision__kernels_8c.html#a38fa089663c3300b061508567cd18462":[2,0,1,1,88,12],
+"vision__kernels_8c.html#a3ffa58aab7da5c6e77096ad19385329a":[2,0,1,1,88,8],
+"vision__kernels_8c.html#a4a280c920122a804828475fb09571052":[2,0,1,1,88,14],
+"vision__kernels_8c.html#a6414bc6af9c28e7baf31b434073e794f":[2,0,1,1,88,5],
+"vision__kernels_8c.html#a6933897ffa7aa6a48b03e6bd01087ae0":[2,0,1,1,88,18],
+"vision__kernels_8c.html#a86aec042bcceb0bd8955f0daf0d986c4":[2,0,1,1,88,7],
+"vision__kernels_8c.html#a95f0081ec402d0df10805093d32c8ae5":[2,0,1,1,88,6],
+"vision__kernels_8c.html#a9af0dbbeb1b7fd100f99d796eaf0623f":[2,0,1,1,88,4],
 "vision__kernels_8c.html#abb267c5e63943557c83c193b2bd637fd":[2,0,1,1,88,16],
 "vision__kernels_8c.html#ac3987d3d95a62a769029100abbbf852a":[2,0,1,1,88,3],
 "vision__kernels_8c.html#ace7994d37be7b565c895e0b7205baad2":[2,0,1,1,88,10],
