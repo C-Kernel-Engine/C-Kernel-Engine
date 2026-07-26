@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 760" font-family="'Inter',system-ui,sans-serif">
+  <defs>
+    <linearGradient id="cnOpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="cnMapGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="cnIrGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="cnCGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <marker id="cnArrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="760" rx="18" fill="#0f172a"/>
+  <rect x="0" y="0" width="1100" height="760" rx="18" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+  <text x="40" y="50" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CIRCUIT TO NATIVE EXECUTION &#183; WHISPER AUDIO FRONTEND</text>
+  <text x="40" y="86" font-size="26" font-weight="700" fill="#f1f5f9">One operation sequence, four owners, zero guesses</text>
+  <text x="40" y="110" font-size="13.5" fill="#94a3b8">Provider selection is a kernel-map decision; scheduling is a call-IR decision; arithmetic belongs to generated C &#8212; never to Python or a codegen branch.</text>
+
+  <!-- ===== COLUMN 1 : CIRCUIT OPS ===== -->
+  <text x="40" y="152" font-size="11" font-weight="700" letter-spacing="2" fill="#a5b4fc" font-family="ui-monospace,Menlo,monospace">1 &#183; CIRCUIT OPS</text>
+  <text x="40" y="170" font-size="10.5" fill="#64748b">whisper_audio_frontend.json</text>
+
+  <g font-family="ui-monospace,Menlo,monospace" font-size="11.5">
+    <rect x="40" y="186" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="208" fill="#e0e7ff" font-weight="600">audio_wav_decode</text>
+    <text x="56" y="226" fill="#8b93b8" font-size="10">RIFF walk &#183; PCM16 &#183; mono mean</text>
+
+    <rect x="40" y="248" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="270" fill="#e0e7ff" font-weight="600">audio_resample</text>
+    <text x="56" y="288" fill="#8b93b8" font-size="10">windowed sinc &#183; identity @16k</text>
+
+    <rect x="40" y="310" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="332" fill="#e0e7ff" font-weight="600">audio_pad_or_truncate</text>
+    <text x="56" y="350" fill="#8b93b8" font-size="10">extent = 480,000 samples</text>
+
+    <rect x="40" y="372" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="394" fill="#e0e7ff" font-weight="600">audio_stft_tables</text>
+    <text x="56" y="412" fill="#8b93b8" font-size="10">Hann + trig, built once</text>
+
+    <rect x="40" y="434" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="456" fill="#e0e7ff" font-weight="600">audio_stft</text>
+    <text x="56" y="474" fill="#8b93b8" font-size="10">FFT400 power &#183; [201 &#215; T]</text>
+
+    <rect x="40" y="496" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="518" fill="#e0e7ff" font-weight="600">audio_mel_filters</text>
+    <text x="56" y="536" fill="#8b93b8" font-size="10">Slaney 80 &#215; 201</text>
+
+    <rect x="40" y="558" width="220" height="52" rx="9" fill="#16123a" stroke="url(#cnOpGrad)" stroke-width="1.5"/>
+    <text x="56" y="580" fill="#e0e7ff" font-weight="600">audio_log_mel</text>
+    <text x="56" y="598" fill="#8b93b8" font-size="10">log10 &#183; global 80 dB clamp</text>
+  </g>
+
+  <!-- ===== COLUMN 2 : CONTRACT + KERNEL MAP ===== -->
+  <text x="330" y="152" font-size="11" font-weight="700" letter-spacing="2" fill="#93c5fd" font-family="ui-monospace,Menlo,monospace">2 &#183; CONTRACT &#8594; KERNEL MAP</text>
+  <text x="330" y="170" font-size="10.5" fill="#64748b">exact numerical contract &#183; map-owned call ABI</text>
+
+  <g>
+    <rect x="330" y="186" width="300" height="240" rx="12" fill="#111c33" stroke="url(#cnMapGrad)" stroke-width="1.6"/>
+    <text x="350" y="216" font-size="12.5" font-weight="700" fill="#bfdbfe">Every op carries:</text>
+    <text x="350" y="244" font-size="11.5" fill="#94a3b8">&#8226; numerical contract id + validation</text>
+    <text x="350" y="266" font-size="11.5" fill="#94a3b8">&#8226; input/output layouts + dtype</text>
+    <text x="350" y="288" font-size="11.5" fill="#94a3b8">&#8226; checkpoint id for X-ray parity</text>
+    <line x1="350" y1="308" x2="610" y2="308" stroke="#1e3a5f" stroke-width="1"/>
+    <text x="350" y="334" font-size="12.5" font-weight="700" fill="#bfdbfe">The map alone chooses:</text>
+    <text x="350" y="362" font-size="11.5" fill="#94a3b8">&#8226; the registered provider function</text>
+    <text x="350" y="384" font-size="11.5" fill="#94a3b8">&#8226; the call ABI (args, buffers, dims)</text>
+    <text x="350" y="410" font-size="10.5" fill="#64748b">kernel_maps/audio_*.json &#183; fail closed if missing</text>
+  </g>
+
+  <g font-family="ui-monospace,Menlo,monospace" font-size="10.5">
+    <rect x="330" y="442" width="300" height="168" rx="12" fill="#0b1120" stroke="#1e3a5f" stroke-width="1.2"/>
+    <text x="348" y="468" fill="#7dd3fc" font-weight="600">resolved providers</text>
+    <text x="348" y="492" fill="#94a3b8">audio_wav_decode_memory_pcm16_mono_f32</text>
+    <text x="348" y="512" fill="#94a3b8">audio_resample_windowed_sinc_f32</text>
+    <text x="348" y="532" fill="#94a3b8">audio_pad_or_truncate_f32</text>
+    <text x="348" y="552" fill="#94a3b8">audio_stft_power_fft400_f32</text>
+    <text x="348" y="572" fill="#94a3b8">audio_whisper_mel_filters_slaney_f32</text>
+    <text x="348" y="592" fill="#94a3b8">audio_whisper_log_mel_from_power_&#8230;</text>
+  </g>
+
+  <!-- ===== COLUMN 3 : LOWERING + CALL IR ===== -->
+  <text x="700" y="152" font-size="11" font-weight="700" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,Menlo,monospace">3 &#183; LOWERED IR &#8594; CALL IR</text>
+  <text x="700" y="170" font-size="10.5" fill="#64748b">buffers planned &#183; runtime WAV metadata lowered</text>
+
+  <g>
+    <rect x="700" y="186" width="360" height="200" rx="12" fill="#2b1d07" stroke="url(#cnIrGrad)" stroke-width="1.6"/>
+    <text x="720" y="216" font-size="12.5" font-weight="700" fill="#fde68a">Lowering owns the schedule:</text>
+    <text x="720" y="244" font-size="11.5" fill="#d6b370">&#8226; frontend buffers planned once</text>
+    <text x="720" y="266" font-size="11.5" fill="#d6b370">&#8226; WAV bytes + sample rate enter as</text>
+    <text x="720" y="284" font-size="11.5" fill="#d6b370">&#160;&#160;runtime call-IR arguments</text>
+    <text x="720" y="306" font-size="11.5" fill="#d6b370">&#8226; op order fixed by the circuit,</text>
+    <text x="720" y="324" font-size="11.5" fill="#d6b370">&#160;&#160;not by Python control flow</text>
+    <text x="720" y="356" font-size="10.5" fill="#8a6d3b">tests fail closed on drift: missing op, incomplete</text>
+    <text x="720" y="372" font-size="10.5" fill="#8a6d3b">runtime args, or ABI bypass all stop the build</text>
+  </g>
+
+  <!-- arrows between columns -->
+  <line x1="262" y1="398" x2="324" y2="398" stroke="#94a3b8" stroke-width="2" marker-end="url(#cnArrow)"/>
+  <line x1="632" y1="398" x2="694" y2="398" stroke="#94a3b8" stroke-width="2" marker-end="url(#cnArrow)"/>
+  <line x1="880" y1="390" x2="880" y2="424" stroke="#94a3b8" stroke-width="2" marker-end="url(#cnArrow)"/>
+
+  <!-- ===== COLUMN 3b : GENERATED C ===== -->
+  <text x="700" y="452" font-size="11" font-weight="700" letter-spacing="2" fill="#6ee7b7" font-family="ui-monospace,Menlo,monospace">4 &#183; GENERATED C</text>
+
+  <g>
+    <rect x="700" y="468" width="360" height="142" rx="12" fill="#0d2818" stroke="url(#cnCGrad)" stroke-width="1.6"/>
+    <text x="720" y="498" font-size="12" font-weight="700" fill="#a7f3d0" font-family="ui-monospace,Menlo,monospace">ck_model_run_audio_wav(</text>
+    <text x="720" y="520" font-size="11" fill="#6ee7b7" font-family="ui-monospace,Menlo,monospace">&#160;&#160;const uint8_t *wav_bytes, &#8230; )</text>
+    <text x="720" y="548" font-size="11.5" fill="#94a3b8">One exported entrypoint runs all seven ops;</text>
+    <text x="720" y="568" font-size="11.5" fill="#94a3b8">all frontend arithmetic lives here, not in Python.</text>
+    <text x="720" y="594" font-size="10.5" fill="#64748b">syntax-compiled per codegen regression &#183; artifact-gated E2E</text>
+  </g>
+
+  <!-- ===== BOTTOM STRIP : OWNERSHIP ===== -->
+  <rect x="40" y="640" width="1020" height="88" rx="12" fill="#0b1120" stroke="#1e293b" stroke-width="1.2"/>
+  <text x="64" y="672" font-size="11" font-weight="700" letter-spacing="1.5" fill="#f59e0b" font-family="ui-monospace,Menlo,monospace">PYTHON</text>
+  <text x="150" y="672" font-size="11.5" fill="#94a3b8">lifecycle only &#8212; artifact directories, encoder/decoder process isolation, report writing. No frontend arithmetic.</text>
+  <text x="64" y="706" font-size="11" font-weight="700" letter-spacing="1.5" fill="#34d399" font-family="ui-monospace,Menlo,monospace">GEN C&#160;&#160;</text>
+  <text x="150" y="706" font-size="11.5" fill="#94a3b8">every sample-level computation &#8212; decode, resample, pad, STFT, mel, log-Mel &#8212; inside the generated artifact.</text>
+</svg>

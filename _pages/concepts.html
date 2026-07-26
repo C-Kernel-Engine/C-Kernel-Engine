@@ -34,6 +34,8 @@
     <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#vision-patch">Vision Patch Embedding</a></li>
     <li><a href="#vision-position">&mdash; 1D Text vs 2D Vision Position (RoPE)</a></li>
+    <li><a href="#audio-frontend">Audio Frontend: WAV to Log-Mel to Conv Stem</a></li>
+    <li><a href="#audio-cross-attention">&mdash; Cross-Attention: Decoder Queries, Encoder Memory</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
 
@@ -933,6 +935,176 @@ vision :  y-dims rotate by  y * base^(-2i/d)
         <strong>The one-line summary</strong><br>
         Text RoPE answers &ldquo;how far along the sequence?&rdquo; with one index. Vision M-RoPE answers &ldquo;which row and which column?&rdquo; with two &mdash; same rotation trick, applied to a 2D grid coordinate, with an interpolatable learned table layered on top.
     </div>
+</div>
+
+<hr>
+
+<h2 id="audio-frontend">Audio Frontend: WAV to Log-Mel to Conv Stem</h2>
+
+<p>Audio families (Whisper Tiny today) start by turning a raw waveform into a sequence of encoder tokens &mdash; the same role the patch frontend plays for vision. In CK-Engine these steps are concrete kernels in <code>src/kernels/audio_kernels.c</code> (declared in <code>include/ckernel_audio.h</code>), not hidden preprocessing, which is what lets the audio encoder share the same lowering, memory plan, and parity-gate machinery as the text and vision lanes.</p>
+
+<div class="img-container svg-viewer" data-title="Audio frontend: WAV decode, resample, STFT power, log-Mel, Conv1D stem, token transpose">
+    <img src="assets/concept-audio-frontend.svg" alt="Audio frontend kernel dataflow from waveform to encoder tokens">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Frontend Contract</h3>
+        <pre>
+wav decode:  PCM16 -> f32, s=pcm/32768  [n_samples]
+resample:    windowed sinc -> 16 kHz mono
+pad/trunc:   extent -> 480,000 samples  (30 s)
+stft power:  n_fft=400, hop=160, Hann   [201 x 3000]
+mel filters: Slaney 80 x 201, built once
+log-mel:     log10, clamp max-8, /4     [80 x 3000]
+conv stem:   k3s1 + k3s2 + GELU         [384 x 1500]
+transpose:   channel -> token major     [1500 x 384]
+        </pre>
+        <p>The stride-2 second convolution halves the time axis, so 3000 log-Mel frames become the <strong>1500 audio tokens</strong> the encoder body and the decoder's cross-attention both key on. The learned positional embedding is added after the transpose, directly analogous to the vision table &mdash; but 1D along time.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why These Kernel Choices</h3>
+        <ul>
+            <li><strong>Resampling is explicit:</strong> <code>audio_resample_windowed_sinc_f32</code> is the band-limited path; <code>audio_resample_linear_f32</code> is the fast path &mdash; the contract names which one a run used.</li>
+            <li><strong>STFT is table-driven:</strong> <code>audio_stft_precompute_tables_f32</code> builds the Hann window and trig tables once; <code>audio_stft_power_fft400_f32</code> specializes the Whisper geometry (n_fft=400, hop=160) with a 20&times;20 mixed-radix FFT instead of a naive DFT.</li>
+            <li><strong>Channel-major conv:</strong> <code>audio_conv1d_channel_major_f32</code> keeps the stem in the layout the weights arrive in, and <code>audio_transpose_channel_to_token_f32</code> is the single, named layout seam before attention.</li>
+        </ul>
+    </div>
+</div>
+
+<h3 id="audio-kernel-walk">Kernel by Kernel: What Each Stage Actually Computes</h3>
+
+<p>Each box in the frontend diagram is a named kernel with a hand-checkable contract. The eight subsections below walk the math exactly as <code>src/kernels/audio_kernels.c</code> implements it &mdash; the same deep-dive treatment the other pages give attention and MLP. The full per-kernel deep dive, with inline SVGs and parity-gate evidence, lives on the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> page.</p>
+
+<h4 id="audio-k1">1. WAV Decode: RIFF Chunks to Normalized Mono</h4>
+
+<p><code>audio_wav_decode_memory_pcm16_mono_f32</code> walks the RIFF container by hand: chunk sizes are odd-padded (+1), only the first <code>fmt</code> and <code>data</code> chunks are honored, and anything that is not PCM tag 1 / 16-bit is a typed rejection &mdash; there is no silent coercion. The sample conversion is channel-averaged, little-endian, scaled into [&minus;1, 1):</p>
+
+<pre>
+mono[f] = (&Sigma;<sub>c</sub> int16_le( pcm[(f&middot;C + c)&middot;2] ) / C) &middot; (1/32768)
+</pre>
+
+<p>For already-decoded interleaved PCM, <code>audio_pcm_s16_to_mono_f32</code> applies the same math without the container walk. <a href="audio-kernels-deep-dive.html#k1-wav">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k2">2. Resample: Endpoint-Preserving Length, Two Interpolants</h4>
+
+<p>The output length is computed to preserve both endpoints &mdash; so a 30.00 s clip maps to exactly 480,000 samples at 16 kHz regardless of input rate:</p>
+
+<pre>
+n_out = 1 + (n_in &minus; 1) &middot; r_out / r_in
+linear:  y[i] = fmaf(x[r+1] &minus; x[l], frac, x[l])   (integer position math)
+sinc:    w(d) = cutoff &middot; sinc(cutoff&middot;d) &middot; hann(d/radius)
+         y[i] = &Sigma; w&middot;x / &Sigma; w                    (double position math)
+</pre>
+
+<p>The windowed-sinc path uses <code>cutoff = min(1, r_out / r_in)</code> as its anti-alias guard and clamps radius to [2, 128]; it is the band-limited contract path, while linear interpolation is the declared fast path. <a href="audio-kernels-deep-dive.html#k2-resample">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k3">3. Pad / Truncate: The Fixed 30-Second Extent</h4>
+
+<p>Everything downstream assumes a fixed time extent &mdash; the STFT frame count, the positional table, and the 1500-token cross-attention bridge all derive from exactly 480,000 samples. <code>audio_pad_or_truncate_f32</code> makes that true for arbitrary input:</p>
+
+<pre>
+copied = min(n_in, 480000)
+out[:copied] = in[:copied]   (memmove, overlap-safe)
+out[copied:] = 0             (zero-pad short clips)
+</pre>
+
+<p>Short clips are zero-padded, long clips are truncated &mdash; not chunked &mdash; and the return value reports how many frames were real. <a href="audio-kernels-deep-dive.html#k3-pad">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k4">4. STFT Power: 20&times;20 Mixed-Radix FFT</h4>
+
+<p>Frames are center-padded (reflect) and windowed with a <em>periodic</em> Hann, then transformed by an FFT specialized to n_fft=400 &mdash; decomposed as 20&times;20 rather than padded to a power of two:</p>
+
+<pre>
+frame:   x[t&middot;160 + n &minus; 200]   reflect-padded (center = true)
+window:  w[n] = 0.5 &minus; 0.5&middot;cos(2&pi;n/400)
+FFT:     400 = 20&times;20  (stage 1: DFT over x[p + 20q],
+                        stage 2: combine with twiddle(f, p))
+power:   P[t, f] = fmaf(re, re, im&middot;im)   &rarr; [201 &times; T],  T = n/160
+</pre>
+
+<p>Trig tables and the window are built once by <code>audio_stft_precompute_tables_f32</code>; the power accumulation is FMA-fused so the magnitude-squared costs one pass. <a href="audio-kernels-deep-dive.html#k4-stft">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k5">5. Mel Filters: The Slaney Filterbank, Built Once</h4>
+
+<p>The 80&times;201 filterbank is constructed once, in double precision, by <code>audio_whisper_mel_filters_slaney_f32</code> &mdash; evenly spaced on the Slaney mel scale, area-normalized so loudness sums comparably across bands:</p>
+
+<pre>
+mel points: n_mels + 2 evenly spaced, mel(0) .. mel(Nyquist)
+w[m, bin] = max(0, min(lower, upper)) &middot; 2/(right &minus; left)
+</pre>
+
+<p>Promoting the filterbank to its own circuit op makes the Slaney identity a named, parity-gated artifact; log-Mel receives the matrix as data, the way PyTorch passes a buffer. <a href="audio-kernels-deep-dive.html#k5-mel">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k6">6. Log-Mel: Global 80 dB Clamp, Not Per-Frame</h4>
+
+<p>The mel projection is a plain matmul against precomputed Slaney-style filters, then the Whisper normalization &mdash; note the clamp is against the <em>global</em> max over the whole spectrogram, which is what keeps quiet passages quiet instead of normalizing every frame to full scale:</p>
+
+<pre>
+M  = mel_filters[80 &times; 201] @ power[201 &times; T]     (mel-major out)
+L0 = log10(max(M, 1e-10))
+L  = (max(L0, global_max &minus; 8) + 4) / 4
+</pre>
+
+<p>Result: <code>[80 &times; 3000]</code> log-Mel features in roughly [&minus;1.5, 0]. <a href="audio-kernels-deep-dive.html#k6-logmel">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k7">7. Conv1D Stem: Two Strided Convolutions with GELU</h4>
+
+<p>The stem stays in the channel-major layout the weights arrive in. Conv1 lifts 80&rarr;384 channels (k3, s1, p1), conv2 keeps 384&rarr;384 but strides by 2 &mdash; that stride is what halves 3000 log-Mel frames into the 1500 encoder tokens:</p>
+
+<pre>
+y[o, t] = b[o] + &Sigma;<sub>i</sub> &Sigma;<sub>k</sub> w[o,i,k] &middot; x[i, t&middot;s + k &minus; p]
+conv1: 80 &rarr; 384, k3 s1 p1, GELU(erf)   [384 &times; 3000]
+conv2: 384 &rarr; 384, k3 s2 p1, GELU(erf)  [384 &times; 1500]
+</pre>
+
+<p>Accumulation is FMA-fused and the padding is an explicit bounds check (zero-pad), so the kernel has no halo assumptions. <a href="audio-kernels-deep-dive.html#k7-conv">Deep dive &rarr;</a></p>
+
+<h4 id="audio-k8">8. Transpose: The Single Named Layout Seam</h4>
+
+<p>Attention wants token-major rows; the conv stem produces channel-major. Rather than threading layout flags through every consumer, the frontend does one explicit transpose and names it:</p>
+
+<pre>
+out[t&middot;C + c] = in[c&middot;T + t]     [384 &times; 1500] &rarr; [1500 &times; 384]
+row t = token t + learned 1D positional embedding
+</pre>
+
+<p>After this seam, the audio encoder is layout-identical to the text and vision lanes &mdash; the same attention and MLP kernels consume it without a Whisper-specific branch. <a href="audio-kernels-deep-dive.html#k8-transpose">Deep dive &rarr;</a></p>
+
+<h3 id="audio-cross-attention">Cross-Attention: Decoder Queries, Encoder Memory</h3>
+
+<p>Everything above feeds a standard self-attention encoder. The genuinely new piece an encoder&ndash;decoder audio model adds is <strong>cross-attention</strong>: the decoder's queries read keys and values projected from the <em>encoder's</em> 1500 frames, not from its own sequence. That is the bridge every transcribed word is conditioned on &mdash; and it is exactly where the runbook's stage-split probe (<code>encoder.npy</code> handoff) cuts the system in two.</p>
+
+<div class="img-container svg-viewer" data-title="Cross-attention: decoder queries over persistent encoder K/V cache">
+    <img src="assets/concept-audio-cross-attention.svg" alt="Cross-attention between decoder queries and cached encoder keys and values">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Math</h3>
+        <pre>
+self-attn:   Q,K,V = xW_q, xW_k, xW_v   (same sequence)
+cross-attn:  Q = xW_q                   (decoder, per token)
+             K,V = H_enc W_k, H_enc W_v (encoder, once)
+
+attn = softmax(Q K^T / sqrt(d_k)) V
+     [1 x 384] x [384 x 1500] -> [1 x 1500] -> [1 x 384]
+        </pre>
+        <p>Because <code>H_enc</code> never changes during decoding, the cross K/V are projected <strong>once at prefill</strong> and held in a persistent FP32 cache &mdash; the decode loop only pays for one new query row per token.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">The Kernel Contract</h3>
+        <ul>
+            <li><strong>Prefill:</strong> batched causal self-attention over the forced decoder prefix, with a persistent KV-cache transition oracle.</li>
+            <li><strong>Decode step t:</strong> self-attention attends all <code>pos+1</code> valid rows of its own cache; cross-attention attends all 1500 encoder rows (the <code>Q=1, K=1500</code> oracle).</li>
+            <li><strong>Same primitives, new wiring:</strong> the attention math is the one from <a href="#attention">Attention Mechanisms</a>; only the provenance of K and V changes, which is why codegen needs no Whisper-specific branch.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Current CK Coverage</h3>
+    <p>Nightly validates the log-Mel frontend against PyTorch, the audio transformer primitives (resampling, FFT, Conv1D, GELU, layout transforms, self-attention, cross-attention), and the portable <code>v8</code> audio circuit/codegen regression. Full model-and-WAV transcription is an opt-in artifact gate: the JFK sample matches the Hugging Face reference token for token. See <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram and evidence, the <a href="v8-runbook.html">v8 Runbook</a> for the operator commands, and the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> for the per-kernel math of every stage above.</p>
 </div>
 
 <hr>

@@ -954,6 +954,7 @@
                         <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
                         <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
@@ -1043,12 +1044,13 @@
         <a class="runbook-link" href="v8-numerical-contracts.html">Open Numerical Contracts</a>
     </div>
     <div class="runbook-card">
-        <h3>v8 Qwen3-VL Runbook</h3>
-        <p>Scoped operator runbook for the validated <code>v8</code> multimodal inference path: Qwen3-VL decoder + matching mmproj.</p>
+        <h3>v8 Runbook</h3>
+        <p>The scoped operator runbook for the validated <code>v8</code> lanes. v8 now supports vision (Qwen3-VL) and audio (Whisper Tiny) alongside text-family bring-up; the canonical commands for each lane live on the runbook page.</p>
         <div class="runbook-tags">
             <span class="runbook-tag">cks-v8-run</span>
             <span class="runbook-tag">ck_run_v8.py</span>
             <span class="runbook-tag">Qwen3-VL</span>
+            <span class="runbook-tag">run_whisper_v8.py</span>
         </div>
         <a class="runbook-link" href="v8-runbook.html">Open v8 Runbook</a>
     </div>
@@ -1061,6 +1063,16 @@
             <span class="runbook-tag">encoder → bridge → decoder</span>
         </div>
         <a class="runbook-link" href="v8-vision-encoder.html">Open Vision Encoder Page</a>
+    </div>
+    <div class="runbook-card">
+        <h3>Whisper Tiny End-to-End</h3>
+        <p>Audio inference through the same circuit and kernel-contract path: PCM16 WAV to log-Mel, generated FP32 encoder and decoder, nightly audio gates, and the opt-in E2E artifact test.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">audio_transformer_*.json</span>
+            <span class="runbook-tag">run_whisper_v8.py</span>
+            <span class="runbook-tag">WAV → log-Mel → encoder → decoder</span>
+        </div>
+        <a class="runbook-link" href="v8-whisper-tiny.html">Open Whisper Tiny Page</a>
     </div>
     <div class="runbook-card">
         <h3>v7 Inference + Training Runbook</h3>
@@ -1144,12 +1156,14 @@
                 <span class="subtitle">One-command dataset -> tokenizer -> train orchestration</span></li>
             <li><a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>
                 <span class="subtitle">Function-level forward/backward/accum/optimizer stitching view</span></li>
-            <li><a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>
-                <span class="subtitle">Current operator path for validated v8 multimodal inference</span></li>
+            <li><a href="v8-runbook.html">v8 Runbook</a>
+                <span class="subtitle">Current operator path for validated v8 text, vision, and Whisper Tiny audio inference</span></li>
             <li><a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>
                 <span class="subtitle">How GGUF intake, template lowering, memory planning, and bridge stitching power the working vision path</span></li>
             <li><a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a>
                 <span class="subtitle">Kimi/DeepSeek-style MLA template contract, explicit cache store/read lowering, and reference kernels</span></li>
+            <li><a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>
+                <span class="subtitle">Generated FP32 audio encoder/decoder circuits from PCM16 WAV, with the pipeline infographic, nightly gates, and current limitations</span></li>
             <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
                 <span class="subtitle">Copy/paste commands for HF GGUF inference + true_bpe training</span></li>
             <li><a href="v7-python-authoring.html">v7 Python Authoring Guide</a>
@@ -1164,6 +1178,8 @@
                 <span class="subtitle">Forward/backward ops</span></li>
             <li><a href="deltanet-deep-dive.html">Gated DeltaNet Deep Dive</a>
                 <span class="subtitle">Qwen3.5/qwen3next recurrent attention state update and kernel parity</span></li>
+            <li><a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>
+                <span class="subtitle">WAV decode, resample, STFT, log-Mel, Conv1D stem, token transpose — math and parity oracles per kernel</span></li>
             <li><a href="codegen.html">Code Generation</a>
                 <span class="subtitle">IR to C compilation</span></li>
             <li><a href="iteration-philosophy.html">Iteration Philosophy</a>
@@ -1222,10 +1238,12 @@
                 <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
             <li><a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>
                 <span class="subtitle">CPU-node roofline workflow for v8/v7 kernel performance work</span></li>
-            <li><a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>
-                <span class="subtitle">Validated decoder/mmproj workflow for multimodal inference</span></li>
+            <li><a href="v8-runbook.html">v8 Runbook</a>
+                <span class="subtitle">Validated text, vision, and Whisper Tiny audio operator workflows</span></li>
             <li><a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>
                 <span class="subtitle">Bridge and encoder design notes for the current multimodal inference lane</span></li>
+            <li><a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>
+                <span class="subtitle">Generated audio encoder/decoder circuits, pipeline infographic, nightly gates</span></li>
             <li><a href="v7-profiling.html">v7 Profiling Runbook</a>
                 <span class="subtitle">VTune + Advisor + perf/flamegraph on train kernels</span></li>
             <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
@@ -1531,7 +1549,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>

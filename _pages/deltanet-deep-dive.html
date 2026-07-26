@@ -1012,6 +1012,13 @@ void recurrent_conv_state_update_forward(
 <p><strong>The kernel engineer's takeaway:</strong> DeltaNet is compute-bound and SIMD-friendly — it rewards wide vector units and dense FMA throughput. SSM conv1d is bandwidth-bound and simple — it rewards prefetch and streaming memory access. On a Xeon with AVX-512, DeltaNet's d×d sweep can actually be faster than you'd expect because the arithmetic intensity is high enough to hide memory latency. SSM's conv with k=4 hits the memory wall almost immediately.</p>
 
 <div class="card card-accent" style="margin-top:2rem;">
+    <h3>🎙️ Related: Audio Kernels</h3>
+    <p>The same kernel-contract discipline drives the audio pipeline — PCM conversion, STFT/log-Mel, Conv1D stems, and unequal-length cross-attention that compose into generated Whisper Tiny encoder and decoder circuits:</p>
+    <p><a href="v8-whisper-tiny.html"><strong>Whisper Tiny End-to-End</strong></a></p>
+    <p><a href="audio-kernels-deep-dive.html"><strong>Audio Kernels Deep Dive</strong></a></p>
+</div>
+
+<div class="card card-accent" style="margin-top:2rem;">
     <h3>📊 Back to Kernel Catalog</h3>
     <p>For the full list of CK-Engine kernels (GEMM, RoPE, Softmax, Loss, etc.), see:</p>
     <p><a href="kernels.html"><strong>Kernel Catalog</strong></a></p>

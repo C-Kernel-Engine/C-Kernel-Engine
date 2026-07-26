@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700" role="img" aria-labelledby="aca-title aca-desc">
+  <title id="aca-title">Cross-attention: decoder queries over encoder memory</title>
+  <desc id="aca-desc">In an encoder-decoder audio transformer the decoder's queries attend over keys and values projected from the encoder's 1500 audio frames. The encoder K/V are computed once and held in a persistent FP32 cache; each decode step adds one query row and attends all valid rows. Caching the immutable cross K/V cut measured decoder time from 16.57 seconds to 0.21 seconds on the JFK fixture.</desc>
+  <defs>
+    <linearGradient id="aca-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <linearGradient id="aca-node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13233c"/>
+      <stop offset="1" stop-color="#0d1a2e"/>
+    </linearGradient>
+    <filter id="aca-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="aca-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="aca-arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+    <marker id="aca-arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="700" fill="url(#aca-bg)"/>
+  <g opacity="0.25" stroke="#26364f" stroke-width="1">
+    <path d="M0 110H1100M0 220H1100M0 330H1100M0 440H1100M0 550H1100"/>
+    <path d="M100 0V620M300 0V620M500 0V620M700 0V620M900 0V620"/>
+  </g>
+
+  <text x="40" y="42" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">ENCODER&#8211;DECODER ATTENTION &#183; THE NEW PIECE AUDIO ADDS</text>
+  <text x="40" y="80" font-size="30" font-weight="700" fill="#f1f5f9" font-family="'Inter',system-ui,sans-serif">Cross-Attention: Decoder Queries, Encoder Memory</text>
+  <text x="40" y="106" font-size="13.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">Self-attention reads its own sequence. Cross-attention reads someone else's &#8212; the 1500 audio frames the encoder produced, once.</text>
+
+  <!-- Encoder tower -->
+  <g filter="url(#aca-shadow)">
+    <rect x="40" y="140" width="290" height="300" rx="12" fill="url(#aca-node)" stroke="#2b3f5f"/>
+    <rect x="40" y="140" width="290" height="34" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="56" y="162" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">ENCODER &#183; RUNS ONCE</text>
+    <rect x="64" y="190" width="242" height="56" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="80" y="214" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">H_enc [1500 &#215; 384]</text>
+    <text x="80" y="232" font-size="11.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif">1500 audio frames from the frontend</text>
+    <rect x="64" y="266" width="114" height="52" rx="8" fill="#0b1729" stroke="#0ea5e9"/>
+    <text x="76" y="288" font-size="12.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">K = H&#183;W_k</text>
+    <text x="76" y="306" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">[1500 &#215; 384]</text>
+    <rect x="192" y="266" width="114" height="52" rx="8" fill="#0b1729" stroke="#0ea5e9"/>
+    <text x="204" y="288" font-size="12.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">V = H&#183;W_v</text>
+    <text x="204" y="306" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">[1500 &#215; 384]</text>
+    <rect x="64" y="338" width="242" height="80" rx="8" fill="#10203a" stroke="#f59e0b" stroke-dasharray="5 4"/>
+    <text x="80" y="362" font-size="12" letter-spacing="1" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">PERSISTENT FP32 CACHE</text>
+    <text x="80" y="384" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">projected once at prefill,</text>
+    <text x="80" y="402" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">never recomputed during decode</text>
+  </g>
+
+  <!-- Decoder tower -->
+  <g filter="url(#aca-shadow)">
+    <rect x="770" y="140" width="290" height="300" rx="12" fill="url(#aca-node)" stroke="#2b3f5f"/>
+    <rect x="770" y="140" width="290" height="34" rx="12" fill="#10b981" opacity="0.16"/>
+    <text x="786" y="162" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">DECODER &#183; PER TOKEN</text>
+    <rect x="794" y="190" width="242" height="56" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="810" y="214" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">x_t [1 &#215; 384]</text>
+    <text x="810" y="232" font-size="11.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif">after causal self-attention</text>
+    <rect x="794" y="266" width="242" height="52" rx="8" fill="#0b1729" stroke="#10b981"/>
+    <text x="810" y="288" font-size="12.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">Q = x&#183;W_q</text>
+    <text x="810" y="306" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">one query row per decode step</text>
+    <rect x="794" y="338" width="242" height="80" rx="8" fill="#10203a" stroke="#34d399" stroke-dasharray="5 4"/>
+    <text x="810" y="362" font-size="12" letter-spacing="1" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">SELF-ATTN KV, SAME CONTRACT</text>
+    <text x="810" y="384" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">step t attends all pos+1 valid rows</text>
+    <text x="810" y="402" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">of its own persistent KV cache</text>
+  </g>
+
+  <!-- Center attention core -->
+  <g filter="url(#aca-shadow)">
+    <rect x="380" y="200" width="340" height="140" rx="14" fill="#13233c" stroke="#7dd3fc" stroke-width="1.5"/>
+    <text x="400" y="232" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CROSS-ATTENTION CORE</text>
+    <text x="400" y="268" font-size="17" fill="#f1f5f9" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">softmax(Q&#183;K<tspan dy="-7" font-size="12">T</tspan><tspan dy="7"> / &#8730;d_k) &#183; V</tspan></text>
+    <text x="400" y="296" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">Q from the decoder &#183; K, V from the encoder</text>
+    <text x="400" y="318" font-size="12" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[1 &#215; 384] &#183; [384 &#215; 1500] &#8594; [1 &#215; 1500] &#8594; [1 &#215; 384]</text>
+  </g>
+
+  <line x1="330" y1="270" x2="372" y2="270" stroke="#7dd3fc" stroke-width="2" marker-end="url(#aca-arrow)"/>
+  <line x1="770" y1="270" x2="728" y2="270" stroke="#34d399" stroke-width="2" marker-end="url(#aca-arrow-green)"/>
+  <path d="M 550 340 L 550 386" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#aca-arrow-amber)"/>
+  <text x="566" y="372" font-size="12" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">context &#8594; MLP &#8594; next token</text>
+
+  <!-- Measured evidence band -->
+  <g filter="url(#aca-shadow)">
+    <rect x="40" y="458" width="1020" height="66" rx="12" fill="#10203a" stroke="#f59e0b" stroke-width="1.4"/>
+    <text x="64" y="484" font-size="11" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">MEASURED &#183; JFK FIXTURE &#183; WHISPER TINY FP32</text>
+    <text x="64" y="508" font-size="13" fill="#e2e8f0" font-family="'Inter',system-ui,sans-serif">decoder <tspan font-weight="700" fill="#fbbf24">16.57 s &#8594; 0.21 s (&#8776;79&#215;)</tspan> &#183; total 28.64 s &#8594; 12.22 s &#183; prefill 0.73 s &#8212; the work moved once, it did not disappear</text>
+    <text x="800" y="484" font-size="10.5" fill="#8a6d3b" font-family="'Inter',system-ui,sans-serif">same exact 23 tokens as Hugging Face,</text>
+    <text x="800" y="500" font-size="10.5" fill="#8a6d3b" font-family="'Inter',system-ui,sans-serif">3 repeated runs &#183; this host</text>
+  </g>
+
+  <!-- Bottom band -->
+  <g filter="url(#aca-shadow)">
+    <rect x="40" y="550" width="330" height="118" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="60" y="578" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">SELF-ATTENTION</text>
+    <text x="60" y="604" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">Q, K, V all projected from the</text>
+    <text x="60" y="622" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">same sequence &#8212; text decoders and</text>
+    <text x="60" y="640" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">the audio encoder both work this way</text>
+  </g>
+  <g filter="url(#aca-shadow)">
+    <rect x="385" y="550" width="330" height="118" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="405" y="578" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CROSS-ATTENTION</text>
+    <text x="405" y="604" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">Q from the decoder, K/V from the</text>
+    <text x="405" y="622" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">encoder's 1500 frames &#8212; the bridge</text>
+    <text x="405" y="640" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">every word is conditioned on audio</text>
+  </g>
+  <g filter="url(#aca-shadow)">
+    <rect x="730" y="550" width="330" height="118" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="750" y="578" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL CONTRACT</text>
+    <text x="750" y="604" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">prefill populates the layer-major cache;</text>
+    <text x="750" y="622" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">decode reads cached head-major slices,</text>
+    <text x="750" y="640" font-size="12.5" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">fails closed until prefill repopulates</text>
+  </g>
+</svg>

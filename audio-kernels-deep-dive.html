@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Kernels Deep Dive | C-Kernel-Engine | C-Kernel-Engine</title>
+    <meta name="description" content="Kernel-by-kernel walk of the Whisper audio frontend in C-Kernel-Engine: WAV decode, windowed-sinc resample, mixed-radix STFT power, log-Mel, Conv1D stem, and the token transpose, each with math, layout contracts, and PyTorch parity oracles.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/audio-kernels-deep-dive.html">
+    <meta property="og:title" content="Audio Kernels Deep Dive | C-Kernel-Engine | C-Kernel-Engine">
+    <meta property="og:description" content="Kernel-by-kernel walk of the Whisper audio frontend in C-Kernel-Engine: WAV decode, windowed-sinc resample, mixed-radix STFT power, log-Mel, Conv1D stem, and the token transpose, each with math, layout contracts, and PyTorch parity oracles.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/audio-kernels-deep-dive.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            box-sizing: border-box;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger ">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>VTune, Advisor, roofline, parity gates</small></a>
+                        <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
+                        <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
+                        <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="">Versions</a>
+        </nav>
+    </header>
+    <main>
+
+<h1>Audio Kernels Deep Dive: From WAV to Encoder Tokens, Kernel by Kernel</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Kernel Source</strong><br>
+        <code>src/kernels/audio_kernels.c</code> and <code>include/ckernel_audio.h</code> &mdash; numerically explicit
+        FP32 reference kernels. Every stage below is a named C function with a PyTorch oracle, not hidden preprocessing.
+        Pipeline overview: <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend</a>;
+        operator commands: <a href="v8-runbook.html">v8 Runbook</a>; evidence: <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>.
+    </div>
+</div>
+
+<p>The Whisper Tiny frontend turns a PCM16 WAV into the <code>[1500 &times; 384]</code> token matrix the audio
+encoder consumes. CK breaks that transformation into seven circuit operations across six frontend stages &mdash;
+STFT table construction and STFT execution are separate ops &mdash; each with one job, one layout contract, and one
+parity oracle. This page walks each kernel the same way the DeltaNet deep dive walks the recurrent update:
+the math, the way the C actually computes it, the memory layout, and the evidence that pins it to PyTorch.</p>
+
+<div class="img-container svg-viewer" data-title="Audio frontend: the six frontend stages this page walks">
+    <img src="assets/concept-audio-frontend.svg" alt="Audio frontend kernel dataflow from waveform to encoder tokens">
+</div>
+
+<h2>Table of Contents</h2>
+<ul>
+    <li><a href="#k1-wav">1. WAV Decode &mdash; <code>audio_wav_decode_memory_pcm16_mono_f32</code></a></li>
+    <li><a href="#k2-resample">2. Resample &mdash; <code>audio_resample_linear_f32</code> / <code>audio_resample_windowed_sinc_f32</code></a></li>
+    <li><a href="#k3-pad">3. Pad / Truncate &mdash; <code>audio_pad_or_truncate_f32</code></a></li>
+    <li><a href="#k4-stft">4. STFT Power &mdash; <code>audio_stft_power_fft400_f32</code> (20&times;20 mixed radix)</a></li>
+    <li><a href="#k5-mel">5. Mel Filters &mdash; <code>audio_whisper_mel_filters_slaney_f32</code></a></li>
+    <li><a href="#k6-logmel">6. Log-Mel &mdash; <code>audio_whisper_log_mel_from_power_reference_f32</code></a></li>
+    <li><a href="#k7-conv">7. Conv1D Stem &mdash; <code>audio_conv1d_channel_major_f32</code></a></li>
+    <li><a href="#k8-transpose">8. Token Transpose &mdash; <code>audio_transpose_channel_to_token_f32</code></a></li>
+    <li><a href="#k9-supporting">9. Supporting Kernels &mdash; position embeddings, erf GELU, head-major attention</a></li>
+    <li><a href="#k10-encoder">10. The Encoder Body &mdash; four bidirectional blocks</a></li>
+    <li><a href="#parity">Parity &amp; Nightly Coverage</a></li>
+</ul>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 1: WAV DECODE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k1-wav">1. WAV Decode: Bytes With a Contract, Not a Library Call</h2>
+
+<p>Most pipelines hand WAV parsing to a media library. CK walks the RIFF container by hand because the frontend's
+input contract is part of the numerical evidence: <strong>PCM (format tag 1), 16-bit, any channel count, any sample
+rate</strong> &mdash; anything else is rejected with a distinct error code before a single float is produced.
+<code>audio_wav_parse_memory</code> validates the container, <code>audio_wav_decode_pcm16_mono_f32</code> turns it
+into mono f32, and the frontend circuit's map-owned provider <code>audio_wav_decode_memory_pcm16_mono_f32</code>
+fuses the two into the single call the generated code makes. For audio that is already interleaved int16 in memory,
+<code>audio_pcm_s16_to_mono_f32</code> applies the same conversion without the container walk.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 400" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="wv-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="wv-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="400" fill="url(#wv-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 1 &#183; RIFF CONTAINER WALK</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Parse, Validate, Then Average Channels</text>
+
+  <!-- byte map -->
+  <g font-family="ui-monospace,'JetBrains Mono',Menlo,monospace" font-size="12">
+    <rect x="40" y="100" width="150" height="52" rx="8" fill="#13233c" stroke="#2b3f5f"/>
+    <text x="55" y="122" fill="#7dd3fc">"RIFF"</text>
+    <text x="55" y="140" fill="#64748b">size | "WAVE"</text>
+    <rect x="200" y="100" width="230" height="52" rx="8" fill="#13233c" stroke="#2b3f5f"/>
+    <text x="215" y="122" fill="#fbbf24">fmt chunk (&#8805;16 B)</text>
+    <text x="215" y="140" fill="#64748b">tag=1 &#183; ch &#183; rate &#183; 16-bit</text>
+    <rect x="440" y="100" width="150" height="52" rx="8" fill="#13233c" stroke="#2b3f5f"/>
+    <text x="455" y="122" fill="#94a3b8">...chunks...</text>
+    <text x="455" y="140" fill="#64748b">odd sizes pad +1</text>
+    <rect x="600" y="100" width="240" height="52" rx="8" fill="#13233c" stroke="#f59e0b"/>
+    <text x="615" y="122" fill="#fbbf24">data chunk</text>
+    <text x="615" y="140" fill="#64748b">interleaved int16 LE</text>
+    <rect x="850" y="100" width="210" height="52" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="865" y="122" fill="#34d399">frames = data_bytes</text>
+    <text x="865" y="140" fill="#64748b">/ (channels &#183; 2)</text>
+  </g>
+
+  <line x1="450" y1="160" x2="450" y2="196" stroke="#7dd3fc" stroke-width="2" marker-end="url(#wv-ar)"/>
+
+  <!-- decode loop -->
+  <rect x="40" y="204" width="660" height="150" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="64" y="234" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">DECODE LOOP &#183; PER FRAME</text>
+  <text x="64" y="266" font-size="14.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">sum = &#931;_c (int16)read_u16_le(pcm + (f&#183;C + c)&#183;2)</text>
+  <text x="64" y="294" font-size="14.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">mono[f] = (sum / channels) &#183; (1 / 32768)</text>
+  <text x="64" y="328" font-size="12.5" fill="#94a3b8">little-endian safe by construction &#8212; bytes are assembled, never cast</text>
+
+  <!-- error codes -->
+  <rect x="730" y="204" width="330" height="150" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="754" y="234" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">REJECTION IS TYPED</text>
+  <text x="754" y="262" font-size="12.5" fill="#cbd5e1">-2 not RIFF/WAVE &#183; -3 truncated</text>
+  <text x="754" y="284" font-size="12.5" fill="#cbd5e1">-4 fmt too small</text>
+  <text x="754" y="306" font-size="12.5" fill="#cbd5e1">-5 not PCM16 &#183; -6 bad frame count</text>
+  <text x="754" y="334" font-size="12" fill="#64748b">every failure mode has its own code</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>The chunk walker starts at offset 12 and hops chunk-to-chunk, adding a pad byte for odd-sized chunks &mdash; RIFF alignment is part of the format.</li>
+            <li>Only the <em>first</em> <code>fmt </code> and <code>data</code> chunks are honored; everything else is skipped, so metadata-heavy WAVs (LIST, cue, bext) parse fine.</li>
+            <li>Multi-channel audio is downmixed by <strong>mean</strong>, not by taking channel 0 &mdash; stereo and mono files produce the same scale.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Not libsndfile</h3>
+        <p>The frontend's whole job is to be a <strong>numerical contract</strong>. A hand-rolled 60-line parser means the exact set of accepted inputs is auditable, the downmix rule is explicit, and no platform codec version can drift the parity gates. The generated artifact owns WAV-to-encoder execution through <code>ck_model_run_audio_wav</code>; the transformer body itself never sees a WAV &mdash; it consumes the log-Mel tensors this kernel chain guarantees.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 2: RESAMPLE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k2-resample">2. Resample: Two Explicit Paths to 16 kHz</h2>
+
+<p>Whisper expects 16&nbsp;kHz mono. CK exposes two named resamplers and the contract records which one a run used:
+<code>audio_resample_linear_f32</code> for the fast path, and <code>audio_resample_windowed_sinc_f32</code> for the
+band-limited path. Both share one frame-count convention &mdash; <code>audio_resampled_frame_count</code> returns
+<code>1 + (n_in &#8722; 1) &#183; r_out / r_in</code>, preserving both endpoints of the signal, so a file never grows or
+shrinks silently by a rounding choice.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 430" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="rs-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="rs-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="430" fill="url(#rs-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 2 &#183; WINDOWED SINC INTERPOLATION</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Every Output Frame Is a Normalized, Windowed Weighted Sum</text>
+
+  <!-- waveform axis -->
+  <g>
+    <line x1="60" y1="240" x2="700" y2="240" stroke="#334155" stroke-width="1.5"/>
+    <!-- input samples -->
+    <g fill="#7dd3fc">
+      <circle cx="100" cy="200" r="5"/><circle cx="180" cy="170" r="5"/><circle cx="260" cy="210" r="5"/>
+      <circle cx="340" cy="255" r="5"/><circle cx="420" cy="275" r="5"/><circle cx="500" cy="230" r="5"/>
+      <circle cx="580" cy="185" r="5"/><circle cx="660" cy="200" r="5"/>
+    </g>
+    <g stroke="#7dd3fc" stroke-width="1" opacity="0.4">
+      <line x1="100" y1="200" x2="100" y2="240"/><line x1="180" y1="170" x2="180" y2="240"/>
+      <line x1="260" y1="210" x2="260" y2="240"/><line x1="340" y1="255" x2="340" y2="240"/>
+      <line x1="420" y1="275" x2="420" y2="240"/><line x1="500" y1="230" x2="500" y2="240"/>
+      <line x1="580" y1="185" x2="580" y2="240"/><line x1="660" y1="200" x2="660" y2="240"/>
+    </g>
+    <text x="70" y="160" font-size="12" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">input samples (r_in)</text>
+
+    <!-- sinc envelope -->
+    <path d="M 260 240 C 300 235 320 140 380 140 C 440 140 460 235 500 240" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+    <path d="M 280 240 C 300 250 320 262 340 262 C 360 262 370 245 380 245" fill="none" stroke="#fbbf24" stroke-width="1.4" opacity="0.55"/>
+    <path d="M 390 245 C 400 245 410 262 430 262 C 450 262 465 250 480 240" fill="none" stroke="#fbbf24" stroke-width="1.4" opacity="0.55"/>
+    <path d="M 260 240 C 300 205 340 175 380 175 C 420 175 460 205 500 240" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="395" y="135" font-size="12" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">sinc(cutoff&#183;d)</text>
+    <text x="512" y="182" font-size="11.5" fill="#94a3b8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">Hann window over radius</text>
+
+    <!-- output position -->
+    <line x1="380" y1="150" x2="380" y2="300" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3"/>
+    <circle cx="380" cy="168" r="6" fill="#f59e0b"/>
+    <text x="352" y="322" font-size="12" fill="#f59e0b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">source = f&#183;r_in/r_out</text>
+  </g>
+
+  <!-- math -->
+  <rect x="740" y="100" width="320" height="260" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="764" y="130" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">THE WEIGHTS, EXACTLY</text>
+  <text x="764" y="162" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">cutoff = min(1, r_out/r_in)</text>
+  <text x="764" y="190" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">sinc(x) = sin(&#960;x)/(&#960;x)</text>
+  <text x="764" y="218" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">win(d) = &#189;(1 + cos(&#960;&#183;d/radius))</text>
+  <text x="764" y="246" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">w = cutoff &#183; sinc(cutoff&#183;d) &#183; win(d)</text>
+  <text x="764" y="274" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">y[f] = &#931; w&#183;x[tap] / &#931; w</text>
+  <text x="764" y="308" font-size="12" fill="#94a3b8">&#931;w normalization keeps the edges</text>
+  <text x="764" y="328" font-size="12" fill="#94a3b8">exact where taps run off the signal</text>
+
+  <text x="60" y="395" font-size="12.5" fill="#64748b">downsampling &#8594; cutoff &lt; 1 narrows the sinc: anti-aliasing is a property of the kernel, not a separate filter stage</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>All position math is <strong>double</strong> (<code>source = frame &#183; r_in / r_out</code>), so long files do not accumulate phase drift.</li>
+            <li>The linear path does its interpolation in <strong>integer numerator arithmetic</strong> plus one <code>fmaf</code> lerp &mdash; no float division per sample.</li>
+            <li>Out-of-range taps are skipped, not clamped; the <code>&#931;w</code> denominator makes the surviving window exact at both signal edges.</li>
+            <li><code>radius</code> is bounded to <code>[2, 128]</code> &mdash; the kernel support is part of the validated contract.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Two Kernels Instead of One Flag</h3>
+        <p>A boolean <code>fast=true</code> inside one function would hide which numerical path produced the evidence. Two named entry points mean the run report can say <em>which</em> resampler fed the STFT, and the parity gate can pin each one separately. Whisper Tiny at 16&nbsp;kHz input skips this kernel entirely &mdash; but the contract has to exist for the day a 44.1&nbsp;kHz file shows up.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 3: PAD / TRUNCATE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k3-pad">3. Pad / Truncate: The Fixed 480,000-Sample Contract</h2>
+
+<p>Everything downstream of resampling assumes a fixed time extent: the STFT frame count, the encoder's positional
+embedding table, and the 1500-token cross-attention bridge all derive from <strong>exactly 480,000 samples
+(30&nbsp;s at 16&nbsp;kHz)</strong>. <code>audio_pad_or_truncate_f32</code> is the kernel that makes that true for
+arbitrary input &mdash; short clips are zero-padded, long clips are truncated (not chunked), and the function
+returns how many frames were real.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 400" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="pd-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="pd-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="400" fill="url(#pd-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 3 &#183; EXTENT NORMALIZATION</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Every Clip Becomes Exactly 30 Seconds</text>
+
+  <!-- short clip case -->
+  <rect x="40" y="100" width="500" height="120" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="64" y="130" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">SHORT CLIP &#183; n &lt; 480,000</text>
+  <rect x="64" y="150" width="180" height="26" rx="4" fill="#0ea5e9" opacity="0.5"/>
+  <rect x="244" y="150" width="256" height="26" rx="4" fill="#1e293b" stroke="#334155" stroke-dasharray="4 3"/>
+  <text x="64" y="196" font-size="12.5" fill="#cbd5e1">memmove the n real frames, then memset the tail to 0.0</text>
+
+  <!-- long clip case -->
+  <rect x="560" y="100" width="500" height="120" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="584" y="130" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">LONG CLIP &#183; n &gt; 480,000</text>
+  <rect x="584" y="150" width="416" height="26" rx="4" fill="#0ea5e9" opacity="0.5"/>
+  <rect x="1000" y="150" width="36" height="26" rx="4" fill="#7f1d1d" opacity="0.7"/>
+  <text x="584" y="196" font-size="12.5" fill="#cbd5e1">memmove the first 480,000 frames; the rest is dropped &#8212; not chunked</text>
+
+  <line x1="550" y1="230" x2="550" y2="262" stroke="#7dd3fc" stroke-width="2" marker-end="url(#pd-ar)"/>
+
+  <!-- contract strip -->
+  <rect x="40" y="270" width="660" height="100" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="64" y="300" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">THE WHOLE KERNEL</text>
+  <text x="64" y="330" font-size="14.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">copied = min(input_frames, output_frames)</text>
+  <text x="64" y="356" font-size="14.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">out[copied:] = 0 &#183; return copied</text>
+
+  <rect x="730" y="270" width="330" height="100" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="754" y="300" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">WHY IT IS A CIRCUIT OP</text>
+  <text x="754" y="328" font-size="12.5" fill="#cbd5e1">the extent is a numerical contract,</text>
+  <text x="754" y="348" font-size="12.5" fill="#cbd5e1">so the compiler owns it &#8212; not Python</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li><code>memmove</code>, not <code>memcpy</code> &mdash; the copy is overlap-safe even if caller and callee ever share a buffer.</li>
+            <li>Only the tail beyond <code>copied</code> is zeroed; real samples are never touched, so a full 30&nbsp;s clip is a pure pass-through.</li>
+            <li>The return value is the real frame count &mdash; downstream stages can distinguish signal from padding without a side channel.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Not Implicit In Resample</h3>
+        <p>Extent normalization is a separate circuit operation (<code>audio_pad_or_truncate</code>) because the 30&nbsp;s limit is a <strong>policy with numerical consequences</strong> &mdash; zero-padding changes the STFT energy and truncation loses content. Naming it keeps the policy auditable, keeps the resampler's contract purely about rate, and lets the limitation docs point at one honest line: longer files are truncated, not chunked.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 4: STFT POWER
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k4-stft">4. STFT Power: Whisper Geometry as a 20&times;20 Mixed-Radix FFT</h2>
+
+<p>The spectrum is where the frontend spends nearly all of its FLOPs, and where parity is easiest to break.
+Whisper's geometry is fixed: <code>n_fft = 400</code>, <code>hop = 160</code>, <strong>201 bins</strong>, a
+<strong>periodic</strong> Hann window, and <code>center = true</code> with <strong>reflect</strong> padding.
+CK has three implementations of the same contract &mdash; a table-driven direct DFT
+(<code>audio_stft_power_precomputed_f32</code>), a Whisper-specialized mixed-radix FFT
+(<code>audio_stft_power_fft400_f32</code>), and the fully self-contained reference
+(<code>audio_whisper_stft_power_reference_f32</code>) that the nightly gate runs against PyTorch.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 460" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="ft-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="460" fill="url(#ft-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 4 &#183; SHORT-TIME FOURIER TRANSFORM, POWER SPECTRUM</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Frame &#8594; Reflect-Pad &#8594; Window &#8594; 20&#215;20 FFT &#8594; |X|&#178;</text>
+
+  <!-- stage 1: framing -->
+  <rect x="40" y="110" width="220" height="150" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="60" y="138" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">FRAME t</text>
+  <text x="60" y="164" font-size="12.5" fill="#cbd5e1">400 samples, hop 160</text>
+  <text x="60" y="186" font-size="12.5" fill="#cbd5e1">centered: pad 200 each side</text>
+  <text x="60" y="212" font-size="12" fill="#fbbf24">reflect_index mirrors edges</text>
+  <text x="60" y="236" font-size="11.5" fill="#64748b">x[-1]=x[1] &#183; x[n]=x[n-2] &#183; no zeros</text>
+
+  <line x1="260" y1="185" x2="300" y2="185" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ft-ar)"/>
+
+  <!-- stage 2: window -->
+  <rect x="306" y="110" width="200" height="150" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="326" y="138" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">&#215; HANN</text>
+  <path d="M 330 220 C 370 150 440 150 482 220" fill="none" stroke="#34d399" stroke-width="2.5"/>
+  <text x="326" y="250" font-size="11.5" fill="#64748b">w[n] = &#189; &#8722; &#189;cos(2&#960;n/400)</text>
+  <text x="326" y="232" font-size="11.5" fill="#34d399">periodic, not symmetric</text>
+
+  <line x1="506" y1="185" x2="546" y2="185" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ft-ar)"/>
+
+  <!-- stage 3: fft -->
+  <rect x="552" y="110" width="260" height="150" rx="12" fill="#13233c" stroke="#f59e0b"/>
+  <text x="572" y="138" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">MIXED-RADIX 400 = 20&#215;20</text>
+  <text x="572" y="164" font-size="12.5" fill="#cbd5e1">stage 1: 20-pt DFTs over x[p+20q]</text>
+  <text x="572" y="186" font-size="12.5" fill="#cbd5e1">stage 2: combine over p, twiddle f&#183;p</text>
+  <text x="572" y="212" font-size="12" fill="#94a3b8">twiddles precomputed [201&#215;400]</text>
+  <text x="572" y="236" font-size="11.5" fill="#64748b">&#8776;6&#215; fewer FMAs than direct DFT</text>
+
+  <line x1="812" y1="185" x2="852" y2="185" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ft-ar)"/>
+
+  <!-- stage 4: power -->
+  <rect x="858" y="110" width="200" height="150" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="878" y="138" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">POWER</text>
+  <text x="878" y="166" font-size="13.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">P = re&#178; + im&#178;</text>
+  <text x="878" y="192" font-size="12.5" fill="#cbd5e1">one fmaf, no sqrt</text>
+  <text x="878" y="222" font-size="12" fill="#64748b">[201 bins &#215; T frames]</text>
+  <text x="878" y="244" font-size="12" fill="#64748b">T = n_samples / 160</text>
+
+  <!-- bottom band -->
+  <rect x="40" y="296" width="1018" height="130" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="64" y="326" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">WHY THESE CHOICES MATCH TORCH.STFT EXACTLY</text>
+  <text x="64" y="354" font-size="12.5" fill="#cbd5e1">&#8226; <tspan fill="#fbbf24">periodic Hann</tspan> &#8212; torch.hann_window(400, periodic=True) divides by n_fft, not n_fft&#8722;1; the table does the same</text>
+  <text x="64" y="378" font-size="12.5" fill="#cbd5e1">&#8226; <tspan fill="#fbbf24">reflect pad + drop last frame</tspan> &#8212; center=True pads 200 both sides; T = n/160 mirrors the oracle's spectrum[:, :-1]</text>
+  <text x="64" y="402" font-size="12.5" fill="#cbd5e1">&#8226; <tspan fill="#fbbf24">fmaf accumulation</tspan> &#8212; real/imag accumulate in fp32 fused multiply-add, matching the validated error budget (rel max &#8804; 2e-5)</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li><code>audio_stft_precompute_tables_f32</code> builds the window and the full <code>[bins &times; n_fft]</code> cos/sin tables once &mdash; the per-frame kernels never call <code>cosf</code>/<code>sinf</code> in the hot loop.</li>
+            <li>The direct kernel is one <code>fmaf</code> per (sample, bin) per component: simple, obviously correct, and the reference every other variant is checked against.</li>
+            <li>The fft400 kernel treats 400 as 20&times;20: stage 1 computes twenty 20-point DFTs over the stride-20 subsequences, stage 2 combines them per output bin with a second twiddle lookup. Scratch is exactly <code>2 &times; 400</code> floats.</li>
+            <li><code>reflect_index</code> is a loop, not an <code>abs</code> &mdash; double reflections at very short signals still land in range.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Keep Three Implementations</h3>
+        <p>Same pattern as the DeltaNet reference-first policy: the <strong>reference</strong> kernel is what the nightly PyTorch gate pins (tones, noise, and impulse signals). The <strong>precomputed</strong> and <strong>fft400</strong> kernels are performance variants whose outputs must agree with that reference &mdash; so a faster FFT can never silently change the numbers the model was validated with. The circuit picks the variant; the contract keeps them equal.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 5: MEL FILTERS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k5-mel">5. Mel Filters: The Slaney Filterbank, Built Once</h2>
+
+<p>Between the STFT power grid and the log-Mel projection sits the filterbank itself: 80 triangular filters over the
+201 power bins, spaced evenly on the <strong>Slaney mel scale</strong> between 0 Hz and Nyquist.
+<code>audio_whisper_mel_filters_slaney_f32</code> constructs the matrix once at table-build time &mdash; in double
+precision &mdash; so the per-frame work stays a single f32 matmul and the triangle geometry can never drift between
+runs.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 400" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="mf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1100" height="400" fill="url(#mf-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 5 &#183; SLANEY TRIANGULAR FILTERBANK</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">80 Triangles, Evenly Spaced in Mel, Area-Normalized</text>
+
+  <!-- triangles -->
+  <g>
+    <rect x="40" y="100" width="620" height="240" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+    <line x1="80" y1="300" x2="620" y2="300" stroke="#334155" stroke-width="1.5"/>
+    <text x="80" y="322" font-size="11" fill="#64748b" font-family="ui-monospace,Menlo,monospace">0 Hz</text>
+    <text x="560" y="322" font-size="11" fill="#64748b" font-family="ui-monospace,Menlo,monospace">8 kHz &#183; 201 bins</text>
+    <path d="M 90 300 L 130 160 L 170 300 Z" fill="#0ea5e9" opacity="0.45"/>
+    <path d="M 140 300 L 185 170 L 230 300 Z" fill="#38bdf8" opacity="0.35"/>
+    <path d="M 195 300 L 245 180 L 295 300 Z" fill="#7dd3fc" opacity="0.3"/>
+    <path d="M 255 300 L 310 195 L 365 300 Z" fill="#fbbf24" opacity="0.35"/>
+    <path d="M 325 300 L 385 210 L 445 300 Z" fill="#fbbf24" opacity="0.28"/>
+    <path d="M 405 300 L 470 228 L 535 300 Z" fill="#f59e0b" opacity="0.24"/>
+    <text x="96" y="150" font-size="11" fill="#7dd3fc" font-family="'Inter',system-ui,sans-serif">narrow at low Hz</text>
+    <text x="420" y="200" font-size="11" fill="#fbbf24" font-family="'Inter',system-ui,sans-serif">wider at high Hz</text>
+    <text x="80" y="130" font-size="12" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">82 mel points (n_mels + 2) &#8594; 80 triangles &#183; peak = 2 / (right &#8722; left)</text>
+  </g>
+
+  <!-- construction math -->
+  <rect x="700" y="100" width="360" height="240" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="724" y="130" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CONSTRUCTION &#183; DOUBLE PRECISION</text>
+  <text x="724" y="162" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">mel(hz) &#8212; Slaney: linear &lt; 1 kHz,</text>
+  <text x="724" y="184" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">log above &#183; points at i/(n_mels+1)</text>
+  <text x="724" y="216" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">lower = (hz &#8722; left)/(center &#8722; left)</text>
+  <text x="724" y="238" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">upper = (right &#8722; hz)/(right &#8722; center)</text>
+  <text x="724" y="270" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">w = max(0, min(lower, upper)) &#215; norm</text>
+  <text x="724" y="302" font-size="12" fill="#64748b" font-family="'Inter',system-ui,sans-serif">norm = 2/(right&#8722;left) &#8212; Slaney area weighting,</text>
+  <text x="724" y="322" font-size="12" fill="#64748b" font-family="'Inter',system-ui,sans-serif">so loudness sums comparably across bands</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>All geometry is computed in <code>double</code> &mdash; mel conversions, triangle edges, and the area normalization &mdash; then stored as f32; the table is built once and reused for every frame.</li>
+            <li>Triangles come from <code>n_mels + 2</code> mel-spaced points converted back to Hz; each bin's weight is <code>max(0, min(lower, upper))</code> scaled by <code>2/(right&#8722;left)</code>.</li>
+            <li>Arguments are validated with typed rejections (&minus;1 null, &minus;2 bad geometry: odd <code>n_fft</code>, non-positive rates or counts).</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why A Separate Circuit Op</h3>
+        <p>The filterbank used to live inside the composite log-Mel reference. Promoting it to its own operation (<code>audio_mel_filters</code>) makes the <strong>Slaney identity a named, parity-gated artifact</strong>: the mel scale choice, the +2 point convention, and the area normalization each appear in the numerical contract, and the generated frontend passes the matrix into log-Mel as data &mdash; the way PyTorch passes a buffer, not a re-computation.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 6: LOG-MEL
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k6-logmel">6. Log-Mel: Perceptual Compression With a Global Clamp</h2>
+
+<p><code>audio_whisper_log_mel_from_power_reference_f32</code> turns the <code>[201 &times; T]</code> power spectrum
+into the <code>[80 &times; T]</code> log-Mel matrix the conv stem consumes. Three distinct numerical decisions live
+here, and all three match <code>whisper.log_mel_spectrogram</code> exactly: a Slaney-style triangular mel
+filterbank, a floored <code>log10</code>, and a <strong>global</strong> dynamic-range clamp before the final affine
+rescale. The fused entry point <code>audio_whisper_log_mel_reference_f32</code> is just STFT + this kernel composed
+&mdash; the nightly gate checks the composition as well as the stages.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 430" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="ml-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="ml-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="430" fill="url(#ml-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 6 &#183; MEL FILTERBANK + LOG COMPRESSION</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">201 Bins &#8594; 80 Mels &#8594; log10 &#8594; Clamp max&#8722;8 &#8594; (x+4)/4</text>
+
+  <!-- filterbank -->
+  <rect x="40" y="110" width="320" height="200" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="60" y="138" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">MEL FILTERBANK [80 &#215; 201]</text>
+  <path d="M 70 250 L 110 180 L 150 250" fill="none" stroke="#7dd3fc" stroke-width="2"/>
+  <path d="M 140 250 L 190 170 L 240 250" fill="none" stroke="#34d399" stroke-width="2"/>
+  <path d="M 220 250 L 280 160 L 340 250" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="60" y1="250" x2="350" y2="250" stroke="#334155" stroke-width="1.5"/>
+  <text x="60" y="278" font-size="11.5" fill="#64748b">triangles, denser at low Hz &#8212; pitch resolution</text>
+  <text x="60" y="298" font-size="11.5" fill="#64748b">normalized by 2/(f_i+2 &#8722; f_i) (Slaney area)</text>
+
+  <line x1="360" y1="210" x2="400" y2="210" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ml-ar)"/>
+
+  <!-- matmul -->
+  <rect x="406" y="110" width="220" height="200" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="426" y="138" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">M = F &#183; P&#7488;</text>
+  <text x="426" y="168" font-size="12.5" fill="#cbd5e1">fmaf over 201 bins</text>
+  <text x="426" y="196" font-size="12.5" fill="#cbd5e1">per (mel, frame)</text>
+  <text x="426" y="230" font-size="12" fill="#fbbf24">output is mel-major [80&#215;T]</text>
+  <text x="426" y="254" font-size="11.5" fill="#64748b">already channel-major for the conv stem</text>
+  <text x="426" y="286" font-size="12" fill="#64748b">L0 = log10(max(M, 1e-10))</text>
+
+  <line x1="626" y1="210" x2="666" y2="210" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ml-ar)"/>
+
+  <!-- clamp -->
+  <rect x="672" y="110" width="220" height="200" rx="12" fill="#13233c" stroke="#f59e0b"/>
+  <text x="692" y="138" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">GLOBAL CLAMP</text>
+  <rect x="692" y="158" width="180" height="22" rx="4" fill="#1e3a5f"/>
+  <rect x="692" y="158" width="180" height="22" rx="4" fill="none" stroke="#7dd3fc"/>
+  <rect x="742" y="158" width="130" height="22" rx="4" fill="#0ea5e9" opacity="0.5"/>
+  <text x="692" y="200" font-size="11.5" fill="#64748b">|&#8592; max&#8722;8 &#8594;|&#8592; kept &#8594;|</text>
+  <text x="692" y="228" font-size="12.5" fill="#cbd5e1">floor = global_max &#8722; 8</text>
+  <text x="692" y="252" font-size="12.5" fill="#cbd5e1">L = max(L0, floor)</text>
+  <text x="692" y="282" font-size="11.5" fill="#64748b">80 dB dynamic range, one pass finds max</text>
+
+  <line x1="892" y1="210" x2="932" y2="210" stroke="#7dd3fc" stroke-width="2" marker-end="url(#ml-ar)"/>
+
+  <!-- rescale -->
+  <rect x="938" y="110" width="122" height="200" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="954" y="138" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">RESCALE</text>
+  <text x="954" y="172" font-size="14" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">(L+4)/4</text>
+  <text x="954" y="204" font-size="11.5" fill="#64748b">&#8776; [&#8722;1, 1]</text>
+  <text x="954" y="250" font-size="12" fill="#fbbf24">[80 &#215; 3000]</text>
+  <text x="954" y="272" font-size="11.5" fill="#64748b">for 30 s of audio</text>
+
+  <text x="60" y="360" font-size="12.5" fill="#94a3b8">The clamp uses the <tspan fill="#fbbf24">global</tspan> max of the whole utterance &#8212; not per-frame &#8212; so quiet frames stay quiet relative to loud ones.</text>
+  <text x="60" y="386" font-size="12.5" fill="#64748b">Nightly tolerances vs PyTorch: log-Mel max &#8804; 1.1e-3, RMSE &#8804; 9e-5 (tones / noise / impulse + stage composition).</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>The filterbank is constructed in planned memory by <code>audio_whisper_mel_filters_slaney_f32</code> and passed in as a <code>[n_mels &times; 201]</code> matrix &mdash; this kernel owns the contraction, while the mel-filter op upstream owns the design.</li>
+            <li>Pass one computes <code>log10(max(M, 1e-10))</code> per entry while tracking the global maximum; pass two applies the floor and the <code>(x+4)/4</code> rescale in place.</li>
+            <li>The output layout is <strong>mel-major</strong> (<code>log_mel[mel &middot; T + frame]</code>) &mdash; which is precisely the channel-major layout the Conv1D stem wants, so no copy sits between the two kernels.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why The Clamp Is Global</h3>
+        <p>A per-frame clamp would renormalize silence up to the same range as speech and the encoder would see phantom structure in quiet regions. Whisper's <code>max &#8722; 8</code> floor (80&nbsp;dB below the loudest frame of the utterance) preserves relative energy across time. It is one line of C &mdash; and one of the easiest places for a reimplementation to quietly diverge, which is why the impulse-signal oracle exists.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 7: CONV1D STEM
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k7-conv">7. Conv1D Stem: The Only Learned Layers Before Attention</h2>
+
+<p><code>audio_conv1d_channel_major_f32</code> is the frontend's first <em>weighted</em> kernel &mdash; everything
+before it is fixed signal processing. The Whisper stem is two 3-tap convolutions with GELU between them:
+<code>80 &rarr; 384</code> at stride 1, then <code>384 &rarr; 384</code> at <strong>stride 2</strong>, which halves the
+time axis from 3000 log-Mel frames to the <strong>1500 audio tokens</strong> the encoder (and the decoder's
+cross-attention) is built around. The kernel is deliberately generic &mdash; channels, kernel size, stride, and
+padding are parameters &mdash; because the same contraction serves any 1D conv frontend.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 430" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="cv-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="cv-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="430" fill="url(#cv-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 7 &#183; CHANNEL-MAJOR 1D CONVOLUTION</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Two 3-Tap Convs; Stride 2 Halves Time</text>
+
+  <!-- input grid -->
+  <rect x="40" y="110" width="300" height="180" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="60" y="136" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">INPUT [C_in &#215; T]</text>
+  <g stroke="#2b3f5f" stroke-width="1">
+    <rect x="70" y="150" width="240" height="18" fill="#0b1729"/><rect x="70" y="170" width="240" height="18" fill="#0b1729"/>
+    <rect x="70" y="190" width="240" height="18" fill="#0b1729"/><rect x="70" y="210" width="240" height="18" fill="#0b1729"/>
+  </g>
+  <rect x="166" y="150" width="54" height="78" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <text x="228" y="162" font-size="11" fill="#fbbf24">k=3 window</text>
+  <text x="60" y="252" font-size="11.5" fill="#64748b">rows = channels &#8212; contiguous per row,</text>
+  <text x="60" y="272" font-size="11.5" fill="#64748b">so a tap read is one cache-friendly walk</text>
+
+  <line x1="340" y1="200" x2="384" y2="200" stroke="#7dd3fc" stroke-width="2" marker-end="url(#cv-ar)"/>
+
+  <!-- conv1 -->
+  <rect x="390" y="110" width="200" height="180" rx="12" fill="#13233c" stroke="#7dd3fc"/>
+  <text x="410" y="136" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CONV 1</text>
+  <text x="410" y="164" font-size="13" fill="#e2e8f0">80 &#8594; 384 &#183; k=3 s=1 p=1</text>
+  <text x="410" y="190" font-size="12" fill="#cbd5e1">+ bias, fmaf inner loop</text>
+  <text x="410" y="216" font-size="12" fill="#34d399">+ GELU (separate kernel)</text>
+  <text x="410" y="248" font-size="12" fill="#64748b">[384 &#215; 3000]</text>
+
+  <line x1="590" y1="200" x2="634" y2="200" stroke="#7dd3fc" stroke-width="2" marker-end="url(#cv-ar)"/>
+
+  <!-- conv2 -->
+  <rect x="640" y="110" width="220" height="180" rx="12" fill="#13233c" stroke="#f59e0b"/>
+  <text x="660" y="136" font-size="12" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CONV 2</text>
+  <text x="660" y="164" font-size="13" fill="#e2e8f0">384 &#8594; 384 &#183; k=3 <tspan fill="#fbbf24">s=2</tspan> p=1</text>
+  <text x="660" y="190" font-size="12" fill="#cbd5e1">every other time step kept</text>
+  <text x="660" y="216" font-size="12" fill="#34d399">+ GELU (separate kernel)</text>
+  <text x="660" y="248" font-size="12" fill="#fbbf24">3000 &#8594; 1500 frames</text>
+  <text x="660" y="272" font-size="11.5" fill="#64748b">[384 &#215; 1500]</text>
+
+  <line x1="860" y1="200" x2="904" y2="200" stroke="#7dd3fc" stroke-width="2" marker-end="url(#cv-ar)"/>
+
+  <!-- math -->
+  <rect x="910" y="110" width="150" height="180" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="926" y="136" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">PER TAP</text>
+  <text x="926" y="168" font-size="12" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">y[o,t] = b[o]</text>
+  <text x="926" y="192" font-size="12" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">+ &#931;_i &#931;_k w&#183;x</text>
+  <text x="926" y="224" font-size="11.5" fill="#64748b">out-of-range taps</text>
+  <text x="926" y="244" font-size="11.5" fill="#64748b">skipped = zero-pad</text>
+  <text x="926" y="272" font-size="11.5" fill="#64748b">(T+2p&#8722;k)/s+1 checked</text>
+
+  <!-- bottom note -->
+  <rect x="40" y="318" width="1020" height="82" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="64" y="346" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">GELU IS A NEIGHBOR, NOT A FUSION</text>
+  <text x="64" y="372" font-size="12.5" fill="#cbd5e1">The erf form (PyTorch approximate='none') runs as its own kernel between the convs &#8212; the generated circuit stitches conv &#8594; gelu &#8594; conv &#8594; gelu, so each stage keeps its own oracle: Whisper stem-1 and stem-2 PyTorch Conv1D gates in <tspan fill="#fbbf24">unittest/test_audio_encoder.py</tspan>.</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>Output-frame count is validated up front: <code>(T + 2p &#8722; k)/s + 1</code> &mdash; a mismatched caller gets <code>-3</code>, not a buffer overrun.</li>
+            <li>Zero padding is a <strong>bounds check</strong> (<code>in_frame &gt;= 0 &amp;&amp; in_frame &lt; T</code>), not a padded buffer &mdash; no scratch allocation, no memset.</li>
+            <li>The accumulation starts from <code>bias[o]</code> and runs <code>fmaf</code> over (in_channel, tap) &mdash; deterministic FP32, one rounding per multiply-add.</li>
+            <li>Channel-major layout means each input row is contiguous, so the inner loop streams memory instead of striding across planes.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Stride 2 Is The Whole Point</h3>
+        <p>Attention cost grows quadratically with sequence length. Halving the time axis before the transformer body is what makes 30 seconds of audio a 1500-token problem instead of a 3000-token one &mdash; a 4&times; attention saving, bought with a single 3-tap convolution. It is also the origin of the number 1500 that shows up everywhere downstream: encoder rows, cross-attention K/V rows, the <code>Q=1, K=1500</code> decode oracle.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 8: TOKEN TRANSPOSE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k8-transpose">8. Token Transpose: The Named Layout Seam</h2>
+
+<p><code>audio_transpose_channel_to_token_f32</code> is eight lines of C and one of the most important kernels in the
+frontend. Everything upstream is <strong>channel-major</strong> (<code>[C &times; T]</code>) because convolutions want
+contiguous channels; everything downstream is <strong>token-major</strong> (<code>[T &times; C]</code>) because
+attention wants one row per sequence element. This kernel is the single explicit point where the layout flips &mdash;
+after it, the learned positional embedding is added and the matrix is literally the 1500-token sequence the encoder
+reads.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 380" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="tp-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/><stop offset="0.55" stop-color="#0f1b2d"/><stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <marker id="tp-ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="380" fill="url(#tp-bg)" rx="14"/>
+
+  <text x="40" y="40" font-size="12" letter-spacing="3" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">KERNEL 8 &#183; LAYOUT TRANSFORM</text>
+  <text x="40" y="72" font-size="22" font-weight="700" fill="#f1f5f9">Column t Becomes Row t &mdash; One Token, 384 Features</text>
+
+  <!-- left grid: channel major -->
+  <rect x="40" y="110" width="330" height="210" rx="12" fill="#13233c" stroke="#2b3f5f"/>
+  <text x="60" y="138" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">CHANNEL-MAJOR [384 &#215; 1500]</text>
+  <g stroke="#2b3f5f" stroke-width="1" fill="#0b1729">
+    <rect x="70" y="152" width="270" height="20"/><rect x="70" y="176" width="270" height="20"/>
+    <rect x="70" y="200" width="270" height="20"/><rect x="70" y="224" width="270" height="20"/>
+    <rect x="70" y="248" width="270" height="20"/>
+  </g>
+  <rect x="205" y="152" width="26" height="116" fill="#f59e0b" opacity="0.35"/>
+  <text x="196" y="290" font-size="11.5" fill="#fbbf24">time slice t</text>
+  <text x="60" y="168" font-size="10.5" fill="#64748b">channel 0 &#8594;</text>
+
+  <line x1="370" y1="215" x2="470" y2="215" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#tp-ar)"/>
+  <text x="382" y="200" font-size="12" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">out[t&#183;C+c]</text>
+  <text x="382" y="236" font-size="12" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">= in[c&#183;T+t]</text>
+
+  <!-- right grid: token major -->
+  <rect x="480" y="110" width="330" height="210" rx="12" fill="#13233c" stroke="#34d399"/>
+  <text x="500" y="138" font-size="12" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">TOKEN-MAJOR [1500 &#215; 384]</text>
+  <g stroke="#2b3f5f" stroke-width="1" fill="#0b1729">
+    <rect x="510" y="152" width="270" height="20"/><rect x="510" y="176" width="270" height="20"/>
+    <rect x="510" y="200" width="270" height="20"/><rect x="510" y="224" width="270" height="20"/>
+    <rect x="510" y="248" width="270" height="20"/>
+  </g>
+  <rect x="510" y="200" width="270" height="20" fill="#34d399" opacity="0.3"/>
+  <text x="500" y="290" font-size="11.5" fill="#34d399">row t = token t (384 contiguous features)</text>
+
+  <!-- what happens next -->
+  <rect x="840" y="110" width="220" height="210" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="860" y="138" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">THEN, DOWNSTREAM</text>
+  <text x="860" y="166" font-size="12.5" fill="#cbd5e1">+ learned positional</text>
+  <text x="860" y="186" font-size="12.5" fill="#cbd5e1">embedding (1D, time)</text>
+  <text x="860" y="216" font-size="12.5" fill="#cbd5e1">&#8594; encoder self-attn rows</text>
+  <text x="860" y="246" font-size="12.5" fill="#cbd5e1">&#8594; H_enc [1500 &#215; 384]</text>
+  <text x="860" y="276" font-size="12.5" fill="#cbd5e1">&#8594; decoder cross-attn K/V</text>
+
+  <text x="60" y="352" font-size="12.5" fill="#64748b">Same contract as the vision lane's layout ops: one named kernel at the seam, so no implicit reshape can drift between frontend and transformer body.</text>
+</svg>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>Two loops, one assignment: <code>out[t&middot;C + c] = in[c&middot;T + t]</code> &mdash; the reference is deliberately naive so the layout contract is unmistakable.</li>
+            <li>It is the <em>only</em> place the audio pipeline reorders memory; an optimized tile/blocked variant can replace it later as long as the contract (and the parity gate) holds.</li>
+            <li>The positional embedding kernel operates token-major immediately after &mdash; the same <code>position_embeddings_add_*</code> family the vision encoder uses, reused, not duplicated.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why A Kernel, Not A Comment</h3>
+        <p>Layout bugs are the silent killer of bring-up: the model runs, the shapes match, and the output is plausible-but-wrong. Making the transpose a named kernel means the circuit JSON can declare <code>logical_layout: token_major</code> at its output checkpoint, the x-ray probe can compare that checkpoint against PyTorch directly, and any future fused frontend must still honor the same boundary.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PARITY COVERAGE
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     KERNEL 9: SUPPORTING KERNELS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 id="k9-supporting">9. Supporting Kernels: The Shared Glue</h2>
+
+<p>Three library kernels complete the audio path without being Whisper-specific. <code>position_embeddings_add</code>
+applies the learned 1D table after the token transpose &mdash; the same kernel the vision lane uses for its 2D table.
+<code>gelu_pytorch_erf_f32_inplace</code> is the exact erf GELU the stem contracts pin (note the naming trap:
+<code>gelu_exact_inplace</code> is historically the <em>tanh</em> approximation despite its name). And
+<code>attention_forward_query_key_head_major_f32</code> serves both attention oracles &mdash; the batched causal
+self-attention transition and the <code>Q=1, K=1500</code> cross-attention decode step &mdash; with head-major rows
+that keep the cached K/V slices contiguous.</p>
+
+<div class="img-container svg-viewer" data-title="Supporting kernels: position embeddings, exact erf GELU, head-major attention">
+    <img src="assets/audio-supporting-kernels.svg" alt="The three shared kernels the Whisper path relies on: position_embeddings_add, gelu_pytorch_erf_f32_inplace, and attention_forward_query_key_head_major_f32">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Why They Are Not Whisper Kernels</h3>
+        <ul>
+            <li>Each already has a numerical contract from the text or vision lanes &mdash; the audio path <em>inherits</em> parity rather than re-proving it.</li>
+            <li>This is the concrete form of "no Whisper model-name branch in codegen": the encoder is assembled from library pieces whose oracles predate Whisper.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Where They Are Pinned</h3>
+        <p><code>unittest/test_audio_encoder.py</code> exercises the erf GELU oracle (max&nbsp;diff &le; 5e-7) and the
+        head-major attention oracles &mdash; including the <code>Q=1, K=1500</code> cross case &mdash; against PyTorch
+        softmax(Q&#183;K&#7511;/&#8730;d)&#183;V. The positional add is pinned by the same suite's encoder
+        checkpoint-by-checkpoint X-ray.</p>
+    </div>
+</div>
+
+<h2 id="k10-encoder">10. The Encoder Body: Four Bidirectional Blocks</h2>
+
+<p>Everything so far produced tokens. The encoder's job is to <strong>contextualize</strong> them: four identical
+pre-LayerNorm blocks turn the raw <code>[1500 &times; 384]</code> frame sequence into a memory where each frame's
+vector has absorbed meaning from the whole 30 seconds. The block contract is explicit in
+<code>audio_transformer_encoder.json</code>: <code>layernorm &rarr; q/k/v_proj &rarr; attn &rarr; out_proj &rarr;
+residual &rarr; layernorm &rarr; mlp_up &rarr; gelu &rarr; mlp_down &rarr; residual</code>, then one final LayerNorm.</p>
+
+<p>The attention itself is where the audio encoder differs from the decoder you already know. Three facts,
+all declared in the circuit's <code>attention_contract</code>: it is <strong>dense bidirectional</strong>
+(<code>causal: false</code>) &mdash; the score grid is the full 1500&times;1500 square, not the decoder's causal
+triangle, so the frame under the word "country" borrows from frames before <em>and</em> after it. There is
+<strong>no RoPE</strong> &mdash; position comes from the absolute learned table added back at the transpose. And the
+K/V are <strong>ephemeral</strong> (<code>ephemeral_full_context</code>) &mdash; computed per layer, used once, freed;
+caching belongs to the decoder, not here. Per head (6 heads &times; 64 dims) the math is the usual
+<code>softmax(Q&#183;K&#7511;/&#8730;64)&#183;V</code> &mdash; softmax row-normalizes the square, so each frame's output
+is a weighted mixture of all 1500 value rows.</p>
+
+<div class="img-container svg-viewer" data-title="Audio encoder anatomy: four pre-LN blocks, dense bidirectional attention, ephemeral K/V">
+    <img src="assets/audio-encoder-anatomy.svg" alt="The Whisper Tiny audio encoder: 1500 tokens through four pre-LayerNorm blocks with dense bidirectional self-attention and a GELU MLP, producing the immutable encoder memory">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">What The Encoder Buys The Decoder</h3>
+        <ul>
+            <li><strong>Context per frame:</strong> after 4 layers, row <code>t</code> is no longer "20 ms of spectrum" &mdash; it is that spectrum disambiguated by its acoustic surroundings, which is what makes cross-attention retrieval meaningful.</li>
+            <li><strong>A stable retrieval target:</strong> because the memory is immutable for the segment, the decoder can project K/V from it <em>once</em> and cache them &mdash; the measured 79&times; decode win lives downstream of exactly this property.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Where It Is Pinned</h3>
+        <p>The 79-edge PyTorch X-ray (<code>compare_whisper_encoder_pytorch_v8.py</code>) checkpoints the encoder
+        block by block &mdash; stem, positional add, per-layer attention and MLP, final norm &mdash; with
+        max&nbsp;abs &asymp; 5.05e-4 and RMSE &asymp; 6.7e-6 in FP32. The encoder is the dominant stage at
+        &asymp;11.15&nbsp;s of the &asymp;12.22&nbsp;s end-to-end run, which is why it carries the deepest parity
+        evidence on this page.</p>
+    </div>
+</div>
+
+<h2 id="parity">Parity &amp; Nightly Coverage</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Where Every Kernel Above Is Pinned</h3>
+    <ul>
+        <li><code>make test-audio</code> &rarr; <code>unittest/test_audio.py</code>: log-Mel frontend vs PyTorch (<code>torch.stft</code>, periodic Hann, reflect pad) across tones, noise, and impulse signals &mdash; power relative max &le; 2e-5, log-Mel max &le; 1.1e-3, RMSE &le; 9e-5 &mdash; plus a stage-composition check that STFT + log-Mel equals the fused reference.</li>
+        <li><code>unittest/test_audio_encoder.py</code>: Whisper stem-1 / stem-2 Conv1D oracles, GELU erf (approximate='none') oracle, batched causal self-attention and persistent KV-cache transition oracles, and the <code>Q=1, K=1500</code> cross-attention decode oracle.</li>
+        <li><code>tests/test_v8_audio_contract.py</code> and <code>tests/test_v8_audio_encoder_contract.py</code>: the portable v8 circuit/codegen regressions, including the checkpoint-by-checkpoint encoder x-ray driven by <code>compare_whisper_encoder_pytorch_v8.py</code>.</li>
+        <li><code>make test-whisper-e2e-auto</code> (opt-in): full model-and-WAV transcription against the reference token sequence &mdash; the JFK sample matches Hugging Face token for token.</li>
+    </ul>
+    <p style="margin-bottom: 0;">
+        Operator commands live in the <a href="v8-runbook.html">v8 Runbook</a>; the pipeline and evidence live in
+        <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>; the kernel-level math is summarized in
+        <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a>.
+        For the same treatment of a recurrent kernel family, see the <a href="deltanet-deep-dive.html">Gated DeltaNet Deep Dive</a>.
+    </p>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

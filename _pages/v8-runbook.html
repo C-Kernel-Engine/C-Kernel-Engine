@@ -124,13 +124,15 @@
     <div class="v8-runbook-card">
         <h2>What This Runbook Covers</h2>
         <p>
-            Two things only: the promoted text-family <code>v8</code> bring-up commands and the one multimodal family that is validated today.
+            Three things: the promoted text-family <code>v8</code> bring-up commands, the one multimodal family that is validated today, and the Whisper Tiny audio lane within its certified scope.
             It does not claim that unrelated multimodal families are ready in <code>v8</code>.
         </p>
         <div class="v8-chip-row">
             <span class="v8-chip">version/v8/scripts/cks-v8-run</span>
             <span class="v8-chip">ck_run_v8.py</span>
             <span class="v8-chip">Qwen3-VL</span>
+            <span class="v8-chip">cks-v8-run audio</span>
+            <span class="v8-chip">Whisper Tiny</span>
             <span class="v8-chip">inference only</span>
         </div>
     </div>
@@ -161,6 +163,14 @@
     </p>
     <p style="margin-bottom: 0;">
         For parity-specific investigation, see <a href="vision-encoder-parity.html">Vision Encoder Parity</a>.
+    </p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">How The Audio Side Works</h3>
+    <p style="margin-bottom: 0;">
+        Whisper Tiny transcription runs through the same circuit and kernel-contract path: generated FP32 encoder and decoder from PCM16 WAV, with nightly audio gates and an opt-in end-to-end artifact test. See
+        <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram, usage, evidence, and current limitations.
     </p>
 </div>
 
@@ -414,6 +424,148 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
   --context-len 1024 \
   --force-convert --force-compile</pre>
     </div>
+</div>
+
+<h2>Canonical Whisper Tiny Audio Run</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Audio Runbook &mdash; WAV To Transcript</h3>
+    <p>
+        The audio lane runs a generated FP32 Whisper Tiny encoder and decoder &mdash; and a generated frontend:
+        WAV decode through log-Mel is seven circuit ops lowered into <code>ck_model_run_audio_wav</code>, so the
+        Python layer coordinates lifecycles only. The unified entrypoint
+        <code>version/v8/scripts/cks-v8-run audio</code> drives both stages and emits a single JSON report.
+        Codegen contains no Whisper model-name branch &mdash; the same v8 lowering path that carries text and vision
+        carries the audio circuits in <code>version/v8/circuits/</code>.
+    </p>
+    <p><strong>Step 1 &mdash; Point at the generated artifacts.</strong>
+        Each run directory must contain the generated runtime (<code>libmodel.so</code>) and its sidecars;
+        the runner refuses to start without them:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>export CK_WHISPER_ENCODER_RUN_DIR=/path/to/whisper-tiny-encoder
+export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
+    </div>
+    <p><strong>Step 2 &mdash; Prepare the WAV.</strong>
+        The frontend expects mono 16&nbsp;kHz PCM16. Convert any source format first:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>ffmpeg -i your-audio.mp3 \
+  -ac 1 -ar 16000 -c:a pcm_s16le \
+  /tmp/test-audio.wav</pre>
+    </div>
+    <p><strong>Step 3 &mdash; Run the transcription.</strong></p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run audio \
+  --encoder-run-dir $CK_WHISPER_ENCODER_RUN_DIR \
+  --decoder-run-dir $CK_WHISPER_DECODER_RUN_DIR \
+  --wav /tmp/test-audio.wav \
+  --language en \
+  --task transcribe \
+  --max-tokens 128 \
+  --output build/whisper-test-report.json</pre>
+    </div>
+    <p style="margin-bottom: 0;"><strong>Step 4 &mdash; Read the output.</strong>
+        The transcript prints on <code>stdout</code>, a per-stage timing line prints on <code>stderr</code>,
+        and <code>--output</code> carries the full report (<code>"schema": "cke.whisper_e2e"</code>) with
+        frontend/encoder/prefill/decode seconds, generated token count, stop reason, and SHA-256 of the WAV
+        and both generated runtimes for provenance.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">What Success Looks Like (Audio)</h3>
+    <ul>
+        <li><code>stdout</code> prints the transcript text &mdash; the JFK sample matches the Hugging Face reference token for token.</li>
+        <li><code>stderr</code> prints <code>frontend=...s encoder=...s prefill=...s decode=...s tokens=N stop=eos</code>.</li>
+        <li>The report JSON contains <code>"status": "ok"</code> with per-stage timings and runtime hashes.</li>
+    </ul>
+    <p style="margin-bottom: 0;">
+        See <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram, kernel sources, and parity evidence.
+    </p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Opt-In E2E Artifact Gate</h3>
+    <p>
+        Nightly already covers the log-Mel frontend against PyTorch, the audio transformer primitives, and the portable v8 audio
+        circuit/codegen regression. Full model-and-WAV transcription stays an opt-in artifact test, because CI runners do not
+        carry the generated Whisper artifacts:
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make test-audio
+
+CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
+CK_WHISPER_DECODER_RUN_DIR=/path/to/decoder \
+CK_WHISPER_WAV=/path/to/jfk.wav \
+make test-whisper-e2e-auto</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.
+    </p>
+    <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
+        Certified scope: Whisper Tiny FP32, English, no-timestamp decoding, up to 30 seconds (longer files are truncated, not chunked).
+        The JFK sample matches Hugging Face token for token; arbitrary recordings are functional rather than corpus-certified yet.
+    </p>
+</div>
+
+<h2>Canonical Whisper Audio Bridge</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Stage-Split Bridge Run</h3>
+    <p>
+        The audio bridge is the <code>encoder.npy</code> handoff: the generated encoder writes the cross-attention
+        conditioning, the generated decoder consumes it. The parent <code>run</code> command spawns exactly the two
+        worker stages below &mdash; running them yourself isolates which side of the bridge a failure lives on.
+        A clean encoder report with garbage decode means the seam; a failed encoder stage means the frontend or encoder.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python version/v8/scripts/run_whisper_v8.py _encoder \
+  --encoder-run-dir $CK_WHISPER_ENCODER_RUN_DIR \
+  --wav /tmp/test-audio.wav \
+  --encoder-output /tmp/whisper-encoder.npy \
+  --worker-report /tmp/whisper-encoder-report.json</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python version/v8/scripts/run_whisper_v8.py _decoder \
+  --decoder-run-dir $CK_WHISPER_DECODER_RUN_DIR \
+  --encoder-output /tmp/whisper-encoder.npy \
+  --language en \
+  --task transcribe \
+  --max-tokens 128 \
+  --worker-report /tmp/whisper-decoder-report.json</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        Each worker writes its own JSON report, so the encoder side can be validated for shape, timing, and
+        <code>"status"</code> before the decoder ever runs.
+    </p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Encoder X-Ray Parity Probe</h3>
+    <p>
+        For checkpoint-level evidence across the encoder side of the bridge,
+        <code>compare_whisper_encoder_pytorch_v8.py</code> walks the generated encoder stop by stop &mdash;
+        stem conv1 &rarr; GELU &rarr; conv2 &rarr; token-major transpose &rarr; per-layer attention and MLP residuals &mdash;
+        against a PyTorch reference, enforcing max-abs and relative-RMSE tolerances per checkpoint.
+        It needs <code>torch</code> + <code>transformers</code> and a local Hugging Face Whisper checkpoint:
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python version/v8/scripts/compare_whisper_encoder_pytorch_v8.py \
+  --run-dir $CK_WHISPER_ENCODER_RUN_DIR \
+  --checkpoint /path/to/local/whisper-tiny \
+  --stops key \
+  --output build/whisper-encoder-xray.json</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        The stop table is derived from the architecture dimensions, not the model name, so the same probe carries
+        to other audio transformer encoders. CI drives the same script through
+        <code>tests/test_v8_audio_encoder_contract.py</code> in the nightly audio lane.
+    </p>
 </div>
 
 <h2>What Success Looks Like</h2>

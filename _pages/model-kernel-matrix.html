@@ -39,6 +39,7 @@
     .model-card.mc-gemma3::before { background: var(--blue); }
     .model-card.mc-gemma4::before { background: #f39c12; }
     .model-card.mc-kimi::before   { background: #b48cff; }
+    .model-card.mc-whisper::before { background: #f59e0b; }
     .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
 
@@ -325,10 +326,12 @@
     Every supported family enters through the same deterministic compile path. The artifact (GGUF) carries the numbers,
     the template carries the structure, and lowering turns both into a concrete C runtime with a fixed memory plan.
     Vision families add a second lane that produces an encoder prefix and bridges it into the decoder.
+    Audio families arrive as safetensors &rarr; BUMP and run an encoder&ndash;decoder pair: the audio encoder's output
+    becomes cross-attention memory that the decoder reads on every generated token.
   </p>
 
-  <svg viewBox="0 0 1180 520" width="100%" role="img"
-       aria-label="C-Kernel-Engine model compilation pipeline: GGUF and template lower to IR, memory plan, codegen and runtime, with a vision encoder lane bridging into the decoder."
+  <svg viewBox="0 0 1180 648" width="100%" role="img"
+       aria-label="C-Kernel-Engine model compilation pipeline: GGUF and template lower to IR, memory plan, codegen and runtime, with a vision encoder lane bridging into the decoder and an audio encoder-decoder lane feeding cross-attention memory."
        style="max-width: 1180px; margin: 0.5rem auto 1.75rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
     <defs>
       <linearGradient id="mk-text" x1="0" y1="0" x2="1" y2="1">
@@ -336,6 +339,9 @@
       </linearGradient>
       <linearGradient id="mk-vision" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="#07adf8"/><stop offset="1" stop-color="#00bcd4"/>
+      </linearGradient>
+      <linearGradient id="mk-audio" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#d97706"/>
       </linearGradient>
       <linearGradient id="mk-run" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="#47b475"/><stop offset="1" stop-color="#2f8d59"/>
@@ -345,6 +351,9 @@
       </marker>
       <marker id="mk-arrow-v" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
         <path d="M0,0 L7,3 L0,6 Z" fill="#07adf8"/>
+      </marker>
+      <marker id="mk-arrow-a" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#f59e0b"/>
       </marker>
       <style>
         .mk-stage{fill:#323232;stroke:#454545;stroke-width:1.4;rx:12;}
@@ -383,7 +392,9 @@
       <rect class="mk-chip" x="746" y="92"  width="120" height="26" rx="6"/><text x="806" y="110" text-anchor="middle" class="mk-chip-t">qwen3vl</text>
       <rect class="mk-chip" x="876" y="92"  width="160" height="26" rx="6"/><text x="956" y="110" text-anchor="middle" class="mk-chip-t" fill="#9ed6ff">gemma4_vision</text>
       <rect class="mk-chip" x="1046" y="92" width="110" height="26" rx="6"/><text x="1101" y="110" text-anchor="middle" class="mk-chip-t" fill="#cbb6ff">siglip_vit</text>
-      <text x="616" y="140" class="mk-sub" fill="#808080">11 templates resolve into the same lowering passes</text>
+      <rect class="mk-chip" x="616" y="126" width="150" height="26" rx="6"/><text x="691" y="144" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_frontend</text>
+      <rect class="mk-chip" x="776" y="126" width="160" height="26" rx="6"/><text x="856" y="144" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_enc / audio_dec</text>
+      <text x="616" y="172" class="mk-sub" fill="#808080">11 text/vision templates + audio circuit trio → same lowering passes</text>
     </g>
 
     <!-- arrows sources -> compile -->
@@ -447,6 +458,32 @@
     <!-- bridge climbs into decoder -->
     <path d="M934,460 C1010,440 1060,400 1070,354" fill="none" stroke="#00bcd4" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#mk-arrow-v)"/>
     <text x="750" y="400" class="mk-sub" fill="#7fd8ec">prefix rows stitch in before text tokens</text>
+
+    <!-- Row 4: audio lane -->
+    <text x="24" y="556" class="mk-band">Audio lane (encoder&#8211;decoder families)</text>
+    <g>
+      <rect x="24"  y="572" width="190" height="58" rx="12" fill="url(#mk-audio)" opacity="0.14" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="44" y="598" class="mk-title" font-size="16">WAV in</text>
+      <text x="44" y="618" class="mk-sub" fill="#ffd38a">pcm16 &#183; resample 16 kHz</text>
+
+      <rect x="244" y="572" width="210" height="58" rx="12" fill="url(#mk-audio)" opacity="0.14" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="264" y="598" class="mk-title" font-size="16">Log-Mel frontend</text>
+      <text x="264" y="618" class="mk-sub" fill="#ffd38a">stft &#183; mel &#183; conv stem</text>
+
+      <rect x="484" y="572" width="210" height="58" rx="12" fill="url(#mk-audio)" opacity="0.14" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="504" y="598" class="mk-title" font-size="16">Audio encoder</text>
+      <text x="504" y="618" class="mk-sub" fill="#ffd38a">self-attn &#183; GELU MLP</text>
+
+      <rect x="724" y="572" width="210" height="58" rx="12" fill="url(#mk-audio)" opacity="0.22" stroke="#f59e0b" stroke-width="1.8"/>
+      <text x="744" y="598" class="mk-title" font-size="16">Cross-attn memory</text>
+      <text x="744" y="618" class="mk-sub" fill="#ffd38a">K/V once &#8594; decoder</text>
+    </g>
+    <path d="M214,601 L240,601" fill="none" stroke="#f59e0b" stroke-width="1.6" marker-end="url(#mk-arrow-a)"/>
+    <path d="M454,601 L480,601" fill="none" stroke="#f59e0b" stroke-width="1.6" marker-end="url(#mk-arrow-a)"/>
+    <path d="M694,601 L720,601" fill="none" stroke="#f59e0b" stroke-width="1.6" marker-end="url(#mk-arrow-a)"/>
+    <!-- cross-attention memory climbs into decoder -->
+    <path d="M934,586 C1020,566 1075,420 1075,354" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#mk-arrow-a)"/>
+    <text x="920" y="540" text-anchor="end" class="mk-sub" fill="#ffd38a">safetensors &#8594; BUMP &#183; encoder K/V read every decode step</text>
   </svg>
 
   <div class="matrix-hero">
@@ -595,6 +632,37 @@
         <span class="mq-chip preferred">Q4_K_M decoder ★</span>
         <span class="mq-chip">Q8_0 mmproj</span>
         <span class="mq-chip">image bridge</span>
+      </div>
+    </div>
+
+    <!-- Whisper Tiny -->
+    <div class="model-card mc-whisper">
+      <span class="model-badge">circuits: audio frontend + encoder + decoder</span>
+      <div class="model-title">Whisper Tiny</div>
+      <div class="model-arch">First encoder&#8211;decoder family &#183; generated frontend (7 ops &#8594; ck_model_run_audio_wav)<br>LayerNorm &#183; learned absolute position &#183; GELU (erf) &#183; dense bidirectional encoder</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 audio inference — WAV to transcript via cks-v8-run audio, cached cross-attn K/V (&asymp;79&times; decode)</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — JFK fixture matches Hugging Face token for token</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up scope: Whisper Tiny FP32 is the first audio lane — English, no-timestamp decoding certified on the JFK fixture; arbitrary recordings functional, not corpus-certified. PCM16 WAV input, 30 s truncated not chunked. safetensors &rarr; BUMP as an encoder + decoder run-directory pair.
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Whisper E2E artifact gate</span><button class="copy-command" type="button" data-copy-command="cmd-whisper">Copy</button></div>
+        <pre id="cmd-whisper"><code>CK_WHISPER_ENCODER_RUN_DIR=/path/to/whisper-tiny-encoder \
+CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder \
+CK_WHISPER_WAV=/path/to/jfk.wav \
+make test-whisper-e2e-auto</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">encoder_decoder</span>
+        <span class="tag learned">cross_attention</span>
+        <span class="tag fixed">artifact-gated e2e</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">FP32 &#9733;</span>
+        <span class="mq-chip">safetensors &#8594; BUMP</span>
+        <span class="mq-chip">enc + dec pair</span>
       </div>
     </div>
 
@@ -954,7 +1022,24 @@ make build/libckernel_engine.so
       <div class="cell ok">SwiGLU</div>
       <div class="cell dim">No</div>
       <div class="cell ok">Untied head</div>
+
+      <div class="cell row-head">Whisper Tiny</div>
+      <div class="cell ok">BPE + task tokens</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Learned absolute</div>
+      <div class="cell ok">Self + cross (enc&#8211;dec)</div>
+      <div class="cell ok">GELU (erf)</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
     </div>
+    <p class="source-note" style="margin-top: 0.75rem;">
+      Whisper Tiny is the first encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
+      the decoder adds the cross-attention lane (K/V from encoder memory, computed once) on top of causal self-attention.
+      Position is a learned absolute table on both sides &mdash; no RoPE anywhere. Kernel-level detail:
+      <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a> and
+      <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>.
+    </p>
   </div>
 
   <div class="matrix-section">
@@ -1160,6 +1245,10 @@ make build/libckernel_engine.so
       <div class="test-item">bartowski--nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF / Q4_K_M</div>
       <div class="test-item">unsloth--GLM-4-9B-0414-GGUF / Q4_K_M</div>
     </div>
+    <p class="source-note" style="margin-top: 0.75rem;">
+      Audio lane: <code>openai/whisper-tiny</code> safetensors &rarr; BUMP as an encoder + decoder run-directory pair,
+      validated through the opt-in E2E artifact gate (<code>make test-whisper-e2e-auto</code>) rather than the GGUF corpus above.
+    </p>
     <p class="source-note" style="margin-top: 0.75rem;">
       Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
       <code>&lt;|im_start|&gt;assistant</code>, the runtime is using the wrong chat wrapper or stop policy.

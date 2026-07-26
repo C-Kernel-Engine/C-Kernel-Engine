@@ -954,6 +954,7 @@
                         <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
                         <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
@@ -1351,6 +1352,12 @@
     <p style="margin-bottom: 0;"><a href="deltanet-deep-dive.html" class="btn btn-sm">Open Gated DeltaNet Deep Dive →</a></p>
 </div>
 
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Audio Inference: Whisper Tiny End-to-End</h3>
+    <p>The same circuit and kernel-contract path now transcribes audio: a generated FP32 Whisper Tiny encoder and decoder run from PCM16 WAV, with the JFK fixture matching Hugging Face token for token. The audio pipeline infographic shows every contracted kernel from log-Mel to persistent-KV decode.</p>
+    <p style="margin-bottom: 0;"><a href="v8-whisper-tiny.html" class="btn btn-sm">Open Whisper Tiny End-to-End →</a></p>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════════════════
      CORRECTNESS
 ═══════════════════════════════════════════════════════════════════════ -->
@@ -1642,7 +1649,7 @@ python version/v7/scripts/ck_run_v7.py train \
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-07-18 18:09</span>
+        <span class="folder-updated">Updated: 2026-07-26 20:23</span>
     </div>
     <pre class="tree-output">
 src/kernels
@@ -1999,7 +2006,7 @@ version/v7
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>

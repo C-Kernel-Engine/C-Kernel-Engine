@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" viewBox="0 0 1100 660" role="img" aria-labelledby="afe-title afe-desc">
+  <title id="afe-title">Audio frontend kernel dataflow</title>
+  <desc id="afe-desc">How a PCM16 WAV becomes Whisper encoder tokens: WAV decode to mono f32, band-limited resample, pad or truncate to 480000 samples, STFT power spectrum, Slaney mel filterbank, log-Mel normalization, then the encoder-side Conv1D stem with GELU and a channel-to-token transpose with learned positional embedding. Every stage is a named C kernel.</desc>
+  <defs>
+    <linearGradient id="afe-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <linearGradient id="afe-node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13233c"/>
+      <stop offset="1" stop-color="#0d1a2e"/>
+    </linearGradient>
+    <filter id="afe-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="afe-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="afe-arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="660" fill="url(#afe-bg)"/>
+  <g opacity="0.25" stroke="#26364f" stroke-width="1">
+    <path d="M0 110H1100M0 220H1100M0 330H1100M0 440H1100M0 550H1100"/>
+    <path d="M100 0V660M300 0V660M500 0V660M700 0V660M900 0V660"/>
+  </g>
+
+  <text x="40" y="42" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO FRONTEND &#183; SEVEN CIRCUIT OPS + ENCODER STEM</text>
+  <text x="40" y="80" font-size="30" font-weight="700" fill="#f1f5f9" font-family="'Inter',system-ui,sans-serif">Waveform to Encoder Tokens</text>
+  <text x="40" y="106" font-size="13.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">Stages 1&#8211;6 are the whisper_audio_frontend circuit's seven ops &#8212; STFT table construction and execution are separate &#8212; lowered into ck_model_run_audio_wav; 7&#8211;8 open the encoder. Each a named kernel, parity-checked against PyTorch.</text>
+
+  <!-- Row 1 -->
+  <g filter="url(#afe-shadow)">
+    <rect x="40" y="140" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="40" y="140" width="235" height="32" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="54" y="161" font-size="11.5" letter-spacing="1.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">1 &#183; WAV DECODE</text>
+    <text x="54" y="196" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_wav_decode_memory_</text>
+    <text x="54" y="212" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">pcm16_mono_f32</text>
+    <text x="54" y="238" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">RIFF walk &#183; odd-pad +1</text>
+    <text x="54" y="258" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">mono mean &#183; s = pcm/32768</text>
+    <text x="54" y="284" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">bytes &#8594; [n_samples]</text>
+  </g>
+
+  <line x1="277" y1="219" x2="299" y2="219" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="305" y="140" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="305" y="140" width="235" height="32" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="319" y="161" font-size="11.5" letter-spacing="1.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">2 &#183; RESAMPLE</text>
+    <text x="319" y="196" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_resample_windowed_</text>
+    <text x="319" y="212" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">sinc_f32</text>
+    <text x="319" y="238" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">band-limited sinc, radius 16</text>
+    <text x="319" y="258" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">identity when rate matches</text>
+    <text x="319" y="284" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">any rate &#8594; 16 kHz mono</text>
+  </g>
+
+  <line x1="542" y1="219" x2="564" y2="219" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="570" y="140" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="570" y="140" width="235" height="32" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="584" y="161" font-size="11.5" letter-spacing="1.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">3 &#183; PAD / TRUNCATE</text>
+    <text x="584" y="196" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_pad_or_truncate_f32</text>
+    <text x="584" y="238" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">zero-pad short clips,</text>
+    <text x="584" y="258" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">truncate long ones (30 s)</text>
+    <text x="584" y="284" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[n] &#8594; [480,000]</text>
+  </g>
+
+  <line x1="807" y1="219" x2="829" y2="219" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="835" y="140" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="835" y="140" width="235" height="32" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="849" y="161" font-size="11.5" letter-spacing="1.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">4 &#183; STFT POWER</text>
+    <text x="849" y="196" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_stft_precompute_tables_f32</text>
+    <text x="849" y="212" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_stft_power_fft400_f32</text>
+    <text x="849" y="238" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">n_fft 400 &#183; hop 160 &#183; Hann</text>
+    <text x="849" y="258" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">20&#215;20 FFT &#183; |X[t,f]|&#178;</text>
+    <text x="849" y="284" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[201 bins &#215; 3000 frames]</text>
+  </g>
+
+  <!-- connector row1 -> row2 -->
+  <path d="M 952 298 L 952 322 L 157 322 L 157 356" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#afe-arrow-amber)" stroke-dasharray="6 4"/>
+
+  <!-- Row 2 -->
+  <g filter="url(#afe-shadow)">
+    <rect x="40" y="360" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="40" y="360" width="235" height="32" rx="12" fill="#f59e0b" opacity="0.14"/>
+    <text x="54" y="381" font-size="11.5" letter-spacing="1.5" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">5 &#183; MEL FILTERS</text>
+    <text x="54" y="416" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_whisper_mel_filters_</text>
+    <text x="54" y="432" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">slaney_f32</text>
+    <text x="54" y="458" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">Slaney-scale filterbank,</text>
+    <text x="54" y="478" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">built once, reused per frame</text>
+    <text x="54" y="504" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[80 mels &#215; 201 bins]</text>
+  </g>
+
+  <line x1="277" y1="439" x2="299" y2="439" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="305" y="360" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="305" y="360" width="235" height="32" rx="12" fill="#f59e0b" opacity="0.14"/>
+    <text x="319" y="381" font-size="11.5" letter-spacing="1.5" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">6 &#183; LOG-MEL</text>
+    <text x="319" y="416" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_whisper_log_mel_from_</text>
+    <text x="319" y="432" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">power_reference_f32</text>
+    <text x="319" y="458" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">mel @ power &#183; log10</text>
+    <text x="319" y="478" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">global max &#8722; 8 clamp &#183; /4 scale</text>
+    <text x="319" y="504" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[80 mels &#215; 3000 frames]</text>
+  </g>
+
+  <line x1="542" y1="439" x2="564" y2="439" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="570" y="360" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="570" y="360" width="235" height="32" rx="12" fill="#10b981" opacity="0.13"/>
+    <text x="584" y="381" font-size="11.5" letter-spacing="1.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">7 &#183; CONV STEM</text>
+    <text x="584" y="416" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_conv1d_channel_major_f32</text>
+    <text x="584" y="440" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">80&#8594;384 k3s1, 384&#8594;384 k3s2</text>
+    <text x="584" y="460" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">GELU(erf) &#183; stride-2 halves time</text>
+    <text x="584" y="486" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[384 ch &#215; 1500 frames]</text>
+    <text x="584" y="506" font-size="10" fill="#34d399" font-family="ui-monospace,Menlo,monospace">encoder circuit</text>
+  </g>
+
+  <line x1="807" y1="439" x2="829" y2="439" stroke="#7dd3fc" stroke-width="2" marker-end="url(#afe-arrow)"/>
+
+  <g filter="url(#afe-shadow)">
+    <rect x="835" y="360" width="235" height="158" rx="12" fill="url(#afe-node)" stroke="#2b3f5f"/>
+    <rect x="835" y="360" width="235" height="32" rx="12" fill="#10b981" opacity="0.13"/>
+    <text x="849" y="381" font-size="11.5" letter-spacing="1.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">8 &#183; TOKEN LAYOUT</text>
+    <text x="849" y="416" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">audio_transpose_channel_to_</text>
+    <text x="849" y="432" font-size="11" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">token_f32</text>
+    <text x="849" y="458" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">channel-major &#8594; token-major</text>
+    <text x="849" y="478" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">+ learned positional embedding</text>
+    <text x="849" y="504" font-size="11" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">[1500 &#215; 384] &#8594; encoder</text>
+  </g>
+
+  <!-- Math band -->
+  <g filter="url(#afe-shadow)">
+    <rect x="40" y="548" width="1030" height="92" rx="12" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="64" y="576" font-size="12" letter-spacing="2" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">THE MATH EACH KERNEL CARRIES</text>
+    <text x="64" y="606" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">P[t,f] = | &#931;_n s[t&#183;160+n] &#183; w_hann[n] &#183; e^(&#8722;2&#960;i f n / 400) |&#178;</text>
+    <text x="64" y="628" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">L = ( clamp(log10(M_mel &#183; P), &#8805; max &#8722; 8) + 4 ) / 4</text>
+    <text x="640" y="606" font-size="13" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">y[o,t] = b[o] + &#931;_i &#931;_k w[o,i,k] &#183; x[i, t&#183;s + k &#8722; p]</text>
+    <text x="640" y="628" font-size="12" fill="#64748b" font-family="'Inter',system-ui,sans-serif">GELU(x) = x &#183; &#934;(x) &#8212; erf form, matching the PyTorch oracle</text>
+  </g>
+</svg>

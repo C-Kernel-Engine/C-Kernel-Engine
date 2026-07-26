@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700" role="img" aria-labelledby="enc-title enc-desc">
+  <title id="enc-title">Audio encoder anatomy: four bidirectional transformer blocks</title>
+  <desc id="enc-desc">The Whisper Tiny audio encoder turns 1500 frontend tokens into a contextualized memory. Four pre-LayerNorm blocks each run dense bidirectional self-attention — every frame attends every frame with no causal mask — followed by a GELU MLP, with residual adds around both. A final LayerNorm produces the immutable 1500 by 384 encoder memory the decoder cross-attends.</desc>
+  <defs>
+    <linearGradient id="enc-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <linearGradient id="enc-node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13233c"/>
+      <stop offset="1" stop-color="#0d1a2e"/>
+    </linearGradient>
+    <filter id="enc-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="enc-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="enc-arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="700" fill="url(#enc-bg)"/>
+  <g opacity="0.25" stroke="#26364f" stroke-width="1">
+    <path d="M0 110H1100M0 220H1100M0 330H1100M0 440H1100M0 550H1100M0 660H1100"/>
+    <path d="M100 0V700M300 0V700M500 0V700M700 0V700M900 0V700"/>
+  </g>
+
+  <text x="40" y="42" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO ENCODER &#183; 4 PRE-LN BLOCKS &#183; DENSE BIDIRECTIONAL ATTENTION</text>
+  <text x="40" y="80" font-size="28" font-weight="700" fill="#f1f5f9" font-family="'Inter',system-ui,sans-serif">1500 Frames In, One Contextualized Memory Out</text>
+  <text x="40" y="106" font-size="13.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">Every output frame is a weighted mixture of <tspan fill="#e2e8f0" font-weight="600">all</tspan> frames &#8212; the encoder sees the whole 30 s at once. That memory is written once, then read by every decoder token.</text>
+
+  <!-- input strip -->
+  <g filter="url(#enc-shadow)">
+    <rect x="40" y="150" width="180" height="420" rx="12" fill="url(#enc-node)" stroke="#2b3f5f"/>
+    <rect x="40" y="150" width="180" height="32" rx="12" fill="#0ea5e9" opacity="0.16"/>
+    <text x="56" y="171" font-size="11.5" letter-spacing="1.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">FROM FRONTEND</text>
+    <g font-family="ui-monospace,Menlo,monospace" font-size="10">
+      <rect x="64" y="196" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.5"/>
+      <rect x="64" y="215" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.38"/>
+      <rect x="64" y="234" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.3"/>
+      <rect x="64" y="253" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.24"/>
+      <rect x="64" y="272" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.19"/>
+      <rect x="64" y="291" width="132" height="15" rx="3" fill="#0ea5e9" opacity="0.15"/>
+    </g>
+    <text x="64" y="330" font-size="12" fill="#cbd5e1" font-family="ui-monospace,Menlo,monospace">x [1500 &#215; 384]</text>
+    <text x="64" y="352" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">conv-stem tokens +</text>
+    <text x="64" y="368" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">learned position table</text>
+    <text x="64" y="404" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">each row: one 20 ms</text>
+    <text x="64" y="420" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">frame of audio, raw &#8212;</text>
+    <text x="64" y="436" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">not yet contextualized</text>
+    <text x="64" y="540" font-size="10.5" fill="#34d399" font-family="ui-monospace,Menlo,monospace">encoder_layout:</text>
+    <text x="64" y="556" font-size="10.5" fill="#34d399" font-family="ui-monospace,Menlo,monospace">token_major</text>
+  </g>
+
+  <line x1="222" y1="360" x2="252" y2="360" stroke="#7dd3fc" stroke-width="2" marker-end="url(#enc-arrow)"/>
+
+  <!-- block anatomy -->
+  <g filter="url(#enc-shadow)">
+    <rect x="258" y="150" width="400" height="420" rx="12" fill="url(#enc-node)" stroke="#2b3f5f"/>
+    <rect x="258" y="150" width="400" height="32" rx="12" fill="#6366f1" opacity="0.18"/>
+    <text x="274" y="171" font-size="11.5" letter-spacing="1.5" fill="#a5b4fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">ONE BLOCK &#215; 4 LAYERS</text>
+
+    <!-- residual arc attention -->
+    <path d="M 300 224 C 268 224 268 330 300 330" fill="none" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="268" y="282" font-size="10" fill="#64748b" font-family="'Inter',system-ui,sans-serif" transform="rotate(-90 268 282)">residual</text>
+
+    <g font-family="ui-monospace,Menlo,monospace" font-size="11">
+      <rect x="310" y="196" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="213" fill="#cbd5e1">layernorm</text>
+      <rect x="310" y="230" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="247" fill="#cbd5e1">q_proj &#183; k_proj &#183; v_proj</text>
+      <rect x="310" y="264" width="320" height="34" rx="6" fill="#1a1533" stroke="#6366f1" stroke-width="1.4"/>
+      <text x="326" y="285" fill="#c7d2fe" font-weight="600">attn &#8212; dense bidirectional</text>
+      <rect x="310" y="306" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="323" fill="#cbd5e1">out_proj &#8594; + residual</text>
+
+      <rect x="310" y="352" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="369" fill="#cbd5e1">layernorm</text>
+      <rect x="310" y="386" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="403" fill="#cbd5e1">mlp_up 384 &#8594; 1536</text>
+      <rect x="310" y="420" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="437" fill="#fbbf24">gelu (erf)</text>
+      <rect x="310" y="454" width="320" height="26" rx="6" fill="#13233c" stroke="#2b3f5f"/>
+      <text x="326" y="471" fill="#cbd5e1">mlp_down 1536 &#8594; 384 &#8594; + residual</text>
+    </g>
+
+    <!-- residual arc mlp -->
+    <path d="M 300 366 C 268 366 268 468 300 468" fill="none" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+    <rect x="274" y="500" width="368" height="54" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+    <text x="290" y="522" font-size="11" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">pre-LN: normalization inside the residual stream,</text>
+    <text x="290" y="540" font-size="11" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">gradients flow cleanly through all 4 layers</text>
+  </g>
+
+  <line x1="660" y1="360" x2="690" y2="360" stroke="#7dd3fc" stroke-width="2" marker-end="url(#enc-arrow)"/>
+
+  <!-- attention zoom -->
+  <g filter="url(#enc-shadow)">
+    <rect x="696" y="150" width="364" height="420" rx="12" fill="url(#enc-node)" stroke="#2b3f5f"/>
+    <rect x="696" y="150" width="364" height="32" rx="12" fill="#f59e0b" opacity="0.14"/>
+    <text x="712" y="171" font-size="11.5" letter-spacing="1.5" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">INSIDE ATTN &#183; PER HEAD (6 &#215; 64)</text>
+
+    <text x="716" y="204" font-size="12.5" fill="#e2e8f0" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">scores = Q&#183;K&#7511; / &#8730;64</text>
+
+    <!-- full attention grid -->
+    <g>
+      <rect x="716" y="218" width="150" height="150" rx="6" fill="#0b1729" stroke="#f59e0b" stroke-width="1.4"/>
+      <g fill="#f59e0b" opacity="0.55">
+        <rect x="722" y="224" width="8" height="8"/><rect x="734" y="224" width="8" height="8"/><rect x="746" y="224" width="8" height="8"/><rect x="758" y="224" width="8" height="8"/><rect x="770" y="224" width="8" height="8"/><rect x="782" y="224" width="8" height="8"/><rect x="794" y="224" width="8" height="8"/><rect x="806" y="224" width="8" height="8"/><rect x="818" y="224" width="8" height="8"/><rect x="830" y="224" width="8" height="8"/><rect x="842" y="224" width="8" height="8"/>
+        <rect x="722" y="238" width="8" height="8"/><rect x="734" y="238" width="8" height="8"/><rect x="746" y="238" width="8" height="8"/><rect x="758" y="238" width="8" height="8"/><rect x="770" y="238" width="8" height="8"/><rect x="782" y="238" width="8" height="8"/><rect x="794" y="238" width="8" height="8"/><rect x="806" y="238" width="8" height="8"/><rect x="818" y="238" width="8" height="8"/><rect x="830" y="238" width="8" height="8"/><rect x="842" y="238" width="8" height="8"/>
+        <rect x="722" y="252" width="8" height="8"/><rect x="734" y="252" width="8" height="8"/><rect x="746" y="252" width="8" height="8"/><rect x="758" y="252" width="8" height="8"/><rect x="770" y="252" width="8" height="8"/><rect x="782" y="252" width="8" height="8"/><rect x="794" y="252" width="8" height="8"/><rect x="806" y="252" width="8" height="8"/><rect x="818" y="252" width="8" height="8"/><rect x="830" y="252" width="8" height="8"/><rect x="842" y="252" width="8" height="8"/>
+        <rect x="722" y="266" width="8" height="8"/><rect x="734" y="266" width="8" height="8"/><rect x="746" y="266" width="8" height="8"/><rect x="758" y="266" width="8" height="8"/><rect x="770" y="266" width="8" height="8"/><rect x="782" y="266" width="8" height="8"/><rect x="794" y="266" width="8" height="8"/><rect x="806" y="266" width="8" height="8"/><rect x="818" y="266" width="8" height="8"/><rect x="830" y="266" width="8" height="8"/><rect x="842" y="266" width="8" height="8"/>
+        <rect x="722" y="280" width="8" height="8"/><rect x="734" y="280" width="8" height="8"/><rect x="746" y="280" width="8" height="8"/><rect x="758" y="280" width="8" height="8"/><rect x="770" y="280" width="8" height="8"/><rect x="782" y="280" width="8" height="8"/><rect x="794" y="280" width="8" height="8"/><rect x="806" y="280" width="8" height="8"/><rect x="818" y="280" width="8" height="8"/><rect x="830" y="280" width="8" height="8"/><rect x="842" y="280" width="8" height="8"/>
+      </g>
+      <text x="791" y="386" font-size="10.5" fill="#fbbf24" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">[1500 &#215; 1500] &#8212; fully lit</text>
+      <text x="791" y="402" font-size="10.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">no causal mask: every frame</text>
+      <text x="791" y="416" font-size="10.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">attends every frame</text>
+    </g>
+
+    <!-- contrast: causal triangle -->
+    <g>
+      <rect x="896" y="218" width="150" height="150" rx="6" fill="#0b1729" stroke="#334155" stroke-width="1.2"/>
+      <path d="M 902 224 L 902 362 L 1040 362 Z" fill="#475569" opacity="0.5"/>
+      <text x="971" y="386" font-size="10.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">decoder self-attn:</text>
+      <text x="971" y="402" font-size="10.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">causal triangle</text>
+      <text x="971" y="416" font-size="10.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif" text-anchor="middle">(contrast)</text>
+    </g>
+
+    <text x="716" y="446" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">softmax row-normalizes &#8594; each frame's output</text>
+    <text x="716" y="464" font-size="12" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">is a weighted mixture of all 1500 value rows</text>
+    <line x1="716" y1="478" x2="1044" y2="478" stroke="#1e293b" stroke-width="1"/>
+    <text x="716" y="500" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">K/V are ephemeral &#8212; computed per layer,</text>
+    <text x="716" y="516" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">used once, freed (kv_layout: ephemeral_full_context).</text>
+    <text x="716" y="532" font-size="11" fill="#64748b" font-family="'Inter',system-ui,sans-serif">No cache here; caching belongs to the decoder.</text>
+    <text x="716" y="556" font-size="10.5" fill="#34d399" font-family="ui-monospace,Menlo,monospace">attention_causal: false &#183; rope: none &#183; absolute position</text>
+  </g>
+
+  <!-- output memory -->
+  <line x1="520" y1="570" x2="520" y2="600" stroke="#fbbf24" stroke-width="2" marker-end="url(#enc-arrow-amber)"/>
+  <g filter="url(#enc-shadow)">
+    <rect x="40" y="606" width="660" height="72" rx="12" fill="#2b1d07" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="64" y="634" font-size="11" letter-spacing="2" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">FINAL LAYERNORM &#8594; H_enc [1500 &#215; 384] &#8212; THE ENCODER MEMORY</text>
+    <text x="64" y="658" font-size="12" fill="#d6b370" font-family="'Inter',system-ui,sans-serif">written once, immutable for the segment &#8212; the decoder's cross-attention K/V are projected from this, once, and cached</text>
+  </g>
+  <g filter="url(#enc-shadow)">
+    <rect x="730" y="606" width="330" height="72" rx="12" fill="#0d2818" stroke="#10b981" stroke-width="1.4"/>
+    <text x="754" y="634" font-size="11" letter-spacing="2" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">WHY BIDIRECTIONAL</text>
+    <text x="754" y="658" font-size="11.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">the frame under "country" borrows meaning</text>
+    <text x="754" y="674" font-size="11.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">from frames before <tspan fill="#e2e8f0">and</tspan> after it</text>
+  </g>
+</svg>

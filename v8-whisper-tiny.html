@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Whisper Tiny End-to-End | C-Kernel-Engine | C-Kernel-Engine</title>
+    <meta name="description" content="CKE v8 transcribes Whisper Tiny end to end from PCM16 WAV through generated FP32 encoder and decoder circuits: nightly audio gates, usage, evidence, and current limitations.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-whisper-tiny.html">
-    <meta property="og:title" content="Documentation | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <meta property="og:title" content="Whisper Tiny End-to-End | C-Kernel-Engine | C-Kernel-Engine">
+    <meta property="og:description" content="CKE v8 transcribes Whisper Tiny end to end from PCM16 WAV through generated FP32 encoder and decoder circuits: nightly audio gates, usage, evidence, and current limitations.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-whisper-tiny.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -903,7 +903,7 @@
         <nav class="site-nav">
             <a href="index.html" class="">Home</a>
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
-            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="quickstart.html" class="active">Getting Started</a>
             <a href="developer-guide.html" class="">Developer Guide</a>
             <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
@@ -954,6 +954,7 @@
                         <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
                         <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
@@ -977,32 +978,322 @@
         </nav>
     </header>
     <main>
----
-layout: default
-title: "Whisper Tiny End-to-End"
-permalink: /v8-whisper-tiny/
----
 
 <h1>Whisper Tiny End-to-End</h1>
 
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Kernel Source</strong><br>
+        <code>src/kernels/audio_kernels.c</code> and <code>include/ckernel_audio.h</code> &mdash; WAV decode,
+        resampling, pad/truncate, STFT/FFT-400, Slaney Mel, log-Mel, Conv1D stem, and layout primitives.
+        The frontend is the circuit <code>version/v8/circuits/whisper_audio_frontend.json</code>; encoder and
+        decoder topology lives in <code>version/v8/circuits/audio_transformer_encoder.json</code> and
+        <code>version/v8/circuits/audio_transformer_decoder.json</code>; lifecycle orchestration in
+        <code>version/v8/scripts/ck_run_v8.py</code> (unified <code>cks-v8-run audio</code> command). Per-kernel
+        math and diagrams:
+        <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a>;
+        per-kernel deep dive: <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>.
+    </div>
+</div>
+
 <p>
-  CKE v8 can run a generated FP32 Whisper Tiny encoder and decoder from a
-  PCM16 WAV file. The orchestration is Python, while WAV decoding,
-  resampling, FFT/log-Mel generation, encoder execution, decoder prefill,
-  persistent KV-cache decode, and attention execute through C kernels and
-  generated model libraries.
+  CKE v8 runs a generated FP32 Whisper Tiny encoder and decoder from a
+  PCM16 WAV file &mdash; and the frontend is generated too. WAV decode,
+  windowed-sinc resampling, pad/truncate, STFT table construction, FFT400
+  power, Slaney Mel filters, and log-Mel normalization are seven explicit
+  circuit operations in
+  <code>version/v8/circuits/whisper_audio_frontend.json</code>, each with an
+  exact numerical contract and a map-owned call ABI. The resolved operation
+  sequence lowers through call IR into generated C exporting
+  <code>ck_model_run_audio_wav</code>. Python coordinates artifact lifecycles
+  and process isolation; it performs no frontend arithmetic. Codegen contains
+  no Whisper model-name branch; every arithmetic boundary resolves through a
+  kernel-map contract.
 </p>
 
-<h2>Run</h2>
+<h2>How the Audio Pipeline Works</h2>
 
-<pre><code>python version/v8/scripts/run_whisper_v8.py run \
+<p>
+  The diagram follows one WAV file through the full system: contract
+  kernels prepare the log-Mel grid, the generated encoder writes an
+  immutable encoder memory once, and the generated decoder reads it on
+  every cross-attention step while its own KV-cache grows token by token.
+</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 880" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="aInputGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="aOpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="aStateGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="aOutGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <marker id="aArrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+    <marker id="aArrowAmber" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1100" height="880" rx="18" fill="#0f172a"/>
+  <rect x="0" y="0" width="1100" height="880" rx="18" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- title -->
+  <text x="40" y="52" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO PIPELINE &#183; GENERATED FP32 WHISPER TINY</text>
+  <text x="40" y="88" font-size="27" font-weight="700" fill="#f1f5f9">One WAV in, tokens out &#8212; every stage a kernel-map contract</text>
+  <text x="40" y="112" font-size="13.5" fill="#94a3b8">Python orchestrates; C kernels and generated model libraries compute. No Whisper model-name branch anywhere in codegen.</text>
+
+  <!-- ============ ROW A : 01 WAV -> 02 FRONTEND -> 03 STEM ============ -->
+
+  <!-- 01 INPUT -->
+  <g>
+    <rect x="30" y="140" width="320" height="216" rx="12" fill="#111c33" stroke="url(#aInputGrad)" stroke-width="1.6"/>
+    <rect x="30" y="140" width="320" height="34" rx="12" fill="url(#aInputGrad)"/>
+    <text x="46" y="162" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#eff6ff">01 &#183; WAV IN</text>
+    <text x="46" y="196" font-size="13" font-weight="600" fill="#e2e8f0">PCM16 &#183; mono &#183; 16 kHz</text>
+    <text x="46" y="216" font-size="11.5" fill="#94a3b8">Any format converted with ffmpeg:</text>
+    <text x="46" y="234" font-size="11" fill="#7dd3fc" font-family="ui-monospace,Menlo,monospace">ffmpeg -ac 1 -ar 16000 -c:a pcm_s16le</text>
+    <line x1="46" y1="250" x2="334" y2="250" stroke="#1e3a5f" stroke-width="1"/>
+    <text x="46" y="272" font-size="11.5" font-weight="600" fill="#93c5fd">CIRCUIT OPS &#8594; MAP-OWNED KERNELS</text>
+    <text x="46" y="290" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_wav_decode_memory_pcm16_mono_f32</text>
+    <text x="46" y="306" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_resample_windowed_sinc_f32</text>
+    <text x="46" y="322" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_pad_or_truncate_f32</text>
+    <text x="46" y="342" font-size="10.5" fill="#64748b">&#8804; 30 s today &#8212; truncated, not chunked</text>
+  </g>
+
+  <line x1="354" y1="248" x2="386" y2="248" stroke="#94a3b8" stroke-width="2" marker-end="url(#aArrow)"/>
+
+  <!-- 02 FRONTEND -->
+  <g>
+    <rect x="390" y="140" width="320" height="216" rx="12" fill="#16123a" stroke="url(#aOpGrad)" stroke-width="1.6"/>
+    <rect x="390" y="140" width="320" height="34" rx="12" fill="url(#aOpGrad)"/>
+    <text x="406" y="162" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#eef2ff">02 &#183; LOG-MEL FRONTEND</text>
+    <text x="406" y="196" font-size="13" font-weight="600" fill="#e2e8f0">STFT power &#8594; 80-band log-Mel</text>
+    <text x="406" y="216" font-size="11.5" fill="#94a3b8">n_fft 400 &#183; hop 160 &#183; Slaney mel</text>
+    <line x1="406" y1="232" x2="694" y2="232" stroke="#2b2660" stroke-width="1"/>
+    <text x="406" y="254" font-size="11.5" font-weight="600" fill="#a5b4fc">CIRCUIT OPS &#8594; MAP-OWNED KERNELS</text>
+    <text x="406" y="272" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_stft_precompute_tables_f32</text>
+    <text x="406" y="288" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_stft_power_fft400_f32</text>
+    <text x="406" y="303" font-size="10" fill="#64748b" font-family="ui-monospace,Menlo,monospace">20&#215;20 mixed-radix FFT + direct-DFT reference</text>
+    <text x="406" y="320" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_whisper_mel_filters_slaney_f32</text>
+    <text x="406" y="336" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_whisper_log_mel_from_power_reference_f32</text>
+    <text x="406" y="352" font-size="10.5" fill="#34d399">vs Hugging Face: 1.54e-4 max|&#916;| &#183; 1.37e-6 RMSE</text>
+  </g>
+
+  <line x1="714" y1="248" x2="746" y2="248" stroke="#94a3b8" stroke-width="2" marker-end="url(#aArrow)"/>
+
+  <!-- 03 STEM -->
+  <g>
+    <rect x="750" y="140" width="320" height="216" rx="12" fill="#16123a" stroke="url(#aOpGrad)" stroke-width="1.6"/>
+    <rect x="750" y="140" width="320" height="34" rx="12" fill="url(#aOpGrad)"/>
+    <text x="766" y="162" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#eef2ff">03 &#183; CONV STEM + LAYOUT</text>
+    <text x="766" y="196" font-size="13" font-weight="600" fill="#e2e8f0">Conv1D &#215;2 + GELU &#8594; tokens</text>
+    <text x="766" y="216" font-size="11.5" fill="#94a3b8">Mel frames become the encoder token grid</text>
+    <line x1="766" y1="232" x2="1054" y2="232" stroke="#2b2660" stroke-width="1"/>
+    <text x="766" y="254" font-size="11.5" font-weight="600" fill="#a5b4fc">CIRCUIT OPS &#8594; MAP-OWNED KERNELS</text>
+    <text x="766" y="274" font-size="11" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_conv1d_channel_major_f32</text>
+    <text x="766" y="292" font-size="11" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">gelu_pytorch_erf_f32_inplace</text>
+    <text x="766" y="310" font-size="11" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_transpose_channel_to_token_f32</text>
+    <text x="766" y="338" font-size="10.5" fill="#64748b">unequal-length primitives, no model branch</text>
+  </g>
+
+  <!-- connector down from stem to encoder row -->
+  <path d="M 910 356 L 910 378 L 240 378 L 240 396" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#aArrow)"/>
+
+  <!-- ============ ROW B : 04 ENCODER -> memory -> 05 DECODER ============ -->
+
+  <!-- 04 ENCODER -->
+  <g>
+    <rect x="30" y="400" width="470" height="220" rx="12" fill="#111c33" stroke="url(#aInputGrad)" stroke-width="1.6"/>
+    <rect x="30" y="400" width="470" height="34" rx="12" fill="url(#aInputGrad)"/>
+    <text x="46" y="422" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#eff6ff">04 &#183; ENCODER &#8212; GENERATED C LIBRARY</text>
+    <text x="46" y="456" font-size="13" font-weight="600" fill="#e2e8f0">Transformer blocks &#183; bidirectional self-attention</text>
+    <text x="46" y="476" font-size="11.5" fill="#94a3b8">whisper-tiny safetensors &#8594; BUMP &#8594; call IR &#8594; generated C</text>
+    <text x="46" y="494" font-size="11.5" fill="#94a3b8">67 source tensors &#8594; 71 BUMP entries &#183; 100% weight coverage</text>
+    <line x1="46" y1="510" x2="484" y2="510" stroke="#1e3a5f" stroke-width="1"/>
+    <text x="46" y="532" font-size="11.5" font-weight="600" fill="#93c5fd">PARITY EVIDENCE</text>
+    <text x="46" y="552" font-size="11.5" fill="#94a3b8">79-edge PyTorch X-ray, checkpoint by checkpoint</text>
+    <text x="46" y="570" font-size="11" fill="#34d399" font-family="ui-monospace,Menlo,monospace">max_abs &#8776; 5.05e-4 &#183; RMSE &#8776; 6.7e-6 (FP32)</text>
+    <text x="46" y="598" font-size="10.5" fill="#64748b">runs in an isolated child process &#8212; encoder and decoder share one ABI,</text>
+    <text x="46" y="613" font-size="10.5" fill="#64748b">so one process could bind a call to the wrong artifact</text>
+  </g>
+
+  <!-- ENCODER MEMORY (amber state) -->
+  <g>
+    <rect x="524" y="446" width="140" height="128" rx="12" fill="#2b1d07" stroke="url(#aStateGrad)" stroke-width="1.8"/>
+    <text x="594" y="474" font-size="10.5" font-weight="700" letter-spacing="1" fill="#fbbf24" text-anchor="middle">ENCODER</text>
+    <text x="594" y="490" font-size="10.5" font-weight="700" letter-spacing="1" fill="#fbbf24" text-anchor="middle">MEMORY</text>
+    <text x="594" y="514" font-size="10" fill="#d6b370" text-anchor="middle">immutable</text>
+    <text x="594" y="530" font-size="10" fill="#d6b370" text-anchor="middle">n_audio rows</text>
+    <text x="594" y="552" font-size="9.5" fill="#8a6d3b" text-anchor="middle">written once,</text>
+    <text x="594" y="565" font-size="9.5" fill="#8a6d3b" text-anchor="middle">read every decode step</text>
+  </g>
+
+  <line x1="500" y1="510" x2="520" y2="510" stroke="#f59e0b" stroke-width="2" marker-end="url(#aArrowAmber)"/>
+  <line x1="664" y1="510" x2="684" y2="510" stroke="#f59e0b" stroke-width="2" marker-end="url(#aArrowAmber)"/>
+
+  <!-- 05 DECODER -->
+  <g>
+    <rect x="688" y="400" width="382" height="220" rx="12" fill="#0d2818" stroke="url(#aOutGrad)" stroke-width="1.6"/>
+    <rect x="688" y="400" width="382" height="34" rx="12" fill="url(#aOutGrad)"/>
+    <text x="704" y="422" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#ecfdf5">05 &#183; DECODER &#8212; PERSISTENT KV-CACHE</text>
+    <text x="704" y="456" font-size="13" font-weight="600" fill="#e2e8f0">forced prefix &#8594; greedy tokens &#8594; EOS</text>
+    <text x="704" y="478" font-size="11.5" fill="#94a3b8">self-attn: decode provider, pos + 1 valid KV rows</text>
+    <text x="704" y="496" font-size="11.5" fill="#94a3b8">cross-attn: K/V from encoder memory (immutable</text>
+    <text x="704" y="512" font-size="11.5" fill="#94a3b8">length), Q from active decoder-token count</text>
+    <line x1="704" y1="528" x2="1054" y2="528" stroke="#14532d" stroke-width="1"/>
+    <text x="704" y="550" font-size="11.5" font-weight="600" fill="#6ee7b7">REFERENCE EVIDENCE</text>
+    <text x="704" y="570" font-size="11.5" fill="#94a3b8">JFK sample: same 23 greedy tokens as</text>
+    <text x="704" y="588" font-size="11.5" fill="#94a3b8">Hugging Face Whisper Tiny, followed by EOS</text>
+    <text x="704" y="606" font-size="10.5" fill="#64748b">English &#183; no-timestamp decoding certified</text>
+  </g>
+
+  <!-- ============ CONTRACT CALLOUTS ============ -->
+  <text x="40" y="662" font-size="11" letter-spacing="2.5" fill="#f59e0b" font-family="ui-monospace,Menlo,monospace">THE THREE CONTRACT FINDINGS THAT MADE E2E WORK</text>
+
+  <g>
+    <rect x="30" y="676" width="340" height="98" rx="10" fill="#1a1533" stroke="#4f46e5" stroke-width="1.2"/>
+    <text x="46" y="702" font-size="11.5" font-weight="700" fill="#c7d2fe">1 &#183; CROSS-ATTN K/V EXTENT</text>
+    <text x="46" y="724" font-size="10.5" fill="#94a3b8">K/V projections keep the immutable</text>
+    <text x="46" y="740" font-size="10.5" fill="#94a3b8">encoder-memory length &#8212; not the active</text>
+    <text x="46" y="756" font-size="10.5" fill="#94a3b8">decoder-token count.</text>
+  </g>
+  <g>
+    <rect x="386" y="676" width="340" height="98" rx="10" fill="#1a1533" stroke="#4f46e5" stroke-width="1.2"/>
+    <text x="402" y="702" font-size="11.5" font-weight="700" fill="#c7d2fe">2 &#183; CROSS-ATTN Q EXTENT</text>
+    <text x="402" y="724" font-size="10.5" fill="#94a3b8">Query length uses the active decoder-token</text>
+    <text x="402" y="740" font-size="10.5" fill="#94a3b8">count &#8212; not the decoder&#8217;s physical</text>
+    <text x="402" y="756" font-size="10.5" fill="#94a3b8">capacity.</text>
+  </g>
+  <g>
+    <rect x="742" y="676" width="328" height="98" rx="10" fill="#1a1533" stroke="#4f46e5" stroke-width="1.2"/>
+    <text x="758" y="702" font-size="11.5" font-weight="700" fill="#c7d2fe">3 &#183; INCREMENTAL SELF-ATTN</text>
+    <text x="758" y="724" font-size="10.5" fill="#94a3b8">Decode provider attends model-&gt;pos + 1</text>
+    <text x="758" y="740" font-size="10.5" fill="#94a3b8">valid KV rows &#8212; a one-token prefill read</text>
+    <text x="758" y="756" font-size="10.5" fill="#94a3b8">only cache row zero.</text>
+  </g>
+
+  <!-- ============ GATE STRIP ============ -->
+  <rect x="30" y="800" width="1040" height="52" rx="10" fill="#0b1120" stroke="#1e293b" stroke-width="1"/>
+  <text x="50" y="822" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#34d399" font-family="ui-monospace,Menlo,monospace">NIGHTLY</text>
+  <text x="130" y="822" font-size="11" fill="#94a3b8">log-Mel frontend vs PyTorch &#183; audio transformer primitives &#183; v8 audio circuit/codegen regression</text>
+  <text x="50" y="841" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#f59e0b" font-family="ui-monospace,Menlo,monospace">OPT-IN</text>
+  <text x="130" y="841" font-size="11" fill="#94a3b8">full model-and-WAV transcription &#8212; artifact gate: full reference token sequence + EOS, no tolerance relaxation</text>
+</svg>
+
+</div>
+
+<h2>Generated Frontend: Circuit Ops to Generated C</h2>
+
+<p>
+  The frontend began as direct C calls selected by the Python runner &mdash;
+  useful correctness bring-up, but provider selection sat outside the v8
+  architecture. It is now seven explicit circuit operations
+  (<code>audio_wav_decode</code>, <code>audio_resample</code>,
+  <code>audio_pad_or_truncate</code>, <code>audio_stft_tables</code>,
+  <code>audio_stft</code>, <code>audio_mel_filters</code>,
+  <code>audio_log_mel</code>), each carrying an exact numerical contract and
+  a map-owned call ABI. Lowering plans the frontend buffers and lowers the
+  runtime WAV metadata into call IR; the resolved sequence generates C
+  exporting <code>ck_model_run_audio_wav</code>.
+</p>
+
+<div class="img-container svg-viewer" data-title="Circuit to native execution: ops, contracts, kernel maps, call IR, generated C">
+    <img src="assets/audio-circuit-to-native.svg" alt="Whisper audio frontend lowering from circuit operations through kernel maps and call IR to generated C">
+</div>
+
+<ul>
+  <li>
+    <strong>Provider selection is a kernel-map decision.</strong> The map
+    alone names the registered provider and its call ABI; tests fail closed
+    when an operation is missing or the provider inventory bypasses
+    map-owned ABI accounting.
+  </li>
+  <li>
+    <strong>Scheduling is a call-IR decision.</strong> Operation order and
+    buffer lifetimes come from the circuit through lowering &mdash; not from
+    Python control flow, and not from a codegen branch.
+  </li>
+  <li>
+    <strong>Python owns lifecycle, generated C owns arithmetic.</strong>
+    The runner coordinates artifact directories, encoder/decoder process
+    isolation, and report writing; every sample-level computation executes
+    inside the generated artifact.
+  </li>
+</ul>
+
+<h2>What Nightly Proves, and What Stays Opt-In</h2>
+
+<p>
+  Coverage is split deliberately, because GitHub runners do not carry the
+  generated Whisper artifacts:
+</p>
+
+<ul>
+  <li>
+    <strong>Nightly &mdash; Audio Log-Mel Frontend.</strong> The optimized C
+    FFT/log-Mel frontend is compared against a PyTorch oracle on every
+    nightly run.
+  </li>
+  <li>
+    <strong>Nightly &mdash; Audio Transformer Primitives.</strong>
+    Resampling, FFT, Conv1D, GELU, layout transforms, self-attention, and
+    cross-attention are exercised against their contracts on every nightly
+    run.
+  </li>
+  <li>
+    <strong>Nightly &mdash; v8 audio circuit/codegen regression.</strong>
+    The generated-circuit lowering and codegen path is gated portably,
+    without model weights. These rows now cover the full frontend sequence:
+    native arithmetic, exact provider resolution for all seven ops, the
+    generated <code>ck_model_run_audio_wav</code> ABI, unified-command CLI
+    ownership, and synthetic compilation.
+  </li>
+  <li>
+    <strong>Opt-in artifact test &mdash; full model-and-WAV
+    transcription.</strong> End-to-end transcription runs where the
+    generated encoder and decoder artifacts exist, via
+    <code>make test-whisper-e2e-auto</code>. The gate requires the full
+    reference token sequence and EOS without tolerance relaxation.
+  </li>
+</ul>
+
+<h2>Transcribe Arbitrary Audio</h2>
+
+<p>
+  Convert any source format to mono 16&nbsp;kHz PCM16 WAV first:
+</p>
+
+<pre><code>ffmpeg -i your-audio.mp3 \
+  -ac 1 -ar 16000 -c:a pcm_s16le \
+  /tmp/test-audio.wav</code></pre>
+
+<p>Then run the generated pipeline through the unified v8 command surface:</p>
+
+<pre><code>version/v8/scripts/cks-v8-run audio \
   --encoder-run-dir /path/to/whisper-tiny-encoder \
   --decoder-run-dir /path/to/whisper-tiny-decoder \
-  --wav /path/to/audio.wav \
+  --wav /tmp/test-audio.wav \
   --language en \
   --task transcribe \
   --max-tokens 128 \
-  --output build/whisper-report.json</code></pre>
+  --output build/whisper-test-report.json</code></pre>
 
 <p>
   Encoder and decoder execution occurs in isolated child processes. Both
@@ -1010,6 +1301,25 @@ permalink: /v8-whisper-tiny/
   names, so loading both into one process can bind a call to the wrong
   artifact.
 </p>
+
+<h2>Current Limitations</h2>
+
+<ul>
+  <li>Whisper Tiny, FP32 only.</li>
+  <li>
+    PCM16 WAV input; use <code>ffmpeg</code> to convert MP3, FLAC, or other
+    formats.
+  </li>
+  <li>
+    Audio is limited to 30 seconds; longer files are currently truncated,
+    not chunked.
+  </li>
+  <li>English transcription and no-timestamp decoding are certified.</li>
+  <li>
+    The JFK sample matches Hugging Face exactly; arbitrary recordings are
+    functional rather than corpus-certified yet.
+  </li>
+</ul>
 
 <h2>Correctness Findings</h2>
 

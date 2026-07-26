@@ -954,6 +954,7 @@
                         <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
                         <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
                         <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
                         <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
@@ -1818,8 +1819,8 @@
       </tr>
       <tr>
         <td>3</td>
-        <td><strong>Whisper tiny/base inference</strong><br>The reusable primitive layer now includes signed-16 PCM conversion, rational linear resampling, precomputed-table STFT, log-Mel, two-stage Conv1D stems, channel-to-token layout conversion, and unequal-length cross-attention. Each arithmetic boundary resolves through a kernel-map contract and runs in nightly without a Whisper compiler branch.</td>
-        <td>Next: WAV container parsing, a band-limited resampler, optimized FFT, generated encoder execution, tokenizer/timestamps, then fixed public fixtures matching PyTorch and whisper.cpp through transcript output.</td>
+        <td><strong>Whisper tiny/base inference</strong><br>Slated for v10, but the v8 compiler lane is incorporating and hardening it ahead of the original plan: Whisper Tiny already transcribes end to end &mdash; WAV parsing, an optimized FFT/log-Mel frontend, and the generated FP32 encoder and decoder compose through the same circuit and kernel-contract path, with no Whisper compiler branch. On the public JFK sample CKE emits the same 23 greedy tokens as Hugging Face, followed by EOS. See the <a href="v8-whisper-tiny.html">Whisper Tiny end-to-end page</a>.</td>
+        <td>Done: WAV container parsing, band-limited windowed-sinc resampling, optimized FFT, generated encoder/decoder composition, English no-timestamp transcript parity on the JFK fixture. Remaining: timestamp decoding, corpus certification beyond the JFK sample, whisper.cpp fixtures, and Whisper base.</td>
         <td><span class="version-status status-building">Active</span></td>
       </tr>
       <tr>
@@ -1875,7 +1876,7 @@
       <tr>
         <td><strong>v8.0</strong></td>
         <td>Inference Compiler + Vision Encoder</td>
-        <td>Circuit-owned topology and weight policy, fail-closed kernel capability resolution, explicit numerical and threading contracts, GraphIR-to-call-IR decision preservation, bounded X-ray attribution, patch embedding, resized position encoding, M-RoPE, deepstack, and multimodal stitching</td>
+        <td>Circuit-owned topology and weight policy, fail-closed kernel capability resolution, explicit numerical and threading contracts, GraphIR-to-call-IR decision preservation, bounded X-ray attribution, patch embedding, resized position encoding, M-RoPE, deepstack, and multimodal stitching &mdash; plus the first audio lane: Whisper Tiny encoder/decoder circuits, originally slated for v10, now incorporating and hardening inside the v8 compiler</td>
         <td>v7.x training</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -1889,7 +1890,7 @@
       <tr>
         <td><strong>v10.0</strong></td>
         <td>Audio Inference</td>
-        <td>Whisper tiny/base first. Contracted PCM, reference resampling, STFT/log-Mel, Conv1D stem, layout conversion, and unequal-length attention are implemented; WAV parsing, band-limited resampling, optimized FFT, generated encoder/decoder composition, timestamps, and transcript parity remain.</td>
+        <td>Whisper tiny/base. The first audio lane landed early: v8 already transcribes Whisper Tiny end to end from PCM16 WAV through generated FP32 frontend, encoder, and decoder circuits &mdash; band-limited windowed-sinc resampling included, English, no-timestamp decoding, JFK fixture exact against Hugging Face (<a href="v8-whisper-tiny.html">details and limitations</a>). v10 remains the full audio release: timestamps, corpus certification beyond the JFK sample, whisper.cpp fixtures, and Whisper base.</td>
         <td>v8 exact resolution + X-ray gates</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -2473,7 +2474,7 @@
     <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
     <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
     <li><strong>v8.x:</strong> Deterministic inference compiler, numerical contracts, X-ray attribution, and vision encoding, now in active hardening</li>
-    <li><strong>v10.x:</strong> Whisper-style audio inference after v8 contract and parity gates; FP32 audio training follows in v11</li>
+    <li><strong>v10.x:</strong> The full audio release &mdash; Whisper-style audio inference was planned here, but v8 is already incorporating and hardening the first lane (Whisper Tiny end-to-end transcription demonstrated on the JFK fixture); v10 completes timestamps, corpus certification, and base-model support, and FP32 audio training follows in v11</li>
     <li><strong>v12.x:</strong> MoE architecture (efficient large models)</li>
     <li><strong>v14.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
@@ -2760,7 +2761,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>
