@@ -8,9 +8,9 @@ var deltanet__kernels_8c =
     [ "gated_deltanet_autoregressive_forward", "deltanet__kernels_8c.html#ab058f3491df124f04213732b3ae76fce", null ],
     [ "gated_deltanet_autoregressive_forward_ref", "deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac", null ],
     [ "gated_deltanet_impl_name", "deltanet__kernels_8c.html#adc72112b97155ad7cd2360ab95661186", null ],
-    [ "gated_deltanet_llama_avx2_forward", "deltanet__kernels_8c.html#ae07446c2ba6fa57a94319b16be5ad1e3", null ],
+    [ "gated_deltanet_llama_avx2_forward", "deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1", null ],
     [ "gated_deltanet_llama_avx2_grouped_forward_impl", "deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d", null ],
-    [ "gated_deltanet_llama_avx2_prefill_forward", "deltanet__kernels_8c.html#a5b745aad433a888e57dc52b6480c4ddd", null ],
+    [ "gated_deltanet_llama_avx2_prefill_forward", "deltanet__kernels_8c.html#a47a99ff5f30a9e1964edb5627c91965c", null ],
     [ "gated_deltanet_prefill_forward", "deltanet__kernels_8c.html#acd4e27eea918e36a74e44984a90bdc6a", null ],
     [ "gated_deltanet_pytorch_grouped_bf16_forward", "deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd", null ],
     [ "gated_deltanet_pytorch_grouped_bf16_prefill_forward", "deltanet__kernels_8c.html#aa2632112e78c450399580167f5e219f9", null ]
