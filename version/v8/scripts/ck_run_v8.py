@@ -494,6 +494,11 @@ def _sync_runtime_lib(src: Path, dst: Path, label: str) -> None:
                 dst.stat().st_size == src.stat().st_size
                 and _sha256_file(dst) == _sha256_file(src)
             ):
+                # Publication is still meaningful when a forced regeneration
+                # produces identical bytes. Refresh the validated artifact's
+                # timestamp so legacy runtime freshness checks do not reject
+                # the newly generated IR that this bundle was validated with.
+                dst.touch()
                 return
         except OSError:
             pass
