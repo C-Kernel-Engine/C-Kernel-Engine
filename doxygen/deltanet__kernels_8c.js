@@ -1,7 +1,13 @@
 var deltanet__kernels_8c =
 [
+    [ "CK_DELTANET_LLAMA_CHUNK_MAX_DIM", "deltanet__kernels_8c.html#a81e2285f3a1a0673862f3dadc219b21f", null ],
+    [ "CK_DELTANET_LLAMA_CHUNK_SIZE", "deltanet__kernels_8c.html#a07d3fe27a8dc9dda88a30039edd6cfbb", null ],
     [ "CK_DELTANET_MAX_STACK_DIM", "deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483", null ],
+    [ "CK_DELTANET_NOINLINE", "deltanet__kernels_8c.html#a0f50bc5aa02618c9de7b4186d91bdc66", null ],
+    [ "ck_deltanet_libm_f32_fn", "deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399", null ],
+    [ "ck_bind_deltanet_llama_libm", "deltanet__kernels_8c.html#abd386e4ba6a2d604b34d0108dbba6944", null ],
     [ "ck_deltanet_force_ref", "deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8", null ],
+    [ "ck_deltanet_llama_sigmoidf", "deltanet__kernels_8c.html#ac9033305635ee3a715529eb42a5e2ffd", null ],
     [ "ck_deltanet_sigmoidf", "deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b", null ],
     [ "gated_deltanet_autoregressive_backward", "deltanet__kernels_8c.html#a13c4e09c2b0eaea0f19c8b162bb9c377", null ],
     [ "gated_deltanet_autoregressive_backward_ref", "deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708", null ],
@@ -13,5 +19,8 @@ var deltanet__kernels_8c =
     [ "gated_deltanet_llama_avx2_prefill_forward", "deltanet__kernels_8c.html#a47a99ff5f30a9e1964edb5627c91965c", null ],
     [ "gated_deltanet_prefill_forward", "deltanet__kernels_8c.html#acd4e27eea918e36a74e44984a90bdc6a", null ],
     [ "gated_deltanet_pytorch_grouped_bf16_forward", "deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd", null ],
-    [ "gated_deltanet_pytorch_grouped_bf16_prefill_forward", "deltanet__kernels_8c.html#aa2632112e78c450399580167f5e219f9", null ]
+    [ "gated_deltanet_pytorch_grouped_bf16_prefill_forward", "deltanet__kernels_8c.html#aa2632112e78c450399580167f5e219f9", null ],
+    [ "ck_deltanet_libm_handle", "deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf", null ],
+    [ "ck_deltanet_libm_once", "deltanet__kernels_8c.html#a151a7eeb05c227a91304e62906f1a834", null ],
+    [ "ck_deltanet_llama_expf", "deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07", null ]
 ];

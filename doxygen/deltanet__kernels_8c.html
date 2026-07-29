@@ -127,7 +127,9 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c.html',''); initRe
 <div class="header">
   <div class="summary">
 <a href="#define-members">Macros</a> &#124;
-<a href="#func-members">Functions</a>  </div>
+<a href="#typedef-members">Typedefs</a> &#124;
+<a href="#func-members">Functions</a> &#124;
+<a href="#var-members">Variables</a>  </div>
   <div class="headertitle"><div class="title">deltanet_kernels.c File Reference</div></div>
 </div><!--header-->
 <div class="contents">
@@ -136,7 +138,10 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c.html',''); initRe
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>&quot;</code><br />
+<code>#include &lt;dlfcn.h&gt;</code><br />
 <code>#include &lt;math.h&gt;</code><br />
+<code>#include &lt;pthread.h&gt;</code><br />
+<code>#include &lt;stdio.h&gt;</code><br />
 <code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdlib.h&gt;</code><br />
 </div>
@@ -144,13 +149,28 @@ $(document).ready(function(){initNavTree('deltanet__kernels_8c.html',''); initRe
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="define-members" name="define-members"></a>
 Macros</h2></td></tr>
+<tr class="memitem:a81e2285f3a1a0673862f3dadc219b21f" id="r_a81e2285f3a1a0673862f3dadc219b21f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a81e2285f3a1a0673862f3dadc219b21f">CK_DELTANET_LLAMA_CHUNK_MAX_DIM</a>&#160;&#160;&#160;256</td></tr>
+<tr class="separator:a81e2285f3a1a0673862f3dadc219b21f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a07d3fe27a8dc9dda88a30039edd6cfbb" id="r_a07d3fe27a8dc9dda88a30039edd6cfbb"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a07d3fe27a8dc9dda88a30039edd6cfbb">CK_DELTANET_LLAMA_CHUNK_SIZE</a>&#160;&#160;&#160;64</td></tr>
+<tr class="separator:a07d3fe27a8dc9dda88a30039edd6cfbb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab4de31192bb2a9b88daba6b8693e9483" id="r_ab4de31192bb2a9b88daba6b8693e9483"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>&#160;&#160;&#160;4096</td></tr>
 <tr class="separator:ab4de31192bb2a9b88daba6b8693e9483"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0f50bc5aa02618c9de7b4186d91bdc66" id="r_a0f50bc5aa02618c9de7b4186d91bdc66"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a0f50bc5aa02618c9de7b4186d91bdc66">CK_DELTANET_NOINLINE</a></td></tr>
+<tr class="separator:a0f50bc5aa02618c9de7b4186d91bdc66"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="typedef-members" name="typedef-members"></a>
+Typedefs</h2></td></tr>
+<tr class="memitem:af7e46d9d6f16d462e279778d0c9a5399" id="r_af7e46d9d6f16d462e279778d0c9a5399"><td class="memItemLeft" align="right" valign="top">typedef float(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399">ck_deltanet_libm_f32_fn</a>) (float)</td></tr>
+<tr class="separator:af7e46d9d6f16d462e279778d0c9a5399"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:abd386e4ba6a2d604b34d0108dbba6944" id="r_abd386e4ba6a2d604b34d0108dbba6944"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#abd386e4ba6a2d604b34d0108dbba6944">ck_bind_deltanet_llama_libm</a> (void)</td></tr>
+<tr class="separator:abd386e4ba6a2d604b34d0108dbba6944"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acda3ae2323f03f9d92026026443d75e8" id="r_acda3ae2323f03f9d92026026443d75e8"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a> (void)</td></tr>
 <tr class="separator:acda3ae2323f03f9d92026026443d75e8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac9033305635ee3a715529eb42a5e2ffd" id="r_ac9033305635ee3a715529eb42a5e2ffd"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#ac9033305635ee3a715529eb42a5e2ffd">ck_deltanet_llama_sigmoidf</a> (float x)</td></tr>
+<tr class="separator:ac9033305635ee3a715529eb42a5e2ffd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9331ad59b9c6268a1f1d4351db2dca6b" id="r_a9331ad59b9c6268a1f1d4351db2dca6b"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a> (float x)</td></tr>
 <tr class="separator:a9331ad59b9c6268a1f1d4351db2dca6b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a13c4e09c2b0eaea0f19c8b162bb9c377" id="r_a13c4e09c2b0eaea0f19c8b162bb9c377"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a13c4e09c2b0eaea0f19c8b162bb9c377">gated_deltanet_autoregressive_backward</a> (const float *d_out, const float *d_state_out, const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, const float *state_out, float *d_q, float *d_k, float *d_v, float *d_g, float *d_beta, float *d_state_in, int num_heads, int state_dim, float norm_eps)</td></tr>
@@ -175,6 +195,15 @@ Functions</h2></td></tr>
 <tr class="separator:a9efb18d23051625039c7dfe8b651f7dd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa2632112e78c450399580167f5e219f9" id="r_aa2632112e78c450399580167f5e219f9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#aa2632112e78c450399580167f5e219f9">gated_deltanet_pytorch_grouped_bf16_prefill_forward</a> (const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int rows, int num_heads, int group_count, int state_dim, float norm_eps)</td></tr>
 <tr class="separator:aa2632112e78c450399580167f5e219f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a843e291852e1e687deafeebf5973a2bf" id="r_a843e291852e1e687deafeebf5973a2bf"><td class="memItemLeft" align="right" valign="top">static void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf">ck_deltanet_libm_handle</a> = NULL</td></tr>
+<tr class="separator:a843e291852e1e687deafeebf5973a2bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a151a7eeb05c227a91304e62906f1a834" id="r_a151a7eeb05c227a91304e62906f1a834"><td class="memItemLeft" align="right" valign="top">static pthread_once_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a151a7eeb05c227a91304e62906f1a834">ck_deltanet_libm_once</a> = PTHREAD_ONCE_INIT</td></tr>
+<tr class="separator:a151a7eeb05c227a91304e62906f1a834"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4d5ff98b4ddefed10fe47da80e862a07" id="r_a4d5ff98b4ddefed10fe47da80e862a07"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399">ck_deltanet_libm_f32_fn</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a> = NULL</td></tr>
+<tr class="separator:a4d5ff98b4ddefed10fe47da80e862a07"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>FP32 Gated DeltaNet kernels for Qwen3.5-style recurrent attention. </p>
@@ -198,6 +227,38 @@ CK-ENGINE KERNEL RULES:</h1>
 
 <p class="definition">Definition in file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
 </div><h2 class="groupheader">Macro Definition Documentation</h2>
+<a id="a81e2285f3a1a0673862f3dadc219b21f" name="a81e2285f3a1a0673862f3dadc219b21f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a81e2285f3a1a0673862f3dadc219b21f">&#9670;&#160;</a></span>CK_DELTANET_LLAMA_CHUNK_MAX_DIM</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define CK_DELTANET_LLAMA_CHUNK_MAX_DIM&#160;&#160;&#160;256</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00053">53</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+</div>
+</div>
+<a id="a07d3fe27a8dc9dda88a30039edd6cfbb" name="a07d3fe27a8dc9dda88a30039edd6cfbb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a07d3fe27a8dc9dda88a30039edd6cfbb">&#9670;&#160;</a></span>CK_DELTANET_LLAMA_CHUNK_SIZE</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define CK_DELTANET_LLAMA_CHUNK_SIZE&#160;&#160;&#160;64</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00052">52</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+</div>
+</div>
 <a id="ab4de31192bb2a9b88daba6b8693e9483" name="ab4de31192bb2a9b88daba6b8693e9483"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab4de31192bb2a9b88daba6b8693e9483">&#9670;&#160;</a></span>CK_DELTANET_MAX_STACK_DIM</h2>
 
@@ -210,11 +271,92 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00048">48</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00051">51</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+</div>
+</div>
+<a id="a0f50bc5aa02618c9de7b4186d91bdc66" name="a0f50bc5aa02618c9de7b4186d91bdc66"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0f50bc5aa02618c9de7b4186d91bdc66">&#9670;&#160;</a></span>CK_DELTANET_NOINLINE</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define CK_DELTANET_NOINLINE</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00058">58</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Typedef Documentation</h2>
+<a id="af7e46d9d6f16d462e279778d0c9a5399" name="af7e46d9d6f16d462e279778d0c9a5399"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af7e46d9d6f16d462e279778d0c9a5399">&#9670;&#160;</a></span>ck_deltanet_libm_f32_fn</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef float(* ck_deltanet_libm_f32_fn) (float)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00061">61</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
 
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="abd386e4ba6a2d604b34d0108dbba6944" name="abd386e4ba6a2d604b34d0108dbba6944"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abd386e4ba6a2d604b34d0108dbba6944">&#9670;&#160;</a></span>ck_bind_deltanet_llama_libm()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static void ck_bind_deltanet_llama_libm </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00066">66</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   67</span>{</div>
+<div class="line"><span class="lineno">   68</span>    <a class="code hl_variable" href="deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf">ck_deltanet_libm_handle</a> = dlopen(<span class="stringliteral">&quot;libm.so.6&quot;</span>, RTLD_NOW | RTLD_LOCAL);</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf">ck_deltanet_libm_handle</a>) {</div>
+<div class="line"><span class="lineno">   70</span>        <a class="code hl_variable" href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a> =</div>
+<div class="line"><span class="lineno">   71</span>            (<a class="code hl_typedef" href="deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399">ck_deltanet_libm_f32_fn</a>)dlsym(<a class="code hl_variable" href="deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf">ck_deltanet_libm_handle</a>, <span class="stringliteral">&quot;expf&quot;</span>);</div>
+<div class="line"><span class="lineno">   72</span>    }</div>
+<div class="line"><span class="lineno">   73</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a>) {</div>
+<div class="line"><span class="lineno">   74</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">   75</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: llama.cpp DeltaNet requires &quot;</span></div>
+<div class="line"><span class="lineno">   76</span>                <span class="stringliteral">&quot;expf from libm.so.6\n&quot;</span>);</div>
+<div class="line"><span class="lineno">   77</span>        abort();</div>
+<div class="line"><span class="lineno">   78</span>    }</div>
+<div class="line"><span class="lineno">   79</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a4d5ff98b4ddefed10fe47da80e862a07"><div class="ttname"><a href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a></div><div class="ttdeci">static ck_deltanet_libm_f32_fn ck_deltanet_llama_expf</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00062">deltanet_kernels.c:62</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a843e291852e1e687deafeebf5973a2bf"><div class="ttname"><a href="deltanet__kernels_8c.html#a843e291852e1e687deafeebf5973a2bf">ck_deltanet_libm_handle</a></div><div class="ttdeci">static void * ck_deltanet_libm_handle</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00063">deltanet_kernels.c:63</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_af7e46d9d6f16d462e279778d0c9a5399"><div class="ttname"><a href="deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399">ck_deltanet_libm_f32_fn</a></div><div class="ttdeci">float(* ck_deltanet_libm_f32_fn)(float)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00061">deltanet_kernels.c:61</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00063">ck_deltanet_libm_handle</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00062">ck_deltanet_llama_expf</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00086">ck_deltanet_llama_sigmoidf()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+
+</div>
+</div>
 <a id="acda3ae2323f03f9d92026026443d75e8" name="acda3ae2323f03f9d92026026443d75e8"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#acda3ae2323f03f9d92026026443d75e8">&#9670;&#160;</a></span>ck_deltanet_force_ref()</h2>
 
@@ -239,13 +381,51 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00908">908</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  909</span>{</div>
-<div class="line"><span class="lineno">  910</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *env = getenv(<span class="stringliteral">&quot;CK_DELTANET_FORCE_REF&quot;</span>);</div>
-<div class="line"><span class="lineno">  911</span>    <span class="keywordflow">return</span> env &amp;&amp; atoi(env) != 0;</div>
-<div class="line"><span class="lineno">  912</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01202">1202</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1203</span>{</div>
+<div class="line"><span class="lineno"> 1204</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *env = getenv(<span class="stringliteral">&quot;CK_DELTANET_FORCE_REF&quot;</span>);</div>
+<div class="line"><span class="lineno"> 1205</span>    <span class="keywordflow">return</span> env &amp;&amp; atoi(env) != 0;</div>
+<div class="line"><span class="lineno"> 1206</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00930">gated_deltanet_autoregressive_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00914">gated_deltanet_impl_name()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l01224">gated_deltanet_autoregressive_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l01208">gated_deltanet_impl_name()</a>.</p>
+
+</div>
+</div>
+<a id="ac9033305635ee3a715529eb42a5e2ffd" name="ac9033305635ee3a715529eb42a5e2ffd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac9033305635ee3a715529eb42a5e2ffd">&#9670;&#160;</a></span>ck_deltanet_llama_sigmoidf()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static float ck_deltanet_llama_sigmoidf </td>
+          <td>(</td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>x</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00086">86</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   87</span>{</div>
+<div class="line"><span class="lineno">   88</span>    pthread_once(&amp;<a class="code hl_variable" href="deltanet__kernels_8c.html#a151a7eeb05c227a91304e62906f1a834">ck_deltanet_libm_once</a>, <a class="code hl_function" href="deltanet__kernels_8c.html#abd386e4ba6a2d604b34d0108dbba6944">ck_bind_deltanet_llama_libm</a>);</div>
+<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">return</span> 1.0f / (1.0f + <a class="code hl_variable" href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a>(-x));</div>
+<div class="line"><span class="lineno">   90</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a151a7eeb05c227a91304e62906f1a834"><div class="ttname"><a href="deltanet__kernels_8c.html#a151a7eeb05c227a91304e62906f1a834">ck_deltanet_libm_once</a></div><div class="ttdeci">static pthread_once_t ck_deltanet_libm_once</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00064">deltanet_kernels.c:64</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_abd386e4ba6a2d604b34d0108dbba6944"><div class="ttname"><a href="deltanet__kernels_8c.html#abd386e4ba6a2d604b34d0108dbba6944">ck_bind_deltanet_llama_libm</a></div><div class="ttdeci">static void ck_bind_deltanet_llama_libm(void)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00066">deltanet_kernels.c:66</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00066">ck_bind_deltanet_llama_libm()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00064">ck_deltanet_libm_once</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00062">ck_deltanet_llama_expf</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
 </div>
 </div>
@@ -273,12 +453,12 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00050">50</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   51</span>{</div>
-<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">return</span> 1.0f / (1.0f + expf(-x));</div>
-<div class="line"><span class="lineno">   53</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00081">81</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   82</span>{</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keywordflow">return</span> 1.0f / (1.0f + expf(-x));</div>
+<div class="line"><span class="lineno">   84</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00363">gated_deltanet_autoregressive_backward_ref()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00304">gated_deltanet_autoregressive_forward_ref()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00101">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00657">gated_deltanet_autoregressive_backward_ref()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00598">gated_deltanet_autoregressive_forward_ref()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
 </div>
 </div>
@@ -404,40 +584,40 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01012">1012</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1030</span>{</div>
-<div class="line"><span class="lineno"> 1031</span>    <span class="keywordflow">if</span> (!d_out || !d_state_out || !q || !k || !v || !g || !beta || !state_in || !state_out ||</div>
-<div class="line"><span class="lineno"> 1032</span>        !d_q || !d_k || !d_v || !d_g || !d_beta || !d_state_in) {</div>
-<div class="line"><span class="lineno"> 1033</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1034</span>    }</div>
-<div class="line"><span class="lineno"> 1035</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0 || state_dim &gt; <a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>) {</div>
-<div class="line"><span class="lineno"> 1036</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 1037</span>    }</div>
-<div class="line"><span class="lineno"> 1038</span> </div>
-<div class="line"><span class="lineno"> 1039</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708">gated_deltanet_autoregressive_backward_ref</a>(</div>
-<div class="line"><span class="lineno"> 1040</span>        d_out,</div>
-<div class="line"><span class="lineno"> 1041</span>        d_state_out,</div>
-<div class="line"><span class="lineno"> 1042</span>        q,</div>
-<div class="line"><span class="lineno"> 1043</span>        k,</div>
-<div class="line"><span class="lineno"> 1044</span>        v,</div>
-<div class="line"><span class="lineno"> 1045</span>        g,</div>
-<div class="line"><span class="lineno"> 1046</span>        beta,</div>
-<div class="line"><span class="lineno"> 1047</span>        state_in,</div>
-<div class="line"><span class="lineno"> 1048</span>        state_out,</div>
-<div class="line"><span class="lineno"> 1049</span>        d_q,</div>
-<div class="line"><span class="lineno"> 1050</span>        d_k,</div>
-<div class="line"><span class="lineno"> 1051</span>        d_v,</div>
-<div class="line"><span class="lineno"> 1052</span>        d_g,</div>
-<div class="line"><span class="lineno"> 1053</span>        d_beta,</div>
-<div class="line"><span class="lineno"> 1054</span>        d_state_in,</div>
-<div class="line"><span class="lineno"> 1055</span>        num_heads,</div>
-<div class="line"><span class="lineno"> 1056</span>        state_dim,</div>
-<div class="line"><span class="lineno"> 1057</span>        norm_eps);</div>
-<div class="line"><span class="lineno"> 1058</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_ab4de31192bb2a9b88daba6b8693e9483"><div class="ttname"><a href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a></div><div class="ttdeci">#define CK_DELTANET_MAX_STACK_DIM</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00048">deltanet_kernels.c:48</a></div></div>
-<div class="ttc" id="adeltanet__kernels_8c_html_abcc51da16224e11073d3716c4f18b708"><div class="ttname"><a href="deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708">gated_deltanet_autoregressive_backward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_backward_ref(const float *d_out, const float *d_state_out, const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, const float *state_out, float *d_q, float *d_k, float *d_v, float *d_g, float *d_beta, float *d_state_in, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00363">deltanet_kernels.c:363</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01306">1306</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1324</span>{</div>
+<div class="line"><span class="lineno"> 1325</span>    <span class="keywordflow">if</span> (!d_out || !d_state_out || !q || !k || !v || !g || !beta || !state_in || !state_out ||</div>
+<div class="line"><span class="lineno"> 1326</span>        !d_q || !d_k || !d_v || !d_g || !d_beta || !d_state_in) {</div>
+<div class="line"><span class="lineno"> 1327</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1328</span>    }</div>
+<div class="line"><span class="lineno"> 1329</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0 || state_dim &gt; <a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>) {</div>
+<div class="line"><span class="lineno"> 1330</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1331</span>    }</div>
+<div class="line"><span class="lineno"> 1332</span> </div>
+<div class="line"><span class="lineno"> 1333</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708">gated_deltanet_autoregressive_backward_ref</a>(</div>
+<div class="line"><span class="lineno"> 1334</span>        d_out,</div>
+<div class="line"><span class="lineno"> 1335</span>        d_state_out,</div>
+<div class="line"><span class="lineno"> 1336</span>        q,</div>
+<div class="line"><span class="lineno"> 1337</span>        k,</div>
+<div class="line"><span class="lineno"> 1338</span>        v,</div>
+<div class="line"><span class="lineno"> 1339</span>        g,</div>
+<div class="line"><span class="lineno"> 1340</span>        beta,</div>
+<div class="line"><span class="lineno"> 1341</span>        state_in,</div>
+<div class="line"><span class="lineno"> 1342</span>        state_out,</div>
+<div class="line"><span class="lineno"> 1343</span>        d_q,</div>
+<div class="line"><span class="lineno"> 1344</span>        d_k,</div>
+<div class="line"><span class="lineno"> 1345</span>        d_v,</div>
+<div class="line"><span class="lineno"> 1346</span>        d_g,</div>
+<div class="line"><span class="lineno"> 1347</span>        d_beta,</div>
+<div class="line"><span class="lineno"> 1348</span>        d_state_in,</div>
+<div class="line"><span class="lineno"> 1349</span>        num_heads,</div>
+<div class="line"><span class="lineno"> 1350</span>        state_dim,</div>
+<div class="line"><span class="lineno"> 1351</span>        norm_eps);</div>
+<div class="line"><span class="lineno"> 1352</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_ab4de31192bb2a9b88daba6b8693e9483"><div class="ttname"><a href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a></div><div class="ttdeci">#define CK_DELTANET_MAX_STACK_DIM</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00051">deltanet_kernels.c:51</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_abcc51da16224e11073d3716c4f18b708"><div class="ttname"><a href="deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708">gated_deltanet_autoregressive_backward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_backward_ref(const float *d_out, const float *d_state_out, const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, const float *state_out, float *d_q, float *d_k, float *d_v, float *d_g, float *d_beta, float *d_state_in, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00657">deltanet_kernels.c:657</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00048">CK_DELTANET_MAX_STACK_DIM</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00363">gated_deltanet_autoregressive_backward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00051">CK_DELTANET_MAX_STACK_DIM</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00657">gated_deltanet_autoregressive_backward_ref()</a>.</p>
 
 </div>
 </div>
@@ -563,120 +743,120 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00363">363</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  381</span>{</div>
-<div class="line"><span class="lineno">  382</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> q_scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)state_dim);</div>
-<div class="line"><span class="lineno">  383</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_stride = (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  384</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t)state_dim * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  385</span> </div>
-<div class="line"><span class="lineno">  386</span>    <span class="keywordtype">float</span> q_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  387</span>    <span class="keywordtype">float</span> k_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  388</span>    <span class="keywordtype">float</span> kv_mem[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  389</span>    <span class="keywordtype">float</span> delta[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  390</span>    <span class="keywordtype">float</span> d_q_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  391</span>    <span class="keywordtype">float</span> d_k_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  392</span>    <span class="keywordtype">float</span> d_mem[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  393</span> </div>
-<div class="line"><span class="lineno">  394</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  395</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_head = d_out + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  396</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_state_out_head = d_state_out + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  397</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  398</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  399</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  400</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  401</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_cur = state_out + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  402</span>        <span class="keywordtype">float</span> *d_q_head = d_q + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  403</span>        <span class="keywordtype">float</span> *d_k_head = d_k + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  404</span>        <span class="keywordtype">float</span> *d_v_head = d_v + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  405</span>        <span class="keywordtype">float</span> *d_state_prev = d_state_in + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  406</span> </div>
-<div class="line"><span class="lineno">  407</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
-<div class="line"><span class="lineno">  408</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = expf(g[h]);</div>
-<div class="line"><span class="lineno">  409</span> </div>
-<div class="line"><span class="lineno">  410</span>        <span class="keywordtype">float</span> qk_dot = 0.0f;</div>
-<div class="line"><span class="lineno">  411</span>        <span class="keywordtype">float</span> out_delta_dot = 0.0f;</div>
-<div class="line"><span class="lineno">  412</span>        <span class="keywordtype">float</span> beta_acc = 0.0f;</div>
-<div class="line"><span class="lineno">  413</span>        <span class="keywordtype">float</span> gate_acc = 0.0f;</div>
-<div class="line"><span class="lineno">  414</span> </div>
-<div class="line"><span class="lineno">  415</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; state_dim; ++i) {</div>
-<div class="line"><span class="lineno">  416</span>            q_hat[i] = q_head[i] * q_scale;</div>
-<div class="line"><span class="lineno">  417</span>            k_hat[i] = k_head[i];</div>
-<div class="line"><span class="lineno">  418</span>            kv_mem[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  419</span>            d_q_hat[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  420</span>            d_k_hat[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  421</span>            d_mem[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  422</span>            d_v_head[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  423</span>            qk_dot += q_hat[i] * k_hat[i];</div>
-<div class="line"><span class="lineno">  424</span>        }</div>
-<div class="line"><span class="lineno">  425</span> </div>
-<div class="line"><span class="lineno">  426</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  427</span>            <span class="keywordtype">float</span> mem = 0.0f;</div>
-<div class="line"><span class="lineno">  428</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  429</span>                mem += (state_prev[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * gate) * k_hat[row];</div>
-<div class="line"><span class="lineno">  430</span>            }</div>
-<div class="line"><span class="lineno">  431</span>            kv_mem[col] = mem;</div>
-<div class="line"><span class="lineno">  432</span>            delta[col] = (v_head[col] - mem) * beta_s;</div>
-<div class="line"><span class="lineno">  433</span>            out_delta_dot += d_out_head[col] * delta[col];</div>
-<div class="line"><span class="lineno">  434</span>        }</div>
-<div class="line"><span class="lineno">  435</span> </div>
-<div class="line"><span class="lineno">  436</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  437</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  438</span>            <span class="keywordtype">float</span> dq_acc = 0.0f;</div>
-<div class="line"><span class="lineno">  439</span>            <span class="keywordtype">float</span> dk_acc = q_hat[row] * out_delta_dot;</div>
-<div class="line"><span class="lineno">  440</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  441</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_state_direct = d_state_out_head[row_off + (size_t)col];</div>
-<div class="line"><span class="lineno">  442</span>                dq_acc += state_cur[row_off + (size_t)col] * d_out_head[col];</div>
-<div class="line"><span class="lineno">  443</span>                dk_acc += d_state_direct * delta[col];</div>
-<div class="line"><span class="lineno">  444</span>            }</div>
-<div class="line"><span class="lineno">  445</span>            d_q_hat[row] = dq_acc;</div>
-<div class="line"><span class="lineno">  446</span>            d_k_hat[row] = dk_acc;</div>
-<div class="line"><span class="lineno">  447</span>        }</div>
-<div class="line"><span class="lineno">  448</span> </div>
-<div class="line"><span class="lineno">  449</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  450</span>            <span class="keywordtype">float</span> d_delta_acc = d_out_head[col] * qk_dot;</div>
-<div class="line"><span class="lineno">  451</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  452</span>                d_delta_acc += d_state_out_head[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * k_hat[row];</div>
-<div class="line"><span class="lineno">  453</span>            }</div>
-<div class="line"><span class="lineno">  454</span> </div>
-<div class="line"><span class="lineno">  455</span>            d_v_head[col] = beta_s * d_delta_acc;</div>
-<div class="line"><span class="lineno">  456</span>            d_mem[col] = -beta_s * d_delta_acc;</div>
-<div class="line"><span class="lineno">  457</span>            beta_acc += d_delta_acc * (v_head[col] - kv_mem[col]);</div>
-<div class="line"><span class="lineno">  458</span>        }</div>
-<div class="line"><span class="lineno">  459</span> </div>
-<div class="line"><span class="lineno">  460</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  461</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  462</span>            <span class="keywordtype">float</span> s_dm_acc = 0.0f;</div>
-<div class="line"><span class="lineno">  463</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  464</span>                s_dm_acc += (state_prev[row_off + (size_t)col] * gate) * d_mem[col];</div>
-<div class="line"><span class="lineno">  465</span>            }</div>
-<div class="line"><span class="lineno">  466</span>            d_k_hat[row] += s_dm_acc;</div>
-<div class="line"><span class="lineno">  467</span>        }</div>
-<div class="line"><span class="lineno">  468</span> </div>
-<div class="line"><span class="lineno">  469</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  470</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  471</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  472</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_state_total = d_state_out_head[row_off + (size_t)col]</div>
-<div class="line"><span class="lineno">  473</span>                                          + q_hat[row] * d_out_head[col]</div>
-<div class="line"><span class="lineno">  474</span>                                          + k_hat[row] * d_mem[col];</div>
-<div class="line"><span class="lineno">  475</span>                d_state_prev[row_off + (size_t)col] = gate * d_state_total;</div>
-<div class="line"><span class="lineno">  476</span>                gate_acc += d_state_total * state_prev[row_off + (size_t)col];</div>
-<div class="line"><span class="lineno">  477</span>            }</div>
-<div class="line"><span class="lineno">  478</span>        }</div>
-<div class="line"><span class="lineno">  479</span> </div>
-<div class="line"><span class="lineno">  480</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; state_dim; ++i) {</div>
-<div class="line"><span class="lineno">  481</span>            d_q_head[i] = d_q_hat[i] * q_scale;</div>
-<div class="line"><span class="lineno">  482</span>            d_k_head[i] = d_k_hat[i];</div>
-<div class="line"><span class="lineno">  483</span>        }</div>
-<div class="line"><span class="lineno">  484</span> </div>
-<div class="line"><span class="lineno">  485</span>        d_g[h] = gate_acc * gate;</div>
-<div class="line"><span class="lineno">  486</span>        d_beta[h] = beta_acc * beta_s * (1.0f - beta_s);</div>
-<div class="line"><span class="lineno">  487</span>    }</div>
-<div class="line"><span class="lineno">  488</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a9331ad59b9c6268a1f1d4351db2dca6b"><div class="ttname"><a href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a></div><div class="ttdeci">static float ck_deltanet_sigmoidf(float x)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00050">deltanet_kernels.c:50</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00657">657</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  675</span>{</div>
+<div class="line"><span class="lineno">  676</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> q_scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)state_dim);</div>
+<div class="line"><span class="lineno">  677</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_stride = (size_t)state_dim;</div>
+<div class="line"><span class="lineno">  678</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t)state_dim * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  679</span> </div>
+<div class="line"><span class="lineno">  680</span>    <span class="keywordtype">float</span> q_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  681</span>    <span class="keywordtype">float</span> k_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  682</span>    <span class="keywordtype">float</span> kv_mem[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  683</span>    <span class="keywordtype">float</span> delta[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  684</span>    <span class="keywordtype">float</span> d_q_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  685</span>    <span class="keywordtype">float</span> d_k_hat[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  686</span>    <span class="keywordtype">float</span> d_mem[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  687</span> </div>
+<div class="line"><span class="lineno">  688</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  689</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_head = d_out + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  690</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_state_out_head = d_state_out + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  691</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  692</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  693</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  694</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  695</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_cur = state_out + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  696</span>        <span class="keywordtype">float</span> *d_q_head = d_q + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  697</span>        <span class="keywordtype">float</span> *d_k_head = d_k + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  698</span>        <span class="keywordtype">float</span> *d_v_head = d_v + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  699</span>        <span class="keywordtype">float</span> *d_state_prev = d_state_in + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  700</span> </div>
+<div class="line"><span class="lineno">  701</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
+<div class="line"><span class="lineno">  702</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = expf(g[h]);</div>
+<div class="line"><span class="lineno">  703</span> </div>
+<div class="line"><span class="lineno">  704</span>        <span class="keywordtype">float</span> qk_dot = 0.0f;</div>
+<div class="line"><span class="lineno">  705</span>        <span class="keywordtype">float</span> out_delta_dot = 0.0f;</div>
+<div class="line"><span class="lineno">  706</span>        <span class="keywordtype">float</span> beta_acc = 0.0f;</div>
+<div class="line"><span class="lineno">  707</span>        <span class="keywordtype">float</span> gate_acc = 0.0f;</div>
+<div class="line"><span class="lineno">  708</span> </div>
+<div class="line"><span class="lineno">  709</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; state_dim; ++i) {</div>
+<div class="line"><span class="lineno">  710</span>            q_hat[i] = q_head[i] * q_scale;</div>
+<div class="line"><span class="lineno">  711</span>            k_hat[i] = k_head[i];</div>
+<div class="line"><span class="lineno">  712</span>            kv_mem[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  713</span>            d_q_hat[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  714</span>            d_k_hat[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  715</span>            d_mem[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  716</span>            d_v_head[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  717</span>            qk_dot += q_hat[i] * k_hat[i];</div>
+<div class="line"><span class="lineno">  718</span>        }</div>
+<div class="line"><span class="lineno">  719</span> </div>
+<div class="line"><span class="lineno">  720</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  721</span>            <span class="keywordtype">float</span> mem = 0.0f;</div>
+<div class="line"><span class="lineno">  722</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  723</span>                mem += (state_prev[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * gate) * k_hat[row];</div>
+<div class="line"><span class="lineno">  724</span>            }</div>
+<div class="line"><span class="lineno">  725</span>            kv_mem[col] = mem;</div>
+<div class="line"><span class="lineno">  726</span>            delta[col] = (v_head[col] - mem) * beta_s;</div>
+<div class="line"><span class="lineno">  727</span>            out_delta_dot += d_out_head[col] * delta[col];</div>
+<div class="line"><span class="lineno">  728</span>        }</div>
+<div class="line"><span class="lineno">  729</span> </div>
+<div class="line"><span class="lineno">  730</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  731</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  732</span>            <span class="keywordtype">float</span> dq_acc = 0.0f;</div>
+<div class="line"><span class="lineno">  733</span>            <span class="keywordtype">float</span> dk_acc = q_hat[row] * out_delta_dot;</div>
+<div class="line"><span class="lineno">  734</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  735</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_state_direct = d_state_out_head[row_off + (size_t)col];</div>
+<div class="line"><span class="lineno">  736</span>                dq_acc += state_cur[row_off + (size_t)col] * d_out_head[col];</div>
+<div class="line"><span class="lineno">  737</span>                dk_acc += d_state_direct * delta[col];</div>
+<div class="line"><span class="lineno">  738</span>            }</div>
+<div class="line"><span class="lineno">  739</span>            d_q_hat[row] = dq_acc;</div>
+<div class="line"><span class="lineno">  740</span>            d_k_hat[row] = dk_acc;</div>
+<div class="line"><span class="lineno">  741</span>        }</div>
+<div class="line"><span class="lineno">  742</span> </div>
+<div class="line"><span class="lineno">  743</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  744</span>            <span class="keywordtype">float</span> d_delta_acc = d_out_head[col] * qk_dot;</div>
+<div class="line"><span class="lineno">  745</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  746</span>                d_delta_acc += d_state_out_head[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * k_hat[row];</div>
+<div class="line"><span class="lineno">  747</span>            }</div>
+<div class="line"><span class="lineno">  748</span> </div>
+<div class="line"><span class="lineno">  749</span>            d_v_head[col] = beta_s * d_delta_acc;</div>
+<div class="line"><span class="lineno">  750</span>            d_mem[col] = -beta_s * d_delta_acc;</div>
+<div class="line"><span class="lineno">  751</span>            beta_acc += d_delta_acc * (v_head[col] - kv_mem[col]);</div>
+<div class="line"><span class="lineno">  752</span>        }</div>
+<div class="line"><span class="lineno">  753</span> </div>
+<div class="line"><span class="lineno">  754</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  755</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  756</span>            <span class="keywordtype">float</span> s_dm_acc = 0.0f;</div>
+<div class="line"><span class="lineno">  757</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  758</span>                s_dm_acc += (state_prev[row_off + (size_t)col] * gate) * d_mem[col];</div>
+<div class="line"><span class="lineno">  759</span>            }</div>
+<div class="line"><span class="lineno">  760</span>            d_k_hat[row] += s_dm_acc;</div>
+<div class="line"><span class="lineno">  761</span>        }</div>
+<div class="line"><span class="lineno">  762</span> </div>
+<div class="line"><span class="lineno">  763</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  764</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  765</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  766</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_state_total = d_state_out_head[row_off + (size_t)col]</div>
+<div class="line"><span class="lineno">  767</span>                                          + q_hat[row] * d_out_head[col]</div>
+<div class="line"><span class="lineno">  768</span>                                          + k_hat[row] * d_mem[col];</div>
+<div class="line"><span class="lineno">  769</span>                d_state_prev[row_off + (size_t)col] = gate * d_state_total;</div>
+<div class="line"><span class="lineno">  770</span>                gate_acc += d_state_total * state_prev[row_off + (size_t)col];</div>
+<div class="line"><span class="lineno">  771</span>            }</div>
+<div class="line"><span class="lineno">  772</span>        }</div>
+<div class="line"><span class="lineno">  773</span> </div>
+<div class="line"><span class="lineno">  774</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; state_dim; ++i) {</div>
+<div class="line"><span class="lineno">  775</span>            d_q_head[i] = d_q_hat[i] * q_scale;</div>
+<div class="line"><span class="lineno">  776</span>            d_k_head[i] = d_k_hat[i];</div>
+<div class="line"><span class="lineno">  777</span>        }</div>
+<div class="line"><span class="lineno">  778</span> </div>
+<div class="line"><span class="lineno">  779</span>        d_g[h] = gate_acc * gate;</div>
+<div class="line"><span class="lineno">  780</span>        d_beta[h] = beta_acc * beta_s * (1.0f - beta_s);</div>
+<div class="line"><span class="lineno">  781</span>    }</div>
+<div class="line"><span class="lineno">  782</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a9331ad59b9c6268a1f1d4351db2dca6b"><div class="ttname"><a href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a></div><div class="ttdeci">static float ck_deltanet_sigmoidf(float x)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00081">deltanet_kernels.c:81</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00048">CK_DELTANET_MAX_STACK_DIM</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00050">ck_deltanet_sigmoidf()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00051">CK_DELTANET_MAX_STACK_DIM</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00081">ck_deltanet_sigmoidf()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l01012">gated_deltanet_autoregressive_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l01306">gated_deltanet_autoregressive_backward()</a>.</p>
 
 </div>
 </div>
@@ -760,45 +940,45 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00930">930</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  941</span>{</div>
-<div class="line"><span class="lineno">  942</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
-<div class="line"><span class="lineno">  943</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  944</span>    }</div>
-<div class="line"><span class="lineno">  945</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  946</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  947</span>    }</div>
-<div class="line"><span class="lineno">  948</span> </div>
-<div class="line"><span class="lineno">  949</span>    <span class="comment">/*</span></div>
-<div class="line"><span class="lineno">  950</span><span class="comment">     * q and k arrive pre-normalized by recurrent_qk_l2_norm, so the</span></div>
-<div class="line"><span class="lineno">  951</span><span class="comment">     * ISA-specialized kernels can follow the same contract as the scalar ref.</span></div>
-<div class="line"><span class="lineno">  952</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  953</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
-<div class="line"><span class="lineno">  954</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
-<div class="line"><span class="lineno">  955</span>            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  956</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  957</span>    }</div>
-<div class="line"><span class="lineno">  958</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  959</span>    gated_deltanet_autoregressive_forward_avx512(</div>
-<div class="line"><span class="lineno">  960</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  961</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  962</span>    gated_deltanet_autoregressive_forward_avx2(</div>
-<div class="line"><span class="lineno">  963</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  964</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  965</span>    gated_deltanet_autoregressive_forward_avx(</div>
-<div class="line"><span class="lineno">  966</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  967</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  968</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
-<div class="line"><span class="lineno">  969</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  970</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  971</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01224">1224</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1235</span>{</div>
+<div class="line"><span class="lineno"> 1236</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
+<div class="line"><span class="lineno"> 1237</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1238</span>    }</div>
+<div class="line"><span class="lineno"> 1239</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1240</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1241</span>    }</div>
+<div class="line"><span class="lineno"> 1242</span> </div>
+<div class="line"><span class="lineno"> 1243</span>    <span class="comment">/*</span></div>
+<div class="line"><span class="lineno"> 1244</span><span class="comment">     * q and k arrive pre-normalized by recurrent_qk_l2_norm, so the</span></div>
+<div class="line"><span class="lineno"> 1245</span><span class="comment">     * ISA-specialized kernels can follow the same contract as the scalar ref.</span></div>
+<div class="line"><span class="lineno"> 1246</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno"> 1247</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1248</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
+<div class="line"><span class="lineno"> 1249</span>            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1250</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1251</span>    }</div>
+<div class="line"><span class="lineno"> 1252</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno"> 1253</span>    gated_deltanet_autoregressive_forward_avx512(</div>
+<div class="line"><span class="lineno"> 1254</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1255</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1256</span>    gated_deltanet_autoregressive_forward_avx2(</div>
+<div class="line"><span class="lineno"> 1257</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1258</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1259</span>    gated_deltanet_autoregressive_forward_avx(</div>
+<div class="line"><span class="lineno"> 1260</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1261</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1262</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
+<div class="line"><span class="lineno"> 1263</span>        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno"> 1264</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1265</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a357c0e1f9059fc199d845a50214ba0ac"><div class="ttname"><a href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward_ref(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00304">deltanet_kernels.c:304</a></div></div>
-<div class="ttc" id="adeltanet__kernels_8c_html_acda3ae2323f03f9d92026026443d75e8"><div class="ttname"><a href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a></div><div class="ttdeci">static int ck_deltanet_force_ref(void)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00908">deltanet_kernels.c:908</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a357c0e1f9059fc199d845a50214ba0ac"><div class="ttname"><a href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward_ref(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00598">deltanet_kernels.c:598</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_acda3ae2323f03f9d92026026443d75e8"><div class="ttname"><a href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a></div><div class="ttdeci">static int ck_deltanet_force_ref(void)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01202">deltanet_kernels.c:1202</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00908">ck_deltanet_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00304">gated_deltanet_autoregressive_forward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l01202">ck_deltanet_force_ref()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00598">gated_deltanet_autoregressive_forward_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00741">ck_test_gated_deltanet_autoregressive()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00973">gated_deltanet_prefill_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00741">ck_test_gated_deltanet_autoregressive()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l01267">gated_deltanet_prefill_forward()</a>.</p>
 
 </div>
 </div>
@@ -882,58 +1062,58 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00304">304</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  315</span>{</div>
-<div class="line"><span class="lineno">  316</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> q_scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)state_dim);</div>
-<div class="line"><span class="lineno">  317</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_stride = (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  318</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t)state_dim * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  319</span> </div>
-<div class="line"><span class="lineno">  320</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  321</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  322</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  323</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  324</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  325</span>        <span class="keywordtype">float</span> *state_cur = state_out + (size_t)h * state_stride;</div>
-<div class="line"><span class="lineno">  326</span>        <span class="keywordtype">float</span> *out_head = out + (size_t)h * vec_stride;</div>
-<div class="line"><span class="lineno">  327</span> </div>
-<div class="line"><span class="lineno">  328</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
-<div class="line"><span class="lineno">  329</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = expf(g[h]);</div>
-<div class="line"><span class="lineno">  330</span> </div>
-<div class="line"><span class="lineno">  331</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  332</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  333</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  334</span>                state_cur[row_off + (size_t)col] = state_prev[row_off + (<span class="keywordtype">size_t</span>)col] * gate;</div>
-<div class="line"><span class="lineno">  335</span>            }</div>
-<div class="line"><span class="lineno">  336</span>        }</div>
-<div class="line"><span class="lineno">  337</span> </div>
-<div class="line"><span class="lineno">  338</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  339</span>            <span class="keywordtype">float</span> kv_mem = 0.0f;</div>
-<div class="line"><span class="lineno">  340</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  341</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_hat = k_head[row];</div>
-<div class="line"><span class="lineno">  342</span>                kv_mem += state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * k_hat;</div>
-<div class="line"><span class="lineno">  343</span>            }</div>
-<div class="line"><span class="lineno">  344</span> </div>
-<div class="line"><span class="lineno">  345</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> delta = (v_head[col] - kv_mem) * beta_s;</div>
-<div class="line"><span class="lineno">  346</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  347</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_hat = k_head[row];</div>
-<div class="line"><span class="lineno">  348</span>                state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] += k_hat * delta;</div>
-<div class="line"><span class="lineno">  349</span>            }</div>
-<div class="line"><span class="lineno">  350</span>        }</div>
-<div class="line"><span class="lineno">  351</span> </div>
-<div class="line"><span class="lineno">  352</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  353</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  354</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  355</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> q_hat = q_head[row] * q_scale;</div>
-<div class="line"><span class="lineno">  356</span>                acc += state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * q_hat;</div>
-<div class="line"><span class="lineno">  357</span>            }</div>
-<div class="line"><span class="lineno">  358</span>            out_head[col] = acc;</div>
-<div class="line"><span class="lineno">  359</span>        }</div>
-<div class="line"><span class="lineno">  360</span>    }</div>
-<div class="line"><span class="lineno">  361</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00598">598</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  609</span>{</div>
+<div class="line"><span class="lineno">  610</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> q_scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)state_dim);</div>
+<div class="line"><span class="lineno">  611</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vec_stride = (size_t)state_dim;</div>
+<div class="line"><span class="lineno">  612</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t)state_dim * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  613</span> </div>
+<div class="line"><span class="lineno">  614</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  615</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  616</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  617</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  618</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  619</span>        <span class="keywordtype">float</span> *state_cur = state_out + (size_t)h * state_stride;</div>
+<div class="line"><span class="lineno">  620</span>        <span class="keywordtype">float</span> *out_head = out + (size_t)h * vec_stride;</div>
+<div class="line"><span class="lineno">  621</span> </div>
+<div class="line"><span class="lineno">  622</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
+<div class="line"><span class="lineno">  623</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = expf(g[h]);</div>
+<div class="line"><span class="lineno">  624</span> </div>
+<div class="line"><span class="lineno">  625</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  626</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_off = (size_t)row * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  627</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  628</span>                state_cur[row_off + (size_t)col] = state_prev[row_off + (<span class="keywordtype">size_t</span>)col] * gate;</div>
+<div class="line"><span class="lineno">  629</span>            }</div>
+<div class="line"><span class="lineno">  630</span>        }</div>
+<div class="line"><span class="lineno">  631</span> </div>
+<div class="line"><span class="lineno">  632</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  633</span>            <span class="keywordtype">float</span> kv_mem = 0.0f;</div>
+<div class="line"><span class="lineno">  634</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  635</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_hat = k_head[row];</div>
+<div class="line"><span class="lineno">  636</span>                kv_mem += state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * k_hat;</div>
+<div class="line"><span class="lineno">  637</span>            }</div>
+<div class="line"><span class="lineno">  638</span> </div>
+<div class="line"><span class="lineno">  639</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> delta = (v_head[col] - kv_mem) * beta_s;</div>
+<div class="line"><span class="lineno">  640</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  641</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> k_hat = k_head[row];</div>
+<div class="line"><span class="lineno">  642</span>                state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] += k_hat * delta;</div>
+<div class="line"><span class="lineno">  643</span>            }</div>
+<div class="line"><span class="lineno">  644</span>        }</div>
+<div class="line"><span class="lineno">  645</span> </div>
+<div class="line"><span class="lineno">  646</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  647</span>            <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  648</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  649</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> q_hat = q_head[row] * q_scale;</div>
+<div class="line"><span class="lineno">  650</span>                acc += state_cur[(size_t)row * (<span class="keywordtype">size_t</span>)state_dim + (size_t)col] * q_hat;</div>
+<div class="line"><span class="lineno">  651</span>            }</div>
+<div class="line"><span class="lineno">  652</span>            out_head[col] = acc;</div>
+<div class="line"><span class="lineno">  653</span>        }</div>
+<div class="line"><span class="lineno">  654</span>    }</div>
+<div class="line"><span class="lineno">  655</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00050">ck_deltanet_sigmoidf()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00081">ck_deltanet_sigmoidf()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00930">gated_deltanet_autoregressive_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00101">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l01224">gated_deltanet_autoregressive_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
 </div>
 </div>
@@ -953,23 +1133,23 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00914">914</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  915</span>{</div>
-<div class="line"><span class="lineno">  916</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
-<div class="line"><span class="lineno">  917</span>        <span class="keywordflow">return</span> <span class="stringliteral">&quot;REF&quot;</span>;</div>
-<div class="line"><span class="lineno">  918</span>    }</div>
-<div class="line"><span class="lineno">  919</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  920</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX512&quot;</span>;</div>
-<div class="line"><span class="lineno">  921</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  922</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX2&quot;</span>;</div>
-<div class="line"><span class="lineno">  923</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  924</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX&quot;</span>;</div>
-<div class="line"><span class="lineno">  925</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  926</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;REF&quot;</span>;</div>
-<div class="line"><span class="lineno">  927</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  928</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01208">1208</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1209</span>{</div>
+<div class="line"><span class="lineno"> 1210</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() || <a class="code hl_function" href="deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8">ck_deltanet_force_ref</a>()) {</div>
+<div class="line"><span class="lineno"> 1211</span>        <span class="keywordflow">return</span> <span class="stringliteral">&quot;REF&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1212</span>    }</div>
+<div class="line"><span class="lineno"> 1213</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno"> 1214</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX512&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1215</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1216</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX2&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1217</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno"> 1218</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;AVX&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1219</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1220</span>    <span class="keywordflow">return</span> <span class="stringliteral">&quot;REF&quot;</span>;</div>
+<div class="line"><span class="lineno"> 1221</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1222</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00908">ck_deltanet_force_ref()</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l01202">ck_deltanet_force_ref()</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>.</p>
 
 </div>
 </div>
@@ -1059,17 +1239,17 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00191">191</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  203</span>{</div>
-<div class="line"><span class="lineno">  204</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a>(</div>
-<div class="line"><span class="lineno">  205</span>        q, k, v, g, beta, state_in, state_out, out,</div>
-<div class="line"><span class="lineno">  206</span>        num_heads, group_count, state_dim, norm_eps, 0);</div>
-<div class="line"><span class="lineno">  207</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a1cfb130522c675f2a1ad1110f440158d"><div class="ttname"><a href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a></div><div class="ttdeci">static void gated_deltanet_llama_avx2_grouped_forward_impl(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps, int pytorch_bf16_boundaries)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00101">deltanet_kernels.c:101</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00485">485</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  497</span>{</div>
+<div class="line"><span class="lineno">  498</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a>(</div>
+<div class="line"><span class="lineno">  499</span>        q, k, v, g, beta, state_in, state_out, out,</div>
+<div class="line"><span class="lineno">  500</span>        num_heads, group_count, state_dim, norm_eps, 0);</div>
+<div class="line"><span class="lineno">  501</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a1cfb130522c675f2a1ad1110f440158d"><div class="ttname"><a href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a></div><div class="ttdeci">static void gated_deltanet_llama_avx2_grouped_forward_impl(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps, int pytorch_bf16_boundaries)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00387">deltanet_kernels.c:387</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00101">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00231">gated_deltanet_llama_avx2_prefill_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00525">gated_deltanet_llama_avx2_prefill_forward()</a>.</p>
 
 </div>
 </div>
@@ -1173,88 +1353,97 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00101">101</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  115</span>{</div>
-<div class="line"><span class="lineno">  116</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  117</span>    (void) norm_eps;</div>
-<div class="line"><span class="lineno">  118</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
-<div class="line"><span class="lineno">  119</span>        num_heads &lt;= 0 || group_count &lt;= 0 || num_heads % group_count != 0 ||</div>
-<div class="line"><span class="lineno">  120</span>        state_dim &lt;= 0 || state_dim &gt; <a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>) {</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  122</span>    }</div>
-<div class="line"><span class="lineno">  123</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>) state_dim);</div>
-<div class="line"><span class="lineno">  124</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vector_stride = (size_t) state_dim;</div>
-<div class="line"><span class="lineno">  125</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t) state_dim * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">  126</span>    <span class="keywordtype">float</span> column[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  127</span>    <span class="keywordtype">float</span> q_scaled[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
-<div class="line"><span class="lineno">  128</span> </div>
-<div class="line"><span class="lineno">  129</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  130</span>        <span class="comment">/* ggml_repeat_4d tiles the compact Q/K head axis.  For H=48,G=16</span></div>
-<div class="line"><span class="lineno">  131</span><span class="comment">         * the value heads bind Q/K groups 0..15, 0..15, 0..15. */</span></div>
-<div class="line"><span class="lineno">  132</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> group = h % group_count;</div>
-<div class="line"><span class="lineno">  133</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t) group * vector_stride;</div>
-<div class="line"><span class="lineno">  134</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t) group * vector_stride;</div>
-<div class="line"><span class="lineno">  135</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t) h * vector_stride;</div>
-<div class="line"><span class="lineno">  136</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t) h * state_stride;</div>
-<div class="line"><span class="lineno">  137</span>        <span class="keywordtype">float</span> *state_cur = state_out + (size_t) h * state_stride;</div>
-<div class="line"><span class="lineno">  138</span>        <span class="keywordtype">float</span> *out_head = out + (size_t) h * vector_stride;</div>
-<div class="line"><span class="lineno">  139</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> gate = expf(g[h]);</div>
-<div class="line"><span class="lineno">  140</span>        <span class="keywordtype">float</span> beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
-<div class="line"><span class="lineno">  141</span>        <span class="keywordflow">if</span> (pytorch_bf16_boundaries) {</div>
-<div class="line"><span class="lineno">  142</span>            beta_s = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(beta_s));</div>
-<div class="line"><span class="lineno">  143</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  144</span>                q_scaled[row] = q_head[row] * scale;</div>
-<div class="line"><span class="lineno">  145</span>            }</div>
-<div class="line"><span class="lineno">  146</span>        }</div>
-<div class="line"><span class="lineno">  147</span> </div>
-<div class="line"><span class="lineno">  148</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  149</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_offset = (size_t) row * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">  150</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  151</span>                state_cur[row_offset + (size_t) col] =</div>
-<div class="line"><span class="lineno">  152</span>                    state_prev[row_offset + (<span class="keywordtype">size_t</span>) col] * gate;</div>
-<div class="line"><span class="lineno">  153</span>            }</div>
-<div class="line"><span class="lineno">  154</span>        }</div>
-<div class="line"><span class="lineno">  155</span> </div>
-<div class="line"><span class="lineno">  156</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">  157</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  158</span>                column[row] = state_cur[(size_t) row * (<span class="keywordtype">size_t</span>) state_dim + (size_t) col];</div>
-<div class="line"><span class="lineno">  159</span>            }</div>
-<div class="line"><span class="lineno">  160</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> memory = ck_deltanet_llama_avx2_dot(column, k_head, state_dim);</div>
-<div class="line"><span class="lineno">  161</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> delta = (v_head[col] - memory) * beta_s;</div>
-<div class="line"><span class="lineno">  162</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
-<div class="line"><span class="lineno">  163</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t) row * (<span class="keywordtype">size_t</span>) state_dim + (size_t) col;</div>
-<div class="line"><span class="lineno">  164</span><span class="preprocessor">#if defined(__FMA__)</span></div>
-<div class="line"><span class="lineno">  165</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> updated = fmaf(k_head[row], delta, state_cur[offset]);</div>
-<div class="line"><span class="lineno">  166</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  167</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> updated = state_cur[offset] + k_head[row] * delta;</div>
-<div class="line"><span class="lineno">  168</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  169</span>                state_cur[offset] = updated;</div>
-<div class="line"><span class="lineno">  170</span>                column[row] = updated;</div>
-<div class="line"><span class="lineno">  171</span>            }</div>
-<div class="line"><span class="lineno">  172</span>            <span class="keywordflow">if</span> (pytorch_bf16_boundaries) {</div>
-<div class="line"><span class="lineno">  173</span>                out_head[col] =</div>
-<div class="line"><span class="lineno">  174</span>                    ck_deltanet_llama_avx2_dot(column, q_scaled, state_dim);</div>
-<div class="line"><span class="lineno">  175</span>            } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  176</span>                out_head[col] =</div>
-<div class="line"><span class="lineno">  177</span>                    ck_deltanet_llama_avx2_dot(column, q_head, state_dim) * scale;</div>
-<div class="line"><span class="lineno">  178</span>            }</div>
-<div class="line"><span class="lineno">  179</span>        }</div>
-<div class="line"><span class="lineno">  180</span>    }</div>
-<div class="line"><span class="lineno">  181</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  182</span>    <span class="keywordflow">if</span> (group_count != num_heads) {</div>
-<div class="line"><span class="lineno">  183</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  184</span>    }</div>
-<div class="line"><span class="lineno">  185</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
-<div class="line"><span class="lineno">  186</span>        q, k, v, g, beta, state_in, state_out, out,</div>
-<div class="line"><span class="lineno">  187</span>        num_heads, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  188</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  189</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00387">387</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  401</span>{</div>
+<div class="line"><span class="lineno">  402</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  403</span>    (void) norm_eps;</div>
+<div class="line"><span class="lineno">  404</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
+<div class="line"><span class="lineno">  405</span>        num_heads &lt;= 0 || group_count &lt;= 0 || num_heads % group_count != 0 ||</div>
+<div class="line"><span class="lineno">  406</span>        state_dim &lt;= 0 || state_dim &gt; <a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>) {</div>
+<div class="line"><span class="lineno">  407</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  408</span>    }</div>
+<div class="line"><span class="lineno">  409</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = ck_deltanet_llama_scale(state_dim);</div>
+<div class="line"><span class="lineno">  410</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vector_stride = (size_t) state_dim;</div>
+<div class="line"><span class="lineno">  411</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_stride = (size_t) state_dim * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">  412</span>    <span class="keywordtype">float</span> column[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  413</span>    <span class="keywordtype">float</span> q_scaled[<a class="code hl_define" href="deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483">CK_DELTANET_MAX_STACK_DIM</a>];</div>
+<div class="line"><span class="lineno">  414</span> </div>
+<div class="line"><span class="lineno">  415</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  416</span>        <span class="comment">/* ggml_repeat_4d tiles the compact Q/K head axis.  For H=48,G=16</span></div>
+<div class="line"><span class="lineno">  417</span><span class="comment">         * the value heads bind Q/K groups 0..15, 0..15, 0..15. */</span></div>
+<div class="line"><span class="lineno">  418</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> group = h % group_count;</div>
+<div class="line"><span class="lineno">  419</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q + (size_t) group * vector_stride;</div>
+<div class="line"><span class="lineno">  420</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t) group * vector_stride;</div>
+<div class="line"><span class="lineno">  421</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t) h * vector_stride;</div>
+<div class="line"><span class="lineno">  422</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_prev = state_in + (size_t) h * state_stride;</div>
+<div class="line"><span class="lineno">  423</span>        <span class="keywordtype">float</span> *state_cur = state_out + (size_t) h * state_stride;</div>
+<div class="line"><span class="lineno">  424</span>        <span class="keywordtype">float</span> *out_head = out + (size_t) h * vector_stride;</div>
+<div class="line"><span class="lineno">  425</span>        <span class="keywordtype">float</span> gate;</div>
+<div class="line"><span class="lineno">  426</span>        <span class="keywordtype">float</span> beta_s;</div>
+<div class="line"><span class="lineno">  427</span>        <span class="keywordflow">if</span> (pytorch_bf16_boundaries) {</div>
+<div class="line"><span class="lineno">  428</span>            gate = expf(g[h]);</div>
+<div class="line"><span class="lineno">  429</span>            beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b">ck_deltanet_sigmoidf</a>(beta[h]);</div>
+<div class="line"><span class="lineno">  430</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  431</span>            pthread_once(&amp;<a class="code hl_variable" href="deltanet__kernels_8c.html#a151a7eeb05c227a91304e62906f1a834">ck_deltanet_libm_once</a>, <a class="code hl_function" href="deltanet__kernels_8c.html#abd386e4ba6a2d604b34d0108dbba6944">ck_bind_deltanet_llama_libm</a>);</div>
+<div class="line"><span class="lineno">  432</span>            gate = <a class="code hl_variable" href="deltanet__kernels_8c.html#a4d5ff98b4ddefed10fe47da80e862a07">ck_deltanet_llama_expf</a>(g[h]);</div>
+<div class="line"><span class="lineno">  433</span>            beta_s = <a class="code hl_function" href="deltanet__kernels_8c.html#ac9033305635ee3a715529eb42a5e2ffd">ck_deltanet_llama_sigmoidf</a>(beta[h]);</div>
+<div class="line"><span class="lineno">  434</span>        }</div>
+<div class="line"><span class="lineno">  435</span>        <span class="keywordflow">if</span> (pytorch_bf16_boundaries) {</div>
+<div class="line"><span class="lineno">  436</span>            beta_s = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(beta_s));</div>
+<div class="line"><span class="lineno">  437</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  438</span>                q_scaled[row] = q_head[row] * scale;</div>
+<div class="line"><span class="lineno">  439</span>            }</div>
+<div class="line"><span class="lineno">  440</span>        }</div>
+<div class="line"><span class="lineno">  441</span> </div>
+<div class="line"><span class="lineno">  442</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  443</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> row_offset = (size_t) row * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">  444</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  445</span>                state_cur[row_offset + (size_t) col] =</div>
+<div class="line"><span class="lineno">  446</span>                    state_prev[row_offset + (<span class="keywordtype">size_t</span>) col] * gate;</div>
+<div class="line"><span class="lineno">  447</span>            }</div>
+<div class="line"><span class="lineno">  448</span>        }</div>
+<div class="line"><span class="lineno">  449</span> </div>
+<div class="line"><span class="lineno">  450</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">  451</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  452</span>                column[row] = state_cur[(size_t) row * (<span class="keywordtype">size_t</span>) state_dim + (size_t) col];</div>
+<div class="line"><span class="lineno">  453</span>            }</div>
+<div class="line"><span class="lineno">  454</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> memory = ck_deltanet_llama_avx2_dot(column, k_head, state_dim);</div>
+<div class="line"><span class="lineno">  455</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> delta = (v_head[col] - memory) * beta_s;</div>
+<div class="line"><span class="lineno">  456</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; state_dim; ++row) {</div>
+<div class="line"><span class="lineno">  457</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t) row * (<span class="keywordtype">size_t</span>) state_dim + (size_t) col;</div>
+<div class="line"><span class="lineno">  458</span><span class="preprocessor">#if defined(__FMA__)</span></div>
+<div class="line"><span class="lineno">  459</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> updated = fmaf(k_head[row], delta, state_cur[offset]);</div>
+<div class="line"><span class="lineno">  460</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  461</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> updated = state_cur[offset] + k_head[row] * delta;</div>
+<div class="line"><span class="lineno">  462</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  463</span>                state_cur[offset] = updated;</div>
+<div class="line"><span class="lineno">  464</span>                column[row] = updated;</div>
+<div class="line"><span class="lineno">  465</span>            }</div>
+<div class="line"><span class="lineno">  466</span>            <span class="keywordflow">if</span> (pytorch_bf16_boundaries) {</div>
+<div class="line"><span class="lineno">  467</span>                out_head[col] =</div>
+<div class="line"><span class="lineno">  468</span>                    ck_deltanet_llama_avx2_dot(column, q_scaled, state_dim);</div>
+<div class="line"><span class="lineno">  469</span>            } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  470</span>                out_head[col] =</div>
+<div class="line"><span class="lineno">  471</span>                    ck_deltanet_llama_avx2_dot(column, q_head, state_dim) * scale;</div>
+<div class="line"><span class="lineno">  472</span>            }</div>
+<div class="line"><span class="lineno">  473</span>        }</div>
+<div class="line"><span class="lineno">  474</span>    }</div>
+<div class="line"><span class="lineno">  475</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  476</span>    <span class="keywordflow">if</span> (group_count != num_heads) {</div>
+<div class="line"><span class="lineno">  477</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  478</span>    }</div>
+<div class="line"><span class="lineno">  479</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a357c0e1f9059fc199d845a50214ba0ac">gated_deltanet_autoregressive_forward_ref</a>(</div>
+<div class="line"><span class="lineno">  480</span>        q, k, v, g, beta, state_in, state_out, out,</div>
+<div class="line"><span class="lineno">  481</span>        num_heads, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno">  482</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  483</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
+<div class="ttc" id="adeltanet__kernels_8c_html_ac9033305635ee3a715529eb42a5e2ffd"><div class="ttname"><a href="deltanet__kernels_8c.html#ac9033305635ee3a715529eb42a5e2ffd">ck_deltanet_llama_sigmoidf</a></div><div class="ttdeci">static float ck_deltanet_llama_sigmoidf(float x)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00086">deltanet_kernels.c:86</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00048">CK_DELTANET_MAX_STACK_DIM</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00050">ck_deltanet_sigmoidf()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00304">gated_deltanet_autoregressive_forward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00066">ck_bind_deltanet_llama_libm()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00064">ck_deltanet_libm_once</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00062">ck_deltanet_llama_expf</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00086">ck_deltanet_llama_sigmoidf()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00051">CK_DELTANET_MAX_STACK_DIM</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00081">ck_deltanet_sigmoidf()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00598">gated_deltanet_autoregressive_forward_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00191">gated_deltanet_llama_avx2_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00209">gated_deltanet_pytorch_grouped_bf16_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00485">gated_deltanet_llama_avx2_forward()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00503">gated_deltanet_pytorch_grouped_bf16_forward()</a>.</p>
 
 </div>
 </div>
@@ -1350,32 +1539,32 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00231">231</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  244</span>{</div>
-<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
-<div class="line"><span class="lineno">  246</span>        rows &lt;= 0 || num_heads &lt;= 0 || group_count &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  247</span>        num_heads % group_count != 0 || state_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  248</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  249</span>    }</div>
-<div class="line"><span class="lineno">  250</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qk_stride = (size_t) group_count * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">  251</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> value_stride = (size_t) num_heads * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">  252</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t) num_heads;</div>
-<div class="line"><span class="lineno">  253</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  254</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1">gated_deltanet_llama_avx2_forward</a>(</div>
-<div class="line"><span class="lineno">  255</span>            q + (<span class="keywordtype">size_t</span>) row * qk_stride,</div>
-<div class="line"><span class="lineno">  256</span>            k + (<span class="keywordtype">size_t</span>) row * qk_stride,</div>
-<div class="line"><span class="lineno">  257</span>            v + (<span class="keywordtype">size_t</span>) row * value_stride,</div>
-<div class="line"><span class="lineno">  258</span>            g + (<span class="keywordtype">size_t</span>) row * gate_stride,</div>
-<div class="line"><span class="lineno">  259</span>            beta + (<span class="keywordtype">size_t</span>) row * gate_stride,</div>
-<div class="line"><span class="lineno">  260</span>            row == 0 ? state_in : state_out,</div>
-<div class="line"><span class="lineno">  261</span>            state_out,</div>
-<div class="line"><span class="lineno">  262</span>            out + (size_t) row * value_stride,</div>
-<div class="line"><span class="lineno">  263</span>            num_heads, group_count, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  264</span>    }</div>
-<div class="line"><span class="lineno">  265</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a803959e1de4db14206e1b8fe09b5e3a1"><div class="ttname"><a href="deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1">gated_deltanet_llama_avx2_forward</a></div><div class="ttdeci">void gated_deltanet_llama_avx2_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00191">deltanet_kernels.c:191</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00525">525</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  538</span>{</div>
+<div class="line"><span class="lineno">  539</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
+<div class="line"><span class="lineno">  540</span>        rows &lt;= 0 || num_heads &lt;= 0 || group_count &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  541</span>        num_heads % group_count != 0 || state_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  542</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  543</span>    }</div>
+<div class="line"><span class="lineno">  544</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qk_stride = (size_t) group_count * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">  545</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> value_stride = (size_t) num_heads * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">  546</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t) num_heads;</div>
+<div class="line"><span class="lineno">  547</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  548</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1">gated_deltanet_llama_avx2_forward</a>(</div>
+<div class="line"><span class="lineno">  549</span>            q + (<span class="keywordtype">size_t</span>) row * qk_stride,</div>
+<div class="line"><span class="lineno">  550</span>            k + (<span class="keywordtype">size_t</span>) row * qk_stride,</div>
+<div class="line"><span class="lineno">  551</span>            v + (<span class="keywordtype">size_t</span>) row * value_stride,</div>
+<div class="line"><span class="lineno">  552</span>            g + (<span class="keywordtype">size_t</span>) row * gate_stride,</div>
+<div class="line"><span class="lineno">  553</span>            beta + (<span class="keywordtype">size_t</span>) row * gate_stride,</div>
+<div class="line"><span class="lineno">  554</span>            row == 0 ? state_in : state_out,</div>
+<div class="line"><span class="lineno">  555</span>            state_out,</div>
+<div class="line"><span class="lineno">  556</span>            out + (size_t) row * value_stride,</div>
+<div class="line"><span class="lineno">  557</span>            num_heads, group_count, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno">  558</span>    }</div>
+<div class="line"><span class="lineno">  559</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a803959e1de4db14206e1b8fe09b5e3a1"><div class="ttname"><a href="deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1">gated_deltanet_llama_avx2_forward</a></div><div class="ttdeci">void gated_deltanet_llama_avx2_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00485">deltanet_kernels.c:485</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00191">gated_deltanet_llama_avx2_forward()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00485">gated_deltanet_llama_avx2_forward()</a>.</p>
 
 </div>
 </div>
@@ -1465,36 +1654,36 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00973">973</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  985</span>{</div>
-<div class="line"><span class="lineno">  986</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
-<div class="line"><span class="lineno">  987</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  988</span>    }</div>
-<div class="line"><span class="lineno">  989</span>    <span class="keywordflow">if</span> (rows &lt;= 0 || num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  990</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  991</span>    }</div>
-<div class="line"><span class="lineno">  992</span> </div>
-<div class="line"><span class="lineno">  993</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vector_stride = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  994</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t)num_heads;</div>
-<div class="line"><span class="lineno">  995</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  996</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_state_in = row == 0 ? state_in : state_out;</div>
-<div class="line"><span class="lineno">  997</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a>(</div>
-<div class="line"><span class="lineno">  998</span>            q + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
-<div class="line"><span class="lineno">  999</span>            k + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
-<div class="line"><span class="lineno"> 1000</span>            v + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
-<div class="line"><span class="lineno"> 1001</span>            g + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
-<div class="line"><span class="lineno"> 1002</span>            beta + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
-<div class="line"><span class="lineno"> 1003</span>            row_state_in,</div>
-<div class="line"><span class="lineno"> 1004</span>            state_out,</div>
-<div class="line"><span class="lineno"> 1005</span>            out + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
-<div class="line"><span class="lineno"> 1006</span>            num_heads,</div>
-<div class="line"><span class="lineno"> 1007</span>            state_dim,</div>
-<div class="line"><span class="lineno"> 1008</span>            norm_eps);</div>
-<div class="line"><span class="lineno"> 1009</span>    }</div>
-<div class="line"><span class="lineno"> 1010</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_ab058f3491df124f04213732b3ae76fce"><div class="ttname"><a href="deltanet__kernels_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00930">deltanet_kernels.c:930</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l01267">1267</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1279</span>{</div>
+<div class="line"><span class="lineno"> 1280</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {</div>
+<div class="line"><span class="lineno"> 1281</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1282</span>    }</div>
+<div class="line"><span class="lineno"> 1283</span>    <span class="keywordflow">if</span> (rows &lt;= 0 || num_heads &lt;= 0 || state_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 1284</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1285</span>    }</div>
+<div class="line"><span class="lineno"> 1286</span> </div>
+<div class="line"><span class="lineno"> 1287</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> vector_stride = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno"> 1288</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t)num_heads;</div>
+<div class="line"><span class="lineno"> 1289</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno"> 1290</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_state_in = row == 0 ? state_in : state_out;</div>
+<div class="line"><span class="lineno"> 1291</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a>(</div>
+<div class="line"><span class="lineno"> 1292</span>            q + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
+<div class="line"><span class="lineno"> 1293</span>            k + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
+<div class="line"><span class="lineno"> 1294</span>            v + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
+<div class="line"><span class="lineno"> 1295</span>            g + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
+<div class="line"><span class="lineno"> 1296</span>            beta + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
+<div class="line"><span class="lineno"> 1297</span>            row_state_in,</div>
+<div class="line"><span class="lineno"> 1298</span>            state_out,</div>
+<div class="line"><span class="lineno"> 1299</span>            out + (<span class="keywordtype">size_t</span>)row * vector_stride,</div>
+<div class="line"><span class="lineno"> 1300</span>            num_heads,</div>
+<div class="line"><span class="lineno"> 1301</span>            state_dim,</div>
+<div class="line"><span class="lineno"> 1302</span>            norm_eps);</div>
+<div class="line"><span class="lineno"> 1303</span>    }</div>
+<div class="line"><span class="lineno"> 1304</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_ab058f3491df124f04213732b3ae76fce"><div class="ttname"><a href="deltanet__kernels_8c.html#ab058f3491df124f04213732b3ae76fce">gated_deltanet_autoregressive_forward</a></div><div class="ttdeci">void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l01224">deltanet_kernels.c:1224</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00930">gated_deltanet_autoregressive_forward()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l01224">gated_deltanet_autoregressive_forward()</a>.</p>
 
 </div>
 </div>
@@ -1584,20 +1773,20 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00209">209</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  221</span>{</div>
-<div class="line"><span class="lineno">  222</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a>(</div>
-<div class="line"><span class="lineno">  223</span>        q, k, v, g, beta, state_in, state_out, out,</div>
-<div class="line"><span class="lineno">  224</span>        num_heads, group_count, state_dim, norm_eps, 1);</div>
-<div class="line"><span class="lineno">  225</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  226</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
-<div class="line"><span class="lineno">  227</span>        out[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(out[i]));</div>
-<div class="line"><span class="lineno">  228</span>    }</div>
-<div class="line"><span class="lineno">  229</span>}</div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00503">503</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  515</span>{</div>
+<div class="line"><span class="lineno">  516</span>    <a class="code hl_function" href="deltanet__kernels_8c.html#a1cfb130522c675f2a1ad1110f440158d">gated_deltanet_llama_avx2_grouped_forward_impl</a>(</div>
+<div class="line"><span class="lineno">  517</span>        q, k, v, g, beta, state_in, state_out, out,</div>
+<div class="line"><span class="lineno">  518</span>        num_heads, group_count, state_dim, norm_eps, 1);</div>
+<div class="line"><span class="lineno">  519</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  520</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">  521</span>        out[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(out[i]));</div>
+<div class="line"><span class="lineno">  522</span>    }</div>
+<div class="line"><span class="lineno">  523</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00101">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00267">gated_deltanet_pytorch_grouped_bf16_prefill_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00561">gated_deltanet_pytorch_grouped_bf16_prefill_forward()</a>.</p>
 
 </div>
 </div>
@@ -1693,32 +1882,111 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00267">267</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  281</span>{</div>
-<div class="line"><span class="lineno">  282</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
-<div class="line"><span class="lineno">  283</span>        rows &lt;= 0 || num_heads &lt;= 0 || group_count &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  284</span>        num_heads % group_count != 0 || state_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  285</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  286</span>    }</div>
-<div class="line"><span class="lineno">  287</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qk_stride = (size_t)group_count * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  288</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> value_stride = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  289</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t)num_heads;</div>
-<div class="line"><span class="lineno">  290</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  291</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd">gated_deltanet_pytorch_grouped_bf16_forward</a>(</div>
-<div class="line"><span class="lineno">  292</span>            q + (<span class="keywordtype">size_t</span>)row * qk_stride,</div>
-<div class="line"><span class="lineno">  293</span>            k + (<span class="keywordtype">size_t</span>)row * qk_stride,</div>
-<div class="line"><span class="lineno">  294</span>            v + (<span class="keywordtype">size_t</span>)row * value_stride,</div>
-<div class="line"><span class="lineno">  295</span>            g + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
-<div class="line"><span class="lineno">  296</span>            beta + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
-<div class="line"><span class="lineno">  297</span>            row == 0 ? state_in : state_out,</div>
-<div class="line"><span class="lineno">  298</span>            state_out,</div>
-<div class="line"><span class="lineno">  299</span>            out + (size_t)row * value_stride,</div>
-<div class="line"><span class="lineno">  300</span>            num_heads, group_count, state_dim, norm_eps);</div>
-<div class="line"><span class="lineno">  301</span>    }</div>
-<div class="line"><span class="lineno">  302</span>}</div>
-<div class="ttc" id="adeltanet__kernels_8c_html_a9efb18d23051625039c7dfe8b651f7dd"><div class="ttname"><a href="deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd">gated_deltanet_pytorch_grouped_bf16_forward</a></div><div class="ttdeci">void gated_deltanet_pytorch_grouped_bf16_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00209">deltanet_kernels.c:209</a></div></div>
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00561">561</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  575</span>{</div>
+<div class="line"><span class="lineno">  576</span>    <span class="keywordflow">if</span> (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||</div>
+<div class="line"><span class="lineno">  577</span>        rows &lt;= 0 || num_heads &lt;= 0 || group_count &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  578</span>        num_heads % group_count != 0 || state_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  579</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  580</span>    }</div>
+<div class="line"><span class="lineno">  581</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> qk_stride = (size_t)group_count * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  582</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> value_stride = (size_t)num_heads * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  583</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> gate_stride = (size_t)num_heads;</div>
+<div class="line"><span class="lineno">  584</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  585</span>        <a class="code hl_function" href="deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd">gated_deltanet_pytorch_grouped_bf16_forward</a>(</div>
+<div class="line"><span class="lineno">  586</span>            q + (<span class="keywordtype">size_t</span>)row * qk_stride,</div>
+<div class="line"><span class="lineno">  587</span>            k + (<span class="keywordtype">size_t</span>)row * qk_stride,</div>
+<div class="line"><span class="lineno">  588</span>            v + (<span class="keywordtype">size_t</span>)row * value_stride,</div>
+<div class="line"><span class="lineno">  589</span>            g + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
+<div class="line"><span class="lineno">  590</span>            beta + (<span class="keywordtype">size_t</span>)row * gate_stride,</div>
+<div class="line"><span class="lineno">  591</span>            row == 0 ? state_in : state_out,</div>
+<div class="line"><span class="lineno">  592</span>            state_out,</div>
+<div class="line"><span class="lineno">  593</span>            out + (size_t)row * value_stride,</div>
+<div class="line"><span class="lineno">  594</span>            num_heads, group_count, state_dim, norm_eps);</div>
+<div class="line"><span class="lineno">  595</span>    }</div>
+<div class="line"><span class="lineno">  596</span>}</div>
+<div class="ttc" id="adeltanet__kernels_8c_html_a9efb18d23051625039c7dfe8b651f7dd"><div class="ttname"><a href="deltanet__kernels_8c.html#a9efb18d23051625039c7dfe8b651f7dd">gated_deltanet_pytorch_grouped_bf16_forward</a></div><div class="ttdeci">void gated_deltanet_pytorch_grouped_bf16_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__kernels_8c_source.html#l00503">deltanet_kernels.c:503</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00209">gated_deltanet_pytorch_grouped_bf16_forward()</a>.</p>
+<p class="reference">References <a class="el" href="deltanet__kernels_8c_source.html#l00503">gated_deltanet_pytorch_grouped_bf16_forward()</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Variable Documentation</h2>
+<a id="a843e291852e1e687deafeebf5973a2bf" name="a843e291852e1e687deafeebf5973a2bf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a843e291852e1e687deafeebf5973a2bf">&#9670;&#160;</a></span>ck_deltanet_libm_handle</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void* ck_deltanet_libm_handle = NULL</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00063">63</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00066">ck_bind_deltanet_llama_libm()</a>.</p>
+
+</div>
+</div>
+<a id="a151a7eeb05c227a91304e62906f1a834" name="a151a7eeb05c227a91304e62906f1a834"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a151a7eeb05c227a91304e62906f1a834">&#9670;&#160;</a></span>ck_deltanet_libm_once</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">pthread_once_t ck_deltanet_libm_once = PTHREAD_ONCE_INIT</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00064">64</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00086">ck_deltanet_llama_sigmoidf()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
+
+</div>
+</div>
+<a id="a4d5ff98b4ddefed10fe47da80e862a07" name="a4d5ff98b4ddefed10fe47da80e862a07"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4d5ff98b4ddefed10fe47da80e862a07">&#9670;&#160;</a></span>ck_deltanet_llama_expf</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399">ck_deltanet_libm_f32_fn</a> ck_deltanet_llama_expf = NULL</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="deltanet__kernels_8c_source.html#l00062">62</a> of file <a class="el" href="deltanet__kernels_8c_source.html">deltanet_kernels.c</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="deltanet__kernels_8c_source.html#l00066">ck_bind_deltanet_llama_libm()</a>, <a class="el" href="deltanet__kernels_8c_source.html#l00086">ck_deltanet_llama_sigmoidf()</a>, and <a class="el" href="deltanet__kernels_8c_source.html#l00387">gated_deltanet_llama_avx2_grouped_forward_impl()</a>.</p>
 
 </div>
 </div>
