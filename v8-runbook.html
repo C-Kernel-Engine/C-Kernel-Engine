@@ -1229,16 +1229,16 @@ python -m pip install -r requirements-v8.txt</pre>
     <h3>GLM4</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre># Low-memory validation lane: template + conversion + comparator syntax
-.venv/bin/python -m unittest tests.test_v8_glm4_template
-.venv/bin/python -m py_compile \
-  version/v8/scripts/compare_glm4_torch_ck_v8.py \
-  version/v8/scripts/convert_gguf_to_bump_v8.py \
-  version/v8/scripts/convert_safetensors_to_bump_v8.py \
-  tests/test_v8_glm4_template.py \
-  tests/test_v8_safetensors_to_bump.py</pre>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf \
+  --context-len 1034 \
+  --force-convert --force-compile \
+  --chat-template glm4 \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
     </div>
-    <p class="mini-note">GLM4 is currently tracked as a v8 template/conversion/parity-harness lane. The patch adds GLM4 GGUF metadata handling, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK comparator. Run full real-model GLM4 smoke on a higher-memory host before promoting it to the high-memory runtime lane.</p>
+    <p class="mini-note">GLM4 has a real Q4_K_M runtime lane with partial pairwise RoPE, persistent FP16 KV cache, and llama.cpp parity coverage. <code>--force-compile</code> force-builds both <code>libckernel_engine.so</code> and <code>libckernel_tokenizer.so</code>, compiles the generated model into a staging directory, verifies that the complete bundle loads without unresolved symbols, and only then replaces the cached runtime. No manual library copy is required.</p>
 
     <h3>Kimi / MLA Decoder Contract</h3>
     <div class="cmd-block">
@@ -1968,7 +1968,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-30</p>
             </div>
         </div>
     </footer>
