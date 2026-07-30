@@ -1,5 +1,6 @@
 var NAVTREEINDEX18 =
 {
+"structTransformerModel.html#af6538865812c32df1cbd785b2d40e370":[1,0,82,0],
 "structblock__q4__0.html":[1,0,1],
 "structblock__q4__0.html#a10fb3b42900b17eb3524821658b871b9":[1,0,1,0],
 "structblock__q4__0.html#a494b8bced6d0e46eb9b990397dfe2721":[1,0,1,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX18 =
 "tokenizer__spm_8c.html#ad622d978ef0bbec95bbfd2fb40e031a8":[2,0,1,2,5,0],
 "tokenizer__spm_8c.html#ae3c876345a3e3568add1e6cf2ebf50a4":[2,0,1,2,5,16],
 "tokenizer__spm_8c.html#aebfc8e903d40787ae3bae076f38beb96":[2,0,1,2,5,3],
-"tokenizer__spm_8c.html#af9d9d18a96516792c699612d0af9ae31":[2,0,1,2,5,7],
-"tokenizer__spm_8c.html#afa4fb7ab0ae07314afc885cfe245962d":[2,0,1,2,5,2]
+"tokenizer__spm_8c.html#af9d9d18a96516792c699612d0af9ae31":[2,0,1,2,5,7]
 };
