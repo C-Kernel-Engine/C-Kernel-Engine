@@ -516,9 +516,21 @@ class AudioEncoderContractTests(unittest.TestCase):
         workflow = (
             ROOT / ".github" / "workflows" / "nightly.yml"
         ).read_text(encoding="utf-8")
-        self.assertEqual(
-            workflow.count("-c requirements-nightly-constraints.txt"),
-            3,
+        dependency_installs = [
+            line.strip()
+            for line in workflow.splitlines()
+            if "pip install" in line and "--upgrade pip" not in line
+        ]
+        self.assertTrue(
+            dependency_installs,
+            "nightly must install its Python dependency sets",
+        )
+        self.assertTrue(
+            all(
+                "-c requirements-nightly-constraints.txt" in line
+                for line in dependency_installs
+            ),
+            "every nightly dependency install must use the pinned constraints file",
         )
         parsed = nightly.parse_sub_tests(
             "audio_encoder_self_attention_equal "
