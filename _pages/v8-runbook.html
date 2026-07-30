@@ -426,12 +426,12 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
     </div>
 </div>
 
-<h2>Canonical Whisper Audio Run</h2>
+<h2>Canonical Whisper Tiny Audio Run</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Audio Runbook &mdash; WAV To Transcript</h3>
     <p>
-        The audio lane runs generated FP32 Whisper Tiny, Base, or Small encoder and decoder artifacts &mdash; and a generated frontend:
+        The audio lane runs a generated FP32 Whisper Tiny encoder and decoder &mdash; and a generated frontend:
         WAV decode through log-Mel is seven circuit ops lowered into <code>ck_model_run_audio_wav</code>, so the
         Python layer coordinates lifecycles only. The unified entrypoint
         <code>version/v8/scripts/cks-v8-run audio</code> drives both stages and emits a single JSON report.
@@ -473,60 +473,6 @@ export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
         and both generated runtimes for provenance.</p>
 </div>
 
-<div class="card">
-    <h3 style="margin-top: 0;">Practical Local CPU Workflow: YouTube Or Teams</h3>
-    <p>
-        Export meeting media through the service's authorized controls, or use
-        <code>yt-dlp</code> for public or otherwise authorized YouTube content.
-        Normalize either source to the same PCM16 contract:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>sudo apt install ffmpeg
-python3 -m pip install --user yt-dlp
-
-mkdir -p "$HOME/cke-audio/results"
-
-yt-dlp -x --audio-format wav \
-  -o "$HOME/cke-audio/source.%(ext)s" \
-  "YOUTUBE_URL"
-
-ffmpeg -y \
-  -i "$HOME/cke-audio/source.wav" \
-  -ac 1 -ar 16000 -c:a pcm_s16le \
-  "$HOME/cke-audio/input-16k.wav"</pre>
-    </div>
-    <p>
-        For a Teams, Zoom, or local recording, replace
-        <code>$HOME/cke-audio/source.wav</code> with the exported MP4, M4A,
-        MP3, FLAC, or WAV file. Transcribe with Whisper Base:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>RUN_DIR="$HOME/.cache/ck-engine-v8/models/whisper-base-local"
-
-CK_NUM_THREADS=20 OMP_NUM_THREADS=20 \
-version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
-  --run "$RUN_DIR" \
-  --wav "$HOME/cke-audio/input-16k.wav" \
-  --language en \
-  --task transcribe \
-  --max-tokens 448 \
-  --output "$HOME/cke-audio/results/transcript.json"
-
-jq -r '.decoder.transcript_text' \
-  "$HOME/cke-audio/results/transcript.json" \
-  &gt; "$HOME/cke-audio/results/transcript.txt"</pre>
-    </div>
-    <p style="margin-bottom: 0;">
-        Audio and transcript data stay local unless the operator separately
-        uploads them. Recordings longer than 30 seconds use sequential source
-        windows. The 33-second parity fixture is certified; arbitrary
-        hour-scale recordings remain functional rather than corpus-certified.
-        Add <code>--timestamps</code> when timestamp tokens are required.
-    </p>
-</div>
-
 <div class="card card-green">
     <h3 style="margin-top: 0;">What Success Looks Like (Audio)</h3>
     <ul>
@@ -559,10 +505,8 @@ make test-whisper-e2e-auto</pre>
         The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.
     </p>
     <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
-        Certified scope: Whisper Tiny, Base, and Small FP32 on the public JFK
-        fixture, plus a 33-second Base long-form fixture. Longer recordings use
-        sequential windows; arbitrary recordings are functional rather than
-        corpus-certified.
+        Certified scope: Whisper Tiny FP32, English, no-timestamp decoding, up to 30 seconds (longer files are truncated, not chunked).
+        The JFK sample matches Hugging Face token for token; arbitrary recordings are functional rather than corpus-certified yet.
     </p>
 </div>
 

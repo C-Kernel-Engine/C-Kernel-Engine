@@ -635,17 +635,17 @@
       </div>
     </div>
 
-    <!-- Whisper Tiny, Base, and Small -->
+    <!-- Whisper Tiny and Base -->
     <div class="model-card mc-whisper">
       <span class="model-badge">circuits: audio frontend + encoder + decoder</span>
-      <div class="model-title">Whisper Tiny / Base / Small</div>
+      <div class="model-title">Whisper Tiny / Base</div>
       <div class="model-arch">First encoder&#8211;decoder family &#183; generated frontend (7 ops &#8594; ck_model_run_audio_wav)<br>LayerNorm &#183; learned absolute position &#183; GELU (erf) &#183; dense bidirectional encoder</div>
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 audio inference — WAV to transcript via cks-v8-run audio, cached cross-attn K/V (&asymp;79&times; decode)</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — Tiny, Base, and Small JFK fixtures match Hugging Face token for token</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — Tiny and Base JFK fixtures match Hugging Face token for token</span></div>
       </div>
       <div class="source-note">
-        Bring-up scope: Whisper Tiny, Base, and Small FP32 — English text and timestamp decoding certified on the JFK fixture; Base also has a 33-second long-form parity fixture. PCM16 WAV input; longer recordings use sequential source windows but arbitrary hour-scale recordings are not yet corpus-certified. A single safetensors checkpoint builds a generated encoder + decoder run-directory pair.
+        Bring-up scope: Whisper Tiny and Base FP32 — English, no-timestamp decoding certified on the JFK fixture; arbitrary recordings functional, not corpus-certified. PCM16 WAV input, 30 s truncated not chunked. A single safetensors checkpoint builds a generated encoder + decoder run-directory pair.
       </div>
       <div class="model-command">
         <div class="model-command-head"><span>Whisper Base end to end</span><button class="copy-command" type="button" data-copy-command="cmd-whisper">Copy</button></div>
@@ -1021,7 +1021,7 @@ make build/libckernel_engine.so
       <div class="cell dim">No</div>
       <div class="cell ok">Untied head</div>
 
-      <div class="cell row-head">Whisper Tiny / Base / Small</div>
+      <div class="cell row-head">Whisper Tiny / Base</div>
       <div class="cell ok">BPE + task tokens</div>
       <div class="cell ok">From weights</div>
       <div class="cell dim">No</div>
@@ -1032,7 +1032,7 @@ make build/libckernel_engine.so
       <div class="cell ok">Tied</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
-      Whisper Tiny, Base, and Small share this encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
+      Whisper Tiny and Base share this encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
       the decoder adds the cross-attention lane (K/V from encoder memory, computed once) on top of causal self-attention.
       Position is a learned absolute table on both sides &mdash; no RoPE anywhere. Kernel-level detail:
       <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a> and
