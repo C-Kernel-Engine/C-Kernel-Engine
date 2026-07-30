@@ -1,7 +1,7 @@
-<!-- TITLE: Whisper Tiny End-to-End -->
+<!-- TITLE: Whisper Tiny and Base End-to-End -->
 <!-- NAV: quickstart -->
 
-<h1>Whisper Tiny End-to-End</h1>
+<h1>Whisper Tiny and Base End-to-End</h1>
 
 <div class="alert alert-info">
     <div class="alert-icon">
@@ -22,7 +22,7 @@
 </div>
 
 <p>
-  CKE v8 runs a generated FP32 Whisper Tiny encoder and decoder from a
+  CKE v8 runs generated FP32 Whisper Tiny and Base encoders and decoders from a
   PCM16 WAV file &mdash; and the frontend is generated too. WAV decode,
   windowed-sinc resampling, pad/truncate, STFT table construction, FFT400
   power, Slaney Mel filters, and log-Mel normalization are seven explicit
@@ -77,7 +77,7 @@
   <rect x="0" y="0" width="1100" height="880" rx="18" fill="none" stroke="#1e293b" stroke-width="2"/>
 
   <!-- title -->
-  <text x="40" y="52" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO PIPELINE &#183; GENERATED FP32 WHISPER TINY</text>
+  <text x="40" y="52" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO PIPELINE &#183; GENERATED FP32 WHISPER TINY / BASE</text>
   <text x="40" y="88" font-size="27" font-weight="700" fill="#f1f5f9">One WAV in, tokens out &#8212; every stage a kernel-map contract</text>
   <text x="40" y="112" font-size="13.5" fill="#94a3b8">Python orchestrates; C kernels and generated model libraries compute. No Whisper model-name branch anywhere in codegen.</text>
 
@@ -308,14 +308,21 @@
 
 <p>Then run the generated pipeline through the unified v8 command surface:</p>
 
-<pre><code>version/v8/scripts/cks-v8-run audio \
-  --encoder-run-dir /path/to/whisper-tiny-encoder \
-  --decoder-run-dir /path/to/whisper-tiny-decoder \
+<pre><code>version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
   --wav /tmp/test-audio.wav \
   --language en \
   --task transcribe \
   --max-tokens 128 \
   --output build/whisper-test-report.json</code></pre>
+
+<p>
+  A local safetensors checkpoint directory can replace the
+  <code>hf://</code> argument. The command builds distinct encoder and decoder
+  runtime bundles. It reuses them only when checkpoint, circuit, kernel
+  registry, converter/codegen, generated model, and runtime hashes agree.
+  Existing prebuilt artifacts remain supported through
+  <code>--encoder-run-dir</code> and <code>--decoder-run-dir</code>.
+</p>
 
 <p>
   Encoder and decoder execution occurs in isolated child processes. Both
@@ -327,7 +334,7 @@
 <h2>Current Limitations</h2>
 
 <ul>
-  <li>Whisper Tiny, FP32 only.</li>
+  <li>Whisper Tiny and Base, FP32 only.</li>
   <li>
     PCM16 WAV input; use <code>ffmpeg</code> to convert MP3, FLAC, or other
     formats.
@@ -399,6 +406,24 @@ ask what you can do for your country.</code></pre>
   total time fell from 28.64 seconds to approximately 12.22 seconds.
 </p>
 
+<p>
+  Whisper Base emits the same 25 greedy text tokens and EOS as Hugging Face
+  on the same sample, including both commas:
+</p>
+
+<pre><code>And so my fellow Americans, ask not what your country can do for you,
+ask what you can do for your country.</code></pre>
+
+<p>
+  At 20 threads, the measured Base run used approximately 24.43 seconds for
+  the generated frontend plus encoder, 2.08 seconds for decoder prefill, and
+  0.43 seconds for 25 decode tokens. This certifies transcript parity on the
+  fixture, not complete tensor parity. The synthetic encoder X-Ray first
+  crosses its material threshold at layer 2 MLP-down and reaches roughly
+  9.77e-4 after final LayerNorm, so the transcript and tensor gates remain
+  separate.
+</p>
+
 <h2>Regression Gates</h2>
 
 <pre><code>make test-audio
@@ -407,6 +432,17 @@ CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
 CK_WHISPER_DECODER_RUN_DIR=/path/to/decoder \
 CK_WHISPER_WAV=/path/to/jfk.wav \
 make test-whisper-e2e-auto</code></pre>
+
+<pre><code>CK_WHISPER_BASE_ENCODER_RUN_DIR=/path/to/base/encoder \
+CK_WHISPER_BASE_DECODER_RUN_DIR=/path/to/base/decoder \
+CK_WHISPER_BASE_WAV=/path/to/jfk.wav \
+make test-whisper-e2e-auto</code></pre>
+
+<pre><code>CK_WHISPER_CHECKPOINT=/path/to/openai--whisper-base \
+CK_WHISPER_ENCODER_RUN_DIR=/path/to/base/encoder \
+CK_WHISPER_DECODER_RUN_DIR=/path/to/base/decoder \
+CK_WHISPER_WAV=/path/to/jfk.wav \
+make test-whisper-pytorch-e2e-auto</code></pre>
 
 <p>
   Nightly publishes separate PyTorch-backed audio frontend and transformer
