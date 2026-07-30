@@ -1290,6 +1290,7 @@
   --wav /tmp/test-audio.wav \
   --language en \
   --task transcribe \
+  --timestamps \
   --max-tokens 128 \
   --output build/whisper-test-report.json</code></pre>
 
@@ -1312,7 +1313,7 @@
 <h2>Current Limitations</h2>
 
 <ul>
-  <li>Whisper Tiny and Base, FP32 only.</li>
+  <li>Whisper Tiny, Base, and Small, FP32 only.</li>
   <li>
     PCM16 WAV input; use <code>ffmpeg</code> to convert MP3, FLAC, or other
     formats.
@@ -1321,7 +1322,10 @@
     Audio is limited to 30 seconds; longer files are currently truncated,
     not chunked.
   </li>
-  <li>English transcription and no-timestamp decoding are certified.</li>
+  <li>
+    English text-only and paired monotonic timestamp decoding are certified
+    on the public JFK fixture.
+  </li>
   <li>
     The JFK sample matches Hugging Face exactly; arbitrary recordings are
     functional rather than corpus-certified yet.
@@ -1402,6 +1406,16 @@ ask what you can do for your country.</code></pre>
   separate.
 </p>
 
+<p>
+  Timestamp mode also matches Hugging Face exactly: 27/27 generated tokens,
+  including <code>&lt;|0.00|&gt;</code> and
+  <code>&lt;|11.00|&gt;</code>, followed by EOS. The decoder contract owns
+  the initial timestamp window, paired-token sequence, monotonic ordering,
+  and aggregate timestamp-probability selection. Whisper Small reuses the
+  same generated circuits and matched all 25 text tokens through EOS on the
+  fixture; no model-size branch was added.
+</p>
+
 <h2>Regression Gates</h2>
 
 <pre><code>make test-audio
@@ -1420,6 +1434,7 @@ make test-whisper-e2e-auto</code></pre>
 CK_WHISPER_ENCODER_RUN_DIR=/path/to/base/encoder \
 CK_WHISPER_DECODER_RUN_DIR=/path/to/base/decoder \
 CK_WHISPER_WAV=/path/to/jfk.wav \
+CK_WHISPER_TIMESTAMPS=1 \
 make test-whisper-pytorch-e2e-auto</code></pre>
 
 <p>

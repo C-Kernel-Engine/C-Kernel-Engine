@@ -912,7 +912,7 @@
       <tr>
         <td><strong>v10.0</strong></td>
         <td>Audio Inference</td>
-        <td>Whisper Tiny/Base. The first audio lane landed early: v8 transcribes both sizes end to end from PCM16 WAV through generated FP32 frontend, encoder, and decoder circuits &mdash; band-limited windowed-sinc resampling included, English no-timestamp decoding, JFK fixture exact against Hugging Face (<a href="v8-whisper-tiny.html">details and limitations</a>). v10 remains the full audio release: timestamps, broader corpus certification, whisper.cpp fixtures, and larger model sizes.</td>
+        <td>Whisper Tiny/Base/Small. The first audio lane landed early: v8 transcribes all three sizes end to end from PCM16 WAV through generated FP32 frontend, encoder, and decoder circuits &mdash; band-limited windowed-sinc resampling included, English text-only and paired monotonic timestamp decoding, JFK fixture exact against Hugging Face (<a href="v8-whisper-tiny.html">details and limitations</a>). v10 remains the full audio release: long-audio window stitching, broader corpus certification, whisper.cpp fixtures, and larger model sizes.</td>
         <td>v8 exact resolution + X-ray gates</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -1496,7 +1496,7 @@
     <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
     <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
     <li><strong>v8.x:</strong> Deterministic inference compiler, numerical contracts, X-ray attribution, and vision encoding, now in active hardening</li>
-    <li><strong>v10.x:</strong> The full audio release &mdash; Whisper-style audio inference was planned here, but v8 is already incorporating and hardening Tiny and Base end-to-end transcription on the JFK fixture; v10 completes timestamps, broader corpus certification, larger-model support, and whisper.cpp comparison, while FP32 audio training follows in v11</li>
+    <li><strong>v10.x:</strong> The full audio release &mdash; Whisper-style audio inference was planned here, but v8 already hardens Tiny, Base, and Small text/timestamp transcription on the JFK fixture; v10 completes long-audio window stitching, broader corpus certification, larger-model support, and whisper.cpp comparison, while FP32 audio training follows in v11</li>
     <li><strong>v12.x:</strong> MoE architecture (efficient large models)</li>
     <li><strong>v14.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
