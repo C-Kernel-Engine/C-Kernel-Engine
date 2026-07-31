@@ -1613,22 +1613,24 @@
       </div>
     </div>
 
-    <!-- Whisper Tiny, Base, and Small -->
+    <!-- Whisper Tiny -->
     <div class="model-card mc-whisper">
       <span class="model-badge">circuits: audio frontend + encoder + decoder</span>
-      <div class="model-title">Whisper Tiny / Base / Small</div>
+      <div class="model-title">Whisper Tiny</div>
       <div class="model-arch">First encoder&#8211;decoder family &#183; generated frontend (7 ops &#8594; ck_model_run_audio_wav)<br>LayerNorm &#183; learned absolute position &#183; GELU (erf) &#183; dense bidirectional encoder</div>
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 audio inference — WAV to transcript via cks-v8-run audio, cached cross-attn K/V (&asymp;79&times; decode)</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — Tiny, Base, and Small JFK fixtures match Hugging Face token for token</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — JFK fixture matches Hugging Face token for token</span></div>
       </div>
       <div class="source-note">
-        Bring-up scope: Whisper Tiny, Base, and Small FP32 — English text and timestamp decoding certified on the JFK fixture; Base also has a 33-second long-form parity fixture. PCM16 WAV input; longer recordings use sequential source windows but arbitrary hour-scale recordings are not yet corpus-certified. A single safetensors checkpoint builds a generated encoder + decoder run-directory pair.
+        Bring-up scope: Whisper Tiny FP32 is the first audio lane — English, no-timestamp decoding certified on the JFK fixture; arbitrary recordings functional, not corpus-certified. PCM16 WAV input, 30 s truncated not chunked. safetensors &rarr; BUMP as an encoder + decoder run-directory pair.
       </div>
       <div class="model-command">
-        <div class="model-command-head"><span>Whisper Base end to end</span><button class="copy-command" type="button" data-copy-command="cmd-whisper">Copy</button></div>
-        <pre id="cmd-whisper"><code>version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
-  --wav /path/to/audio.wav --language en --task transcribe</code></pre>
+        <div class="model-command-head"><span>Whisper E2E artifact gate</span><button class="copy-command" type="button" data-copy-command="cmd-whisper">Copy</button></div>
+        <pre id="cmd-whisper"><code>CK_WHISPER_ENCODER_RUN_DIR=/path/to/whisper-tiny-encoder \
+CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder \
+CK_WHISPER_WAV=/path/to/jfk.wav \
+make test-whisper-e2e-auto</code></pre>
       </div>
       <div class="model-tags">
         <span class="tag learned">encoder_decoder</span>
@@ -1999,7 +2001,7 @@ make build/libckernel_engine.so
       <div class="cell dim">No</div>
       <div class="cell ok">Untied head</div>
 
-      <div class="cell row-head">Whisper Tiny / Base / Small</div>
+      <div class="cell row-head">Whisper Tiny</div>
       <div class="cell ok">BPE + task tokens</div>
       <div class="cell ok">From weights</div>
       <div class="cell dim">No</div>
@@ -2010,11 +2012,11 @@ make build/libckernel_engine.so
       <div class="cell ok">Tied</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
-      Whisper Tiny, Base, and Small share this encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
+      Whisper Tiny is the first encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
       the decoder adds the cross-attention lane (K/V from encoder memory, computed once) on top of causal self-attention.
       Position is a learned absolute table on both sides &mdash; no RoPE anywhere. Kernel-level detail:
       <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a> and
-      <a href="v8-whisper-tiny.html">Whisper Audio End-to-End</a>.
+      <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>.
     </p>
   </div>
 
@@ -2222,8 +2224,8 @@ make build/libckernel_engine.so
       <div class="test-item">unsloth--GLM-4-9B-0414-GGUF / Q4_K_M</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
-      Audio lane: <code>openai/whisper-tiny</code> and <code>openai/whisper-base</code> safetensors &rarr; BUMP as generated encoder + decoder runtime pairs,
-      validated through opt-in transcript and PyTorch parity gates rather than the GGUF corpus above.
+      Audio lane: <code>openai/whisper-tiny</code> safetensors &rarr; BUMP as an encoder + decoder run-directory pair,
+      validated through the opt-in E2E artifact gate (<code>make test-whisper-e2e-auto</code>) rather than the GGUF corpus above.
     </p>
     <p class="source-note" style="margin-top: 0.75rem;">
       Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
@@ -2550,7 +2552,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-31</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>
