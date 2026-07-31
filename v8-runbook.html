@@ -1229,16 +1229,16 @@ python -m pip install -r requirements-v8.txt</pre>
     <h3>GLM4</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre># Low-memory validation lane: template + conversion + comparator syntax
-.venv/bin/python -m unittest tests.test_v8_glm4_template
-.venv/bin/python -m py_compile \
-  version/v8/scripts/compare_glm4_torch_ck_v8.py \
-  version/v8/scripts/convert_gguf_to_bump_v8.py \
-  version/v8/scripts/convert_safetensors_to_bump_v8.py \
-  tests/test_v8_glm4_template.py \
-  tests/test_v8_safetensors_to_bump.py</pre>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf \
+  --context-len 1034 \
+  --force-convert --force-compile \
+  --chat-template glm4 \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
     </div>
-    <p class="mini-note">GLM4 is currently tracked as a v8 template/conversion/parity-harness lane. The patch adds GLM4 GGUF metadata handling, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK comparator. Run full real-model GLM4 smoke on a higher-memory host before promoting it to the high-memory runtime lane.</p>
+    <p class="mini-note">GLM4 has a real Q4_K_M runtime lane with partial pairwise RoPE, persistent FP16 KV cache, and llama.cpp parity coverage. <code>--force-compile</code> force-builds both <code>libckernel_engine.so</code> and <code>libckernel_tokenizer.so</code>, compiles the generated model into a staging directory, verifies that the complete bundle loads without unresolved symbols, and only then replaces the cached runtime. No manual library copy is required.</p>
 
     <h3>Kimi / MLA Decoder Contract</h3>
     <div class="cmd-block">
@@ -1404,12 +1404,12 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
     </div>
 </div>
 
-<h2>Canonical Whisper Tiny Audio Run</h2>
+<h2>Canonical Whisper Audio Run</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Audio Runbook &mdash; WAV To Transcript</h3>
     <p>
-        The audio lane runs a generated FP32 Whisper Tiny encoder and decoder &mdash; and a generated frontend:
+        The audio lane runs generated FP32 Whisper Tiny, Base, or Small encoder and decoder artifacts &mdash; and a generated frontend:
         WAV decode through log-Mel is seven circuit ops lowered into <code>ck_model_run_audio_wav</code>, so the
         Python layer coordinates lifecycles only. The unified entrypoint
         <code>version/v8/scripts/cks-v8-run audio</code> drives both stages and emits a single JSON report.
@@ -1451,6 +1451,60 @@ export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
         and both generated runtimes for provenance.</p>
 </div>
 
+<div class="card">
+    <h3 style="margin-top: 0;">Practical Local CPU Workflow: YouTube Or Teams</h3>
+    <p>
+        Export meeting media through the service's authorized controls, or use
+        <code>yt-dlp</code> for public or otherwise authorized YouTube content.
+        Normalize either source to the same PCM16 contract:
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>sudo apt install ffmpeg
+python3 -m pip install --user yt-dlp
+
+mkdir -p "$HOME/cke-audio/results"
+
+yt-dlp -x --audio-format wav \
+  -o "$HOME/cke-audio/source.%(ext)s" \
+  "YOUTUBE_URL"
+
+ffmpeg -y \
+  -i "$HOME/cke-audio/source.wav" \
+  -ac 1 -ar 16000 -c:a pcm_s16le \
+  "$HOME/cke-audio/input-16k.wav"</pre>
+    </div>
+    <p>
+        For a Teams, Zoom, or local recording, replace
+        <code>$HOME/cke-audio/source.wav</code> with the exported MP4, M4A,
+        MP3, FLAC, or WAV file. Transcribe with Whisper Base:
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>RUN_DIR="$HOME/.cache/ck-engine-v8/models/whisper-base-local"
+
+CK_NUM_THREADS=20 OMP_NUM_THREADS=20 \
+version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
+  --run "$RUN_DIR" \
+  --wav "$HOME/cke-audio/input-16k.wav" \
+  --language en \
+  --task transcribe \
+  --max-tokens 448 \
+  --output "$HOME/cke-audio/results/transcript.json"
+
+jq -r '.decoder.transcript_text' \
+  "$HOME/cke-audio/results/transcript.json" \
+  &gt; "$HOME/cke-audio/results/transcript.txt"</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        Audio and transcript data stay local unless the operator separately
+        uploads them. Recordings longer than 30 seconds use sequential source
+        windows. The 33-second parity fixture is certified; arbitrary
+        hour-scale recordings remain functional rather than corpus-certified.
+        Add <code>--timestamps</code> when timestamp tokens are required.
+    </p>
+</div>
+
 <div class="card card-green">
     <h3 style="margin-top: 0;">What Success Looks Like (Audio)</h3>
     <ul>
@@ -1483,8 +1537,10 @@ make test-whisper-e2e-auto</pre>
         The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.
     </p>
     <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
-        Certified scope: Whisper Tiny FP32, English, no-timestamp decoding, up to 30 seconds (longer files are truncated, not chunked).
-        The JFK sample matches Hugging Face token for token; arbitrary recordings are functional rather than corpus-certified yet.
+        Certified scope: Whisper Tiny, Base, and Small FP32 on the public JFK
+        fixture, plus a 33-second Base long-form fixture. Longer recordings use
+        sequential windows; arbitrary recordings are functional rather than
+        corpus-certified.
     </p>
 </div>
 
@@ -1968,7 +2024,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-31</p>
             </div>
         </div>
     </footer>
