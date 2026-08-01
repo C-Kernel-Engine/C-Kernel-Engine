@@ -8,6 +8,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ck_model_abi_v8.h", "ck__model__abi__v8_8h.html", "ck__model__abi__v8_8h" ],
     [ "ck_model_api.h", "ck__model__api_8h.html", "ck__model__api_8h" ],
     [ "ck_parity_api.h", "ck__parity__api_8h.html", "ck__parity__api_8h" ],
+    [ "ck_session_v8.h", "ck__session__v8_8h.html", "ck__session__v8_8h" ],
     [ "ck_speed_profiles.h", "ck__speed__profiles_8h.html", "ck__speed__profiles_8h" ],
     [ "ck_threadpool.h", "ck__threadpool_8h.html", "ck__threadpool_8h" ],
     [ "ck_tokenizer.h", "ck__tokenizer_8h.html", "ck__tokenizer_8h" ],

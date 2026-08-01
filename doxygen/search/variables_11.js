@@ -16,7 +16,7 @@ var searchData=
   ['section_5fweight_5fbytes_13',['section_weight_bytes',['../structCKSection.html#a50088bc199e240759c6402920180e469',1,'CKSection']]],
   ['sections_14',['sections',['../structCKModel.html#ab7a4ebc13bcb370c4dbb36f3357af03a',1,'CKModel']]],
   ['sgemm_15',['sgemm',['../structCKMathBackend.html#a7e59ba4baa9c776241287338a219d9c4',1,'CKMathBackend']]],
-  ['shape_16',['shape',['../structCKBufferSpec.html#ae34b00c892e6e3ffd7928a0a31924b59',1,'CKBufferSpec::shape'],['../structCKIRV2Buffer.html#a22f159608ef2fbcdfdd84704ae3f5da4',1,'CKIRV2Buffer::shape']]],
+  ['shape_16',['shape',['../structCKIRV2Buffer.html#a22f159608ef2fbcdfdd84704ae3f5da4',1,'CKIRV2Buffer::shape'],['../structCKBufferSpec.html#ae34b00c892e6e3ffd7928a0a31924b59',1,'CKBufferSpec::shape']]],
   ['shared_5fby_5fcores_17',['shared_by_cores',['../structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c',1,'CacheInfo']]],
   ['shared_5fscratch_18',['shared_scratch',['../structCKModel.html#a23c5fb291d06cc7cbe7aa8bc2a07b06b',1,'CKModel']]],
   ['shared_5fscratch_5fbytes_19',['shared_scratch_bytes',['../structCKModel.html#afdaa49dc294acb37ed54a2708b6bc8e0',1,'CKModel']]],
@@ -38,10 +38,12 @@ var searchData=
   ['spm_5fmode_35',['spm_mode',['../structCKTokenizerConfig.html#ae2fe2d16420d6118bc884b3f0ef17e4d',1,'CKTokenizerConfig::spm_mode'],['../tokenizer_8h.html#a6cf5b659a496d344ebd7ae14a0392033',1,'spm_mode:&#160;tokenizer.h']]],
   ['start_36',['start',['../utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b',1,'utf8.c']]],
   ['stepping_37',['stepping',['../structCPUInfo.html#a1f7fa60b1c2d20e0eb7bc2f780461ebb',1,'CPUInfo']]],
-  ['strings_38',['strings',['../true__bpe_8h.html#a24d810ef07e5196cf41374aba53c3021',1,'true_bpe.h']]],
-  ['struct_5fsize_39',['struct_size',['../structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537',1,'CKModelRuntimeDescriptorV8']]],
-  ['style_40',['style',['../tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346',1,'tokenizer.h']]],
-  ['supports_5frdma_41',['supports_rdma',['../structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46',1,'NetworkInterface']]],
-  ['supports_5froce_42',['supports_roce',['../structNetworkInterface.html#a943270da345cf36912ed3ec3a957e15c',1,'NetworkInterface']]],
-  ['swiglu_5fout_43',['swiglu_out',['../structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b',1,'CKLayerBackwardParams::swiglu_out'],['../structCKLayerForwardParamsQ4K.html#a976fb97749625cdc0f8e16e690c5e5a0',1,'CKLayerForwardParamsQ4K::swiglu_out'],['../structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a',1,'CKLayerForwardParams::swiglu_out']]]
+  ['stop_5freason_38',['stop_reason',['../structCKSessionGenerateResultV8.html#a569248e5a07f451c2940189a8d4b67ae',1,'CKSessionGenerateResultV8']]],
+  ['strings_39',['strings',['../true__bpe_8h.html#a24d810ef07e5196cf41374aba53c3021',1,'true_bpe.h']]],
+  ['struct_5fsize_40',['struct_size',['../structCKSessionGenerateRequestV8.html#ae18f23f160fed1d26cd64fc5c757c87b',1,'CKSessionGenerateRequestV8::struct_size'],['../structCKSessionGenerateResultV8.html#a990e348ccbec7d7d18544b4fadbf3722',1,'CKSessionGenerateResultV8::struct_size'],['../structCKSessionConfigV8.html#a6e3a15db35c3a66a44dadff55af9f31a',1,'CKSessionConfigV8::struct_size'],['../structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537',1,'CKModelRuntimeDescriptorV8::struct_size']]],
+  ['style_41',['style',['../tokenizer_8h.html#aebee6a319ed22559d77672c8b7663346',1,'tokenizer.h']]],
+  ['supports_5frdma_42',['supports_rdma',['../structNetworkInterface.html#a3a7b2f85e17f8e861ea160f94ade4a46',1,'NetworkInterface']]],
+  ['supports_5froce_43',['supports_roce',['../structNetworkInterface.html#a943270da345cf36912ed3ec3a957e15c',1,'NetworkInterface']]],
+  ['swiglu_5fout_44',['swiglu_out',['../structCKLayerForwardParams.html#a64b3c9bf08573696fe23f773e0af3f4a',1,'CKLayerForwardParams::swiglu_out'],['../structCKLayerBackwardParams.html#aa82d1124a56c3e119f2bb9336bfb364b',1,'CKLayerBackwardParams::swiglu_out'],['../structCKLayerForwardParamsQ4K.html#a976fb97749625cdc0f8e16e690c5e5a0',1,'CKLayerForwardParamsQ4K::swiglu_out']]],
+  ['system_5ftext_45',['system_text',['../structCKSessionGenerateRequestV8.html#a28007ad9705b62600399c839451ff85c',1,'CKSessionGenerateRequestV8']]]
 ];

@@ -20,7 +20,10 @@ var searchData=
   ['ckmodelartifactrolev8_17',['CKModelArtifactRoleV8',['../ck__model__abi__v8_8h.html#a47a297fdc6c2ce3745944ef458dd6d09',1,'ck_model_abi_v8.h']]],
   ['ckmodelcapabilityv8_18',['CKModelCapabilityV8',['../ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626',1,'ck_model_abi_v8.h']]],
   ['ckoptype_19',['CKOpType',['../ckernel__ir_8h.html#a37376e6b0c13d2069c36be3bbc93c933',1,'ckernel_ir.h']]],
-  ['ckspaceprefixstyle_20',['ckspaceprefixstyle',['../tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6',1,'CKSpacePrefixStyle:&#160;tokenizer.h'],['../true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6',1,'CKSpacePrefixStyle:&#160;true_bpe.h']]],
-  ['ckspmmode_21',['CKSpmMode',['../tokenizer_8h.html#a8a61458f294240972a499c24a5a47488',1,'tokenizer.h']]],
-  ['cktokenizertype_22',['CKTokenizerType',['../tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa',1,'tokenizer.h']]]
+  ['cksessionrequestflagsv8_20',['CKSessionRequestFlagsV8',['../ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcf',1,'ck_session_v8.h']]],
+  ['cksessionstatusv8_21',['CKSessionStatusV8',['../ck__session__v8_8h.html#a7b2292e66074bb6a2f4d7b04efd3c603',1,'ck_session_v8.h']]],
+  ['cksessionstopreasonv8_22',['CKSessionStopReasonV8',['../ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083',1,'ck_session_v8.h']]],
+  ['ckspaceprefixstyle_23',['ckspaceprefixstyle',['../tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6',1,'CKSpacePrefixStyle:&#160;tokenizer.h'],['../true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6',1,'CKSpacePrefixStyle:&#160;true_bpe.h']]],
+  ['ckspmmode_24',['CKSpmMode',['../tokenizer_8h.html#a8a61458f294240972a499c24a5a47488',1,'tokenizer.h']]],
+  ['cktokenizertype_25',['CKTokenizerType',['../tokenizer_8h.html#a2fed9709848fc75201063ec8f8f99baa',1,'tokenizer.h']]]
 ];

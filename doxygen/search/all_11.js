@@ -40,7 +40,8 @@ var searchData=
   ['num_5fsections_37',['num_sections',['../structCKModel.html#a1743953a890cd83255850e11bbe651a4',1,'CKModel']]],
   ['num_5fslots_38',['num_slots',['../structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2',1,'MemoryInfo']]],
   ['num_5fspans_39',['num_spans',['../structCKMemPlan.html#a7c1dd8cbe777a1f0a40af32a417fdc37',1,'CKMemPlan']]],
-  ['numa_40',['numa',['../structSystemTopology.html#a614df36f023f6261b3819210d15a5fe7',1,'SystemTopology']]],
-  ['numanode_41',['NUMANode',['../structNUMANode.html',1,'']]],
-  ['numatopology_42',['NUMATopology',['../structNUMATopology.html',1,'']]]
+  ['num_5fthreads_40',['num_threads',['../structCKSessionConfigV8.html#a594793664c03a0599d3d9662225fc765',1,'CKSessionConfigV8']]],
+  ['numa_41',['numa',['../structSystemTopology.html#a614df36f023f6261b3819210d15a5fe7',1,'SystemTopology']]],
+  ['numanode_42',['NUMANode',['../structNUMANode.html',1,'']]],
+  ['numatopology_43',['NUMATopology',['../structNUMATopology.html',1,'']]]
 ];

@@ -5,5 +5,6 @@ var searchData=
   ['unk_5fscore_2',['unk_score',['../structCKTokenizerConfig.html#a25de8175fe44fc209d958136ce3c669e',1,'CKTokenizerConfig']]],
   ['use_5fcolors_3',['use_colors',['../show__config_8c.html#a7d98e2dd1964a2c9cdb897cc63f23d0b',1,'show_config.c']]],
   ['use_5ftrie_4',['use_trie',['../structCKTokenizerConfig.html#a6a4c7a490b1e83f6dfc73b351b3826ec',1,'CKTokenizerConfig::use_trie'],['../tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15',1,'use_trie:&#160;tokenizer.h']]],
-  ['used_5',['used',['../structCKPoolBlock.html#ad15144404362a0676f0c46a5b5a8d0ba',1,'CKPoolBlock::used'],['../structCKTokenizerMemPool.html#a390bbe0c2c3c9c2dcc7f5fc14d8c587f',1,'CKTokenizerMemPool::used']]]
+  ['used_5',['used',['../structCKPoolBlock.html#ad15144404362a0676f0c46a5b5a8d0ba',1,'CKPoolBlock::used'],['../structCKTokenizerMemPool.html#a390bbe0c2c3c9c2dcc7f5fc14d8c587f',1,'CKTokenizerMemPool::used']]],
+  ['user_5ftext_6',['user_text',['../structCKSessionGenerateRequestV8.html#ac5fa5c9cd39fee80c8274e6ddca104d1',1,'CKSessionGenerateRequestV8']]]
 ];
