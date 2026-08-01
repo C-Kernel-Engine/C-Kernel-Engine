@@ -1,5 +1,6 @@
 var NAVTREEINDEX2 =
 {
+"ck__metrics_8h.html#a0fda2436a3e92c0430b9a0dbb2e7189d":[2,0,0,4,22],
 "ck__metrics_8h.html#a11f7b15f57f635ce706d4907a786a048":[2,0,0,4,14],
 "ck__metrics_8h.html#a13bda17865c16027ce312cdbdf01c67f":[2,0,0,4,2],
 "ck__metrics_8h.html#a448a7bf26685a19952547689ceb2eec3":[2,0,0,4,16],
@@ -248,6 +249,5 @@ var NAVTREEINDEX2 =
 "ck__threadpool_8c.html#ad8587e01d4b5cac581553d7d651e9b91":[2,0,1,12,8],
 "ck__threadpool_8c.html#ada9a2b22c2eb79fe8834b026a3c7d8b4":[2,0,1,12,20],
 "ck__threadpool_8c.html#ae0445e61c7b90259729ee63b95ee3257":[2,0,1,12,1],
-"ck__threadpool_8c.html#aedf852ec498fe7db175f59f810886b9f":[2,0,1,12,5],
-"ck__threadpool_8c.html#aef9103ab0a271feb7fdc74c915a78d10":[2,0,1,12,17]
+"ck__threadpool_8c.html#aedf852ec498fe7db175f59f810886b9f":[2,0,1,12,5]
 };

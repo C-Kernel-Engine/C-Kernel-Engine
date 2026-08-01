@@ -1,5 +1,7 @@
 var NAVTREEINDEX17 =
 {
+"structCKSectionConfig.html#adb98840ee192100731d7c970794be581":[1,0,53,0],
+"structCKSectionConfig.html#aeb21ad93633c6b7fba562f4882706e22":[1,0,53,14],
 "structCKTokenizer.html":[1,0,54],
 "structCKTokenizer.html#a0e16f753888edda5716eefba903d6001":[1,0,54,2],
 "structCKTokenizer.html#a0eb8ddbada16659161f4c11444a5ef34":[1,0,54,22],
@@ -247,7 +249,5 @@ var NAVTREEINDEX17 =
 "structQWEN2__0__5B__DECODELayerOffsets.html#a32095f0f14ecbb9080a841f8bb6c55ad":[1,0,78,15],
 "structQWEN2__0__5B__DECODELayerOffsets.html#a346ac8ddf3a96db669d95275d9d9636b":[1,0,78,11],
 "structQWEN2__0__5B__DECODELayerOffsets.html#a3726e8bfaef388f143dc9c53433551f6":[1,0,78,5],
-"structQWEN2__0__5B__DECODELayerOffsets.html#a3b2f762d6b9a75547053ba44f72dbd24":[1,0,78,8],
-"structQWEN2__0__5B__DECODELayerOffsets.html#a3b6311eaaa8fe59a25b213d0c6a0273c":[1,0,78,3],
-"structQWEN2__0__5B__DECODELayerOffsets.html#a3e0685fe07858372ec2aee386632c98c":[1,0,78,20]
+"structQWEN2__0__5B__DECODELayerOffsets.html#a3b2f762d6b9a75547053ba44f72dbd24":[1,0,78,8]
 };

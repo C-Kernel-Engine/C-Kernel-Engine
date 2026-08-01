@@ -1,5 +1,7 @@
 var NAVTREEINDEX23 =
 {
+"v6_86_2test__generated_2qwen2__int8_8c_source.html":[2,0,1,7,1,4],
+"v6_86_2test__generic__api_8c.html":[2,0,1,7,9],
 "v6_86_2test__generic__api_8c.html#a3c04138a5bfe5d72780bb7e82a18e627":[2,0,1,7,9,2],
 "v6_86_2test__generic__api_8c.html#a82f4142d2a0e754351c8bda8d186ba65":[2,0,1,7,9,1],
 "v6_86_2test__generic__api_8c.html#a8ccda62fb94e43417bf785ec2204b32e":[2,0,1,7,9,4],

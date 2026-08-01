@@ -58,6 +58,7 @@ var attention__kernels_8c =
     [ "attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4", "attention__kernels_8c.html#a3d995f9db7a093fa08caf8513947d7f8", null ],
     [ "attention_forward_query_key_head_major_f32", "attention__kernels_8c.html#a5aedd742eb2be8a93870850c8a53eb8c", null ],
     [ "attention_forward_query_key_head_major_f32_packed_k", "attention__kernels_8c.html#a4809e9c0fa0a7050b20c1cd669874859", null ],
+    [ "attention_forward_query_key_head_major_tiled_f16kv_fp32", "attention__kernels_8c.html#aa5e2810c521c23e5cb62ae940cec1656", null ],
     [ "attention_query_full_exact_regular", "attention__kernels_8c.html#a160ba40204fb7170167453b497f57daf", null ],
     [ "attention_query_full_ggml_regular", "attention__kernels_8c.html#a788eddc7d837ca3793ab62db0fcbf9af", null ],
     [ "attention_query_full_ggml_regular_direct_v", "attention__kernels_8c.html#a1f98e579ce7a335c00b3581357f9ec76", null ],

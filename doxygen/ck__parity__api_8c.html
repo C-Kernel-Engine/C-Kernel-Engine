@@ -443,18 +443,18 @@ Functions</h2></td></tr>
 <p>Variant with configurable kv_stride_tokens for KV cache layouts where K/V may not be contiguous in memory.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l04358">4358</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 4368</span>{</div>
-<div class="line"><span class="lineno"> 4369</span>    <a class="code hl_function" href="attention__kernels_8c.html#ac6162954d641aff20a1ef590f0435f90">attention_forward_head_major_gqa_flash_impl</a>(q, k, v, output,</div>
-<div class="line"><span class="lineno"> 4370</span>                                                num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno"> 4371</span>                                                num_tokens, head_dim,</div>
-<div class="line"><span class="lineno"> 4372</span>                                                aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 4373</span>                                                kv_stride_tokens,</div>
-<div class="line"><span class="lineno"> 4374</span>                                                <span class="comment">/*causal=*/</span>1,</div>
-<div class="line"><span class="lineno"> 4375</span>                                                <span class="comment">/*round_full_kv_fp16=*/</span>0,</div>
-<div class="line"><span class="lineno"> 4376</span>                                                1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim));</div>
-<div class="line"><span class="lineno"> 4377</span>}</div>
-<div class="ttc" id="aattention__kernels_8c_html_ac6162954d641aff20a1ef590f0435f90"><div class="ttname"><a href="attention__kernels_8c.html#ac6162954d641aff20a1ef590f0435f90">attention_forward_head_major_gqa_flash_impl</a></div><div class="ttdeci">static void attention_forward_head_major_gqa_flash_impl(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int causal, int round_full_kv_fp16, float scale)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l04050">attention_kernels.c:4050</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l04389">4389</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 4399</span>{</div>
+<div class="line"><span class="lineno"> 4400</span>    <a class="code hl_function" href="attention__kernels_8c.html#ac6162954d641aff20a1ef590f0435f90">attention_forward_head_major_gqa_flash_impl</a>(q, k, v, output,</div>
+<div class="line"><span class="lineno"> 4401</span>                                                num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno"> 4402</span>                                                num_tokens, head_dim,</div>
+<div class="line"><span class="lineno"> 4403</span>                                                aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 4404</span>                                                kv_stride_tokens,</div>
+<div class="line"><span class="lineno"> 4405</span>                                                <span class="comment">/*causal=*/</span>1,</div>
+<div class="line"><span class="lineno"> 4406</span>                                                <span class="comment">/*round_full_kv_fp16=*/</span>0,</div>
+<div class="line"><span class="lineno"> 4407</span>                                                1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim));</div>
+<div class="line"><span class="lineno"> 4408</span>}</div>
+<div class="ttc" id="aattention__kernels_8c_html_ac6162954d641aff20a1ef590f0435f90"><div class="ttname"><a href="attention__kernels_8c.html#ac6162954d641aff20a1ef590f0435f90">attention_forward_head_major_gqa_flash_impl</a></div><div class="ttdeci">static void attention_forward_head_major_gqa_flash_impl(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int causal, int round_full_kv_fp16, float scale)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l04081">attention_kernels.c:4081</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00884">ck_test_attention_causal()</a>.</p>
 
@@ -741,9 +741,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  902</span>        seq_len              <span class="comment">/* kv_stride_tokens = seq_len for contiguous KV */</span></div>
 <div class="line"><span class="lineno">  903</span>    );</div>
 <div class="line"><span class="lineno">  904</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l04358">attention_kernels.c:4358</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l04389">attention_kernels.c:4389</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l04358">attention_forward_causal_head_major_gqa_flash_strided()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l04389">attention_forward_causal_head_major_gqa_flash_strided()</a>.</p>
 
 </div>
 </div>
