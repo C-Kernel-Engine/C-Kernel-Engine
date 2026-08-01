@@ -340,41 +340,50 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00614">614</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  626</span>{</div>
-<div class="line"><span class="lineno">  627</span>    <span class="keywordflow">if</span> (input == NULL || weight == NULL || output == NULL) {</div>
-<div class="line"><span class="lineno">  628</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  629</span>    }</div>
-<div class="line"><span class="lineno">  630</span>    <span class="keywordflow">if</span> (input_channels &lt;= 0 || output_channels &lt;= 0 || input_frames &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  631</span>        kernel_size &lt;= 0 || stride &lt;= 0 || padding &lt; 0 || output_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  632</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  633</span>    }</div>
-<div class="line"><span class="lineno">  634</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = (input_frames + 2 * padding - kernel_size) / stride + 1;</div>
-<div class="line"><span class="lineno">  635</span>    <span class="keywordflow">if</span> (output_frames != expected) {</div>
-<div class="line"><span class="lineno">  636</span>        <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  637</span>    }</div>
-<div class="line"><span class="lineno">  638</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> out_channel = 0; out_channel &lt; output_channels; ++out_channel) {</div>
-<div class="line"><span class="lineno">  639</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *weight_channel = weight +</div>
-<div class="line"><span class="lineno">  640</span>            (size_t)out_channel * input_channels * kernel_size;</div>
-<div class="line"><span class="lineno">  641</span>        <span class="keywordtype">float</span> *output_channel = output + (size_t)out_channel * output_frames;</div>
-<div class="line"><span class="lineno">  642</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> out_frame = 0; out_frame &lt; output_frames; ++out_frame) {</div>
-<div class="line"><span class="lineno">  643</span>            <span class="keywordtype">float</span> sum = bias != NULL ? bias[out_channel] : 0.0f;</div>
-<div class="line"><span class="lineno">  644</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> in_channel = 0; in_channel &lt; input_channels; ++in_channel) {</div>
-<div class="line"><span class="lineno">  645</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *input_channel = input + (size_t)in_channel * input_frames;</div>
-<div class="line"><span class="lineno">  646</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *weight_row = weight_channel + (size_t)in_channel * kernel_size;</div>
-<div class="line"><span class="lineno">  647</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> kernel = 0; kernel &lt; kernel_size; ++kernel) {</div>
-<div class="line"><span class="lineno">  648</span>                    <span class="keyword">const</span> <span class="keywordtype">int</span> in_frame = out_frame * stride + kernel - padding;</div>
-<div class="line"><span class="lineno">  649</span>                    <span class="keywordflow">if</span> (in_frame &gt;= 0 &amp;&amp; in_frame &lt; input_frames) {</div>
-<div class="line"><span class="lineno">  650</span>                        sum = fmaf(input_channel[in_frame], weight_row[kernel], sum);</div>
-<div class="line"><span class="lineno">  651</span>                    }</div>
-<div class="line"><span class="lineno">  652</span>                }</div>
-<div class="line"><span class="lineno">  653</span>            }</div>
-<div class="line"><span class="lineno">  654</span>            output_channel[out_frame] = sum;</div>
-<div class="line"><span class="lineno">  655</span>        }</div>
-<div class="line"><span class="lineno">  656</span>    }</div>
-<div class="line"><span class="lineno">  657</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  658</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00730">730</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  742</span>{</div>
+<div class="line"><span class="lineno">  743</span>    <span class="keywordflow">if</span> (input == NULL || weight == NULL || output == NULL) {</div>
+<div class="line"><span class="lineno">  744</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  745</span>    }</div>
+<div class="line"><span class="lineno">  746</span>    <span class="keywordflow">if</span> (input_channels &lt;= 0 || output_channels &lt;= 0 || input_frames &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  747</span>        kernel_size &lt;= 0 || stride &lt;= 0 || padding &lt; 0 || output_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  748</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  749</span>    }</div>
+<div class="line"><span class="lineno">  750</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = (input_frames + 2 * padding - kernel_size) / stride + 1;</div>
+<div class="line"><span class="lineno">  751</span>    <span class="keywordflow">if</span> (output_frames != expected) {</div>
+<div class="line"><span class="lineno">  752</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  753</span>    }</div>
+<div class="line"><span class="lineno">  754</span>    ck_audio_conv1d_f32_args_t args = {</div>
+<div class="line"><span class="lineno">  755</span>        .input = input,</div>
+<div class="line"><span class="lineno">  756</span>        .weight = weight,</div>
+<div class="line"><span class="lineno">  757</span>        .bias = bias,</div>
+<div class="line"><span class="lineno">  758</span>        .output = output,</div>
+<div class="line"><span class="lineno">  759</span>        .input_channels = input_channels,</div>
+<div class="line"><span class="lineno">  760</span>        .output_channels = output_channels,</div>
+<div class="line"><span class="lineno">  761</span>        .input_frames = input_frames,</div>
+<div class="line"><span class="lineno">  762</span>        .kernel_size = kernel_size,</div>
+<div class="line"><span class="lineno">  763</span>        .stride = stride,</div>
+<div class="line"><span class="lineno">  764</span>        .padding = padding,</div>
+<div class="line"><span class="lineno">  765</span>        .output_frames = output_frames,</div>
+<div class="line"><span class="lineno">  766</span>    };</div>
+<div class="line"><span class="lineno">  767</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  768</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  769</span>    <span class="keywordflow">if</span> (active &gt; output_channels) active = output_channels;</div>
+<div class="line"><span class="lineno">  770</span>    <span class="keywordflow">if</span> (pool != NULL &amp;&amp; active &gt; 1) {</div>
+<div class="line"><span class="lineno">  771</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(</div>
+<div class="line"><span class="lineno">  772</span>            pool, active, <a class="code hl_function" href="audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7">ck_audio_conv1d_channel_major_f32_work</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  773</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  774</span>        <a class="code hl_function" href="audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7">ck_audio_conv1d_channel_major_f32_work</a>(0, 1, &amp;args);</div>
+<div class="line"><span class="lineno">  775</span>    }</div>
+<div class="line"><span class="lineno">  776</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  777</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a89c6ec8d05af4d452933a0091ef15df7"><div class="ttname"><a href="audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7">ck_audio_conv1d_channel_major_f32_work</a></div><div class="ttdeci">static void ck_audio_conv1d_channel_major_f32_work(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00632">audio_kernels.c:632</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4554995880b7a47e275f9b10511b5e43"><div class="ttname"><a href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a></div><div class="ttdeci">void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00327">ck_threadpool.c:327</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00494">ck_threadpool.c:494</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00420">ck_threadpool.c:420</a></div></div>
 </div><!-- fragment -->
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00632">ck_audio_conv1d_channel_major_f32_work()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00327">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00494">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00420">ck_threadpool_n_threads()</a>.</p>
+
 </div>
 </div>
 <a id="ad7d987ef94d207f26bd869e78f80b5ed" name="ad7d987ef94d207f26bd869e78f80b5ed"></a>
@@ -415,24 +424,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00276">276</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  281</span>{</div>
-<div class="line"><span class="lineno">  282</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
-<div class="line"><span class="lineno">  283</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  284</span>    }</div>
-<div class="line"><span class="lineno">  285</span>    <span class="keywordflow">if</span> (input_frames &lt;= 0 || output_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  286</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  287</span>    }</div>
-<div class="line"><span class="lineno">  288</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> copied = input_frames &lt; output_frames ? input_frames : output_frames;</div>
-<div class="line"><span class="lineno">  289</span>    memmove(output, input, (<span class="keywordtype">size_t</span>)copied * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  290</span>    <span class="keywordflow">if</span> (copied &lt; output_frames) {</div>
-<div class="line"><span class="lineno">  291</span>        memset(</div>
-<div class="line"><span class="lineno">  292</span>            output + copied,</div>
-<div class="line"><span class="lineno">  293</span>            0,</div>
-<div class="line"><span class="lineno">  294</span>            (<span class="keywordtype">size_t</span>)(output_frames - copied) * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  295</span>    }</div>
-<div class="line"><span class="lineno">  296</span>    <span class="keywordflow">return</span> copied;</div>
-<div class="line"><span class="lineno">  297</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00280">280</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  285</span>{</div>
+<div class="line"><span class="lineno">  286</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
+<div class="line"><span class="lineno">  287</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  288</span>    }</div>
+<div class="line"><span class="lineno">  289</span>    <span class="keywordflow">if</span> (input_frames &lt;= 0 || output_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  290</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  291</span>    }</div>
+<div class="line"><span class="lineno">  292</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> copied = input_frames &lt; output_frames ? input_frames : output_frames;</div>
+<div class="line"><span class="lineno">  293</span>    memmove(output, input, (<span class="keywordtype">size_t</span>)copied * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  294</span>    <span class="keywordflow">if</span> (copied &lt; output_frames) {</div>
+<div class="line"><span class="lineno">  295</span>        memset(</div>
+<div class="line"><span class="lineno">  296</span>            output + copied,</div>
+<div class="line"><span class="lineno">  297</span>            0,</div>
+<div class="line"><span class="lineno">  298</span>            (<span class="keywordtype">size_t</span>)(output_frames - copied) * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  299</span>    }</div>
+<div class="line"><span class="lineno">  300</span>    <span class="keywordflow">return</span> copied;</div>
+<div class="line"><span class="lineno">  301</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -474,24 +483,24 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00172">172</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  177</span>{</div>
-<div class="line"><span class="lineno">  178</span>    <span class="keywordflow">if</span> (interleaved == NULL || mono == NULL) {</div>
-<div class="line"><span class="lineno">  179</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  180</span>    }</div>
-<div class="line"><span class="lineno">  181</span>    <span class="keywordflow">if</span> (n_frames &lt;= 0 || n_channels &lt;= 0) {</div>
-<div class="line"><span class="lineno">  182</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  183</span>    }</div>
-<div class="line"><span class="lineno">  184</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
-<div class="line"><span class="lineno">  185</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  186</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  187</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; n_channels; ++channel) {</div>
-<div class="line"><span class="lineno">  188</span>            sum += (float)interleaved[(<span class="keywordtype">size_t</span>)frame * n_channels + channel];</div>
-<div class="line"><span class="lineno">  189</span>        }</div>
-<div class="line"><span class="lineno">  190</span>        mono[frame] = (sum / (float)n_channels) * scale;</div>
-<div class="line"><span class="lineno">  191</span>    }</div>
-<div class="line"><span class="lineno">  192</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  193</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00176">176</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  181</span>{</div>
+<div class="line"><span class="lineno">  182</span>    <span class="keywordflow">if</span> (interleaved == NULL || mono == NULL) {</div>
+<div class="line"><span class="lineno">  183</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  184</span>    }</div>
+<div class="line"><span class="lineno">  185</span>    <span class="keywordflow">if</span> (n_frames &lt;= 0 || n_channels &lt;= 0) {</div>
+<div class="line"><span class="lineno">  186</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  187</span>    }</div>
+<div class="line"><span class="lineno">  188</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
+<div class="line"><span class="lineno">  189</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  190</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  191</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; n_channels; ++channel) {</div>
+<div class="line"><span class="lineno">  192</span>            sum += (float)interleaved[(<span class="keywordtype">size_t</span>)frame * n_channels + channel];</div>
+<div class="line"><span class="lineno">  193</span>        }</div>
+<div class="line"><span class="lineno">  194</span>        mono[frame] = (sum / (float)n_channels) * scale;</div>
+<div class="line"><span class="lineno">  195</span>    }</div>
+<div class="line"><span class="lineno">  196</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  197</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -545,29 +554,29 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00206">206</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  213</span>{</div>
-<div class="line"><span class="lineno">  214</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
-<div class="line"><span class="lineno">  215</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  216</span>    }</div>
-<div class="line"><span class="lineno">  217</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = <a class="code hl_function" href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a>(input_frames, input_rate, output_rate);</div>
-<div class="line"><span class="lineno">  218</span>    <span class="keywordflow">if</span> (expected &lt;= 0 || output_frames != expected) {</div>
-<div class="line"><span class="lineno">  219</span>        <span class="keywordflow">return</span> -2;</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00210">210</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  217</span>{</div>
+<div class="line"><span class="lineno">  218</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
+<div class="line"><span class="lineno">  219</span>        <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">  220</span>    }</div>
-<div class="line"><span class="lineno">  221</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; output_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  222</span>        <span class="keyword">const</span> <span class="keywordtype">long</span> <span class="keywordtype">long</span> numerator = (<span class="keywordtype">long</span> long)frame * input_rate;</div>
-<div class="line"><span class="lineno">  223</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = (int)(numerator / output_rate);</div>
-<div class="line"><span class="lineno">  224</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 &lt; input_frames ? <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 : <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
-<div class="line"><span class="lineno">  225</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> fraction = (float)(numerator % output_rate) / (float)output_rate;</div>
-<div class="line"><span class="lineno">  226</span>        output[frame] = fmaf(input[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>] - input[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>], fraction, input[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>]);</div>
-<div class="line"><span class="lineno">  227</span>    }</div>
-<div class="line"><span class="lineno">  228</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  229</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_af899a2a47519d1740ab65706a5430e14"><div class="ttname"><a href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a></div><div class="ttdeci">int audio_resampled_frame_count(int input_frames, int input_rate, int output_rate)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00195">audio_kernels.c:195</a></div></div>
+<div class="line"><span class="lineno">  221</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = <a class="code hl_function" href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a>(input_frames, input_rate, output_rate);</div>
+<div class="line"><span class="lineno">  222</span>    <span class="keywordflow">if</span> (expected &lt;= 0 || output_frames != expected) {</div>
+<div class="line"><span class="lineno">  223</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  224</span>    }</div>
+<div class="line"><span class="lineno">  225</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; output_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  226</span>        <span class="keyword">const</span> <span class="keywordtype">long</span> <span class="keywordtype">long</span> numerator = (<span class="keywordtype">long</span> long)frame * input_rate;</div>
+<div class="line"><span class="lineno">  227</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = (int)(numerator / output_rate);</div>
+<div class="line"><span class="lineno">  228</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 &lt; input_frames ? <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> + 1 : <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>;</div>
+<div class="line"><span class="lineno">  229</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> fraction = (float)(numerator % output_rate) / (float)output_rate;</div>
+<div class="line"><span class="lineno">  230</span>        output[frame] = fmaf(input[<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>] - input[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>], fraction, input[<a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>]);</div>
+<div class="line"><span class="lineno">  231</span>    }</div>
+<div class="line"><span class="lineno">  232</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  233</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_af899a2a47519d1740ab65706a5430e14"><div class="ttname"><a href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a></div><div class="ttdeci">int audio_resampled_frame_count(int input_frames, int input_rate, int output_rate)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00199">audio_kernels.c:199</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_abf33d3f8e74eb48d5a4394c67ac4f1cd"><div class="ttname"><a href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a></div><div class="ttdeci">const char * left</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00131">true_bpe.h:131</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_afb60251d57a9ee3324fbc011e4be71e9"><div class="ttname"><a href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a></div><div class="ttdeci">const char const char * right</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00132">true_bpe.h:132</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00195">audio_resampled_frame_count()</a>, <a class="el" href="true__bpe_8h_source.html#l00131">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00132">right</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00199">audio_resampled_frame_count()</a>, <a class="el" href="true__bpe_8h_source.html#l00131">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00132">right</a>.</p>
 
 </div>
 </div>
@@ -627,46 +636,46 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00231">231</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  239</span>{</div>
-<div class="line"><span class="lineno">  240</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
-<div class="line"><span class="lineno">  241</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  242</span>    }</div>
-<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = <a class="code hl_function" href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a>(input_frames, input_rate, output_rate);</div>
-<div class="line"><span class="lineno">  244</span>    <span class="keywordflow">if</span> (expected &lt;= 0 || output_frames != expected || radius &lt; 2 || radius &gt; 128) {</div>
-<div class="line"><span class="lineno">  245</span>        <span class="keywordflow">return</span> -2;</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00235">235</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  243</span>{</div>
+<div class="line"><span class="lineno">  244</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
+<div class="line"><span class="lineno">  245</span>        <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">  246</span>    }</div>
-<div class="line"><span class="lineno">  247</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> ratio = (double)output_rate / (<span class="keywordtype">double</span>)input_rate;</div>
-<div class="line"><span class="lineno">  248</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> cutoff = ratio &lt; 1.0 ? ratio : 1.0;</div>
-<div class="line"><span class="lineno">  249</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; output_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  250</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> source = (double)frame * (<span class="keywordtype">double</span>)input_rate / (double)output_rate;</div>
-<div class="line"><span class="lineno">  251</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> center = (int)floor(source);</div>
-<div class="line"><span class="lineno">  252</span>        <span class="keywordtype">double</span> weighted = 0.0;</div>
-<div class="line"><span class="lineno">  253</span>        <span class="keywordtype">double</span> weight_sum = 0.0;</div>
-<div class="line"><span class="lineno">  254</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tap = center - radius + 1; tap &lt;= center + radius; ++tap) {</div>
-<div class="line"><span class="lineno">  255</span>            <span class="keywordflow">if</span> (tap &lt; 0 || tap &gt;= input_frames) {</div>
-<div class="line"><span class="lineno">  256</span>                <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  257</span>            }</div>
-<div class="line"><span class="lineno">  258</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> distance = source - (double)tap;</div>
-<div class="line"><span class="lineno">  259</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> scaled = cutoff * distance;</div>
-<div class="line"><span class="lineno">  260</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> sinc = fabs(scaled) &lt; 1.0e-12 ? 1.0 :</div>
-<div class="line"><span class="lineno">  261</span>                sin(<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * scaled) / (<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * scaled);</div>
-<div class="line"><span class="lineno">  262</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> window_x = distance / (double)radius;</div>
-<div class="line"><span class="lineno">  263</span>            <span class="keywordflow">if</span> (fabs(window_x) &gt;= 1.0) {</div>
-<div class="line"><span class="lineno">  264</span>                <span class="keywordflow">continue</span>;</div>
-<div class="line"><span class="lineno">  265</span>            }</div>
-<div class="line"><span class="lineno">  266</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> window = 0.5 * (1.0 + cos(<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * window_x));</div>
-<div class="line"><span class="lineno">  267</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> weight = cutoff * sinc * window;</div>
-<div class="line"><span class="lineno">  268</span>            weighted += (double)input[tap] * weight;</div>
-<div class="line"><span class="lineno">  269</span>            weight_sum += weight;</div>
-<div class="line"><span class="lineno">  270</span>        }</div>
-<div class="line"><span class="lineno">  271</span>        output[frame] = weight_sum != 0.0 ? (float)(weighted / weight_sum) : 0.0f;</div>
-<div class="line"><span class="lineno">  272</span>    }</div>
-<div class="line"><span class="lineno">  273</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  274</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a6b35bbc9ad4c67b3fed7f2290b925171"><div class="ttname"><a href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a></div><div class="ttdeci">#define CK_AUDIO_PI_D</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00015">audio_kernels.c:15</a></div></div>
+<div class="line"><span class="lineno">  247</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> expected = <a class="code hl_function" href="audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14">audio_resampled_frame_count</a>(input_frames, input_rate, output_rate);</div>
+<div class="line"><span class="lineno">  248</span>    <span class="keywordflow">if</span> (expected &lt;= 0 || output_frames != expected || radius &lt; 2 || radius &gt; 128) {</div>
+<div class="line"><span class="lineno">  249</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  250</span>    }</div>
+<div class="line"><span class="lineno">  251</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> ratio = (double)output_rate / (<span class="keywordtype">double</span>)input_rate;</div>
+<div class="line"><span class="lineno">  252</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> cutoff = ratio &lt; 1.0 ? ratio : 1.0;</div>
+<div class="line"><span class="lineno">  253</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; output_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  254</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> source = (double)frame * (<span class="keywordtype">double</span>)input_rate / (double)output_rate;</div>
+<div class="line"><span class="lineno">  255</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> center = (int)floor(source);</div>
+<div class="line"><span class="lineno">  256</span>        <span class="keywordtype">double</span> weighted = 0.0;</div>
+<div class="line"><span class="lineno">  257</span>        <span class="keywordtype">double</span> weight_sum = 0.0;</div>
+<div class="line"><span class="lineno">  258</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tap = center - radius + 1; tap &lt;= center + radius; ++tap) {</div>
+<div class="line"><span class="lineno">  259</span>            <span class="keywordflow">if</span> (tap &lt; 0 || tap &gt;= input_frames) {</div>
+<div class="line"><span class="lineno">  260</span>                <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  261</span>            }</div>
+<div class="line"><span class="lineno">  262</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> distance = source - (double)tap;</div>
+<div class="line"><span class="lineno">  263</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> scaled = cutoff * distance;</div>
+<div class="line"><span class="lineno">  264</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> sinc = fabs(scaled) &lt; 1.0e-12 ? 1.0 :</div>
+<div class="line"><span class="lineno">  265</span>                sin(<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * scaled) / (<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * scaled);</div>
+<div class="line"><span class="lineno">  266</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> window_x = distance / (double)radius;</div>
+<div class="line"><span class="lineno">  267</span>            <span class="keywordflow">if</span> (fabs(window_x) &gt;= 1.0) {</div>
+<div class="line"><span class="lineno">  268</span>                <span class="keywordflow">continue</span>;</div>
+<div class="line"><span class="lineno">  269</span>            }</div>
+<div class="line"><span class="lineno">  270</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> window = 0.5 * (1.0 + cos(<a class="code hl_define" href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a> * window_x));</div>
+<div class="line"><span class="lineno">  271</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> weight = cutoff * sinc * window;</div>
+<div class="line"><span class="lineno">  272</span>            weighted += (double)input[tap] * weight;</div>
+<div class="line"><span class="lineno">  273</span>            weight_sum += weight;</div>
+<div class="line"><span class="lineno">  274</span>        }</div>
+<div class="line"><span class="lineno">  275</span>        output[frame] = weight_sum != 0.0 ? (float)(weighted / weight_sum) : 0.0f;</div>
+<div class="line"><span class="lineno">  276</span>    }</div>
+<div class="line"><span class="lineno">  277</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  278</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a6b35bbc9ad4c67b3fed7f2290b925171"><div class="ttname"><a href="audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171">CK_AUDIO_PI_D</a></div><div class="ttdeci">#define CK_AUDIO_PI_D</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00019">audio_kernels.c:19</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00195">audio_resampled_frame_count()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00015">CK_AUDIO_PI_D</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00199">audio_resampled_frame_count()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00019">CK_AUDIO_PI_D</a>.</p>
 
 </div>
 </div>
@@ -702,15 +711,15 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00195">195</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  199</span>{</div>
-<div class="line"><span class="lineno">  200</span>    <span class="keywordflow">if</span> (input_frames &lt;= 0 || input_rate &lt;= 0 || output_rate &lt;= 0) {</div>
-<div class="line"><span class="lineno">  201</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  202</span>    }</div>
-<div class="line"><span class="lineno">  203</span>    <span class="keywordflow">return</span> 1 + (int)(((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)(input_frames - 1) * output_rate) / input_rate);</div>
-<div class="line"><span class="lineno">  204</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00199">199</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  203</span>{</div>
+<div class="line"><span class="lineno">  204</span>    <span class="keywordflow">if</span> (input_frames &lt;= 0 || input_rate &lt;= 0 || output_rate &lt;= 0) {</div>
+<div class="line"><span class="lineno">  205</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  206</span>    }</div>
+<div class="line"><span class="lineno">  207</span>    <span class="keywordflow">return</span> 1 + (int)(((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)(input_frames - 1) * output_rate) / input_rate);</div>
+<div class="line"><span class="lineno">  208</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00206">audio_resample_linear_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00231">audio_resample_windowed_sinc_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00210">audio_resample_linear_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00235">audio_resample_windowed_sinc_f32()</a>.</p>
 
 </div>
 </div>
@@ -782,37 +791,37 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00437">437</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  447</span>{</div>
-<div class="line"><span class="lineno">  448</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> n_fft = <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>;</div>
-<div class="line"><span class="lineno">  449</span>    <span class="keywordflow">if</span> (samples == NULL || window == NULL || cos_table == NULL ||</div>
-<div class="line"><span class="lineno">  450</span>        sin_table == NULL || power == NULL || fft_scratch == NULL) {</div>
-<div class="line"><span class="lineno">  451</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  452</span>    }</div>
-<div class="line"><span class="lineno">  453</span>    <span class="keywordflow">if</span> (hop_length != <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> ||</div>
-<div class="line"><span class="lineno">  454</span>        n_samples &lt;= n_fft / 2 || n_frames &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  455</span>        n_frames != n_samples / hop_length) {</div>
-<div class="line"><span class="lineno">  456</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  457</span>    }</div>
-<div class="line"><span class="lineno">  458</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  459</span>        <a class="code hl_function" href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a>(</div>
-<div class="line"><span class="lineno">  460</span>            samples,</div>
-<div class="line"><span class="lineno">  461</span>            n_samples,</div>
-<div class="line"><span class="lineno">  462</span>            frame,</div>
-<div class="line"><span class="lineno">  463</span>            window,</div>
-<div class="line"><span class="lineno">  464</span>            cos_table,</div>
-<div class="line"><span class="lineno">  465</span>            sin_table,</div>
-<div class="line"><span class="lineno">  466</span>            power + (<span class="keywordtype">size_t</span>)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>,</div>
-<div class="line"><span class="lineno">  467</span>            fft_scratch);</div>
-<div class="line"><span class="lineno">  468</span>    }</div>
-<div class="line"><span class="lineno">  469</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  470</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a720f9e30546e68a3d69346ec336dcb78"><div class="ttname"><a href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a></div><div class="ttdeci">static void audio_stft_power_fft400_frame_f32(const float *samples, int n_samples, int frame, const float *window, const float *cos_table, const float *sin_table, float *power, float *fft_scratch)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00472">audio_kernels.c:472</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00441">441</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  451</span>{</div>
+<div class="line"><span class="lineno">  452</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> n_fft = <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>;</div>
+<div class="line"><span class="lineno">  453</span>    <span class="keywordflow">if</span> (samples == NULL || window == NULL || cos_table == NULL ||</div>
+<div class="line"><span class="lineno">  454</span>        sin_table == NULL || power == NULL || fft_scratch == NULL) {</div>
+<div class="line"><span class="lineno">  455</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  456</span>    }</div>
+<div class="line"><span class="lineno">  457</span>    <span class="keywordflow">if</span> (hop_length != <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> ||</div>
+<div class="line"><span class="lineno">  458</span>        n_samples &lt;= n_fft / 2 || n_frames &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  459</span>        n_frames != n_samples / hop_length) {</div>
+<div class="line"><span class="lineno">  460</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  461</span>    }</div>
+<div class="line"><span class="lineno">  462</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  463</span>        <a class="code hl_function" href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a>(</div>
+<div class="line"><span class="lineno">  464</span>            samples,</div>
+<div class="line"><span class="lineno">  465</span>            n_samples,</div>
+<div class="line"><span class="lineno">  466</span>            frame,</div>
+<div class="line"><span class="lineno">  467</span>            window,</div>
+<div class="line"><span class="lineno">  468</span>            cos_table,</div>
+<div class="line"><span class="lineno">  469</span>            sin_table,</div>
+<div class="line"><span class="lineno">  470</span>            power + (<span class="keywordtype">size_t</span>)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>,</div>
+<div class="line"><span class="lineno">  471</span>            fft_scratch);</div>
+<div class="line"><span class="lineno">  472</span>    }</div>
+<div class="line"><span class="lineno">  473</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  474</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a720f9e30546e68a3d69346ec336dcb78"><div class="ttname"><a href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a></div><div class="ttdeci">static void audio_stft_power_fft400_frame_f32(const float *samples, int n_samples, int frame, const float *window, const float *cos_table, const float *sin_table, float *power, float *fft_scratch)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00476">audio_kernels.c:476</a></div></div>
 <div class="ttc" id="ackernel__audio_8h_html_a8104385637cb3f91a6e39939e0db5761"><div class="ttname"><a href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a></div><div class="ttdeci">#define CK_AUDIO_WHISPER_N_FFT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00012">ckernel_audio.h:12</a></div></div>
 <div class="ttc" id="ackernel__audio_8h_html_acf72a26ee07e106d85da5e65d7e71d59"><div class="ttname"><a href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a></div><div class="ttdeci">#define CK_AUDIO_WHISPER_HOP_LENGTH</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00013">ckernel_audio.h:13</a></div></div>
 <div class="ttc" id="ackernel__audio_8h_html_afb106d375720b93e8d92279d2f9d4661"><div class="ttname"><a href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a></div><div class="ttdeci">#define CK_AUDIO_WHISPER_POWER_BINS</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00014">ckernel_audio.h:14</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00472">audio_stft_power_fft400_frame_f32()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00476">audio_stft_power_fft400_frame_f32()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>.</p>
 
 </div>
 </div>
@@ -884,43 +893,43 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00383">383</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  393</span>{</div>
-<div class="line"><span class="lineno">  394</span>    <span class="keywordflow">if</span> (samples == NULL || window == NULL || cos_table == NULL ||</div>
-<div class="line"><span class="lineno">  395</span>        sin_table == NULL || power == NULL) {</div>
-<div class="line"><span class="lineno">  396</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  397</span>    }</div>
-<div class="line"><span class="lineno">  398</span>    <span class="keywordflow">if</span> (n_fft &lt;= 0 || hop_length &lt;= 0 || n_samples &lt;= n_fft / 2 ||</div>
-<div class="line"><span class="lineno">  399</span>        (n_fft &amp; 1) != 0 || n_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  400</span>        <span class="keywordflow">return</span> -2;</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00387">387</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  397</span>{</div>
+<div class="line"><span class="lineno">  398</span>    <span class="keywordflow">if</span> (samples == NULL || window == NULL || cos_table == NULL ||</div>
+<div class="line"><span class="lineno">  399</span>        sin_table == NULL || power == NULL) {</div>
+<div class="line"><span class="lineno">  400</span>        <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">  401</span>    }</div>
-<div class="line"><span class="lineno">  402</span>    <span class="keywordflow">if</span> (n_frames != n_samples / hop_length) {</div>
-<div class="line"><span class="lineno">  403</span>        <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  404</span>    }</div>
-<div class="line"><span class="lineno">  405</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
-<div class="line"><span class="lineno">  406</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> center = n_fft / 2;</div>
-<div class="line"><span class="lineno">  407</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  408</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
-<div class="line"><span class="lineno">  409</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_table + (size_t)bin * n_fft;</div>
-<div class="line"><span class="lineno">  410</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_table + (size_t)bin * n_fft;</div>
-<div class="line"><span class="lineno">  411</span>            <span class="keywordtype">float</span> real = 0.0f;</div>
-<div class="line"><span class="lineno">  412</span>            <span class="keywordtype">float</span> imag = 0.0f;</div>
-<div class="line"><span class="lineno">  413</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
-<div class="line"><span class="lineno">  414</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> source = <a class="code hl_function" href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a>(</div>
-<div class="line"><span class="lineno">  415</span>                    frame * hop_length + sample - center, n_samples);</div>
-<div class="line"><span class="lineno">  416</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> value = samples[source] * window[sample];</div>
-<div class="line"><span class="lineno">  417</span>                real = fmaf(value, cos_row[sample], real);</div>
-<div class="line"><span class="lineno">  418</span>                imag = fmaf(value, sin_row[sample], imag);</div>
-<div class="line"><span class="lineno">  419</span>            }</div>
-<div class="line"><span class="lineno">  420</span>            power[(size_t)frame * bins + bin] =</div>
-<div class="line"><span class="lineno">  421</span>                fmaf(real, real, imag * imag);</div>
-<div class="line"><span class="lineno">  422</span>        }</div>
-<div class="line"><span class="lineno">  423</span>    }</div>
-<div class="line"><span class="lineno">  424</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  425</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a5a6560a6e827e927a14e20dc7a25500f"><div class="ttname"><a href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a></div><div class="ttdeci">static int reflect_index(int index, int length)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00017">audio_kernels.c:17</a></div></div>
+<div class="line"><span class="lineno">  402</span>    <span class="keywordflow">if</span> (n_fft &lt;= 0 || hop_length &lt;= 0 || n_samples &lt;= n_fft / 2 ||</div>
+<div class="line"><span class="lineno">  403</span>        (n_fft &amp; 1) != 0 || n_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  404</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  405</span>    }</div>
+<div class="line"><span class="lineno">  406</span>    <span class="keywordflow">if</span> (n_frames != n_samples / hop_length) {</div>
+<div class="line"><span class="lineno">  407</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  408</span>    }</div>
+<div class="line"><span class="lineno">  409</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
+<div class="line"><span class="lineno">  410</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> center = n_fft / 2;</div>
+<div class="line"><span class="lineno">  411</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  412</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
+<div class="line"><span class="lineno">  413</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *cos_row = cos_table + (size_t)bin * n_fft;</div>
+<div class="line"><span class="lineno">  414</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *sin_row = sin_table + (size_t)bin * n_fft;</div>
+<div class="line"><span class="lineno">  415</span>            <span class="keywordtype">float</span> real = 0.0f;</div>
+<div class="line"><span class="lineno">  416</span>            <span class="keywordtype">float</span> imag = 0.0f;</div>
+<div class="line"><span class="lineno">  417</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
+<div class="line"><span class="lineno">  418</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> source = <a class="code hl_function" href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a>(</div>
+<div class="line"><span class="lineno">  419</span>                    frame * hop_length + sample - center, n_samples);</div>
+<div class="line"><span class="lineno">  420</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> value = samples[source] * window[sample];</div>
+<div class="line"><span class="lineno">  421</span>                real = fmaf(value, cos_row[sample], real);</div>
+<div class="line"><span class="lineno">  422</span>                imag = fmaf(value, sin_row[sample], imag);</div>
+<div class="line"><span class="lineno">  423</span>            }</div>
+<div class="line"><span class="lineno">  424</span>            power[(size_t)frame * bins + bin] =</div>
+<div class="line"><span class="lineno">  425</span>                fmaf(real, real, imag * imag);</div>
+<div class="line"><span class="lineno">  426</span>        }</div>
+<div class="line"><span class="lineno">  427</span>    }</div>
+<div class="line"><span class="lineno">  428</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  429</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a5a6560a6e827e927a14e20dc7a25500f"><div class="ttname"><a href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a></div><div class="ttdeci">static int reflect_index(int index, int length)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00021">audio_kernels.c:21</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00017">reflect_index()</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00021">reflect_index()</a>.</p>
 
 </div>
 </div>
@@ -962,33 +971,33 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00299">299</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  304</span>{</div>
-<div class="line"><span class="lineno">  305</span>    <span class="keywordflow">if</span> (window == NULL || cos_table == NULL || sin_table == NULL) {</div>
-<div class="line"><span class="lineno">  306</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  307</span>    }</div>
-<div class="line"><span class="lineno">  308</span>    <span class="keywordflow">if</span> (n_fft &lt;= 0 || (n_fft &amp; 1) != 0) {</div>
-<div class="line"><span class="lineno">  309</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  310</span>    }</div>
-<div class="line"><span class="lineno">  311</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
-<div class="line"><span class="lineno">  312</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
-<div class="line"><span class="lineno">  313</span>        window[sample] = 0.5f - 0.5f * cosf(</div>
-<div class="line"><span class="lineno">  314</span>            2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> * (<span class="keywordtype">float</span>)sample / (<span class="keywordtype">float</span>)n_fft);</div>
-<div class="line"><span class="lineno">  315</span>    }</div>
-<div class="line"><span class="lineno">  316</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
-<div class="line"><span class="lineno">  317</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
-<div class="line"><span class="lineno">  318</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> angle = -2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> *</div>
-<div class="line"><span class="lineno">  319</span>                (float)(bin * sample) / (float)n_fft;</div>
-<div class="line"><span class="lineno">  320</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index = (size_t)bin * n_fft + sample;</div>
-<div class="line"><span class="lineno">  321</span>            cos_table[index] = cosf(angle);</div>
-<div class="line"><span class="lineno">  322</span>            sin_table[index] = sinf(angle);</div>
-<div class="line"><span class="lineno">  323</span>        }</div>
-<div class="line"><span class="lineno">  324</span>    }</div>
-<div class="line"><span class="lineno">  325</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  326</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a6e7adb42c11df3ade2b6b770105e369b"><div class="ttname"><a href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a></div><div class="ttdeci">#define CK_AUDIO_PI_F</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00014">audio_kernels.c:14</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00303">303</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  308</span>{</div>
+<div class="line"><span class="lineno">  309</span>    <span class="keywordflow">if</span> (window == NULL || cos_table == NULL || sin_table == NULL) {</div>
+<div class="line"><span class="lineno">  310</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  311</span>    }</div>
+<div class="line"><span class="lineno">  312</span>    <span class="keywordflow">if</span> (n_fft &lt;= 0 || (n_fft &amp; 1) != 0) {</div>
+<div class="line"><span class="lineno">  313</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  314</span>    }</div>
+<div class="line"><span class="lineno">  315</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
+<div class="line"><span class="lineno">  316</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
+<div class="line"><span class="lineno">  317</span>        window[sample] = 0.5f - 0.5f * cosf(</div>
+<div class="line"><span class="lineno">  318</span>            2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> * (<span class="keywordtype">float</span>)sample / (<span class="keywordtype">float</span>)n_fft);</div>
+<div class="line"><span class="lineno">  319</span>    }</div>
+<div class="line"><span class="lineno">  320</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
+<div class="line"><span class="lineno">  321</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; n_fft; ++sample) {</div>
+<div class="line"><span class="lineno">  322</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> angle = -2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> *</div>
+<div class="line"><span class="lineno">  323</span>                (float)(bin * sample) / (float)n_fft;</div>
+<div class="line"><span class="lineno">  324</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index = (size_t)bin * n_fft + sample;</div>
+<div class="line"><span class="lineno">  325</span>            cos_table[index] = cosf(angle);</div>
+<div class="line"><span class="lineno">  326</span>            sin_table[index] = sinf(angle);</div>
+<div class="line"><span class="lineno">  327</span>        }</div>
+<div class="line"><span class="lineno">  328</span>    }</div>
+<div class="line"><span class="lineno">  329</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  330</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a6e7adb42c11df3ade2b6b770105e369b"><div class="ttname"><a href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a></div><div class="ttdeci">#define CK_AUDIO_PI_F</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00018">audio_kernels.c:18</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00014">CK_AUDIO_PI_F</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00018">CK_AUDIO_PI_F</a>.</p>
 
 </div>
 </div>
@@ -1030,22 +1039,22 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00660">660</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  665</span>{</div>
-<div class="line"><span class="lineno">  666</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
-<div class="line"><span class="lineno">  667</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  668</span>    }</div>
-<div class="line"><span class="lineno">  669</span>    <span class="keywordflow">if</span> (channels &lt;= 0 || frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  670</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  671</span>    }</div>
-<div class="line"><span class="lineno">  672</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; frames; ++frame) {</div>
-<div class="line"><span class="lineno">  673</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; channels; ++channel) {</div>
-<div class="line"><span class="lineno">  674</span>            output[(size_t)frame * channels + channel] =</div>
-<div class="line"><span class="lineno">  675</span>                input[(<span class="keywordtype">size_t</span>)channel * frames + frame];</div>
-<div class="line"><span class="lineno">  676</span>        }</div>
-<div class="line"><span class="lineno">  677</span>    }</div>
-<div class="line"><span class="lineno">  678</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  679</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00779">779</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  784</span>{</div>
+<div class="line"><span class="lineno">  785</span>    <span class="keywordflow">if</span> (input == NULL || output == NULL) {</div>
+<div class="line"><span class="lineno">  786</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  787</span>    }</div>
+<div class="line"><span class="lineno">  788</span>    <span class="keywordflow">if</span> (channels &lt;= 0 || frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  789</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  790</span>    }</div>
+<div class="line"><span class="lineno">  791</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; frames; ++frame) {</div>
+<div class="line"><span class="lineno">  792</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; channels; ++channel) {</div>
+<div class="line"><span class="lineno">  793</span>            output[(size_t)frame * channels + channel] =</div>
+<div class="line"><span class="lineno">  794</span>                input[(<span class="keywordtype">size_t</span>)channel * frames + frame];</div>
+<div class="line"><span class="lineno">  795</span>        }</div>
+<div class="line"><span class="lineno">  796</span>    }</div>
+<div class="line"><span class="lineno">  797</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  798</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1093,14 +1102,14 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00129">129</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  135</span>{</div>
-<div class="line"><span class="lineno">  136</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__kernels_8c.html#af4abdc08264eabcc7f8066c78d4e38a6">audio_wav_decode_memory_pcm16_mono_window_f32</a>(</div>
-<div class="line"><span class="lineno">  137</span>        bytes, byte_count, 0, mono, mono_capacity, info);</div>
-<div class="line"><span class="lineno">  138</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_af4abdc08264eabcc7f8066c78d4e38a6"><div class="ttname"><a href="audio__kernels_8c.html#af4abdc08264eabcc7f8066c78d4e38a6">audio_wav_decode_memory_pcm16_mono_window_f32</a></div><div class="ttdeci">int audio_wav_decode_memory_pcm16_mono_window_f32(const uint8_t *bytes, size_t byte_count, int start_frame, float *mono, int mono_capacity, CKAudioWavInfo *info)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00140">audio_kernels.c:140</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00133">133</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  139</span>{</div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__kernels_8c.html#af4abdc08264eabcc7f8066c78d4e38a6">audio_wav_decode_memory_pcm16_mono_window_f32</a>(</div>
+<div class="line"><span class="lineno">  141</span>        bytes, byte_count, 0, mono, mono_capacity, info);</div>
+<div class="line"><span class="lineno">  142</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_af4abdc08264eabcc7f8066c78d4e38a6"><div class="ttname"><a href="audio__kernels_8c.html#af4abdc08264eabcc7f8066c78d4e38a6">audio_wav_decode_memory_pcm16_mono_window_f32</a></div><div class="ttdeci">int audio_wav_decode_memory_pcm16_mono_window_f32(const uint8_t *bytes, size_t byte_count, int start_frame, float *mono, int mono_capacity, CKAudioWavInfo *info)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00144">audio_kernels.c:144</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00140">audio_wav_decode_memory_pcm16_mono_window_f32()</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00144">audio_wav_decode_memory_pcm16_mono_window_f32()</a>.</p>
 
 </div>
 </div>
@@ -1154,40 +1163,40 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00140">140</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  147</span>{</div>
-<div class="line"><span class="lineno">  148</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> status = <a class="code hl_function" href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a>(bytes, byte_count, info);</div>
-<div class="line"><span class="lineno">  149</span>    <span class="keywordflow">if</span> (status != 0) {</div>
-<div class="line"><span class="lineno">  150</span>        <span class="keywordflow">return</span> status;</div>
-<div class="line"><span class="lineno">  151</span>    }</div>
-<div class="line"><span class="lineno">  152</span>    <span class="keywordflow">if</span> (start_frame &lt; 0 || start_frame &gt;= info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> || mono_capacity &lt;= 0) {</div>
-<div class="line"><span class="lineno">  153</span>        <span class="keywordflow">return</span> -7;</div>
-<div class="line"><span class="lineno">  154</span>    }</div>
-<div class="line"><span class="lineno">  155</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available = info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> - start_frame;</div>
-<div class="line"><span class="lineno">  156</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> decoded = available &lt; mono_capacity ? available : mono_capacity;</div>
-<div class="line"><span class="lineno">  157</span>    <span class="keyword">const</span> uint8_t *pcm = bytes + info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>;</div>
-<div class="line"><span class="lineno">  158</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
-<div class="line"><span class="lineno">  159</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; decoded; ++frame) {</div>
-<div class="line"><span class="lineno">  160</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  161</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> source_frame = (size_t)start_frame + (<span class="keywordtype">size_t</span>)frame;</div>
-<div class="line"><span class="lineno">  162</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>; ++channel) {</div>
-<div class="line"><span class="lineno">  163</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index =</div>
-<div class="line"><span class="lineno">  164</span>                (source_frame * (size_t)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> + (<span class="keywordtype">size_t</span>)channel) * 2u;</div>
-<div class="line"><span class="lineno">  165</span>            sum += (float)(int16_t)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(pcm + index);</div>
-<div class="line"><span class="lineno">  166</span>        }</div>
-<div class="line"><span class="lineno">  167</span>        mono[frame] = (sum / (float)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>) * scale;</div>
-<div class="line"><span class="lineno">  168</span>    }</div>
-<div class="line"><span class="lineno">  169</span>    <span class="keywordflow">return</span> decoded;</div>
-<div class="line"><span class="lineno">  170</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a13ac269ed76636283b5d98c21a4cb62f"><div class="ttname"><a href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a></div><div class="ttdeci">int audio_wav_parse_memory(const uint8_t *bytes, size_t byte_count, CKAudioWavInfo *info)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00040">audio_kernels.c:40</a></div></div>
-<div class="ttc" id="aaudio__kernels_8c_html_a5326a387c09d9ac2c0365910e9fa67f3"><div class="ttname"><a href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a></div><div class="ttdeci">static uint16_t read_u16_le(const uint8_t *p)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00029">audio_kernels.c:29</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00144">144</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  151</span>{</div>
+<div class="line"><span class="lineno">  152</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> status = <a class="code hl_function" href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a>(bytes, byte_count, info);</div>
+<div class="line"><span class="lineno">  153</span>    <span class="keywordflow">if</span> (status != 0) {</div>
+<div class="line"><span class="lineno">  154</span>        <span class="keywordflow">return</span> status;</div>
+<div class="line"><span class="lineno">  155</span>    }</div>
+<div class="line"><span class="lineno">  156</span>    <span class="keywordflow">if</span> (start_frame &lt; 0 || start_frame &gt;= info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> || mono_capacity &lt;= 0) {</div>
+<div class="line"><span class="lineno">  157</span>        <span class="keywordflow">return</span> -7;</div>
+<div class="line"><span class="lineno">  158</span>    }</div>
+<div class="line"><span class="lineno">  159</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available = info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> - start_frame;</div>
+<div class="line"><span class="lineno">  160</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> decoded = available &lt; mono_capacity ? available : mono_capacity;</div>
+<div class="line"><span class="lineno">  161</span>    <span class="keyword">const</span> uint8_t *pcm = bytes + info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>;</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; decoded; ++frame) {</div>
+<div class="line"><span class="lineno">  164</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  165</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> source_frame = (size_t)start_frame + (<span class="keywordtype">size_t</span>)frame;</div>
+<div class="line"><span class="lineno">  166</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>; ++channel) {</div>
+<div class="line"><span class="lineno">  167</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index =</div>
+<div class="line"><span class="lineno">  168</span>                (source_frame * (size_t)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> + (<span class="keywordtype">size_t</span>)channel) * 2u;</div>
+<div class="line"><span class="lineno">  169</span>            sum += (float)(int16_t)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(pcm + index);</div>
+<div class="line"><span class="lineno">  170</span>        }</div>
+<div class="line"><span class="lineno">  171</span>        mono[frame] = (sum / (float)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>) * scale;</div>
+<div class="line"><span class="lineno">  172</span>    }</div>
+<div class="line"><span class="lineno">  173</span>    <span class="keywordflow">return</span> decoded;</div>
+<div class="line"><span class="lineno">  174</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a13ac269ed76636283b5d98c21a4cb62f"><div class="ttname"><a href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a></div><div class="ttdeci">int audio_wav_parse_memory(const uint8_t *bytes, size_t byte_count, CKAudioWavInfo *info)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00044">audio_kernels.c:44</a></div></div>
+<div class="ttc" id="aaudio__kernels_8c_html_a5326a387c09d9ac2c0365910e9fa67f3"><div class="ttname"><a href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a></div><div class="ttdeci">static uint16_t read_u16_le(const uint8_t *p)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00033">audio_kernels.c:33</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_a028e31e0ebfd2ddaa941c841b5a4df90"><div class="ttname"><a href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">CKAudioWavInfo::frames</a></div><div class="ttdeci">int frames</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00021">ckernel_audio.h:21</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_a5977de925aa541e28ce598ac6005dc19"><div class="ttname"><a href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">CKAudioWavInfo::channels</a></div><div class="ttdeci">int channels</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00018">ckernel_audio.h:18</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_a7f03c9c155c83eadf60a4bf620d62ebd"><div class="ttname"><a href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">CKAudioWavInfo::data_offset</a></div><div class="ttdeci">size_t data_offset</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00022">ckernel_audio.h:22</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00040">audio_wav_parse_memory()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="audio__kernels_8c_source.html#l00029">read_u16_le()</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00044">audio_wav_parse_memory()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="audio__kernels_8c_source.html#l00033">read_u16_le()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00129">audio_wav_decode_memory_pcm16_mono_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00133">audio_wav_decode_memory_pcm16_mono_f32()</a>.</p>
 
 </div>
 </div>
@@ -1235,35 +1244,35 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00101">101</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  107</span>{</div>
-<div class="line"><span class="lineno">  108</span>    <span class="keywordflow">if</span> (bytes == NULL || info == NULL || mono == NULL) {</div>
-<div class="line"><span class="lineno">  109</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  110</span>    }</div>
-<div class="line"><span class="lineno">  111</span>    <span class="keywordflow">if</span> (info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> != 1 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> != 16 ||</div>
-<div class="line"><span class="lineno">  112</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> &lt;= 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> &lt;= 0 || mono_capacity &lt; info-&gt;frames ||</div>
-<div class="line"><span class="lineno">  113</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a> &gt; byte_count || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> &gt; byte_count - info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>) {</div>
-<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  115</span>    }</div>
-<div class="line"><span class="lineno">  116</span>    <span class="keyword">const</span> uint8_t *pcm = bytes + info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>;</div>
-<div class="line"><span class="lineno">  117</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
-<div class="line"><span class="lineno">  118</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>; ++frame) {</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>; ++channel) {</div>
-<div class="line"><span class="lineno">  121</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index = ((size_t)frame * info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> + channel) * 2u;</div>
-<div class="line"><span class="lineno">  122</span>            sum += (float)(int16_t)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(pcm + index);</div>
-<div class="line"><span class="lineno">  123</span>        }</div>
-<div class="line"><span class="lineno">  124</span>        mono[frame] = (sum / (float)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>) * scale;</div>
-<div class="line"><span class="lineno">  125</span>    }</div>
-<div class="line"><span class="lineno">  126</span>    <span class="keywordflow">return</span> info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>;</div>
-<div class="line"><span class="lineno">  127</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00105">105</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  111</span>{</div>
+<div class="line"><span class="lineno">  112</span>    <span class="keywordflow">if</span> (bytes == NULL || info == NULL || mono == NULL) {</div>
+<div class="line"><span class="lineno">  113</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  114</span>    }</div>
+<div class="line"><span class="lineno">  115</span>    <span class="keywordflow">if</span> (info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> != 1 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> != 16 ||</div>
+<div class="line"><span class="lineno">  116</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> &lt;= 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> &lt;= 0 || mono_capacity &lt; info-&gt;frames ||</div>
+<div class="line"><span class="lineno">  117</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a> &gt; byte_count || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> &gt; byte_count - info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>) {</div>
+<div class="line"><span class="lineno">  118</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  119</span>    }</div>
+<div class="line"><span class="lineno">  120</span>    <span class="keyword">const</span> uint8_t *pcm = bytes + info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a>;</div>
+<div class="line"><span class="lineno">  121</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / 32768.0f;</div>
+<div class="line"><span class="lineno">  122</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>; ++frame) {</div>
+<div class="line"><span class="lineno">  123</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  124</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> channel = 0; channel &lt; info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>; ++channel) {</div>
+<div class="line"><span class="lineno">  125</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> index = ((size_t)frame * info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> + channel) * 2u;</div>
+<div class="line"><span class="lineno">  126</span>            sum += (float)(int16_t)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(pcm + index);</div>
+<div class="line"><span class="lineno">  127</span>        }</div>
+<div class="line"><span class="lineno">  128</span>        mono[frame] = (sum / (float)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a>) * scale;</div>
+<div class="line"><span class="lineno">  129</span>    }</div>
+<div class="line"><span class="lineno">  130</span>    <span class="keywordflow">return</span> info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>;</div>
+<div class="line"><span class="lineno">  131</span>}</div>
 <div class="ttc" id="astructCKAudioWavInfo_html_abb73452bfec57f0df42413bf289b49e7"><div class="ttname"><a href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">CKAudioWavInfo::format_tag</a></div><div class="ttdeci">int format_tag</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00017">ckernel_audio.h:17</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_ad270c19780c360f69c9276cb9e89cff9"><div class="ttname"><a href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">CKAudioWavInfo::bits_per_sample</a></div><div class="ttdeci">int bits_per_sample</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00020">ckernel_audio.h:20</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_ad5701d8a252c6d90e2658d18638b8eb0"><div class="ttname"><a href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">CKAudioWavInfo::data_bytes</a></div><div class="ttdeci">size_t data_bytes</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00023">ckernel_audio.h:23</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__audio_8h_source.html#l00020">CKAudioWavInfo::bits_per_sample</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00023">CKAudioWavInfo::data_bytes</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00017">CKAudioWavInfo::format_tag</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="audio__kernels_8c_source.html#l00029">read_u16_le()</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__audio_8h_source.html#l00020">CKAudioWavInfo::bits_per_sample</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00023">CKAudioWavInfo::data_bytes</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00017">CKAudioWavInfo::format_tag</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="audio__kernels_8c_source.html#l00033">read_u16_le()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00525">audio_whisper_log_mel_window_wav_pcm16_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00529">audio_whisper_log_mel_window_wav_pcm16_f32()</a>.</p>
 
 </div>
 </div>
@@ -1299,69 +1308,69 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00040">40</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   44</span>{</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (bytes == NULL || info == NULL) {</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   47</span>    }</div>
-<div class="line"><span class="lineno">   48</span>    <span class="keywordflow">if</span> (byte_count &lt; 12 || memcmp(bytes, <span class="stringliteral">&quot;RIFF&quot;</span>, 4) != 0 ||</div>
-<div class="line"><span class="lineno">   49</span>        memcmp(bytes + 8, <span class="stringliteral">&quot;WAVE&quot;</span>, 4) != 0) {</div>
-<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">return</span> -2;</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00044">44</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   48</span>{</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">if</span> (bytes == NULL || info == NULL) {</div>
+<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">return</span> -1;</div>
 <div class="line"><span class="lineno">   51</span>    }</div>
-<div class="line"><span class="lineno">   52</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> riff_end = (size_t)<a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(bytes + 4) + 8u;</div>
-<div class="line"><span class="lineno">   53</span>    <span class="keywordflow">if</span> (riff_end &lt; 12 || riff_end &gt; byte_count) {</div>
-<div class="line"><span class="lineno">   54</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">if</span> (byte_count &lt; 12 || memcmp(bytes, <span class="stringliteral">&quot;RIFF&quot;</span>, 4) != 0 ||</div>
+<div class="line"><span class="lineno">   53</span>        memcmp(bytes + 8, <span class="stringliteral">&quot;WAVE&quot;</span>, 4) != 0) {</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keywordflow">return</span> -2;</div>
 <div class="line"><span class="lineno">   55</span>    }</div>
-<div class="line"><span class="lineno">   56</span>    memset(info, 0, <span class="keyword">sizeof</span>(*info));</div>
-<div class="line"><span class="lineno">   57</span>    <span class="keywordtype">int</span> found_format = 0;</div>
-<div class="line"><span class="lineno">   58</span>    <span class="keywordtype">int</span> found_data = 0;</div>
-<div class="line"><span class="lineno">   59</span>    <span class="keywordtype">size_t</span> offset = 12;</div>
-<div class="line"><span class="lineno">   60</span>    <span class="keywordflow">while</span> (offset + 8 &lt;= riff_end) {</div>
-<div class="line"><span class="lineno">   61</span>        <span class="keyword">const</span> uint8_t *chunk = bytes + offset;</div>
-<div class="line"><span class="lineno">   62</span>        <span class="keyword">const</span> uint32_t chunk_bytes = <a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(chunk + 4);</div>
-<div class="line"><span class="lineno">   63</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> payload = offset + 8;</div>
-<div class="line"><span class="lineno">   64</span>        <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)chunk_bytes &gt; riff_end - payload) {</div>
-<div class="line"><span class="lineno">   65</span>            <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">   66</span>        }</div>
-<div class="line"><span class="lineno">   67</span>        <span class="keywordflow">if</span> (!found_format &amp;&amp; memcmp(chunk, <span class="stringliteral">&quot;fmt &quot;</span>, 4) == 0) {</div>
-<div class="line"><span class="lineno">   68</span>            <span class="keywordflow">if</span> (chunk_bytes &lt; 16) {</div>
-<div class="line"><span class="lineno">   69</span>                <span class="keywordflow">return</span> -4;</div>
-<div class="line"><span class="lineno">   70</span>            }</div>
-<div class="line"><span class="lineno">   71</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload);</div>
-<div class="line"><span class="lineno">   72</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload + 2);</div>
-<div class="line"><span class="lineno">   73</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(bytes + payload + 4);</div>
-<div class="line"><span class="lineno">   74</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload + 14);</div>
-<div class="line"><span class="lineno">   75</span>            found_format = 1;</div>
-<div class="line"><span class="lineno">   76</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (!found_data &amp;&amp; memcmp(chunk, <span class="stringliteral">&quot;data&quot;</span>, 4) == 0) {</div>
-<div class="line"><span class="lineno">   77</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a> = payload;</div>
-<div class="line"><span class="lineno">   78</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> = chunk_bytes;</div>
-<div class="line"><span class="lineno">   79</span>            found_data = 1;</div>
-<div class="line"><span class="lineno">   80</span>        }</div>
-<div class="line"><span class="lineno">   81</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> padded = (size_t)chunk_bytes + ((<span class="keywordtype">size_t</span>)chunk_bytes &amp; 1u);</div>
-<div class="line"><span class="lineno">   82</span>        <span class="keywordflow">if</span> (padded &gt; SIZE_MAX - payload) {</div>
-<div class="line"><span class="lineno">   83</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   56</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> riff_end = (size_t)<a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(bytes + 4) + 8u;</div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">if</span> (riff_end &lt; 12 || riff_end &gt; byte_count) {</div>
+<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   59</span>    }</div>
+<div class="line"><span class="lineno">   60</span>    memset(info, 0, <span class="keyword">sizeof</span>(*info));</div>
+<div class="line"><span class="lineno">   61</span>    <span class="keywordtype">int</span> found_format = 0;</div>
+<div class="line"><span class="lineno">   62</span>    <span class="keywordtype">int</span> found_data = 0;</div>
+<div class="line"><span class="lineno">   63</span>    <span class="keywordtype">size_t</span> offset = 12;</div>
+<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">while</span> (offset + 8 &lt;= riff_end) {</div>
+<div class="line"><span class="lineno">   65</span>        <span class="keyword">const</span> uint8_t *chunk = bytes + offset;</div>
+<div class="line"><span class="lineno">   66</span>        <span class="keyword">const</span> uint32_t chunk_bytes = <a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(chunk + 4);</div>
+<div class="line"><span class="lineno">   67</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> payload = offset + 8;</div>
+<div class="line"><span class="lineno">   68</span>        <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)chunk_bytes &gt; riff_end - payload) {</div>
+<div class="line"><span class="lineno">   69</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   70</span>        }</div>
+<div class="line"><span class="lineno">   71</span>        <span class="keywordflow">if</span> (!found_format &amp;&amp; memcmp(chunk, <span class="stringliteral">&quot;fmt &quot;</span>, 4) == 0) {</div>
+<div class="line"><span class="lineno">   72</span>            <span class="keywordflow">if</span> (chunk_bytes &lt; 16) {</div>
+<div class="line"><span class="lineno">   73</span>                <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">   74</span>            }</div>
+<div class="line"><span class="lineno">   75</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload);</div>
+<div class="line"><span class="lineno">   76</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload + 2);</div>
+<div class="line"><span class="lineno">   77</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a>(bytes + payload + 4);</div>
+<div class="line"><span class="lineno">   78</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> = (int)<a class="code hl_function" href="audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3">read_u16_le</a>(bytes + payload + 14);</div>
+<div class="line"><span class="lineno">   79</span>            found_format = 1;</div>
+<div class="line"><span class="lineno">   80</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (!found_data &amp;&amp; memcmp(chunk, <span class="stringliteral">&quot;data&quot;</span>, 4) == 0) {</div>
+<div class="line"><span class="lineno">   81</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a7f03c9c155c83eadf60a4bf620d62ebd">data_offset</a> = payload;</div>
+<div class="line"><span class="lineno">   82</span>            info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> = chunk_bytes;</div>
+<div class="line"><span class="lineno">   83</span>            found_data = 1;</div>
 <div class="line"><span class="lineno">   84</span>        }</div>
-<div class="line"><span class="lineno">   85</span>        offset = payload + padded;</div>
-<div class="line"><span class="lineno">   86</span>    }</div>
-<div class="line"><span class="lineno">   87</span>    <span class="keywordflow">if</span> (!found_format || !found_data || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> != 1 ||</div>
-<div class="line"><span class="lineno">   88</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> &lt;= 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> &lt;= 0 ||</div>
-<div class="line"><span class="lineno">   89</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> != 16) {</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keywordflow">return</span> -5;</div>
-<div class="line"><span class="lineno">   91</span>    }</div>
-<div class="line"><span class="lineno">   92</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes_per_frame = (size_t)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> * 2u;</div>
-<div class="line"><span class="lineno">   93</span>    <span class="keywordflow">if</span> (bytes_per_frame == 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> % bytes_per_frame != 0 ||</div>
-<div class="line"><span class="lineno">   94</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> / bytes_per_frame &gt; (<span class="keywordtype">size_t</span>)INT_MAX) {</div>
-<div class="line"><span class="lineno">   95</span>        <span class="keywordflow">return</span> -6;</div>
-<div class="line"><span class="lineno">   96</span>    }</div>
-<div class="line"><span class="lineno">   97</span>    info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> = (int)(info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> / bytes_per_frame);</div>
-<div class="line"><span class="lineno">   98</span>    <span class="keywordflow">return</span> info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> &gt; 0 ? 0 : -6;</div>
-<div class="line"><span class="lineno">   99</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_ad2dea24c20761250c3df3b634ffabed4"><div class="ttname"><a href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a></div><div class="ttdeci">static uint32_t read_u32_le(const uint8_t *p)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00034">audio_kernels.c:34</a></div></div>
+<div class="line"><span class="lineno">   85</span>        <span class="keyword">const</span> <span class="keywordtype">size_t</span> padded = (size_t)chunk_bytes + ((<span class="keywordtype">size_t</span>)chunk_bytes &amp; 1u);</div>
+<div class="line"><span class="lineno">   86</span>        <span class="keywordflow">if</span> (padded &gt; SIZE_MAX - payload) {</div>
+<div class="line"><span class="lineno">   87</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">   88</span>        }</div>
+<div class="line"><span class="lineno">   89</span>        offset = payload + padded;</div>
+<div class="line"><span class="lineno">   90</span>    }</div>
+<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">if</span> (!found_format || !found_data || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#abb73452bfec57f0df42413bf289b49e7">format_tag</a> != 1 ||</div>
+<div class="line"><span class="lineno">   92</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> &lt;= 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> &lt;= 0 ||</div>
+<div class="line"><span class="lineno">   93</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9">bits_per_sample</a> != 16) {</div>
+<div class="line"><span class="lineno">   94</span>        <span class="keywordflow">return</span> -5;</div>
+<div class="line"><span class="lineno">   95</span>    }</div>
+<div class="line"><span class="lineno">   96</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes_per_frame = (size_t)info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19">channels</a> * 2u;</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">if</span> (bytes_per_frame == 0 || info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> % bytes_per_frame != 0 ||</div>
+<div class="line"><span class="lineno">   98</span>        info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> / bytes_per_frame &gt; (<span class="keywordtype">size_t</span>)INT_MAX) {</div>
+<div class="line"><span class="lineno">   99</span>        <span class="keywordflow">return</span> -6;</div>
+<div class="line"><span class="lineno">  100</span>    }</div>
+<div class="line"><span class="lineno">  101</span>    info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> = (int)(info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0">data_bytes</a> / bytes_per_frame);</div>
+<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">return</span> info-&gt;<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> &gt; 0 ? 0 : -6;</div>
+<div class="line"><span class="lineno">  103</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_ad2dea24c20761250c3df3b634ffabed4"><div class="ttname"><a href="audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4">read_u32_le</a></div><div class="ttdeci">static uint32_t read_u32_le(const uint8_t *p)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00038">audio_kernels.c:38</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html_a056e487f230f8cd625dec984e79711dd"><div class="ttname"><a href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">CKAudioWavInfo::sample_rate</a></div><div class="ttdeci">int sample_rate</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00019">ckernel_audio.h:19</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__audio_8h_source.html#l00020">CKAudioWavInfo::bits_per_sample</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00023">CKAudioWavInfo::data_bytes</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00017">CKAudioWavInfo::format_tag</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, <a class="el" href="audio__kernels_8c_source.html#l00029">read_u16_le()</a>, <a class="el" href="audio__kernels_8c_source.html#l00034">read_u32_le()</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00019">CKAudioWavInfo::sample_rate</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__audio_8h_source.html#l00020">CKAudioWavInfo::bits_per_sample</a>, <a class="el" href="ckernel__audio_8h_source.html#l00018">CKAudioWavInfo::channels</a>, <a class="el" href="ckernel__audio_8h_source.html#l00023">CKAudioWavInfo::data_bytes</a>, <a class="el" href="ckernel__audio_8h_source.html#l00022">CKAudioWavInfo::data_offset</a>, <a class="el" href="ckernel__audio_8h_source.html#l00017">CKAudioWavInfo::format_tag</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, <a class="el" href="audio__kernels_8c_source.html#l00033">read_u16_le()</a>, <a class="el" href="audio__kernels_8c_source.html#l00038">read_u32_le()</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00019">CKAudioWavInfo::sample_rate</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00140">audio_wav_decode_memory_pcm16_mono_window_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00525">audio_whisper_log_mel_window_wav_pcm16_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00144">audio_wav_decode_memory_pcm16_mono_window_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00529">audio_whisper_log_mel_window_wav_pcm16_f32()</a>.</p>
 
 </div>
 </div>
@@ -1409,44 +1418,44 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00722">722</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  728</span>{</div>
-<div class="line"><span class="lineno">  729</span>    <span class="keywordflow">if</span> (power == NULL || mel_filters == NULL || log_mel == NULL) {</div>
-<div class="line"><span class="lineno">  730</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  731</span>    }</div>
-<div class="line"><span class="lineno">  732</span>    <span class="keywordflow">if</span> (n_mels &lt;= 0 || n_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  733</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  734</span>    }</div>
-<div class="line"><span class="lineno">  735</span> </div>
-<div class="line"><span class="lineno">  736</span>    <span class="keywordtype">float</span> maximum = -INFINITY;</div>
-<div class="line"><span class="lineno">  737</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
-<div class="line"><span class="lineno">  738</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *filter = mel_filters + (size_t)mel * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
-<div class="line"><span class="lineno">  739</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * n_frames;</div>
-<div class="line"><span class="lineno">  740</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  741</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *spectrum = power + (size_t)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
-<div class="line"><span class="lineno">  742</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  743</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
-<div class="line"><span class="lineno">  744</span>                sum = fmaf(filter[bin], spectrum[bin], sum);</div>
-<div class="line"><span class="lineno">  745</span>            }</div>
-<div class="line"><span class="lineno">  746</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = log10f(fmaxf(sum, 1.0e-10f));</div>
-<div class="line"><span class="lineno">  747</span>            output[frame] = value;</div>
-<div class="line"><span class="lineno">  748</span>            maximum = fmaxf(maximum, value);</div>
-<div class="line"><span class="lineno">  749</span>        }</div>
-<div class="line"><span class="lineno">  750</span>    }</div>
-<div class="line"><span class="lineno">  751</span> </div>
-<div class="line"><span class="lineno">  752</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> floor = maximum - 8.0f;</div>
-<div class="line"><span class="lineno">  753</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
-<div class="line"><span class="lineno">  754</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * n_frames;</div>
-<div class="line"><span class="lineno">  755</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  756</span>            output[frame] = (fmaxf(output[frame], floor) + 4.0f) / 4.0f;</div>
-<div class="line"><span class="lineno">  757</span>        }</div>
-<div class="line"><span class="lineno">  758</span>    }</div>
-<div class="line"><span class="lineno">  759</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  760</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00841">841</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  847</span>{</div>
+<div class="line"><span class="lineno">  848</span>    <span class="keywordflow">if</span> (power == NULL || mel_filters == NULL || log_mel == NULL) {</div>
+<div class="line"><span class="lineno">  849</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  850</span>    }</div>
+<div class="line"><span class="lineno">  851</span>    <span class="keywordflow">if</span> (n_mels &lt;= 0 || n_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  852</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  853</span>    }</div>
+<div class="line"><span class="lineno">  854</span> </div>
+<div class="line"><span class="lineno">  855</span>    <span class="keywordtype">float</span> maximum = -INFINITY;</div>
+<div class="line"><span class="lineno">  856</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
+<div class="line"><span class="lineno">  857</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *filter = mel_filters + (size_t)mel * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
+<div class="line"><span class="lineno">  858</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * n_frames;</div>
+<div class="line"><span class="lineno">  859</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  860</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *spectrum = power + (size_t)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
+<div class="line"><span class="lineno">  861</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  862</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
+<div class="line"><span class="lineno">  863</span>                sum = fmaf(filter[bin], spectrum[bin], sum);</div>
+<div class="line"><span class="lineno">  864</span>            }</div>
+<div class="line"><span class="lineno">  865</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = log10f(fmaxf(sum, 1.0e-10f));</div>
+<div class="line"><span class="lineno">  866</span>            output[frame] = value;</div>
+<div class="line"><span class="lineno">  867</span>            maximum = fmaxf(maximum, value);</div>
+<div class="line"><span class="lineno">  868</span>        }</div>
+<div class="line"><span class="lineno">  869</span>    }</div>
+<div class="line"><span class="lineno">  870</span> </div>
+<div class="line"><span class="lineno">  871</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> floor = maximum - 8.0f;</div>
+<div class="line"><span class="lineno">  872</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
+<div class="line"><span class="lineno">  873</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * n_frames;</div>
+<div class="line"><span class="lineno">  874</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  875</span>            output[frame] = (fmaxf(output[frame], floor) + 4.0f) / 4.0f;</div>
+<div class="line"><span class="lineno">  876</span>        }</div>
+<div class="line"><span class="lineno">  877</span>    }</div>
+<div class="line"><span class="lineno">  878</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  879</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00762">audio_whisper_log_mel_reference_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00881">audio_whisper_log_mel_reference_f32()</a>.</p>
 
 </div>
 </div>
@@ -1506,20 +1515,20 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00762">762</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  770</span>{</div>
-<div class="line"><span class="lineno">  771</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> stft_status = <a class="code hl_function" href="audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057">audio_whisper_stft_power_reference_f32</a>(</div>
-<div class="line"><span class="lineno">  772</span>        samples, n_samples, power_scratch, n_frames);</div>
-<div class="line"><span class="lineno">  773</span>    <span class="keywordflow">if</span> (stft_status != 0) {</div>
-<div class="line"><span class="lineno">  774</span>        <span class="keywordflow">return</span> stft_status;</div>
-<div class="line"><span class="lineno">  775</span>    }</div>
-<div class="line"><span class="lineno">  776</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__kernels_8c.html#ab16ee955749f4f39bba1dad4b0c651e0">audio_whisper_log_mel_from_power_reference_f32</a>(</div>
-<div class="line"><span class="lineno">  777</span>        power_scratch, mel_filters, n_mels, n_frames, log_mel);</div>
-<div class="line"><span class="lineno">  778</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a6cc87d2eaa6781543bc2730968241057"><div class="ttname"><a href="audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057">audio_whisper_stft_power_reference_f32</a></div><div class="ttdeci">int audio_whisper_stft_power_reference_f32(const float *samples, int n_samples, float *power, int n_frames)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00681">audio_kernels.c:681</a></div></div>
-<div class="ttc" id="aaudio__kernels_8c_html_ab16ee955749f4f39bba1dad4b0c651e0"><div class="ttname"><a href="audio__kernels_8c.html#ab16ee955749f4f39bba1dad4b0c651e0">audio_whisper_log_mel_from_power_reference_f32</a></div><div class="ttdeci">int audio_whisper_log_mel_from_power_reference_f32(const float *power, const float *mel_filters, int n_mels, int n_frames, float *log_mel)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00722">audio_kernels.c:722</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00881">881</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  889</span>{</div>
+<div class="line"><span class="lineno">  890</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> stft_status = <a class="code hl_function" href="audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057">audio_whisper_stft_power_reference_f32</a>(</div>
+<div class="line"><span class="lineno">  891</span>        samples, n_samples, power_scratch, n_frames);</div>
+<div class="line"><span class="lineno">  892</span>    <span class="keywordflow">if</span> (stft_status != 0) {</div>
+<div class="line"><span class="lineno">  893</span>        <span class="keywordflow">return</span> stft_status;</div>
+<div class="line"><span class="lineno">  894</span>    }</div>
+<div class="line"><span class="lineno">  895</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="audio__kernels_8c.html#ab16ee955749f4f39bba1dad4b0c651e0">audio_whisper_log_mel_from_power_reference_f32</a>(</div>
+<div class="line"><span class="lineno">  896</span>        power_scratch, mel_filters, n_mels, n_frames, log_mel);</div>
+<div class="line"><span class="lineno">  897</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a6cc87d2eaa6781543bc2730968241057"><div class="ttname"><a href="audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057">audio_whisper_stft_power_reference_f32</a></div><div class="ttdeci">int audio_whisper_stft_power_reference_f32(const float *samples, int n_samples, float *power, int n_frames)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00800">audio_kernels.c:800</a></div></div>
+<div class="ttc" id="aaudio__kernels_8c_html_ab16ee955749f4f39bba1dad4b0c651e0"><div class="ttname"><a href="audio__kernels_8c.html#ab16ee955749f4f39bba1dad4b0c651e0">audio_whisper_log_mel_from_power_reference_f32</a></div><div class="ttdeci">int audio_whisper_log_mel_from_power_reference_f32(const float *power, const float *mel_filters, int n_mels, int n_frames, float *log_mel)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00841">audio_kernels.c:841</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00722">audio_whisper_log_mel_from_power_reference_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00681">audio_whisper_stft_power_reference_f32()</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00841">audio_whisper_log_mel_from_power_reference_f32()</a>, and <a class="el" href="audio__kernels_8c_source.html#l00800">audio_whisper_stft_power_reference_f32()</a>.</p>
 
 </div>
 </div>
@@ -1603,88 +1612,88 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00525">525</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  537</span>{</div>
-<div class="line"><span class="lineno">  538</span>    <span class="keywordflow">if</span> (bytes == NULL || window == NULL || cos_table == NULL ||</div>
-<div class="line"><span class="lineno">  539</span>        sin_table == NULL || mel_filters == NULL || log_mel == NULL) {</div>
-<div class="line"><span class="lineno">  540</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  541</span>    }</div>
-<div class="line"><span class="lineno">  542</span>    <a class="code hl_struct" href="structCKAudioWavInfo.html">CKAudioWavInfo</a> info;</div>
-<div class="line"><span class="lineno">  543</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a>(bytes, byte_count, &amp;info) != 0 ||</div>
-<div class="line"><span class="lineno">  544</span>        info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> != target_sample_rate ||</div>
-<div class="line"><span class="lineno">  545</span>        target_sample_rate != <a class="code hl_define" href="ckernel__audio_8h.html#af1c758eba3f2e41f26558e4d9662aefa">CK_AUDIO_WHISPER_SAMPLE_RATE</a> ||</div>
-<div class="line"><span class="lineno">  546</span>        start_frame &lt; 0 ||</div>
-<div class="line"><span class="lineno">  547</span>        start_frame % <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> != 0 ||</div>
-<div class="line"><span class="lineno">  548</span>        n_mels &lt;= 0 || output_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  549</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  550</span>    }</div>
-<div class="line"><span class="lineno">  551</span>    <span class="keywordtype">float</span> *samples = (<span class="keywordtype">float</span> *)malloc((<span class="keywordtype">size_t</span>)info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> * <span class="keyword">sizeof</span>(float));</div>
-<div class="line"><span class="lineno">  552</span>    <span class="keywordflow">if</span> (samples == NULL) {</div>
-<div class="line"><span class="lineno">  553</span>        <span class="keywordflow">return</span> -3;</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00529">529</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  541</span>{</div>
+<div class="line"><span class="lineno">  542</span>    <span class="keywordflow">if</span> (bytes == NULL || window == NULL || cos_table == NULL ||</div>
+<div class="line"><span class="lineno">  543</span>        sin_table == NULL || mel_filters == NULL || log_mel == NULL) {</div>
+<div class="line"><span class="lineno">  544</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  545</span>    }</div>
+<div class="line"><span class="lineno">  546</span>    <a class="code hl_struct" href="structCKAudioWavInfo.html">CKAudioWavInfo</a> info;</div>
+<div class="line"><span class="lineno">  547</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="audio__kernels_8c.html#a13ac269ed76636283b5d98c21a4cb62f">audio_wav_parse_memory</a>(bytes, byte_count, &amp;info) != 0 ||</div>
+<div class="line"><span class="lineno">  548</span>        info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd">sample_rate</a> != target_sample_rate ||</div>
+<div class="line"><span class="lineno">  549</span>        target_sample_rate != <a class="code hl_define" href="ckernel__audio_8h.html#af1c758eba3f2e41f26558e4d9662aefa">CK_AUDIO_WHISPER_SAMPLE_RATE</a> ||</div>
+<div class="line"><span class="lineno">  550</span>        start_frame &lt; 0 ||</div>
+<div class="line"><span class="lineno">  551</span>        start_frame % <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> != 0 ||</div>
+<div class="line"><span class="lineno">  552</span>        n_mels &lt;= 0 || output_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  553</span>        <span class="keywordflow">return</span> -2;</div>
 <div class="line"><span class="lineno">  554</span>    }</div>
-<div class="line"><span class="lineno">  555</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> decoded = <a class="code hl_function" href="audio__kernels_8c.html#a38c4b1c6b2219556b9852dcd44708c1a">audio_wav_decode_pcm16_mono_f32</a>(</div>
-<div class="line"><span class="lineno">  556</span>        bytes, byte_count, &amp;info, samples, info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>);</div>
-<div class="line"><span class="lineno">  557</span>    <span class="keywordflow">if</span> (decoded != info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>) {</div>
-<div class="line"><span class="lineno">  558</span>        free(samples);</div>
-<div class="line"><span class="lineno">  559</span>        <span class="keywordflow">return</span> -4;</div>
-<div class="line"><span class="lineno">  560</span>    }</div>
-<div class="line"><span class="lineno">  561</span> </div>
-<div class="line"><span class="lineno">  562</span>    memset(</div>
-<div class="line"><span class="lineno">  563</span>        log_mel,</div>
-<div class="line"><span class="lineno">  564</span>        0,</div>
-<div class="line"><span class="lineno">  565</span>        (<span class="keywordtype">size_t</span>)n_mels * (<span class="keywordtype">size_t</span>)output_frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  566</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> global_frames = info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>;</div>
-<div class="line"><span class="lineno">  567</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> start_feature = start_frame / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>;</div>
-<div class="line"><span class="lineno">  568</span>    <span class="keywordtype">float</span> maximum = -INFINITY;</div>
-<div class="line"><span class="lineno">  569</span>    <span class="keywordtype">float</span> power[<a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>];</div>
-<div class="line"><span class="lineno">  570</span>    <span class="keywordtype">float</span> fft_scratch[2 * <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>];</div>
-<div class="line"><span class="lineno">  571</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; global_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  572</span>        <a class="code hl_function" href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a>(</div>
-<div class="line"><span class="lineno">  573</span>            samples,</div>
-<div class="line"><span class="lineno">  574</span>            info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>,</div>
-<div class="line"><span class="lineno">  575</span>            frame,</div>
-<div class="line"><span class="lineno">  576</span>            window,</div>
-<div class="line"><span class="lineno">  577</span>            cos_table,</div>
-<div class="line"><span class="lineno">  578</span>            sin_table,</div>
-<div class="line"><span class="lineno">  579</span>            power,</div>
-<div class="line"><span class="lineno">  580</span>            fft_scratch);</div>
-<div class="line"><span class="lineno">  581</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
-<div class="line"><span class="lineno">  582</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *filter =</div>
-<div class="line"><span class="lineno">  583</span>                mel_filters + (size_t)mel * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
-<div class="line"><span class="lineno">  584</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  585</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
-<div class="line"><span class="lineno">  586</span>                sum = fmaf(filter[bin], power[bin], sum);</div>
-<div class="line"><span class="lineno">  587</span>            }</div>
-<div class="line"><span class="lineno">  588</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = log10f(fmaxf(sum, 1.0e-10f));</div>
-<div class="line"><span class="lineno">  589</span>            maximum = fmaxf(maximum, value);</div>
-<div class="line"><span class="lineno">  590</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> output_frame = frame - start_feature;</div>
-<div class="line"><span class="lineno">  591</span>            <span class="keywordflow">if</span> (output_frame &gt;= 0 &amp;&amp; output_frame &lt; output_frames) {</div>
-<div class="line"><span class="lineno">  592</span>                log_mel[(size_t)mel * output_frames + output_frame] = value;</div>
-<div class="line"><span class="lineno">  593</span>            }</div>
-<div class="line"><span class="lineno">  594</span>        }</div>
-<div class="line"><span class="lineno">  595</span>    }</div>
-<div class="line"><span class="lineno">  596</span>    free(samples);</div>
-<div class="line"><span class="lineno">  597</span>    <span class="keywordflow">if</span> (!isfinite(maximum)) {</div>
-<div class="line"><span class="lineno">  598</span>        <span class="keywordflow">return</span> -5;</div>
+<div class="line"><span class="lineno">  555</span>    <span class="keywordtype">float</span> *samples = (<span class="keywordtype">float</span> *)malloc((<span class="keywordtype">size_t</span>)info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> * <span class="keyword">sizeof</span>(float));</div>
+<div class="line"><span class="lineno">  556</span>    <span class="keywordflow">if</span> (samples == NULL) {</div>
+<div class="line"><span class="lineno">  557</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  558</span>    }</div>
+<div class="line"><span class="lineno">  559</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> decoded = <a class="code hl_function" href="audio__kernels_8c.html#a38c4b1c6b2219556b9852dcd44708c1a">audio_wav_decode_pcm16_mono_f32</a>(</div>
+<div class="line"><span class="lineno">  560</span>        bytes, byte_count, &amp;info, samples, info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>);</div>
+<div class="line"><span class="lineno">  561</span>    <span class="keywordflow">if</span> (decoded != info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>) {</div>
+<div class="line"><span class="lineno">  562</span>        free(samples);</div>
+<div class="line"><span class="lineno">  563</span>        <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  564</span>    }</div>
+<div class="line"><span class="lineno">  565</span> </div>
+<div class="line"><span class="lineno">  566</span>    memset(</div>
+<div class="line"><span class="lineno">  567</span>        log_mel,</div>
+<div class="line"><span class="lineno">  568</span>        0,</div>
+<div class="line"><span class="lineno">  569</span>        (<span class="keywordtype">size_t</span>)n_mels * (<span class="keywordtype">size_t</span>)output_frames * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  570</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> global_frames = info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a> / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>;</div>
+<div class="line"><span class="lineno">  571</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> start_feature = start_frame / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>;</div>
+<div class="line"><span class="lineno">  572</span>    <span class="keywordtype">float</span> maximum = -INFINITY;</div>
+<div class="line"><span class="lineno">  573</span>    <span class="keywordtype">float</span> power[<a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>];</div>
+<div class="line"><span class="lineno">  574</span>    <span class="keywordtype">float</span> fft_scratch[2 * <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>];</div>
+<div class="line"><span class="lineno">  575</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; global_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  576</span>        <a class="code hl_function" href="audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78">audio_stft_power_fft400_frame_f32</a>(</div>
+<div class="line"><span class="lineno">  577</span>            samples,</div>
+<div class="line"><span class="lineno">  578</span>            info.<a class="code hl_variable" href="structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90">frames</a>,</div>
+<div class="line"><span class="lineno">  579</span>            frame,</div>
+<div class="line"><span class="lineno">  580</span>            window,</div>
+<div class="line"><span class="lineno">  581</span>            cos_table,</div>
+<div class="line"><span class="lineno">  582</span>            sin_table,</div>
+<div class="line"><span class="lineno">  583</span>            power,</div>
+<div class="line"><span class="lineno">  584</span>            fft_scratch);</div>
+<div class="line"><span class="lineno">  585</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
+<div class="line"><span class="lineno">  586</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *filter =</div>
+<div class="line"><span class="lineno">  587</span>                mel_filters + (size_t)mel * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>;</div>
+<div class="line"><span class="lineno">  588</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  589</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
+<div class="line"><span class="lineno">  590</span>                sum = fmaf(filter[bin], power[bin], sum);</div>
+<div class="line"><span class="lineno">  591</span>            }</div>
+<div class="line"><span class="lineno">  592</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = log10f(fmaxf(sum, 1.0e-10f));</div>
+<div class="line"><span class="lineno">  593</span>            maximum = fmaxf(maximum, value);</div>
+<div class="line"><span class="lineno">  594</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> output_frame = frame - start_feature;</div>
+<div class="line"><span class="lineno">  595</span>            <span class="keywordflow">if</span> (output_frame &gt;= 0 &amp;&amp; output_frame &lt; output_frames) {</div>
+<div class="line"><span class="lineno">  596</span>                log_mel[(size_t)mel * output_frames + output_frame] = value;</div>
+<div class="line"><span class="lineno">  597</span>            }</div>
+<div class="line"><span class="lineno">  598</span>        }</div>
 <div class="line"><span class="lineno">  599</span>    }</div>
-<div class="line"><span class="lineno">  600</span> </div>
-<div class="line"><span class="lineno">  601</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available = global_frames - start_feature;</div>
-<div class="line"><span class="lineno">  602</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> valid_frames =</div>
-<div class="line"><span class="lineno">  603</span>        available &lt; output_frames ? (available &gt; 0 ? available : 0) : output_frames;</div>
-<div class="line"><span class="lineno">  604</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> floor = maximum - 8.0f;</div>
-<div class="line"><span class="lineno">  605</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
-<div class="line"><span class="lineno">  606</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * output_frames;</div>
-<div class="line"><span class="lineno">  607</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; valid_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  608</span>            output[frame] = (fmaxf(output[frame], floor) + 4.0f) / 4.0f;</div>
-<div class="line"><span class="lineno">  609</span>        }</div>
-<div class="line"><span class="lineno">  610</span>    }</div>
-<div class="line"><span class="lineno">  611</span>    <span class="keywordflow">return</span> valid_frames;</div>
-<div class="line"><span class="lineno">  612</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a38c4b1c6b2219556b9852dcd44708c1a"><div class="ttname"><a href="audio__kernels_8c.html#a38c4b1c6b2219556b9852dcd44708c1a">audio_wav_decode_pcm16_mono_f32</a></div><div class="ttdeci">int audio_wav_decode_pcm16_mono_f32(const uint8_t *bytes, size_t byte_count, const CKAudioWavInfo *info, float *mono, int mono_capacity)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00101">audio_kernels.c:101</a></div></div>
+<div class="line"><span class="lineno">  600</span>    free(samples);</div>
+<div class="line"><span class="lineno">  601</span>    <span class="keywordflow">if</span> (!isfinite(maximum)) {</div>
+<div class="line"><span class="lineno">  602</span>        <span class="keywordflow">return</span> -5;</div>
+<div class="line"><span class="lineno">  603</span>    }</div>
+<div class="line"><span class="lineno">  604</span> </div>
+<div class="line"><span class="lineno">  605</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available = global_frames - start_feature;</div>
+<div class="line"><span class="lineno">  606</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> valid_frames =</div>
+<div class="line"><span class="lineno">  607</span>        available &lt; output_frames ? (available &gt; 0 ? available : 0) : output_frames;</div>
+<div class="line"><span class="lineno">  608</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> floor = maximum - 8.0f;</div>
+<div class="line"><span class="lineno">  609</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
+<div class="line"><span class="lineno">  610</span>        <span class="keywordtype">float</span> *output = log_mel + (size_t)mel * output_frames;</div>
+<div class="line"><span class="lineno">  611</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; valid_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  612</span>            output[frame] = (fmaxf(output[frame], floor) + 4.0f) / 4.0f;</div>
+<div class="line"><span class="lineno">  613</span>        }</div>
+<div class="line"><span class="lineno">  614</span>    }</div>
+<div class="line"><span class="lineno">  615</span>    <span class="keywordflow">return</span> valid_frames;</div>
+<div class="line"><span class="lineno">  616</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a38c4b1c6b2219556b9852dcd44708c1a"><div class="ttname"><a href="audio__kernels_8c.html#a38c4b1c6b2219556b9852dcd44708c1a">audio_wav_decode_pcm16_mono_f32</a></div><div class="ttdeci">int audio_wav_decode_pcm16_mono_f32(const uint8_t *bytes, size_t byte_count, const CKAudioWavInfo *info, float *mono, int mono_capacity)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00105">audio_kernels.c:105</a></div></div>
 <div class="ttc" id="ackernel__audio_8h_html_af1c758eba3f2e41f26558e4d9662aefa"><div class="ttname"><a href="ckernel__audio_8h.html#af1c758eba3f2e41f26558e4d9662aefa">CK_AUDIO_WHISPER_SAMPLE_RATE</a></div><div class="ttdeci">#define CK_AUDIO_WHISPER_SAMPLE_RATE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00011">ckernel_audio.h:11</a></div></div>
 <div class="ttc" id="astructCKAudioWavInfo_html"><div class="ttname"><a href="structCKAudioWavInfo.html">CKAudioWavInfo</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__audio_8h_source.html#l00016">ckernel_audio.h:16</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00472">audio_stft_power_fft400_frame_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l00101">audio_wav_decode_pcm16_mono_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l00040">audio_wav_parse_memory()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>, <a class="el" href="ckernel__audio_8h_source.html#l00011">CK_AUDIO_WHISPER_SAMPLE_RATE</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00019">CKAudioWavInfo::sample_rate</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00476">audio_stft_power_fft400_frame_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l00105">audio_wav_decode_pcm16_mono_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l00044">audio_wav_parse_memory()</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>, <a class="el" href="ckernel__audio_8h_source.html#l00011">CK_AUDIO_WHISPER_SAMPLE_RATE</a>, <a class="el" href="ckernel__audio_8h_source.html#l00021">CKAudioWavInfo::frames</a>, and <a class="el" href="ckernel__audio_8h_source.html#l00019">CKAudioWavInfo::sample_rate</a>.</p>
 
 </div>
 </div>
@@ -1726,44 +1735,44 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00344">344</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  349</span>{</div>
-<div class="line"><span class="lineno">  350</span>    <span class="keywordflow">if</span> (mel_filters == NULL) {</div>
-<div class="line"><span class="lineno">  351</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  352</span>    }</div>
-<div class="line"><span class="lineno">  353</span>    <span class="keywordflow">if</span> (sample_rate &lt;= 0 || n_fft &lt;= 0 || (n_fft &amp; 1) != 0 || n_mels &lt;= 0) {</div>
-<div class="line"><span class="lineno">  354</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  355</span>    }</div>
-<div class="line"><span class="lineno">  356</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
-<div class="line"><span class="lineno">  357</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> mel_min = <a class="code hl_function" href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a>(0.0);</div>
-<div class="line"><span class="lineno">  358</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> mel_max = <a class="code hl_function" href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a>((<span class="keywordtype">double</span>)sample_rate / 2.0);</div>
-<div class="line"><span class="lineno">  359</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
-<div class="line"><span class="lineno">  360</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> left_mel =</div>
-<div class="line"><span class="lineno">  361</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)mel / (double)(n_mels + 1);</div>
-<div class="line"><span class="lineno">  362</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> center_mel =</div>
-<div class="line"><span class="lineno">  363</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)(mel + 1) / (<span class="keywordtype">double</span>)(n_mels + 1);</div>
-<div class="line"><span class="lineno">  364</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> right_mel =</div>
-<div class="line"><span class="lineno">  365</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)(mel + 2) / (<span class="keywordtype">double</span>)(n_mels + 1);</div>
-<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(left_mel);</div>
-<div class="line"><span class="lineno">  367</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> center = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(center_mel);</div>
-<div class="line"><span class="lineno">  368</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(right_mel);</div>
-<div class="line"><span class="lineno">  369</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> normalization = 2.0 / (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>);</div>
-<div class="line"><span class="lineno">  370</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
-<div class="line"><span class="lineno">  371</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> hz =</div>
-<div class="line"><span class="lineno">  372</span>                ((double)sample_rate / 2.0) * (double)bin / (<span class="keywordtype">double</span>)(bins - 1);</div>
-<div class="line"><span class="lineno">  373</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> lower = (hz - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>) / (center - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>);</div>
-<div class="line"><span class="lineno">  374</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> upper = (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - hz) / (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - center);</div>
-<div class="line"><span class="lineno">  375</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> triangle = fmax(0.0, fmin(lower, upper));</div>
-<div class="line"><span class="lineno">  376</span>            mel_filters[(size_t)mel * bins + bin] =</div>
-<div class="line"><span class="lineno">  377</span>                (<span class="keywordtype">float</span>)(triangle * normalization);</div>
-<div class="line"><span class="lineno">  378</span>        }</div>
-<div class="line"><span class="lineno">  379</span>    }</div>
-<div class="line"><span class="lineno">  380</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  381</span>}</div>
-<div class="ttc" id="aaudio__kernels_8c_html_a84c0d1f2b32522f09113013da85f65a9"><div class="ttname"><a href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a></div><div class="ttdeci">static double audio_hz_to_mel_slaney(double hz)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00328">audio_kernels.c:328</a></div></div>
-<div class="ttc" id="aaudio__kernels_8c_html_aa7a3d73f7e1474865e975c30a26eda0d"><div class="ttname"><a href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a></div><div class="ttdeci">static double audio_mel_to_hz_slaney(double mel)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00336">audio_kernels.c:336</a></div></div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00348">348</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  353</span>{</div>
+<div class="line"><span class="lineno">  354</span>    <span class="keywordflow">if</span> (mel_filters == NULL) {</div>
+<div class="line"><span class="lineno">  355</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  356</span>    }</div>
+<div class="line"><span class="lineno">  357</span>    <span class="keywordflow">if</span> (sample_rate &lt;= 0 || n_fft &lt;= 0 || (n_fft &amp; 1) != 0 || n_mels &lt;= 0) {</div>
+<div class="line"><span class="lineno">  358</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  359</span>    }</div>
+<div class="line"><span class="lineno">  360</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> bins = n_fft / 2 + 1;</div>
+<div class="line"><span class="lineno">  361</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> mel_min = <a class="code hl_function" href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a>(0.0);</div>
+<div class="line"><span class="lineno">  362</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> mel_max = <a class="code hl_function" href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a>((<span class="keywordtype">double</span>)sample_rate / 2.0);</div>
+<div class="line"><span class="lineno">  363</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> mel = 0; mel &lt; n_mels; ++mel) {</div>
+<div class="line"><span class="lineno">  364</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> left_mel =</div>
+<div class="line"><span class="lineno">  365</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)mel / (double)(n_mels + 1);</div>
+<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> center_mel =</div>
+<div class="line"><span class="lineno">  367</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)(mel + 1) / (<span class="keywordtype">double</span>)(n_mels + 1);</div>
+<div class="line"><span class="lineno">  368</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> right_mel =</div>
+<div class="line"><span class="lineno">  369</span>            mel_min + (mel_max - mel_min) * (<span class="keywordtype">double</span>)(mel + 2) / (<span class="keywordtype">double</span>)(n_mels + 1);</div>
+<div class="line"><span class="lineno">  370</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a> = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(left_mel);</div>
+<div class="line"><span class="lineno">  371</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> center = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(center_mel);</div>
+<div class="line"><span class="lineno">  372</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> <a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> = <a class="code hl_function" href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a>(right_mel);</div>
+<div class="line"><span class="lineno">  373</span>        <span class="keyword">const</span> <span class="keywordtype">double</span> normalization = 2.0 / (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>);</div>
+<div class="line"><span class="lineno">  374</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; bins; ++bin) {</div>
+<div class="line"><span class="lineno">  375</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> hz =</div>
+<div class="line"><span class="lineno">  376</span>                ((double)sample_rate / 2.0) * (double)bin / (<span class="keywordtype">double</span>)(bins - 1);</div>
+<div class="line"><span class="lineno">  377</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> lower = (hz - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>) / (center - <a class="code hl_variable" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>);</div>
+<div class="line"><span class="lineno">  378</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> upper = (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - hz) / (<a class="code hl_variable" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a> - center);</div>
+<div class="line"><span class="lineno">  379</span>            <span class="keyword">const</span> <span class="keywordtype">double</span> triangle = fmax(0.0, fmin(lower, upper));</div>
+<div class="line"><span class="lineno">  380</span>            mel_filters[(size_t)mel * bins + bin] =</div>
+<div class="line"><span class="lineno">  381</span>                (<span class="keywordtype">float</span>)(triangle * normalization);</div>
+<div class="line"><span class="lineno">  382</span>        }</div>
+<div class="line"><span class="lineno">  383</span>    }</div>
+<div class="line"><span class="lineno">  384</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  385</span>}</div>
+<div class="ttc" id="aaudio__kernels_8c_html_a84c0d1f2b32522f09113013da85f65a9"><div class="ttname"><a href="audio__kernels_8c.html#a84c0d1f2b32522f09113013da85f65a9">audio_hz_to_mel_slaney</a></div><div class="ttdeci">static double audio_hz_to_mel_slaney(double hz)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00332">audio_kernels.c:332</a></div></div>
+<div class="ttc" id="aaudio__kernels_8c_html_aa7a3d73f7e1474865e975c30a26eda0d"><div class="ttname"><a href="audio__kernels_8c.html#aa7a3d73f7e1474865e975c30a26eda0d">audio_mel_to_hz_slaney</a></div><div class="ttdeci">static double audio_mel_to_hz_slaney(double mel)</div><div class="ttdef"><b>Definition</b> <a href="audio__kernels_8c_source.html#l00340">audio_kernels.c:340</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00328">audio_hz_to_mel_slaney()</a>, <a class="el" href="audio__kernels_8c_source.html#l00336">audio_mel_to_hz_slaney()</a>, <a class="el" href="true__bpe_8h_source.html#l00131">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00132">right</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00332">audio_hz_to_mel_slaney()</a>, <a class="el" href="audio__kernels_8c_source.html#l00340">audio_mel_to_hz_slaney()</a>, <a class="el" href="true__bpe_8h_source.html#l00131">left</a>, and <a class="el" href="true__bpe_8h_source.html#l00132">right</a>.</p>
 
 </div>
 </div>
@@ -1805,46 +1814,46 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00681">681</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  686</span>{</div>
-<div class="line"><span class="lineno">  687</span>    <span class="keywordflow">if</span> (samples == NULL || power == NULL) {</div>
-<div class="line"><span class="lineno">  688</span>        <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  689</span>    }</div>
-<div class="line"><span class="lineno">  690</span>    <span class="keywordflow">if</span> (n_samples &lt;= <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a> / 2 || n_frames &lt;= 0) {</div>
-<div class="line"><span class="lineno">  691</span>        <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">  692</span>    }</div>
-<div class="line"><span class="lineno">  693</span>    <span class="keywordflow">if</span> (n_frames != n_samples / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>) {</div>
-<div class="line"><span class="lineno">  694</span>        <span class="keywordflow">return</span> -3;</div>
-<div class="line"><span class="lineno">  695</span>    }</div>
-<div class="line"><span class="lineno">  696</span> </div>
-<div class="line"><span class="lineno">  697</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> center = <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a> / 2;</div>
-<div class="line"><span class="lineno">  698</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
-<div class="line"><span class="lineno">  699</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
-<div class="line"><span class="lineno">  700</span>            <span class="keywordtype">float</span> real = 0.0f;</div>
-<div class="line"><span class="lineno">  701</span>            <span class="keywordtype">float</span> imag = 0.0f;</div>
-<div class="line"><span class="lineno">  702</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>; ++sample) {</div>
-<div class="line"><span class="lineno">  703</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> source = <a class="code hl_function" href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a>(</div>
-<div class="line"><span class="lineno">  704</span>                    frame * <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> + sample - center,</div>
-<div class="line"><span class="lineno">  705</span>                    n_samples);</div>
-<div class="line"><span class="lineno">  706</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> window = 0.5f - 0.5f * cosf(</div>
-<div class="line"><span class="lineno">  707</span>                    2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> * (<span class="keywordtype">float</span>)sample /</div>
-<div class="line"><span class="lineno">  708</span>                    (<span class="keywordtype">float</span>)<a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>);</div>
-<div class="line"><span class="lineno">  709</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> value = samples[source] * window;</div>
-<div class="line"><span class="lineno">  710</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> angle = -2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> *</div>
-<div class="line"><span class="lineno">  711</span>                    (float)(bin * sample) / (float)<a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>;</div>
-<div class="line"><span class="lineno">  712</span>                real = fmaf(value, cosf(angle), real);</div>
-<div class="line"><span class="lineno">  713</span>                imag = fmaf(value, sinf(angle), imag);</div>
-<div class="line"><span class="lineno">  714</span>            }</div>
-<div class="line"><span class="lineno">  715</span>            power[(size_t)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a> + bin] =</div>
-<div class="line"><span class="lineno">  716</span>                fmaf(real, real, imag * imag);</div>
-<div class="line"><span class="lineno">  717</span>        }</div>
-<div class="line"><span class="lineno">  718</span>    }</div>
-<div class="line"><span class="lineno">  719</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  720</span>}</div>
+<p class="definition">Definition at line <a class="el" href="audio__kernels_8c_source.html#l00800">800</a> of file <a class="el" href="audio__kernels_8c_source.html">audio_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  805</span>{</div>
+<div class="line"><span class="lineno">  806</span>    <span class="keywordflow">if</span> (samples == NULL || power == NULL) {</div>
+<div class="line"><span class="lineno">  807</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  808</span>    }</div>
+<div class="line"><span class="lineno">  809</span>    <span class="keywordflow">if</span> (n_samples &lt;= <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a> / 2 || n_frames &lt;= 0) {</div>
+<div class="line"><span class="lineno">  810</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  811</span>    }</div>
+<div class="line"><span class="lineno">  812</span>    <span class="keywordflow">if</span> (n_frames != n_samples / <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a>) {</div>
+<div class="line"><span class="lineno">  813</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  814</span>    }</div>
+<div class="line"><span class="lineno">  815</span> </div>
+<div class="line"><span class="lineno">  816</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> center = <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a> / 2;</div>
+<div class="line"><span class="lineno">  817</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> frame = 0; frame &lt; n_frames; ++frame) {</div>
+<div class="line"><span class="lineno">  818</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bin = 0; bin &lt; <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a>; ++bin) {</div>
+<div class="line"><span class="lineno">  819</span>            <span class="keywordtype">float</span> real = 0.0f;</div>
+<div class="line"><span class="lineno">  820</span>            <span class="keywordtype">float</span> imag = 0.0f;</div>
+<div class="line"><span class="lineno">  821</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> sample = 0; sample &lt; <a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>; ++sample) {</div>
+<div class="line"><span class="lineno">  822</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> source = <a class="code hl_function" href="audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f">reflect_index</a>(</div>
+<div class="line"><span class="lineno">  823</span>                    frame * <a class="code hl_define" href="ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59">CK_AUDIO_WHISPER_HOP_LENGTH</a> + sample - center,</div>
+<div class="line"><span class="lineno">  824</span>                    n_samples);</div>
+<div class="line"><span class="lineno">  825</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> window = 0.5f - 0.5f * cosf(</div>
+<div class="line"><span class="lineno">  826</span>                    2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> * (<span class="keywordtype">float</span>)sample /</div>
+<div class="line"><span class="lineno">  827</span>                    (<span class="keywordtype">float</span>)<a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>);</div>
+<div class="line"><span class="lineno">  828</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> value = samples[source] * window;</div>
+<div class="line"><span class="lineno">  829</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> angle = -2.0f * <a class="code hl_define" href="audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b">CK_AUDIO_PI_F</a> *</div>
+<div class="line"><span class="lineno">  830</span>                    (float)(bin * sample) / (float)<a class="code hl_define" href="ckernel__audio_8h.html#a8104385637cb3f91a6e39939e0db5761">CK_AUDIO_WHISPER_N_FFT</a>;</div>
+<div class="line"><span class="lineno">  831</span>                real = fmaf(value, cosf(angle), real);</div>
+<div class="line"><span class="lineno">  832</span>                imag = fmaf(value, sinf(angle), imag);</div>
+<div class="line"><span class="lineno">  833</span>            }</div>
+<div class="line"><span class="lineno">  834</span>            power[(size_t)frame * <a class="code hl_define" href="ckernel__audio_8h.html#afb106d375720b93e8d92279d2f9d4661">CK_AUDIO_WHISPER_POWER_BINS</a> + bin] =</div>
+<div class="line"><span class="lineno">  835</span>                fmaf(real, real, imag * imag);</div>
+<div class="line"><span class="lineno">  836</span>        }</div>
+<div class="line"><span class="lineno">  837</span>    }</div>
+<div class="line"><span class="lineno">  838</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  839</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00014">CK_AUDIO_PI_F</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>, and <a class="el" href="audio__kernels_8c_source.html#l00017">reflect_index()</a>.</p>
+<p class="reference">References <a class="el" href="audio__kernels_8c_source.html#l00018">CK_AUDIO_PI_F</a>, <a class="el" href="ckernel__audio_8h_source.html#l00013">CK_AUDIO_WHISPER_HOP_LENGTH</a>, <a class="el" href="ckernel__audio_8h_source.html#l00012">CK_AUDIO_WHISPER_N_FFT</a>, <a class="el" href="ckernel__audio_8h_source.html#l00014">CK_AUDIO_WHISPER_POWER_BINS</a>, and <a class="el" href="audio__kernels_8c_source.html#l00021">reflect_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00762">audio_whisper_log_mel_reference_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l00881">audio_whisper_log_mel_reference_f32()</a>.</p>
 
 </div>
 </div>

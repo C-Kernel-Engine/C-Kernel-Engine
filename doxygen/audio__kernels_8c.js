@@ -24,6 +24,7 @@ var audio__kernels_8c =
     [ "audio_whisper_log_mel_window_wav_pcm16_f32", "audio__kernels_8c.html#a3cfe264d4c0a3c1552fdcfb8ef9d5761", null ],
     [ "audio_whisper_mel_filters_slaney_f32", "audio__kernels_8c.html#a01991d85b95102453b3912c03f83f2cb", null ],
     [ "audio_whisper_stft_power_reference_f32", "audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057", null ],
+    [ "ck_audio_conv1d_channel_major_f32_work", "audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7", null ],
     [ "read_u16_le", "audio__kernels_8c.html#a5326a387c09d9ac2c0365910e9fa67f3", null ],
     [ "read_u32_le", "audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4", null ],
     [ "reflect_index", "audio__kernels_8c.html#a5a6560a6e827e927a14e20dc7a25500f", null ]
