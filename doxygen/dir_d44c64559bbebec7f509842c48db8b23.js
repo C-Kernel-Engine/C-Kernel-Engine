@@ -5,6 +5,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "bf16_utils.h", "bf16__utils_8h.html", "bf16__utils_8h" ],
     [ "ck_features.h", "ck__features_8h.html", "ck__features_8h" ],
     [ "ck_metrics.h", "ck__metrics_8h.html", "ck__metrics_8h" ],
+    [ "ck_model_abi_v8.h", "ck__model__abi__v8_8h.html", "ck__model__abi__v8_8h" ],
     [ "ck_model_api.h", "ck__model__api_8h.html", "ck__model__api_8h" ],
     [ "ck_parity_api.h", "ck__parity__api_8h.html", "ck__parity__api_8h" ],
     [ "ck_speed_profiles.h", "ck__speed__profiles_8h.html", "ck__speed__profiles_8h" ],
