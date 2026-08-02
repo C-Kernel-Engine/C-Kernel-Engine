@@ -32,6 +32,7 @@
     .model-card.mc-qwen2::before  { background: var(--orange); }
     .model-card.mc-qwen3::before  { background: var(--green); }
     .model-card.mc-qwen35::before { background: #1abc9c; }
+    .model-card.mc-qwen36::before { background: #ff8c42; }
     .model-card.mc-qwen3vl::before { background: #00bcd4; }
     .model-card.mc-gemma4v::before { background: #ff6f91; }
     .model-card.mc-siglip::before  { background: #a78bfa; }
@@ -566,6 +567,29 @@
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q8_0</span>
         <span class="mq-chip">FP32</span>
+      </div>
+    </div>
+
+    <!-- Qwen3.6 -->
+    <div class="model-card mc-qwen36">
+      <span class="model-badge">qwen35-family hybrid circuit</span>
+      <div class="model-title">Qwen3.6 27B</div>
+      <div class="model-arch">Hybrid recurrent + gated attention · Gated DeltaNet<br>Q4_K_M quantized inference · optimized batched prefill (opt-in)</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Exact head-parallel DeltaNet prefill — value heads partitioned across the threadpool once per prompt</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K × Q8_K AVX-512 VNNI x16 prefill — AVX2 / reference fallback on other CPUs</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Sequential prefill remains the default while long-context parity is unresolved</span></div>
+      </div>
+      <div class="source-note">
+        Prefill coverage (PR #277): the measured Qwen3.6-27B Q4_K_M projection shapes dispatch to the AVX-512 VNNI x16 provider with packed weights prepared at load time, reaching <code>11.20 tok/s</code> prompt rate (about 2.6x the previous CKE batched baseline) on an ICX AVX-512/VNNI host. 1K-context logit parity is not certified yet, so the lane stays behind <code>CK_V8_FORCE_BATCHED_PREFILL=1</code>. Operator steps: <a href="v8-runbook.html#qwen36-optimized-prefill">v8 runbook</a>; performance context and remaining targets: <a href="prefill-performance-roadmap.html">prefill performance roadmap</a>.
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">exact_head_parallel_deltanet</span>
+        <span class="tag learned">q4k_q8k_vnni_x16_prefill</span>
+        <span class="tag fixed">opt-in until 1K parity</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
       </div>
     </div>
 
