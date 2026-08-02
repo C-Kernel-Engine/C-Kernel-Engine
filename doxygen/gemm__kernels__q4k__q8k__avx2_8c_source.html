@@ -151,106 +151,133 @@ $(document).ready(function(){initNavTree('gemm__kernels__q4k__q8k__avx2_8c_sourc
 <div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span> </div>
 <div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="preprocessor">#include &lt;stddef.h&gt;</span></div>
 <div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span><span class="preprocessor">#include &lt;stdint.h&gt;</span></div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span> </div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span> </div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span> </div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(<span class="keywordtype">float</span> *y,</div>
-<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
-<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>                        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K);</div>
-<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span> </div>
-<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keywordtype">float</span> hsum256_ps_q4k(__m256 v) {</div>
-<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span>    __m128 sum = _mm_add_ps(_mm256_castps256_ps128(v), _mm256_extractf128_ps(v, 1));</div>
-<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));</div>
-<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));</div>
-<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>    <span class="keywordflow">return</span> _mm_cvtss_f32(sum);</div>
-<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>}</div>
-<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span> </div>
-<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span><span class="keyword">static</span> <span class="keywordtype">float</span> dot_q4_k_q8_k_avx2(<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w,</div>
-<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>                                <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x,</div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>                                <span class="keywordtype">int</span> k)</div>
-<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>{</div>
-<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>    __m256 acc = _mm256_setzero_ps();</div>
-<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span>    __m128 acc_min = _mm_setzero_ps();</div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>    <span class="keyword">const</span> __m256i nibble_mask = _mm256_set1_epi8(0x0F);</div>
-<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span> </div>
-<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
-<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>        uint8_t sc[8], m_val[8];</div>
-<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>        <a class="code hl_function" href="ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307">unpack_q4_k_scales</a>(w[i].scales, sc, m_val);</div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span> </div>
-<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w[i].d) * x[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
-<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dmin = -<a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w[i].dmin) * x[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
-<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span> </div>
-<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>        <span class="keyword">const</span> __m128i mins = _mm_loadl_epi64((<span class="keyword">const</span> __m128i *)m_val);</div>
-<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>        <span class="keyword">const</span> __m128i q8_sums = _mm_hadd_epi16(</div>
-<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span>                _mm_loadu_si128((<span class="keyword">const</span> __m128i *)&amp;x[i].bsums[0]),</div>
-<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>                _mm_loadu_si128((<span class="keyword">const</span> __m128i *)&amp;x[i].bsums[8]));</div>
-<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>        <span class="keyword">const</span> __m128i min_products = _mm_madd_epi16(_mm_cvtepu8_epi16(mins), q8_sums);</div>
-<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>        acc_min = _mm_fmadd_ps(</div>
-<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>                _mm_set1_ps(dmin), _mm_cvtepi32_ps(min_products), acc_min);</div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span> </div>
-<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>        __m256i block_sum = _mm256_setzero_si256();</div>
-<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> / 64; ++group) {</div>
-<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>            <span class="keyword">const</span> __m256i packed = _mm256_loadu_si256(</div>
-<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>                    (<span class="keyword">const</span> __m256i *)&amp;w[i].qs[group * 32]);</div>
-<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>            <span class="keyword">const</span> __m256i q4_lo = _mm256_and_si256(packed, nibble_mask);</div>
-<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span>            <span class="keyword">const</span> __m256i q4_hi = _mm256_and_si256(</div>
-<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>                    _mm256_srli_epi16(packed, 4), nibble_mask);</div>
-<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>            <span class="keyword">const</span> __m256i q8_lo = _mm256_loadu_si256(</div>
-<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>                    (<span class="keyword">const</span> __m256i *)&amp;x[i].qs[group * 64]);</div>
-<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>            <span class="keyword">const</span> __m256i q8_hi = _mm256_loadu_si256(</div>
-<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>                    (<span class="keyword">const</span> __m256i *)&amp;x[i].qs[group * 64 + 32]);</div>
-<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>            __m256i lo = _mm256_maddubs_epi16(q4_lo, q8_lo);</div>
-<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span>            __m256i hi = _mm256_maddubs_epi16(q4_hi, q8_hi);</div>
-<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>            lo = _mm256_madd_epi16(_mm256_set1_epi16(sc[2 * group]), lo);</div>
-<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>            hi = _mm256_madd_epi16(_mm256_set1_epi16(sc[2 * group + 1]), hi);</div>
-<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>            block_sum = _mm256_add_epi32(block_sum, _mm256_add_epi32(lo, hi));</div>
-<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        }</div>
-<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>        acc = _mm256_fmadd_ps(</div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>                _mm256_set1_ps(d), _mm256_cvtepi32_ps(block_sum), acc);</div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>    }</div>
-<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span> </div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>    acc_min = _mm_add_ps(acc_min, _mm_movehl_ps(acc_min, acc_min));</div>
-<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>    acc_min = _mm_add_ss(acc_min, _mm_movehdup_ps(acc_min));</div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>    <span class="keywordflow">return</span> hsum256_ps_q4k(acc) + _mm_cvtss_f32(acc_min);</div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>}</div>
-<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span> </div>
-<div class="foldopen" id="foldopen00090" data-start="{" data-end="}">
-<div class="line"><a id="l00090" name="l00090"></a><span class="lineno"><a class="line" href="gemm__kernels__amx_8c.html#a030c98b26ad610ccea6dabf993b60cdf">   90</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf">gemv_q4_k_q8_k_avx2</a>(<span class="keywordtype">float</span> *y,</div>
-<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                         <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
-<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>                         <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
-<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>                         <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K)</div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>{</div>
-<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>    }</div>
-<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span> </div>
-<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span> </div>
-<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
-<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>        y[row] = dot_q4_k_q8_k_avx2(w_row, x, K);</div>
-<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>    }</div>
-<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>    <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span>}</div>
+<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span><span class="preprocessor">#include &lt;string.h&gt;</span></div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span> </div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="preprocessor">#include &quot;<a class="code" href="ckernel__quant_8h.html">ckernel_quant.h</a>&quot;</span></div>
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span> </div>
+<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="preprocessor">#include &lt;immintrin.h&gt;</span></div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span> </div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(<span class="keywordtype">float</span> *y,</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>                        <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>                        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K);</div>
+<div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span> </div>
+<div class="line"><a id="l00032" name="l00032"></a><span class="lineno">   32</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00033" name="l00033"></a><span class="lineno">   33</span><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keywordtype">float</span> hsum256_ps_q4k(__m256 v) {</div>
+<div class="line"><a id="l00034" name="l00034"></a><span class="lineno">   34</span>    __m128 sum = _mm_add_ps(_mm256_castps256_ps128(v), _mm256_extractf128_ps(v, 1));</div>
+<div class="line"><a id="l00035" name="l00035"></a><span class="lineno">   35</span>    sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));</div>
+<div class="line"><a id="l00036" name="l00036"></a><span class="lineno">   36</span>    sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));</div>
+<div class="line"><a id="l00037" name="l00037"></a><span class="lineno">   37</span>    <span class="keywordflow">return</span> _mm_cvtss_f32(sum);</div>
+<div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>}</div>
+<div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span> </div>
+<div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span><span class="keyword">static</span> <span class="keyword">inline</span> __m256i q4k_scale_pair_shuffle(<span class="keywordtype">int</span> pair)</div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>{</div>
+<div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> lo = 2 * pair;</div>
+<div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>    <span class="keywordflow">return</span> _mm256_set1_epi16((<span class="keywordtype">short</span>)(((lo + 1) &lt;&lt; 8) | lo));</div>
+<div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>}</div>
+<div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span> </div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span><span class="keyword">static</span> <span class="keywordtype">float</span> dot_q4_k_q8_k_avx2(<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w,</div>
+<div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>                                <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x,</div>
+<div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>                                <span class="keywordtype">int</span> k)</div>
+<div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>{</div>
+<div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = k / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>    __m256 acc = _mm256_setzero_ps();</div>
+<div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>    __m128 acc_min = _mm_setzero_ps();</div>
+<div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>    <span class="keyword">const</span> __m256i nibble_mask = _mm256_set1_epi8(0x0F);</div>
+<div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>    <span class="keyword">const</span> uint32_t mask_6bit = UINT32_C(0x3f3f3f3f);</div>
+<div class="line"><a id="l00055" name="l00055"></a><span class="lineno">   55</span>    <span class="keyword">const</span> uint32_t mask_4bit = UINT32_C(0x0f0f0f0f);</div>
+<div class="line"><a id="l00056" name="l00056"></a><span class="lineno">   56</span>    <span class="keyword">const</span> uint32_t mask_2bit = UINT32_C(0x03030303);</div>
+<div class="line"><a id="l00057" name="l00057"></a><span class="lineno">   57</span> </div>
+<div class="line"><a id="l00058" name="l00058"></a><span class="lineno">   58</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; nb; ++i) {</div>
+<div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>        uint32_t packed[4];</div>
+<div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>        memcpy(packed, w[i].scales, 12);</div>
+<div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span>        packed[3] = ((packed[2] &gt;&gt; 4) &amp; mask_4bit) |</div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>                    (((packed[1] &gt;&gt; 6) &amp; mask_2bit) &lt;&lt; 4);</div>
+<div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>        <span class="keyword">const</span> uint32_t upper_scales = packed[1] &amp; mask_6bit;</div>
+<div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>        packed[1] = (packed[2] &amp; mask_4bit) |</div>
+<div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>                    (((packed[0] &gt;&gt; 6) &amp; mask_2bit) &lt;&lt; 4);</div>
+<div class="line"><a id="l00066" name="l00066"></a><span class="lineno">   66</span>        packed[2] = upper_scales;</div>
+<div class="line"><a id="l00067" name="l00067"></a><span class="lineno">   67</span>        packed[0] &amp;= mask_6bit;</div>
+<div class="line"><a id="l00068" name="l00068"></a><span class="lineno">   68</span> </div>
+<div class="line"><a id="l00069" name="l00069"></a><span class="lineno">   69</span>        <span class="keyword">const</span> __m256i mins_and_scales = _mm256_cvtepu8_epi16(</div>
+<div class="line"><a id="l00070" name="l00070"></a><span class="lineno">   70</span>            _mm_set_epi32((<span class="keywordtype">int</span>)packed[3], (<span class="keywordtype">int</span>)packed[2],</div>
+<div class="line"><a id="l00071" name="l00071"></a><span class="lineno">   71</span>                          (<span class="keywordtype">int</span>)packed[1], (<span class="keywordtype">int</span>)packed[0]));</div>
+<div class="line"><a id="l00072" name="l00072"></a><span class="lineno">   72</span>        <span class="keyword">const</span> __m128i scale_bytes =</div>
+<div class="line"><a id="l00073" name="l00073"></a><span class="lineno">   73</span>            _mm256_extracti128_si256(mins_and_scales, 0);</div>
+<div class="line"><a id="l00074" name="l00074"></a><span class="lineno">   74</span>        <span class="keyword">const</span> __m256i scales = _mm256_set_m128i(scale_bytes, scale_bytes);</div>
+<div class="line"><a id="l00075" name="l00075"></a><span class="lineno">   75</span> </div>
+<div class="line"><a id="l00076" name="l00076"></a><span class="lineno">   76</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> d = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w[i].d) * x[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
+<div class="line"><a id="l00077" name="l00077"></a><span class="lineno">   77</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> dmin = -<a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w[i].dmin) * x[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a>;</div>
+<div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span> </div>
+<div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        <span class="keyword">const</span> __m128i q8_sums = _mm_hadd_epi16(</div>
+<div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span>                _mm_loadu_si128((<span class="keyword">const</span> __m128i *)&amp;x[i].bsums[0]),</div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>                _mm_loadu_si128((<span class="keyword">const</span> __m128i *)&amp;x[i].bsums[8]));</div>
+<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>        <span class="keyword">const</span> __m128i min_products = _mm_madd_epi16(</div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>            _mm256_extracti128_si256(mins_and_scales, 1), q8_sums);</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>        acc_min = _mm_fmadd_ps(</div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>                _mm_set1_ps(dmin), _mm_cvtepi32_ps(min_products), acc_min);</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span> </div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>        __m256i block_sum = _mm256_setzero_si256();</div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> group = 0; group &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> / 64; ++group) {</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>            <span class="keyword">const</span> __m256i packed = _mm256_loadu_si256(</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>                    (<span class="keyword">const</span> __m256i *)&amp;w[i].qs[group * 32]);</div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>            <span class="keyword">const</span> __m256i q4_lo = _mm256_and_si256(packed, nibble_mask);</div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>            <span class="keyword">const</span> __m256i q4_hi = _mm256_and_si256(</div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>                    _mm256_srli_epi16(packed, 4), nibble_mask);</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>            <span class="keyword">const</span> __m256i q8_lo = _mm256_loadu_si256(</div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>                    (<span class="keyword">const</span> __m256i *)&amp;x[i].qs[group * 64]);</div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>            <span class="keyword">const</span> __m256i q8_hi = _mm256_loadu_si256(</div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>                    (<span class="keyword">const</span> __m256i *)&amp;x[i].qs[group * 64 + 32]);</div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>            __m256i lo = _mm256_maddubs_epi16(q4_lo, q8_lo);</div>
+<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>            __m256i hi = _mm256_maddubs_epi16(q4_hi, q8_hi);</div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>            <span class="keyword">const</span> __m256i scale_lo = _mm256_shuffle_epi8(</div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>                scales, q4k_scale_pair_shuffle(2 * group));</div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>            <span class="keyword">const</span> __m256i scale_hi = _mm256_shuffle_epi8(</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>                scales, q4k_scale_pair_shuffle(2 * group + 1));</div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>            lo = _mm256_madd_epi16(scale_lo, lo);</div>
+<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>            hi = _mm256_madd_epi16(scale_hi, hi);</div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>            block_sum = _mm256_add_epi32(block_sum, _mm256_add_epi32(lo, hi));</div>
+<div class="line"><a id="l00107" name="l00107"></a><span class="lineno">  107</span>        }</div>
+<div class="line"><a id="l00108" name="l00108"></a><span class="lineno">  108</span>        acc = _mm256_fmadd_ps(</div>
+<div class="line"><a id="l00109" name="l00109"></a><span class="lineno">  109</span>                _mm256_set1_ps(d), _mm256_cvtepi32_ps(block_sum), acc);</div>
+<div class="line"><a id="l00110" name="l00110"></a><span class="lineno">  110</span>    }</div>
+<div class="line"><a id="l00111" name="l00111"></a><span class="lineno">  111</span> </div>
+<div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>    acc_min = _mm_add_ps(acc_min, _mm_movehl_ps(acc_min, acc_min));</div>
+<div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>    acc_min = _mm_add_ss(acc_min, _mm_movehdup_ps(acc_min));</div>
+<div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span>    <span class="keywordflow">return</span> hsum256_ps_q4k(acc) + _mm_cvtss_f32(acc_min);</div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>}</div>
+<div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span> </div>
+<div class="foldopen" id="foldopen00118" data-start="{" data-end="}">
+<div class="line"><a id="l00118" name="l00118"></a><span class="lineno"><a class="line" href="gemm__kernels__amx_8c.html#a030c98b26ad610ccea6dabf993b60cdf">  118</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf">gemv_q4_k_q8_k_avx2</a>(<span class="keywordtype">float</span> *y,</div>
+<div class="line"><a id="l00119" name="l00119"></a><span class="lineno">  119</span>                         <span class="keyword">const</span> <span class="keywordtype">void</span> *W,</div>
+<div class="line"><a id="l00120" name="l00120"></a><span class="lineno">  120</span>                         <span class="keyword">const</span> <span class="keywordtype">void</span> *x_q8,</div>
+<div class="line"><a id="l00121" name="l00121"></a><span class="lineno">  121</span>                         <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l00122" name="l00122"></a><span class="lineno">  122</span>{</div>
+<div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>    <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>    }</div>
+<div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span> </div>
+<div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
+<div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
+<div class="line"><a id="l00130" name="l00130"></a><span class="lineno">  130</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><a id="l00131" name="l00131"></a><span class="lineno">  131</span> </div>
+<div class="line"><a id="l00132" name="l00132"></a><span class="lineno">  132</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
+<div class="line"><a id="l00133" name="l00133"></a><span class="lineno">  133</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><a id="l00134" name="l00134"></a><span class="lineno">  134</span>        y[row] = dot_q4_k_q8_k_avx2(w_row, x, K);</div>
+<div class="line"><a id="l00135" name="l00135"></a><span class="lineno">  135</span>    }</div>
+<div class="line"><a id="l00136" name="l00136"></a><span class="lineno">  136</span><span class="preprocessor">#else</span></div>
+<div class="line"><a id="l00137" name="l00137"></a><span class="lineno">  137</span>    <a class="code hl_function" href="gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><a id="l00138" name="l00138"></a><span class="lineno">  138</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00139" name="l00139"></a><span class="lineno">  139</span>}</div>
 </div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00380">ckernel_quant.h:380</a></div></div>
-<div class="ttc" id="ackernel__quant_8h_html_adc037213865781c5c1ea63708ef94307"><div class="ttname"><a href="ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307">unpack_q4_k_scales</a></div><div class="ttdeci">static void unpack_q4_k_scales(const uint8_t *scales, uint8_t *sc, uint8_t *m)</div><div class="ttdoc">Unpack Q4_K sub-block scales and mins.</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00227">ckernel_quant.h:227</a></div></div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00121">ckernel_quant.h:121</a></div></div>
-<div class="ttc" id="agemm__kernels__q4k__q8k__avx2_8c_html_a030c98b26ad610ccea6dabf993b60cdf"><div class="ttname"><a href="gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf">gemv_q4_k_q8_k_avx2</a></div><div class="ttdeci">void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k__avx2_8c_source.html#l00090">gemm_kernels_q4k_q8k_avx2.c:90</a></div></div>
+<div class="ttc" id="agemm__kernels__q4k__q8k__avx2_8c_html_a030c98b26ad610ccea6dabf993b60cdf"><div class="ttname"><a href="gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf">gemv_q4_k_q8_k_avx2</a></div><div class="ttdeci">void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k__avx2_8c_source.html#l00118">gemm_kernels_q4k_q8k_avx2.c:118</a></div></div>
 <div class="ttc" id="agemm__kernels__q4k__q8k__avx2_8c_html_ac01f8caf84e100f3c72919c71217010e"><div class="ttname"><a href="gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00201">gemm_kernels_q4k_q8k.c:201</a></div></div>
 <div class="ttc" id="astructblock__q4__K_html"><div class="ttname"><a href="structblock__q4__K.html">block_q4_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00124">ckernel_quant.h:124</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00153">ckernel_quant.h:153</a></div></div>

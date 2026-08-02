@@ -57,6 +57,8 @@ var gemm__kernels__q4k__q8k__vnni_8c =
     [ "gemm_q4_packed_meta_x8_split_min_mreuse_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#ac3de2c7e5468d96797ffe45c611a962e", null ],
     [ "gemm_q4_packed_u8_x16_mtile_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a8ff0183ae64baa0fdf13f87299c669e1", null ],
     [ "gemm_q4_packed_vnni_x16_q8k_16m_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#abde806a81ec1f4661ae9f2bc4b728484", null ],
+    [ "gemm_q4_packed_vnni_x8_q8k_4m_job", "gemm__kernels__q4k__q8k__vnni_8c.html#a0e5bd47e250a20e9752757e4603a0b8c", null ],
+    [ "gemm_q4_packed_vnni_x8_q8k_4m_range_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a11aeda085109c834bdf3914f18102ebf", null ],
     [ "gemm_q4_packed_vnni_x8_q8k_4m_thread_fn", "gemm__kernels__q4k__q8k__vnni_8c.html#a1a9fd5dffc1a4a4b5cab99a4856b5326", null ],
     [ "gemv_q4_k_q8_k_avx2", "gemm__kernels__q4k__q8k__vnni_8c.html#a030c98b26ad610ccea6dabf993b60cdf", null ],
     [ "gemv_q4_k_q8_k_parallel_vnni", "gemm__kernels__q4k__q8k__vnni_8c.html#a0ea9f437d0af65398100c4c50c85ece6", null ],

@@ -1,6 +1,7 @@
 var gemm__kernels__q4k__q8k_8c =
 [
     [ "ck_nearest_int", "gemm__kernels__q4k__q8k_8c.html#ab5a6ee098afcfc17f8e2da12535945aa", null ],
+    [ "ck_q4k_q8k_force_ref", "gemm__kernels__q4k__q8k_8c.html#ad29d5db776f07b458d83c11d252874dc", null ],
     [ "dot_q4_k_q8_k_ref", "gemm__kernels__q4k__q8k_8c.html#adfa872f261f44f596eaf4e25599b0e3c", null ],
     [ "gemm_nt_q4_k_q8_k", "gemm__kernels__q4k__q8k_8c.html#a64fc7f7c8582355c66edf044b9858964", null ],
     [ "gemm_q4_k_q8_k", "gemm__kernels__q4k__q8k_8c.html#ac52baba628268303f41c01413c445024", null ],
