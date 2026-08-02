@@ -1,5 +1,9 @@
 var NAVTREEINDEX9 =
 {
+"dequant__kernels_8c.html#a5f456737b8276015b96f99a03daf11ad":[2,0,1,1,12,10],
+"dequant__kernels_8c.html#a79c5cea176a2a885717a0c5b42f13551":[2,0,1,1,12,4],
+"dequant__kernels_8c.html#a7b76a9677d59e551a7cbc57b2c396499":[2,0,1,1,12,0],
+"dequant__kernels_8c.html#a82b903e16498e719418051cf1ea32640":[2,0,1,1,12,14],
 "dequant__kernels_8c.html#a9fe84053743b560c755728a0f43c8887":[2,0,1,1,12,13],
 "dequant__kernels_8c.html#aa93fe3ed692c10046d000b65ed2076c0":[2,0,1,1,12,8],
 "dequant__kernels_8c.html#ac7a7fbd5c66b4bf7a1e5ce34033b0559":[2,0,1,1,12,9],
@@ -51,8 +55,8 @@ var NAVTREEINDEX9 =
 "fp16__convert_8c.html#af6d772e480abb26bbd5533edb5e7e4dd":[2,0,1,1,15,3],
 "fp16__convert_8c.html#af7424d60e8ca1ef00a889407399ccf1f":[2,0,1,1,15,6],
 "fp16__convert_8c_source.html":[2,0,1,1,15],
-"functions.html":[1,2,0,0],
 "functions.html":[1,2,0],
+"functions.html":[1,2,0,0],
 "functions_b.html":[1,2,0,1],
 "functions_c.html":[1,2,0,2],
 "functions_d.html":[1,2,0,3],
@@ -73,8 +77,8 @@ var NAVTREEINDEX9 =
 "functions_t.html":[1,2,0,18],
 "functions_u.html":[1,2,0,19],
 "functions_v.html":[1,2,0,20],
-"functions_vars.html":[1,2,1,0],
 "functions_vars.html":[1,2,1],
+"functions_vars.html":[1,2,1,0],
 "functions_vars_b.html":[1,2,1,1],
 "functions_vars_c.html":[1,2,1,2],
 "functions_vars_d.html":[1,2,1,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX9 =
 "gemm__kernels__bf16_8c.html#ab32643e4416889fd1d220f85a0298591":[2,0,1,1,24,9],
 "gemm__kernels__bf16_8c.html#ab7869ea8871e5e87859c5eed2a9e8277":[2,0,1,1,24,5],
 "gemm__kernels__bf16_8c.html#ac5d7318c45a162932cc6b2aa9f1ee463":[2,0,1,1,24,11],
-"gemm__kernels__bf16_8c.html#adf0e6e83bbf057ec55557429b394c7dc":[2,0,1,1,24,7],
-"gemm__kernels__bf16_8c.html#adf6bd63a63f6f7d2bf1ef80b2c687ab2":[2,0,1,1,24,24],
-"gemm__kernels__bf16_8c.html#ae0091c47ade010e18f3673ab97f50eb0":[2,0,1,1,24,17],
-"gemm__kernels__bf16_8c.html#ae8f09233924443b9beef9048821deb7a":[2,0,1,1,24,19],
-"gemm__kernels__bf16_8c_source.html":[2,0,1,1,24]
+"gemm__kernels__bf16_8c.html#adf0e6e83bbf057ec55557429b394c7dc":[2,0,1,1,24,7]
 };

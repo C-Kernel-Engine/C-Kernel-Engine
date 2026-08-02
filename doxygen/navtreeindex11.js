@@ -1,5 +1,9 @@
 var NAVTREEINDEX11 =
 {
+"gemm__kernels__q5__1__q8__1_8c.html#ac4283ad44999c29ed0867b234557a697":[2,0,1,1,38,0],
+"gemm__kernels__q5__1__q8__1_8c.html#af38ec26b97b6fcf2813351abcbf4fa0a":[2,0,1,1,38,2],
+"gemm__kernels__q5__1__q8__1_8c_source.html":[2,0,1,1,38],
+"gemm__kernels__q5__k_8c.html":[2,0,1,1,39],
 "gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2":[2,0,1,1,39,9],
 "gemm__kernels__q5__k_8c.html#a05e8183a955190d9e7e87b9b5d04642e":[2,0,1,1,39,3],
 "gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3":[2,0,1,1,39,13],
@@ -195,14 +199,14 @@ var NAVTREEINDEX11 =
 "ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6":[2,0,1,1,49,3],
 "ggml__runtime__compat_8h.html#af96c7de149a9dab3bc48b7d9b70c4ad8":[2,0,1,1,49,10],
 "ggml__runtime__compat_8h_source.html":[2,0,1,1,49],
-"globals.html":[2,1,0],
 "globals.html":[2,1,0,0],
+"globals.html":[2,1,0],
 "globals_a.html":[2,1,0,1],
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
 "globals_d.html":[2,1,0,4],
-"globals_defs.html":[2,1,6],
 "globals_defs.html":[2,1,6,0],
+"globals_defs.html":[2,1,6],
 "globals_defs_a.html":[2,1,6,1],
 "globals_defs_b.html":[2,1,6,2],
 "globals_defs_c.html":[2,1,6,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX11 =
 "globals_func_o.html":[2,1,1,15],
 "globals_func_p.html":[2,1,1,16],
 "globals_func_q.html":[2,1,1,17],
-"globals_func_r.html":[2,1,1,18],
-"globals_func_s.html":[2,1,1,19],
-"globals_func_t.html":[2,1,1,20],
-"globals_func_u.html":[2,1,1,21],
-"globals_func_v.html":[2,1,1,22]
+"globals_func_r.html":[2,1,1,18]
 };

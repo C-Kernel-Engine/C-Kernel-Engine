@@ -6225,7 +6225,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
 
 <details open>
-    <summary>SwiGLU Activation (16)</summary>
+    <summary>SwiGLU Activation (17)</summary>
     <div class="accordion-content">
 
 
@@ -6236,6 +6236,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_swiglu(const float * gate_up, float * output, int n_tokens, int intermediate_dim)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">SwiGLU activation.</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">farskip_swiglu_shared_combine_bf16</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void farskip_swiglu_shared_combine_bf16(const float * hidden, const float * routed, const float * post_attn_residual, const uint16_t * shared_gate, const uint16_t * shared_up, const uint16_t * shared_down, float * main_output, float * routed_free_output, int rows, int hidden_dim, int intermediate_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 
@@ -6401,7 +6411,7 @@ test_swiglu.py::TestSwiGLUForward::test_exact_single</p>
 
 
 <details open>
-    <summary>RoPE (Rotary Position Embedding) (72)</summary>
+    <summary>RoPE (Rotary Position Embedding) (75)</summary>
     <div class="accordion-content">
 
 
@@ -7132,6 +7142,36 @@ test_rope.py::TestRoPECache::test_cache_values</p>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">yarn_rope_cache_explicit_positions_bf16</code>
+                
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void yarn_rope_cache_explicit_positions_bf16(uint16_t * cos_cache, uint16_t * sin_cache, const int32_t * positions, int num_tokens, int rotary_dim, float freq_base, float factor, int original_context, float beta_fast, float beta_slow, float mscale, float mscale_all_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">yarn_rope_cache_explicit_positions_f32</code>
+                
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void yarn_rope_cache_explicit_positions_f32(float * cos_cache, float * sin_cache, const int32_t * positions, int num_tokens, int rotary_dim, float freq_base, float factor, int original_context, float beta_fast, float beta_slow, float mscale, float mscale_all_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">yarn_rope_cache_explicit_positions_impl</code>
+                
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void yarn_rope_cache_explicit_positions_impl(float * cos_f32, float * sin_f32, uint16_t * cos_bf16, uint16_t * sin_bf16, const int32_t * positions, int num_tokens, int rotary_dim, float freq_base, float factor, int original_context, float beta_fast, float beta_slow, float mscale, float mscale_all_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
     </div>
 </details>
 
@@ -7165,7 +7205,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1240)</summary>
+    <summary>Other Functions (1242)</summary>
     <div class="accordion-content">
 
 
@@ -19548,6 +19588,26 @@ The IR graph structure (number of layers, op types)</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void * worker_main(void * arg)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">yarn_correction_dim</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float yarn_correction_dim(float rotations, int rotary_dim, float freq_base, int original_context)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">yarn_mscale</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float yarn_mscale(float factor, float scale)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

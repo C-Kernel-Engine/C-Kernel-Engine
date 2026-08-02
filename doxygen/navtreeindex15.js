@@ -1,5 +1,15 @@
 var NAVTREEINDEX15 =
 {
+"structCKFooterGradOffsets.html#ac3f2b08b2785cf1fa039bb3c0e6e2197":[1,0,19,8],
+"structCKFooterGradOffsets.html#ada3b948a5b678ac0f01d74bf7ab3a8c8":[1,0,19,3],
+"structCKFooterGradOffsets.html#ae2a60b057eaa172d1132474349ad5d40":[1,0,19,5],
+"structCKFooterGradOffsets.html#ae30e8699e5a492c5ecfd6bd6644e775b":[1,0,19,2],
+"structCKFooterGradOffsets.html#ae6e42eddc33324875a7458f7d804a694":[1,0,19,1],
+"structCKFooterGradOffsets.html#ae9169fef93e53c932b9f4728d8cb6e30":[1,0,19,10],
+"structCKFooterOffsets.html":[1,0,20],
+"structCKFooterOffsets.html#a17d1b0599249931fab10aa62ce6b8b20":[1,0,20,6],
+"structCKFooterOffsets.html#a44484b840457f80b8fa286f5167d1687":[1,0,20,1],
+"structCKFooterOffsets.html#a5a3df48e55198eeebcfba9453881de01":[1,0,20,2],
 "structCKFooterOffsets.html#a638f017bdaec7d988d89bf2692a48d6b":[1,0,20,10],
 "structCKFooterOffsets.html#a6e968314ca3082225d5fdbeda2c64343":[1,0,20,0],
 "structCKFooterOffsets.html#a8866b0a08fa2195bbb577d5e4a4e12dd":[1,0,20,3],
@@ -239,15 +249,5 @@ var NAVTREEINDEX15 =
 "structCKLayerForwardParamsQ4K.html#ad7671a4ac45c1d65be5e28c03c700d2a":[1,0,33,48],
 "structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646":[1,0,33,11],
 "structCKLayerForwardParamsQ4K.html#ada91d4c0f5e6040aca475655f7f1bcab":[1,0,33,2],
-"structCKLayerForwardParamsQ4K.html#af0407fc50e027301417628d774a41ff3":[1,0,33,22],
-"structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e":[1,0,33,16],
-"structCKLayerForwardParamsQ4K.html#afae06ea5bb1f1d1aed99a1bfd54dd6bf":[1,0,33,18],
-"structCKLayerGradOffsets.html":[1,0,34],
-"structCKLayerGradOffsets.html#a00bd2969b569fa381be440e4e6f9cb4a":[1,0,34,17],
-"structCKLayerGradOffsets.html#a020b61adaa42a2b67579be3ce01f4d4c":[1,0,34,19],
-"structCKLayerGradOffsets.html#a09f74e154441a54bddb99ab67a961235":[1,0,34,9],
-"structCKLayerGradOffsets.html#a0a648a4351c960b008fd79a147bdfff2":[1,0,34,45],
-"structCKLayerGradOffsets.html#a0b6545d5f66c48d0896d5e328e5da974":[1,0,34,34],
-"structCKLayerGradOffsets.html#a0f042df968961329893d5a375b2ceb3d":[1,0,34,52],
-"structCKLayerGradOffsets.html#a22e21f41e2a46966632669d02fc0721d":[1,0,34,43]
+"structCKLayerForwardParamsQ4K.html#af0407fc50e027301417628d774a41ff3":[1,0,33,22]
 };

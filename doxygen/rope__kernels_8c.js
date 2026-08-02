@@ -79,5 +79,10 @@ var rope__kernels_8c =
     [ "vision_mrope_yarn", "rope__kernels_8c.html#a978dfe3b164c626162f7a1cb9ae96dce", null ],
     [ "vision_mrope_yarn_corr_dim", "rope__kernels_8c.html#ab4e622d1413541185685c8dcba133c0e", null ],
     [ "vision_mrope_yarn_corr_dims", "rope__kernels_8c.html#aaf2bc1ad8ac5e11ab24b67429a8b674b", null ],
-    [ "vision_mrope_yarn_ramp", "rope__kernels_8c.html#af98a35fe79365aa6793f1d5b47cecdd2", null ]
+    [ "vision_mrope_yarn_ramp", "rope__kernels_8c.html#af98a35fe79365aa6793f1d5b47cecdd2", null ],
+    [ "yarn_correction_dim", "rope__kernels_8c.html#ae07827e58a921df0e3dc654e30da130c", null ],
+    [ "yarn_mscale", "rope__kernels_8c.html#ab189039b2b462896a7405a2a7be18024", null ],
+    [ "yarn_rope_cache_explicit_positions_bf16", "rope__kernels_8c.html#a3b2a3c0e00fba2964884ae6db444565d", null ],
+    [ "yarn_rope_cache_explicit_positions_f32", "rope__kernels_8c.html#abdc5ff497129c93f5d6db4cffc24897a", null ],
+    [ "yarn_rope_cache_explicit_positions_impl", "rope__kernels_8c.html#a5cb56e51d2cac1fcc06a06ff2261235c", null ]
 ];

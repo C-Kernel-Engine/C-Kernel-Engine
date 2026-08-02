@@ -141,6 +141,7 @@ var ckernel__engine_8h =
     [ "embedding_forward_q5_0", "ckernel__engine_8h.html#ac5d9a661409d8edec457d13ce27cf7f4", null ],
     [ "embedding_forward_q6_k", "ckernel__engine_8h.html#a04f715861b61ca2e811fc14112f1083e", null ],
     [ "embedding_forward_q8_0", "ckernel__engine_8h.html#ace8166ca41fc55267666032365c330a4", null ],
+    [ "farskip_swiglu_shared_combine_bf16", "ckernel__engine_8h.html#ac147cc1c814db75ad6b0382780c5c455", null ],
     [ "fc1_backward_kernel", "ckernel__engine_8h.html#a73e088d0e2388c78920e8fc99b0c3846", null ],
     [ "fc2_backward_kernel", "ckernel__engine_8h.html#a89a29fc853aae0baf9f6094fee52562a", null ],
     [ "feature_concat", "ckernel__engine_8h.html#ac3987d3d95a62a769029100abbbf852a", null ],
@@ -465,5 +466,7 @@ var ckernel__engine_8h =
     [ "unfused_rmsnorm_qkv_prefill", "ckernel__engine_8h.html#a96082b299d4fa9b2e3cfcd6077b22ca3", null ],
     [ "vec_dot_q6_k_q8_k", "ckernel__engine_8h.html#a892b783bece286ef3d51dfef42017ac5", null ],
     [ "vision_position_ids_2d_merge", "ckernel__engine_8h.html#af0161c757898c6d0193bcae1415dc1e4", null ],
-    [ "weighted_sum_f32", "ckernel__engine_8h.html#a6923864d9edb216c4938436cd74a4823", null ]
+    [ "weighted_sum_f32", "ckernel__engine_8h.html#a6923864d9edb216c4938436cd74a4823", null ],
+    [ "yarn_rope_cache_explicit_positions_bf16", "ckernel__engine_8h.html#a3b2a3c0e00fba2964884ae6db444565d", null ],
+    [ "yarn_rope_cache_explicit_positions_f32", "ckernel__engine_8h.html#abdc5ff497129c93f5d6db4cffc24897a", null ]
 ];

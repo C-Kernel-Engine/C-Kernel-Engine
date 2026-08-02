@@ -1,5 +1,15 @@
 var NAVTREEINDEX16 =
 {
+"structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e":[1,0,33,16],
+"structCKLayerForwardParamsQ4K.html#afae06ea5bb1f1d1aed99a1bfd54dd6bf":[1,0,33,18],
+"structCKLayerGradOffsets.html":[1,0,34],
+"structCKLayerGradOffsets.html#a00bd2969b569fa381be440e4e6f9cb4a":[1,0,34,17],
+"structCKLayerGradOffsets.html#a020b61adaa42a2b67579be3ce01f4d4c":[1,0,34,19],
+"structCKLayerGradOffsets.html#a09f74e154441a54bddb99ab67a961235":[1,0,34,9],
+"structCKLayerGradOffsets.html#a0a648a4351c960b008fd79a147bdfff2":[1,0,34,45],
+"structCKLayerGradOffsets.html#a0b6545d5f66c48d0896d5e328e5da974":[1,0,34,34],
+"structCKLayerGradOffsets.html#a0f042df968961329893d5a375b2ceb3d":[1,0,34,52],
+"structCKLayerGradOffsets.html#a22e21f41e2a46966632669d02fc0721d":[1,0,34,43],
 "structCKLayerGradOffsets.html#a298c68b6ec8832481837dd00c3a6fbdf":[1,0,34,44],
 "structCKLayerGradOffsets.html#a2d059e5b3e882d461ee74d459b54aeae":[1,0,34,2],
 "structCKLayerGradOffsets.html#a338e5dc53f5ef93dfa563d999e27826a":[1,0,34,21],
@@ -239,15 +249,5 @@ var NAVTREEINDEX16 =
 "structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537":[1,0,47,10],
 "structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950":[1,0,47,6],
 "structCKModelRuntimeDescriptorV8.html#abd5584742189913e789e7d705fc3196d":[1,0,47,8],
-"structCKModelRuntimeDescriptorV8.html#ac5af8940d8ac291ed5d286f0de175d00":[1,0,47,4],
-"structCKModelRuntimeDescriptorV8.html#af0560f7439030c528a9b3364bef4b79e":[1,0,47,7],
-"structCKModelRuntimeDescriptorV8.html#af425dd44d5d3c8b98f14d709e846c175":[1,0,47,0],
-"structCKModelRuntimeDescriptorV8.html#af6a006961191329f5cc41410bf97a13e":[1,0,47,11],
-"structCKPlanBinding.html":[1,0,48],
-"structCKPlanBinding.html#a86cd6b157f1489dc20f7558c5a69c94f":[1,0,48,1],
-"structCKPlanBinding.html#adf2dd85574e578a94cd1fc656d077505":[1,0,48,0],
-"structCKPlanStep.html":[1,0,49],
-"structCKPlanStep.html#a07deae3fde9109078baca99987e58ad1":[1,0,49,1],
-"structCKPlanStep.html#a870b313bb3754be086178d1478aa8b9e":[1,0,49,0],
-"structCKPlanStepV2.html":[1,0,50]
+"structCKModelRuntimeDescriptorV8.html#ac5af8940d8ac291ed5d286f0de175d00":[1,0,47,4]
 };

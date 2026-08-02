@@ -10,6 +10,7 @@ var axpy__kernels_8c =
     [ "ck_moe_sigmoid_f32", "axpy__kernels_8c.html#acbfeb51b56dcd12f1c77b5e6f307ae6e", null ],
     [ "ck_moe_silu_f32", "axpy__kernels_8c.html#a016bad88c138cb1af2b1bf0b5ec3d39b", null ],
     [ "ck_moe_up_idx", "axpy__kernels_8c.html#a1dbe012150b76ea78303e526a35f93fc", null ],
+    [ "farskip_swiglu_shared_combine_bf16", "axpy__kernels_8c.html#ac147cc1c814db75ad6b0382780c5c455", null ],
     [ "moe_accumulate_expert_f32", "axpy__kernels_8c.html#a0df9f0994c879eaa00c6ba9c0867bbec", null ],
     [ "moe_relu2_expert_backward_f32", "axpy__kernels_8c.html#a3d0ee5eba40a47c33dc5c9c6cd4453c0", null ],
     [ "moe_relu2_expert_forward_f32", "axpy__kernels_8c.html#a61a81e4029a3cc37bea14e7ee7017979", null ],
