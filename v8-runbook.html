@@ -1229,16 +1229,16 @@ python -m pip install -r requirements-v8.txt</pre>
     <h3>GLM4</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>version/v8/scripts/cks-v8-run run \
-  hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf \
-  --context-len 1034 \
-  --force-convert --force-compile \
-  --chat-template glm4 \
-  --prompt 'Give me a detailed example of C, Python and SQL code.' \
-  --max-tokens 256 \
-  --temperature 0.0</pre>
+<pre># Low-memory validation lane: template + conversion + comparator syntax
+.venv/bin/python -m unittest tests.test_v8_glm4_template
+.venv/bin/python -m py_compile \
+  version/v8/scripts/compare_glm4_torch_ck_v8.py \
+  version/v8/scripts/convert_gguf_to_bump_v8.py \
+  version/v8/scripts/convert_safetensors_to_bump_v8.py \
+  tests/test_v8_glm4_template.py \
+  tests/test_v8_safetensors_to_bump.py</pre>
     </div>
-    <p class="mini-note">GLM4 has a real Q4_K_M runtime lane with partial pairwise RoPE, persistent FP16 KV cache, and llama.cpp parity coverage. <code>--force-compile</code> force-builds both <code>libckernel_engine.so</code> and <code>libckernel_tokenizer.so</code>, compiles the generated model into a staging directory, verifies that the complete bundle loads without unresolved symbols, and only then replaces the cached runtime. No manual library copy is required.</p>
+    <p class="mini-note">GLM4 is currently tracked as a v8 template/conversion/parity-harness lane. The patch adds GLM4 GGUF metadata handling, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK comparator. Run full real-model GLM4 smoke on a higher-memory host before promoting it to the high-memory runtime lane.</p>
 
     <h3>Kimi / MLA Decoder Contract</h3>
     <div class="cmd-block">
@@ -1344,100 +1344,6 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
     <p class="mini-note">Gemma4 followed this route: BF16 safetensors proved the split-direct RoPE circuit against PyTorch, then the GGUF Q4_K_M path reused the same IR/kernel contract for coherent long-answer smoke testing.</p>
 </div>
 
-<h2 id="qwen36-optimized-prefill">Qwen3.6 Q4_K_M Optimized Prefill</h2>
-
-<p>
-    PR <strong>#277</strong> landed an exact batched-prefill optimization lane for
-    <strong>Qwen3.6-27B Q4_K_M</strong> (merge <code>c0a04690</code>, engineering note
-    <code>docs/notes/QWEN36_EXACT_BATCHED_PREFILL_2026-07-30.md</code>). It provides two principal optimizations:
-</p>
-<ol>
-    <li><strong>Exact head-parallel DeltaNet prefill.</strong> Independent value heads are partitioned across the threadpool once per prompt, and each worker advances its assigned heads through the tokens in order. This preserves CKE's certified serial arithmetic while avoiding serial head execution and repeated per-token dispatch.</li>
-    <li><strong>AVX-512 VNNI x16 Q4_K prefill projections.</strong> The existing <code>Q4_K x Q8_K</code> AVX-512 VNNI x16 provider is used for the measured Qwen3.6 prefill projection shapes, and the packed weights are prepared during model loading instead of being charged to the first prompt.</li>
-</ol>
-
-<div class="img-container svg-viewer" data-title="Qwen3.6 exact batched prefill: what PR #277 changed">
-    <img src="assets/qwen36-exact-batched-prefill.svg" alt="Before and after diagram of the Qwen3.6 optimized prefill lane: serial head execution with per-token dispatch and first-prompt weight packing at 6682.61 ms and 4.34 tok/s, versus value heads partitioned across the threadpool once per prompt with AVX-512 VNNI x16 weights packed at load at 2588.18 ms and 11.20 tok/s, with a bar chart of the three measured configurations">
-</div>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Test The Optimized Lane</h3>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>CK_V8_COMPILER=icx \
-CK_BUMP_FORCE_MIXED=1 \
-CK_NUM_THREADS=14 \
-CK_V8_FORCE_BATCHED_PREFILL=1 \
-CK_DEBUG_Q4K_PREFILL_DISPATCH=1 \
-.venv/bin/python \
-version/v8/scripts/ck_run_v8.py run \
-/path/to/qwen36-runtime \
---prompt "Give me a detailed explanation with working examples of C, Python, and SQL code." \
---chat-template qwen35 \
---thinking-mode suppressed \
---temperature 0 \
---max-tokens 64 \
---context-len 1034</pre>
-    </div>
-    <p class="mini-note">First test with 64 output tokens. Raising <code>--max-tokens</code> exercises longer <em>decode</em>, not longer prefill &mdash; to probe prefill behavior and long-prefix parity, lengthen the input prefix (and <code>--context-len</code>) instead. Set <code>CK_NUM_THREADS</code> to match your host's CPU allocation; the measured host ran inside a 14-CPU cgroup.</p>
-</div>
-
-<div class="card card-blue">
-    <h3 style="margin-top: 0;">Confirm Kernel Dispatch</h3>
-    <p>Startup evidence should include a line similar to:</p>
-    <pre>[CK parallel prefill] Prepared 184 AVX-512 VNNI x16 Q4_K weights at load time</pre>
-    <p>With <code>CK_DEBUG_Q4K_PREFILL_DISPATCH=1</code>, the projection diagnostics should show the <code>x16_mreuse</code> provider for the eligible Q4 prefill shapes.</p>
-    <p class="v8-note" style="margin-bottom: 0;">
-        This does not mean every CPU selects AVX-512: AVX-512/VNNI-capable systems may select the x16 provider, while other systems use a certified AVX2 or reference fallback. Kernel selection is intended to become automatic from CPU capability, model metadata, quantization format, and runtime shape; the debug environment variables are diagnostic overrides, not a public configuration surface.
-    </p>
-</div>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Measured Result</h3>
-    <table class="table">
-        <thead>
-            <tr><th>Configuration</th><th>Prompt time</th><th>Prompt rate</th></tr>
-        </thead>
-        <tbody>
-            <tr><td>Batched baseline</td><td>6682.61 ms</td><td>4.34 tok/s</td></tr>
-            <tr><td>Exact head-parallel DeltaNet</td><td>4014.20 ms</td><td>7.22 tok/s</td></tr>
-            <tr><td>Exact DeltaNet + measured Q4 x16 shapes</td><td>2588.18 ms</td><td>11.20 tok/s</td></tr>
-        </tbody>
-    </table>
-    <p>Two repeated final runs recorded <code>2552.64 ms</code> (<code>11.36 tok/s</code>) and <code>2601.74 ms</code> (<code>11.15 tok/s</code>).</p>
-    <p>That is approximately <strong>61% less prompt time</strong> and approximately <strong>2.6x the previous CKE batched-prefill throughput</strong>.</p>
-    <p class="v8-note" style="margin-bottom: 0;">
-        Measurement context: Qwen3.6-27B Q4_K_M, a 29-token templated prompt, an ICX native AVX-512/VNNI build, and a 14-CPU cgroup on the measurement host. Do not generalize these numbers to every CPU, compiler, context length, or model.
-    </p>
-</div>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    </div>
-    <div>
-        <strong>Current Limitation</strong><br>
-        Batched prefill is still opt-in: <code>CK_V8_FORCE_BATCHED_PREFILL=1</code> is temporarily required and the default <code>sequential_decode</code> policy is unchanged. Short-prompt trajectories pass, and greedy top-1 matched at the tested short, 353-token, and 1K-token checkpoints &mdash; but full 1K-context logit parity is not certified. At the 1K first step the recorded comparison was cosine <code>0.865948879</code>, RMSE <code>2.014045</code>, maximum absolute difference <code>19.671235</code>. Matching greedy tokens must not be read as complete numerical parity. This drift predates the scheduling/x16 optimization and was not introduced by PR #277.
-    </div>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Planned Automatic Policy</h3>
-    <p>
-        <code>CK_V8_FORCE_BATCHED_PREFILL</code> is a temporary correctness guard, not a permanent user configuration requirement. The intended user experience is automatic selection:
-    </p>
-    <pre>model metadata + quantization + prompt shape + CPU ISA
-                       |
-                       v
-              certified kernel map
-                       |
-                       v
-       optimized provider or safe fallback</pre>
-    <p style="margin-bottom: 0;">
-        After long-context numerical parity is closed: Qwen3.6 should automatically use batched prefill, <code>CK_V8_FORCE_BATCHED_PREFILL</code> should no longer be required for normal use, a disable/debug escape hatch may remain for developers, and nightly tests should verify automatic selection without user flags. Remaining performance targets are tracked in the <a href="prefill-performance-roadmap.html">Prefill Performance Roadmap</a>, and kernel/provider coverage is summarized in the <a href="model-kernel-matrix.html">Model + Kernel Matrix</a>.
-    </p>
-</div>
-
 <h2>Canonical Gemma4 Vision Bridge Smoke</h2>
 
 <div class="card card-accent">
@@ -1498,12 +1404,12 @@ version/v8/scripts/ck_run_v8.py run \
     </div>
 </div>
 
-<h2>Canonical Whisper Audio Run</h2>
+<h2>Canonical Whisper Tiny Audio Run</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Audio Runbook &mdash; WAV To Transcript</h3>
     <p>
-        The audio lane runs generated FP32 Whisper Tiny, Base, or Small encoder and decoder artifacts &mdash; and a generated frontend:
+        The audio lane runs a generated FP32 Whisper Tiny encoder and decoder &mdash; and a generated frontend:
         WAV decode through log-Mel is seven circuit ops lowered into <code>ck_model_run_audio_wav</code>, so the
         Python layer coordinates lifecycles only. The unified entrypoint
         <code>version/v8/scripts/cks-v8-run audio</code> drives both stages and emits a single JSON report.
@@ -1545,60 +1451,6 @@ export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
         and both generated runtimes for provenance.</p>
 </div>
 
-<div class="card">
-    <h3 style="margin-top: 0;">Practical Local CPU Workflow: YouTube Or Teams</h3>
-    <p>
-        Export meeting media through the service's authorized controls, or use
-        <code>yt-dlp</code> for public or otherwise authorized YouTube content.
-        Normalize either source to the same PCM16 contract:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>sudo apt install ffmpeg
-python3 -m pip install --user yt-dlp
-
-mkdir -p "$HOME/cke-audio/results"
-
-yt-dlp -x --audio-format wav \
-  -o "$HOME/cke-audio/source.%(ext)s" \
-  "YOUTUBE_URL"
-
-ffmpeg -y \
-  -i "$HOME/cke-audio/source.wav" \
-  -ac 1 -ar 16000 -c:a pcm_s16le \
-  "$HOME/cke-audio/input-16k.wav"</pre>
-    </div>
-    <p>
-        For a Teams, Zoom, or local recording, replace
-        <code>$HOME/cke-audio/source.wav</code> with the exported MP4, M4A,
-        MP3, FLAC, or WAV file. Transcribe with Whisper Base:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>RUN_DIR="$HOME/.cache/ck-engine-v8/models/whisper-base-local"
-
-CK_NUM_THREADS=20 OMP_NUM_THREADS=20 \
-version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
-  --run "$RUN_DIR" \
-  --wav "$HOME/cke-audio/input-16k.wav" \
-  --language en \
-  --task transcribe \
-  --max-tokens 448 \
-  --output "$HOME/cke-audio/results/transcript.json"
-
-jq -r '.decoder.transcript_text' \
-  "$HOME/cke-audio/results/transcript.json" \
-  &gt; "$HOME/cke-audio/results/transcript.txt"</pre>
-    </div>
-    <p style="margin-bottom: 0;">
-        Audio and transcript data stay local unless the operator separately
-        uploads them. Recordings longer than 30 seconds use sequential source
-        windows. The 33-second parity fixture is certified; arbitrary
-        hour-scale recordings remain functional rather than corpus-certified.
-        Add <code>--timestamps</code> when timestamp tokens are required.
-    </p>
-</div>
-
 <div class="card card-green">
     <h3 style="margin-top: 0;">What Success Looks Like (Audio)</h3>
     <ul>
@@ -1631,10 +1483,8 @@ make test-whisper-e2e-auto</pre>
         The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.
     </p>
     <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
-        Certified scope: Whisper Tiny, Base, and Small FP32 on the public JFK
-        fixture, plus a 33-second Base long-form fixture. Longer recordings use
-        sequential windows; arbitrary recordings are functional rather than
-        corpus-certified.
+        Certified scope: Whisper Tiny FP32, English, no-timestamp decoding, up to 30 seconds (longer files are truncated, not chunked).
+        The JFK sample matches Hugging Face token for token; arbitrary recordings are functional rather than corpus-certified yet.
     </p>
 </div>
 
@@ -1694,92 +1544,6 @@ make test-whisper-e2e-auto</pre>
         to other audio transformer encoders. CI drives the same script through
         <code>tests/test_v8_audio_encoder_contract.py</code> in the nightly audio lane.
     </p>
-</div>
-
-<h2>Compile Once, Run Natively</h2>
-
-<div class="card card-accent">
-    <p>
-        Python is the build orchestrator: it downloads or reads the model, converts weights, resolves the
-        template and kernel maps, lowers the circuit, generates C, and compiles the model library. It does
-        not need to remain in the production token loop. Build or refresh a model once with the normal v8 runner:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run MODEL.gguf \
-  --force-convert --force-compile \
-  --prompt "Hello" --max-tokens 1</pre>
-    </div>
-    <p>
-        Then run the generated library, native tokenizer, and generated chat contract directly through the C CLI:
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>make ck-cli-v8
-
-./build/ck-cli-v8 \
-  --lib "$RUN_DIR/ck-kernel-inference.so" \
-  --weights "$RUN_DIR/weights.bump" \
-  --manifest "$RUN_DIR/weights_manifest.map" \
-  --require-generated-abi \
-  --prompt "Give me a detailed example of C, Python, and SQL code." \
-  --temperature 0 --top-p 1 --max-tokens 256</pre>
-    </div>
-    <p style="margin-bottom: 0;">
-        The generated model selects the tokenizer implementation, chat formatting, stop-token policy, and
-        modality capabilities from its compiled contract. <code>temperature</code> and <code>top-p</code> are
-        request-time sampling parameters; they do not select or alter the tokenizer.
-    </p>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Native Server And FFI Boundary</h3>
-    <p>
-        External Python, Rust, or C hosts should bind <code>include/ck_session_v8.h</code> through
-        <code>build/libck_session_v8.so</code>. The session loads the generated model once and exposes native
-        chat formatting, encode, decode, generation, streaming token callbacks, cancellation, reset, timings,
-        and a versioned capability descriptor.
-    </p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>make ck-session-v8
-make test-native-session-v8</pre>
-    </div>
-    <p style="margin-bottom: 0;">
-        Independent requests reset KV and recurrent state by default. Continuation is explicit. A generated
-        runtime missing the required tokenizer or chat capability fails closed instead of guessing from its filename.
-    </p>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Profile The Native Token Loop</h3>
-    <p>Use the C CLI directly so Python startup and orchestration do not contaminate the profile:</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>perf stat -d -- \
-  ./build/ck-cli-v8 --lib "$MODEL_SO" --weights "$WEIGHTS" \
-  --manifest "$MANIFEST" --require-generated-abi \
-  --prompt "Hello" --max-tokens 64 --quiet-output --no-timing
-
-perf record -g --call-graph dwarf -- \
-  ./build/ck-cli-v8 --lib "$MODEL_SO" --weights "$WEIGHTS" \
-  --manifest "$MANIFEST" --require-generated-abi \
-  --prompt "Hello" --max-tokens 64 --quiet-output --no-timing
-
-vtune -collect hotspots -result-dir build/vtune-v8-native -- \
-  ./build/ck-cli-v8 --lib "$MODEL_SO" --weights "$WEIGHTS" \
-  --manifest "$MANIFEST" --require-generated-abi \
-  --prompt "Hello" --max-tokens 64 --quiet-output --no-timing</pre>
-    </div>
-</div>
-
-<div class="card card-blue">
-    <h3 style="margin-top: 0;">What End-to-End Certification Means</h3>
-    <ol style="margin-bottom: 0;">
-        <li>Tokenizer parity: generated C encode/decode agrees with the declared Hugging Face or reference tokenizer.</li>
-        <li>Model parity: identical token IDs produce the required logits or generated token trajectory against the numerical oracle.</li>
-        <li>Native product parity: <code>ck-cli-v8</code> performs generated chat formatting, C tokenization, model execution, generated stop policy, and C detokenization without Python in the request path.</li>
-    </ol>
 </div>
 
 <h2>What Success Looks Like</h2>
@@ -2204,7 +1968,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-02</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>
