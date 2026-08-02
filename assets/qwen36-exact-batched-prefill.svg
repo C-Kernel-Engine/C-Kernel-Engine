@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="800" viewBox="0 0 1100 800" role="img" aria-labelledby="q36-title q36-desc">
+  <title id="q36-title">Qwen3.6 exact batched prefill: what PR #277 changed</title>
+  <desc id="q36-desc">Before and after diagram for the Qwen3.6-27B Q4_K_M optimized prefill lane. Before: serial head execution with repeated per-token dispatch and weight packing charged to the first prompt, measured at 6682.61 ms or 4.34 tokens per second. After: independent DeltaNet value heads partitioned across the threadpool once per prompt with each worker advancing its heads through tokens in order, plus AVX-512 VNNI x16 Q4_K weights packed at load time, measured at 2588.18 ms or 11.20 tokens per second. A bar chart shows the three measured configurations: batched baseline, exact head-parallel DeltaNet, and exact DeltaNet plus measured Q4 x16 shapes.</desc>
+  <defs>
+    <linearGradient id="q36-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <linearGradient id="q36-node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13233c"/>
+      <stop offset="1" stop-color="#0d1a2e"/>
+    </linearGradient>
+    <linearGradient id="q36-bar-amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="q36-bar-cyan" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="q36-bar-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+    <filter id="q36-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="q36-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="q36-arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="800" fill="url(#q36-bg)"/>
+  <g opacity="0.25" stroke="#26364f" stroke-width="1">
+    <path d="M0 130H1100M0 260H1100M0 390H1100M0 520H1100M0 650H1100"/>
+    <path d="M100 0V800M300 0V800M500 0V800M700 0V800M900 0V800"/>
+  </g>
+
+  <text x="40" y="42" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">QWEN3.6-27B Q4_K_M &#183; EXACT BATCHED PREFILL &#183; PR #277</text>
+  <text x="40" y="80" font-size="30" font-weight="700" fill="#f1f5f9" font-family="'Inter',system-ui,sans-serif">What the Optimized Prefill Lane Changed</text>
+  <text x="40" y="104" font-size="13.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">Same certified serial arithmetic &#8212; two scheduling and layout changes: value heads partitioned across the threadpool once</text>
+  <text x="40" y="124" font-size="13.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">per prompt, and Q4_K x16 weights packed at load instead of on the first prompt.</text>
+
+  <!-- BEFORE panel -->
+  <g filter="url(#q36-shadow)">
+    <rect x="40" y="140" width="470" height="320" rx="12" fill="url(#q36-node)" stroke="#2b3f5f"/>
+    <rect x="40" y="140" width="470" height="32" rx="12" fill="#f59e0b" opacity="0.14"/>
+    <text x="56" y="161" font-size="11.5" letter-spacing="1.5" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">BEFORE &#183; BATCHED BASELINE</text>
+  </g>
+
+  <rect x="64" y="192" width="240" height="46" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="76" y="211" font-size="11.5" fill="#cbd5e1" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">for each token in prompt</text>
+  <text x="76" y="228" font-size="11.5" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">dispatch -&gt; run all heads serially</text>
+
+  <g>
+    <rect x="64" y="262" width="56" height="38" rx="6" fill="#13233c" stroke="#3b2a2a"/>
+    <text x="80" y="286" font-size="11" fill="#ffb6b6" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">H0</text>
+    <path d="M122 281 H132" stroke="#64748b" stroke-width="1.5" marker-end="url(#q36-arrow)"/>
+    <rect x="136" y="262" width="56" height="38" rx="6" fill="#13233c" stroke="#3b2a2a"/>
+    <text x="152" y="286" font-size="11" fill="#ffb6b6" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">H1</text>
+    <path d="M194 281 H204" stroke="#64748b" stroke-width="1.5" marker-end="url(#q36-arrow)"/>
+    <rect x="208" y="262" width="56" height="38" rx="6" fill="#13233c" stroke="#3b2a2a"/>
+    <text x="224" y="286" font-size="11" fill="#ffb6b6" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">H2</text>
+    <path d="M266 281 H276" stroke="#64748b" stroke-width="1.5" marker-end="url(#q36-arrow)"/>
+    <rect x="280" y="262" width="56" height="38" rx="6" fill="#13233c" stroke="#3b2a2a"/>
+    <text x="293" y="286" font-size="11" fill="#ffb6b6" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">&#8230;</text>
+    <path d="M338 281 H348" stroke="#64748b" stroke-width="1.5" marker-end="url(#q36-arrow)"/>
+    <rect x="352" y="262" width="56" height="38" rx="6" fill="#13233c" stroke="#3b2a2a"/>
+    <text x="366" y="286" font-size="11" fill="#ffb6b6" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">Hn</text>
+  </g>
+  <text x="64" y="326" font-size="11.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">serial head execution &#183; repeated per-token dispatch</text>
+  <circle cx="70" cy="350" r="4" fill="#fbbf24"/>
+  <text x="84" y="354" font-size="11.5" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">weight packing charged to the first prompt</text>
+
+  <rect x="64" y="388" width="250" height="44" rx="8" fill="#0b1729" stroke="#f59e0b" stroke-opacity="0.5"/>
+  <text x="80" y="415" font-size="13" font-weight="700" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">6682.61 ms &#183; 4.34 tok/s</text>
+
+  <!-- transition arrow -->
+  <path d="M518 300 H578" stroke="#34d399" stroke-width="2.5" marker-end="url(#q36-arrow-green)"/>
+  <text x="514" y="286" font-size="10.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">PR #277</text>
+
+  <!-- AFTER panel -->
+  <g filter="url(#q36-shadow)">
+    <rect x="590" y="140" width="470" height="320" rx="12" fill="url(#q36-node)" stroke="#2b3f5f"/>
+    <rect x="590" y="140" width="470" height="32" rx="12" fill="#10b981" opacity="0.14"/>
+    <text x="606" y="161" font-size="11.5" letter-spacing="1.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AFTER &#183; EXACT HEAD-PARALLEL DELTANET + Q4 x16</text>
+  </g>
+
+  <rect x="614" y="192" width="300" height="46" rx="8" fill="#0b1729" stroke="#2b3f5f"/>
+  <text x="626" y="211" font-size="11.5" fill="#cbd5e1" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">partition value heads once per prompt</text>
+  <text x="626" y="228" font-size="11.5" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">each worker walks its heads token by token</text>
+
+  <g>
+    <rect x="614" y="262" width="100" height="52" rx="8" fill="#13233c" stroke="#1f3d33"/>
+    <text x="626" y="282" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">worker 0</text>
+    <text x="626" y="299" font-size="10" fill="#94a3b8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">head slice 0</text>
+    <rect x="726" y="262" width="100" height="52" rx="8" fill="#13233c" stroke="#1f3d33"/>
+    <text x="738" y="282" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">worker 1</text>
+    <text x="738" y="299" font-size="10" fill="#94a3b8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">head slice 1</text>
+    <rect x="838" y="262" width="100" height="52" rx="8" fill="#13233c" stroke="#1f3d33"/>
+    <text x="850" y="282" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">worker 2</text>
+    <text x="850" y="299" font-size="10" fill="#94a3b8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">head slice 2</text>
+    <rect x="950" y="262" width="86" height="52" rx="8" fill="#13233c" stroke="#1f3d33"/>
+    <text x="962" y="282" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">&#8230;</text>
+    <text x="962" y="299" font-size="10" fill="#94a3b8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">slice n</text>
+  </g>
+
+  <rect x="614" y="332" width="196" height="26" rx="13" fill="#0b1729" stroke="#0ea5e9" stroke-opacity="0.45"/>
+  <text x="628" y="349" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">weights packed at load</text>
+  <rect x="822" y="332" width="212" height="26" rx="13" fill="#0b1729" stroke="#0ea5e9" stroke-opacity="0.45"/>
+  <text x="836" y="349" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">x16_mreuse &#183; AVX-512 VNNI</text>
+
+  <rect x="614" y="388" width="250" height="44" rx="8" fill="#0b1729" stroke="#10b981" stroke-opacity="0.55"/>
+  <text x="630" y="415" font-size="13" font-weight="700" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">2588.18 ms &#183; 11.20 tok/s</text>
+
+  <!-- measured bars -->
+  <text x="40" y="508" font-size="12" letter-spacing="3" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">MEASURED &#183; 29-TOKEN TEMPLATED PROMPT &#183; ICX AVX-512/VNNI &#183; 14-CPU CGROUP</text>
+
+  <line x1="60" y1="716" x2="1060" y2="716" stroke="#26364f" stroke-width="1.5"/>
+
+  <rect x="120" y="546" width="180" height="170" rx="6" fill="url(#q36-bar-amber)" opacity="0.9"/>
+  <text x="210" y="534" font-size="13" font-weight="700" text-anchor="middle" fill="#fbbf24" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">6682.61 ms</text>
+  <text x="210" y="738" font-size="11" text-anchor="middle" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">batched baseline</text>
+  <text x="210" y="755" font-size="11" text-anchor="middle" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">4.34 tok/s</text>
+
+  <rect x="420" y="614" width="180" height="102" rx="6" fill="url(#q36-bar-cyan)" opacity="0.9"/>
+  <text x="510" y="602" font-size="13" font-weight="700" text-anchor="middle" fill="#7dd3fc" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">4014.20 ms</text>
+  <text x="510" y="738" font-size="11" text-anchor="middle" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">head-parallel DeltaNet</text>
+  <text x="510" y="755" font-size="11" text-anchor="middle" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">7.22 tok/s</text>
+
+  <rect x="720" y="650" width="180" height="66" rx="6" fill="url(#q36-bar-green)" opacity="0.9"/>
+  <text x="810" y="638" font-size="13" font-weight="700" text-anchor="middle" fill="#34d399" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">2588.18 ms</text>
+  <text x="810" y="738" font-size="11" text-anchor="middle" fill="#cbd5e1" font-family="'Inter',system-ui,sans-serif">+ measured Q4 x16 shapes</text>
+  <text x="810" y="755" font-size="11" text-anchor="middle" fill="#64748b" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">11.20 tok/s</text>
+
+  <text x="960" y="620" font-size="15" font-weight="700" text-anchor="middle" fill="#34d399" font-family="'Inter',system-ui,sans-serif">~61% less</text>
+  <text x="960" y="640" font-size="12" text-anchor="middle" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">prompt time</text>
+  <text x="960" y="672" font-size="15" font-weight="700" text-anchor="middle" fill="#34d399" font-family="'Inter',system-ui,sans-serif">~2.6&#215;</text>
+  <text x="960" y="692" font-size="12" text-anchor="middle" fill="#94a3b8" font-family="'Inter',system-ui,sans-serif">throughput</text>
+
+  <text x="40" y="786" font-size="11.5" fill="#64748b" font-family="'Inter',system-ui,sans-serif">Opt-in lane: CK_V8_FORCE_BATCHED_PREFILL=1 until 1K-context logit parity is certified &#8212; greedy top-1 agreement is not full numerical parity. AVX2 / reference fallback on other CPUs.</text>
+</svg>

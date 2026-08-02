@@ -995,6 +995,16 @@
   </div>
 
   <div class="alert alert-success">
+    <strong>Measured result — Qwen3.6 Q4_K_M exact batched prefill (2026-07-30, PR #277):</strong>
+    Exact head-parallel DeltaNet prefill plus the measured AVX-512 VNNI x16 Q4_K prefill shapes cut a 29-token
+    templated prompt on Qwen3.6-27B Q4_K_M from <code>6682.61 ms</code> (<code>4.34 tok/s</code>) to
+    <code>2588.18 ms</code> (<code>11.20 tok/s</code>) — about 61% less prompt time and 2.6x the previous CKE
+    batched-prefill throughput, measured on an ICX native AVX-512/VNNI build inside a 14-CPU cgroup.
+    The lane is still opt-in (<code>CK_V8_FORCE_BATCHED_PREFILL=1</code>) until 1K-context logit parity is certified.
+    Operator steps: <a href="v8-runbook.html#qwen36-optimized-prefill">v8 Runbook — Qwen3.6 Q4_K_M optimized prefill</a>.
+  </div>
+
+  <div class="alert alert-success">
     <strong>Qwen3-VL AVX2 update (2026-07-18):</strong>
     On the i7-14700T, the exact Q4_K x Q8_K provider now reuses each packed weight block across a two-token output tile while preserving llama.cpp's split-min reduction order. For the 1008-token visual mixed-prefill workload, profiled Q4 projection time fell from <code>54.32 s</code> to <code>34.75 s</code> and mixed-prefill wall time fell from <code>77.21 s</code> to <code>56.87 s</code>. The real llama.cpp production oracle remains bit-exact.
   </div>
@@ -1055,6 +1065,12 @@
         <td>Schedule small token tiles against eight-row output tiles, with a separate implementation for the exact repacked split-min contract.</td>
         <td>This reuses the same packed Q4_K group across multiple Q8_K token rows and is the first step toward a true register-blocked GEMM microkernel.</td>
         <td>Active for aligned, large grouped-prefill shapes; other arithmetic contracts remain separately gated</td>
+      </tr>
+      <tr>
+        <td>Exact head-parallel DeltaNet + Q4 x16 prefill</td>
+        <td>Partition independent DeltaNet value heads across the threadpool once per prompt, and route the measured Qwen3.6 Q4_K projection shapes through the AVX-512 VNNI x16 provider with weights packed at load time.</td>
+        <td>Removes serial head execution and repeated per-token dispatch for Qwen3.6 prefill without changing the certified serial arithmetic.</td>
+        <td>Completed for measured Qwen3.6 Q4_K_M shapes (PR #277); opt-in until long-context parity is certified</td>
       </tr>
       <tr>
         <td>Fused MLP kernels</td>
@@ -1179,12 +1195,28 @@ make profile-v8-prefill-perf-stat</code></pre>
     <li>Promote only the shapes where the sweep wins; keep canonical dispatch as the fallback.</li>
   </ol>
 
+  <h2>Remaining Performance Work</h2>
+  <p>
+    The Qwen3.6 Q4 x16 prefill shapes and the exact head-parallel DeltaNet items above are completed, measured work.
+    The next measured targets, in order, are planned work — none of them are implemented yet:
+  </p>
+  <ol>
+    <li>Q6 recurrent QKV and MLP-down short-wide GEMM providers.</li>
+    <li>Q8 recurrent output projection.</li>
+    <li>Reduction of threadpool barriers and intermediate-buffer traffic.</li>
+    <li>Per-layer CKE-versus-llama.cpp performance attribution.</li>
+    <li>Separate first-token and steady-state decode analysis.</li>
+    <li>Resolution of the 353-token / 1K-token numerical accumulation drift that currently keeps Qwen3.6 batched prefill opt-in.</li>
+  </ol>
+
   <h2>Related Files</h2>
   <ul>
     <li><code>src/kernels/gemm_kernels_q4k_q8k_vnni.c</code> - Q4_K x Q8_K packed-meta kernels.</li>
     <li><code>version/v8/src/ck_parallel_prefill_v8.c</code> - v8 prefill dispatch policy.</li>
     <li><code>scripts/perf_stat_v8_prefill_compare.py</code> - safe CK-vs-llama perf counter lane.</li>
     <li><code>benchmarks/compare_ck_llama_v8.py</code> - standardized v8 model-family comparison.</li>
+    <li><a href="v8-runbook.html#qwen36-optimized-prefill">v8 Runbook — Qwen3.6 optimized prefill</a> - operator commands, dispatch verification, and current parity limitation.</li>
+    <li><code>docs/notes/QWEN36_EXACT_BATCHED_PREFILL_2026-07-30.md</code> - authoritative engineering note for PR #277.</li>
     <li><a href="q6-prefill-roofline.html">Q6_K Prefill Roofline Notes</a> - shape-gating precedent for Q6_K.</li>
     <li><a href="profiling.html">Profiling Guide</a> - safe profiling commands and VTune/Advisor warning.</li>
   </ul>
