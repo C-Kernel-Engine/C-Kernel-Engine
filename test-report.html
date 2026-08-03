@@ -1023,188 +1023,99 @@
 
     .runner-hardware {
       position: relative;
-      overflow: hidden;
       margin: 1rem 0 2rem;
-      padding: 0.95rem 1.25rem 0.7rem;
-      background:
-        radial-gradient(900px 280px at 10% -50px, rgba(255, 180, 0, 0.13), transparent 60%),
-        radial-gradient(700px 320px at 96% 130%, rgba(255, 180, 0, 0.06), transparent 55%),
-        linear-gradient(165deg, #212125 0%, #17171b 55%, #131316 100%);
-      border: 1px solid rgba(255, 180, 0, 0.22);
-      border-radius: 10px;
-      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35), inset 0 0 70px rgba(255, 180, 0, 0.025);
-    }
-    .runner-hardware::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--orange) 0%, rgba(255, 180, 0, 0.25) 45%, transparent 70%);
+      padding: 1rem 1.25rem 0.9rem;
+      background: linear-gradient(135deg, #101823 0%, #0b1118 100%);
+      border: 1px solid #2b3a4c;
+      border-left: 3px solid #4299e1;
+      border-radius: 8px;
     }
     .runner-hardware__header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
+      margin-bottom: 0.5rem;
     }
     .runner-hardware__header h2 {
       margin: 0;
-      font-size: 1.4rem;
-      font-weight: 700;
-      line-height: 1.3;
-      letter-spacing: -0.01em;
+      font-size: 1.05rem;
+      line-height: 1.35;
     }
     .runner-hardware__kicker {
-      margin-bottom: 0.3rem;
-      color: var(--orange);
-      font-size: 0.72rem;
+      margin-bottom: 0.15rem;
+      color: var(--text-muted);
+      font-size: 0.68rem;
       font-weight: 700;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
     .runner-hardware__model {
       color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.02rem;
+      font-weight: 700;
     }
     .runner-hardware__grid {
-      margin-top: 0.7rem;
+      display: grid;
+      gap: 0.3rem;
     }
-    .runner-hardware__stats {
+    .runner-hardware__ribbon {
       display: flex;
       flex-wrap: wrap;
-      border-top: 1px solid #3d3a31;
-      border-bottom: 1px solid #3d3a31;
+      align-items: baseline;
+      gap: 0.15rem 0.55rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cbd5e0;
     }
-    .runner-hardware__stat {
-      padding: 0.6rem 1.2rem 0.55rem 0;
-      margin-right: 1.2rem;
-      border-right: 1px solid #3d3a31;
+    .runner-hardware__ribbon--muted {
+      color: var(--text-muted);
+      font-size: 0.74rem;
     }
-    .runner-hardware__stat:last-child {
-      border-right: none;
-      margin-right: 0;
-      padding-right: 0;
-    }
-    .runner-hardware__stat span {
-      display: block;
-      margin-bottom: 0.18rem;
-      color: #8a8a92;
-      font-size: 0.66rem;
+    .runner-hardware__ribbon .rh-label {
+      margin-right: 0.3rem;
+      color: #5c7285;
+      font-size: 0.64rem;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .runner-hardware__stat strong {
-      display: block;
-      color: var(--text-primary);
-      font-size: 1.08rem;
-      font-weight: 600;
-    }
-    .runner-hardware__stat strong.mono {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.92rem;
-      font-weight: 500;
-      padding-top: 0.14rem;
-    }
-    .runner-hardware__stat em {
-      display: block;
-      margin-top: 0.12rem;
-      color: #909098;
-      font-size: 0.76rem;
-      font-style: normal;
-    }
-    .runner-hardware__foot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.4rem 1rem;
-      padding-bottom: 0.6rem;
-      margin-bottom: 0.6rem;
-      border-bottom: 1px dashed #3d3a31;
-    }
-    .runner-hardware__meta {
-      color: #9a9aa2;
-      font-size: 0.8rem;
-    }
-    .runner-hardware__meta .rh-sep {
-      margin: 0 0.45rem;
-      color: #4a4a52;
-    }
-    .runner-hardware__meta code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.76rem;
-      color: #b8b8c0;
+    .runner-hardware__ribbon .rh-sep {
+      color: #33445a;
     }
     .runner-hardware__isa {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
+      margin-top: 0.65rem;
     }
     .runner-hardware__isa-label {
-      color: #8a8a92;
-      font-size: 0.62rem;
+      color: #5c7285;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.64rem;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      margin-right: 0.1rem;
     }
     .runner-hardware__isa code {
-      padding: 0.14rem 0.5rem;
+      padding: 0.2rem 0.45rem;
       color: #9ae6b4;
-      background: rgba(72, 187, 120, 0.08);
-      border: 1px solid rgba(72, 187, 120, 0.25);
+      background: rgba(72, 187, 120, 0.1);
+      border: 1px solid rgba(72, 187, 120, 0.28);
       border-radius: 999px;
-      font-size: 0.74rem;
-    }
-    .runner-hardware__linkage {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 0.6rem;
-      color: #cfa254;
-      font-size: 0.76rem;
-      letter-spacing: 0.02em;
-    }
-    .runner-hardware__linkage::before {
-      content: '';
-      width: 1px;
-      height: 0.85rem;
-      background: linear-gradient(180deg, rgba(255, 180, 0, 0.15), var(--orange));
-      border-radius: 1px;
-    }
-    .runner-hardware__linkage svg {
-      flex-shrink: 0;
+      font-size: 0.75rem;
     }
     .runner-hardware details {
-      background: transparent;
-      border: none;
-      border-radius: 0;
-      margin: 0.55rem 0 0;
-      border-top: 1px solid #3d3a31;
-      padding-top: 0.4rem;
-      overflow: visible;
-    }
-    .runner-hardware details:hover {
-      border-left: none;
+      margin-top: 0.7rem;
+      border-top: 1px solid #243142;
+      padding-top: 0.55rem;
     }
     .runner-hardware summary {
-      padding: 0.15rem 0;
       cursor: pointer;
-      color: #9a9aa2;
-      font-size: 0.84rem;
-      font-weight: 500;
-      transition: color 0.15s;
-    }
-    .runner-hardware summary:hover {
-      background: transparent;
-      color: var(--orange-light);
-    }
-    .runner-hardware details[open] summary {
-      border-bottom: none;
-      margin-bottom: 0.4rem;
+      color: #63b3ed;
+      font-size: 0.85rem;
     }
     .runner-hardware__capture-label {
       margin: 1rem 0 0.35rem;
@@ -1507,13 +1418,8 @@
       </div>
       <div id="runner-hardware-grid" class="runner-hardware__grid"></div>
       <div id="runner-hardware-isa" class="runner-hardware__isa"></div>
-      <div class="runner-hardware__linkage">
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M5 1v6M5 7L2 4.2M5 7l3-2.8" stroke="#ffb400" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Every result below was produced on this machine &mdash; kernel dispatch follows its detected ISA surface.</span>
-      </div>
       <details id="runner-hardware-details" hidden>
-        <summary>Show runner provenance and exact system evidence</summary>
-        <div id="runner-hardware-provenance" class="runner-hardware__foot"></div>
+        <summary>Show exact system evidence captured for this run</summary>
         <div id="runner-hardware-cpu-group">
           <div id="runner-hardware-cpu-label" class="runner-hardware__capture-label">CPU</div>
           <pre id="runner-hardware-cpu"></pre>
@@ -2437,7 +2343,6 @@ function renderRunnerHardware(data) {
   const gridEl = document.getElementById('runner-hardware-grid');
   const isaEl = document.getElementById('runner-hardware-isa');
   const detailsEl = document.getElementById('runner-hardware-details');
-  const provenanceEl = document.getElementById('runner-hardware-provenance');
   const cpuGroupEl = document.getElementById('runner-hardware-cpu-group');
   const cpuLabelEl = document.getElementById('runner-hardware-cpu-label');
   const cpuRawEl = document.getElementById('runner-hardware-cpu');
@@ -2459,50 +2364,54 @@ function renderRunnerHardware(data) {
   const cpu = data.cpu || {};
   const runner = data.runner || {};
   const memory = data.memory || {};
-  const topologySub = [
+  const topology = [
     cpu.sockets ? `${cpu.sockets} socket${cpu.sockets === '1' ? '' : 's'}` : '',
     cpu.cores_per_socket ? `${cpu.cores_per_socket} cores/socket` : '',
     cpu.threads_per_core ? `${cpu.threads_per_core} threads/core` : '',
+    cpu.logical_cpus ? `${cpu.logical_cpus} logical CPUs` : '',
   ].filter(Boolean).join(' · ');
   const image = [runner.image_os, runner.image_version].filter(Boolean).join(' ');
-  const stats = [
-    {label: 'Architecture', value: cpu.architecture || runner.arch || '', sub: ''},
-    {label: 'Logical CPUs', value: cpu.logical_cpus || '', sub: topologySub},
-    {label: 'Memory', value: memory.total ? formatMemoryKiB(memory.total) : '', sub: memory.available ? `${formatMemoryKiB(memory.available)} available` : ''},
-    {label: 'Kernel', value: runner.kernel || '', sub: '', mono: true},
-  ].filter(s => s.value);
-  const metaParts = [
-    cpu.vendor_id || '',
-    image ? `runner <code>${escapeHtml(image)}</code>` : (runner.os ? `runner ${escapeHtml(runner.os)}` : ''),
-    runner.run_id ? `workflow <code>#${escapeHtml(runner.run_id)}</code>${runner.run_attempt ? ` · attempt ${escapeHtml(runner.run_attempt)}` : ''}` : '',
-    data.cpu_source ? `evidence <code>${escapeHtml(data.cpu_source)}</code>` : '',
-  ].filter(Boolean);
+  const memorySummary = [
+    memory.total ? `${formatMemoryKiB(memory.total)} total` : '',
+    memory.available ? `${formatMemoryKiB(memory.available)} available` : '',
+  ].filter(Boolean).join(' · ');
+  const ribbonMain = [
+    ['Arch', cpu.architecture || runner.arch || ''],
+    ['Topology', topology],
+    ['Memory', memorySummary],
+    ['Kernel', runner.kernel || ''],
+  ];
+  const ribbonMeta = [
+    ['Vendor', cpu.vendor_id || ''],
+    ['Runner', image || runner.os || ''],
+    ['Workflow', runner.run_id ? `#${runner.run_id}${runner.run_attempt ? ` · attempt ${runner.run_attempt}` : ''}` : 'local'],
+    ['Evidence', data.cpu_source || ''],
+  ];
+  const renderRibbon = (items, muted) => {
+    const parts = items
+      .filter(([, value]) => value)
+      .map(([label, value]) =>
+        `<span class="rh-item"><span class="rh-label">${escapeHtml(label)}</span>${escapeHtml(value)}</span>`
+      );
+    if (!parts.length) return '';
+    return `<div class="runner-hardware__ribbon${muted ? ' runner-hardware__ribbon--muted' : ''}">` +
+      parts.join('<span class="rh-sep">&middot;</span>') + '</div>';
+  };
 
   modelEl.textContent = cpu.model_name || 'Unknown CPU model';
   providerEl.textContent = data.provider === 'github-actions' ? 'GITHUB-HOSTED' : String(data.provider || 'LOCAL').toUpperCase();
   providerEl.className = 'regression-badge pass';
+  gridEl.innerHTML = renderRibbon(ribbonMain, false) + renderRibbon(ribbonMeta, true);
 
   const supportedIsa = Object.entries(data.isa || {}).filter(([, enabled]) => enabled).map(([name]) => name);
-  const isaHtml = supportedIsa.length
-    ? `<span class="runner-hardware__isa"><span class="runner-hardware__isa-label">ISA</span>` +
-      supportedIsa.map(name => `<code>${escapeHtml(name)}</code>`).join('') + `</span>`
+  isaEl.innerHTML = supportedIsa.length
+    ? `<span class="runner-hardware__isa-label">ISA</span>` + supportedIsa.map(name => `<code>${escapeHtml(name)}</code>`).join('')
     : '';
-  const metaHtml = metaParts.length
-    ? `<span class="runner-hardware__meta">${metaParts.join('<span class="rh-sep">&middot;</span>')}</span>`
-    : '';
-  gridEl.innerHTML =
-    `<div class="runner-hardware__stats">` + stats.map(s =>
-      `<div class="runner-hardware__stat"><span>${escapeHtml(s.label)}</span>` +
-      `<strong${s.mono ? ' class="mono"' : ''}>${escapeHtml(s.value)}</strong>` +
-      (s.sub ? `<em>${escapeHtml(s.sub)}</em>` : '') + `</div>`
-    ).join('') + `</div>`;
-  isaEl.innerHTML = '';
-  provenanceEl.innerHTML = metaHtml || isaHtml ? `${metaHtml}${isaHtml}` : '';
 
   const cpuRaw = String(data.raw_lscpu || data.raw_cpuinfo || '');
   const freeRaw = String(data.raw_free_h || '');
   const meminfoRaw = String(data.raw_meminfo || '');
-  detailsEl.hidden = !(provenanceEl.innerHTML || cpuRaw || freeRaw || meminfoRaw);
+  detailsEl.hidden = !(cpuRaw || freeRaw || meminfoRaw);
   cpuGroupEl.hidden = !cpuRaw;
   freeGroupEl.hidden = !freeRaw;
   meminfoGroupEl.hidden = !meminfoRaw;
@@ -3261,7 +3170,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-03</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-02</p>
             </div>
         </div>
     </footer>
