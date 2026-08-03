@@ -43,10 +43,12 @@
     .summary-card.failed .value { color: #f56565; }
 
     .runner-hardware {
+      position: relative;
       margin: 1rem 0 2rem;
-      padding: 1.25rem;
-      background: linear-gradient(135deg, #111923 0%, #0d131a 100%);
+      padding: 1rem 1.25rem 0.9rem;
+      background: linear-gradient(135deg, #101823 0%, #0b1118 100%);
       border: 1px solid #2b3a4c;
+      border-left: 3px solid #4299e1;
       border-radius: 8px;
     }
     .runner-hardware__header {
@@ -54,46 +56,69 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
     .runner-hardware__header h2 {
-      margin: 0 0 0.25rem;
-      font-size: 1.2rem;
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+    .runner-hardware__kicker {
+      margin-bottom: 0.15rem;
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
     }
     .runner-hardware__model {
       color: var(--text-primary);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.95rem;
+      font-size: 1.02rem;
+      font-weight: 700;
     }
     .runner-hardware__grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 0.75rem;
+      gap: 0.3rem;
     }
-    .runner-hardware__metric {
-      padding: 0.7rem 0.8rem;
-      background: rgba(255, 255, 255, 0.025);
-      border: 1px solid #243142;
-      border-radius: 6px;
+    .runner-hardware__ribbon {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.15rem 0.55rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cbd5e0;
     }
-    .runner-hardware__metric span {
-      display: block;
+    .runner-hardware__ribbon--muted {
       color: var(--text-muted);
-      font-size: 0.72rem;
-      letter-spacing: 0.05em;
+      font-size: 0.74rem;
+    }
+    .runner-hardware__ribbon .rh-label {
+      margin-right: 0.3rem;
+      color: #5c7285;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .runner-hardware__metric strong {
-      display: block;
-      margin-top: 0.2rem;
-      color: var(--text-primary);
-      font-size: 0.9rem;
+    .runner-hardware__ribbon .rh-sep {
+      color: #33445a;
     }
     .runner-hardware__isa {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 0.4rem;
-      margin-top: 0.9rem;
+      margin-top: 0.65rem;
+    }
+    .runner-hardware__isa-label {
+      color: #5c7285;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
     .runner-hardware__isa code {
       padding: 0.2rem 0.45rem;
@@ -104,9 +129,9 @@
       font-size: 0.75rem;
     }
     .runner-hardware details {
-      margin-top: 1rem;
+      margin-top: 0.7rem;
       border-top: 1px solid #243142;
-      padding-top: 0.8rem;
+      padding-top: 0.55rem;
     }
     .runner-hardware summary {
       cursor: pointer;
@@ -407,8 +432,8 @@
     <section id="runner-hardware" class="runner-hardware" aria-labelledby="runner-hardware-title">
       <div class="runner-hardware__header">
         <div>
-          <h2 id="runner-hardware-title">Nightly Runner Hardware</h2>
-          <div id="runner-hardware-model" class="runner-hardware__model">Hardware evidence was not published by this run.</div>
+          <div class="runner-hardware__kicker">Executed on &middot; nightly CI runner</div>
+          <h2 id="runner-hardware-title"><span id="runner-hardware-model" class="runner-hardware__model">Hardware evidence was not published by this run.</span></h2>
         </div>
         <span id="runner-hardware-provider" class="regression-badge skip">NOT PUBLISHED</span>
       </div>
@@ -1371,26 +1396,38 @@ function renderRunnerHardware(data) {
     memory.total ? `${formatMemoryKiB(memory.total)} total` : '',
     memory.available ? `${formatMemoryKiB(memory.available)} available` : '',
   ].filter(Boolean).join(' · ');
-  const metrics = [
-    ['Vendor', cpu.vendor_id || '-'],
-    ['Architecture', cpu.architecture || runner.arch || '-'],
-    ['Topology', topology || '-'],
-    ['Memory', memorySummary || '-'],
-    ['CPU evidence', data.cpu_source || '-'],
-    ['Runner image', image || runner.os || '-'],
-    ['Kernel', runner.kernel || '-'],
-    ['Workflow run', runner.run_id ? `#${runner.run_id}${runner.run_attempt ? ` · attempt ${runner.run_attempt}` : ''}` : 'local'],
+  const ribbonMain = [
+    ['Arch', cpu.architecture || runner.arch || ''],
+    ['Topology', topology],
+    ['Memory', memorySummary],
+    ['Kernel', runner.kernel || ''],
   ];
+  const ribbonMeta = [
+    ['Vendor', cpu.vendor_id || ''],
+    ['Runner', image || runner.os || ''],
+    ['Workflow', runner.run_id ? `#${runner.run_id}${runner.run_attempt ? ` · attempt ${runner.run_attempt}` : ''}` : 'local'],
+    ['Evidence', data.cpu_source || ''],
+  ];
+  const renderRibbon = (items, muted) => {
+    const parts = items
+      .filter(([, value]) => value)
+      .map(([label, value]) =>
+        `<span class="rh-item"><span class="rh-label">${escapeHtml(label)}</span>${escapeHtml(value)}</span>`
+      );
+    if (!parts.length) return '';
+    return `<div class="runner-hardware__ribbon${muted ? ' runner-hardware__ribbon--muted' : ''}">` +
+      parts.join('<span class="rh-sep">&middot;</span>') + '</div>';
+  };
 
   modelEl.textContent = cpu.model_name || 'Unknown CPU model';
   providerEl.textContent = data.provider === 'github-actions' ? 'GITHUB-HOSTED' : String(data.provider || 'LOCAL').toUpperCase();
   providerEl.className = 'regression-badge pass';
-  gridEl.innerHTML = metrics.map(([label, value]) =>
-    `<div class="runner-hardware__metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
-  ).join('');
+  gridEl.innerHTML = renderRibbon(ribbonMain, false) + renderRibbon(ribbonMeta, true);
 
   const supportedIsa = Object.entries(data.isa || {}).filter(([, enabled]) => enabled).map(([name]) => name);
-  isaEl.innerHTML = supportedIsa.map(name => `<code>${escapeHtml(name)}</code>`).join('');
+  isaEl.innerHTML = supportedIsa.length
+    ? `<span class="runner-hardware__isa-label">ISA</span>` + supportedIsa.map(name => `<code>${escapeHtml(name)}</code>`).join('')
+    : '';
 
   const cpuRaw = String(data.raw_lscpu || data.raw_cpuinfo || '');
   const freeRaw = String(data.raw_free_h || '');
