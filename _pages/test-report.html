@@ -496,6 +496,75 @@
       overflow-x: auto;
       margin-top: 0.7rem;
     }
+
+    /* What-this-tests explainers and status semantics */
+    .contract-explainer {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.7rem;
+      margin: 0.9rem 0 1.1rem;
+    }
+    .contract-explainer__card {
+      padding: 0.75rem 0.9rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid #3d3a31;
+      border-left: 3px solid var(--orange);
+      border-radius: 8px;
+    }
+    .contract-explainer__card h3 {
+      margin: 0;
+      color: var(--text-primary);
+      font-size: 0.88rem;
+    }
+    .contract-explainer__card p {
+      margin: 0.4rem 0 0.55rem;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+    .cmd-chip {
+      display: inline-block;
+      padding: 0.16rem 0.5rem;
+      color: var(--orange-light);
+      background: rgba(255, 180, 0, 0.08);
+      border: 1px solid rgba(255, 180, 0, 0.28);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .cmd-chip:hover {
+      background: rgba(255, 180, 0, 0.16);
+    }
+    .status-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem 1.3rem;
+      margin: 0.6rem 0 1rem;
+      padding: 0.55rem 0.8rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid #3d3a31;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+    }
+    .status-legend .legend-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 600;
+    }
+    .status-legend .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-legend .dot.pass { background: #48bb78; }
+    .status-legend .dot.warn { background: var(--orange); }
+    .status-legend .dot.fail { background: #f56565; }
+    .status-legend .dot.skip { background: #a0aec0; }
   </style>
 
   <div id="loading-state" class="active">
@@ -619,6 +688,25 @@
         `make test-architecture-contracts` status is not available in this report yet.
       </p>
 
+      <div class="contract-explainer">
+        <div class="contract-explainer__card">
+          <h3>What this tests</h3>
+          <p>Every promoted circuit template declares critical tensor edges &mdash; the wiring that carries activations between ops. This dashboard checks whether those edges are <strong>explicit</strong> in each template or still <strong>implicit</strong> (inferred by the compiler).</p>
+          <a class="cmd-chip" href="testing.html">make test-architecture-contracts</a>
+        </div>
+        <div class="contract-explainer__card">
+          <h3>How to read it</h3>
+          <p><strong>WARN is not broken.</strong> It marks hardening debt: the wiring is correct, but some edges are still implicit and must be made explicit. <strong>FAIL</strong> means a declared contract was actually violated.</p>
+          <a class="cmd-chip" href="v8-runbook.html">v8 runbook</a>
+        </div>
+      </div>
+
+      <div class="status-legend">
+        <span class="legend-key"><span class="dot pass"></span>PASS</span><span>all critical edges explicit</span>
+        <span class="legend-key"><span class="dot warn"></span>WARN</span><span>correct wiring, implicit edges remain</span>
+        <span class="legend-key"><span class="dot fail"></span>FAIL</span><span>declared contract violated</span>
+      </div>
+
       <div class="summary-cards" style="margin: 0 0 1rem 0;">
         <div class="summary-card">
           <div class="value" id="architecture-contract-status">-</div>
@@ -648,6 +736,30 @@
       <p class="regression-meta" id="v8-dsl-contract-meta">
         Waiting for the three nightly rows that compose <code>make test-v8-dsl</code>.
       </p>
+
+      <div class="contract-explainer">
+        <div class="contract-explainer__card">
+          <h3>Zero Hardcoding</h3>
+          <p>Generated code may not bake in model-specific values &mdash; every constant must trace back to the circuit or the weights, so a new model family never needs a compiler branch.</p>
+          <a class="cmd-chip" href="testing.html">make test-v8-dsl-policy</a>
+        </div>
+        <div class="contract-explainer__card">
+          <h3>Numerical Kernel Contracts</h3>
+          <p>Each kernel declares its input/compute/reduction/output dtypes and its oracle parity envelope; the suite checks the declarations hold.</p>
+          <a class="cmd-chip" href="testing.html">make test-numerical-contracts</a>
+        </div>
+        <div class="contract-explainer__card">
+          <h3>Circuit / Dataflow Audit</h3>
+          <p>Template wiring is audited so tensors flow only through declared edges &mdash; no silent paths around the circuit map.</p>
+          <a class="cmd-chip" href="testing.html">make test-v8-template-circuit-audit</a>
+        </div>
+      </div>
+
+      <div class="status-legend">
+        <span class="legend-key"><span class="dot pass"></span>PASS</span><span>contract held on this runner</span>
+        <span class="legend-key"><span class="dot skip"></span>SKIP</span><span>suite not applicable or not run on this runner &mdash; not a failure</span>
+        <span class="legend-key"><span class="dot fail"></span>FAIL</span><span>contract violated &mdash; investigate before merging</span>
+      </div>
 
       <div class="summary-cards" style="margin: 0 0 1rem 0;">
         <div class="summary-card"><div class="value" id="v8-dsl-contract-status">-</div><div class="label">Overall</div></div>
