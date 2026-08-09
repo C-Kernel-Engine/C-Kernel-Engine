@@ -1,5 +1,6 @@
 var NAVTREEINDEX24 =
 {
+"vision__kernels_8c.html#a6414bc6af9c28e7baf31b434073e794f":[2,0,1,1,88,5],
 "vision__kernels_8c.html#a6933897ffa7aa6a48b03e6bd01087ae0":[2,0,1,1,88,18],
 "vision__kernels_8c.html#a86aec042bcceb0bd8955f0daf0d986c4":[2,0,1,1,88,7],
 "vision__kernels_8c.html#a95f0081ec402d0df10805093d32c8ae5":[2,0,1,1,88,6],
