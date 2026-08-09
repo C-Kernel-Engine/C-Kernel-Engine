@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 390">
+  <title>P3 evidence node storage tiers: system drive, /data artifact tier, planned Gen5 tensor tier</title>
+  <desc>Three storage tiers. Current: a 512 GB Samsung OEM system NVMe boot drive, and a 2 TB WD_BLACK SN850X mounted at /data holding model catalogs, converted BUMP artifacts, worktrees, X-Ray tensors and profiler captures, with an advertised 7,300 MB/s vendor rating. Planned: a 4 TB Samsung 9100 PRO PCIe 5.0 tensor tier with advertised 14,800 read and 13,400 write MB/s ratings, shown as a dated quote only. A note states that more capacity broadens experiments and artifact retention but does not remove RAM constraints.</desc>
+
+  <defs>
+    <marker id="arrStore" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="390" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">P3 Evidence Node: Storage Tiers</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">system drive → /data artifact tier → planned Gen5 tensor tier · sequential figures are advertised vendor ratings</text>
+
+  <!-- Box 1: system drive -->
+  <rect x="30" y="90" width="270" height="190" rx="8" fill="#252525" stroke="#47b475" stroke-width="1.5"/>
+  <rect x="206" y="102" width="80" height="20" rx="10" fill="none" stroke="#47b475" stroke-width="1.2"/>
+  <text x="246" y="116" font-family="Inter, sans-serif" font-size="9.5" font-weight="700" fill="#47b475" text-anchor="middle">CURRENT</text>
+  <text x="45" y="117" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#b0b0b0">512 GB system NVMe</text>
+  <text x="45" y="148" font-family="monospace" font-size="10" fill="#9ed6ff">Samsung OEM MZVL2512HDJD</text>
+  <text x="45" y="170" font-family="Inter, sans-serif" font-size="11" fill="#808080">Ubuntu Server OS + toolchain</text>
+  <text x="45" y="192" font-family="Inter, sans-serif" font-size="11" fill="#808080">remains the boot drive</text>
+
+  <!-- Arrow 1 → 2 -->
+  <line x1="302" y1="185" x2="339" y2="185" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrStore)"/>
+  <text x="320" y="172" font-family="Inter, sans-serif" font-size="10" fill="#47b475" text-anchor="middle">installed</text>
+
+  <!-- Box 2: /data tier -->
+  <rect x="345" y="90" width="270" height="190" rx="8" fill="#252525" stroke="#47b475" stroke-width="1.5"/>
+  <rect x="521" y="102" width="80" height="20" rx="10" fill="none" stroke="#47b475" stroke-width="1.2"/>
+  <text x="561" y="116" font-family="Inter, sans-serif" font-size="9.5" font-weight="700" fill="#47b475" text-anchor="middle">CURRENT</text>
+  <text x="360" y="117" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#86efac">2 TB /data artifact tier</text>
+  <text x="360" y="146" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">WD_BLACK SN850X · PCIe 4.0 x4</text>
+  <text x="360" y="165" font-family="Inter, sans-serif" font-size="11" fill="#ffc933">advertised 7,300 MB/s read</text>
+  <text x="360" y="184" font-family="Inter, sans-serif" font-size="11" fill="#808080">≈1.8 TiB usable · ext4 · noatime</text>
+  <text x="360" y="206" font-family="Inter, sans-serif" font-size="11" fill="#808080">model catalog · BUMP artifacts</text>
+  <text x="360" y="225" font-family="Inter, sans-serif" font-size="11" fill="#808080">worktrees · X-Ray tensors</text>
+  <text x="360" y="244" font-family="Inter, sans-serif" font-size="11" fill="#808080">VTune / Advisor / perf captures</text>
+
+  <!-- Arrow 2 → 3 -->
+  <line x1="617" y1="185" x2="654" y2="185" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrStore)"/>
+  <text x="636" y="172" font-family="Inter, sans-serif" font-size="10" fill="#ffc933" text-anchor="middle">planned</text>
+
+  <!-- Box 3: planned Gen5 tier -->
+  <rect x="660" y="90" width="270" height="190" rx="8" fill="#252525" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <rect x="836" y="102" width="80" height="20" rx="10" fill="none" stroke="#ffb400" stroke-width="1.2"/>
+  <text x="876" y="116" font-family="Inter, sans-serif" font-size="9.5" font-weight="700" fill="#ffc933" text-anchor="middle">PLANNED</text>
+  <text x="675" y="117" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#ffc933">4 TB Gen5 tensor tier</text>
+  <text x="675" y="146" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Samsung 9100 PRO · PCIe 5.0 x4</text>
+  <text x="675" y="165" font-family="Inter, sans-serif" font-size="11" fill="#ffc933">advertised up to</text>
+  <text x="675" y="184" font-family="Inter, sans-serif" font-size="11" fill="#ffc933">14,800 / 13,400 MB/s r/w</text>
+  <text x="675" y="206" font-family="Inter, sans-serif" font-size="11" fill="#808080">dated quote only — not purchased</text>
+  <text x="675" y="225" font-family="Inter, sans-serif" font-size="11" fill="#808080">NVMe-tier research lane</text>
+
+  <!-- note bar -->
+  <rect x="30" y="308" width="900" height="40" rx="6" fill="#2a230f" stroke="#ffb400" stroke-width="1.2"/>
+  <text x="480" y="333" font-family="Inter, sans-serif" font-size="11.5" fill="#ffc933" text-anchor="middle">More capacity = broader experiments and longer artifact retention. Storage does not remove RAM constraints — an SSD is not DRAM.</text>
+
+  <!-- legend -->
+  <rect x="30" y="362" width="14" height="14" rx="3" fill="#252525" stroke="#47b475" stroke-width="1.5"/>
+  <text x="52" y="374" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">installed and in use</text>
+  <rect x="200" y="362" width="14" height="14" rx="3" fill="#252525" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="222" y="374" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">planned — dated quote only</text>
+  <text x="440" y="374" font-family="Inter, sans-serif" font-size="11" fill="#707070">no measured fio result is published for either drive yet</text>
+</svg>
