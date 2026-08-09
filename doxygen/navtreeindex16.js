@@ -1,5 +1,8 @@
 var NAVTREEINDEX16 =
 {
+"structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646":[1,0,33,11],
+"structCKLayerForwardParamsQ4K.html#ada91d4c0f5e6040aca475655f7f1bcab":[1,0,33,2],
+"structCKLayerForwardParamsQ4K.html#af0407fc50e027301417628d774a41ff3":[1,0,33,22],
 "structCKLayerForwardParamsQ4K.html#af9afcd6bc50e22482a16dd1237aee02e":[1,0,33,16],
 "structCKLayerForwardParamsQ4K.html#afae06ea5bb1f1d1aed99a1bfd54dd6bf":[1,0,33,18],
 "structCKLayerGradOffsets.html":[1,0,34],
@@ -246,8 +249,5 @@ var NAVTREEINDEX16 =
 "structCKModelRuntimeDescriptorV8.html#a1c05637dda33b9c3abcec4e34fffec57":[1,0,47,3],
 "structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4":[1,0,47,5],
 "structCKModelRuntimeDescriptorV8.html#a7230fff85cda3eb99e6a7e26469dfd9b":[1,0,47,1],
-"structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537":[1,0,47,10],
-"structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950":[1,0,47,6],
-"structCKModelRuntimeDescriptorV8.html#abd5584742189913e789e7d705fc3196d":[1,0,47,8],
-"structCKModelRuntimeDescriptorV8.html#ac5af8940d8ac291ed5d286f0de175d00":[1,0,47,4]
+"structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537":[1,0,47,10]
 };

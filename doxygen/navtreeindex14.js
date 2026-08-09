@@ -1,5 +1,8 @@
 var NAVTREEINDEX14 =
 {
+"rmsnorm__kernels__int4_8c.html#a8636e5ec5a86b1093378e6b9e47232f6":[2,0,1,1,76,2],
+"rmsnorm__kernels__int4_8c.html#a9c0e4a1798e2ff7fd3450cdb541783ea":[2,0,1,1,76,0],
+"rmsnorm__kernels__int4_8c.html#abd6eee8fe2cdb4c9b9934e93474f4f22":[2,0,1,1,76,3],
 "rmsnorm__kernels__int4_8c.html#ac4e3dd8120af16f51a0fc7178ba4d8cd":[2,0,1,1,76,5],
 "rmsnorm__kernels__int4_8c_source.html":[2,0,1,1,76],
 "rmsnorm__kernels__int8_8c.html":[2,0,1,1,77],
@@ -246,8 +249,5 @@ var NAVTREEINDEX14 =
 "structCKDimToken.html#a984c6bca0fce2bd1893a21834837fc7f":[1,0,18,2],
 "structCKFooterGradOffsets.html":[1,0,19],
 "structCKFooterGradOffsets.html#a1033308e389797d86251b87a79781bae":[1,0,19,9],
-"structCKFooterGradOffsets.html#a39e8fc85fe6bcd5c1a1fbd7ced054879":[1,0,19,0],
-"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519":[1,0,19,6],
-"structCKFooterGradOffsets.html#a9275fe493cec58474de57a572d4867f4":[1,0,19,4],
-"structCKFooterGradOffsets.html#ab1ee7c4f660361ce5072f1c9183fa74f":[1,0,19,7]
+"structCKFooterGradOffsets.html#a39e8fc85fe6bcd5c1a1fbd7ced054879":[1,0,19,0]
 };

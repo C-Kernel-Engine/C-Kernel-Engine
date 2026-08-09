@@ -1,5 +1,8 @@
 var NAVTREEINDEX18 =
 {
+"structMemoryInfo.html#a72adfc47f767bf59141275a7e542f5e2":[1,0,69,0],
+"structMemoryInfo.html#a8ac82d5b5a76eb7a19634cff450bb897":[1,0,69,9],
+"structMemoryInfo.html#a8cf60ff7368ef5b531d0722edf78b2e2":[1,0,69,8],
 "structMemoryInfo.html#ab747a208ec62ee715eb864cfe1daec4d":[1,0,69,13],
 "structMemoryInfo.html#ac20112f20e405d5fafdd560b3535f000":[1,0,69,4],
 "structMemoryInfo.html#ac9d849331a689ebbfa4c6e65da74f990":[1,0,69,1],
@@ -244,10 +247,7 @@ var NAVTREEINDEX18 =
 "system__topology_8c.html#afa3b302a31c3fe70d5a615a60d3df7f7":[2,0,1,28,8],
 "system__topology_8c.html#afd3ae767003bf9070768199caa3f7ee1":[2,0,1,28,17],
 "system__topology_8c_source.html":[2,0,1,28],
-"system__topology_8h.html":[2,0,0,34],
-"system__topology_8h.html#a274dcedf2b6259112dff57aa23f55d15":[2,0,0,34,40],
-"system__topology_8h.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,0,34,29],
-"system__topology_8h.html#a3e80c10682d58f63c4fa70b98e6a7dfb":[2,0,0,34,32],
-"system__topology_8h.html#a3fd4135ab056f548986d55e3864316f2":[2,0,0,34,25],
-"system__topology_8h.html#a418478bfd80cdc978000fcd7e8ab9c28":[2,0,0,34,21]
+"system__topology_8h.html":[2,0,0,35],
+"system__topology_8h.html#a274dcedf2b6259112dff57aa23f55d15":[2,0,0,35,40],
+"system__topology_8h.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,0,35,29]
 };
