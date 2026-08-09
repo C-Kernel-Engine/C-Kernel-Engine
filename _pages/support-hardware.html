@@ -55,14 +55,6 @@ body { overflow-x: hidden; }
 .support-investment-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .support-investment-total { color: var(--blue); font: 800 1.7rem 'JetBrains Mono', monospace; }
 .support-funded { color: var(--green); font: 700 .72rem 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
-.fleet-dot { display: inline-block; width: .62rem; height: .62rem; border-radius: 50%; margin-right: .45rem; vertical-align: middle; }
-.fleet-dot.legacy { background: #808080; }
-.fleet-dot.portable { background: var(--blue); }
-.fleet-dot.server { background: var(--green); }
-.fleet-dot.planned { background: var(--orange); }
-.fleet-dot.future { background: #bc8cff; }
-.fleet-status { font: 700 .72rem 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-.support-quote { color: var(--orange); font: 700 1.05rem 'JetBrains Mono', monospace; }
 @media (max-width: 850px) { .support-grid { grid-template-columns: minmax(0, 1fr); } .support-hero { padding: 2.2rem 1.25rem; } .support-actions, .support-button { box-sizing: border-box; width: 100%; } .support-table { display: block; max-width: 100%; overflow-x: auto; } }
 @media (max-width: 700px) { .support-milestones { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 </style>
@@ -99,118 +91,18 @@ body { overflow-x: hidden; }
 <section class="support-investment">
   <div class="support-investment-head">
     <div><div class="support-kicker">Personal investment so far</div><h2 style="margin:.35rem 0 0">Founder-funded hardware already supporting CKE</h2></div>
-    <div class="support-investment-total">CAD $2,209.99</div>
+    <div class="support-investment-total">CAD $1,650</div>
   </div>
   <p>This is money personally spent on hardware now used for CKE development and evidence generation. It is separate from sponsor funding, donated or loaned equipment, and the future CAD $30,000 laboratory ceiling.</p>
   <table class="support-table">
     <thead><tr><th>Hardware</th><th>Personal cost</th><th>Research role</th><th>Funding status</th></tr></thead>
     <tbody>
-      <tr><td>Lenovo ThinkPad T14 Gen 3 (used), Core i7-1260P, 24 GB DDR4-3200 (8 GB soldered + 16 GB SODIMM)</td><td>CAD $600</td><td>Portable Ubuntu development and documentation workstation, AVX2 portability node, and interactive control node for server experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
-      <tr><td>Lenovo P3 Tiny, Core i7-14700T (20 physical / 28 logical CPUs, AVX2/FMA/AVX-VNNI), 32 GB DDR5</td><td>CAD $1,050</td><td>Dedicated minimal Ubuntu Server node for repeatable CKE execution, profiling, and unattended experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
-      <tr><td>WD_BLACK SN850X 2 TB NVMe expansion for the P3 (CAD $499.99 + $35.00 PST + $25.00 GST), mounted at <code>/data</code></td><td>CAD $559.99</td><td>Artifact tier: model catalog, converted BUMP weights, isolated worktrees, X-Ray tensors, and VTune/Advisor/perf captures</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Used Lenovo ThinkPad, purchased through Craigslist</td><td>CAD $600</td><td>Portable CKE development, AVX2 testing, documentation, and content production</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Lenovo P3 Tiny, Core i7, 32 GB RAM</td><td>CAD $1,050</td><td>Dedicated minimal Ubuntu Server node for repeatable CKE execution, profiling, and unattended experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
     </tbody>
   </table>
-  <p><strong>Ledger scope:</strong> this total includes only the three dated purchases above. The 2014 ThinkPad W530 remains available as a legacy node, but its original cost is not currently documented — it is marked pending verification and excluded from the total rather than estimated. The ledger also excludes electricity, personal labor, the planned second 32 GB SODIMM for the P3, the planned Ryzen node quoted below, and future Xeon nodes. Future entries will separate personally funded, sponsor funded, donated, loaned, and discounted hardware.</p>
+  <p><strong>Ledger scope:</strong> this total includes only the two confirmed hardware purchases above. It excludes electricity, storage or memory upgrades, warranties already included with a purchase, personal labor, and planned Xeon nodes. Future entries will separate personally funded, sponsor funded, donated, loaned, and discounted hardware.</p>
 </section>
-
-<h2>Current CPU Fleet</h2>
-<p>The fleet is deliberately heterogeneous. Matched identical systems help controlled distributed scaling, but a mix of Intel generations, a planned AMD node, and one legacy machine exposes the ISA, scheduler, numerical, and provider-selection assumptions that identical hardware would silently hide. Each node below carries a status label: <strong>legacy/available</strong>, <strong>active portable</strong>, <strong>active server</strong>, <strong>planned/quoted</strong>, or <strong>future target</strong>.</p>
-
-<table class="support-table">
-  <thead><tr><th>Node</th><th>Status</th><th>CPU &amp; ISA</th><th>Memory</th><th>Storage</th><th>OS role</th><th>Profiler</th><th>Research purpose</th></tr></thead>
-  <tbody>
-    <tr>
-      <td><strong>ThinkPad W530</strong> (2014)</td>
-      <td><span class="fleet-dot legacy"></span><span class="fleet-status">Legacy / available</span></td>
-      <td>Pending verification — old-x86, scalar/SSE/older AVX where supported</td>
-      <td>Pending verification</td>
-      <td>Pending verification</td>
-      <td>Legacy test node, remote orchestration</td>
-      <td>perf where supported</td>
-      <td>Old-x86 compatibility, scalar/SSE/older-AVX regression, failure and portability testing</td>
-    </tr>
-    <tr>
-      <td><strong>ThinkPad T14 Gen 3</strong></td>
-      <td><span class="fleet-dot portable"></span><span class="fleet-status">Active portable</span></td>
-      <td>Core i7-1260P · AVX2</td>
-      <td>24 GB DDR4-3200 (8 GB soldered + 16 GB SODIMM)</td>
-      <td>Not an evidence tier</td>
-      <td>Ubuntu/AwesomeWM development and documentation workstation</td>
-      <td>perf (interactive)</td>
-      <td>Everyday CKE development, AVX2 portability, interactive control node for server experiments</td>
-    </tr>
-    <tr>
-      <td><strong>Lenovo P3 Tiny</strong></td>
-      <td><span class="fleet-dot server"></span><span class="fleet-status">Active server</span></td>
-      <td>Core i7-14700T · 20 physical / 28 logical · AVX2/FMA/AVX-VNNI · no AVX-512</td>
-      <td>32 GB DDR5 (second 32 GB SODIMM planned, not purchased)</td>
-      <td>512 GB OEM system NVMe + 2 TB SN850X at <code>/data</code> (PCIe 4.0; 7,300 MB/s advertised)</td>
-      <td>Minimal Ubuntu Server, unattended experiments</td>
-      <td>Intel VTune + Advisor (existing Intel evidence; Advisor is deprecated) + perf</td>
-      <td>Primary repeatable execution, profiling, and cross-family benchmark node</td>
-    </tr>
-    <tr>
-      <td><strong>Ryzen 9 9950X3D node</strong></td>
-      <td><span class="fleet-dot planned"></span><span class="fleet-status">Planned / quoted</span></td>
-      <td><a href="https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html">Ryzen 9 9950X3D</a> · Zen 5 · 16C/32T · AVX-512 + AVX2 · 128 MB L3</td>
-      <td>64 GB DDR5-6000 (quoted kit)</td>
-      <td>Planned <a href="https://semiconductor.samsung.com/consumer-storage/internal-ssd/9100-pro/">Samsung 9100 PRO</a> 4 TB, PCIe 5.0 (14,800/13,400 MB/s advertised vendor ratings)</td>
-      <td>Planned Linux evidence node</td>
-      <td>perf + AMD uProf (VTune hardware event sampling requires a genuine Intel CPU — not promised on AMD)</td>
-      <td>Native AVX-512 versus AVX2/VNNI, Gen5 NVMe streaming and Memory Tetris research, cross-vendor numerics, distributed experiments with the P3</td>
-    </tr>
-    <tr>
-      <td><strong>Xeon 636 → 650/670 class</strong></td>
-      <td><span class="fleet-dot future"></span><span class="fleet-status">Future target</span></td>
-      <td>Xeon 630/650/670-class · AMX BF16 · AVX-512</td>
-      <td>ECC RDIMM, four channels → eight with 650/670-class CPUs</td>
-      <td>NVMe per stage bill of materials</td>
-      <td>Sponsorship-roadmap lab node</td>
-      <td>VTune / Advisor / perf</td>
-      <td>AMX BF16 kernels, memory-channel scaling, matched-node distributed research</td>
-    </tr>
-  </tbody>
-</table>
-
-<h3>Storage tiers on the P3 evidence node</h3>
-<p>The P3 keeps its original 512 GB Samsung OEM drive as the system disk and adds the SN850X as a dedicated artifact tier. The 7,300 MB/s figure is Western Digital's <a href="https://www.westerndigital.com/products/internal-drives/wd-black-sn850x-nvme-ssd">advertised</a> sequential rating, not a CKE measurement; no dated fio artifact is published for either drive yet. The Gen5 tier is a quoted plan, not an installed device.</p>
-
-<div class="img-container svg-viewer" data-title="P3 storage tiers: current 512 GB system drive, current 2 TB /data artifact tier, planned 4 TB Gen5 tensor tier">
-  <img src="assets/support-hardware-storage-tiers.svg" alt="Storage tier flow for the P3 evidence node: the current 512 GB Samsung OEM system NVMe boot drive, an arrow marked installed to the current 2 TB WD_BLACK SN850X /data artifact tier with advertised 7,300 MB/s read holding model catalogs, BUMP artifacts, worktrees, X-Ray tensors and profiler captures, then a dashed arrow marked planned to the planned 4 TB Samsung 9100 PRO PCIe 5.0 tensor tier with advertised 14,800 read and 13,400 write MB/s shown as a dated quote only. A note bar states that more capacity broadens experiments and artifact retention but storage does not remove RAM constraints and an SSD is not DRAM." style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
-</div>
-
-<h3>What the new /data tier unlocks</h3>
-<p>Roughly 1.8 TiB of usable space (ext4, noatime, mounted read/write at <code>/data</code>) changes how much evidence the lab can keep, not how fast the machine computes:</p>
-<ul>
-  <li><strong>Model catalog and converted artifacts</strong> — multiple GGUF sources and their converted BUMP weight files stay resident side by side instead of being re-downloaded or re-converted per experiment.</li>
-  <li><strong>Isolated worktrees and generated runtimes</strong> — parallel experiment branches with their own generated models and build trees.</li>
-  <li><strong>X-Ray tensors and reports</strong> — per-tensor capture across runs, retained for comparison instead of sampled and discarded.</li>
-  <li><strong>Profiler captures</strong> — VTune, Advisor, and perf sessions kept beside the runs they describe.</li>
-  <li><strong>Cross-family benchmark artifacts</strong> and future NVMe-tier research (the Memory Tetris proposal: a software-managed DRAM working set over explicit NVMe tensor tiers).</li>
-</ul>
-<p><strong>Scope limit:</strong> capacity improves experimental breadth and artifact retention. It does not remove RAM constraints, and no storage tier makes an SSD equivalent to DRAM.</p>
-
-<h3>Planned AMD evidence node — quoted, not purchased</h3>
-<div class="support-callout">
-  <p style="margin-top:0"><strong>Status: planned/quoted.</strong> Two dated quotes from 2026-08-09 define the candidate configuration. Nothing below is purchased, and none of it enters the founder-funded ledger until a receipt exists and the hardware is verified.</p>
-  <table class="support-table">
-    <thead><tr><th>Quote</th><th>Contents</th><th>Visible price</th></tr></thead>
-    <tbody>
-      <tr>
-        <td>Memory Express bundle (dated quote, not a receipt)</td>
-        <td>AMD Ryzen 9 9950X3D (16C/32T, up to 5.7 GHz) · ASUS TUF Gaming X870E-PLUS WIFI7 · G.Skill Flare X5 64 GB DDR5-6000 CL36 (2×32 GB) · Cooler Master MasterLiquid 360 Elite</td>
-        <td><span class="support-quote">CAD $2,174.98</span></td>
-      </tr>
-      <tr>
-        <td>Newegg cart (volatile quote, not a receipt)</td>
-        <td>Fractal Design Define 7 Compact · Corsair RM850e 850 W · Samsung 9100 PRO 4 TB with heatsink (PCIe 5.0 x4)</td>
-        <td><span class="support-quote">CAD $1,319.94 est. before tax</span></td>
-      </tr>
-    </tbody>
-  </table>
-  <p>The Newegg figure is the cart's visible estimated total after combo savings and before tax calculation; carts are volatile and the number is indicative only. Samsung's 14,800/13,400 MB/s sequential figures for the 9100 PRO 4 TB are <a href="https://semiconductor.samsung.com/consumer-storage/internal-ssd/9100-pro/">vendor ratings</a> until measured on the final motherboard. CPU claims follow the <a href="https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html">AMD product page</a>: Zen 5, 16 cores / 32 threads, AVX-512 and AVX2, 128 MB L3, PCIe 5.0, dual-channel DDR5, 170 W.</p>
-  <p style="margin-bottom:0"><strong>Research role:</strong> native Zen 5 AVX-512 versus P3 AVX2/AVX-VNNI comparisons; a 64 GB initial high-memory model lane (expansion evaluated separately); PCIe 5 NVMe streaming and Memory Tetris experiments; cross-vendor numerical repeatability and provider selection; larger Gemma, GLM, Kimi, Qwen3.6, Whisper, and multimodal artifact-backed tests where memory permits; and distributed CKE experiments with the P3 as the Intel node and Ryzen as the AMD node — no scaling claim until measured. On AMD, Linux perf and AMD uProf (hardware counters, event-based profiling, IBS) are the primary PMU tools; Intel documents VTune hardware event-based sampling as requiring a genuine Intel processor, so no VTune PMU analysis is promised on Ryzen, and the deprecated Advisor remains an Intel-only evidence tool. This node is an intermediate founder-funded AVX-512 and storage lane — it does not replace the Xeon AMX/BF16/memory-channel sponsorship roadmap below.</p>
-</div>
 
 <h2>The Immediate Goal</h2>
 <p>Founder funding establishes matched Xeon 636 nodes for native AMX BF16, AVX-512/VNNI, four-channel memory, and direct-network experiments. Sponsor support then unlocks the Xeon 600 platform's full eight-channel path through compatible 650/670-class processor upgrades and four additional matched RDIMMs per node. The resulting four-channel-versus-eight-channel comparison becomes a published experiment rather than an assumed benefit.</p>
@@ -277,24 +169,6 @@ body { overflow-x: hidden; }
   <li><strong>Financial contribution:</strong> fund a published stage or a clearly identified component after the bill of materials is confirmed.</li>
 </ul>
 <p>Use <a href="https://github.com/sponsors/antshiv">GitHub Sponsors</a> for direct financial support. Use <a href="https://www.shivasnotes.com/work-with-us">ShivasNotes Work With Us</a> for a paid private investigation with bounded deliverables. Hardware vendors and laboratories can contact <a href="mailto:anthony.shivakumar@antshiv.com?subject=CKE%20hardware%20lab%20support">Anthony Shivakumar</a> about loaners, remote access, parts, or discounts.</p>
-
-<h2>Evidence Before Claims</h2>
-<p>No fleet result — from the W530 to the future Xeon nodes — is published without the same minimum evidence packet. A number without this packet is a lab note, not a CKE result.</p>
-<ul style="columns: 16rem; column-gap: 2.5rem;">
-  <li>Motherboard and SSD firmware versions</li>
-  <li><code>lscpu</code> output and detected ISA</li>
-  <li>DIMM topology, capacity, and memory frequency</li>
-  <li><code>nvme list</code> / device SMART state</li>
-  <li>Dated fio bandwidth baseline</li>
-  <li>Memory bandwidth baseline</li>
-  <li>Thermal and throttling log</li>
-  <li>Compiler version and flags</li>
-  <li>Model hash and quantization format</li>
-  <li>CKE commit under test</li>
-  <li>Thread count and affinity policy</li>
-  <li>Reference backend and numerical tolerances</li>
-  <li>Profiler artifact (VTune, Advisor, perf, or AMD uProf as applicable)</li>
-</ul>
 
 <h2>Evidence and Disclosure Contract</h2>
 <div class="support-contract">
