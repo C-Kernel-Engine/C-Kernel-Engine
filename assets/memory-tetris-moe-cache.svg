@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560">
+  <title>MoE expert residency: hot experts in DRAM, cold experts on NVMe</title>
+  <desc>The router selects experts per token. A hit on a hot resident expert runs immediately. A selected expert that is only on NVMe is a hard dependency: it is fetched to a staging slot, verified, and only then run. No expert is silently substituted.</desc>
+
+  <defs>
+    <marker id="arrMoeGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#47b475"/>
+    </marker>
+    <marker id="arrMoeRed" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f85149"/>
+    </marker>
+    <marker id="arrMoeAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="560" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">MoE Expert Residency: Hot in DRAM, Cold on NVMe</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">The router creates demand — a missing selected expert is a hard dependency, never substituted</text>
+
+  <!-- router -->
+  <rect x="40" y="100" width="250" height="76" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="165" y="134" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">Router</text>
+  <text x="165" y="156" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">per-token expert selection</text>
+
+  <!-- DRAM panel -->
+  <rect x="340" y="90" width="580" height="210" rx="10" fill="#252525" stroke="#47b475" stroke-width="1.5"/>
+  <text x="904" y="116" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#47b475" text-anchor="end">DRAM — fast working set</text>
+
+  <rect x="356" y="134" width="130" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="421" y="160" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">common</text>
+  <text x="421" y="180" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">weights</text>
+
+  <rect x="496" y="134" width="110" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="551" y="160" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#7dd3fc" text-anchor="middle">expert E3</text>
+  <text x="551" y="180" font-family="Inter, sans-serif" font-size="10" fill="#5b8ba8" text-anchor="middle">hot — resident</text>
+
+  <rect x="616" y="134" width="110" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="671" y="160" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#7dd3fc" text-anchor="middle">expert E7</text>
+  <text x="671" y="180" font-family="Inter, sans-serif" font-size="10" fill="#5b8ba8" text-anchor="middle">hot — resident</text>
+
+  <rect x="736" y="134" width="90" height="64" rx="6" fill="#2a2a2a" stroke="#555555" stroke-width="1.5"/>
+  <text x="781" y="160" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#b0b0b0" text-anchor="middle">KV / state</text>
+  <text x="781" y="180" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">resident</text>
+
+  <rect x="836" y="134" width="72" height="64" rx="6" fill="#1d1d1d" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="872" y="160" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffc933" text-anchor="middle">staging</text>
+  <text x="872" y="180" font-family="Inter, sans-serif" font-size="10" fill="#caa64a" text-anchor="middle">slot</text>
+
+  <text x="630" y="230" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">resident: common weights, hot and active experts, KV/state, staging slots</text>
+  <text x="630" y="252" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">residency is guided by measured hit rate — routing is not</text>
+
+  <!-- hit arrow: router → E3 -->
+  <line x1="290" y1="118" x2="545" y2="128" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrMoeGreen)"/>
+  <text x="418" y="112" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#47b475" text-anchor="middle">hit: run now</text>
+
+  <!-- miss arrow: router → cold E5 -->
+  <line x1="290" y1="162" x2="668" y2="380" stroke="#f85149" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrMoeRed)"/>
+  <text x="350" y="320" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#f87171">miss: selected but not resident — hard dependency</text>
+
+  <!-- fetch arrow: cold E5 → staging slot -->
+  <line x1="700" y1="380" x2="860" y2="206" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrMoeAmber)"/>
+  <text x="694" y="312" font-family="Inter, sans-serif" font-size="10.5" fill="#ffc933" text-anchor="middle">fetch → staging,</text>
+  <text x="694" y="328" font-family="Inter, sans-serif" font-size="10.5" fill="#ffc933" text-anchor="middle">verify, then run</text>
+
+  <!-- no-substitution callout -->
+  <rect x="40" y="340" width="250" height="170" rx="8" fill="#2a1f08" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="165" y="370" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffc933" text-anchor="middle">No silent substitution</text>
+  <text x="165" y="398" font-family="Inter, sans-serif" font-size="11" fill="#d8c58f" text-anchor="middle">A selected expert that is not</text>
+  <text x="165" y="416" font-family="Inter, sans-serif" font-size="11" fill="#d8c58f" text-anchor="middle">resident is a hard dependency:</text>
+  <text x="165" y="434" font-family="Inter, sans-serif" font-size="11" fill="#d8c58f" text-anchor="middle">compute waits for verified</text>
+  <text x="165" y="452" font-family="Inter, sans-serif" font-size="11" fill="#d8c58f" text-anchor="middle">residency. Hit rate guides</text>
+  <text x="165" y="470" font-family="Inter, sans-serif" font-size="11" fill="#d8c58f" text-anchor="middle">caching — never routing.</text>
+  <text x="165" y="494" font-family="Inter, sans-serif" font-size="10.5" fill="#caa64a" text-anchor="middle">checksum + provenance first</text>
+
+  <!-- NVMe panel -->
+  <rect x="340" y="340" width="580" height="170" rx="10" fill="#252525" stroke="#454545" stroke-width="1.5"/>
+  <text x="356" y="366" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#b0b0b0">NVMe — capacity-oriented backing tier</text>
+
+  <rect x="356" y="384" width="86" height="54" rx="6" fill="#1d1d1d" stroke="#555555" stroke-width="1.5"/>
+  <text x="399" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#909090" text-anchor="middle">expert E1</text>
+  <text x="399" y="425" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="middle">cold</text>
+
+  <rect x="450" y="384" width="86" height="54" rx="6" fill="#1d1d1d" stroke="#555555" stroke-width="1.5"/>
+  <text x="493" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#909090" text-anchor="middle">expert E2</text>
+  <text x="493" y="425" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="middle">cold</text>
+
+  <rect x="544" y="384" width="86" height="54" rx="6" fill="#1d1d1d" stroke="#555555" stroke-width="1.5"/>
+  <text x="587" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#909090" text-anchor="middle">expert E4</text>
+  <text x="587" y="425" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="middle">cold</text>
+
+  <rect x="638" y="384" width="86" height="54" rx="6" fill="#2a230f" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="681" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffc933" text-anchor="middle">expert E5</text>
+  <text x="681" y="425" font-family="Inter, sans-serif" font-size="10" fill="#caa64a" text-anchor="middle">selected — cold</text>
+
+  <rect x="732" y="384" width="86" height="54" rx="6" fill="#1d1d1d" stroke="#555555" stroke-width="1.5"/>
+  <text x="775" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#909090" text-anchor="middle">expert E6</text>
+  <text x="775" y="425" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="middle">cold</text>
+
+  <rect x="826" y="384" width="86" height="54" rx="6" fill="#1d1d1d" stroke="#555555" stroke-width="1.5"/>
+  <text x="869" y="407" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#909090" text-anchor="middle">expert E8</text>
+  <text x="869" y="425" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="middle">cold</text>
+
+  <text x="630" y="478" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">cold experts, future layers and inactive immutable weights stay here until selected</text>
+</svg>

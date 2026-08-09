@@ -1,0 +1,399 @@
+<!-- TITLE: Memory Tetris: DRAM as a Tensor Cache over NVMe -->
+<!-- NAV: research -->
+
+<h1>Memory Tetris: DRAM as a Tensor Cache over NVMe</h1>
+
+<p class="lead">
+    CKE can potentially exploit known tensor lifetimes to manage a fixed DRAM working window over a much
+    larger model stored on NVMe. This is explicit storage-tier scheduling, not an SSD pretending to be RAM.
+</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div style="min-width: 0;">
+        <strong>Status: research design</strong><br>
+        Memory Tetris is <strong>not implemented in the production runtime</strong>. Hardware measurements
+        and numerical certification are pending. This HTML page is the canonical public design and visual
+        reference. Any lower-level Markdown implementation note must link back here and may not supersede
+        this page. Nothing here is a supported feature, a measured speedup, or a committed
+        model-compatibility claim.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">What it is</h3>
+        <ul>
+            <li>A <strong>lifetime-aware reuse policy</strong> for a fixed DRAM arena: when a tensor reaches its declared last use, its slot may become the final destination for a future tensor loaded asynchronously from NVMe (and, later, from another node).</li>
+            <li><strong>Explicit storage-tier scheduling</strong>: CKE owns slot lifetime, prefetch timing, transfer completion and consumption ordering.</li>
+            <li>A planner that may manage a predictable DRAM working window more effectively than demand paging, because tensor lifetimes are known in advance.</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">What it is not</h3>
+        <ul>
+            <li><strong>Not SSD-backed virtual memory.</strong> This design does not claim that an SSD has DRAM latency or bandwidth, and it is not swap or page-cache demand paging with a new name.</li>
+            <li><strong>Not a promise that PCIe bandwidth equals application throughput.</strong> Nominal device numbers do not fix an incorrect schedule, insufficient look-ahead, small random reads or excessive copies.</li>
+            <li><strong>Not implemented.</strong> No production code path does this today; hardware gates decide whether the idea earns promotion.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>The Mental Model</h2>
+
+<p>
+    Three roles, kept deliberately separate:
+</p>
+
+<pre><code>DRAM = explicitly managed tensor working set
+NVMe = capacity-oriented backing tier
+CKE  = planner that schedules ownership, transfer and consumption</code></pre>
+
+<p>
+    DRAM holds the fast working set &mdash; the tensors the current and next few computation steps touch.
+    NVMe holds the capacity-oriented backing tier &mdash; the rest of the converted model, larger than the
+    DRAM window. CKE sits between them and owns four things explicitly: <strong>slot lifetime</strong> (when
+    an arena region is proven dead), <strong>prefetch</strong> (when a transfer starts), <strong>transfer
+    completion</strong> (the event consumers wait on) and <strong>consumption</strong> (which kernel may run,
+    and only after residency is verified). Dead arena regions are reused in place; live tensors are never
+    shifted to make room.
+</p>
+
+<h2>Arena-Slot Reuse</h2>
+
+<p>
+    Assume four layer-weight groups fit in the streaming arena. When <code>L1</code> completes and its slot
+    is proven dead, an asynchronous read may place <code>L5</code> directly into that slot &mdash; at
+    <code>L1</code>'s old final address. <code>L2</code>, <code>L3</code>, <code>L4</code>, scratch and
+    persistent state keep their addresses across the whole sequence. The planner changes slot ownership and
+    waits for the transfer-completion event before allowing the <code>L5</code> consumer to run.
+</p>
+
+<div class="img-container svg-viewer" data-title="Arena ownership across T0, T1 and T2: L5 lands in L1's freed slot while every other live tensor keeps its address">
+    <img src="assets/memory-tetris-arena-timeline.svg" alt="Arena-slot reuse timeline: at T0 the DRAM arena holds layers L1 through L4 plus scratch and persistent state; at T1 the L1 slot is free after L1's last use; at T2 layer L5 has been loaded from the NVMe backing tier directly into L1's old final address while L2, L3, L4, scratch and persistent state never move" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>Overlapping Compute and I/O</h2>
+
+<p>
+    Storage traffic is hidden only when the next tensor arrives before its first use. With double buffering,
+    the desired timeline has the CPU computing <code>L17</code>, <code>L18</code>, <code>L19</code> while the
+    I/O path loads <code>L18</code>, <code>L19</code>, <code>L20</code> one layer ahead. Four outcomes matter
+    and must be distinguishable in telemetry: transfer hidden behind compute; exposed storage stall; transfer
+    completed before first use; consumer blocked because completion was late.
+</p>
+
+<div class="img-container svg-viewer" data-title="CPU execution and asynchronous I/O timeline: hidden transfer versus exposed storage stall">
+    <img src="assets/memory-tetris-overlap.svg" alt="Two timelines. Scenario A: the CPU computes L17, L18 and L19 while I/O loads L18, L19 and L20 one layer ahead; each load completes before first use so the transfer is hidden with zero exposed stall. Scenario B: the load of L32 completes after its first use, so the CPU stalls between computing L31 and L32 while the consumer is blocked waiting for the completion event" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h3>Bandwidth arithmetic without overstating it</h3>
+
+<p>
+    For a 500 MB tensor, an idealized transfer takes about <strong>71 ms at 7 GB/s</strong> and about
+    <strong>36 ms at 14 GB/s</strong>. These are division-based examples &mdash; bytes divided by nominal
+    bandwidth &mdash; not measured end-to-end latency and not a performance guarantee.
+</p>
+
+<table>
+    <tr>
+        <th>Example</th>
+        <th>Arithmetic</th>
+        <th>Idealized time</th>
+        <th>Nature</th>
+    </tr>
+    <tr>
+        <td>500 MB tensor at 7 GB/s</td>
+        <td>500 MB &divide; 7 GB/s</td>
+        <td>&asymp; 71 ms</td>
+        <td>division-based illustration</td>
+    </tr>
+    <tr>
+        <td>500 MB tensor at 14 GB/s</td>
+        <td>500 MB &divide; 14 GB/s</td>
+        <td>&asymp; 36 ms</td>
+        <td>division-based illustration</td>
+    </tr>
+</table>
+
+<p>
+    Real throughput is shaped by latency, queue depth, filesystem behavior, thermal state, page-cache state,
+    alignment and intermediate copies. A nominal 14 GB/s-class device cannot fix an incorrect schedule,
+    insufficient look-ahead, small random reads or excessive copies &mdash; which is why Gen5 hardware is only
+    worth evaluating after Gen4 proves the implementation can actually overlap I/O.
+</p>
+
+<h2>Actual Linux I/O Paths</h2>
+
+<p>
+    An ordinary buffered <code>read()</code> does <strong>not</strong> guarantee direct PCIe DMA into the
+    final userspace arena; the kernel page cache and an additional copy may be involved. Four candidate
+    mechanisms must be measured independently, and no path earns provider promotion before benchmarking:
+</p>
+
+<div class="img-container svg-viewer" data-title="NVMe-to-arena candidate paths: buffered asynchronous read, mmap plus controlled readahead, aligned O_DIRECT, and registered io_uring buffers">
+    <img src="assets/memory-tetris-storage-paths.svg" alt="Four candidate Linux I/O paths from model weights on NVMe to the CKE DRAM arena: buffered asynchronous read stages through the kernel page cache with an extra copy into the arena; mmap plus controlled readahead populates page-cache pages ahead of use then copies or faults on first use; aligned O_DIRECT bypasses the page cache and lands in the final arena slot subject to an alignment contract; registered io_uring buffers complete asynchronously into a registered slot where kernel and filesystem support exist. A warning bar states that queue depth, filesystem, cache state, alignment and copy overhead decide which path earns promotion" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<ol>
+    <li><strong>Buffered asynchronous reads</strong> &mdash; simple and portable, but the kernel page cache plus a copy into the arena costs CPU and effective bandwidth.</li>
+    <li><strong><code>mmap()</code> plus controlled readahead</strong> &mdash; page residency is steered ahead of use, but behavior depends on cache state and a copy or fault still happens at first use.</li>
+    <li><strong>Aligned <code>O_DIRECT</code> reads</strong> &mdash; bypass the page cache and can land in final arena slots, subject to a strict alignment contract.</li>
+    <li><strong>Registered <code>io_uring</code> buffers</strong> &mdash; asynchronous completion events into fixed buffers, where the kernel and filesystem support them.</li>
+</ol>
+
+<p>
+    The fastest mechanism is not assumed in advance. The planner interface should describe a transfer source
+    and a completion event without hard-coding one Linux I/O mechanism into model circuits, so the winning
+    path can be selected by measurement rather than by guesswork.
+</p>
+
+<h2>Dense and MoE Residency Policies</h2>
+
+<h3>Dense: a predictable sliding window</h3>
+
+<p>
+    Dense models provide a predictable layer sliding window with deterministic look-ahead: prefetch future
+    layer weights in circuit order and retain only the number of layers allowed by the DRAM budget. This is
+    the initial implementation target precisely because the schedule is known before execution starts.
+</p>
+
+<h3>MoE: a cache policy plus look-ahead</h3>
+
+<p>
+    MoE models keep common weights and hot experts resident in DRAM while cold experts, future layers and
+    inactive immutable weights stay on NVMe. Routing decisions determine immediate expert demand, and a
+    selected expert that is not resident is a <strong>hard dependency</strong>: compute must wait for verified
+    residency. Historical hit rate can guide residency, but <strong>no expert may be silently
+    substituted</strong> &mdash; a cache never changes the arithmetic contract.
+</p>
+
+<div class="img-container svg-viewer" data-title="Hot and cold MoE expert residency with router-driven demand: hits run immediately, misses are hard dependencies fetched to staging and verified">
+    <img src="assets/memory-tetris-moe-cache.svg" alt="MoE expert residency diagram: a per-token router sends demand to a DRAM working set holding common weights, hot resident experts E3 and E7, KV state and a staging slot, while cold experts E1, E2, E4, E5, E6 and E8 remain on the NVMe backing tier. A hit on E3 runs immediately. A selection of cold expert E5 is a hard dependency: it is fetched to the staging slot, verified, and only then run. A callout states that no expert is silently substituted and checksum plus provenance are checked first" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>Safety Contracts: Fail Closed</h2>
+
+<p>
+    Every tier-managed tensor carries machine-readable metadata: tensor id, source artifact and offset, arena
+    slot and final address offset, size and alignment, first and last use, mutability and dirty state, storage
+    tier and residency state, prefetch deadline and completion event, reuse distance, and checksum or artifact
+    provenance. The planner must <strong>fail closed</strong> &mdash; refuse the schedule &mdash; when any of
+    these hold:
+</p>
+
+<ul>
+    <li>the previous slot owner is still <strong>live</strong>;</li>
+    <li>a read or writable <strong>alias</strong> remains active;</li>
+    <li>the slot is <strong>pinned</strong> by a kernel or an in-flight transfer;</li>
+    <li>a <strong>writeback is pending</strong> for mutable state;</li>
+    <li>the new <strong>transfer is incomplete</strong> at the consumer dependency;</li>
+    <li>the source extent, destination extent or alignment is invalid;</li>
+    <li>model <strong>provenance or checksum</strong> does not match the converted-model manifest;</li>
+    <li>numerical execution would select a different arithmetic contract merely because the tensor came from another tier.</li>
+</ul>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Immutable weights first</h3>
+    <p style="margin-bottom: 0;">
+        The first implementation target is <strong>converted, immutable weights</strong>, because they never
+        need writeback. KV caches, recurrent state, gradients and optimizer state are explicitly out of scope
+        for the first stages: they require later, explicit writeback, persistence and coherence contracts
+        before they may be tier-managed.
+    </p>
+</div>
+
+<h2>X-Ray Evidence</h2>
+
+<p>
+    The feature is not successful merely because a larger model runs. The proposed X-Ray integration records,
+    per tensor and per layer, the full transfer lifecycle &mdash; request, first byte, completion and first
+    use &mdash; so that hidden transfer, exposed wait and bandwidth are measured facts rather than hope.
+</p>
+
+<div class="img-container svg-viewer" data-title="Proposed X-Ray evidence flow: request, first byte, completion and first use, with prefetch lead time when on time and exposed wait when late">
+    <img src="assets/memory-tetris-xray.svg" alt="Proposed X-Ray evidence flow with two timelines. On time: request, first byte, completion and first use markers, with spans for time to first byte, transfer duration giving achieved read bandwidth, and prefetch lead time hidden behind compute. Late: first use arrives before completion and the gap is exposed wait where the consumer is blocked. A panel lists the proposed per-tensor record fields: requested and completed bytes, source tier, destination slot, timestamps, prefetch lead, exposed wait, achieved bandwidth, residency duration, hit, miss and eviction reason, temporary-copy bytes, and checksum and provenance status" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h3>Proposed per-tensor report fields</h3>
+
+<ul>
+    <li>requested bytes and completed bytes;</li>
+    <li>source tier and destination slot;</li>
+    <li>request, first-byte, completion and first-use timestamps;</li>
+    <li>prefetch lead time;</li>
+    <li>exposed wait at first use;</li>
+    <li>achieved read bandwidth;</li>
+    <li>slot reuse and residency duration;</li>
+    <li>cache hit, miss and eviction reason;</li>
+    <li>temporary-copy bytes;</li>
+    <li>checksum / provenance result.</li>
+</ul>
+
+<h3>Proposed aggregate report</h3>
+
+<ul>
+    <li>model bytes resident in DRAM;</li>
+    <li>model bytes served by NVMe per token or prompt;</li>
+    <li>I/O time hidden behind compute;</li>
+    <li>exposed storage stall time;</li>
+    <li>useful bandwidth versus device baseline;</li>
+    <li>hot-expert hit rate for MoE;</li>
+    <li>page-cache and direct-I/O mode;</li>
+    <li>token parity against the fully resident baseline.</li>
+</ul>
+
+<p>
+    Numerical certification compares the tiered runtime against the same generated runtime and provider
+    schedule with fully resident weights. Token parity alone is insufficient: selected layer and checkpoint
+    outputs and artifact hashes must also match under their existing numerical contracts.
+</p>
+
+<h2>Hardware Results: Not Yet Certified</h2>
+
+<p>
+    The table below is the planned evidence matrix. Every result cell is <strong>not yet certified</strong>:
+    no reproducible Gen4 experiment has been run and recorded to CKE's evidence standard. A provisional Gen4
+    NVMe measurement exists in the lab but is deliberately withheld from this page until the command, artifact
+    size and cache state are recorded &mdash; an unrecorded number is not a CKE benchmark.
+</p>
+
+<table>
+    <tr>
+        <th>Experiment</th>
+        <th>Configuration</th>
+        <th>Result</th>
+        <th>Status</th>
+    </tr>
+    <tr>
+        <td>Device qualification</td>
+        <td>Gen4 NVMe sequential read, multiple block sizes and queue depths, direct and buffered</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Cache-state behavior</td>
+        <td>cold-cache and warm-cache measured separately</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Sustained reads</td>
+        <td>beyond the SSD SLC cache, with thermal and latency distributions recorded</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Synchronous baseline</td>
+        <td>fully resident versus one-slot synchronous streaming</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Buffering depth</td>
+        <td>one-slot versus double- and triple-buffered asynchronous streaming</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Tensor-size sweep</td>
+        <td>64 MB through 1 GB layer sizes</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Overlap windows</td>
+        <td>compute windows shorter than, equal to and longer than transfer time</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Numerical parity</td>
+        <td>fully resident versus tiered, identical outputs</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Failure injection</td>
+        <td>forced short read, stale artifact, checksum failure, slot overlap</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Thread-count checks</td>
+        <td>identical output with 1, 8 and production thread counts</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>MoE certification</td>
+        <td>dense model first, then a public MoE model with controlled routing</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+</table>
+
+<p>
+    Every run must record the exact CPU, memory, filesystem, mount options, SSD firmware, temperature and
+    free-space state. Gen5-class hardware is evaluated only after Gen4 establishes that the implementation
+    can overlap I/O at all.
+</p>
+
+<h2>Distributed Extensibility</h2>
+
+<p>
+    The transfer abstraction is designed so that a source can eventually be local DRAM, local NVMe,
+    recomputation, or <strong>another CKE node</strong>. The planner can then compare resident reuse, local
+    NVMe transfer, recomputation and network transfer without encoding distributed behavior into individual
+    kernels. <strong>Distributed tensor loading is not implemented</strong> &mdash; this is an interface
+    requirement for later stages, not a current capability.
+</p>
+
+<h2>Implementation Stages and Promotion Criteria</h2>
+
+<h3>Planned stages</h3>
+
+<ol>
+    <li>Add immutable tensor source extents and storage-tier metadata to the model manifest and validated IR.</li>
+    <li>Add a fixed, aligned streaming-slot allocator alongside persistent and scratch arena classes.</li>
+    <li>Implement synchronous final-slot reads as the correctness baseline.</li>
+    <li>Add asynchronous prefetch and explicit completion dependencies.</li>
+    <li>Certify deterministic dense-layer sliding windows with one and two slots.</li>
+    <li>Add double/triple buffering and tune look-ahead from measured kernel time.</li>
+    <li>Add X-Ray transfer and stall reporting.</li>
+    <li>Add MoE expert residency with deterministic cache-policy fixtures.</li>
+    <li>Add mutable-state tiers only after explicit writeback and recovery design.</li>
+    <li>Generalize the transfer source to remote-node tensors for distributed execution.</li>
+</ol>
+
+<h3>Promotion criteria</h3>
+
+<ul>
+    <li>No undeclared staging copy.</li>
+    <li>No read from an incomplete or stale slot.</li>
+    <li>The fully resident numerical contract remains unchanged.</li>
+    <li>X-Ray accounts for all tiered bytes and exposed wait.</li>
+    <li>Asynchronous mode beats the synchronous baseline reproducibly.</li>
+    <li>The selected model exceeds available DRAM or demonstrates a measured residency benefit &mdash; otherwise storage streaming adds complexity without value.</li>
+</ul>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The defensible claim</h3>
+    <p style="margin-bottom: 0;">
+        CKE's explicit tensor lifetimes may let it manage a predictable DRAM working window more effectively
+        than demand paging. The hardware gates &mdash; not the diagrams &mdash; determine how much I/O can
+        actually be hidden.
+    </p>
+</div>
+
+<h2>Related Pages</h2>
+
+<ul>
+    <li><a href="deterministic-memory.html">Deterministic Memory</a> &mdash; compile-time known offsets that make slot lifetimes auditable</li>
+    <li><a href="memory-safety.html">Memory Safety</a> &mdash; bump allocator, canaries and arena discipline</li>
+    <li><a href="memory-reality.html">Memory Reality</a> &mdash; honest memory-capacity accounting for large models</li>
+    <li><a href="scaling.html">Scaling Philosophy</a> &mdash; the CPU-only, Linux-first hardware bet behind this research</li>
+    <li><a href="research.html">Research Tracker</a> &mdash; other proposed techniques and their status</li>
+</ul>

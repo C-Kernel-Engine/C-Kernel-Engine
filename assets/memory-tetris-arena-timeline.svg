@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+  <title>Memory Tetris arena-slot reuse across T0, T1 and T2</title>
+  <desc>Three snapshots of a fixed DRAM streaming arena. At T0 slots hold layers L1 to L4 plus scratch and persistent state. At T1 the L1 slot is free after L1's last use. At T2 layer L5 has been loaded from NVMe directly into L1's old slot while every other live tensor keeps its address.</desc>
+
+  <defs>
+    <marker id="arrAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <marker id="arrGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="600" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Memory Tetris: Arena-Slot Reuse Across Time</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">A dead layer's slot becomes the final destination for a future layer — no live tensor moves</text>
+
+  <text x="110" y="82" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#808080">DRAM streaming arena (fixed size)</text>
+
+  <!-- ═══ T0 ═══ -->
+  <text x="62" y="136" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#a0a0a0" text-anchor="middle">T0</text>
+
+  <g>
+    <rect x="110" y="95" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="172" y="122" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L1</text>
+    <text x="172" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">layer weights</text>
+  </g>
+  <g>
+    <rect x="245" y="95" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="307" y="122" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L2</text>
+    <text x="307" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">layer weights</text>
+  </g>
+  <g>
+    <rect x="380" y="95" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="442" y="122" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L3</text>
+    <text x="442" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">layer weights</text>
+  </g>
+  <g>
+    <rect x="515" y="95" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="577" y="122" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L4</text>
+    <text x="577" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">layer weights</text>
+  </g>
+  <g>
+    <rect x="650" y="95" width="120" height="64" rx="6" fill="#2a2a2a" stroke="#555555" stroke-width="2"/>
+    <text x="710" y="122" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#b0b0b0" text-anchor="middle">scratch</text>
+    <text x="710" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">reused workspace</text>
+  </g>
+  <g>
+    <rect x="780" y="95" width="150" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+    <text x="855" y="122" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">persistent state</text>
+    <text x="855" y="142" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">KV / model state</text>
+  </g>
+
+  <!-- transition T0 → T1 -->
+  <line x1="172" y1="168" x2="172" y2="212" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+  <text x="196" y="196" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">L1 reaches its declared last use → the slot is proven dead</text>
+
+  <!-- ═══ T1 ═══ -->
+  <text x="62" y="265" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#a0a0a0" text-anchor="middle">T1</text>
+
+  <g>
+    <rect x="110" y="224" width="125" height="64" rx="6" fill="#1d1d1d" stroke="#666666" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="172" y="251" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#808080" text-anchor="middle">free</text>
+    <text x="172" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#606060" text-anchor="middle">L1 slot released</text>
+  </g>
+  <g>
+    <rect x="245" y="224" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="307" y="251" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L2</text>
+    <text x="307" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="380" y="224" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="442" y="251" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L3</text>
+    <text x="442" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="515" y="224" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="577" y="251" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L4</text>
+    <text x="577" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="650" y="224" width="120" height="64" rx="6" fill="#2a2a2a" stroke="#555555" stroke-width="2"/>
+    <text x="710" y="251" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#b0b0b0" text-anchor="middle">scratch</text>
+    <text x="710" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="780" y="224" width="150" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+    <text x="855" y="251" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">persistent state</text>
+    <text x="855" y="271" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">unchanged address</text>
+  </g>
+
+  <!-- transition T1 → T2 -->
+  <line x1="172" y1="297" x2="172" y2="341" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+  <text x="196" y="325" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">an asynchronous NVMe read writes L5 directly into the freed slot</text>
+
+  <!-- ═══ T2 ═══ -->
+  <text x="62" y="394" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#a0a0a0" text-anchor="middle">T2</text>
+
+  <g>
+    <rect x="110" y="353" width="125" height="64" rx="6" fill="#2a1f08" stroke="#ffb400" stroke-width="2"/>
+    <text x="172" y="380" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#ffc933" text-anchor="middle">L5</text>
+    <text x="172" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#caa64a" text-anchor="middle">L1's old final address</text>
+  </g>
+  <g>
+    <rect x="245" y="353" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="307" y="380" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L2</text>
+    <text x="307" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="380" y="353" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="442" y="380" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L3</text>
+    <text x="442" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="515" y="353" width="125" height="64" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="577" y="380" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">L4</text>
+    <text x="577" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#5b8ba8" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="650" y="353" width="120" height="64" rx="6" fill="#2a2a2a" stroke="#555555" stroke-width="2"/>
+    <text x="710" y="380" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#b0b0b0" text-anchor="middle">scratch</text>
+    <text x="710" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">unchanged address</text>
+  </g>
+  <g>
+    <rect x="780" y="353" width="150" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+    <text x="855" y="380" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">persistent state</text>
+    <text x="855" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">unchanged address</text>
+  </g>
+
+  <!-- NVMe backing tier -->
+  <line x1="172" y1="474" x2="172" y2="426" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+  <text x="190" y="440" font-family="Inter, sans-serif" font-size="11" fill="#47b475">transfer completes</text>
+  <text x="190" y="456" font-family="Inter, sans-serif" font-size="11" fill="#47b475">before first use</text>
+  <text x="655" y="450" font-family="Inter, sans-serif" font-size="11.5" fill="#808080" text-anchor="middle">L2–L4, scratch and persistent state never move</text>
+
+  <rect x="110" y="474" width="820" height="60" rx="8" fill="#252525" stroke="#454545" stroke-width="1.5"/>
+  <text x="520" y="500" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#b0b0b0" text-anchor="middle">NVMe backing tier</text>
+  <text x="520" y="520" font-family="Inter, sans-serif" font-size="11" fill="#707070" text-anchor="middle">capacity-oriented storage: future layers L5, L6, L7 … far larger than the DRAM window</text>
+
+  <!-- legend -->
+  <rect x="110" y="560" width="14" height="14" rx="3" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="130" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">resident layer</text>
+  <rect x="245" y="560" width="14" height="14" rx="3" fill="#2a1f08" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="265" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">new arrival</text>
+  <rect x="375" y="560" width="14" height="14" rx="3" fill="#1d1d1d" stroke="#666666" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="395" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">free slot</text>
+  <rect x="490" y="560" width="14" height="14" rx="3" fill="#2a2a2a" stroke="#555555" stroke-width="1.5"/>
+  <text x="510" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">scratch</text>
+  <rect x="590" y="560" width="14" height="14" rx="3" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="610" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">persistent state</text>
+  <rect x="745" y="560" width="14" height="14" rx="3" fill="#252525" stroke="#454545" stroke-width="1.5"/>
+  <text x="765" y="572" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0">NVMe tier</text>
+</svg>

@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
+  <title>Candidate Linux I/O paths from NVMe to the CKE arena</title>
+  <desc>Four candidate read paths compared: buffered asynchronous read through the kernel page cache with an extra copy, mmap with controlled readahead, aligned O_DIRECT reads that land in the final arena slot, and registered io_uring buffers. Every path must be benchmarked before promotion; none is assumed to DMA directly into the arena.</desc>
+
+  <defs>
+    <marker id="arrPath" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="620" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Candidate Linux I/O Paths: NVMe → CKE Arena</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Four benchmark candidates — no path is assumed to DMA directly into the arena</text>
+
+  <!-- source -->
+  <rect x="230" y="84" width="500" height="52" rx="8" fill="#252525" stroke="#454545" stroke-width="1.5"/>
+  <text x="480" y="107" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#b0b0b0" text-anchor="middle">model weights on NVMe</text>
+  <text x="480" y="125" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">converted, immutable artifact with provenance manifest</text>
+
+  <!-- distribution bus -->
+  <line x1="480" y1="136" x2="480" y2="152" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="135" y1="152" x2="825" y2="152" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="135" y1="152" x2="135" y2="164" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+  <line x1="365" y1="152" x2="365" y2="164" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+  <line x1="595" y1="152" x2="595" y2="164" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+  <line x1="825" y1="152" x2="825" y2="164" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <!-- ═══ Column 1: buffered async read ═══ -->
+  <rect x="30" y="170" width="210" height="30" rx="6" fill="#ffb400"/>
+  <text x="135" y="190" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">1 · buffered async read</text>
+
+  <rect x="30" y="214" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="135" y="242" font-family="monospace" font-size="12" fill="#9ed6ff" text-anchor="middle">buffered read()</text>
+  <text x="135" y="262" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">issued from an async worker</text>
+
+  <line x1="135" y1="278" x2="135" y2="290" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="30" y="292" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="135" y="320" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#b0b0b0" text-anchor="middle">kernel page cache</text>
+  <text x="135" y="340" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">kernel-mediated staging</text>
+
+  <line x1="135" y1="356" x2="135" y2="368" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="30" y="370" width="210" height="64" rx="6" fill="#2a230f" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="135" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffc933" text-anchor="middle">extra copy into arena</text>
+  <text x="135" y="418" font-family="Inter, sans-serif" font-size="10.5" fill="#caa64a" text-anchor="middle">CPU cost + effective bandwidth</text>
+
+  <!-- ═══ Column 2: mmap + readahead ═══ -->
+  <rect x="260" y="170" width="210" height="30" rx="6" fill="#ffb400"/>
+  <text x="365" y="190" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">2 · mmap + readahead</text>
+
+  <rect x="260" y="214" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="365" y="242" font-family="monospace" font-size="12" fill="#9ed6ff" text-anchor="middle">mmap() + readahead</text>
+  <text x="365" y="262" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">controlled page residency</text>
+
+  <line x1="365" y1="278" x2="365" y2="290" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="260" y="292" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="365" y="320" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#b0b0b0" text-anchor="middle">kernel page cache</text>
+  <text x="365" y="340" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">pages populated ahead of use</text>
+
+  <line x1="365" y1="356" x2="365" y2="368" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="260" y="370" width="210" height="64" rx="6" fill="#2a230f" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="365" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffc933" text-anchor="middle">copy or fault on first use</text>
+  <text x="365" y="418" font-family="Inter, sans-serif" font-size="10.5" fill="#caa64a" text-anchor="middle">behavior depends on cache state</text>
+
+  <!-- ═══ Column 3: aligned O_DIRECT ═══ -->
+  <rect x="490" y="170" width="210" height="30" rx="6" fill="#ffb400"/>
+  <text x="595" y="190" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">3 · aligned O_DIRECT</text>
+
+  <rect x="490" y="214" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="595" y="242" font-family="monospace" font-size="12" fill="#9ed6ff" text-anchor="middle">aligned O_DIRECT read</text>
+  <text x="595" y="262" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">offset, size and buffer aligned</text>
+
+  <line x1="595" y1="278" x2="595" y2="290" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="490" y="292" width="210" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="595" y="320" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">bypasses page cache</text>
+  <text x="595" y="340" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">no intermediate kernel copy</text>
+
+  <line x1="595" y1="356" x2="595" y2="368" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="490" y="370" width="210" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="595" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">lands in final arena slot</text>
+  <text x="595" y="418" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">alignment contract required</text>
+
+  <!-- ═══ Column 4: io_uring registered buffers ═══ -->
+  <rect x="720" y="170" width="210" height="30" rx="6" fill="#ffb400"/>
+  <text x="825" y="190" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#1d1d1d" text-anchor="middle">4 · io_uring registered</text>
+
+  <rect x="720" y="214" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="825" y="242" font-family="monospace" font-size="12" fill="#9ed6ff" text-anchor="middle">io_uring submit</text>
+  <text x="825" y="262" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">fixed / registered buffers</text>
+
+  <line x1="825" y1="278" x2="825" y2="290" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="720" y="292" width="210" height="64" rx="6" fill="#2a2a2a" stroke="#454545" stroke-width="1.5"/>
+  <text x="825" y="320" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#b0b0b0" text-anchor="middle">kernel completes async</text>
+  <text x="825" y="340" font-family="Inter, sans-serif" font-size="10.5" fill="#707070" text-anchor="middle">completion queue event</text>
+
+  <line x1="825" y1="356" x2="825" y2="368" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <rect x="720" y="370" width="210" height="64" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="825" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">data in registered slot</text>
+  <text x="825" y="418" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">kernel + filesystem support needed</text>
+
+  <!-- collection bus -->
+  <line x1="135" y1="434" x2="135" y2="452" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="365" y1="434" x2="365" y2="452" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="595" y1="434" x2="595" y2="452" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="825" y1="434" x2="825" y2="452" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="135" y1="452" x2="825" y2="452" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="480" y1="452" x2="480" y2="464" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrPath)"/>
+
+  <!-- arena destination -->
+  <rect x="230" y="470" width="500" height="52" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="480" y="493" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">CKE DRAM arena — final slot addresses</text>
+  <text x="480" y="511" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">consumers wait for the transfer-completion event</text>
+
+  <!-- measurement warning -->
+  <rect x="30" y="550" width="900" height="46" rx="6" fill="#2a230f" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="480" y="578" font-family="Inter, sans-serif" font-size="12" fill="#ffc933" text-anchor="middle">Measure first: queue depth, filesystem, cache state, alignment and copy overhead decide which path earns promotion</text>
+</svg>

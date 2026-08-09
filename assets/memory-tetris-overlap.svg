@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560">
+  <title>Compute and I/O overlap: hidden transfer versus exposed storage stall</title>
+  <desc>Two timelines. In scenario A the CPU computes L17, L18 and L19 while asynchronous I/O loads L18, L19 and L20; each load completes before its first use, so the transfer is hidden. In scenario B the load of L32 completes after its first use, leaving an exposed storage stall where the consumer is blocked.</desc>
+
+  <defs>
+    <marker id="arrTime" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="560" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Compute / I/O Overlap</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">A transfer is free only when it completes before its consumer's first use</text>
+
+  <!-- ═══ Scenario A: hidden ═══ -->
+  <text x="60" y="94" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#47b475">A — Prefetch wins: transfer hidden behind compute</text>
+
+  <text x="46" y="144" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">CPU</text>
+  <rect x="120" y="112" width="190" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="215" y="144" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#7dd3fc" text-anchor="middle">compute L17</text>
+  <rect x="330" y="112" width="190" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="425" y="144" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#7dd3fc" text-anchor="middle">compute L18</text>
+  <rect x="540" y="112" width="190" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="635" y="144" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#7dd3fc" text-anchor="middle">compute L19</text>
+
+  <!-- first-use marker: load L18 finished at x=300, compute L18 starts at x=330 -->
+  <line x1="330" y1="170" x2="330" y2="222" stroke="#47b475" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="346" y="200" font-family="Inter, sans-serif" font-size="11.5" fill="#47b475">first use of L18: already resident</text>
+
+  <text x="46" y="256" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">I/O</text>
+  <rect x="150" y="224" width="150" height="52" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="225" y="249" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">load L18</text>
+  <text x="225" y="267" font-family="Inter, sans-serif" font-size="10" fill="#5a9e78" text-anchor="middle">completes early</text>
+  <rect x="360" y="224" width="150" height="52" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="435" y="249" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">load L19</text>
+  <text x="435" y="267" font-family="Inter, sans-serif" font-size="10" fill="#5a9e78" text-anchor="middle">completes early</text>
+  <rect x="570" y="224" width="150" height="52" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="645" y="249" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">load L20</text>
+  <text x="645" y="267" font-family="Inter, sans-serif" font-size="10" fill="#5a9e78" text-anchor="middle">one layer ahead</text>
+
+  <text x="770" y="256" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">zero exposed stall</text>
+
+  <!-- ═══ Scenario B: exposed stall ═══ -->
+  <text x="60" y="336" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#f85149">B — Prefetch loses: exposed storage stall</text>
+
+  <text x="46" y="386" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">CPU</text>
+  <rect x="120" y="354" width="190" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="215" y="386" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#7dd3fc" text-anchor="middle">compute L31</text>
+  <rect x="330" y="354" width="100" height="52" rx="6" fill="#331414" stroke="#f85149" stroke-width="2"/>
+  <text x="380" y="386" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#f87171" text-anchor="middle">stalled</text>
+  <rect x="450" y="354" width="190" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="545" y="386" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#7dd3fc" text-anchor="middle">compute L32</text>
+
+  <!-- exposed wait region between lanes -->
+  <rect x="330" y="406" width="100" height="52" fill="rgba(248, 81, 73, 0.08)"/>
+  <line x1="330" y1="406" x2="330" y2="458" stroke="#f85149" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <line x1="430" y1="406" x2="430" y2="458" stroke="#f85149" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="380" y="436" font-family="Inter, sans-serif" font-size="10.5" fill="#f87171" text-anchor="middle">exposed wait</text>
+  <text x="470" y="436" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">consumer blocked until the completion event arrives</text>
+
+  <text x="46" y="498" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">I/O</text>
+  <rect x="240" y="466" width="190" height="52" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="335" y="491" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#86efac" text-anchor="middle">load L32</text>
+  <text x="335" y="509" font-family="Inter, sans-serif" font-size="10" fill="#5a9e78" text-anchor="middle">completes late</text>
+
+  <!-- time axis -->
+  <line x1="90" y1="540" x2="916" y2="540" stroke="#555555" stroke-width="1.5" marker-end="url(#arrTime)"/>
+  <text x="936" y="544" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">time</text>
+</svg>

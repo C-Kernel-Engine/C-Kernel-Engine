@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <title>Proposed X-Ray evidence flow for a tiered tensor transfer</title>
+  <desc>Two transfer timelines. On time: request, first byte, completion, first use — the prefetch lead between completion and first use is hidden behind compute. Late: first use arrives before completion and the gap is exposed wait where the consumer is blocked. Every transfer records bytes, tiers, slots, timestamps, bandwidth, residency, hit or miss reason, temporary copies and checksum status.</desc>
+
+  <rect width="960" height="540" fill="#232323"/>
+
+  <text x="480" y="32" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">X-Ray Evidence Flow (Proposed)</text>
+  <text x="480" y="54" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">request → first byte → completion → first use: every tiered transfer leaves a measurable record</text>
+
+  <!-- ═══ Timeline A: on time ═══ -->
+  <text x="60" y="100" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#47b475">On time — transfer hidden</text>
+
+  <line x1="90" y1="140" x2="900" y2="140" stroke="#555555" stroke-width="1.5"/>
+
+  <circle cx="150" cy="140" r="6" fill="#ffb400"/>
+  <circle cx="380" cy="140" r="6" fill="#07adf8"/>
+  <circle cx="620" cy="140" r="6" fill="#47b475"/>
+  <circle cx="830" cy="140" r="6" fill="#bc8cff"/>
+
+  <text x="150" y="166" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffc933" text-anchor="middle">request</text>
+  <text x="150" y="184" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">read issued</text>
+  <text x="380" y="166" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">first byte</text>
+  <text x="380" y="184" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">data starts arriving</text>
+  <text x="620" y="166" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#86efac" text-anchor="middle">completion</text>
+  <text x="620" y="184" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">all bytes resident in slot</text>
+  <text x="830" y="166" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#bc8cff" text-anchor="middle">first use</text>
+  <text x="830" y="184" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">consumer kernel runs</text>
+
+  <rect x="150" y="210" width="230" height="18" rx="4" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="265" y="224" font-family="Inter, sans-serif" font-size="11" fill="#7dd3fc" text-anchor="middle">time to first byte</text>
+
+  <rect x="150" y="240" width="470" height="18" rx="4" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="385" y="254" font-family="Inter, sans-serif" font-size="11" fill="#7dd3fc" text-anchor="middle">transfer duration → achieved read bandwidth</text>
+
+  <rect x="620" y="270" width="210" height="18" rx="4" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="725" y="284" font-family="Inter, sans-serif" font-size="11" fill="#86efac" text-anchor="middle">prefetch lead (hidden)</text>
+
+  <!-- ═══ Timeline B: late ═══ -->
+  <text x="60" y="336" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#f85149">Late — exposed wait</text>
+
+  <rect x="560" y="350" width="180" height="18" rx="4" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+  <text x="650" y="364" font-family="Inter, sans-serif" font-size="10.5" fill="#f87171" text-anchor="middle">exposed wait — consumer blocked</text>
+
+  <line x1="90" y1="392" x2="900" y2="392" stroke="#555555" stroke-width="1.5"/>
+
+  <circle cx="150" cy="392" r="6" fill="#ffb400"/>
+  <circle cx="380" cy="392" r="6" fill="#07adf8"/>
+  <circle cx="560" cy="392" r="6" fill="#bc8cff"/>
+  <circle cx="740" cy="392" r="6" fill="#47b475"/>
+
+  <text x="150" y="418" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffc933" text-anchor="middle">request</text>
+  <text x="380" y="418" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">first byte</text>
+  <text x="560" y="418" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#bc8cff" text-anchor="middle">first use</text>
+  <text x="740" y="418" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#86efac" text-anchor="middle">completion (late)</text>
+
+  <!-- ═══ recorded fields ═══ -->
+  <rect x="60" y="452" width="840" height="68" rx="8" fill="#252525" stroke="#454545" stroke-width="1.5"/>
+  <text x="78" y="476" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffb400">Per-tensor X-Ray record (proposed fields)</text>
+  <text x="78" y="496" font-family="Inter, sans-serif" font-size="10.5" fill="#b0b0b0">requested / completed bytes · source tier · destination slot · timestamps · prefetch lead · exposed wait · achieved bandwidth</text>
+  <text x="78" y="512" font-family="Inter, sans-serif" font-size="10.5" fill="#b0b0b0">residency duration · hit / miss / eviction reason · temporary-copy bytes · checksum and provenance status</text>
+</svg>
