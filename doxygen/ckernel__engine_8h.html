@@ -345,6 +345,10 @@ Functions</h2></td></tr>
 <tr class="separator:aedf852ec498fe7db175f59f810886b9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7ff78bf68a9657c2d6858b64df79f7ae" id="r_a7ff78bf68a9657c2d6858b64df79f7ae"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a> (void)</td></tr>
 <tr class="separator:a7ff78bf68a9657c2d6858b64df79f7ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abd6ab9084229d028a570a77712000c46" id="r_abd6ab9084229d028a570a77712000c46"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#abd6ab9084229d028a570a77712000c46">ck_multimodal_mrope_positions_2d</a> (int32_t *positions, int total_tokens, int prefix_start, int position_base, int prefix_tokens, int grid_x, int grid_y, int text_pos)</td></tr>
+<tr class="separator:abd6ab9084229d028a570a77712000c46"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a410a57d9f55e9b45c97df10e7ba13fd0" id="r_a410a57d9f55e9b45c97df10e7ba13fd0"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a410a57d9f55e9b45c97df10e7ba13fd0">ck_multimodal_prefix_insert_f32</a> (const float *source_rows, int32_t *token_ids, float *decoder_rows, int row_count, int source_row_stride, int decoder_row_stride, int copy_dim, int start_row, int decoder_capacity)</td></tr>
+<tr class="separator:a410a57d9f55e9b45c97df10e7ba13fd0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4add2625b432613d83486a87bdfd5da5" id="r_a4add2625b432613d83486a87bdfd5da5"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a4add2625b432613d83486a87bdfd5da5">ck_q6_k_q8_k_provider_name</a> (void)</td></tr>
 <tr class="separator:a4add2625b432613d83486a87bdfd5da5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a35426895690beefd7b84cf090639b169" id="r_a35426895690beefd7b84cf090639b169"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a35426895690beefd7b84cf090639b169">ck_residual_add_backward</a> (const float *d_out, float *d_a, float *d_b, int tokens, int aligned_embed_dim)</td></tr>
@@ -10284,6 +10288,210 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c.html#ad94b76f11ab5b09db24682947452e946">CK_ADD_PAIR</a>.</p>
 
+</div>
+</div>
+<a id="abd6ab9084229d028a570a77712000c46" name="abd6ab9084229d028a570a77712000c46"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abd6ab9084229d028a570a77712000c46">&#9670;&#160;</a></span>ck_multimodal_mrope_positions_2d()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_multimodal_mrope_positions_2d </td>
+          <td>(</td>
+          <td class="paramtype">int32_t *&#160;</td>
+          <td class="paramname"><em>positions</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>total_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>prefix_start</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>position_base</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>prefix_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>grid_x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>grid_y</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>text_pos</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l02774">2774</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2782</span>{</div>
+<div class="line"><span class="lineno"> 2783</span>    <span class="keywordflow">if</span> (!positions || total_tokens &lt;= 0 || prefix_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 2784</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno"> 2785</span>    }</div>
+<div class="line"><span class="lineno"> 2786</span>    <span class="keywordflow">if</span> (grid_x &lt;= 0 || grid_y &lt;= 0 || grid_x * grid_y != prefix_tokens) {</div>
+<div class="line"><span class="lineno"> 2787</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno"> 2788</span>    }</div>
+<div class="line"><span class="lineno"> 2789</span>    <span class="keywordflow">if</span> (prefix_start &lt; 0 || prefix_start &gt; total_tokens) {</div>
+<div class="line"><span class="lineno"> 2790</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno"> 2791</span>    }</div>
+<div class="line"><span class="lineno"> 2792</span>    <span class="keywordflow">if</span> (prefix_tokens &gt; total_tokens - prefix_start) {</div>
+<div class="line"><span class="lineno"> 2793</span>        <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno"> 2794</span>    }</div>
+<div class="line"><span class="lineno"> 2795</span> </div>
+<div class="line"><span class="lineno"> 2796</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> prefix_end = prefix_start + prefix_tokens;</div>
+<div class="line"><span class="lineno"> 2797</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> grid_extent = grid_x &gt; grid_y ? grid_x : grid_y;</div>
+<div class="line"><span class="lineno"> 2798</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> resolved_text_pos = text_pos &gt; 0</div>
+<div class="line"><span class="lineno"> 2799</span>        ? text_pos</div>
+<div class="line"><span class="lineno"> 2800</span>        : prefix_start + grid_extent;</div>
+<div class="line"><span class="lineno"> 2801</span> </div>
+<div class="line"><span class="lineno"> 2802</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> = 0; <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; total_tokens; ++<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>) {</div>
+<div class="line"><span class="lineno"> 2803</span>        int32_t pos0;</div>
+<div class="line"><span class="lineno"> 2804</span>        int32_t pos1;</div>
+<div class="line"><span class="lineno"> 2805</span>        int32_t pos2;</div>
+<div class="line"><span class="lineno"> 2806</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_start) {</div>
+<div class="line"><span class="lineno"> 2807</span>            pos0 = pos1 = pos2 = (int32_t)<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>;</div>
+<div class="line"><span class="lineno"> 2808</span>        } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> &lt; prefix_end) {</div>
+<div class="line"><span class="lineno"> 2809</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> local_token = <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_start;</div>
+<div class="line"><span class="lineno"> 2810</span>            pos0 = (int32_t)position_base;</div>
+<div class="line"><span class="lineno"> 2811</span>            pos1 = (int32_t)(position_base + local_token / grid_x);</div>
+<div class="line"><span class="lineno"> 2812</span>            pos2 = (int32_t)(position_base + local_token % grid_x);</div>
+<div class="line"><span class="lineno"> 2813</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno"> 2814</span>            pos0 = pos1 = pos2 = (int32_t)(resolved_text_pos + <a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> - prefix_end);</div>
+<div class="line"><span class="lineno"> 2815</span>        }</div>
+<div class="line"><span class="lineno"> 2816</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>] = pos0;</div>
+<div class="line"><span class="lineno"> 2817</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + total_tokens] = pos1;</div>
+<div class="line"><span class="lineno"> 2818</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 2 * total_tokens] = pos2;</div>
+<div class="line"><span class="lineno"> 2819</span>        positions[<a class="code hl_variable" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a> + 3 * total_tokens] = 0;</div>
+<div class="line"><span class="lineno"> 2820</span>    }</div>
+<div class="line"><span class="lineno"> 2821</span>    <span class="keywordflow">return</span> resolved_text_pos;</div>
+<div class="line"><span class="lineno"> 2822</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+
+</div>
+</div>
+<a id="a410a57d9f55e9b45c97df10e7ba13fd0" name="a410a57d9f55e9b45c97df10e7ba13fd0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a410a57d9f55e9b45c97df10e7ba13fd0">&#9670;&#160;</a></span>ck_multimodal_prefix_insert_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_multimodal_prefix_insert_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>source_rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int32_t *&#160;</td>
+          <td class="paramname"><em>token_ids</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>decoder_rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>row_count</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>source_row_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>decoder_row_stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>copy_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>start_row</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>decoder_capacity</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="embedding__kernels_8c_source.html#l00342">342</a> of file <a class="el" href="embedding__kernels_8c_source.html">embedding_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  351</span>{</div>
+<div class="line"><span class="lineno">  352</span>    <span class="keywordflow">if</span> (!source_rows || !token_ids || !decoder_rows || row_count &lt;= 0) {</div>
+<div class="line"><span class="lineno">  353</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  354</span>    }</div>
+<div class="line"><span class="lineno">  355</span>    <span class="keywordflow">if</span> (source_row_stride &lt; copy_dim || decoder_row_stride &lt; copy_dim || copy_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  356</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  357</span>    }</div>
+<div class="line"><span class="lineno">  358</span>    <span class="keywordflow">if</span> (start_row &lt; 0 || start_row &gt;= decoder_capacity) {</div>
+<div class="line"><span class="lineno">  359</span>        <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  360</span>    }</div>
+<div class="line"><span class="lineno">  361</span>    <span class="keywordflow">if</span> (row_count &gt; decoder_capacity - start_row) {</div>
+<div class="line"><span class="lineno">  362</span>        row_count = decoder_capacity - start_row;</div>
+<div class="line"><span class="lineno">  363</span>    }</div>
+<div class="line"><span class="lineno">  364</span> </div>
+<div class="line"><span class="lineno">  365</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; row_count; ++row) {</div>
+<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = source_rows + (size_t)row * (<span class="keywordtype">size_t</span>)source_row_stride;</div>
+<div class="line"><span class="lineno">  367</span>        <span class="keywordtype">float</span> *dst = decoder_rows</div>
+<div class="line"><span class="lineno">  368</span>                   + (size_t)(start_row + row) * (size_t)decoder_row_stride;</div>
+<div class="line"><span class="lineno">  369</span>        memcpy(dst, src, (<span class="keywordtype">size_t</span>)copy_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  370</span>        token_ids[start_row + row] = 0;</div>
+<div class="line"><span class="lineno">  371</span>    }</div>
+<div class="line"><span class="lineno">  372</span>    <span class="keywordflow">return</span> row_count;</div>
+<div class="line"><span class="lineno">  373</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="a4add2625b432613d83486a87bdfd5da5" name="a4add2625b432613d83486a87bdfd5da5"></a>

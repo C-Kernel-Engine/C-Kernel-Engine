@@ -98,6 +98,8 @@ var ckernel__engine_8h =
     [ "ck_gemm_nt_head_major_q8_0", "ckernel__engine_8h.html#a083471cd407d1f7ece23be4340e640bb", null ],
     [ "ck_get_num_threads", "ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f", null ],
     [ "ck_get_physical_cores", "ckernel__engine_8h.html#a7ff78bf68a9657c2d6858b64df79f7ae", null ],
+    [ "ck_multimodal_mrope_positions_2d", "ckernel__engine_8h.html#abd6ab9084229d028a570a77712000c46", null ],
+    [ "ck_multimodal_prefix_insert_f32", "ckernel__engine_8h.html#a410a57d9f55e9b45c97df10e7ba13fd0", null ],
     [ "ck_q6_k_q8_k_provider_name", "ckernel__engine_8h.html#a4add2625b432613d83486a87bdfd5da5", null ],
     [ "ck_residual_add_backward", "ckernel__engine_8h.html#a35426895690beefd7b84cf090639b169", null ],
     [ "ck_residual_add_token_major", "ckernel__engine_8h.html#ab0948def8f4a6c6fd8a5288aacd22f01", null ],

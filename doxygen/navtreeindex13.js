@@ -1,5 +1,8 @@
 var NAVTREEINDEX13 =
 {
+"memory__pool_8c.html#a8235172a28dfe58996c66c23d36bc8cb":[2,0,1,2,1,3],
+"memory__pool_8c.html#a85478de26879bfe01081c3f24b3f43bf":[2,0,1,2,1,9],
+"memory__pool_8c.html#a87b6e97cc5c3ae2145464a7f058b507d":[2,0,1,2,1,8],
 "memory__pool_8c.html#a8825ca1a45f75b31e9a24a25856eca88":[2,0,1,2,1,4],
 "memory__pool_8c.html#ad6214a9d8e0abc784c34a8598d886b55":[2,0,1,2,1,1],
 "memory__pool_8c_source.html":[2,0,1,2,1],
@@ -246,8 +249,5 @@ var NAVTREEINDEX13 =
 "rmsnorm__kernels_8c_source.html":[2,0,1,1,74],
 "rmsnorm__kernels__bf16_8c.html":[2,0,1,1,75],
 "rmsnorm__kernels__bf16_8c.html#a14d80153de303766038a231e4932e357":[2,0,1,1,75,0],
-"rmsnorm__kernels__bf16_8c.html#a4f024774420774821f805d0742694d02":[2,0,1,1,75,1],
-"rmsnorm__kernels__bf16_8c_source.html":[2,0,1,1,75],
-"rmsnorm__kernels__int4_8c.html":[2,0,1,1,76],
-"rmsnorm__kernels__int4_8c.html#a59a34ee64765705aafa4472344e32e5e":[2,0,1,1,76,1]
+"rmsnorm__kernels__bf16_8c.html#a4f024774420774821f805d0742694d02":[2,0,1,1,75,1]
 };

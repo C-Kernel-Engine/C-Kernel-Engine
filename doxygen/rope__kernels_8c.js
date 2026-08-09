@@ -16,6 +16,7 @@ var rope__kernels_8c =
     [ "ck_rope_math_f32_binary_fn", "rope__kernels_8c.html#a345af4013242b5015a2f49a4b1492e28", null ],
     [ "ck_rope_math_f32_fn", "rope__kernels_8c.html#a8e8482c4879c73d16b5585bc5820736c", null ],
     [ "ck_mrope_round_storage", "rope__kernels_8c.html#a2ea9b3ec0ca316b45e793d085ce0e64e", null ],
+    [ "ck_multimodal_mrope_positions_2d", "rope__kernels_8c.html#abd6ab9084229d028a570a77712000c46", null ],
     [ "ck_resolve_ggml_build_forward_expand", "rope__kernels_8c.html#a4b9d87174bac203294a3d3c87c8ea528", null ],
     [ "ck_resolve_ggml_cpu_init", "rope__kernels_8c.html#af01562233d51ada3d6fef32f29b7bd25", null ],
     [ "ck_resolve_ggml_free", "rope__kernels_8c.html#aae77aaabe2878ffec9798956478d8433", null ],
