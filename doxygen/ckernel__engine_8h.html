@@ -345,6 +345,10 @@ Functions</h2></td></tr>
 <tr class="separator:aedf852ec498fe7db175f59f810886b9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7ff78bf68a9657c2d6858b64df79f7ae" id="r_a7ff78bf68a9657c2d6858b64df79f7ae"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a> (void)</td></tr>
 <tr class="separator:a7ff78bf68a9657c2d6858b64df79f7ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a687568ddefa9d991d3ef5bf22fdc634a" id="r_a687568ddefa9d991d3ef5bf22fdc634a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a687568ddefa9d991d3ef5bf22fdc634a">ck_layout_head_to_token_f32</a> (const float *src, float *dst, int heads, int tokens, int head_dim)</td></tr>
+<tr class="separator:a687568ddefa9d991d3ef5bf22fdc634a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c2ef02aaab290a0933ffe1ae0564db0" id="r_a5c2ef02aaab290a0933ffe1ae0564db0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a5c2ef02aaab290a0933ffe1ae0564db0">ck_layout_token_to_head_f32</a> (const float *src, float *dst, int tokens, int heads, int head_dim)</td></tr>
+<tr class="separator:a5c2ef02aaab290a0933ffe1ae0564db0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abd6ab9084229d028a570a77712000c46" id="r_abd6ab9084229d028a570a77712000c46"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#abd6ab9084229d028a570a77712000c46">ck_multimodal_mrope_positions_2d</a> (int32_t *positions, int total_tokens, int prefix_start, int position_base, int prefix_tokens, int grid_x, int grid_y, int text_pos)</td></tr>
 <tr class="separator:abd6ab9084229d028a570a77712000c46"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a410a57d9f55e9b45c97df10e7ba13fd0" id="r_a410a57d9f55e9b45c97df10e7ba13fd0"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ckernel__engine_8h.html#a410a57d9f55e9b45c97df10e7ba13fd0">ck_multimodal_prefix_insert_f32</a> (const float *source_rows, int32_t *token_ids, float *decoder_rows, int row_count, int source_row_stride, int decoder_row_stride, int copy_dim, int start_row, int decoder_capacity)</td></tr>
@@ -1166,20 +1170,20 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463" name="ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"></a>CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l01726">1726</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1726</span>             {</div>
-<div class="line"><span class="lineno"> 1727</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
-<div class="line"><span class="lineno"> 1728</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
-<div class="line"><span class="lineno"> 1729</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
-<div class="line"><span class="lineno"> 1730</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
-<div class="line"><span class="lineno"> 1731</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
-<div class="line"><span class="lineno"> 1732</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01726">ckernel_engine.h:1726</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01731">ckernel_engine.h:1731</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01728">ckernel_engine.h:1728</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01730">ckernel_engine.h:1730</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01729">ckernel_engine.h:1729</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01727">ckernel_engine.h:1727</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l01732">1732</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1732</span>             {</div>
+<div class="line"><span class="lineno"> 1733</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a> = 0,</div>
+<div class="line"><span class="lineno"> 1734</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a> = 1,</div>
+<div class="line"><span class="lineno"> 1735</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a> = 2,</div>
+<div class="line"><span class="lineno"> 1736</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a> = 3,</div>
+<div class="line"><span class="lineno"> 1737</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a> = 4,</div>
+<div class="line"><span class="lineno"> 1738</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010e"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e">ck_attention_reduction_t</a></div><div class="ttdeci">ck_attention_reduction_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01732">ckernel_engine.h:1732</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea115dd6cf8ca1bbc5a7689a88c5d28463">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01737">ckernel_engine.h:1737</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01734">ckernel_engine.h:1734</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea9de5268ef35fefa367f6c8219143d2bb">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01736">ckernel_engine.h:1736</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eacd061ae5c8ef1eadf0f2bf97ec2ca433">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01735">ckernel_engine.h:1735</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8"><div class="ttname"><a href="ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8">CK_ATTN_REDUCTION_FP32_ONLINE</a></div><div class="ttdeci">@ CK_ATTN_REDUCTION_FP32_ONLINE</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01733">ckernel_engine.h:1733</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1200,16 +1204,16 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614" name="adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"></a>CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l01734">1734</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 1734</span>             {</div>
-<div class="line"><span class="lineno"> 1735</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
-<div class="line"><span class="lineno"> 1736</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
-<div class="line"><span class="lineno"> 1737</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
-<div class="line"><span class="lineno"> 1738</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01734">ckernel_engine.h:1734</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01737">ckernel_engine.h:1737</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01735">ckernel_engine.h:1735</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01736">ckernel_engine.h:1736</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ckernel__engine_8h_source.html#l01740">1740</a> of file <a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1740</span>             {</div>
+<div class="line"><span class="lineno"> 1741</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a> = 0,</div>
+<div class="line"><span class="lineno"> 1742</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a> = -1,</div>
+<div class="line"><span class="lineno"> 1743</span>    <a class="code hl_enumvalue" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a> = -2,</div>
+<div class="line"><span class="lineno"> 1744</span>} <a class="code hl_enumeration" href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a>;</div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67">ck_attention_status_t</a></div><div class="ttdeci">ck_attention_status_t</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01740">ckernel_engine.h:1740</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01743">ckernel_engine.h:1743</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1">CK_ATTENTION_STATUS_OK</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_OK</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01741">ckernel_engine.h:1741</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df"><div class="ttname"><a href="ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a></div><div class="ttdeci">@ CK_ATTENTION_STATUS_INVALID_ARGUMENT</div><div class="ttdef"><b>Definition</b> <a href="ckernel__engine_8h_source.html#l01742">ckernel_engine.h:1742</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -4594,7 +4598,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ab0a9c9cc11cdf029cbee5fefecd77ae1"><div class="ttname"><a href="attention__kernels_8c.html#ab0a9c9cc11cdf029cbee5fefecd77ae1">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract</a></div><div class="ttdeci">ck_attention_status_t attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l07005">attention_kernels.c:7005</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00501">ck_threadpool.c:501</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07005">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l06097">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01731">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02797">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00349">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00565">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00491">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00501">ck_threadpool_thread_id()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07005">attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="attention__kernels_8c_source.html#l06097">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01742">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01741">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01743">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="attention__kernels_8c_source.html#l02797">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00349">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00565">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00491">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00501">ck_threadpool_thread_id()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
 </div>
 </div>
@@ -4776,7 +4780,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 6344</span>}</div>
 <div class="ttc" id="aattention__kernels_8c_html_ae5334baaab9469712be3e9acaf9d3aaa"><div class="ttname"><a href="attention__kernels_8c.html#ae5334baaab9469712be3e9acaf9d3aaa">attention_forward_decode_head_major_gqa_flash_f16cache_contract</a></div><div class="ttdeci">ck_attention_status_t attention_forward_decode_head_major_gqa_flash_f16cache_contract(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06025">attention_kernels.c:6025</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06025">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l06097">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01730">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l01728">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01729">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01727">CK_ATTN_REDUCTION_FP32_ONLINE</a>, <a class="el" href="attention__kernels_8c_source.html#l02797">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00349">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00565">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00491">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00501">ck_threadpool_thread_id()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l06025">attention_forward_decode_head_major_gqa_flash_f16cache_contract()</a>, <a class="el" href="attention__kernels_8c_source.html#l06097">ck_attention_f16_prefill_qtile64_work()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01742">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01741">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01743">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64</a>, <a class="el" href="ckernel__engine_8h_source.html#l01734">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01733">CK_ATTN_REDUCTION_FP32_ONLINE</a>, <a class="el" href="attention__kernels_8c_source.html#l02797">CK_GGML_FA_TILE_Q</a>, <a class="el" href="ck__threadpool_8c_source.html#l00349">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00565">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00491">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00501">ck_threadpool_thread_id()</a>.</p>
 
 </div>
 </div>
@@ -4891,7 +4895,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno"> 7191</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno"> 7192</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l01731">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
+<p class="reference">References <a class="el" href="ckernel__engine_8h_source.html#l01742">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01743">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, and <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>.</p>
 
 </div>
 </div>
@@ -5305,7 +5309,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="atokenizer_8h_html_a7d3edfa508be401819bb24057b3c1be6"><div class="ttname"><a href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a></div><div class="ttdeci">const char * token</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00307">tokenizer.h:307</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01731">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01742">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01741">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01743">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="tokenizer_8h_source.html#l00328">score</a>, and <a class="el" href="tokenizer_8h_source.html#l00307">token</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l07079">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract()</a>.</p>
 
@@ -5738,7 +5742,7 @@ Functions</h2></td></tr>
 <div class="ttc" id="aattention__kernels_8c_html_ad7693ff011ebdd2eb16801f863b010c6"><div class="ttname"><a href="attention__kernels_8c.html#ad7693ff011ebdd2eb16801f863b010c6">attention_forward_decode_head_major_gqa_flash_f16cache_split</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_f16cache_split(const float *q_token, const uint16_t *k_cache, const uint16_t *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int split_chunks)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l06004">attention_kernels.c:6004</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07194">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06004">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01736">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01737">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01728">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01729">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01727">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l07194">attention_forward_decode_head_major_gqa_flash_f16cache()</a>, <a class="el" href="attention__kernels_8c_source.html#l06004">attention_forward_decode_head_major_gqa_flash_f16cache_split()</a>, <a class="el" href="ckernel__engine_8h_source.html#l01742">CK_ATTENTION_STATUS_INVALID_ARGUMENT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01741">CK_ATTENTION_STATUS_OK</a>, <a class="el" href="ckernel__engine_8h_source.html#l01743">CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT</a>, <a class="el" href="ckernel__engine_8h_source.html#l01734">CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01735">CK_ATTN_REDUCTION_F16_ONLINE_SINGLE_RANGE</a>, <a class="el" href="ckernel__engine_8h_source.html#l01733">CK_ATTN_REDUCTION_FP32_ONLINE</a>, and <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l06243">attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract()</a>.</p>
 
@@ -10288,6 +10292,122 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__strict_8c.html#ad94b76f11ab5b09db24682947452e946">CK_ADD_PAIR</a>.</p>
 
+</div>
+</div>
+<a id="a687568ddefa9d991d3ef5bf22fdc634a" name="a687568ddefa9d991d3ef5bf22fdc634a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a687568ddefa9d991d3ef5bf22fdc634a">&#9670;&#160;</a></span>ck_layout_head_to_token_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_layout_head_to_token_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>src</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>dst</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="layout__kernels_8c_source.html#l00019">19</a> of file <a class="el" href="layout__kernels_8c_source.html">layout_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   21</span>{</div>
+<div class="line"><span class="lineno">   22</span>    <span class="keywordflow">if</span> (!src || !dst || heads &lt;= 0 || tokens &lt;= 0 || head_dim &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   23</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">   24</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   25</span>            memcpy(dst + ((<span class="keywordtype">size_t</span>)t * (<span class="keywordtype">size_t</span>)heads + (<span class="keywordtype">size_t</span>)h) * (<span class="keywordtype">size_t</span>)head_dim,</div>
+<div class="line"><span class="lineno">   26</span>                   src + ((<span class="keywordtype">size_t</span>)h * (<span class="keywordtype">size_t</span>)tokens + (<span class="keywordtype">size_t</span>)t) * (<span class="keywordtype">size_t</span>)head_dim,</div>
+<div class="line"><span class="lineno">   27</span>                   (<span class="keywordtype">size_t</span>)head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   28</span>        }</div>
+<div class="line"><span class="lineno">   29</span>    }</div>
+<div class="line"><span class="lineno">   30</span>}</div>
+</div><!-- fragment -->
+</div>
+</div>
+<a id="a5c2ef02aaab290a0933ffe1ae0564db0" name="a5c2ef02aaab290a0933ffe1ae0564db0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c2ef02aaab290a0933ffe1ae0564db0">&#9670;&#160;</a></span>ck_layout_token_to_head_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ck_layout_token_to_head_f32 </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>src</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>dst</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="layout__kernels_8c_source.html#l00006">6</a> of file <a class="el" href="layout__kernels_8c_source.html">layout_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">    8</span>{</div>
+<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">if</span> (!src || !dst || tokens &lt;= 0 || heads &lt;= 0 || head_dim &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   10</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">   11</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; heads; ++h) {</div>
+<div class="line"><span class="lineno">   12</span>            memcpy(dst + ((<span class="keywordtype">size_t</span>)h * (<span class="keywordtype">size_t</span>)tokens + (<span class="keywordtype">size_t</span>)t) * (<span class="keywordtype">size_t</span>)head_dim,</div>
+<div class="line"><span class="lineno">   13</span>                   src + ((<span class="keywordtype">size_t</span>)t * (<span class="keywordtype">size_t</span>)heads + (<span class="keywordtype">size_t</span>)h) * (<span class="keywordtype">size_t</span>)head_dim,</div>
+<div class="line"><span class="lineno">   14</span>                   (<span class="keywordtype">size_t</span>)head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   15</span>        }</div>
+<div class="line"><span class="lineno">   16</span>    }</div>
+<div class="line"><span class="lineno">   17</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="abd6ab9084229d028a570a77712000c46" name="abd6ab9084229d028a570a77712000c46"></a>

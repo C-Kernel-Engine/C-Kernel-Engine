@@ -1,5 +1,7 @@
 var NAVTREEINDEX9 =
 {
+"deltanet__kernels_8c_source.html":[2,0,1,1,11],
+"dequant__kernels_8c.html":[2,0,1,1,12],
 "dequant__kernels_8c.html#a03dfd2a1c4ee71909e61cd5fd22ed259":[2,0,1,1,12,1],
 "dequant__kernels_8c.html#a22c4a007b8fe9fe8a1a9e4c3f4c3e04a":[2,0,1,1,12,6],
 "dequant__kernels_8c.html#a4b1482bd60f21521ba08b497c5289770":[2,0,1,1,12,7],
@@ -247,7 +249,5 @@ var NAVTREEINDEX9 =
 "gemm__kernels__bf16_8c.html#a8647bb8c6a9a965a92e1c98330f237af":[2,0,1,1,24,12],
 "gemm__kernels__bf16_8c.html#a9020b3311acc4db83cc7243b3d13d439":[2,0,1,1,24,13],
 "gemm__kernels__bf16_8c.html#a9565f4daa416be45820a918ef901bb50":[2,0,1,1,24,8],
-"gemm__kernels__bf16_8c.html#a9e5a60d8bcbdf7ccf28b31142fdc624a":[2,0,1,1,24,15],
-"gemm__kernels__bf16_8c.html#aa11d4803fa44f4bad7c0171f26bd5e98":[2,0,1,1,24,4],
-"gemm__kernels__bf16_8c.html#aa17196850ccde558e4940c65151fb5b7":[2,0,1,1,24,10]
+"gemm__kernels__bf16_8c.html#a9e5a60d8bcbdf7ccf28b31142fdc624a":[2,0,1,1,24,15]
 };

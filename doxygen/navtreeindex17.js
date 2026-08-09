@@ -1,5 +1,11 @@
 var NAVTREEINDEX17 =
 {
+"structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027":[1,0,46,18],
+"structCKModelConfig.html#add8cceba6c14fd375e8e6b4320e9df98":[1,0,46,13],
+"structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377":[1,0,46,15],
+"structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af":[1,0,46,4],
+"structCKModelRuntimeDescriptorV8.html":[1,0,47],
+"structCKModelRuntimeDescriptorV8.html#a091b5afa9a16fa6614aabe006ce8ebe8":[1,0,47,9],
 "structCKModelRuntimeDescriptorV8.html#a0d617809f817677c4f5297ae16ddf05c":[1,0,47,2],
 "structCKModelRuntimeDescriptorV8.html#a1c05637dda33b9c3abcec4e34fffec57":[1,0,47,3],
 "structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4":[1,0,47,5],
@@ -243,11 +249,5 @@ var NAVTREEINDEX17 =
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,10,0],
 "structGEMMParams.html":[1,0,67],
 "structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,67,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,67,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,67,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,67,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,67,4],
-"structMemoryInfo.html":[1,0,69],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,69,10],
-"structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2":[1,0,69,11]
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,67,3]
 };

@@ -1,5 +1,7 @@
 var NAVTREEINDEX8 =
 {
+"ckernel__model__load__v4_8c_source.html":[2,0,1,4,0],
+"ckernel__model__load__v4_8h.html":[2,0,0,27],
 "ckernel__model__load__v4_8h.html#a216e94b7cc4499f2199a523bb2621022":[2,0,0,27,0],
 "ckernel__model__load__v4_8h_source.html":[2,0,0,27],
 "ckernel__orchestration_8c.html":[2,0,1,23],
@@ -247,7 +249,5 @@ var NAVTREEINDEX8 =
 "deltanet__kernels_8c.html#acda3ae2323f03f9d92026026443d75e8":[2,0,1,1,11,6],
 "deltanet__kernels_8c.html#ad2b6361675fb7fbc2c0a84c9282dbfae":[2,0,1,1,11,19],
 "deltanet__kernels_8c.html#adc72112b97155ad7cd2360ab95661186":[2,0,1,1,11,13],
-"deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399":[2,0,1,1,11,4],
-"deltanet__kernels_8c_source.html":[2,0,1,1,11],
-"dequant__kernels_8c.html":[2,0,1,1,12]
+"deltanet__kernels_8c.html#af7e46d9d6f16d462e279778d0c9a5399":[2,0,1,1,11,4]
 };
