@@ -1,5 +1,11 @@
 var NAVTREEINDEX21 =
 {
+"v6_85_2test__generated_2generic__api__test_8c.html#adbe6709e5df039baccfa634eb6ac050b":[2,0,1,6,0,2,33],
+"v6_85_2test__generated_2generic__api__test_8c.html#ae297e4193654fc2efb7c2a061abbd011":[2,0,1,6,0,2,18],
+"v6_85_2test__generated_2generic__api__test_8c.html#ae83bb643d8c0d7ee497b9760e56e6578":[2,0,1,6,0,2,12],
+"v6_85_2test__generated_2generic__api__test_8c.html#aed6c7c2ea709d2b2512053e5b7b35070":[2,0,1,6,0,2,40],
+"v6_85_2test__generated_2generic__api__test_8c.html#aed91b24984a5d65762e7f985e102028d":[2,0,1,6,0,2,47],
+"v6_85_2test__generated_2generic__api__test_8c.html#aefe572c58f1dd2cbf3cfc0f2c5286b94":[2,0,1,6,0,2,14],
 "v6_85_2test__generated_2generic__api__test_8c.html#af157e6ff8eea1a199d44fdeca58c21e0":[2,0,1,6,0,2,38],
 "v6_85_2test__generated_2generic__api__test_8c.html#af3d58f9b984d05b753b0771fd71c3cba":[2,0,1,6,0,2,49],
 "v6_85_2test__generated_2generic__api__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062":[2,0,1,6,0,2,50],
@@ -243,11 +249,5 @@ var NAVTREEINDEX21 =
 "v6_86_2generated_2ck-kernel-inference_8c.html#a72ca7233113b8ab2acbadc710514f3cc":[2,0,1,7,0,0,23],
 "v6_86_2generated_2ck-kernel-inference_8c.html#a83526729f733fbd311a503bf661132b6":[2,0,1,7,0,0,6],
 "v6_86_2generated_2ck-kernel-inference_8c.html#a9cdc13ab71c3c11ffd53fbb205b1c423":[2,0,1,7,0,0,30],
-"v6_86_2generated_2ck-kernel-inference_8c.html#aa0bfb039a5a1afb4fd62a43ebb7ad301":[2,0,1,7,0,0,8],
-"v6_86_2generated_2ck-kernel-inference_8c.html#aa166790009f89187756bfa0110467dd3":[2,0,1,7,0,0,4],
-"v6_86_2generated_2ck-kernel-inference_8c.html#aa1affed3de5ec1317dfc6f04b9b2c275":[2,0,1,7,0,0,20],
-"v6_86_2generated_2ck-kernel-inference_8c.html#aa81a07e508590695da2e91794a06369a":[2,0,1,7,0,0,21],
-"v6_86_2generated_2ck-kernel-inference_8c.html#aa9166f047b7ada2d386eac689ef31419":[2,0,1,7,0,0,9],
-"v6_86_2generated_2ck-kernel-inference_8c.html#ab0aae69c5e861cc4454dff9eb8fbf4a7":[2,0,1,7,0,0,22],
-"v6_86_2generated_2ck-kernel-inference_8c.html#ab898071398b359603a35c202e9c65f3b":[2,0,1,7,0,0,1]
+"v6_86_2generated_2ck-kernel-inference_8c.html#aa0bfb039a5a1afb4fd62a43ebb7ad301":[2,0,1,7,0,0,8]
 };
