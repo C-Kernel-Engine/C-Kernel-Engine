@@ -979,7 +979,7 @@
     </header>
     <main>
 
-<h1>Whisper Tiny and Base End-to-End</h1>
+<h1>Whisper Tiny End-to-End</h1>
 
 <div class="alert alert-info">
     <div class="alert-icon">
@@ -1000,7 +1000,7 @@
 </div>
 
 <p>
-  CKE v8 runs generated FP32 Whisper Tiny and Base encoders and decoders from a
+  CKE v8 runs a generated FP32 Whisper Tiny encoder and decoder from a
   PCM16 WAV file &mdash; and the frontend is generated too. WAV decode,
   windowed-sinc resampling, pad/truncate, STFT table construction, FFT400
   power, Slaney Mel filters, and log-Mel normalization are seven explicit
@@ -1055,7 +1055,7 @@
   <rect x="0" y="0" width="1100" height="880" rx="18" fill="none" stroke="#1e293b" stroke-width="2"/>
 
   <!-- title -->
-  <text x="40" y="52" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO PIPELINE &#183; GENERATED FP32 WHISPER TINY / BASE</text>
+  <text x="40" y="52" font-size="12" letter-spacing="3" fill="#818cf8" font-family="ui-monospace,'JetBrains Mono',Menlo,monospace">AUDIO PIPELINE &#183; GENERATED FP32 WHISPER TINY</text>
   <text x="40" y="88" font-size="27" font-weight="700" fill="#f1f5f9">One WAV in, tokens out &#8212; every stage a kernel-map contract</text>
   <text x="40" y="112" font-size="13.5" fill="#94a3b8">Python orchestrates; C kernels and generated model libraries compute. No Whisper model-name branch anywhere in codegen.</text>
 
@@ -1074,7 +1074,7 @@
     <text x="46" y="290" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_wav_decode_memory_pcm16_mono_f32</text>
     <text x="46" y="306" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_resample_windowed_sinc_f32</text>
     <text x="46" y="322" font-size="10.5" fill="#94a3b8" font-family="ui-monospace,Menlo,monospace">audio_pad_or_truncate_f32</text>
-    <text x="46" y="342" font-size="10.5" fill="#64748b">Long recordings use sequential source windows</text>
+    <text x="46" y="342" font-size="10.5" fill="#64748b">&#8804; 30 s today &#8212; truncated, not chunked</text>
   </g>
 
   <line x1="354" y1="248" x2="386" y2="248" stroke="#94a3b8" stroke-width="2" marker-end="url(#aArrow)"/>
@@ -1274,109 +1274,26 @@
   </li>
 </ul>
 
-<h2>Local YouTube And Meeting Transcription</h2>
+<h2>Transcribe Arbitrary Audio</h2>
 
 <p>
-  CKE can be used as a local CPU transcription pipeline. The recording and
-  generated transcript remain on the machine unless the operator separately
-  uploads them. CKE does not bypass access controls or download private meeting
-  recordings: export a recording you are authorized to process, then provide
-  the local media file to the pipeline.
+  Convert any source format to mono 16&nbsp;kHz PCM16 WAV first:
 </p>
 
-<p>
-  Install the media tools once. Distribution packages may also be used:
-</p>
-
-<pre><code>sudo apt install ffmpeg
-python3 -m pip install --user yt-dlp</code></pre>
-
-<h3>YouTube Audio</h3>
-
-<p>
-  Download audio only from content you are permitted to access, then normalize
-  it to the frontend's mono 16&nbsp;kHz PCM16 WAV contract:
-</p>
-
-<pre><code>mkdir -p "$HOME/cke-audio/results"
-
-yt-dlp -x --audio-format wav \
-  -o "$HOME/cke-audio/source.%(ext)s" \
-  "YOUTUBE_URL"
-
-ffmpeg -y \
-  -i "$HOME/cke-audio/source.wav" \
+<pre><code>ffmpeg -i your-audio.mp3 \
   -ac 1 -ar 16000 -c:a pcm_s16le \
-  "$HOME/cke-audio/youtube-16k.wav"</code></pre>
+  /tmp/test-audio.wav</code></pre>
 
-<h3>Teams Or Other Meeting Exports</h3>
+<p>Then run the generated pipeline through the unified v8 command surface:</p>
 
-<p>
-  Download the recording through the meeting service's authorized export
-  controls. MP4, M4A, MP3, FLAC, and other formats use the same normalization
-  step:
-</p>
-
-<pre><code>ffmpeg -y \
-  -i "$HOME/Downloads/meeting-recording.mp4" \
-  -ac 1 -ar 16000 -c:a pcm_s16le \
-  "$HOME/cke-audio/meeting-16k.wav"</code></pre>
-
-<h3>Build And Run Whisper Base</h3>
-
-<p>
-  The unified v8 command downloads the Hugging Face safetensors checkpoint,
-  generates the encoder and decoder runtimes, compiles them, and transcribes
-  the WAV. Subsequent runs reuse the validated generated artifacts:
-</p>
-
-<pre><code>RUN_DIR="$HOME/.cache/ck-engine-v8/models/whisper-base-local"
-
-version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
-  --run "$RUN_DIR" \
-  --wav "$HOME/cke-audio/youtube-16k.wav" \
+<pre><code>version/v8/scripts/cks-v8-run audio \
+  --encoder-run-dir /path/to/whisper-tiny-encoder \
+  --decoder-run-dir /path/to/whisper-tiny-decoder \
+  --wav /tmp/test-audio.wav \
   --language en \
   --task transcribe \
-  --max-tokens 448 \
-  --output "$HOME/cke-audio/results/transcript.json"</code></pre>
-
-<p>
-  To use already-built artifacts without checking or downloading the source
-  checkpoint again:
-</p>
-
-<pre><code>CK_NUM_THREADS=20 OMP_NUM_THREADS=20 \
-version/v8/scripts/cks-v8-run audio \
-  --encoder-run-dir "$RUN_DIR/encoder" \
-  --decoder-run-dir "$RUN_DIR/decoder" \
-  --wav "$HOME/cke-audio/youtube-16k.wav" \
-  --language en \
-  --task transcribe \
-  --max-tokens 448 \
-  --output "$HOME/cke-audio/results/transcript.json"</code></pre>
-
-<p>
-  The transcript is printed to standard output. The JSON report also preserves
-  stage timings, generated tokens, audio identity, and runtime provenance.
-  Extract only the stitched text with:
-</p>
-
-<pre><code>jq -r '.decoder.transcript_text' \
-  "$HOME/cke-audio/results/transcript.json" \
-  &gt; "$HOME/cke-audio/results/transcript.txt"</code></pre>
-
-<p>
-  Replace the WAV path with <code>meeting-16k.wav</code> for the meeting
-  workflow. Add <code>--timestamps</code> when timestamp tokens are required.
-  Plain transcription is the more mature long-recording path.
-</p>
-
-<p>
-  A local safetensors checkpoint directory can replace the
-  <code>hf://</code> argument. The command builds distinct encoder and decoder
-  runtime bundles. It reuses them only when checkpoint, circuit, kernel
-  registry, converter/codegen, generated model, and runtime hashes agree.
-</p>
+  --max-tokens 128 \
+  --output build/whisper-test-report.json</code></pre>
 
 <p>
   Encoder and decoder execution occurs in isolated child processes. Both
@@ -1388,27 +1305,19 @@ version/v8/scripts/cks-v8-run audio \
 <h2>Current Limitations</h2>
 
 <ul>
-  <li>Whisper Tiny, Base, and Small, FP32 only.</li>
+  <li>Whisper Tiny, FP32 only.</li>
   <li>
     PCM16 WAV input; use <code>ffmpeg</code> to convert MP3, FLAC, or other
     formats.
   </li>
   <li>
-    Recordings longer than 30 seconds are processed as sequential source
-    windows. A 33-second PCM16 fixture is parity-certified; arbitrary
-    hour-scale recordings are functional but not yet corpus-certified.
+    Audio is limited to 30 seconds; longer files are currently truncated,
+    not chunked.
   </li>
-  <li>
-    English text-only and paired monotonic timestamp decoding are certified
-    on the public JFK fixture.
-  </li>
+  <li>English transcription and no-timestamp decoding are certified.</li>
   <li>
     The JFK sample matches Hugging Face exactly; arbitrary recordings are
     functional rather than corpus-certified yet.
-  </li>
-  <li>
-    CKE currently emits transcript JSON and plain text. It does not yet emit
-    SRT or VTT subtitle files directly.
   </li>
 </ul>
 
@@ -1468,101 +1377,6 @@ ask what you can do for your country.</code></pre>
   total time fell from 28.64 seconds to approximately 12.22 seconds.
 </p>
 
-<p>
-  Whisper Base emits the same 25 greedy text tokens and EOS as Hugging Face
-  on the same sample, including both commas:
-</p>
-
-<pre><code>And so my fellow Americans, ask not what your country can do for you,
-ask what you can do for your country.</code></pre>
-
-<p>
-  At 20 threads, the measured Base run used approximately 24.43 seconds for
-  the generated frontend plus encoder, 2.08 seconds for decoder prefill, and
-  0.43 seconds for 25 decode tokens. This certifies transcript parity on the
-  fixture, not complete tensor parity. The synthetic encoder X-Ray first
-  crosses its material threshold at layer 2 MLP-down and reaches roughly
-  9.77e-4 after final LayerNorm, so the transcript and tensor gates remain
-  separate.
-</p>
-
-<h3>Same-Host Base Performance Baseline</h3>
-
-<p>
-  A current three-repetition same-host AVX2 measurement compared the same
-  11-second JFK WAV, Whisper Base model family, English greedy transcript,
-  20 CPU threads, and 25 generated text tokens. Backend order rotated each
-  repetition, and all three backends emitted identical text-token IDs:
-</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Backend</th>
-      <th>Measured compute</th>
-      <th>Process wall time</th>
-      <th>CKE ratio vs native reference</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>CKE generated FP32</td>
-      <td>26.751 s</td>
-      <td>27.418 s</td>
-      <td>49.15&times;</td>
-    </tr>
-    <tr>
-      <td>PyTorch CPU</td>
-      <td>0.500 s</td>
-      <td>2.937 s</td>
-      <td>&mdash;</td>
-    </tr>
-    <tr>
-      <td>whisper.cpp FP16</td>
-      <td>0.544 s</td>
-      <td>0.567 s</td>
-      <td>1.00&times;</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>
-  Compute and process wall time are intentionally separate. PyTorch compute
-  includes feature extraction and generation but excludes checkpoint loading;
-  its process wall time includes interpreter and framework startup.
-  <code>whisper.cpp</code> total time includes its model load. CKE compute is
-  the generated audio/encoder, decoder-prefill, and decode stage sum. This
-  baseline proves that CKE's immediate audio priority is encoder scheduling and
-  GEMM/provider optimization, not incremental decoder tuning.
-</p>
-
-<pre><code>python benchmarks/compare_whisper_backends_v8.py \
-  --checkpoint /path/to/openai--whisper-base \
-  --encoder-run-dir "$RUN_DIR/encoder" \
-  --decoder-run-dir "$RUN_DIR/decoder" \
-  --wav /path/to/jfk.wav \
-  --whisper-cpp-cli /path/to/whisper.cpp/build/bin/whisper-cli \
-  --whisper-cpp-model /path/to/whisper.cpp/models/ggml-base.bin \
-  --language en --task transcribe \
-  --threads 20 --repetitions 3 \
-  --output build/reports/whisper-base-three-backend.json</code></pre>
-
-<p>
-  The benchmark rotates backend order between repetitions, records commands,
-  model and runtime hashes, CPU features, wall and compute timing, transcript
-  text, and token IDs, and fails when any backend changes the transcript.
-</p>
-
-<p>
-  Timestamp mode also matches Hugging Face exactly: 27/27 generated tokens,
-  including <code>&lt;|0.00|&gt;</code> and
-  <code>&lt;|11.00|&gt;</code>, followed by EOS. The decoder contract owns
-  the initial timestamp window, paired-token sequence, monotonic ordering,
-  and aggregate timestamp-probability selection. Whisper Small reuses the
-  same generated circuits and matched all 25 text tokens through EOS on the
-  fixture; no model-size branch was added.
-</p>
-
 <h2>Regression Gates</h2>
 
 <pre><code>make test-audio
@@ -1571,18 +1385,6 @@ CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
 CK_WHISPER_DECODER_RUN_DIR=/path/to/decoder \
 CK_WHISPER_WAV=/path/to/jfk.wav \
 make test-whisper-e2e-auto</code></pre>
-
-<pre><code>CK_WHISPER_BASE_ENCODER_RUN_DIR=/path/to/base/encoder \
-CK_WHISPER_BASE_DECODER_RUN_DIR=/path/to/base/decoder \
-CK_WHISPER_BASE_WAV=/path/to/jfk.wav \
-make test-whisper-e2e-auto</code></pre>
-
-<pre><code>CK_WHISPER_CHECKPOINT=/path/to/openai--whisper-base \
-CK_WHISPER_ENCODER_RUN_DIR=/path/to/base/encoder \
-CK_WHISPER_DECODER_RUN_DIR=/path/to/base/decoder \
-CK_WHISPER_WAV=/path/to/jfk.wav \
-CK_WHISPER_TIMESTAMPS=1 \
-make test-whisper-pytorch-e2e-auto</code></pre>
 
 <p>
   Nightly publishes separate PyTorch-backed audio frontend and transformer
@@ -1822,7 +1624,7 @@ make test-whisper-pytorch-e2e-auto</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-07-26</p>
             </div>
         </div>
     </footer>
