@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" role="img" aria-labelledby="title desc">
+  <title id="title">Kernel maps: three levels of separation</title>
+  <desc id="desc">Stack of four levels: circuits declare logical requirements, the DSL resolver selects a provider mechanically, kernel maps own the physical contract, and C kernels only execute arithmetic.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.map{fill:#1a1526;stroke:#bc8cff;stroke-width:2}.ok{fill:#10231d;stroke:#30c48d;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="780"/>
+  <text class="t" x="50" y="52">Kernel maps: three levels of separation</text>
+  <text class="p" x="50" y="82">Circuits state logical requirements. The resolver picks a provider mechanically. Kernel maps own everything physical.</text>
+
+  <rect class="input" x="50" y="112" width="520" height="128" rx="8"/>
+  <text class="h" x="75" y="146">1 · Circuit — logical</text>
+  <text class="m" x="75" y="174">version/v8/circuits/*.json</text>
+  <text class="p" x="75" y="201">Op instances, named port edges,</text>
+  <text class="p" x="75" y="224">required_numerical_contracts</text>
+
+  <rect class="panel" x="600" y="112" width="550" height="128" rx="8"/>
+  <text class="h" x="625" y="146">Owns: WHAT math is required</text>
+  <text class="p" x="625" y="176">Logical requirements only. For hardened ops the</text>
+  <text class="p" x="625" y="200">circuit must not name a physical provider ID.</text>
+  <text class="small" x="625" y="224">Scheduling (op insertion) legitimately stays here.</text>
+
+  <path class="line" d="M310 240 V270"/>
+
+  <rect class="gate" x="50" y="270" width="520" height="128" rx="8"/>
+  <text class="h" x="75" y="304">2 · DSL resolver — selection</text>
+  <text class="m" x="75" y="332">build_ir_v8.py</text>
+  <text class="p" x="75" y="359">Filter by contract → filter by compatibility →</text>
+  <text class="p" x="75" y="382">rank → fail closed on ambiguity</text>
+
+  <rect class="panel" x="600" y="270" width="550" height="128" rx="8"/>
+  <text class="h" x="625" y="304">Owns: WHICH provider runs</text>
+  <text class="p" x="625" y="334">Mechanical matching on contract, phase, dtype,</text>
+  <text class="p" x="625" y="358">shape, layout, ISA, and alias safety.</text>
+  <text class="small" x="625" y="382">No model-name checks allowed in the resolver.</text>
+
+  <path class="line" d="M310 398 V428"/>
+
+  <rect class="map" x="50" y="428" width="520" height="128" rx="8"/>
+  <text class="h" x="75" y="462">3 · Kernel map — physical contract</text>
+  <text class="m" x="75" y="490">version/v8/kernel_maps/*.json (284 maps)</text>
+  <text class="p" x="75" y="517">Interface, port dtype/layout/stride/storage,</text>
+  <text class="p" x="75" y="540">phases, call ABI, lifecycle, priority</text>
+
+  <rect class="panel" x="600" y="428" width="550" height="128" rx="8"/>
+  <text class="h" x="625" y="462">Owns: HOW the op is executed</text>
+  <text class="p" x="625" y="492">Everything physical: numerical-contract identity,</text>
+  <text class="p" x="625" y="516">persistent-state and alias semantics, C call ABI.</text>
+  <text class="small" x="625" y="540">Schema-validated; audited against the baseline ratchet.</text>
+
+  <path class="line" d="M310 556 V586"/>
+
+  <rect class="ok" x="50" y="586" width="520" height="128" rx="8"/>
+  <text class="h" x="75" y="620">4 · C kernel — arithmetic</text>
+  <text class="m" x="75" y="648">impl.function (e.g. memcpy)</text>
+  <text class="p" x="75" y="675">Executes the declared contract.</text>
+  <text class="p" x="75" y="698">Generated C does not guess.</text>
+
+  <rect class="panel" x="600" y="586" width="550" height="128" rx="8"/>
+  <text class="h" x="625" y="620">Owns: nothing but the math</text>
+  <text class="p" x="625" y="650">No selection, no dispatch, no model knowledge.</text>
+  <text class="p" x="625" y="674">It receives exact ABI arguments and runs.</text>
+</svg>

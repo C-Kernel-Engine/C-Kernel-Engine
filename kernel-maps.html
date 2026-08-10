@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine</title>
-    <meta name="description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <title>Kernel Maps and Provider Selection | C-Kernel-Engine</title>
+    <meta name="description" content="How C-Kernel-Engine v8 selects which physical C kernel executes each logical op: 284 machine-checked kernel maps, a fail-closed resolver, the residual_save to memcpy case study, and the ratcheted migration scoreboard.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
-    <meta property="og:title" content="CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine">
-    <meta property="og:description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/kernel-maps.html">
+    <meta property="og:title" content="Kernel Maps and Provider Selection | C-Kernel-Engine">
+    <meta property="og:description" content="How C-Kernel-Engine v8 selects which physical C kernel executes each logical op: 284 machine-checked kernel maps, a fail-closed resolver, the residual_save to memcpy case study, and the ratcheted migration scoreboard.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/kernel-maps.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -908,9 +908,9 @@
             <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
             <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
-            <a href="cke-throughput-unit.html" class="active" style="color:var(--orange)">CKU</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger ">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -979,439 +979,235 @@
     </header>
     <main>
 
-<h1>CKE Throughput Unit</h1>
+<style>
+.km-note{border:1px solid rgba(7,173,248,.45);border-radius:8px;padding:1rem;background:rgba(7,173,248,.06)}
+.km-good{border-color:rgba(48,196,141,.55);background:rgba(48,196,141,.06)}
+.km-bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.06)}
+.km-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin:1rem 0}
+.km-card{border:1px solid var(--grey);border-left:4px solid var(--orange);border-radius:8px;padding:1rem;background:rgba(255,255,255,.02)}
+.km-card h3{margin-top:0}
+.km-flow{overflow-x:auto}
+.km-flow img{display:block;width:100%;min-width:880px;height:auto}
+.km-table{width:100%;border-collapse:collapse;margin:1rem 0 2rem}
+.km-table th,.km-table td{padding:.65rem .78rem;border:1px solid var(--grey);text-align:left;vertical-align:top}
+.km-table th{color:var(--orange);background:rgba(255,180,0,.07)}
+.km-table td:first-child{font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.km-dot{display:inline-block;width:.62rem;height:.62rem;border-radius:50%;margin-right:.45rem;vertical-align:middle}
+.km-dot.floor{background:var(--green)}
+.km-dot.ceiling{background:#fb7185}
+.km-tag{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.35);color:var(--text-secondary);border-radius:999px;padding:.18rem .55rem;display:inline-block;margin:.15rem .25rem .15rem 0}
+p code,li code,td code{overflow-wrap:anywhere}
+@media (max-width:700px){.km-table{display:block;max-width:100%;overflow-x:auto}.km-table td:first-child{white-space:normal}}
+</style>
 
-<div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
-    <h2 style="margin-top: 0; color: #ffb400;">The 1 PB/s North-Star Unit</h2>
-    <p style="font-size: 1.12em; line-height: 1.7;">
-        C-Kernel-Engine cares about a practical systems question:
-        <strong>how fast can the cumulative compute system cycle active model data to produce tokens?</strong>
-        FLOPS and TOPS are useful hardware numbers, but they do not directly answer whether a real model can move its weights, activations, KV cache, intermediate buffers, and network payloads quickly enough to generate the next token.
-    </p>
-    <p style="font-size: 1.12em; line-height: 1.7; margin-bottom: 0;">
-        The proposed CKE unit is aggregate bytes cycled per second across the full token path.
-        The north-star target is <strong>1 petabyte/sec</strong>, which is the same as <strong>1000 terabytes/sec</strong>, or <strong>1 terabyte every millisecond</strong>.
-    </p>
-    <p style="font-size: 1.08em; line-height: 1.7; margin-top: 1.2rem; margin-bottom: 0;">
-        The reference CKU is <strong>useful model-math byte throughput</strong>, not a copy-bandwidth score.
-        A DSA engine can move bytes, but CKU asks whether active weights, activations, and cache/state are
-        fed through GEMM/FMA/attention work to advance the model. The clean upper-bound reference is
-        full-context prefill, where active weights are cycled through mostly GEMM. Decode is a related but
-        different path: mostly GEMV plus KV/cache reads and writes.
-    </p>
-</div>
+<h1>Kernel Maps and Provider Selection</h1>
 
-<div class="img-container svg-viewer" data-title="CKE Throughput Unit">
-    <img src="assets/cke-throughput-unit.svg" alt="CKE throughput unit: active bytes per token divided by token latency equals aggregate bytes cycled per second.">
-</div>
-
-<h2>The Unit</h2>
-
-<pre><code>CKU = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    CKU means <strong>C-Kernel throughput unit</strong>.
-    The unit is not just DRAM bandwidth from one socket and it is not just matrix FLOPS.
-    It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse through useful model compute in order to produce tokens.
-    Plain copies are not enough; the bytes have to arrive in the right layout at the right kernel and participate in the model's math.
-    Depending on the model and phase, that can include:
-</p>
-
-<ul>
-    <li>active weights read for the token path</li>
-    <li>activation buffers and scratch buffers</li>
-    <li>KV cache reads and writes, or recurrent state updates for SSM-style models</li>
-    <li>prefill token blocks, decode token steps, and batching effects</li>
-    <li>NUMA traffic, cache movement, and inter-node communication</li>
-    <li>quantized layout conversion, repacking, and dequantization overhead</li>
-</ul>
-
-<h2>Not Just Weights</h2>
-
-<p>
-    A common shortcut is to say, "a 1 TB model at 1 ms/token needs 1 PB/s."
-    That is a useful intuition, but it is not the full CKU definition.
-    CKU is not only parameter bytes divided by token time.
-    It is the <strong>active byte path</strong> divided by token time.
-    The active byte path includes both the model data being read and the runtime
-    data being produced, consumed, stored, and moved while the token is generated.
-</p>
-
-<p>
-    In decode, weights are often the streaming bottleneck because many layers
-    repeatedly read projection and MLP weights for each new token.
-    In prefill, long prompts can make activation and KV/cache writes matter much
-    more because the system processes many token rows at once.
-    In training, activation saves, gradient writes, optimizer state, and backward
-    reads all become part of the active path.
-    In distributed execution, activation transfers, KV/state movement, gradient
-    exchange, and pipeline bubbles must be counted too.
-</p>
-
-<p>
-    This distinction matters because two runs with the same stored model size can
-    have very different CKU. A dense 1 GB model may touch nearly all weights on
-    every decode token. A sparse MoE model may store far more total weights but
-    only touch selected experts. A vision-language prefill run may move less
-    weight than expected but spend heavily on image-token activations and bridge
-    buffers. CKU asks what the system actually had to cycle for this token path.
-</p>
-
-<h2>Why 1 PB/s?</h2>
-
-<p>
-    A very large modern model can easily imply hundreds of gigabytes to terabytes of active weight and state movement across the token path, especially before accounting for prefill, KV cache, MoE routing, recurrent state, or distributed execution.
-    Quantization and MoE reduce the active bytes touched per token, but the optimization problem remains the same: the faster the system can cycle the active bytes, the faster it can produce useful output.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Active bytes per token</th>
-            <th>Token latency</th>
-            <th>Required aggregate rate</th>
-            <th>Implied token rate</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1 TB</td>
-            <td>1 second</td>
-            <td>1 TB/s</td>
-            <td>1 token/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>10 ms</td>
-            <td>100 TB/s</td>
-            <td>100 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>1 ms</td>
-            <td>1 PB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>100 GB</td>
-            <td>1 ms</td>
-            <td>100 TB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-    </tbody>
-</table>
-
-<p>
-    This is why the 1 PB/s unit matters.
-    It turns a vague performance goal into a concrete systems target:
-    if the active token path is one terabyte and the target is one millisecond per token, the cumulative runtime has to behave like a one-petabyte-per-second machine.
-    That machine does not have to be one CPU.
-    It can be a coordinated set of CPU sockets, memory channels, NUMA domains, and Linux nodes.
-</p>
-
-<p>
-    In CKE, this is intentionally anchored to the hardest clean reference:
-    <strong>full-context prefill over the active model path</strong>.
-    Prefill is mostly GEMM-shaped work over many token rows, so the system must
-    stream active weights, reuse activations, execute reductions, and write the
-    next layer state at high rate. Decode is measured too, but it is usually a
-    different shape: mostly GEMV over one or a few token rows, plus KV/cache
-    reads and writes. That is why CKU should report the phase and workload
-    shape, not only the headline byte rate.
-</p>
-
-<h2>What Counts as Active Bytes?</h2>
-
-<p>
-    Active bytes are the bytes that matter for the current token path.
-    They are not the total size of every file on disk and they are not necessarily the total parameter count of the model.
-    For a dense model, the active path may touch most weights every token.
-    For a Mixture-of-Experts model, only the selected experts are active.
-    For recurrent or SSM-style models, the KV-cache term may shrink or disappear for many layers, but recurrent state updates still count.
-</p>
-
-<p>
-    This makes CKU useful across model families.
-    A 5 TB model with quantization, MoE routing, and sparse activation may have a much smaller active-byte path per token than its full stored footprint.
-    CKE cares about the measured active path: which weights are actually read, which activations are produced, which cache/state buffers are updated, and which bytes cross sockets or nodes.
-</p>
-
-<h2>Lifecycle Envelope and Concurrency</h2>
-
-<p>
-    CKU is first a <strong>single-stream lifecycle unit</strong>.
-    It asks what the runtime must cycle for one model instance serving one token
-    path at the model's intended operating envelope.
-    If a model advertises a 1 million token context length with an 8K embedding
-    dimension, the lifecycle envelope should include the memory behavior needed
-    to support that context: the active weights, the full KV/cache or recurrent
-    state footprint, the activations needed by prefill/decode, and the load/store
-    traffic required to keep the token path moving.
-</p>
-
-<p>
-    That does not mean every CKU number automatically includes every concurrent
-    user. Concurrency is a separate service-level multiplier.
-    A single-user CKU report answers, "Can this system run one full-context model
-    stream at this token rate?"
-    A service report then asks, "How many such streams can the cluster run at the
-    same time, and what token rate does each user receive?"
-</p>
-
-<pre><code>single_user_cku = active_lifecycle_bytes_per_token / seconds_per_token
-
-service_cku     = single_user_cku * concurrent_streams
-
-per_user_rate   = total_generated_tokens_per_second / concurrent_streams</code></pre>
-
-<p>
-    For example, a cluster might target 1 token/sec for 1000 concurrent users on
-    a very large model. That is a different operating point from 1000 tokens/sec
-    for one user, even if both produce 1000 aggregate tokens/sec.
-    CKU should make both cases explicit: the active lifecycle bytes per user, the
-    concurrency count, the total aggregate byte rate, and the per-user token rate.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Byte class</th>
-            <th>Examples</th>
-            <th>When it dominates</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Weights</td>
-            <td>Q/K/V projections, MLP gate/up/down, expert weights, output head</td>
-            <td>Decode and small-batch inference, especially dense models</td>
-        </tr>
-        <tr>
-            <td>Activations</td>
-            <td>Layer inputs/outputs, normalized streams, Q8 views, fused scratch</td>
-            <td>Prefill, vision/audio encoders, large token blocks, unfused paths</td>
-        </tr>
-        <tr>
-            <td>Cache and state</td>
-            <td>KV cache reads/writes, recurrent state, Mamba/DeltaNet state</td>
-            <td>Long context, recurrent models, decode with large history</td>
-        </tr>
-        <tr>
-            <td>Training state</td>
-            <td>Saved activations, gradients, optimizer moments, checkpoints</td>
-            <td>Backward pass, fine-tuning, long-context training</td>
-        </tr>
-        <tr>
-            <td>Communication</td>
-            <td>Pipeline activations, tensor-parallel shards, MPI/RDMA transfers</td>
-            <td>Multi-node inference/training and CPU clusters</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>Node Roofline Math</h2>
-
-<p>
-    CKU is not only a memory-bandwidth number and it is not only a FLOPS number.
-    A CPU node can only contribute the useful part of the slowest roof: memory
-    bandwidth, compute throughput, or network movement when the run is
-    distributed. This is why CKU belongs next to roofline analysis.
-</p>
-
-<div class="img-container svg-viewer" data-title="CKU Node Roofline Math">
-    <img src="assets/cke-node-roofline-math.svg" alt="CKU node roofline math: required service CKU divided by effective node CKU yields the number of CPU nodes needed.">
-</div>
-
-<pre><code>required_service_cku =
-    active_lifecycle_bytes_per_token
-  * tokens_per_second_per_user
-  * concurrent_streams
-
-node_memory_roof =
-    sockets
-  * memory_channels_per_socket
-  * transfer_rate_MTps
-  * 8 bytes_per_channel_transfer
-
-node_compute_roof_bytes =
-    useful_flops_per_second / arithmetic_intensity_flops_per_byte
-
-effective_node_cku =
-    min(node_memory_roof, node_compute_roof_bytes, node_network_roof)
-  * runtime_efficiency
-
-nodes_needed =
-    required_service_cku / effective_node_cku</code></pre>
-
-<p>
-    For DDR memory, a practical first-pass estimate is:
-    <code>channel_GBps = MT/s * 8 bytes / 1000</code>.
-    DDR5-6600 is about 52.8 GB/s per channel.
-    A 12-channel socket is therefore about 633.6 GB/s theoretical, and a
-    dual-socket system is about 1.27 TB/s theoretical before NUMA effects,
-    memory-controller efficiency, page placement, and OS noise.
-    At 8800 MT/s, the same 12-channel socket is about 844.8 GB/s, or about
-    1.69 TB/s for two sockets.
-</p>
-
-<p>
-    Compute has its own roof. For an AVX-512 FP32 FMA path, a rough dense-core
-    estimate is:
-    <code>cores * GHz * FMA_units_per_core * lanes_per_vector * 2 FLOPs_per_FMA</code>.
-    That estimate changes for BF16, INT8, AMX tile paths, VNNI, SVE, or Neon.
-    Quantized Q4/Q6 kernels are often limited by unpacking, metadata,
-    reductions, cache reuse, and memory traffic, so AMX is not automatically the
-    answer. In many CKE paths, AVX-512/VNNI-style layout work is the more direct
-    lever.
-</p>
-
-<p>
-    This also keeps the 1 PB/s north star honest. If a dual-socket CPU node can
-    deliver 1.2 TB/s of useful lifecycle movement, then 1 PB/s requires roughly
-    833 such nodes in the perfect case. At 60-70% useful efficiency, the number
-    is closer to 1200-1400 nodes. If quantization, MoE routing, locality, and
-    cache reuse reduce the active path to 100 GB/token at 100 tokens/sec, the
-    requirement becomes 10 TB/s, which is a very different cluster shape.
-</p>
-
-<p>
-    The CPU thesis is not that one socket beats an H100 at dense tensor math.
-    The thesis is that commodity capacity, many memory channels, many physical
-    cores, SIMD/matrix units, Linux tuning, MPI/RDMA placement, and generated C
-    scheduling can combine into a measurable aggregate byte machine. GPUs can
-    also reach enormous aggregate bandwidth, but a 1 TB resident model may need
-    many expensive HBM devices just for capacity before it even starts serving
-    traffic.
-</p>
-
-<h2>Memory Placement Is a Scheduling Problem</h2>
-
-<p>
-    Capacity and throughput cannot be separated from placement. Accelerator
-    systems often move selected activations, parameters, or optimizer state
-    from scarce HBM into host DRAM. CPU-native execution removes that specific
-    host-to-device boundary for CPU-resident state, but it does not remove data
-    movement. Cache fills, DRAM traffic, NUMA hops, network transfers, and
-    storage reads still have to be placed and scheduled against useful work.
-</p>
-
-<p>
-    NVIDIA's JAX host-offloading study provides a useful measured example. On
-    its DeepSeek-V3 671B configuration, optimized activation offloading with a
-    latency-hiding scheduler and pipelined copies reached 908.2 TFLOPs/s/device,
-    compared with 578.3 TFLOPs/s/device for no offload with activation
-    rematerialization. But host offloading without those scheduling mechanisms
-    reached only 541.6 TFLOPs/s/device. The placement policy created capacity;
-    overlap determined whether that capacity translated into throughput.
-</p>
-
-<p>
-    The same study reported a smaller but equally important result for Llama
-    3.1 405B: QKV offloading with latency hiding improved throughput by 2.9%,
-    while disabling latency hiding made the offloaded run slower than the
-    no-offload baseline. The 70.9 GiB host allocation represented QKV storage
-    across all layers, while scan-based backward execution needed only one
-    layer's QKV activations resident on the GPU at a time. This is a lifetime
-    and scheduling result, not a raw bandwidth claim.
-</p>
-
-<p>CKE should apply the same discipline to CPU nodes and clusters:</p>
-
-<ul>
-    <li><strong>Place by lifetime:</strong> keep the active layer, tile, KV/state window, or optimizer shard near the compute that consumes it.</li>
-    <li><strong>Overlap explicitly:</strong> prefetch the next tile or shard while the current kernel performs useful work.</li>
-    <li><strong>Budget staging memory:</strong> double buffers and prefetched data consume capacity even when they improve throughput.</li>
-    <li><strong>Measure exposed transfer time:</strong> a transfer hidden behind compute and the same transfer on the critical path have different performance consequences.</li>
-    <li><strong>Keep rematerialization in the comparison:</strong> recomputing an activation may cost less than moving it, depending on arithmetic intensity and topology.</li>
-</ul>
-
-<pre><code>effective_step_time =
-    useful_compute_time
-  + exposed_memory_time
-  + exposed_network_time
-  + synchronization_time
-
-staging_capacity = resident_working_set + prefetched_buffers + in_flight_outputs</code></pre>
-
-<p>
-    This refines the CKU interpretation. Logical active bytes describe the
-    model state needed by the operation. Physical bytes include every movement
-    required by the chosen placement plan. A valid CKU report must state what
-    was resident, what was transferred or rematerialized, how much transfer was
-    overlapped, and which movement remained on the critical path.
-</p>
-
-<p>
-    Reference:
-    <a href="https://developer.nvidia.com/blog/reducing-high-bandwidth-memory-bottlenecks-in-jax-based-llm-training-with-host-offloading/" target="_blank" rel="noopener noreferrer">NVIDIA, Reducing High-Bandwidth Memory Bottlenecks in JAX-Based LLM Training with Host Offloading</a>.
-</p>
-
-<h2>What CKE Optimizes</h2>
-
-<p>
-    CKE does not optimize a single number in isolation.
-    It tries to organize the whole token path so useful bytes stay close to useful compute:
-</p>
-
-<ul>
-    <li><strong>Kernel layout:</strong> Q4/Q5/Q6/Q8 formats, packed layouts, SIMD-friendly loops, and shape-gated dispatch.</li>
-    <li><strong>Memory layout:</strong> contiguous bump files, planned activation buffers, cache-aligned sections, and deterministic offsets.</li>
-    <li><strong>Runtime scheduling:</strong> prefill vs decode kernels, persistent thread pools, batching, lifetime-aware placement, asynchronous prefetch, and pipeline staging.</li>
-    <li><strong>Linux tuning:</strong> CPU affinity, huge pages, NUMA placement, cache behavior, and perf/VTune/Advisor measurement.</li>
-    <li><strong>Cluster scaling:</strong> model/layer ownership, activation movement, gradient movement, MPI/RDMA paths, and topology-aware placement.</li>
-</ul>
-
-<h2>How to Measure It</h2>
-
-<p>
-    CKU is meant to be measured, not asserted.
-    A practical report should show the model, phase, context length, batch size, active-byte estimate, token latency, and the resulting aggregate rate.
-    The same run should also show CPU utilization, memory bandwidth, cache behavior, and network transfer if the run spans nodes.
-</p>
-
-<pre><code>active_bytes_per_token = weights_read_or_reused
-                       + activations_read_written
-                       + cache_or_state_read_written
-                       + scratch_and_layout_traffic
-                       + communication_read_written
-
-seconds_per_token      = measured_wall_time / generated_tokens
-
-CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    A stricter report can also split <em>logical active bytes</em> from
-    <em>physical traffic</em>.
-    Logical active bytes describe the model/runtime tensors that participate in
-    the token path. Physical traffic includes cache-line rereads, layout
-    conversion, write-allocate behavior, NUMA hops, and network retransfers.
-    CKE tracks the logical path first, then uses perf, VTune, Advisor, and
-    benchmark counters to find where physical traffic is higher than it should be.
-</p>
-
-<p>
-    This is the reason CKE keeps investing in visualizers, memory layouts, <a href="kernel-maps.html">kernel maps</a>, perf counters, VTune/Advisor profiles, and future MPI lanes.
-    The generated C code is only one part of the system.
-    The larger optimization problem is arranging the full data path so the machine spends less time waiting for bytes and more time turning those bytes into useful output.
-</p>
-
-<h2>Not a FLOPS Replacement</h2>
-
-<p>
-    FLOPS still matter. Matrix units still matter. SIMD still matters.
-    But for LLM inference and training, raw arithmetic throughput is only useful when the data reaches the execution units at the right time and in the right layout.
-    CKU is a complementary metric: it asks whether the whole system can cycle the bytes that the model actually needs.
+<p class="lead">
+    How CKE v8 decides <em>which physical C kernel</em> executes each logical operation — and why that decision
+    lives in 284 machine-checked JSON maps instead of in Python conditionals.
 </p>
 
 <div class="alert alert-warning">
     <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </div>
-    <div>
-        <strong>This is a north-star systems unit, not a current laptop benchmark.</strong><br>
-        A single workstation is not expected to cycle 1 PB/s today. The point is to make the long-horizon optimization problem explicit: organize CPU kernels, memory hierarchy, Linux scheduling, and distributed nodes so aggregate active-byte throughput keeps rising.
+    <div style="min-width: 0;">
+        <strong>Two different "kernel map" systems exist in this repository.</strong><br>
+        The top-level <code>kernel_maps/README.md</code> documents the <strong>older v7-era</strong> map format
+        (decoder layer plans and buffer layouts consumed by <code>gen_kernel_specs.py</code>). This page is about
+        the <strong>v8</strong> provider-selection system in <code>version/v8/kernel_maps/*.json</code> — a
+        different format with a different job. Do not confuse the two.
     </div>
 </div>
+
+<h2>The Three-Level Separation — and Why</h2>
+
+<p>
+    One CKE runtime serves many model families &times; quantization formats &times; ISA variants &times;
+    execution phases, all on CPUs. That product space is why v8 separates <strong>what math is required</strong>
+    from <strong>which provider runs</strong> from <strong>how the op is physically executed</strong>:
+</p>
+
+<div class="img-container svg-viewer km-flow" data-title="The three-level stack: circuit, DSL resolver, kernel map, C kernel, with what each level owns">
+  <img src="assets/kernel-maps-layers.svg" alt="Four-level stack. Level 1, the circuit in version/v8/circuits, owns what math is required: op instances, named port edges and required numerical contracts, and must not name physical provider IDs. Level 2, the DSL resolver in build_ir_v8.py, owns which provider runs: mechanical matching on contract, phase, dtype, shape, layout, ISA and alias safety, with no model-name checks. Level 3, the 284 kernel maps in version/v8/kernel_maps, own how the op is executed: numerical-contract identity, port dtype, layout, stride, storage, persistent-state and alias semantics, call ABI, lifecycle and priority. Level 4, the C kernel, owns nothing but the math.">
+</div>
+
+<div class="km-grid">
+  <div class="km-card">
+    <h3>Circuits declare the logical</h3>
+    <p><code>version/v8/circuits/*.json</code> (e.g. <code>qwen3vl.json</code>, <code>qwen35.json</code>) declare op instances, named port edges, and <code>required_numerical_contracts</code>. For hardened ops a circuit must <strong>not</strong> name a physical provider ID — it states requirements, not implementations.</p>
+  </div>
+  <div class="km-card">
+    <h3>Kernel maps own the physical</h3>
+    <p><code>version/v8/kernel_maps/*.json</code> — 284 maps — own the operation interface, numerical-contract identity, port dtype/layout/stride/storage, prefill/decode phase support, persistent-state and alias semantics, the C call ABI, lifecycle status, and priority.</p>
+  </div>
+  <div class="km-card">
+    <h3>The DSL resolves mechanically</h3>
+    <p><code>version/v8/scripts/build_ir_v8.py</code> filters by contract, then by phase/dtype/shape/layout/ISA/alias compatibility, ranks by lifecycle then priority, and <strong>fails closed</strong> on ambiguity. No model-name checks are allowed in the resolver.</p>
+  </div>
+</div>
+
+<h2>Anatomy of a Kernel Map</h2>
+
+<p>
+    <code>version/v8/kernel_maps/memcpy.json</code> is the canonical annotated example — the production map behind
+    the <code>residual_save</code> op. Every field group has one job:
+</p>
+
+<div class="img-container svg-viewer km-flow" data-title="Annotated field-group breakdown of memcpy.json">
+  <img src="assets/kernel-maps-anatomy.svg" alt="Six field groups of the memcpy kernel map. Identity: id memcpy, op residual_save, operation interface residual_save.memcpy_copy.v1, variant fp32_copy — the stable names circuit contracts bind to. Selection metadata: status production, priority 100, equivalence group, phases prefill and decode — schema-required, drives ranking, priority ranks only within one equivalence group. Ports: input src fp32 N read, output dst fp32 N write, no weights or scratch, with layout, access, storage class and consumption per port; alias and overlap rules live in constraints notes. Quant: weight null, activation fp32, output fp32 — the dtypes compatibility filters match. Map-owned call ABI: dims N, param _memcpy_bytes of type size_t, call ABI version 1 with dst, src and size — the exact C call arguments owned by the map. Implementation and constraints: function memcpy, default variant, byte copy with no arithmetic and no overlapping writable views.">
+</div>
+
+<h3>Selection metadata is schema-enforced</h3>
+
+<p>
+    The <code>selection</code> block is required by
+    <code>version/v8/schemas/kernel_provider_selection.schema.json</code> and carries exactly four fields:
+</p>
+
+<table class="km-table">
+  <tr><th>Field</th><th>Type</th><th>Rule</th></tr>
+  <tr><td>status</td><td><code>production | candidate | diagnostic | deprecated</code></td><td>Lifecycle rank. Only <code>production</code> providers auto-select; candidate, diagnostic, and deprecated never do.</td></tr>
+  <tr><td>priority</td><td>integer</td><td>Ranks providers <strong>within one equivalence group only</strong>. It cannot compare across groups.</td></tr>
+  <tr><td>equivalence_group</td><td>non-empty string</td><td>Mandatory. A provider that omits it is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
+  <tr><td>phases</td><td>non-empty unique list of <code>init | prefill | decode | training | backward</code></td><td>Declares which execution phases the provider supports.</td></tr>
+</table>
+
+<p>
+    The hard rules: an equal-priority tie between explicit production providers is a fault, not a coin flip.
+    And the map — not the code generator — owns the call ABI: <code>dims</code>, typed <code>params</code>
+    (here <code>_memcpy_bytes</code> of type <code>size_t</code>), and a versioned <code>call_abi</code> block
+    naming the exact argument list (<code>dst</code>, <code>src</code>, <code>size</code>) with each argument's
+    source port. The alias and arithmetic contract is part of the map too: <code>constraints.notes</code>
+    states this is a byte copy, performs no arithmetic, and is undefined for overlapping writable views.
+</p>
+
+<h2>The Resolution Algorithm</h2>
+
+<p>
+    Provider selection lives in <code>_provider_selection_metadata</code> and <code>_rank_provider_matches</code>
+    (<code>build_ir_v8.py:5666-5770</code>). The pipeline:
+</p>
+
+<div class="img-container svg-viewer km-flow" data-title="Resolver flow: compatibility filters before priority ranking, fail closed on tie or empty result, X-Ray evidence">
+  <img src="assets/kernel-maps-resolver-flow.svg" alt="Resolver flow. 284 candidate kernel maps enter compatibility filters — required numerical contracts, phase, dtype, shape, layout, ISA and alias safety — where any mismatch is rejected with a recorded reason and a missing equivalence group is a hard selection fault. Survivors rank by direction, activation preference, lifecycle with production first, then priority within one group only; candidate, diagnostic and deprecated never auto-select. Three outcomes: exactly one provider left is selected before GraphIR and preserved through generated C; no compatible provider fails closed as a compile-time error; an equal-priority production tie is a hard fault — ambiguous within a group, and priority cannot choose across groups. X-Ray records the selected provider plus every rejection reason, proving compatibility rejection precedes priority ranking.">
+</div>
+
+<ol>
+  <li><strong>Validate selection metadata.</strong> Every provider must declare an <code>equivalence_group</code>; a missing or malformed <code>selection</code> block is a <code>HARD KERNEL SELECTION FAULT</code>. Providers with no <code>selection</code> block at all are treated as legacy.</li>
+  <li><strong>Filter by compatibility.</strong> Contract identity, phase, dtype, shape, layout, ISA, and alias safety — any mismatch rejects the provider with a recorded reason.</li>
+  <li><strong>Rank the survivors.</strong> The ranking tuple is direction (inference vs backward) &rarr; activation preference &rarr; lifecycle rank (<code>production</code> first) &rarr; priority (higher wins, within the group).</li>
+  <li><strong>Fail closed on ambiguity.</strong> A tie among explicit production providers raises <code>"equal-priority production providers are ambiguous"</code> when they share a group, or <code>"priority cannot choose between different equivalence groups"</code> when they do not. Zero compatible providers is also a compile-time failure — the build never silently substitutes different numerics.</li>
+</ol>
+
+<p>
+    <strong>Evidence, not assertion.</strong> The X-Ray fixture
+    <code>version/v8/tests/fixtures/xray/provider_selection_trace.json</code> records a real selection trace:
+    a <code>candidate</code> provider with priority 900 is rejected for <code>status_not_production</code>,
+    a priority-800 production provider for <code>phase_mismatch</code>, and a priority-700 production provider
+    for <code>weight_dtype_mismatch</code> — all before the compatible priority-100 production provider is
+    selected at rank 0. Higher priority loses to incompatibility every time, because compatibility filtering
+    happens <em>before</em> priority ranking.
+</p>
+
+<h2>Case Study: residual_save &rarr; memcpy</h2>
+
+<p>
+    This is the headline example of DSL logic that <em>legitimately remains</em> — and of what hardened selection
+    replaced. The two concerns are different, and the code now keeps them in different places:
+</p>
+
+<div class="img-container svg-viewer km-flow" data-title="residual_save case study: DSL scheduling lane versus hardened kernel-map selection lane, plus remaining debt">
+  <img src="assets/kernel-maps-residual-save.svg" alt="Two lanes. DSL scheduling lane: the predicate should_insert_residual_save fires when the current op is a pre-norm, the next op starts a branch, and the previous op is not already residual_save; the op is auto-inserted before the pre-norm and stamped kernel memcpy; at lowering the byte size _memcpy_bytes equals embed_dim times seq_len times 4. Kernel-map lane: memcpy.json is selection-managed with operation interface residual_save.memcpy_copy.v1, production status, priority 100, prefill and decode phases, src read and dst write fp32 ports, constraints of byte copy with no arithmetic and no overlapping writable views, and a versioned call ABI of dst, src, size — copy semantics, not mislabeled residual arithmetic. Remaining debt box: template-override branches for rope_qk, rope_q, mrope_qk, position_embeddings, kv_cache_store_shared_q and assistant_layer_scale inside map_op_to_kernel, plus _make_decode_kv_store_op fabricating decode KV store ops; each migration moves selection into the maps and deletes the conditional.">
+</div>
+
+<ul>
+  <li><strong>Insertion is scheduling, and stays in the DSL.</strong> <code>should_insert_residual_save</code> (<code>build_ir_v8.py:3743</code>) fires when the current op is a pre-norm, the next op starts a branch (attention or MLP), and the previous op is not already a residual save. The op is auto-inserted and stamped <code>"kernel": "memcpy"</code> at <code>build_ir_v8.py:7328</code>; the <code>_memcpy_bytes</code> buffer size (<code>embed_dim &times; seq_len &times; 4</code>) is computed during lowering at <code>build_ir_v8.py:8610</code>. Deciding <em>that</em> a residual must be saved is graph scheduling — it belongs here.</li>
+  <li><strong>Selection is hardened.</strong> The <code>memcpy</code> map is selection-managed with declared copy semantics — a byte copy, not residual arithmetic mislabeled under a copy's name. It wins or loses through the same mechanical resolver as every other hardened provider.</li>
+  <li><strong>The debt is named, not hidden.</strong> <code>map_op_to_kernel</code> (<code>build_ir_v8.py:6712</code>) still carries template-override branches: <code>rope_qk</code> via <code>_resolve_rope_qk_kernel</code>, <code>rope_q</code>, <code>mrope_qk</code>, <code>position_embeddings</code> via <code>_resolve_position_embeddings_kernel</code>, <code>kv_cache_store_shared_q</code>, and the <code>assistant_layer_scale</code> override. Separately, <code>_make_decode_kv_store_op</code> (<code>build_ir_v8.py:8782</code>) fabricates decode KV store ops. This is migration debt being actively burned down — tracked by the ratchet below.</li>
+</ul>
+
+<h2>Where the Weights Side Fits</h2>
+
+<p>
+    Provider selection decides which kernel runs; the weights pipeline decides which bytes it reads. Converted
+    BUMP weights carry a metadata sidecar describing tensor names, dtypes, and layouts (see
+    <a href="gguf-bump.html">GGUF to Bump</a> and
+    <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/adr/0006-weight-mapping-via-template.md">ADR 0006</a>).
+    Circuits and templates reference weight tensors, and the map's <code>quant</code> block and
+    <code>weights</code> ports must match what the sidecar describes — a map that expects Q4_K weights will not
+    pass compatibility filtering against an FP32 tensor. The conversion format itself is documented on the BUMP
+    page; it is not re-explained here.
+</p>
+
+<h2>Evolution Timeline</h2>
+
+<p>An honest, PR-dated history. The direction is monotonic: physics moves into the maps, heuristics leave the DSL.</p>
+
+<div class="img-container svg-viewer km-flow" data-title="Timeline from legacy bindings to the agnostic-DSL end state">
+  <img src="assets/kernel-maps-evolution.svg" alt="Timeline with five milestones. Legacy era: kernel_bindings.json plus function-name ABI fallback, where naming conventions were the contract. PR 302: hardened provider selection with lifecycle status, priority and equivalence groups, and the operation-interface format. PR 305: shared RoPE, residual-copy and KV-cache providers migrated to maps. PRs 318 and 320: layout provider selection and direct-layout attention providers. Future, dashed: rebind circuits to hardened metadata and delete legacy branches, then attention and quantized GEMM migrations, ending in an agnostic DSL. A scoreboard strip shows the ratcheted burn-down: 32 hardened maps, 32 interface and ABI cross-validated, 131 map-owned call ABI, 43 selection-managed, 25 legacy-interface-ready, with ceilings of 54 contract-pending, 191 legacy, 73 legacy selection conditionals and 35 operation-specific conditionals. The baseline is monotonic: the audit fails if a floor drops or a ceiling rises.">
+</div>
+
+<ul>
+  <li><strong>Legacy:</strong> <code>kernel_bindings.json</code> and a function-name ABI fallback — the name was the contract.</li>
+  <li><strong>PR #302:</strong> hardened provider selection (lifecycle, priority, equivalence groups) and the operation-interface format introduced.</li>
+  <li><strong>PR #305:</strong> shared RoPE, residual-copy, and KV-cache providers migrated to selection-managed maps.</li>
+  <li><strong>PR #318 / #320:</strong> layout provider selection and direct-layout attention providers — physical layout joins the map-owned contract.</li>
+  <li><strong>Future:</strong> resolver cleanup (rebind circuits to hardened metadata, delete the legacy branches), then attention and quantized GEMM migrations. The end state is an agnostic DSL: circuits state contracts, maps own everything physical, the resolver contains no model knowledge at all.</li>
+</ul>
+
+<h2>Migration Scoreboard</h2>
+
+<p>
+    <code>version/v8/contracts/kernel_interface_migration_baseline.json</code> is a <strong>monotonic ratchet</strong>
+    checked by <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code>: floors may only rise, ceilings
+    may only fall. The audit currently reports the baseline values exactly — this is the starting line the
+    burn-down is measured from:
+</p>
+
+<table class="km-table">
+  <tr><th>Metric</th><th>Bound</th><th>Direction</th></tr>
+  <tr><td>hardened maps</td><td>&ge; 32</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>interface + ABI cross-validated</td><td>&ge; 32</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>map-owned call ABI</td><td>&ge; 131</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>selection-managed maps</td><td>&ge; 43</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>legacy-interface-ready maps</td><td>&ge; 25</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>contract-pending maps</td><td>&le; 54</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy maps</td><td>&le; 191</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy selection conditionals</td><td>&le; 73</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>operation-specific conditionals</td><td>&le; 35</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+</table>
+
+<h2>Is This Over-Engineered?</h2>
+
+<p>
+    Fair question — the project owner has asked it directly. 284 JSON maps, a schema for four fields, a ratchet
+    file, and an audit script can look like architecture for its own sake. The honest answer has three parts.
+</p>
+
+<div class="km-grid">
+  <div class="km-card">
+    <h3>Why the layering exists</h3>
+    <p>One runtime serves many model families &times; quant formats &times; ISA variants &times; execution phases on CPUs. When provider choice is a Python conditional, the failure mode is not a crash — it is <strong>silently wrong numerics</strong> that pass leaf tests and corrupt a stitched model. Fail-closed selection converts that class of bug into a compile-time error with a recorded reason.</p>
+  </div>
+  <div class="km-card">
+    <h3>The costs are real</h3>
+    <p>284 maps to maintain. 73 legacy selection conditionals still in the resolver. A migration still in flight, with named debt (RoPE, position embeddings, decode KV store) that has not yet moved into maps. Nobody should pretend this is finished or free.</p>
+  </div>
+  <div class="km-card">
+    <h3>Why it is not ceremony</h3>
+    <p>The burn-down metrics are <strong>ratcheted and shrinking</strong> — the audit fails if they regress. The resolver has no model-name conditionals. Every layer is schema-validated and test-enforced: <code>tests/test_v8_provider_selection.py</code>, <code>tests/test_v8_shared_provider_migration.py</code>, <code>tests/test_v8_kernel_call_abi.py</code>, and the interface audit script.</p>
+  </div>
+</div>
+
+<div class="km-note km-bad">
+  <strong>The kill criterion is explicit:</strong> if the scoreboard metrics stopped moving — floors frozen,
+  ceilings never shrinking — then the layering would be ceremony and should be torn out. As long as the
+  ratchet keeps tightening and conditionals keep leaving the DSL, the structure is paying for itself in
+  eliminated ambiguity.
+</div>
+
+<p>Related: <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a>, <a href="architecture.html">System Architecture</a>, <a href="codegen.html">Code Generation</a>, <a href="gguf-bump.html">GGUF to Bump</a>, and <a href="architecture-links.html">Architecture Links</a>.</p>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

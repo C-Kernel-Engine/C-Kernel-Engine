@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="830" viewBox="0 0 1200 830" role="img" aria-labelledby="title desc">
+  <title id="title">Anatomy of a kernel map: memcpy.json</title>
+  <desc id="desc">Field-group breakdown of the memcpy kernel map: identity, selection metadata, ports, quant, map-owned call ABI, and implementation, each with a one-line purpose.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.map{fill:#1a1526;stroke:#bc8cff;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="830"/>
+  <text class="t" x="50" y="52">Anatomy of a kernel map</text>
+  <text class="p" x="50" y="82">The canonical annotated example: version/v8/kernel_maps/memcpy.json — a production map for a pure byte copy.</text>
+
+  <rect class="map" x="330" y="110" width="540" height="92" rx="8"/>
+  <text class="h" x="600" y="148" text-anchor="middle">memcpy.json</text>
+  <text class="m" x="600" y="178" text-anchor="middle">op: residual_save · impl.function: memcpy</text>
+  <path class="line" d="M470 202 V258 H235 V286"/>
+  <path class="line" d="M600 202 V286"/>
+  <path class="line" d="M730 202 V258 H965 V286"/>
+
+  <rect class="input" x="50" y="286" width="370" height="224" rx="8"/>
+  <text class="h" x="75" y="320">Identity</text>
+  <text class="m" x="75" y="350">id: "memcpy"</text>
+  <text class="m" x="75" y="376">op: "residual_save"</text>
+  <text class="m" x="75" y="402">operation_interface:</text>
+  <text class="m" x="75" y="424">  "residual_save.memcpy_copy.v1"</text>
+  <text class="m" x="75" y="450">variant: "fp32_copy"</text>
+  <text class="small" x="75" y="484">Stable names the circuit contract binds to.</text>
+
+  <rect class="gate" x="415" y="286" width="370" height="224" rx="8"/>
+  <text class="h" x="440" y="320">Selection metadata</text>
+  <text class="m" x="440" y="350">status: "production"</text>
+  <text class="m" x="440" y="376">priority: 100</text>
+  <text class="m" x="440" y="402">equivalence_group:</text>
+  <text class="m" x="440" y="424">  "residual_save.memcpy_copy.v1"</text>
+  <text class="m" x="440" y="450">phases: ["prefill", "decode"]</text>
+  <text class="small" x="440" y="476">Schema-required; drives ranking. Priority ranks</text>
+  <text class="small" x="440" y="497">only inside one equivalence group.</text>
+
+  <rect class="input" x="780" y="286" width="370" height="224" rx="8"/>
+  <text class="h" x="805" y="320">Ports</text>
+  <text class="m" x="805" y="350">inputs:  src  fp32 [N] read</text>
+  <text class="m" x="805" y="376">outputs: dst  fp32 [N] write</text>
+  <text class="m" x="805" y="402">weights: []  scratch: []</text>
+  <text class="m" x="805" y="428">layout / access / storage_class /</text>
+  <text class="m" x="805" y="450">consumption per port</text>
+  <text class="small" x="805" y="484">Alias + overlap rules live in constraints.notes.</text>
+
+  <rect class="panel" x="50" y="540" width="370" height="224" rx="8"/>
+  <text class="h" x="75" y="574">Quant</text>
+  <text class="m" x="75" y="604">weight: null</text>
+  <text class="m" x="75" y="630">activation: "fp32"</text>
+  <text class="m" x="75" y="656">output: "fp32"</text>
+  <text class="small" x="75" y="690">Weight / activation / output dtypes the</text>
+  <text class="small" x="75" y="711">compatibility filters match against.</text>
+
+  <rect class="gate" x="415" y="540" width="370" height="224" rx="8"/>
+  <text class="h" x="440" y="574">Map-owned call ABI</text>
+  <text class="m" x="440" y="604">dims: ["N"]</text>
+  <text class="m" x="440" y="630">params: _memcpy_bytes size_t</text>
+  <text class="m" x="440" y="656">call_abi v1:</text>
+  <text class="m" x="440" y="678">  dst (void*), src (const void*), size</text>
+  <text class="small" x="440" y="712">The exact C call arguments, owned by the map —</text>
+  <text class="small" x="440" y="733">not reconstructed by the code generator.</text>
+
+  <rect class="panel" x="780" y="540" width="370" height="224" rx="8"/>
+  <text class="h" x="805" y="574">Implementation + constraints</text>
+  <text class="m" x="805" y="604">impl.function: "memcpy"</text>
+  <text class="m" x="805" y="630">impl.variants: [default]</text>
+  <text class="m" x="805" y="656">constraints.notes:</text>
+  <text class="m" x="805" y="678">  byte copy · no arithmetic</text>
+  <text class="m" x="805" y="700">  no overlapping writable views</text>
+  <text class="small" x="805" y="734">Which C function fulfills the contract, and the</text>
+  <text class="small" x="805" y="755">semantics it must preserve.</text>
+</svg>

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" viewBox="0 0 1200 860" role="img" aria-labelledby="title desc">
+  <title id="title">Case study: residual_save lowered to memcpy</title>
+  <desc id="desc">Two lanes. The DSL scheduling lane checks a predicate, auto-inserts residual_save before a pre-norm, and computes the byte size. The kernel-map lane owns hardened selection through the memcpy map with copy semantics. A debt box lists the remaining template-override branches.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.map{fill:#1a1526;stroke:#bc8cff;stroke-width:2}.fail{fill:#27151a;stroke:#fb7185;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="860"/>
+  <text class="t" x="50" y="52">Case study: residual_save → memcpy</text>
+  <text class="p" x="50" y="82">Scheduling legitimately stays in the DSL. Selection is hardened map metadata.</text>
+
+  <rect class="input" x="50" y="115" width="540" height="56" rx="8"/>
+  <text class="h" x="75" y="150">DSL lane — scheduling (legitimate)</text>
+
+  <rect class="panel" x="50" y="195" width="540" height="116" rx="8"/>
+  <text class="h" x="75" y="228">Predicate</text>
+  <text class="m" x="75" y="256">should_insert_residual_save</text>
+  <text class="small" x="75" y="284">current op is a pre-norm · next op starts a branch ·</text>
+  <text class="small" x="75" y="304">previous op is not already residual_save</text>
+
+  <path class="line" d="M320 311 V337"/>
+
+  <rect class="panel" x="50" y="337" width="540" height="116" rx="8"/>
+  <text class="h" x="75" y="370">Auto-insert</text>
+  <text class="m" x="75" y="398">residual_save stamped "kernel": "memcpy"</text>
+  <text class="small" x="75" y="426">inserted before the pre-norm so the later</text>
+  <text class="small" x="75" y="446">residual_add still sees the branch input</text>
+
+  <path class="line" d="M320 453 V483"/>
+
+  <rect class="panel" x="50" y="483" width="540" height="96" rx="8"/>
+  <text class="h" x="75" y="516">Byte sizing at lowering</text>
+  <text class="m" x="75" y="544">_memcpy_bytes = embed_dim × seq_len × 4</text>
+  <text class="small" x="75" y="570">the map's call_abi consumes it as the size argument</text>
+
+  <rect class="map" x="660" y="115" width="490" height="56" rx="8"/>
+  <text class="h" x="685" y="150">Kernel-map lane — hardened selection</text>
+
+  <rect class="map" x="660" y="195" width="490" height="384" rx="8"/>
+  <text class="h" x="685" y="232">memcpy.json — selection-managed</text>
+  <text class="m" x="685" y="264">operation_interface:</text>
+  <text class="m" x="685" y="288">  residual_save.memcpy_copy.v1</text>
+  <text class="p" x="685" y="322">selection: production · priority 100</text>
+  <text class="p" x="685" y="348">phases: prefill + decode</text>
+  <text class="p" x="685" y="380">ports: src read / dst write, fp32 [N]</text>
+  <text class="p" x="685" y="412">constraints: byte copy, no arithmetic,</text>
+  <text class="p" x="685" y="436">no overlapping writable views</text>
+  <text class="p" x="685" y="468">call_abi v1: dst, src, size</text>
+  <text class="small" x="685" y="506">Copy semantics — not mislabeled residual arithmetic.</text>
+  <text class="small" x="685" y="532">Selected by the same mechanical resolver as every</text>
+  <text class="small" x="685" y="554">other hardened provider.</text>
+
+  <path class="line" d="M590 253 H660"/>
+  <path class="line" d="M590 395 H660"/>
+  <path class="line" d="M590 531 H660"/>
+
+  <rect class="fail" x="50" y="610" width="1100" height="210" rx="8"/>
+  <text class="h" x="75" y="648">Remaining DSL selection debt — being burned down</text>
+  <text class="p" x="75" y="682">Template-override branches still inside map_op_to_kernel:</text>
+  <text class="m" x="75" y="712">rope_qk · rope_q · mrope_qk · position_embeddings</text>
+  <text class="m" x="75" y="738">kv_cache_store_shared_q · assistant_layer_scale</text>
+  <text class="p" x="75" y="770">Plus _make_decode_kv_store_op fabricating decode KV store ops.</text>
+  <text class="small" x="75" y="798">Each migration moves selection into the maps and deletes the conditional.</text>
+</svg>

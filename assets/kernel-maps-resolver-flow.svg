@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="800" viewBox="0 0 1440 800" role="img" aria-labelledby="title desc">
+  <title id="title">Provider resolution flow: fail closed, never guess</title>
+  <desc id="desc">Candidate providers pass through compatibility filters for contract, phase, dtype, shape, layout, ISA and alias safety, then rank by lifecycle and priority. A tie or an empty result is a hard fault. X-Ray records the selected provider and every rejection reason.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.ok{fill:#10231d;stroke:#30c48d;stroke-width:2}.fail{fill:#27151a;stroke:#fb7185;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="800"/>
+  <text class="t" x="55" y="52">Provider resolution: fail closed, never guess</text>
+  <text class="p" x="55" y="82">Compatibility filtering runs before priority ranking — and X-Ray records both.</text>
+
+  <rect class="input" x="55" y="130" width="250" height="150" rx="8"/>
+  <text class="h" x="80" y="164">Candidate providers</text>
+  <text class="m" x="80" y="196">284 kernel maps</text>
+  <text class="p" x="80" y="225">filtered per op instance</text>
+  <text class="p" x="80" y="249">per active phase</text>
+
+  <path class="line" d="M305 205 H355"/>
+
+  <rect class="gate" x="355" y="110" width="430" height="260" rx="8"/>
+  <text class="h" x="380" y="148">1 · Compatibility filters</text>
+  <text class="m" x="380" y="180">required_numerical_contracts</text>
+  <text class="m" x="380" y="206">phase (init / prefill / decode / …)</text>
+  <text class="m" x="380" y="232">dtype · shape · layout</text>
+  <text class="m" x="380" y="258">ISA · alias safety</text>
+  <text class="p" x="380" y="294">Any mismatch → rejected, with a recorded reason.</text>
+  <text class="small" x="380" y="324">Missing equivalence_group → HARD SELECTION FAULT</text>
+
+  <path class="line" d="M785 240 H835"/>
+
+  <rect class="gate" x="835" y="110" width="350" height="260" rx="8"/>
+  <text class="h" x="860" y="148">2 · Rank the survivors</text>
+  <text class="p" x="860" y="182">direction (inference / backward)</text>
+  <text class="p" x="860" y="208">activation preference</text>
+  <text class="p" x="860" y="234">lifecycle: production first</text>
+  <text class="p" x="860" y="260">priority — within one group only</text>
+  <text class="small" x="860" y="294">candidate / diagnostic / deprecated</text>
+  <text class="small" x="860" y="318">never auto-select</text>
+
+  <path class="line" d="M1010 370 V440 H245 V470"/>
+  <path class="line" d="M1010 370 V470"/>
+  <path class="line" d="M1010 370 V440 H1190 V470"/>
+
+  <rect class="ok" x="55" y="470" width="380" height="160" rx="8"/>
+  <text class="h" x="80" y="508">Exactly one provider left</text>
+  <text class="p" x="80" y="540">Selected before GraphIR is built.</text>
+  <text class="p" x="80" y="566">LoweredIR and generated C must</text>
+  <text class="p" x="80" y="590">preserve it — no reselection.</text>
+
+  <rect class="fail" x="820" y="470" width="380" height="160" rx="8"/>
+  <text class="h" x="845" y="508">No compatible provider</text>
+  <text class="p" x="845" y="540">FAIL CLOSED: compile-time error</text>
+  <text class="p" x="845" y="566">before C is emitted. Never silently</text>
+  <text class="p" x="845" y="590">substitute different numerics.</text>
+
+  <rect class="fail" x="1010" y="640" width="375" height="130" rx="8"/>
+  <text class="h" x="1035" y="676">Equal-priority tie</text>
+  <text class="p" x="1035" y="706">HARD KERNEL SELECTION FAULT — same group:</text>
+  <text class="p" x="1035" y="730">ambiguous; across groups: priority cannot choose.</text>
+
+  <rect class="panel" x="355" y="640" width="630" height="130" rx="8"/>
+  <text class="h" x="380" y="676">X-Ray evidence</text>
+  <text class="p" x="380" y="706">Selected provider plus every rejection reason.</text>
+  <text class="m" x="380" y="734">tests/fixtures/xray/provider_selection_trace.json</text>
+  <text class="small" x="380" y="758">Proves compatibility rejection precedes priority ranking.</text>
+
+  <path class="line" d="M245 630 V705 H355"/>
+  <path class="line" d="M1010 630 V700 H985"/>
+</svg>

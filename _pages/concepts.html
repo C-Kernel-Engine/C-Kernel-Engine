@@ -287,7 +287,7 @@ GLM template/model map:
 <div class="card card-green">
     <h3 style="margin-top: 0;">How CK controls this</h3>
     <p>The GLM template declares the circuit-level RoPE policy with <code>rope_layout: "pairwise"</code> and the safetensors model map carries the same architecture contract. Lowering reads that metadata and emits <code>rope_forward_qk_pairwise</code> for the Q/K rotary operation. The kernel itself is generic: it implements pairwise partial rotary math and does not know that the caller is GLM.</p>
-    <p>This keeps the DSL/compiler path deterministic. Templates and model maps describe the semantic contract; kernel maps bind that contract to an implementation; generated C should not infer or guess the rotary convention from tensor shape alone.</p>
+    <p>This keeps the DSL/compiler path deterministic. Templates and model maps describe the semantic contract; <a href="kernel-maps.html">kernel maps</a> bind that contract to an implementation; generated C should not infer or guess the rotary convention from tensor shape alone.</p>
 </div>
 
 <h3 id="gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</h3>

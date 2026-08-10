@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760" role="img" aria-labelledby="title desc">
+  <title id="title">Evolution of provider selection in CKE v8</title>
+  <desc id="desc">Timeline from legacy kernel bindings and function-name ABI fallback through PR 302 hardened provider selection, PR 305 shared provider migration, PRs 318 and 320 layout provider selection, toward a future agnostic DSL where circuits state contracts and maps own everything physical. A scoreboard strip shows the ratcheted burn-down metrics.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.done{fill:#10231d;stroke:#30c48d;stroke-width:2}.future{fill:#131b27;stroke:#bc8cff;stroke-width:2;stroke-dasharray:8 6}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.axis{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}.node{fill:#ffb400}.node-future{fill:#bc8cff}
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="760"/>
+  <text class="t" x="55" y="52">Evolution: legacy bindings → agnostic DSL</text>
+  <text class="p" x="55" y="82">Dated by merged pull requests. The end state: circuits state contracts; maps own everything physical; the DSL guesses nothing.</text>
+
+  <path class="axis" d="M60 240 H1390"/>
+  <circle class="node" cx="150" cy="240" r="9"/>
+  <circle class="node" cx="420" cy="240" r="9"/>
+  <circle class="node" cx="700" cy="240" r="9"/>
+  <circle class="node" cx="980" cy="240" r="9"/>
+  <circle class="node-future" cx="1260" cy="240" r="9"/>
+
+  <text class="m" x="150" y="205" text-anchor="middle">legacy</text>
+  <text class="m" x="420" y="205" text-anchor="middle">PR #302</text>
+  <text class="m" x="700" y="205" text-anchor="middle">PR #305</text>
+  <text class="m" x="980" y="205" text-anchor="middle">PR #318 / #320</text>
+  <text class="m" x="1260" y="205" text-anchor="middle">future</text>
+
+  <rect class="panel" x="35" y="285" width="230" height="200" rx="8"/>
+  <text class="h" x="60" y="320">Legacy era</text>
+  <text class="p" x="60" y="352">kernel_bindings.json</text>
+  <text class="p" x="60" y="378">plus function-name</text>
+  <text class="p" x="60" y="402">ABI fallback</text>
+  <text class="small" x="60" y="436">Naming conventions were</text>
+  <text class="small" x="60" y="457">the contract.</text>
+
+  <rect class="done" x="305" y="285" width="230" height="200" rx="8"/>
+  <text class="h" x="330" y="320">Hardened selection</text>
+  <text class="p" x="330" y="352">Provider lifecycle status,</text>
+  <text class="p" x="330" y="378">priority, equivalence</text>
+  <text class="p" x="330" y="402">groups introduced</text>
+  <text class="small" x="330" y="436">Operation-interface</text>
+  <text class="small" x="330" y="457">format defined.</text>
+
+  <rect class="done" x="585" y="285" width="230" height="200" rx="8"/>
+  <text class="h" x="610" y="320">Shared providers</text>
+  <text class="p" x="610" y="352">RoPE, residual-copy,</text>
+  <text class="p" x="610" y="378">and KV-cache providers</text>
+  <text class="p" x="610" y="402">migrated to maps</text>
+  <text class="small" x="610" y="436">First real selection</text>
+  <text class="small" x="610" y="457">debt burned down.</text>
+
+  <rect class="done" x="865" y="285" width="230" height="200" rx="8"/>
+  <text class="h" x="890" y="320">Layout providers</text>
+  <text class="p" x="890" y="352">Layout provider selection</text>
+  <text class="p" x="890" y="378">plus direct-layout</text>
+  <text class="p" x="890" y="402">attention providers</text>
+  <text class="small" x="890" y="436">Physical layout joins the</text>
+  <text class="small" x="890" y="457">map-owned contract.</text>
+
+  <rect class="future" x="1145" y="285" width="250" height="200" rx="8"/>
+  <text class="h" x="1170" y="320">Agnostic DSL</text>
+  <text class="p" x="1170" y="352">Rebind circuits to</text>
+  <text class="p" x="1170" y="378">hardened metadata, delete</text>
+  <text class="p" x="1170" y="402">legacy branches</text>
+  <text class="small" x="1170" y="436">Then attention + quantized</text>
+  <text class="small" x="1170" y="457">GEMM migrations.</text>
+
+  <rect class="gate" x="90" y="545" width="1260" height="165" rx="8"/>
+  <text class="h" x="115" y="582">Ratcheted burn-down (kernel_interface_migration_baseline.json)</text>
+  <text class="p" x="115" y="616">32 hardened maps · 32 interface+ABI cross-validated · 131 map-owned call ABI · 43 selection-managed · 25 legacy-interface-ready</text>
+  <text class="p" x="115" y="646">Ceilings only shrink: ≤ 54 contract-pending · ≤ 191 legacy · ≤ 73 legacy selection conditionals · ≤ 35 operation-specific conditionals</text>
+  <text class="small" x="115" y="680">The baseline is monotonic: the audit fails if a floor drops or a ceiling rises. If these numbers stop moving, the layering is ceremony.</text>
+</svg>
