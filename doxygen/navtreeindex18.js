@@ -1,5 +1,6 @@
 var NAVTREEINDEX18 =
 {
+"structCPUInfo.html#acb466a15f99116d3c9b88f2d35be4b93":[1,0,66,22],
 "structCPUInfo.html#accaf39347e29f639b10e0d99825a0ca5":[1,0,66,29],
 "structCPUInfo.html#acfedda3a3d92c0fd6dde00f5757fdf92":[1,0,66,0],
 "structCPUInfo.html#ad3efc23f84451ced9b6085cb036ceb7d":[1,0,66,25],
@@ -248,6 +249,5 @@ var NAVTREEINDEX18 =
 "swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c":[2,0,1,1,86,8],
 "swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c":[2,0,1,1,86,1],
 "swiglu__kernels_8c.html#acb65349d061ea0910dd80602f5f210df":[2,0,1,1,86,6],
-"swiglu__kernels_8c_source.html":[2,0,1,1,86],
-"swiglu__kernels__bf16_8c.html":[2,0,1,1,87]
+"swiglu__kernels_8c_source.html":[2,0,1,1,86]
 };

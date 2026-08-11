@@ -1,5 +1,6 @@
 var NAVTREEINDEX14 =
 {
+"relu__kernels_8c.html#a434da7f0647cdada09cd6ad435560467":[2,0,1,1,73,2],
 "relu__kernels_8c.html#a7987de4b09bfb9f8d04405a6d9d2c4c5":[2,0,1,1,73,0],
 "relu__kernels_8c.html#a856216dca72f3534c079f429d1d58d48":[2,0,1,1,73,3],
 "relu__kernels_8c.html#ab7af1607007954a2841bad370c7f9e35":[2,0,1,1,73,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX14 =
 "structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9":[1,0,15,2],
 "structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,15,5],
 "structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,15,0],
-"structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,15,1],
-"structCKBufferSpec.html#a557043a61f56575dfa44c4f13b31cddb":[1,0,15,4]
+"structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,15,1]
 };

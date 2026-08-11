@@ -1,5 +1,6 @@
 var NAVTREEINDEX17 =
 {
+"structCKModel.html#a9b0ad93300ab3b15395daf0d8e720f4d":[1,0,45,4],
 "structCKModel.html#aae295251889deebf6fbf7c9e79503406":[1,0,45,13],
 "structCKModel.html#ab7a4ebc13bcb370c4dbb36f3357af03a":[1,0,45,15],
 "structCKModel.html#aca3677590515480ee313d29adad814fb":[1,0,45,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX17 =
 "structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05":[1,0,66,41],
 "structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,66,11],
 "structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714":[1,0,66,3],
-"structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,66,23],
-"structCPUInfo.html#acb466a15f99116d3c9b88f2d35be4b93":[1,0,66,22]
+"structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,66,23]
 };
