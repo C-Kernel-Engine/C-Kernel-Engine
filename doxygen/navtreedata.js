@@ -63,19 +63,19 @@ var NAVTREEINDEX =
 "deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b",
 "gemm__kernels__amx_8c.html#a998729746a87ae13e3bb8d714c40d5aa",
 "gemm__kernels__q5__0_8c.html#ac4c3c0e32b64297e71b21bde4a574999",
-"globals_defs_i.html",
-"mega__fused__attention__prefill_8c.html",
-"recurrent__state__kernels_8c_source.html",
-"structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9",
-"structCKLayerForwardParamsQ4K.html#a2309c41abca4ad1bc357dd780e55fecb",
-"structCKModel.html#a4f3d9a363a8fc7d37556b33e6b20cd69",
-"structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05",
-"swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c",
-"true__bpe_8c.html#a75cb6719be3c165611a4b97047856b6b",
-"v6_85_2test__generated_2generic__api__test_8c.html#a91f1fd56517ea08a87dc94391c3400b6",
-"v6_86_2generated_2ck-kernel-inference_8c.html#a0cfd0d104b622b5158f9add5c66330c8",
-"v6_86_2test__generated_2generic__api__test_8c.html#afd072f83e4f14e9c324bb41500746beb",
-"v6__inference_8c.html#af6e8b5c7b35e8bff4c581efd8019c798"
+"globals_defs_e.html",
+"mega__fused__attention__decode__q5__0_8h.html#a3c6fc830704a70059d6f5ae9df4b0fce",
+"recurrent__split__kernels_8c_source.html",
+"structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c",
+"structCKLayerForwardParamsQ4K.html#a150feea348e2b0c728b05364bc291d68",
+"structCKModel.html#a23c5fb291d06cc7cbe7aa8bc2a07b06b",
+"structCPUInfo.html#a943858d53173dca145611d8cb192f0ca",
+"swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650",
+"true__bpe_8c.html#a72a2743792c98b19ab360f088f0ab746",
+"v6_85_2test__generated_2generic__api__test_8c.html#a85e2f991eb27ea9be883da6e63ade47d",
+"v6_85__simple_8c.html#affee8ab1cdfe5082eb9b315ebfb70dd3",
+"v6_86_2test__generated_2generic__api__test_8c.html#af157e6ff8eea1a199d44fdeca58c21e0",
+"v6__inference_8c.html#aa426a8be646bd381a914fef6ca0c9c4b"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

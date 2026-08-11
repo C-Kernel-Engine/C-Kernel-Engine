@@ -1,5 +1,9 @@
 var NAVTREEINDEX17 =
 {
+"structCKModel.html#a23c5fb291d06cc7cbe7aa8bc2a07b06b":[1,0,45,16],
+"structCKModel.html#a2a35dbca7a62e3ebe14b6c502c68f2aa":[1,0,45,10],
+"structCKModel.html#a2f32be944ddd75f746ac27532bff6851":[1,0,45,6],
+"structCKModel.html#a30077b979aff326f5c4bd20da8b6d807":[1,0,45,9],
 "structCKModel.html#a4f3d9a363a8fc7d37556b33e6b20cd69":[1,0,45,12],
 "structCKModel.html#a5e10579eb6d5d28cabce344d328b3c7a":[1,0,45,7],
 "structCKModel.html#a84832de4929055025d6634e18ceae38a":[1,0,45,19],
@@ -245,9 +249,5 @@ var NAVTREEINDEX17 =
 "structCPUInfo.html#a7983ac279a57f5d5992248d720452dfe":[1,0,66,5],
 "structCPUInfo.html#a7cb0183778ff279baa23ce4816b99089":[1,0,66,14],
 "structCPUInfo.html#a7fed58e4df275a215e37074b900e0f96":[1,0,66,19],
-"structCPUInfo.html#a934706fb3c631457a24c2616c293b20e":[1,0,66,33],
-"structCPUInfo.html#a943858d53173dca145611d8cb192f0ca":[1,0,66,2],
-"structCPUInfo.html#aa4bcdef1bf48fa3860742a28a7d57d6d":[1,0,66,35],
-"structCPUInfo.html#aa67080f78191b764515728bdabf55924":[1,0,66,37],
-"structCPUInfo.html#aabf53af233c0f5d4692beb98fa2c2434":[1,0,66,21]
+"structCPUInfo.html#a934706fb3c631457a24c2616c293b20e":[1,0,66,33]
 };

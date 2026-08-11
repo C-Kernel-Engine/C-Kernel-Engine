@@ -1,5 +1,9 @@
 var NAVTREEINDEX14 =
 {
+"recurrent__split__kernels_8c_source.html":[2,0,1,1,71],
+"recurrent__state__kernels_8c.html":[2,0,1,1,72],
+"recurrent__state__kernels_8c.html#a55ef0ed9f1f51ca4910e3f7457054044":[2,0,1,1,72,1],
+"recurrent__state__kernels_8c.html#ae70cf86294508b950abfac4af0762266":[2,0,1,1,72,0],
 "recurrent__state__kernels_8c_source.html":[2,0,1,1,72],
 "relu__kernels_8c.html":[2,0,1,1,73],
 "relu__kernels_8c.html#a434da7f0647cdada09cd6ad435560467":[2,0,1,1,73,2],
@@ -245,9 +249,5 @@ var NAVTREEINDEX14 =
 "structCKAudioWavInfo.html#ad270c19780c360f69c9276cb9e89cff9":[1,0,13,0],
 "structCKAudioWavInfo.html#ad5701d8a252c6d90e2658d18638b8eb0":[1,0,13,2],
 "structCKBPEConfig.html":[1,0,14],
-"structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5":[1,0,14,2],
-"structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c":[1,0,14,3],
-"structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,14,0],
-"structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,14,1],
-"structCKBufferSpec.html":[1,0,15]
+"structCKBPEConfig.html#a6d2ef23c628fac092ae6085b54705bb5":[1,0,14,2]
 };
