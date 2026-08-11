@@ -157,6 +157,14 @@ Functions</h2></td></tr>
 <tr class="memitem:ab58c945a0911101ac318f093dfce1770" id="r_ab58c945a0911101ac318f093dfce1770"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a> (const void *A_q8, const void *B_q5, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="memdesc:ab58c945a0911101ac318f093dfce1770"><td class="mdescLeft">&#160;</td><td class="mdescRight">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.  <br /></td></tr>
 <tr class="separator:ab58c945a0911101ac318f093dfce1770"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac5adde6f6ac41a35d621c66b80f86d6f" id="r_ac5adde6f6ac41a35d621c66b80f86d6f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#ac5adde6f6ac41a35d621c66b80f86d6f">gemm_nt_q5_0_q8_0_m2n4</a> (const void *A_q8, const void *B_q5, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
+<tr class="separator:ac5adde6f6ac41a35d621c66b80f86d6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa077f71eb92869dd8a6f1dc6348c4f1d" id="r_aa077f71eb92869dd8a6f1dc6348c4f1d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#aa077f71eb92869dd8a6f1dc6348c4f1d">gemm_nt_q5_0_q8_0_m2n4_tile</a> (const void *A_q8, const void *B_q5, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K, int ldc)</td></tr>
+<tr class="separator:aa077f71eb92869dd8a6f1dc6348c4f1d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a26cdd7acb7a72020b32c4ed8b2dd2d66" id="r_a26cdd7acb7a72020b32c4ed8b2dd2d66"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#a26cdd7acb7a72020b32c4ed8b2dd2d66">gemm_nt_q5_0_q8_0_m4n2</a> (const void *A_q8, const void *B_q5, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
+<tr class="separator:a26cdd7acb7a72020b32c4ed8b2dd2d66"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9f4192d949a637944ea5a28e267b8535" id="r_a9f4192d949a637944ea5a28e267b8535"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#a9f4192d949a637944ea5a28e267b8535">gemm_nt_q5_0_q8_0_m4n2_tile</a> (const void *A_q8, const void *B_q5, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K, int ldc)</td></tr>
+<tr class="separator:a9f4192d949a637944ea5a28e267b8535"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa25694bd7b677f5b945be6f5dbdaa9c9" id="r_aa25694bd7b677f5b945be6f5dbdaa9c9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__0_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9">gemm_nt_q5_0_ref</a> (const float *A, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="memdesc:aa25694bd7b677f5b945be6f5dbdaa9c9"><td class="mdescLeft">&#160;</td><td class="mdescRight">GEMM with transposed Q5_0 weights: C = A @ B^T.  <br /></td></tr>
 <tr class="separator:aa25694bd7b677f5b945be6f5dbdaa9c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -588,7 +596,498 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01602">vec_dot_q5_0_q8_0()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00533">ck_test_gemm_q5_0()</a>, <a class="el" href="prefill__fused__gemm_8c_source.html#l00177">gemm_nt_q8_0_dispatch()</a>, and <a class="el" href="prefill__fused__gemm_8c_source.html#l00916">gemm_nt_q8_0_mlp_dispatch()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00533">ck_test_gemm_q5_0()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01766">gemm_nt_q5_0_q8_0_m2n4_tile()</a>, <a class="el" href="prefill__fused__gemm_8c_source.html#l00177">gemm_nt_q8_0_dispatch()</a>, and <a class="el" href="prefill__fused__gemm_8c_source.html#l00916">gemm_nt_q8_0_mlp_dispatch()</a>.</p>
+
+</div>
+</div>
+<a id="ac5adde6f6ac41a35d621c66b80f86d6f" name="ac5adde6f6ac41a35d621c66b80f86d6f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac5adde6f6ac41a35d621c66b80f86d6f">&#9670;&#160;</a></span>gemm_nt_q5_0_q8_0_m2n4()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q5_0_q8_0_m2n4 </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B_q5</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01894">1894</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1902</span>{</div>
+<div class="line"><span class="lineno"> 1903</span>    <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#aa077f71eb92869dd8a6f1dc6348c4f1d">gemm_nt_q5_0_q8_0_m2n4_tile</a>(A_q8, B_q5, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, N);</div>
+<div class="line"><span class="lineno"> 1904</span>}</div>
+<div class="ttc" id="agemm__kernels__q5__0_8c_html_aa077f71eb92869dd8a6f1dc6348c4f1d"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#aa077f71eb92869dd8a6f1dc6348c4f1d">gemm_nt_q5_0_q8_0_m2n4_tile</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0_m2n4_tile(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K, int ldc)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01766">gemm_kernels_q5_0.c:1766</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01766">gemm_nt_q5_0_q8_0_m2n4_tile()</a>.</p>
+
+</div>
+</div>
+<a id="aa077f71eb92869dd8a6f1dc6348c4f1d" name="aa077f71eb92869dd8a6f1dc6348c4f1d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa077f71eb92869dd8a6f1dc6348c4f1d">&#9670;&#160;</a></span>gemm_nt_q5_0_q8_0_m2n4_tile()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q5_0_q8_0_m2n4_tile </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B_q5</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>ldc</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01766">1766</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1775</span>{</div>
+<div class="line"><span class="lineno"> 1776</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1777</span>    <span class="keywordflow">if</span> (!A_q8 || !B_q5 || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1778</span>        (K % <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>) != 0 || ldc &lt; N) {</div>
+<div class="line"><span class="lineno"> 1779</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1780</span>    }</div>
+<div class="line"><span class="lineno"> 1781</span> </div>
+<div class="line"><span class="lineno"> 1782</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1783</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *)B_q5;</div>
+<div class="line"><span class="lineno"> 1784</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = K / <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
+<div class="line"><span class="lineno"> 1785</span>    <span class="keywordtype">int</span> m = 0;</div>
+<div class="line"><span class="lineno"> 1786</span> </div>
+<div class="line"><span class="lineno"> 1787</span>    <span class="keywordflow">for</span> (; m + 1 &lt; M; m += 2) {</div>
+<div class="line"><span class="lineno"> 1788</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a0 = a + (size_t)(m + 0) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1789</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a1 = a + (size_t)(m + 1) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1790</span>        <span class="keywordtype">int</span> n = 0;</div>
+<div class="line"><span class="lineno"> 1791</span> </div>
+<div class="line"><span class="lineno"> 1792</span>        <span class="keywordflow">for</span> (; n + 3 &lt; N; n += 4) {</div>
+<div class="line"><span class="lineno"> 1793</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w0 = w + (size_t)(n + 0) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1794</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w1 = w + (size_t)(n + 1) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1795</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w2 = w + (size_t)(n + 2) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1796</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w3 = w + (size_t)(n + 3) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1797</span>            __m256 acc00 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1798</span>            __m256 acc01 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1799</span>            __m256 acc02 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1800</span>            __m256 acc03 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1801</span>            __m256 acc10 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1802</span>            __m256 acc11 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1803</span>            __m256 acc12 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1804</span>            __m256 acc13 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1805</span> </div>
+<div class="line"><span class="lineno"> 1806</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ib = 0; ib &lt; nb; ++ib) {</div>
+<div class="line"><span class="lineno"> 1807</span>                __m256i qw0 = bytes_from_nibbles_32_avx(w0[ib].qs);</div>
+<div class="line"><span class="lineno"> 1808</span>                __m256i qw1 = bytes_from_nibbles_32_avx(w1[ib].qs);</div>
+<div class="line"><span class="lineno"> 1809</span>                __m256i qw2 = bytes_from_nibbles_32_avx(w2[ib].qs);</div>
+<div class="line"><span class="lineno"> 1810</span>                __m256i qw3 = bytes_from_nibbles_32_avx(w3[ib].qs);</div>
+<div class="line"><span class="lineno"> 1811</span>                <span class="keyword">const</span> __m256i sign = _mm256_set1_epi8((<span class="keywordtype">char</span>)0xF0);</div>
+<div class="line"><span class="lineno"> 1812</span>                qw0 = _mm256_or_si256(qw0, _mm256_andnot_si256(bytes_from_bits_32_avx(w0[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1813</span>                qw1 = _mm256_or_si256(qw1, _mm256_andnot_si256(bytes_from_bits_32_avx(w1[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1814</span>                qw2 = _mm256_or_si256(qw2, _mm256_andnot_si256(bytes_from_bits_32_avx(w2[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1815</span>                qw3 = _mm256_or_si256(qw3, _mm256_andnot_si256(bytes_from_bits_32_avx(w3[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1816</span> </div>
+<div class="line"><span class="lineno"> 1817</span>                <span class="keyword">const</span> __m256i qa0 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a0[ib].qs);</div>
+<div class="line"><span class="lineno"> 1818</span>                <span class="keyword">const</span> __m256i qa1 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a1[ib].qs);</div>
+<div class="line"><span class="lineno"> 1819</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da0 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a0[ib].d);</div>
+<div class="line"><span class="lineno"> 1820</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da1 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a1[ib].d);</div>
+<div class="line"><span class="lineno"> 1821</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw0 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w0[ib].d);</div>
+<div class="line"><span class="lineno"> 1822</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw1 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w1[ib].d);</div>
+<div class="line"><span class="lineno"> 1823</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw2 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w2[ib].d);</div>
+<div class="line"><span class="lineno"> 1824</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw3 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w3[ib].d);</div>
+<div class="line"><span class="lineno"> 1825</span>                <span class="keyword">const</span> __m256 p00 = mul_sum_i8_pairs_float_avx(qw0, qa0);</div>
+<div class="line"><span class="lineno"> 1826</span>                <span class="keyword">const</span> __m256 p01 = mul_sum_i8_pairs_float_avx(qw1, qa0);</div>
+<div class="line"><span class="lineno"> 1827</span>                <span class="keyword">const</span> __m256 p02 = mul_sum_i8_pairs_float_avx(qw2, qa0);</div>
+<div class="line"><span class="lineno"> 1828</span>                <span class="keyword">const</span> __m256 p03 = mul_sum_i8_pairs_float_avx(qw3, qa0);</div>
+<div class="line"><span class="lineno"> 1829</span>                <span class="keyword">const</span> __m256 p10 = mul_sum_i8_pairs_float_avx(qw0, qa1);</div>
+<div class="line"><span class="lineno"> 1830</span>                <span class="keyword">const</span> __m256 p11 = mul_sum_i8_pairs_float_avx(qw1, qa1);</div>
+<div class="line"><span class="lineno"> 1831</span>                <span class="keyword">const</span> __m256 p12 = mul_sum_i8_pairs_float_avx(qw2, qa1);</div>
+<div class="line"><span class="lineno"> 1832</span>                <span class="keyword">const</span> __m256 p13 = mul_sum_i8_pairs_float_avx(qw3, qa1);</div>
+<div class="line"><span class="lineno"> 1833</span><span class="preprocessor">#if defined(__FMA__)</span></div>
+<div class="line"><span class="lineno"> 1834</span>                acc00 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da0), p00, acc00);</div>
+<div class="line"><span class="lineno"> 1835</span>                acc01 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da0), p01, acc01);</div>
+<div class="line"><span class="lineno"> 1836</span>                acc02 = _mm256_fmadd_ps(_mm256_set1_ps(dw2 * da0), p02, acc02);</div>
+<div class="line"><span class="lineno"> 1837</span>                acc03 = _mm256_fmadd_ps(_mm256_set1_ps(dw3 * da0), p03, acc03);</div>
+<div class="line"><span class="lineno"> 1838</span>                acc10 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da1), p10, acc10);</div>
+<div class="line"><span class="lineno"> 1839</span>                acc11 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da1), p11, acc11);</div>
+<div class="line"><span class="lineno"> 1840</span>                acc12 = _mm256_fmadd_ps(_mm256_set1_ps(dw2 * da1), p12, acc12);</div>
+<div class="line"><span class="lineno"> 1841</span>                acc13 = _mm256_fmadd_ps(_mm256_set1_ps(dw3 * da1), p13, acc13);</div>
+<div class="line"><span class="lineno"> 1842</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1843</span>                acc00 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da0), p00), acc00);</div>
+<div class="line"><span class="lineno"> 1844</span>                acc01 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da0), p01), acc01);</div>
+<div class="line"><span class="lineno"> 1845</span>                acc02 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw2 * da0), p02), acc02);</div>
+<div class="line"><span class="lineno"> 1846</span>                acc03 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw3 * da0), p03), acc03);</div>
+<div class="line"><span class="lineno"> 1847</span>                acc10 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da1), p10), acc10);</div>
+<div class="line"><span class="lineno"> 1848</span>                acc11 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da1), p11), acc11);</div>
+<div class="line"><span class="lineno"> 1849</span>                acc12 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw2 * da1), p12), acc12);</div>
+<div class="line"><span class="lineno"> 1850</span>                acc13 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw3 * da1), p13), acc13);</div>
+<div class="line"><span class="lineno"> 1851</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1852</span>            }</div>
+<div class="line"><span class="lineno"> 1853</span> </div>
+<div class="line"><span class="lineno"> 1854</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc00) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1855</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc01) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1856</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 2] = hsum_float_8_avx(acc02) + (bias ? bias[n + 2] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1857</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 3] = hsum_float_8_avx(acc03) + (bias ? bias[n + 3] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1858</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc10) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1859</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc11) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1860</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 2] = hsum_float_8_avx(acc12) + (bias ? bias[n + 2] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1861</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 3] = hsum_float_8_avx(acc13) + (bias ? bias[n + 3] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1862</span>        }</div>
+<div class="line"><span class="lineno"> 1863</span> </div>
+<div class="line"><span class="lineno"> 1864</span>        <span class="keywordflow">for</span> (; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno"> 1865</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *wn = w + (size_t)n * (<span class="keywordtype">size_t</span>)nb;</div>
+<div class="line"><span class="lineno"> 1866</span>            <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, &amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(<span class="keywordtype">size_t</span>)(m + 0) * (<span class="keywordtype">size_t</span>)ldc + n], wn, a0);</div>
+<div class="line"><span class="lineno"> 1867</span>            <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, &amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(<span class="keywordtype">size_t</span>)(m + 1) * (<span class="keywordtype">size_t</span>)ldc + n], wn, a1);</div>
+<div class="line"><span class="lineno"> 1868</span>            <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><span class="lineno"> 1869</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n] += bias[n];</div>
+<div class="line"><span class="lineno"> 1870</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n] += bias[n];</div>
+<div class="line"><span class="lineno"> 1871</span>            }</div>
+<div class="line"><span class="lineno"> 1872</span>        }</div>
+<div class="line"><span class="lineno"> 1873</span>    }</div>
+<div class="line"><span class="lineno"> 1874</span> </div>
+<div class="line"><span class="lineno"> 1875</span>    <span class="keywordflow">if</span> (m &lt; M) {</div>
+<div class="line"><span class="lineno"> 1876</span>        <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a>(</div>
+<div class="line"><span class="lineno"> 1877</span>            a + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)nb, w, bias,</div>
+<div class="line"><span class="lineno"> 1878</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)ldc, 1, N, K);</div>
+<div class="line"><span class="lineno"> 1879</span>    }</div>
+<div class="line"><span class="lineno"> 1880</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1881</span>    <span class="keywordflow">if</span> (ldc == N) {</div>
+<div class="line"><span class="lineno"> 1882</span>        <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a>(A_q8, B_q5, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno"> 1883</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno"> 1884</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> nb = K / <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
+<div class="line"><span class="lineno"> 1885</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1886</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno"> 1887</span>            <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a>(a + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)nb, B_q5, bias,</div>
+<div class="line"><span class="lineno"> 1888</span>                              <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)ldc, 1, N, K);</div>
+<div class="line"><span class="lineno"> 1889</span>        }</div>
+<div class="line"><span class="lineno"> 1890</span>    }</div>
+<div class="line"><span class="lineno"> 1891</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1892</span>}</div>
+<div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00380">ckernel_quant.h:380</a></div></div>
+<div class="ttc" id="agemm__kernels__q5__0_8c_html_ab58c945a0911101ac318f093dfce1770"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#ab58c945a0911101ac318f093dfce1770">gemm_nt_q5_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">Batch GEMM with Q5_0 weights and Q8_0 activations for prefill.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01728">gemm_kernels_q5_0.c:1728</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00380">CK_FP16_TO_FP32</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01728">gemm_nt_q5_0_q8_0()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01602">vec_dot_q5_0_q8_0()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01894">gemm_nt_q5_0_q8_0_m2n4()</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01908">gemm_nt_q5_0_q8_0_m4n2_tile()</a>.</p>
+
+</div>
+</div>
+<a id="a26cdd7acb7a72020b32c4ed8b2dd2d66" name="a26cdd7acb7a72020b32c4ed8b2dd2d66"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a26cdd7acb7a72020b32c4ed8b2dd2d66">&#9670;&#160;</a></span>gemm_nt_q5_0_q8_0_m4n2()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q5_0_q8_0_m4n2 </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B_q5</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l02017">2017</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2025</span>{</div>
+<div class="line"><span class="lineno"> 2026</span>    <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#a9f4192d949a637944ea5a28e267b8535">gemm_nt_q5_0_q8_0_m4n2_tile</a>(A_q8, B_q5, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, N);</div>
+<div class="line"><span class="lineno"> 2027</span>}</div>
+<div class="ttc" id="agemm__kernels__q5__0_8c_html_a9f4192d949a637944ea5a28e267b8535"><div class="ttname"><a href="gemm__kernels__q5__0_8c.html#a9f4192d949a637944ea5a28e267b8535">gemm_nt_q5_0_q8_0_m4n2_tile</a></div><div class="ttdeci">void gemm_nt_q5_0_q8_0_m4n2_tile(const void *A_q8, const void *B_q5, const float *bias, float *C, int M, int N, int K, int ldc)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__0_8c_source.html#l01908">gemm_kernels_q5_0.c:1908</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01908">gemm_nt_q5_0_q8_0_m4n2_tile()</a>.</p>
+
+</div>
+</div>
+<a id="a9f4192d949a637944ea5a28e267b8535" name="a9f4192d949a637944ea5a28e267b8535"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9f4192d949a637944ea5a28e267b8535">&#9670;&#160;</a></span>gemm_nt_q5_0_q8_0_m4n2_tile()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q5_0_q8_0_m4n2_tile </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B_q5</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>ldc</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01908">1908</a> of file <a class="el" href="gemm__kernels__q5__0_8c_source.html">gemm_kernels_q5_0.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 1917</span>{</div>
+<div class="line"><span class="lineno"> 1918</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno"> 1919</span>    <span class="keywordflow">if</span> (!A_q8 || !B_q5 || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno"> 1920</span>        (K % <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>) != 0 || ldc &lt; N) {</div>
+<div class="line"><span class="lineno"> 1921</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 1922</span>    }</div>
+<div class="line"><span class="lineno"> 1923</span> </div>
+<div class="line"><span class="lineno"> 1924</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *)A_q8;</div>
+<div class="line"><span class="lineno"> 1925</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *)B_q5;</div>
+<div class="line"><span class="lineno"> 1926</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> nb = K / <a class="code hl_define" href="ckernel__quant_8h.html#a01fd96c19126075d365d10748fb254ac">QK5_0</a>;</div>
+<div class="line"><span class="lineno"> 1927</span>    <span class="keywordtype">int</span> m = 0;</div>
+<div class="line"><span class="lineno"> 1928</span> </div>
+<div class="line"><span class="lineno"> 1929</span>    <span class="keywordflow">for</span> (; m + 3 &lt; M; m += 4) {</div>
+<div class="line"><span class="lineno"> 1930</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a0 = a + (size_t)(m + 0) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1931</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a1 = a + (size_t)(m + 1) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1932</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a2 = a + (size_t)(m + 2) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1933</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *a3 = a + (size_t)(m + 3) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1934</span>        <span class="keywordtype">int</span> n = 0;</div>
+<div class="line"><span class="lineno"> 1935</span> </div>
+<div class="line"><span class="lineno"> 1936</span>        <span class="keywordflow">for</span> (; n + 1 &lt; N; n += 2) {</div>
+<div class="line"><span class="lineno"> 1937</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w0 = w + (size_t)(n + 0) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1938</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *w1 = w + (size_t)(n + 1) * (size_t)nb;</div>
+<div class="line"><span class="lineno"> 1939</span>            __m256 acc00 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1940</span>            __m256 acc01 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1941</span>            __m256 acc10 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1942</span>            __m256 acc11 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1943</span>            __m256 acc20 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1944</span>            __m256 acc21 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1945</span>            __m256 acc30 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1946</span>            __m256 acc31 = _mm256_setzero_ps();</div>
+<div class="line"><span class="lineno"> 1947</span> </div>
+<div class="line"><span class="lineno"> 1948</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ib = 0; ib &lt; nb; ++ib) {</div>
+<div class="line"><span class="lineno"> 1949</span>                __m256i qw0 = bytes_from_nibbles_32_avx(w0[ib].qs);</div>
+<div class="line"><span class="lineno"> 1950</span>                __m256i qw1 = bytes_from_nibbles_32_avx(w1[ib].qs);</div>
+<div class="line"><span class="lineno"> 1951</span>                <span class="keyword">const</span> __m256i sign = _mm256_set1_epi8((<span class="keywordtype">char</span>)0xF0);</div>
+<div class="line"><span class="lineno"> 1952</span>                qw0 = _mm256_or_si256(qw0, _mm256_andnot_si256(bytes_from_bits_32_avx(w0[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1953</span>                qw1 = _mm256_or_si256(qw1, _mm256_andnot_si256(bytes_from_bits_32_avx(w1[ib].qh), sign));</div>
+<div class="line"><span class="lineno"> 1954</span> </div>
+<div class="line"><span class="lineno"> 1955</span>                <span class="keyword">const</span> __m256i qa0 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a0[ib].qs);</div>
+<div class="line"><span class="lineno"> 1956</span>                <span class="keyword">const</span> __m256i qa1 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a1[ib].qs);</div>
+<div class="line"><span class="lineno"> 1957</span>                <span class="keyword">const</span> __m256i qa2 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a2[ib].qs);</div>
+<div class="line"><span class="lineno"> 1958</span>                <span class="keyword">const</span> __m256i qa3 = _mm256_loadu_si256((<span class="keyword">const</span> __m256i *)a3[ib].qs);</div>
+<div class="line"><span class="lineno"> 1959</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw0 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w0[ib].d);</div>
+<div class="line"><span class="lineno"> 1960</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dw1 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(w1[ib].d);</div>
+<div class="line"><span class="lineno"> 1961</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da0 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a0[ib].d);</div>
+<div class="line"><span class="lineno"> 1962</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da1 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a1[ib].d);</div>
+<div class="line"><span class="lineno"> 1963</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da2 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a2[ib].d);</div>
+<div class="line"><span class="lineno"> 1964</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> da3 = <a class="code hl_define" href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a>(a3[ib].d);</div>
+<div class="line"><span class="lineno"> 1965</span><span class="preprocessor">#if defined(__FMA__)</span></div>
+<div class="line"><span class="lineno"> 1966</span>                acc00 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da0), mul_sum_i8_pairs_float_avx(qw0, qa0), acc00);</div>
+<div class="line"><span class="lineno"> 1967</span>                acc01 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da0), mul_sum_i8_pairs_float_avx(qw1, qa0), acc01);</div>
+<div class="line"><span class="lineno"> 1968</span>                acc10 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da1), mul_sum_i8_pairs_float_avx(qw0, qa1), acc10);</div>
+<div class="line"><span class="lineno"> 1969</span>                acc11 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da1), mul_sum_i8_pairs_float_avx(qw1, qa1), acc11);</div>
+<div class="line"><span class="lineno"> 1970</span>                acc20 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da2), mul_sum_i8_pairs_float_avx(qw0, qa2), acc20);</div>
+<div class="line"><span class="lineno"> 1971</span>                acc21 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da2), mul_sum_i8_pairs_float_avx(qw1, qa2), acc21);</div>
+<div class="line"><span class="lineno"> 1972</span>                acc30 = _mm256_fmadd_ps(_mm256_set1_ps(dw0 * da3), mul_sum_i8_pairs_float_avx(qw0, qa3), acc30);</div>
+<div class="line"><span class="lineno"> 1973</span>                acc31 = _mm256_fmadd_ps(_mm256_set1_ps(dw1 * da3), mul_sum_i8_pairs_float_avx(qw1, qa3), acc31);</div>
+<div class="line"><span class="lineno"> 1974</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 1975</span>                acc00 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da0), mul_sum_i8_pairs_float_avx(qw0, qa0)), acc00);</div>
+<div class="line"><span class="lineno"> 1976</span>                acc01 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da0), mul_sum_i8_pairs_float_avx(qw1, qa0)), acc01);</div>
+<div class="line"><span class="lineno"> 1977</span>                acc10 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da1), mul_sum_i8_pairs_float_avx(qw0, qa1)), acc10);</div>
+<div class="line"><span class="lineno"> 1978</span>                acc11 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da1), mul_sum_i8_pairs_float_avx(qw1, qa1)), acc11);</div>
+<div class="line"><span class="lineno"> 1979</span>                acc20 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da2), mul_sum_i8_pairs_float_avx(qw0, qa2)), acc20);</div>
+<div class="line"><span class="lineno"> 1980</span>                acc21 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da2), mul_sum_i8_pairs_float_avx(qw1, qa2)), acc21);</div>
+<div class="line"><span class="lineno"> 1981</span>                acc30 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw0 * da3), mul_sum_i8_pairs_float_avx(qw0, qa3)), acc30);</div>
+<div class="line"><span class="lineno"> 1982</span>                acc31 = _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(dw1 * da3), mul_sum_i8_pairs_float_avx(qw1, qa3)), acc31);</div>
+<div class="line"><span class="lineno"> 1983</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 1984</span>            }</div>
+<div class="line"><span class="lineno"> 1985</span> </div>
+<div class="line"><span class="lineno"> 1986</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc00) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1987</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 0) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc01) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1988</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc10) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1989</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 1) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc11) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1990</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 2) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc20) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1991</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 2) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc21) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1992</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 3) * (size_t)ldc + n + 0] = hsum_float_8_avx(acc30) + (bias ? bias[n + 0] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1993</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + 3) * (size_t)ldc + n + 1] = hsum_float_8_avx(acc31) + (bias ? bias[n + 1] : 0.0f);</div>
+<div class="line"><span class="lineno"> 1994</span>        }</div>
+<div class="line"><span class="lineno"> 1995</span> </div>
+<div class="line"><span class="lineno"> 1996</span>        <span class="keywordflow">if</span> (n &lt; N) {</div>
+<div class="line"><span class="lineno"> 1997</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q5__0.html">block_q5_0</a> *wn = w + (size_t)n * (<span class="keywordtype">size_t</span>)nb;</div>
+<div class="line"><span class="lineno"> 1998</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__0.html">block_q8_0</a> *rows[4] = {a0, a1, a2, a3};</div>
+<div class="line"><span class="lineno"> 1999</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; 4; ++r) {</div>
+<div class="line"><span class="lineno"> 2000</span>                <span class="keywordtype">float</span> *out = &amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * (size_t)ldc + n];</div>
+<div class="line"><span class="lineno"> 2001</span>                <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#a8744a3b1e4d1dc928fce050f111414a6">vec_dot_q5_0_q8_0</a>(K, out, wn, rows[r]);</div>
+<div class="line"><span class="lineno"> 2002</span>                <span class="keywordflow">if</span> (bias) *out += bias[n];</div>
+<div class="line"><span class="lineno"> 2003</span>            }</div>
+<div class="line"><span class="lineno"> 2004</span>        }</div>
+<div class="line"><span class="lineno"> 2005</span>    }</div>
+<div class="line"><span class="lineno"> 2006</span> </div>
+<div class="line"><span class="lineno"> 2007</span>    <span class="keywordflow">if</span> (m &lt; M) {</div>
+<div class="line"><span class="lineno"> 2008</span>        <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#aa077f71eb92869dd8a6f1dc6348c4f1d">gemm_nt_q5_0_q8_0_m2n4_tile</a>(</div>
+<div class="line"><span class="lineno"> 2009</span>            a + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)nb, w, bias,</div>
+<div class="line"><span class="lineno"> 2010</span>            <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> + (<span class="keywordtype">size_t</span>)m * (<span class="keywordtype">size_t</span>)ldc, M - m, N, K, ldc);</div>
+<div class="line"><span class="lineno"> 2011</span>    }</div>
+<div class="line"><span class="lineno"> 2012</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno"> 2013</span>    <a class="code hl_function" href="gemm__kernels__q5__0_8c.html#aa077f71eb92869dd8a6f1dc6348c4f1d">gemm_nt_q5_0_q8_0_m2n4_tile</a>(A_q8, B_q5, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, ldc);</div>
+<div class="line"><span class="lineno"> 2014</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 2015</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00380">CK_FP16_TO_FP32</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01766">gemm_nt_q5_0_q8_0_m2n4_tile()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01602">vec_dot_q5_0_q8_0()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__0_8c_source.html#l02017">gemm_nt_q5_0_q8_0_m4n2()</a>.</p>
 
 </div>
 </div>
@@ -700,7 +1199,6 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  829</span>        }</div>
 <div class="line"><span class="lineno">  830</span>    }</div>
 <div class="line"><span class="lineno">  831</span>}</div>
-<div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00380">ckernel_quant.h:380</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00380">CK_FP16_TO_FP32</a>, <a class="el" href="ckernel__quant_8h_source.html#l00071">block_q5_0::d</a>, <a class="el" href="ckernel__quant_8h_source.html#l00072">block_q5_0::qh</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00073">block_q5_0::qs</a>.</p>
 
@@ -1753,7 +2251,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q5__0_8c_source.html#l00901">vec_dot_q5_0_q8_0_ref()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00406">ck_test_vec_dot_q5_0_q8_0()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01728">gemm_nt_q5_0_q8_0()</a>, <a class="el" href="gemv__omp_8c_source.html#l00098">gemv_fused_q5_0_bias_parallel_omp()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01640">gemv_q5_0_q8_0()</a>, <a class="el" href="gemv__omp_8c_source.html#l00074">gemv_q5_0_q8_0_parallel_omp()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01662">gemv_q5_0_q8_0_parallel_simd()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00222">mega_fused_attention_decode_q5_0()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00367">mega_fused_attention_decode_q5_0_parallel_simd()</a>, <a class="el" href="mega__fused__attention__prefill_8c_source.html#l00104">out_proj_head_major_q5_0_q8_0()</a>, and <a class="el" href="mega__fused__outproj__mlp__prefill_8c_source.html#l00057">out_proj_head_major_q5_0_q8_0()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00406">ck_test_vec_dot_q5_0_q8_0()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01728">gemm_nt_q5_0_q8_0()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01766">gemm_nt_q5_0_q8_0_m2n4_tile()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01908">gemm_nt_q5_0_q8_0_m4n2_tile()</a>, <a class="el" href="gemv__omp_8c_source.html#l00098">gemv_fused_q5_0_bias_parallel_omp()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01640">gemv_q5_0_q8_0()</a>, <a class="el" href="gemv__omp_8c_source.html#l00074">gemv_q5_0_q8_0_parallel_omp()</a>, <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01662">gemv_q5_0_q8_0_parallel_simd()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00222">mega_fused_attention_decode_q5_0()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00367">mega_fused_attention_decode_q5_0_parallel_simd()</a>, <a class="el" href="mega__fused__attention__prefill_8c_source.html#l00104">out_proj_head_major_q5_0_q8_0()</a>, and <a class="el" href="mega__fused__outproj__mlp__prefill_8c_source.html#l00057">out_proj_head_major_q5_0_q8_0()</a>.</p>
 
 </div>
 </div>

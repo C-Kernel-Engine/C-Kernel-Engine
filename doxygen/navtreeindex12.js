@@ -1,5 +1,9 @@
 var NAVTREEINDEX12 =
 {
+"globals_defs_s.html":[2,1,6,17],
+"globals_defs_w.html":[2,1,6,18],
+"globals_defs_y.html":[2,1,6,19],
+"globals_e.html":[2,1,0,5],
 "globals_enum.html":[2,1,4],
 "globals_eval.html":[2,1,5],
 "globals_f.html":[2,1,0,6],
@@ -245,9 +249,5 @@ var NAVTREEINDEX12 =
 "mega__fused__attention__prefill_8c.html#a3c0ac15e87fbf875bd91aad8288b7e7c":[2,0,1,1,0,6,2],
 "mega__fused__attention__prefill_8c.html#a6a5da63aac6821fd65ed403bb1546577":[2,0,1,1,0,6,5],
 "mega__fused__attention__prefill_8c.html#a883b9f36dd8db8e37e5df4037f25b86e":[2,0,1,1,0,6,6],
-"mega__fused__attention__prefill_8c.html#a9fdbcc38d87e3452b8f466ae91e17c5b":[2,0,1,1,0,6,1],
-"mega__fused__attention__prefill_8c_source.html":[2,0,1,1,0,6],
-"mega__fused__attention__prefill__q8__0_8c.html":[2,0,1,1,0,7],
-"mega__fused__attention__prefill__q8__0_8c.html#a00f6e544eff204d7567bfe46076d3533":[2,0,1,1,0,7,2],
-"mega__fused__attention__prefill__q8__0_8c.html#a0404c43ebf752ec2c2f54ead81036f30":[2,0,1,1,0,7,3]
+"mega__fused__attention__prefill_8c.html#a9fdbcc38d87e3452b8f466ae91e17c5b":[2,0,1,1,0,6,1]
 };
