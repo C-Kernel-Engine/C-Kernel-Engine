@@ -1,5 +1,9 @@
 var NAVTREEINDEX18 =
 {
+"structCPUInfo.html#aaf14c11cad59d839d69e7fa7e367dd05":[1,0,66,41],
+"structCPUInfo.html#ac02376e5e445112e00ec31ff39f0bd17":[1,0,66,11],
+"structCPUInfo.html#ac41947b54c3a9b315338aee3113b5714":[1,0,66,3],
+"structCPUInfo.html#ac60a906dc4aaa71a6ca5453d6628fa2e":[1,0,66,23],
 "structCPUInfo.html#acb466a15f99116d3c9b88f2d35be4b93":[1,0,66,22],
 "structCPUInfo.html#accaf39347e29f639b10e0d99825a0ca5":[1,0,66,29],
 "structCPUInfo.html#acfedda3a3d92c0fd6dde00f5757fdf92":[1,0,66,0],
@@ -245,9 +249,5 @@ var NAVTREEINDEX18 =
 "swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650":[2,0,1,1,86,4],
 "swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6":[2,0,1,1,86,2],
 "swiglu__kernels_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,1,86,0],
-"swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,86,3],
-"swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c":[2,0,1,1,86,8],
-"swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c":[2,0,1,1,86,1],
-"swiglu__kernels_8c.html#acb65349d061ea0910dd80602f5f210df":[2,0,1,1,86,6],
-"swiglu__kernels_8c_source.html":[2,0,1,1,86]
+"swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747":[2,0,1,1,86,3]
 };

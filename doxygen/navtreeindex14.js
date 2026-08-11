@@ -1,5 +1,7 @@
 var NAVTREEINDEX14 =
 {
+"recurrent__state__kernels_8c_source.html":[2,0,1,1,72],
+"relu__kernels_8c.html":[2,0,1,1,73],
 "relu__kernels_8c.html#a434da7f0647cdada09cd6ad435560467":[2,0,1,1,73,2],
 "relu__kernels_8c.html#a7987de4b09bfb9f8d04405a6d9d2c4c5":[2,0,1,1,73,0],
 "relu__kernels_8c.html#a856216dca72f3534c079f429d1d58d48":[2,0,1,1,73,3],
@@ -218,12 +220,14 @@ var NAVTREEINDEX14 =
 "src_2data__structures_2tries_2trie_8h.html#ab8035bc5fe0a2b35f00ee8acbba4cba3":[2,0,1,0,0,1,8],
 "src_2data__structures_2tries_2trie_8h_source.html":[2,0,1,0,0,1],
 "ssm__kernels_8c.html":[2,0,1,1,85],
-"ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054":[2,0,1,1,85,5],
-"ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439":[2,0,1,1,85,1],
-"ssm__kernels_8c.html#a9f2633ab09cac4f4da73ff75542824b2":[2,0,1,1,85,4],
-"ssm__kernels_8c.html#ac2a4728f5217ee472cf208da9f68a994":[2,0,1,1,85,2],
-"ssm__kernels_8c.html#ad827366642547a76913f8052b643a0df":[2,0,1,1,85,3],
-"ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f":[2,0,1,1,85,0],
+"ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b":[2,0,1,1,85,0],
+"ssm__kernels_8c.html#a45c4fac663fed699857885012816a6a1":[2,0,1,1,85,5],
+"ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054":[2,0,1,1,85,7],
+"ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439":[2,0,1,1,85,2],
+"ssm__kernels_8c.html#a9f2633ab09cac4f4da73ff75542824b2":[2,0,1,1,85,6],
+"ssm__kernels_8c.html#ac2a4728f5217ee472cf208da9f68a994":[2,0,1,1,85,3],
+"ssm__kernels_8c.html#ad827366642547a76913f8052b643a0df":[2,0,1,1,85,4],
+"ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f":[2,0,1,1,85,1],
 "ssm__kernels_8c_source.html":[2,0,1,1,85],
 "structAffinityInfo.html":[1,0,0],
 "structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5":[1,0,0,3],
@@ -245,9 +249,5 @@ var NAVTREEINDEX14 =
 "structCKBPEConfig.html#a8425351ff0b3ec6e13ab4dd55644911c":[1,0,14,3],
 "structCKBPEConfig.html#abfb01eec95857319bd1dafbaf6336238":[1,0,14,0],
 "structCKBPEConfig.html#af3e1a881a51c302240ff8581f4cfcba5":[1,0,14,1],
-"structCKBufferSpec.html":[1,0,15],
-"structCKBufferSpec.html#a2b1e3d9cac9dfffef27a598dc88207c9":[1,0,15,2],
-"structCKBufferSpec.html#a313cd889d11375cfaf4db616ed1c99ac":[1,0,15,5],
-"structCKBufferSpec.html#a3d2e80ce499f08ea3e9d969de367f945":[1,0,15,0],
-"structCKBufferSpec.html#a4af21c5671866d5883b7c95cd9032afd":[1,0,15,1]
+"structCKBufferSpec.html":[1,0,15]
 };

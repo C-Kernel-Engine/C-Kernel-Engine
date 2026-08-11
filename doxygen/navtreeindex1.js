@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"attention__oracle__ggml_8c.html#a9a2bce1b4a836245b3efff353d45c8e6":[2,0,1,1,6,29],
 "attention__oracle__ggml_8c.html#aaaf1d9a680641b5695d4e637945e8474":[2,0,1,1,6,58],
 "attention__oracle__ggml_8c.html#aae77aaabe2878ffec9798956478d8433":[2,0,1,1,6,54],
 "attention__oracle__ggml_8c.html#aaf9f64a4b72f14fe3a048a73b573c1d1":[2,0,1,1,6,67],
@@ -248,6 +249,5 @@ var NAVTREEINDEX1 =
 "ck__cli__v6_8c.html#afc72cc80be78368af715686669663668":[2,0,1,5,0,4],
 "ck__cli__v6_8c.html#afda9eb047036eb6f4543c16cfb0a3d2d":[2,0,1,5,0,7],
 "ck__cli__v6_8c_source.html":[2,0,1,5,0],
-"ck__features_8h.html":[2,0,0,3],
-"ck__features_8h.html#a14a0c69726a841765a4a1012aa4e4ec5":[2,0,0,3,2]
+"ck__features_8h.html":[2,0,0,3]
 };

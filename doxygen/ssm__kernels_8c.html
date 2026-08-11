@@ -135,6 +135,7 @@ $(document).ready(function(){initNavTree('ssm__kernels_8c.html',''); initResizab
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="ck__threadpool_8h_source.html">ck_threadpool.h</a>&quot;</code><br />
 <code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;string.h&gt;</code><br />
 </div>
@@ -142,6 +143,8 @@ $(document).ready(function(){initNavTree('ssm__kernels_8c.html',''); initResizab
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a365fda696bf3cca96c231bc4026bf77b" id="r_a365fda696bf3cca96c231bc4026bf77b"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b">ck_ssm_conv1d_llama_channel_range</a> (int begin, int <a class="el" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, void *opaque)</td></tr>
+<tr class="separator:a365fda696bf3cca96c231bc4026bf77b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae4110c9033c9835558cbfe32d5f7265f" id="r_ae4110c9033c9835558cbfe32d5f7265f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f">ssm_conv1d_backward</a> (const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
 <tr class="separator:ae4110c9033c9835558cbfe32d5f7265f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a946087306bce247ac00d4c24f3ec9439" id="r_a946087306bce247ac00d4c24f3ec9439"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439">ssm_conv1d_backward_ref</a> (const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
@@ -150,6 +153,8 @@ Functions</h2></td></tr>
 <tr class="separator:ac2a4728f5217ee472cf208da9f68a994"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad827366642547a76913f8052b643a0df" id="r_ad827366642547a76913f8052b643a0df"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#ad827366642547a76913f8052b643a0df">ssm_conv1d_forward_llama_production</a> (const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
 <tr class="separator:ad827366642547a76913f8052b643a0df"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a45c4fac663fed699857885012816a6a1" id="r_a45c4fac663fed699857885012816a6a1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#a45c4fac663fed699857885012816a6a1">ssm_conv1d_forward_llama_production_serial</a> (const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
+<tr class="separator:a45c4fac663fed699857885012816a6a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9f2633ab09cac4f4da73ff75542824b2" id="r_a9f2633ab09cac4f4da73ff75542824b2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#a9f2633ab09cac4f4da73ff75542824b2">ssm_conv1d_forward_pytorch_bf16_storage</a> (const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
 <tr class="separator:a9f2633ab09cac4f4da73ff75542824b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e84239cff90dfd33ba8a31438ce5054" id="r_a6e84239cff90dfd33ba8a31438ce5054"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a> (const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</td></tr>
@@ -171,6 +176,87 @@ CK-ENGINE KERNEL RULES:</h1>
 
 <p class="definition">Definition in file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
 </div><h2 class="groupheader">Function Documentation</h2>
+<a id="a365fda696bf3cca96c231bc4026bf77b" name="a365fda696bf3cca96c231bc4026bf77b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a365fda696bf3cca96c231bc4026bf77b">&#9670;&#160;</a></span>ck_ssm_conv1d_llama_channel_range()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static void ck_ssm_conv1d_llama_channel_range </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>begin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>end</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>opaque</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00154">154</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  155</span>{</div>
+<div class="line"><span class="lineno">  156</span>    <span class="keyword">const</span> ck_ssm_conv1d_llama_args_t *args =</div>
+<div class="line"><span class="lineno">  157</span>        (<span class="keyword">const</span> ck_ssm_conv1d_llama_args_t *)opaque;</div>
+<div class="line"><span class="lineno">  158</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> kernel_size = args-&gt;kernel_size;</div>
+<div class="line"><span class="lineno">  159</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_channels = args-&gt;num_channels;</div>
+<div class="line"><span class="lineno">  160</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> num_tokens = args-&gt;num_tokens;</div>
+<div class="line"><span class="lineno">  161</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
+<div class="line"><span class="lineno">  164</span> </div>
+<div class="line"><span class="lineno">  165</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; args-&gt;num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">  166</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = args-&gt;conv_x + (size_t)seq * conv_seq_stride;</div>
+<div class="line"><span class="lineno">  167</span>        <span class="keywordtype">float</span> *out_seq = args-&gt;out + (size_t)seq * out_seq_stride;</div>
+<div class="line"><span class="lineno">  168</span> </div>
+<div class="line"><span class="lineno">  169</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = begin; ch &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++ch) {</div>
+<div class="line"><span class="lineno">  170</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row =</div>
+<div class="line"><span class="lineno">  171</span>                args-&gt;kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
+<div class="line"><span class="lineno">  172</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_channel = conv_seq + (size_t)ch * seq_width;</div>
+<div class="line"><span class="lineno">  173</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">  174</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row =</div>
+<div class="line"><span class="lineno">  175</span>                    conv_channel + (size_t)tok;</div>
+<div class="line"><span class="lineno">  176</span>                <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno">  177</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
+<div class="line"><span class="lineno">  178</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> product = conv_row[k] * kernel_row[k];</div>
+<div class="line"><span class="lineno">  179</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> next = sum + product;</div>
+<div class="line"><span class="lineno">  180</span>                    sum = next;</div>
+<div class="line"><span class="lineno">  181</span>                }</div>
+<div class="line"><span class="lineno">  182</span>                out_seq[(size_t)tok * (<span class="keywordtype">size_t</span>)num_channels + (size_t)ch] = sum;</div>
+<div class="line"><span class="lineno">  183</span>            }</div>
+<div class="line"><span class="lineno">  184</span>        }</div>
+<div class="line"><span class="lineno">  185</span>    }</div>
+<div class="line"><span class="lineno">  186</span>}</div>
+<div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00206">ssm_conv1d_forward_llama_production()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00188">ssm_conv1d_forward_llama_production_serial()</a>.</p>
+
+</div>
+</div>
 <a id="ae4110c9033c9835558cbfe32d5f7265f" name="ae4110c9033c9835558cbfe32d5f7265f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae4110c9033c9835558cbfe32d5f7265f">&#9670;&#160;</a></span>ssm_conv1d_backward()</h2>
 
@@ -239,13 +325,13 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00203">203</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  212</span>{</div>
-<div class="line"><span class="lineno">  213</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439">ssm_conv1d_backward_ref</a>(d_out, conv_x, kernel, d_conv_x, d_kernel, kernel_size, num_channels, num_tokens, num_seqs);</div>
-<div class="line"><span class="lineno">  214</span>}</div>
-<div class="ttc" id="assm__kernels_8c_html_a946087306bce247ac00d4c24f3ec9439"><div class="ttname"><a href="ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439">ssm_conv1d_backward_ref</a></div><div class="ttdeci">void ssm_conv1d_backward_ref(const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs)</div><div class="ttdef"><b>Definition</b> <a href="ssm__kernels_8c_source.html#l00076">ssm_kernels.c:76</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00250">250</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  259</span>{</div>
+<div class="line"><span class="lineno">  260</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439">ssm_conv1d_backward_ref</a>(d_out, conv_x, kernel, d_conv_x, d_kernel, kernel_size, num_channels, num_tokens, num_seqs);</div>
+<div class="line"><span class="lineno">  261</span>}</div>
+<div class="ttc" id="assm__kernels_8c_html_a946087306bce247ac00d4c24f3ec9439"><div class="ttname"><a href="ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439">ssm_conv1d_backward_ref</a></div><div class="ttdeci">void ssm_conv1d_backward_ref(const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs)</div><div class="ttdef"><b>Definition</b> <a href="ssm__kernels_8c_source.html#l00077">ssm_kernels.c:77</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00076">ssm_conv1d_backward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00077">ssm_conv1d_backward_ref()</a>.</p>
 
 </div>
 </div>
@@ -317,49 +403,49 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00076">76</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   85</span>{</div>
-<div class="line"><span class="lineno">   86</span>    <span class="keywordflow">if</span> (!d_out || !conv_x || !kernel || !d_conv_x || !d_kernel) {</div>
-<div class="line"><span class="lineno">   87</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   88</span>    }</div>
-<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">if</span> (kernel_size &lt;= 0 || num_channels &lt;= 0 || num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   91</span>    }</div>
-<div class="line"><span class="lineno">   92</span> </div>
-<div class="line"><span class="lineno">   93</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
-<div class="line"><span class="lineno">   94</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_total = (size_t)num_seqs * (<span class="keywordtype">size_t</span>)num_channels * seq_width;</div>
-<div class="line"><span class="lineno">   95</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kernel_total = (size_t)num_channels * (<span class="keywordtype">size_t</span>)kernel_size;</div>
-<div class="line"><span class="lineno">   96</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
-<div class="line"><span class="lineno">   97</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">   98</span> </div>
-<div class="line"><span class="lineno">   99</span>    memset(d_conv_x, 0, conv_total * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  100</span>    memset(d_kernel, 0, kernel_total * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  101</span> </div>
-<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">  103</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_seq = d_out + (size_t)seq * out_seq_stride;</div>
-<div class="line"><span class="lineno">  104</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t)seq * conv_seq_stride;</div>
-<div class="line"><span class="lineno">  105</span>        <span class="keywordtype">float</span> *d_conv_seq = d_conv_x + (size_t)seq * conv_seq_stride;</div>
-<div class="line"><span class="lineno">  106</span> </div>
-<div class="line"><span class="lineno">  107</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">  108</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_tok = d_out_seq + (size_t)tok * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">  109</span> </div>
-<div class="line"><span class="lineno">  110</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; num_channels; ++ch) {</div>
-<div class="line"><span class="lineno">  111</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> grad = d_out_tok[ch];</div>
-<div class="line"><span class="lineno">  112</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row = conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
-<div class="line"><span class="lineno">  113</span>                <span class="keywordtype">float</span> *d_conv_row = d_conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
-<div class="line"><span class="lineno">  114</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row = kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
-<div class="line"><span class="lineno">  115</span>                <span class="keywordtype">float</span> *d_kernel_row = d_kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
-<div class="line"><span class="lineno">  116</span> </div>
-<div class="line"><span class="lineno">  117</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
-<div class="line"><span class="lineno">  118</span>                    d_kernel_row[k] += grad * conv_row[k];</div>
-<div class="line"><span class="lineno">  119</span>                    d_conv_row[k] += grad * kernel_row[k];</div>
-<div class="line"><span class="lineno">  120</span>                }</div>
-<div class="line"><span class="lineno">  121</span>            }</div>
-<div class="line"><span class="lineno">  122</span>        }</div>
-<div class="line"><span class="lineno">  123</span>    }</div>
-<div class="line"><span class="lineno">  124</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00077">77</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   86</span>{</div>
+<div class="line"><span class="lineno">   87</span>    <span class="keywordflow">if</span> (!d_out || !conv_x || !kernel || !d_conv_x || !d_kernel) {</div>
+<div class="line"><span class="lineno">   88</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   89</span>    }</div>
+<div class="line"><span class="lineno">   90</span>    <span class="keywordflow">if</span> (kernel_size &lt;= 0 || num_channels &lt;= 0 || num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
+<div class="line"><span class="lineno">   91</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   92</span>    }</div>
+<div class="line"><span class="lineno">   93</span> </div>
+<div class="line"><span class="lineno">   94</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
+<div class="line"><span class="lineno">   95</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_total = (size_t)num_seqs * (<span class="keywordtype">size_t</span>)num_channels * seq_width;</div>
+<div class="line"><span class="lineno">   96</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kernel_total = (size_t)num_channels * (<span class="keywordtype">size_t</span>)kernel_size;</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
+<div class="line"><span class="lineno">   98</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
+<div class="line"><span class="lineno">   99</span> </div>
+<div class="line"><span class="lineno">  100</span>    memset(d_conv_x, 0, conv_total * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  101</span>    memset(d_kernel, 0, kernel_total * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  102</span> </div>
+<div class="line"><span class="lineno">  103</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">  104</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_seq = d_out + (size_t)seq * out_seq_stride;</div>
+<div class="line"><span class="lineno">  105</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t)seq * conv_seq_stride;</div>
+<div class="line"><span class="lineno">  106</span>        <span class="keywordtype">float</span> *d_conv_seq = d_conv_x + (size_t)seq * conv_seq_stride;</div>
+<div class="line"><span class="lineno">  107</span> </div>
+<div class="line"><span class="lineno">  108</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">  109</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_tok = d_out_seq + (size_t)tok * (<span class="keywordtype">size_t</span>)num_channels;</div>
+<div class="line"><span class="lineno">  110</span> </div>
+<div class="line"><span class="lineno">  111</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; num_channels; ++ch) {</div>
+<div class="line"><span class="lineno">  112</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> grad = d_out_tok[ch];</div>
+<div class="line"><span class="lineno">  113</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row = conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
+<div class="line"><span class="lineno">  114</span>                <span class="keywordtype">float</span> *d_conv_row = d_conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
+<div class="line"><span class="lineno">  115</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row = kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
+<div class="line"><span class="lineno">  116</span>                <span class="keywordtype">float</span> *d_kernel_row = d_kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
+<div class="line"><span class="lineno">  117</span> </div>
+<div class="line"><span class="lineno">  118</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
+<div class="line"><span class="lineno">  119</span>                    d_kernel_row[k] += grad * conv_row[k];</div>
+<div class="line"><span class="lineno">  120</span>                    d_conv_row[k] += grad * kernel_row[k];</div>
+<div class="line"><span class="lineno">  121</span>                }</div>
+<div class="line"><span class="lineno">  122</span>            }</div>
+<div class="line"><span class="lineno">  123</span>        }</div>
+<div class="line"><span class="lineno">  124</span>    }</div>
+<div class="line"><span class="lineno">  125</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00203">ssm_conv1d_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00250">ssm_conv1d_backward()</a>.</p>
 
 </div>
 </div>
@@ -419,13 +505,13 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00126">126</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  133</span>{</div>
-<div class="line"><span class="lineno">  134</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a>(conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs);</div>
-<div class="line"><span class="lineno">  135</span>}</div>
-<div class="ttc" id="assm__kernels_8c_html_a6e84239cff90dfd33ba8a31438ce5054"><div class="ttname"><a href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a></div><div class="ttdeci">void ssm_conv1d_forward_ref(const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</div><div class="ttdef"><b>Definition</b> <a href="ssm__kernels_8c_source.html#l00037">ssm_kernels.c:37</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00127">127</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  134</span>{</div>
+<div class="line"><span class="lineno">  135</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a>(conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs);</div>
+<div class="line"><span class="lineno">  136</span>}</div>
+<div class="ttc" id="assm__kernels_8c_html_a6e84239cff90dfd33ba8a31438ce5054"><div class="ttname"><a href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a></div><div class="ttdeci">void ssm_conv1d_forward_ref(const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs)</div><div class="ttdef"><b>Definition</b> <a href="ssm__kernels_8c_source.html#l00038">ssm_kernels.c:38</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00037">ssm_conv1d_forward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00038">ssm_conv1d_forward_ref()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00767">ck_test_ssm_conv1d()</a>.</p>
 
@@ -487,43 +573,105 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00143">143</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  150</span>{</div>
-<div class="line"><span class="lineno">  151</span>    <span class="keywordflow">if</span> (!conv_x || !kernel || !out) {</div>
-<div class="line"><span class="lineno">  152</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  153</span>    }</div>
-<div class="line"><span class="lineno">  154</span>    <span class="keywordflow">if</span> (kernel_size &lt;= 0 || num_channels &lt;= 0 || num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
-<div class="line"><span class="lineno">  155</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  156</span>    }</div>
-<div class="line"><span class="lineno">  157</span> </div>
-<div class="line"><span class="lineno">  158</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
-<div class="line"><span class="lineno">  159</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
-<div class="line"><span class="lineno">  160</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">  161</span> </div>
-<div class="line"><span class="lineno">  162</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">  163</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t)seq * conv_seq_stride;</div>
-<div class="line"><span class="lineno">  164</span>        <span class="keywordtype">float</span> *out_seq = out + (size_t)seq * out_seq_stride;</div>
-<div class="line"><span class="lineno">  165</span> </div>
-<div class="line"><span class="lineno">  166</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">  167</span>            <span class="keywordtype">float</span> *out_tok = out_seq + (size_t)tok * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">  168</span> </div>
-<div class="line"><span class="lineno">  169</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; num_channels; ++ch) {</div>
-<div class="line"><span class="lineno">  170</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row =</div>
-<div class="line"><span class="lineno">  171</span>                    conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
-<div class="line"><span class="lineno">  172</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row =</div>
-<div class="line"><span class="lineno">  173</span>                    kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
-<div class="line"><span class="lineno">  174</span>                <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno">  175</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
-<div class="line"><span class="lineno">  176</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> product = conv_row[k] * kernel_row[k];</div>
-<div class="line"><span class="lineno">  177</span>                    <span class="keyword">volatile</span> <span class="keywordtype">float</span> next = sum + product;</div>
-<div class="line"><span class="lineno">  178</span>                    sum = next;</div>
-<div class="line"><span class="lineno">  179</span>                }</div>
-<div class="line"><span class="lineno">  180</span>                out_tok[ch] = sum;</div>
-<div class="line"><span class="lineno">  181</span>            }</div>
-<div class="line"><span class="lineno">  182</span>        }</div>
-<div class="line"><span class="lineno">  183</span>    }</div>
-<div class="line"><span class="lineno">  184</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00206">206</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  213</span>{</div>
+<div class="line"><span class="lineno">  214</span>    <span class="keywordflow">if</span> (!conv_x || !kernel || !out || kernel_size &lt;= 0 || num_channels &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  215</span>        num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
+<div class="line"><span class="lineno">  216</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  217</span>    }</div>
+<div class="line"><span class="lineno">  218</span>    ck_ssm_conv1d_llama_args_t args = {</div>
+<div class="line"><span class="lineno">  219</span>        conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs,</div>
+<div class="line"><span class="lineno">  220</span>    };</div>
+<div class="line"><span class="lineno">  221</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  222</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> workers = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  223</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> active = workers &lt; num_channels ? workers : num_channels;</div>
+<div class="line"><span class="lineno">  224</span>    <span class="keywordflow">if</span> (active &gt; 1 &amp;&amp; num_tokens &gt; 1) {</div>
+<div class="line"><span class="lineno">  225</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>(</div>
+<div class="line"><span class="lineno">  226</span>            pool, active, 0, num_channels, 32,</div>
+<div class="line"><span class="lineno">  227</span>            <a class="code hl_function" href="ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b">ck_ssm_conv1d_llama_channel_range</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  228</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  229</span>        <a class="code hl_function" href="ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b">ck_ssm_conv1d_llama_channel_range</a>(0, num_channels, &amp;args);</div>
+<div class="line"><span class="lineno">  230</span>    }</div>
+<div class="line"><span class="lineno">  231</span>}</div>
+<div class="ttc" id="ack__threadpool_8h_html_a201c68c915e80d824c95721b55c5ab83"><div class="ttname"><a href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a></div><div class="ttdeci">void ck_threadpool_parallel_for_n(ck_threadpool_t *pool, int active_threads, int begin, int end, int grain_size, ck_range_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00434">ck_threadpool.c:434</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00565">ck_threadpool.c:565</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00491">ck_threadpool.c:491</a></div></div>
+<div class="ttc" id="assm__kernels_8c_html_a365fda696bf3cca96c231bc4026bf77b"><div class="ttname"><a href="ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b">ck_ssm_conv1d_llama_channel_range</a></div><div class="ttdeci">static void ck_ssm_conv1d_llama_channel_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="ssm__kernels_8c_source.html#l00154">ssm_kernels.c:154</a></div></div>
 </div><!-- fragment -->
+<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00154">ck_ssm_conv1d_llama_channel_range()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00565">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00491">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00434">ck_threadpool_parallel_for_n()</a>.</p>
+
+</div>
+</div>
+<a id="a45c4fac663fed699857885012816a6a1" name="a45c4fac663fed699857885012816a6a1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a45c4fac663fed699857885012816a6a1">&#9670;&#160;</a></span>ssm_conv1d_forward_llama_production_serial()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ssm_conv1d_forward_llama_production_serial </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>conv_x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>kernel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>kernel_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_channels</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_seqs</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00188">188</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  195</span>{</div>
+<div class="line"><span class="lineno">  196</span>    <span class="keywordflow">if</span> (!conv_x || !kernel || !out || kernel_size &lt;= 0 || num_channels &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  197</span>        num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
+<div class="line"><span class="lineno">  198</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  199</span>    }</div>
+<div class="line"><span class="lineno">  200</span>    ck_ssm_conv1d_llama_args_t args = {</div>
+<div class="line"><span class="lineno">  201</span>        conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs,</div>
+<div class="line"><span class="lineno">  202</span>    };</div>
+<div class="line"><span class="lineno">  203</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b">ck_ssm_conv1d_llama_channel_range</a>(0, num_channels, &amp;args);</div>
+<div class="line"><span class="lineno">  204</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="ssm__kernels_8c_source.html#l00154">ck_ssm_conv1d_llama_channel_range()</a>.</p>
+
 </div>
 </div>
 <a id="a9f2633ab09cac4f4da73ff75542824b2" name="a9f2633ab09cac4f4da73ff75542824b2"></a>
@@ -582,20 +730,20 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00186">186</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  193</span>{</div>
-<div class="line"><span class="lineno">  194</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a>(</div>
-<div class="line"><span class="lineno">  195</span>        conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs);</div>
-<div class="line"><span class="lineno">  196</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count =</div>
-<div class="line"><span class="lineno">  197</span>        (size_t)num_seqs * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)num_channels;</div>
-<div class="line"><span class="lineno">  198</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
-<div class="line"><span class="lineno">  199</span>        out[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(out[i]));</div>
-<div class="line"><span class="lineno">  200</span>    }</div>
-<div class="line"><span class="lineno">  201</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00233">233</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  240</span>{</div>
+<div class="line"><span class="lineno">  241</span>    <a class="code hl_function" href="ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054">ssm_conv1d_forward_ref</a>(</div>
+<div class="line"><span class="lineno">  242</span>        conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs);</div>
+<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> count =</div>
+<div class="line"><span class="lineno">  244</span>        (size_t)num_seqs * (<span class="keywordtype">size_t</span>)num_tokens * (size_t)num_channels;</div>
+<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">  246</span>        out[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(out[i]));</div>
+<div class="line"><span class="lineno">  247</span>    }</div>
+<div class="line"><span class="lineno">  248</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00037">ssm_conv1d_forward_ref()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00038">ssm_conv1d_forward_ref()</a>.</p>
 
 </div>
 </div>
@@ -655,40 +803,40 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00037">37</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   44</span>{</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (!conv_x || !kernel || !out) {</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   47</span>    }</div>
-<div class="line"><span class="lineno">   48</span>    <span class="keywordflow">if</span> (kernel_size &lt;= 0 || num_channels &lt;= 0 || num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
-<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   50</span>    }</div>
-<div class="line"><span class="lineno">   51</span> </div>
-<div class="line"><span class="lineno">   52</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
-<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
-<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">   55</span> </div>
-<div class="line"><span class="lineno">   56</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">   57</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t)seq * conv_seq_stride;</div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordtype">float</span> *out_seq = out + (size_t)seq * out_seq_stride;</div>
-<div class="line"><span class="lineno">   59</span> </div>
-<div class="line"><span class="lineno">   60</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">   61</span>            <span class="keywordtype">float</span> *out_tok = out_seq + (size_t)tok * (<span class="keywordtype">size_t</span>)num_channels;</div>
-<div class="line"><span class="lineno">   62</span> </div>
-<div class="line"><span class="lineno">   63</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; num_channels; ++ch) {</div>
-<div class="line"><span class="lineno">   64</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row = conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
-<div class="line"><span class="lineno">   65</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row = kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
-<div class="line"><span class="lineno">   66</span>                <span class="keywordtype">float</span> sumf = 0.0f;</div>
-<div class="line"><span class="lineno">   67</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
-<div class="line"><span class="lineno">   68</span>                    sumf += conv_row[k] * kernel_row[k];</div>
-<div class="line"><span class="lineno">   69</span>                }</div>
-<div class="line"><span class="lineno">   70</span>                out_tok[ch] = sumf;</div>
-<div class="line"><span class="lineno">   71</span>            }</div>
-<div class="line"><span class="lineno">   72</span>        }</div>
-<div class="line"><span class="lineno">   73</span>    }</div>
-<div class="line"><span class="lineno">   74</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ssm__kernels_8c_source.html#l00038">38</a> of file <a class="el" href="ssm__kernels_8c_source.html">ssm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   45</span>{</div>
+<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (!conv_x || !kernel || !out) {</div>
+<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   48</span>    }</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keywordflow">if</span> (kernel_size &lt;= 0 || num_channels &lt;= 0 || num_tokens &lt; 0 || num_seqs &lt;= 0) {</div>
+<div class="line"><span class="lineno">   50</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   51</span>    }</div>
+<div class="line"><span class="lineno">   52</span> </div>
+<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> seq_width = (size_t)kernel_size - 1u + (<span class="keywordtype">size_t</span>)num_tokens;</div>
+<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> conv_seq_stride = (size_t)num_channels * seq_width;</div>
+<div class="line"><span class="lineno">   55</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_seq_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)num_channels;</div>
+<div class="line"><span class="lineno">   56</span> </div>
+<div class="line"><span class="lineno">   57</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">   58</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t)seq * conv_seq_stride;</div>
+<div class="line"><span class="lineno">   59</span>        <span class="keywordtype">float</span> *out_seq = out + (size_t)seq * out_seq_stride;</div>
+<div class="line"><span class="lineno">   60</span> </div>
+<div class="line"><span class="lineno">   61</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">   62</span>            <span class="keywordtype">float</span> *out_tok = out_seq + (size_t)tok * (<span class="keywordtype">size_t</span>)num_channels;</div>
+<div class="line"><span class="lineno">   63</span> </div>
+<div class="line"><span class="lineno">   64</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; num_channels; ++ch) {</div>
+<div class="line"><span class="lineno">   65</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *conv_row = conv_seq + (size_t)ch * seq_width + (<span class="keywordtype">size_t</span>)tok;</div>
+<div class="line"><span class="lineno">   66</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *kernel_row = kernel + (size_t)ch * (<span class="keywordtype">size_t</span>)kernel_size;</div>
+<div class="line"><span class="lineno">   67</span>                <span class="keywordtype">float</span> sumf = 0.0f;</div>
+<div class="line"><span class="lineno">   68</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> k = 0; k &lt; kernel_size; ++k) {</div>
+<div class="line"><span class="lineno">   69</span>                    sumf += conv_row[k] * kernel_row[k];</div>
+<div class="line"><span class="lineno">   70</span>                }</div>
+<div class="line"><span class="lineno">   71</span>                out_tok[ch] = sumf;</div>
+<div class="line"><span class="lineno">   72</span>            }</div>
+<div class="line"><span class="lineno">   73</span>        }</div>
+<div class="line"><span class="lineno">   74</span>    }</div>
+<div class="line"><span class="lineno">   75</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00126">ssm_conv1d_forward()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00186">ssm_conv1d_forward_pytorch_bf16_storage()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ssm__kernels_8c_source.html#l00127">ssm_conv1d_forward()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00233">ssm_conv1d_forward_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>

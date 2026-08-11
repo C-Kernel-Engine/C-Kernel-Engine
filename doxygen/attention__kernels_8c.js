@@ -18,6 +18,7 @@ var attention__kernels_8c =
     [ "attention_flash_query_causal", "attention__kernels_8c.html#aa09ace92ab625ae8365e61f47c3d93a5", null ],
     [ "attention_flash_query_causal_exact", "attention__kernels_8c.html#a23e073c6f9e07d4694f3d2ba98b9e4b5", null ],
     [ "attention_flash_query_causal_exact_f16kv", "attention__kernels_8c.html#ab456b0818521195e3157348024300598", null ],
+    [ "attention_flash_query_causal_exact_prerounded_f16kv", "attention__kernels_8c.html#ad53cee63b94773f4ed691ad98c371e5e", null ],
     [ "attention_forward_causal_head_major", "attention__kernels_8c.html#a3d8664b9e0808546484af9ec7d4ddfe1", null ],
     [ "attention_forward_causal_head_major_exact", "attention__kernels_8c.html#a57b7a6f6f08b030fd8d5fbf87fa31ac7", null ],
     [ "attention_forward_causal_head_major_gqa", "attention__kernels_8c.html#a3e1aa7c55e515fd996318da27c2c5ade", null ],

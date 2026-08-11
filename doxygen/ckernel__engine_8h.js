@@ -458,6 +458,7 @@ var ckernel__engine_8h =
     [ "ssm_conv1d_backward", "ckernel__engine_8h.html#ae4110c9033c9835558cbfe32d5f7265f", null ],
     [ "ssm_conv1d_forward", "ckernel__engine_8h.html#ac2a4728f5217ee472cf208da9f68a994", null ],
     [ "ssm_conv1d_forward_llama_production", "ckernel__engine_8h.html#ad827366642547a76913f8052b643a0df", null ],
+    [ "ssm_conv1d_forward_llama_production_serial", "ckernel__engine_8h.html#a45c4fac663fed699857885012816a6a1", null ],
     [ "ssm_conv1d_forward_pytorch_bf16_storage", "ckernel__engine_8h.html#a9f2633ab09cac4f4da73ff75542824b2", null ],
     [ "swiglu_backward", "ckernel__engine_8h.html#a2d1ada314dda9d7788371a08067917d6", null ],
     [ "swiglu_backward_bf16", "ckernel__engine_8h.html#a77fb89fc5fa2dcc73d9d37ccf9c50322", null ],
