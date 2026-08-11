@@ -2,7 +2,7 @@ var searchData=
 [
   ['v_0',['v',['../structQWEN2__0__5B__DECODELayerOffsets.html#a6ab1aaae9a533bac1f99126a77f816d3',1,'QWEN2_0_5B_DECODELayerOffsets::v'],['../structCKLayerForwardParamsQ4K.html#a7b17e1545dee689697df5da4751de3ea',1,'CKLayerForwardParamsQ4K::v'],['../structCKLayerBackwardParams.html#ada3ee32dfad069f78687e2632f024837',1,'CKLayerBackwardParams::v'],['../structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16',1,'CKLayerForwardParams::v'],['../structCKLayerOffsets.html#a21dedb037033c59edb5c355268bbbad5',1,'CKLayerOffsets::v']]],
   ['v2_5flegacy_2fck_5ftokenizer_5fv2_2ec_1',['ck_tokenizer_v2.c',['../v2__legacy_2ck__tokenizer__v2_8c.html',1,'']]],
-  ['v6_206_2',['v6 6',['../ckernel__orchestration_8c.html#autotoc_md15',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__codegen_8c.html#autotoc_md12',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
+  ['v6_206_2',['v6 6',['../ckernel__codegen_8c.html#autotoc_md12',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8c.html#autotoc_md15',1,'LEGACY CODE - NOT USED IN v6.6'],['../ckernel__orchestration_8h.html#autotoc_md3',1,'LEGACY HEADER - NOT USED IN v6.6']]],
   ['v6_206_202026_2002_3',['v6 6 2026 02',['../ckernel__orchestration_8c.html#autotoc_md16',1,'Deprecated: v6.6 (2026-02)'],['../ckernel__orchestration_8h.html#autotoc_md4',1,'Deprecated: v6.6 (2026-02)'],['../ckernel__codegen_8c.html#autotoc_md13',1,'Deprecated: v6.6 (2026-02)']]],
   ['v6_2e5_2ftest_5fbump_5ftokenizer_2ec_4',['test_bump_tokenizer.c',['../v6_85_2test__bump__tokenizer_8c.html',1,'']]],
   ['v6_2e5_2ftest_5fgenerated_2fck_2dkernel_2dinference_2ec_5',['ck-kernel-inference.c',['../v6_85_2test__generated_2ck-kernel-inference_8c.html',1,'']]],
@@ -62,7 +62,7 @@ var searchData=
   ['vec_5fdot_5fq8_5f0_5fq8_5f0_5fref_59',['vec_dot_q8_0_q8_0_ref',['../gemm__kernels__q8__0_8c.html#a7522a539e09d34bc1298e9d5a3d09692',1,'vec_dot_q8_0_q8_0_ref(int n, float *s, const void *vx, const void *vy):&#160;gemm_kernels_q8_0.c'],['../gemm__kernels__q8__0__q8__0__contract_8c.html#a7522a539e09d34bc1298e9d5a3d09692',1,'vec_dot_q8_0_q8_0_ref(int n, float *s, const void *vx, const void *vy):&#160;gemm_kernels_q8_0.c']]],
   ['vec_5fscale_5fparallel_60',['vec_scale_parallel',['../parallel__orchestration_8c.html#a16e02661985307528fd35a40fa83135f',1,'parallel_orchestration.c']]],
   ['vec_5fzero_5fparallel_61',['vec_zero_parallel',['../parallel__orchestration_8c.html#a049cc63ce5dd8458256cf3e21a343163',1,'parallel_orchestration.c']]],
-  ['vendor_62',['vendor',['../structPCIeDevice.html#ad0ee5cdc2f18d4a309e541766e95a5e6',1,'PCIeDevice::vendor'],['../structCPUInfo.html#a49e6a0b2a711e5acbb16ab29ed9da21f',1,'CPUInfo::vendor']]],
+  ['vendor_62',['vendor',['../structCPUInfo.html#a49e6a0b2a711e5acbb16ab29ed9da21f',1,'CPUInfo::vendor'],['../structPCIeDevice.html#ad0ee5cdc2f18d4a309e541766e95a5e6',1,'PCIeDevice::vendor']]],
   ['version_63',['version',['../structCKBumpHeaderV5.html#ac9d9d27ee6b660da40e40517b5cc6a36',1,'CKBumpHeaderV5']]],
   ['vision_5fkernels_2ec_64',['vision_kernels.c',['../vision__kernels_8c.html',1,'']]],
   ['vision_5fkernels_5fbf16_2ec_65',['vision_kernels_bf16.c',['../vision__kernels__bf16_8c.html',1,'']]],
