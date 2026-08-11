@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" viewBox="0 0 1200 860" role="img" aria-labelledby="title desc">
+  <title id="title">Anatomy of a rich kernel map: gemm_nt_q8_0_q8_0.json</title>
+  <desc id="desc">Field-group breakdown of the Q8 GEMM kernel map: identity and selection, ports and quant, map-owned call ABI, numerical contract with equivalence group, ISA variants, and validation oracles. Groups not present in the minimal memcpy map are drawn in purple.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffb400"/>
+    </marker>
+    <style>
+      .bg{fill:#0b1018}.panel{fill:#131b27;stroke:#334155;stroke-width:2}.input{fill:#17202d;stroke:#07adf8;stroke-width:2}.gate{fill:#201b11;stroke:#ffb400;stroke-width:2}.map{fill:#1a1526;stroke:#bc8cff;stroke-width:2}.t{fill:#f8fafc;font:700 22px Inter,Arial,sans-serif}.h{fill:#f8fafc;font:700 18px Inter,Arial,sans-serif}.p{fill:#cbd5e1;font:15px Inter,Arial,sans-serif}.m{fill:#93c5fd;font:14px 'JetBrains Mono',monospace}.small{fill:#94a3b8;font:13px Inter,Arial,sans-serif}.line{fill:none;stroke:#ffb400;stroke-width:3;marker-end:url(#arrow)}.lg-blue{fill:#07adf8}.lg-purple{fill:#bc8cff}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="860"/>
+  <text class="t" x="50" y="52">Anatomy of a rich map: gemm_nt_q8_0_q8_0</text>
+  <text class="p" x="50" y="82">Same format as memcpy.json, plus the field groups a real quantized production kernel needs.</text>
+  <rect class="lg-blue" x="800" y="40" width="14" height="14" rx="3"/>
+  <text class="small" x="822" y="52">also present in memcpy.json</text>
+  <rect class="lg-purple" x="990" y="40" width="14" height="14" rx="3"/>
+  <text class="small" x="1012" y="52">not in memcpy.json</text>
+
+  <rect class="map" x="300" y="110" width="600" height="92" rx="8"/>
+  <text class="h" x="600" y="148" text-anchor="middle">gemm_nt_q8_0_q8_0.json</text>
+  <text class="m" x="600" y="178" text-anchor="middle">op: gemm · prefill · q8_0 weights × q8_0 inputs → fp32 out</text>
+  <path class="line" d="M440 202 V258 H235 V286"/>
+  <path class="line" d="M600 202 V286"/>
+  <path class="line" d="M760 202 V258 H965 V286"/>
+
+  <rect class="gate" x="50" y="286" width="370" height="240" rx="8"/>
+  <text class="h" x="75" y="320">Identity + selection</text>
+  <text class="m" x="75" y="350">id: "gemm_nt_q8_0_q8_0"</text>
+  <text class="m" x="75" y="376">op: "gemm" · variant: "q8_0_w_q8_0_a"</text>
+  <text class="m" x="75" y="402">status: "production"</text>
+  <text class="m" x="75" y="428">priority: 200</text>
+  <text class="m" x="75" y="454">phases: ["prefill"]</text>
+  <text class="small" x="75" y="488">Prefill-only: a decode op never matches this</text>
+  <text class="small" x="75" y="509">provider — phase filtering removes it first.</text>
+
+  <rect class="input" x="415" y="286" width="370" height="240" rx="8"/>
+  <text class="h" x="440" y="320">Ports + quant</text>
+  <text class="m" x="440" y="350">A  q8_0 [M,K] token_major</text>
+  <text class="m" x="440" y="376">B  q8_0 [N,K] opaque_packed</text>
+  <text class="m" x="440" y="402">bias fp32 [N] optional</text>
+  <text class="m" x="440" y="428">C  fp32 [M,N] token_major</text>
+  <text class="m" x="440" y="454">quant: q8_0 / q8_0 / fp32</text>
+  <text class="small" x="440" y="488">dtype and layout drive compatibility filtering;</text>
+  <text class="small" x="440" y="509">constraints pin K to a multiple of 32.</text>
+
+  <rect class="gate" x="780" y="286" width="370" height="240" rx="8"/>
+  <text class="h" x="805" y="320">Map-owned call ABI</text>
+  <text class="m" x="805" y="350">call_abi v1 — 7 arguments:</text>
+  <text class="m" x="805" y="376">A    ← activation:a</text>
+  <text class="m" x="805" y="402">B    ← weight:_first_weight</text>
+  <text class="m" x="805" y="428">bias ← weight_f:_bias</text>
+  <text class="m" x="805" y="454">C, M, N, K ← output/dims</text>
+  <text class="small" x="805" y="488">Codegen emits exactly this call; unknown fields</text>
+  <text class="small" x="805" y="509">are a HARD CALL ABI FAULT, not a default.</text>
+
+  <rect class="map" x="50" y="556" width="370" height="240" rx="8"/>
+  <text class="h" x="75" y="590">Numerical contract</text>
+  <text class="m" x="75" y="620">numerical_contract =</text>
+  <text class="m" x="75" y="646">equivalence_group =</text>
+  <text class="m" x="75" y="672">  q8_0_weight_q8_0_input_</text>
+  <text class="m" x="75" y="694">  llama_fp32_output</text>
+  <text class="small" x="75" y="728">The group name encodes the arithmetic, so</text>
+  <text class="small" x="75" y="749">priority can never pick across numerics.</text>
+  <text class="small" x="75" y="777">(Identical strings — deliberate.)</text>
+
+  <rect class="map" x="415" y="556" width="370" height="240" rx="8"/>
+  <text class="h" x="440" y="590">ISA variants</text>
+  <text class="m" x="440" y="620">impl.function: gemm_nt_q8_0_q8_0</text>
+  <text class="m" x="440" y="646">avx2_m2n4  requires avx2+fma</text>
+  <text class="m" x="440" y="672">  priority 240 · M≥2 · K mult 32</text>
+  <text class="m" x="440" y="698">avx2 / avx_vnni + compile_flags</text>
+  <text class="small" x="440" y="732">requires gates ISA eligibility — an ineligible</text>
+  <text class="small" x="440" y="753">variant is filtered out, never guessed at.</text>
+
+  <rect class="map" x="780" y="556" width="370" height="240" rx="8"/>
+  <text class="h" x="805" y="590">Validation oracles</text>
+  <text class="m" x="805" y="620">reference: vec_dot_q8_0_q8_0_ref</text>
+  <text class="m" x="805" y="646">  scalar_contract_oracle · validated</text>
+  <text class="m" x="805" y="672">tests: unit + bench + parity</text>
+  <text class="m" x="805" y="698">llama.cpp oracle, tolerance 0.0</text>
+  <text class="small" x="805" y="732">production.reference_comparison is bit_exact —</text>
+  <text class="small" x="805" y="753">the optimized path must match the oracle's</text>
+  <text class="small" x="805" y="774">reduction order bit for bit.</text>
+</svg>

@@ -18,7 +18,7 @@
 .km-dot.floor{background:var(--green)}
 .km-dot.ceiling{background:#fb7185}
 .km-tag{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.35);color:var(--text-secondary);border-radius:999px;padding:.18rem .55rem;display:inline-block;margin:.15rem .25rem .15rem 0}
-p code,li code,td code{overflow-wrap:anywhere}
+main code{overflow-wrap:anywhere}
 @media (max-width:700px){.km-table{display:block;max-width:100%;overflow-x:auto}.km-table td:first-child{white-space:normal}}
 </style>
 
@@ -102,6 +102,223 @@ p code,li code,td code{overflow-wrap:anywhere}
     naming the exact argument list (<code>dst</code>, <code>src</code>, <code>size</code>) with each argument's
     source port. The alias and arithmetic contract is part of the map too: <code>constraints.notes</code>
     states this is a byte copy, performs no arithmetic, and is undefined for overlapping writable views.
+</p>
+
+<h2>Reading a Kernel Map: Field Reference</h2>
+
+<p>
+    The anatomy figure above shows the shape of one map. This section is the member-by-member reference:
+    what each field means, which component consumes it, and what happens when it is missing or wrong.
+</p>
+
+<div class="km-note">
+  <strong>The format is a superset — not every map carries every field.</strong> The migration is in flight,
+  so three vintages coexist and the audit
+  (<code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code>) sorts every map into explicit buckets:
+  <strong>selection-managed</strong> (a valid <code>selection</code> block),
+  <strong>hardened</strong> (<code>operation_interface</code> + <code>numerical_capabilities</code>, where each
+  capability entry requires <code>contract_id, status, phases, function, explicit_selector, implementation,
+  arithmetic</code> per <code>numerical_kernel_capability.schema.json</code>),
+  <strong>interface+ABI cross-validated</strong> (hardened, plus a <code>call_abi</code> whose
+  <code>ports</code> entries cover every declared input/weight/output port exactly), and
+  <strong>legacy</strong> (none of the above). A missing optional block moves a map into an older bucket;
+  it is not an error. The examples below are all production and selection-managed, and each lacks a
+  different piece of the hardened format — that is deliberate, and the page says so per example.
+</div>
+
+<table class="km-table">
+  <tr><th>Field</th><th>What it means</th><th>Consumed by</th><th>If missing or wrong</th></tr>
+  <tr><td>id</td><td>Registry identity of the provider.</td><td>Resolver, X-Ray (selections and rejections are recorded by id), audits.</td><td>Every map has one in practice; X-Ray and audit output key on it.</td></tr>
+  <tr><td>op</td><td>The logical operation this map provides (e.g. <code>gemm</code>, <code>residual_save</code>, <code>kv_cache_store</code>).</td><td>Resolver — matches the circuit's op name.</td><td>Wrong op: the provider simply never matches that operation.</td></tr>
+  <tr><td>operation_interface</td><td>Hardened interface identity (e.g. <code>residual_save.memcpy_copy.v1</code>, <code>kv_cache_store.bf16.head_major.v1</code>) that circuit contracts bind to.</td><td>Resolver, audit.</td><td>Optional. Absent: map stays in the legacy/contract-pending bucket. Present: the audit hard-fails unsafe port aliasing on the map.</td></tr>
+  <tr><td>variant</td><td>Human/machine tag for the variant (e.g. <code>fp32_copy</code>, <code>bf16_cache</code>, <code>q8_0_w_q8_0_a</code>).</td><td>Resolver — direction ranking reads variant/kernel id to demote backward providers during inference.</td><td>Optional; a misleading name can misrank inference vs backward.</td></tr>
+  <tr><td>quant {weight, activation, output}</td><td>Weight, activation, and output dtypes of the provider.</td><td>Resolver — dtype compatibility filtering and activation-preference ranking.</td><td>Wrong dtype: the provider is filtered out for mismatched tensors (recorded as a rejection reason, e.g. <code>weight_dtype_mismatch</code>).</td></tr>
+  <tr><td>selection {status, priority, equivalence_group, phases}</td><td>Selection metadata; see the schema table above.</td><td>Resolver ranking, audit.</td><td>The block itself is optional — absent, the provider is treated as <code>legacy</code> and never outranks a production provider. Present but invalid (bad status, non-integer priority, empty group, bad phases): audit failure; a missing <code>equivalence_group</code> is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
+  <tr><td>inputs / weights / outputs / scratch</td><td>Port lists. Each port has <code>name</code>, <code>dtype</code>, symbolic <code>shape</code>, <code>layout</code>, and a <code>desc</code>; depending on map vintage also <code>access</code>, <code>storage_class</code>, <code>consumption</code> (memcpy, kv_cache_store) or <code>placement</code>, <code>optional</code> (gemm). <code>storage_class: state</code> marks persistent state rather than an ephemeral output.</td><td>Resolver (dtype/layout/alias compatibility), lowering and the memory planner, audit cross-validation.</td><td>Member sets vary by vintage — that is expected. On interface-declaring maps, an unsafe <code>alias_of</code> or writable overlap is an audit hard fault.</td></tr>
+  <tr><td>dims</td><td>Symbolic dimension names the call ABI and lowering resolve to integers (e.g. <code>_memcpy_bytes = embed_dim × seq_len × 4</code> computed at lowering).</td><td>Lowering, codegen.</td><td>Missing/undeclared dims cannot be referenced by the call ABI.</td></tr>
+  <tr><td>params</td><td>Extra typed scalar parameters beyond ports and dims (e.g. <code>_memcpy_bytes</code> of type <code>size_t</code>).</td><td>Lowering, codegen.</td><td>Optional; empty for most GEMM-class maps whose arguments are all ports and dims.</td></tr>
+  <tr><td>call_abi</td><td>The exact C argument list: ordered <code>params</code>, each with <code>name</code> and a namespaced <code>source</code> (<code>activation:</code>, <code>weight:</code>, <code>output:</code>, <code>dim:</code>, <code>runtime:</code>, <code>const:</code>, …), plus optional <code>cast</code> and <code>ports</code>.</td><td>Codegen (emits exactly this call), <code>_validate_kernel_call_abi</code> in <code>build_ir_v8.py</code>, audit.</td><td>Optional — absent, codegen falls back to legacy argument conventions and the audit counts the map as legacy ABI. Present but malformed (unknown field, version ≠ 1, missing name/source, bad source namespace): <code>HARD CALL ABI FAULT</code>.</td></tr>
+  <tr><td>parallelization {supported, preferred, strategies}</td><td>Declared threading policy: which partitionings exist, which is preferred per phase, and per-strategy constraints (e.g. split by tokens vs by output features, minimum chunk, alignment).</td><td>Lowering / thread dispatch.</td><td>Optional; governs scheduling only, never numerics (<code>reduction_order_effect</code> is declared separately).</td></tr>
+  <tr><td>constraints {notes, alignment}</td><td>The semantics contract in prose and machine-checkable alignment (e.g. K must be a multiple of 32; "byte copy, no arithmetic, no overlapping writable views").</td><td>Humans, audits, parity reviewers.</td><td>Optional but load-bearing: this is where alias and arithmetic promises live.</td></tr>
+  <tr><td>numerical_contract</td><td>Contract ID string naming the exact arithmetic (e.g. <code>q8_0_weight_q8_0_input_llama_fp32_output</code>). The audit calls maps carrying it "legacy contract-shaped".</td><td>Resolver/contract validation, parity gates.</td><td>Optional extension; where present it must name a real registered contract.</td></tr>
+  <tr><td>impl {function, sources, variants[]}</td><td>Which C function fulfills the contract, which sources compile it, and ISA-gated variants — each with <code>name</code>, <code>requires</code> (ISA features), <code>compile_flags</code>, and optionally its own <code>priority</code> and <code>shape_constraints</code>.</td><td>Codegen (build), resolver/ISA filtering (<code>requires</code> gates eligibility).</td><td>An ineligible variant is filtered out, never guessed at; a missing source file fails the build.</td></tr>
+  <tr><td>tests</td><td>Unit, bench, and parity oracles with tolerances (e.g. a bit-exact llama.cpp comparison).</td><td>Parity gates, CI.</td><td>Optional; memcpy's is empty — a pure byte copy has no arithmetic to oracle.</td></tr>
+  <tr><td>reference</td><td>The scalar contract oracle: reference function, adapter, validation status, and external oracles. <code>production.reference_comparison</code> can demand <code>bit_exact</code> agreement.</td><td>Parity gates.</td><td>Optional extension; where present, the optimized path must match the oracle's reduction order.</td></tr>
+  <tr><td>phase_selection, production, implementation</td><td>Map-specific extension blocks: per-phase kernel families and scheduling policy, the production function with its comparison requirement, and execution metadata (ISA dispatch style, storage formats, threading runtime).</td><td>Lowering, resolver, parity gates.</td><td>Optional; richer maps carry them, minimal maps omit them.</td></tr>
+</table>
+
+<h2>Worked Example 1: memcpy — the Baseline Read</h2>
+
+<p>
+    <code>memcpy.json</code> is the minimal production map: one op, two ports, one computed parameter, no ISA
+    variants, no numerical contract — a byte copy has no arithmetic to contract. Verbatim excerpt
+    (<code>…</code> marks elided lines):
+</p>
+
+<pre><code>{
+  "id": "memcpy",
+  "op": "residual_save",
+  "operation_interface": "residual_save.memcpy_copy.v1",
+  "selection": {"status": "production", "priority": 100, "equivalence_group": "residual_save.memcpy_copy.v1", "phases": ["prefill", "decode"]},
+  "variant": "fp32_copy",
+  "quant": {"weight": null, "activation": "fp32", "output": "fp32"},
+  "inputs":  [{"name": "src", "dtype": "fp32", "shape": ["N"], "layout": "contiguous", "access": "read",  "storage_class": "activation", …}],
+  "outputs": [{"name": "dst", "dtype": "fp32", "shape": ["N"], "layout": "contiguous", "access": "write", "storage_class": "activation", …}],
+  "dims": ["N"],
+  "params": [{"name": "_memcpy_bytes", "type": "size_t", "desc": "Number of bytes to copy"}],
+  "constraints": {"notes": "Byte copy implementing logical residual_save; performs no arithmetic. src and dst must not overlap …"},
+  "impl": {"function": "memcpy", "sources": [], "variants": [{"name": "default", "requires": [], "compile_flags": []}]},
+  "call_abi": {"version": 1, "params": [
+    {"name": "dst",  "source": "output:dst",        "cast": "void*", …},
+    {"name": "src",  "source": "activation:src",    "cast": "const void*", …},
+    {"name": "size", "source": "dim:_memcpy_bytes"} ]},
+  "tests": {}
+}</code></pre>
+
+<p><strong>How to read it.</strong> The resolver reaches this map when a circuit needs
+<code>residual_save</code> in prefill or decode: the <code>selection</code> block makes it eligible in both
+phases, <code>quant</code> matches FP32 activations, and the single default variant passes ISA filtering
+vacuously (<code>requires: []</code>). Codegen then emits exactly
+<code>memcpy(dst, src, size)</code> — no argument reconstruction. What it deliberately lacks:
+<code>numerical_contract</code>, <code>numerical_capabilities</code>, non-empty <code>tests</code>. The audit
+therefore classes it as selection-managed and interface-ready, not fully "hardened" — a legitimate state for
+a copy with one possible behavior.</p>
+
+<h2>Worked Example 2: gemm_nt_q8_0_q8_0 — the Rich One</h2>
+
+<p>
+    The Q8 prefill GEMM shows every group memcpy omits: a named numerical contract, ISA-gated variants,
+    map-owned ABI for seven arguments, and validation oracles.
+</p>
+
+<div class="img-container svg-viewer km-flow" data-title="Annotated field-group breakdown of gemm_nt_q8_0_q8_0.json, with groups absent from memcpy.json highlighted">
+  <img src="assets/kernel-maps-gemm-anatomy.svg" alt="Six field groups of the Q8 GEMM kernel map. Blue groups also exist in memcpy.json: identity plus selection with status production, priority 200 and prefill-only phases; ports A and B in Q8_0, optional FP32 bias, FP32 output C, with quant q8_0, q8_0, fp32; and a map-owned seven-argument call ABI. Purple groups are absent from memcpy.json: the numerical contract whose equivalence group name q8_0_weight_q8_0_input_llama_fp32_output encodes the arithmetic so priority never picks across numerics; ISA variants avx2_m2n4, avx2 and avx_vnni gated by requires and compile flags; and validation oracles with a scalar reference function and a bit-exact llama.cpp parity test.">
+</div>
+
+<pre><code>{
+  "id": "gemm_nt_q8_0_q8_0",
+  "op": "gemm",
+  "selection": {"status": "production", "priority": 200,
+                "equivalence_group": "q8_0_weight_q8_0_input_llama_fp32_output",
+                "phases": ["prefill"]},
+  "numerical_contract": "q8_0_weight_q8_0_input_llama_fp32_output",
+  "quant": {"weight": "q8_0", "activation": "q8_0", "output": "fp32"},
+  "inputs": [
+    {"name": "A", "dtype": "q8_0", "shape": ["M", "K"], "layout": "token_major_contiguous", …},
+    {"name": "B", "dtype": "q8_0", "shape": ["N", "K"], "layout": "opaque_packed", …},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], …, "optional": true, …} ],
+  "outputs": [{"name": "C", "dtype": "fp32", "shape": ["M", "N"], "layout": "token_major_contiguous", …}],
+  "dims": ["M", "N", "K"],
+  "constraints": {"alignment": {"K": 32}, "notes": "Q8_0 requires K dimension multiple of 32 …"},
+  "phase_selection": {"decode": {"op_family": "gemv", "default_kernel": "gemv_q8_0_q8_0",
+                                 "notes": "Single-token decode retains the certified GEMV path."}, …},
+  "impl": {"function": "gemm_nt_q8_0_q8_0", "sources": ["src/kernels/gemm_batch_int8.c", …],
+    "variants": [
+      {"name": "avx2_m2n4", "function": "gemm_nt_q8_0_q8_0_m2n4", "priority": 240,
+       "requires": ["avx2", "fma"], "shape_constraints": {"M_min": 2, "K_multiple": 32},
+       "numerical_contract": "q8_0_weight_q8_0_input_llama_fp32_output"},
+      {"name": "avx2",     "requires": ["avx2", "fma"],              "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx_vnni", "requires": ["avx2", "avx_vnni", "fma"],  "compile_flags": ["-mavx2", "-mavxvnni", "-mfma"]} ]},
+  "reference": {"function": "vec_dot_q8_0_q8_0_ref", "kind": "scalar_contract_oracle", …},
+  "production": {"function": "gemm_nt_q8_0_q8_0", …, "reference_comparison": {"requirement": "bit_exact", …}},
+  "call_abi": {"version": 1, "params": [
+    {"name": "A", "source": "activation:a", "cast": "const void*"},
+    {"name": "B", "source": "weight:_first_weight"},
+    {"name": "bias", "source": "weight_f:_bias"},
+    {"name": "C", "source": "output:c", "cast": "float*"},
+    {"name": "M", "source": "dim:_m"}, {"name": "N", "source": "dim:_output_dim"},
+    {"name": "K", "source": "dim:_input_dim"} ]},
+  …
+}</code></pre>
+
+<p><strong>How the resolver uses it.</strong> Three facts interact:</p>
+
+<ul>
+  <li><strong>The equivalence-group name encodes the arithmetic.</strong> <code>equivalence_group</code> and
+  <code>numerical_contract</code> are the same string —
+  <code>q8_0_weight_q8_0_input_llama_fp32_output</code>: Q8_0 weights times Q8_0 activations producing FP32
+  output under llama.cpp-compatible semantics. Because priority ranks only <em>within</em> a group, no
+  priority value can ever promote a provider with different arithmetic over this one; cross-group ties are a
+  hard fault ("priority cannot choose between different equivalence groups"), not a silent substitution.</li>
+  <li><strong>Phases filter before priority ranks.</strong> <code>phases: ["prefill"]</code> means a decode op
+  never sees this provider at all — <code>phase_selection.decode</code> documents that single-token decode
+  keeps the certified <code>gemv_q8_0_q8_0</code> GEMV path instead. Priority 200 is only ever compared
+  against other prefill Q8 GEMM providers in the same group.</li>
+  <li><strong>Variants carry ISA eligibility.</strong> Each variant's <code>requires</code> list gates it by
+  CPU features: on a machine without AVX-VNNI the <code>avx_vnni</code> variant is ineligible and filtered
+  out. The <code>avx2_m2n4</code> tile variant adds its own <code>priority: 240</code> and shape constraints
+  (<code>M ≥ 2</code>, <code>K</code> multiple of 32) — variant-level preference, still inside the same
+  numerical contract, which it repeats verbatim.</li>
+</ul>
+
+<p><strong>Honesty note:</strong> this map has no <code>operation_interface</code> and no
+<code>numerical_capabilities</code> block, so the audit classes it as selection-managed and
+legacy-contract-shaped — a production provider carrying the older contract keys, exactly the kind of map the
+migration ratchet tracks.</p>
+
+<h2>Worked Example 3: kv_cache_store_bf16 — the Persistent-State One</h2>
+
+<p>
+    Cache stores look like ordinary ops but their outputs are <em>state</em>, not ephemeral tensors. Verbatim
+    excerpt:
+</p>
+
+<pre><code>{
+  "id": "kv_cache_store_bf16",
+  "op": "kv_cache_store",
+  "operation_interface": "kv_cache_store.bf16.head_major.v1",
+  "selection": {"status": "production", "priority": 100,
+                "equivalence_group": "kv_cache_store.bf16.head_major.v1", "phases": ["decode"]},
+  "variant": "bf16_cache",
+  "quant": {"activation": "fp32", "output": "bf16"},
+  "inputs": [
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "D"], "layout": "head_major_contiguous",
+     "access": "read", "storage_class": "activation", "consumption": "required", …},
+    {"name": "v", …} ],
+  "outputs": [
+    {"name": "kv_cache_k", "dtype": "bf16", "shape": ["KV", "S_max", "D"], "layout": "head_major_contiguous",
+     "access": "read_write", "storage_class": "state", "consumption": "required",
+     "desc": "Packed BF16 K cache slice at current pos. Physical capacity S_max rows; valid-token count is tracked separately by the caller (append index); …"},
+    {"name": "kv_cache_v", …} ],
+  "dims": ["num_kv_heads", "head_dim", "num_layers", "max_seq_len", "KV", "S_max", "D"],
+  "constraints": {"notes": "Scheduling may round the extent to physical capacity S_max; kernels must never read or write KV rows beyond the valid-token count declared by the append index."},
+  "impl": {"function": "kv_cache_store_bf16", …, "sources": ["src/kernels/kv_cache_kernels.c"]},
+  "call_abi": {"version": 1, "params": [
+    {"name": "kv_cache_k", "source": "runtime:kv_cache_k_layer_u16", "cast": "uint16_t*", …},
+    {"name": "kv_cache_v", "source": "runtime:kv_cache_v_layer_u16", "cast": "uint16_t*", …},
+    {"name": "k", "source": "activation:k", "cast": "const float*", …},
+    {"name": "v", "source": "activation:v", "cast": "const float*", …},
+    {"name": "layer", "source": "const:0"}, {"name": "pos", "source": "runtime:pos"},
+    {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+    {"name": "head_dim", "source": "dim:head_dim"}, {"name": "max_seq_len", "source": "dim:max_seq_len"} ]},
+  …
+}</code></pre>
+
+<p><strong>How to read it.</strong></p>
+
+<ul>
+  <li><strong>State, not output.</strong> The <code>kv_cache_k</code>/<code>kv_cache_v</code> ports are
+  <code>storage_class: "state"</code> with <code>access: "read_write"</code> — the kernel appends into a
+  persistent cache slice rather than producing a fresh tensor. That classification is what lets the memory
+  planner treat the cache as long-lived state instead of a per-op allocation.</li>
+  <li><strong>Capacity vs validity.</strong> The shape <code>["KV", "S_max", "D"]</code> is physical capacity:
+  <code>S_max</code> rows exist, but the valid-token count is tracked separately by the caller through the
+  append index (<code>pos</code> in the call ABI, sourced from <code>runtime:pos</code>). The constraint is
+  explicit: append writes exactly the rows at the append index and never reads beyond valid rows, even if
+  scheduling rounds extents up to <code>S_max</code>.</li>
+  <li><strong>Storage dtype and layout are part of the contract.</strong> The interface and equivalence group —
+  <code>kv_cache_store.bf16.head_major.v1</code> — bake in BF16 storage and head-major layout. An FP16 or
+  FP32 cache store is a different group, so the resolver can never swap storage formats as a "priority"
+  decision; <code>quant</code> says FP32 in, BF16 stored.</li>
+  <li><strong>Decode-only is deliberate.</strong> <code>phases: ["decode"]</code> keeps this provider out of
+  prefill entirely; prefill KV writes use their own providers. Like memcpy it carries
+  <code>operation_interface</code> but no <code>numerical_capabilities</code>, so the audit classes it as
+  selection-managed and legacy-interface-ready.</li>
+</ul>
+
+<p>
+    With the format and three real maps in hand, the resolution algorithm below is mechanical: everything the
+    resolver knows about a provider comes from these fields, and everything it rejects leaves a recorded reason.
 </p>
 
 <h2>The Resolution Algorithm</h2>
