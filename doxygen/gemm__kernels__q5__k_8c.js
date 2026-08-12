@@ -10,6 +10,7 @@ var gemm__kernels__q5__k_8c =
     [ "gemm_nt_q5_k", "gemm__kernels__q5__k_8c.html#af1ba72d73c6d788f686bfc12a60281a4", null ],
     [ "gemm_nt_q5_k_prepared", "gemm__kernels__q5__k_8c.html#ade3e51af530aef1d7883f755b978920e", null ],
     [ "gemm_nt_q5_k_prepared_m4", "gemm__kernels__q5__k_8c.html#a624942249ce60cd1067badff49addf0d", null ],
+    [ "gemm_nt_q5_k_prepared_q8_m4_nrange", "gemm__kernels__q5__k_8c.html#ae35b341df2c29c2ffd3d6312ad0efccf", null ],
     [ "gemm_nt_q5_k_q8_k", "gemm__kernels__q5__k_8c.html#aa42d4abdad51556e030da79dd53fb5f0", null ],
     [ "gemm_nt_q5_k_q8_k_ref", "gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d", null ],
     [ "gemm_nt_q5_k_ref", "gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698", null ],

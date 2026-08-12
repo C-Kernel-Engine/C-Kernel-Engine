@@ -17,6 +17,7 @@ var deltanet__kernels_8c =
     [ "gated_deltanet_llama_avx2_forward", "deltanet__kernels_8c.html#a803959e1de4db14206e1b8fe09b5e3a1", null ],
     [ "gated_deltanet_llama_avx2_forward_head_range", "deltanet__kernels_8c.html#a6fa08e3b39eecd72a71fcae5d4e6511c", null ],
     [ "gated_deltanet_llama_avx2_grouped_forward_impl", "deltanet__kernels_8c.html#a861d967c6bca867b5a5b518923886d31", null ],
+    [ "gated_deltanet_llama_avx2_grouped_forward_transposed_impl", "deltanet__kernels_8c.html#a4e193119a082e76b61b422ab09052615", null ],
     [ "gated_deltanet_llama_avx2_prefill_forward", "deltanet__kernels_8c.html#a47a99ff5f30a9e1964edb5627c91965c", null ],
     [ "gated_deltanet_llama_chunk64_head_forward", "deltanet__kernels_8c.html#ab3e7921d991c947c1bd1b80739c99d22", null ],
     [ "gated_deltanet_llama_chunk64_prefill_forward", "deltanet__kernels_8c.html#ad2b6361675fb7fbc2c0a84c9282dbfae", null ],

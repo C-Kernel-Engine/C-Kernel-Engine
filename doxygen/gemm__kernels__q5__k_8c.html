@@ -167,6 +167,8 @@ Functions</h2></td></tr>
 <tr class="separator:ade3e51af530aef1d7883f755b978920e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a624942249ce60cd1067badff49addf0d" id="r_a624942249ce60cd1067badff49addf0d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__k_8c.html#a624942249ce60cd1067badff49addf0d">gemm_nt_q5_k_prepared_m4</a> (const float *A, const void *B_prepared, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="separator:a624942249ce60cd1067badff49addf0d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae35b341df2c29c2ffd3d6312ad0efccf" id="r_ae35b341df2c29c2ffd3d6312ad0efccf"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__k_8c.html#ae35b341df2c29c2ffd3d6312ad0efccf">gemm_nt_q5_k_prepared_q8_m4_nrange</a> (const void *A_q8, const void *B_prepared, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K, int n_begin, int n_end)</td></tr>
+<tr class="separator:ae35b341df2c29c2ffd3d6312ad0efccf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa42d4abdad51556e030da79dd53fb5f0" id="r_aa42d4abdad51556e030da79dd53fb5f0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__k_8c.html#aa42d4abdad51556e030da79dd53fb5f0">gemm_nt_q5_k_q8_k</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
 <tr class="separator:aa42d4abdad51556e030da79dd53fb5f0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab121e92f0792fcfc1de07cea6cd5e0d" id="r_aab121e92f0792fcfc1de07cea6cd5e0d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a> (const void *A_q8, const void *B, const float *bias, float *<a class="el" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, int M, int N, int K)</td></tr>
@@ -373,7 +375,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">   55</span>    <span class="keywordflow">return</span> cached;</div>
 <div class="line"><span class="lineno">   56</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_nt_q5_k_ref()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">gemv_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_nt_q5_k_ref()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">gemv_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -617,28 +619,28 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00805">805</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  810</span>{</div>
-<div class="line"><span class="lineno">  811</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  812</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
-<div class="line"><span class="lineno">  813</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  814</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  815</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
-<div class="line"><span class="lineno">  816</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  817</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  818</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
-<div class="line"><span class="lineno">  819</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  820</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno">  821</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
-<div class="line"><span class="lineno">  822</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  823</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  824</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  825</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  826</span>}</div>
-<div class="ttc" id="agemm__kernels__q5__k_8c_html_aa165bcff171b4bc4877ac5d604ddb698"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a></div><div class="ttdeci">void gemm_nt_q5_k_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_kernels_q5_k.c:704</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00847">847</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  852</span>{</div>
+<div class="line"><span class="lineno">  853</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  854</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
+<div class="line"><span class="lineno">  855</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  856</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  857</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
+<div class="line"><span class="lineno">  858</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  859</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  860</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
+<div class="line"><span class="lineno">  861</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  862</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno">  863</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
+<div class="line"><span class="lineno">  864</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  865</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  866</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  867</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  868</span>}</div>
+<div class="ttc" id="agemm__kernels__q5__k_8c_html_aa165bcff171b4bc4877ac5d604ddb698"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698">gemm_nt_q5_k_ref</a></div><div class="ttdeci">void gemm_nt_q5_k_ref(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_kernels_q5_k.c:746</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_nt_q5_k_ref()</a>.</p>
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_nt_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -820,6 +822,115 @@ CK-ENGINE KERNEL RULES:</h1>
 
 </div>
 </div>
+<a id="ae35b341df2c29c2ffd3d6312ad0efccf" name="ae35b341df2c29c2ffd3d6312ad0efccf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae35b341df2c29c2ffd3d6312ad0efccf">&#9670;&#160;</a></span>gemm_nt_q5_k_prepared_q8_m4_nrange()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void gemm_nt_q5_k_prepared_q8_m4_nrange </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>A_q8</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>B_prepared</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bias</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>C</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>N</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>K</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>n_begin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>n_end</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00660">660</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  666</span>{</div>
+<div class="line"><span class="lineno">  667</span><span class="preprocessor">#if !defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  668</span>    (void)A_q8; (void)B_prepared; (void)bias; (void)<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>;</div>
+<div class="line"><span class="lineno">  669</span>    (void)M; (void)N; (void)K; (void)n_begin; (void)n_end;</div>
+<div class="line"><span class="lineno">  670</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  671</span>    <span class="keywordflow">if</span> (!A_q8 || !B_prepared || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  672</span>            (K % <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) != 0 || n_begin &lt; 0 || n_end &gt; N ||</div>
+<div class="line"><span class="lineno">  673</span>            n_begin &gt;= n_end) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  674</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">  675</span>    <span class="keywordflow">if</span> (blocks_per_row &gt; <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  676</span>    <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *A = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)A_q8;</div>
+<div class="line"><span class="lineno">  677</span>    <span class="keyword">const</span> block_q5_K_prepared *W =</div>
+<div class="line"><span class="lineno">  678</span>        (<span class="keyword">const</span> block_q5_K_prepared *)B_prepared;</div>
+<div class="line"><span class="lineno">  679</span> </div>
+<div class="line"><span class="lineno">  680</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m += 4) {</div>
+<div class="line"><span class="lineno">  681</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> rows = M - m &lt; 4 ? M - m : 4;</div>
+<div class="line"><span class="lineno">  682</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *row_ptrs[4] = {</div>
+<div class="line"><span class="lineno">  683</span>            A + (size_t)(m + 0) * blocks_per_row,</div>
+<div class="line"><span class="lineno">  684</span>            A + (size_t)(m + (rows &gt; 1 ? 1 : 0)) * blocks_per_row,</div>
+<div class="line"><span class="lineno">  685</span>            A + (size_t)(m + (rows &gt; 2 ? 2 : 0)) * blocks_per_row,</div>
+<div class="line"><span class="lineno">  686</span>            A + (size_t)(m + (rows &gt; 3 ? 3 : 0)) * blocks_per_row,</div>
+<div class="line"><span class="lineno">  687</span>        };</div>
+<div class="line"><span class="lineno">  688</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = n_begin; n &lt; n_end; ++n) {</div>
+<div class="line"><span class="lineno">  689</span>            <span class="keywordtype">float</span> sums[4];</div>
+<div class="line"><span class="lineno">  690</span>            dot_q5_k_prepared_q8_k_m4_avx2(</div>
+<div class="line"><span class="lineno">  691</span>                W + (<span class="keywordtype">size_t</span>)n * blocks_per_row,</div>
+<div class="line"><span class="lineno">  692</span>                row_ptrs, rows, blocks_per_row, sums);</div>
+<div class="line"><span class="lineno">  693</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">  694</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)(m + r) * N + n] =</div>
+<div class="line"><span class="lineno">  695</span>                    sums[r] + (bias ? bias[n] : 0.0f);</div>
+<div class="line"><span class="lineno">  696</span>            }</div>
+<div class="line"><span class="lineno">  697</span>        }</div>
+<div class="line"><span class="lineno">  698</span>    }</div>
+<div class="line"><span class="lineno">  699</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  700</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00046">CK_Q5K_STACK_Q8_BLOCKS</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>.</p>
+
+</div>
+</div>
 <a id="aa42d4abdad51556e030da79dd53fb5f0" name="aa42d4abdad51556e030da79dd53fb5f0"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa42d4abdad51556e030da79dd53fb5f0">&#9670;&#160;</a></span>gemm_nt_q5_k_q8_k()</h2>
 
@@ -876,24 +987,24 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00763">763</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  768</span>{</div>
-<div class="line"><span class="lineno">  769</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  770</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
-<div class="line"><span class="lineno">  771</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  772</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  773</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
-<div class="line"><span class="lineno">  774</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  775</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  776</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
-<div class="line"><span class="lineno">  777</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  778</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno">  779</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
-<div class="line"><span class="lineno">  780</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  781</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  782</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  783</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  784</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00805">805</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  810</span>{</div>
+<div class="line"><span class="lineno">  811</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  812</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
+<div class="line"><span class="lineno">  813</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  814</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  815</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
+<div class="line"><span class="lineno">  816</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  817</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  818</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
+<div class="line"><span class="lineno">  819</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  820</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno">  821</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
+<div class="line"><span class="lineno">  822</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  823</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  824</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(A_q8, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  825</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  826</span>}</div>
 <div class="ttc" id="agemm__kernels__q5__k_8c_html_aab121e92f0792fcfc1de07cea6cd5e0d"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a></div><div class="ttdeci">void gemm_nt_q5_k_q8_k_ref(const void *A_q8, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00569">gemm_kernels_q5_k.c:569</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00569">gemm_nt_q5_k_q8_k_ref()</a>.</p>
@@ -982,7 +1093,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00369">dot_q5_k_q8_k_row()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00763">gemm_nt_q5_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_nt_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00805">gemm_nt_q5_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_nt_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -1042,40 +1153,40 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">704</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  709</span>{</div>
-<div class="line"><span class="lineno">  710</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno">  711</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  712</span>    }</div>
-<div class="line"><span class="lineno">  713</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de">ck_q5k_debug_fp32_fallback</a>()) {</div>
-<div class="line"><span class="lineno">  714</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  715</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  716</span>    }</div>
-<div class="line"><span class="lineno">  717</span>    <span class="keywordflow">if</span> (K % <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
-<div class="line"><span class="lineno">  718</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  719</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  720</span>    }</div>
-<div class="line"><span class="lineno">  721</span> </div>
-<div class="line"><span class="lineno">  722</span>    <span class="keyword">const</span> block_q5_K *blocks = (<span class="keyword">const</span> block_q5_K *)B;</div>
-<div class="line"><span class="lineno">  723</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_col = K / <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">  724</span>    <span class="keywordflow">if</span> (blocks_per_col &gt; <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>) {</div>
-<div class="line"><span class="lineno">  725</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  726</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  727</span>    }</div>
-<div class="line"><span class="lineno">  728</span> </div>
-<div class="line"><span class="lineno">  729</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno">  730</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
-<div class="line"><span class="lineno">  731</span>        <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> a_q8[<a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>];</div>
-<div class="line"><span class="lineno">  732</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(a_row, a_q8, K);</div>
-<div class="line"><span class="lineno">  733</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(a_q8, blocks, bias, &amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], 1, N, K);</div>
-<div class="line"><span class="lineno">  734</span>    }</div>
-<div class="line"><span class="lineno">  735</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">746</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  751</span>{</div>
+<div class="line"><span class="lineno">  752</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno">  753</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  754</span>    }</div>
+<div class="line"><span class="lineno">  755</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de">ck_q5k_debug_fp32_fallback</a>()) {</div>
+<div class="line"><span class="lineno">  756</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  757</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  758</span>    }</div>
+<div class="line"><span class="lineno">  759</span>    <span class="keywordflow">if</span> (K % <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
+<div class="line"><span class="lineno">  760</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  761</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  762</span>    }</div>
+<div class="line"><span class="lineno">  763</span> </div>
+<div class="line"><span class="lineno">  764</span>    <span class="keyword">const</span> block_q5_K *blocks = (<span class="keyword">const</span> block_q5_K *)B;</div>
+<div class="line"><span class="lineno">  765</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_col = K / <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">  766</span>    <span class="keywordflow">if</span> (blocks_per_col &gt; <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>) {</div>
+<div class="line"><span class="lineno">  767</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  768</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  769</span>    }</div>
+<div class="line"><span class="lineno">  770</span> </div>
+<div class="line"><span class="lineno">  771</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno">  772</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *a_row = &amp;A[m * K];</div>
+<div class="line"><span class="lineno">  773</span>        <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> a_q8[<a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>];</div>
+<div class="line"><span class="lineno">  774</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(a_row, a_q8, K);</div>
+<div class="line"><span class="lineno">  775</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d">gemm_nt_q5_k_q8_k_ref</a>(a_q8, blocks, bias, &amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], 1, N, K);</div>
+<div class="line"><span class="lineno">  776</span>    }</div>
+<div class="line"><span class="lineno">  777</span>}</div>
 <div class="ttc" id="agemm__kernels__q5__k_8c_html_a037305c0ba58ea1cae37e0f5e7f04de2"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#a037305c0ba58ea1cae37e0f5e7f04de2">gemm_nt_q5_k_ref_fp32</a></div><div class="ttdeci">static void gemm_nt_q5_k_ref_fp32(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00494">gemm_kernels_q5_k.c:494</a></div></div>
 <div class="ttc" id="agemm__kernels__q5__k_8c_html_a97d5f32d99bfce1027e26f89ef4d09de"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de">ck_q5k_debug_fp32_fallback</a></div><div class="ttdeci">static int ck_q5k_debug_fp32_fallback(void)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00048">gemm_kernels_q5_k.c:48</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00048">ck_q5k_debug_fp32_fallback()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00046">CK_Q5K_STACK_Q8_BLOCKS</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00569">gemm_nt_q5_k_q8_k_ref()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00494">gemm_nt_q5_k_ref_fp32()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00121">quantize_row_q8_k()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00805">gemm_nt_q5_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00847">gemm_nt_q5_k()</a>.</p>
 
 </div>
 </div>
@@ -1179,7 +1290,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00380">CK_FP16_TO_FP32</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00119">q5_k_quant_value()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00095">unpack_q5_k_scales()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_nt_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_nt_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -1227,27 +1338,27 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00786">786</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  787</span>{</div>
-<div class="line"><span class="lineno">  788</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  789</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
-<div class="line"><span class="lineno">  790</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  791</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  792</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
-<div class="line"><span class="lineno">  793</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  794</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  795</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
-<div class="line"><span class="lineno">  796</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  797</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno">  798</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
-<div class="line"><span class="lineno">  799</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  800</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  801</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  802</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  803</span>}</div>
-<div class="ttc" id="agemm__kernels__q5__k_8c_html_a0d2f4480df784df8fa9db194489a70c3"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a></div><div class="ttdeci">void gemv_q5_k_ref(float *y, const void *W, const float *x, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00668">gemm_kernels_q5_k.c:668</a></div></div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00828">828</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  829</span>{</div>
+<div class="line"><span class="lineno">  830</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  831</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
+<div class="line"><span class="lineno">  832</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  833</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  834</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
+<div class="line"><span class="lineno">  835</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  836</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  837</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
+<div class="line"><span class="lineno">  838</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  839</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno">  840</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
+<div class="line"><span class="lineno">  841</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  842</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  843</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  844</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  845</span>}</div>
+<div class="ttc" id="agemm__kernels__q5__k_8c_html_a0d2f4480df784df8fa9db194489a70c3"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#a0d2f4480df784df8fa9db194489a70c3">gemv_q5_k_ref</a></div><div class="ttdeci">void gemv_q5_k_ref(float *y, const void *W, const float *x, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00710">gemm_kernels_q5_k.c:710</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">gemv_q5_k_ref()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">gemv_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -1295,24 +1406,24 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00741">741</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  745</span>{</div>
-<div class="line"><span class="lineno">  746</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  747</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
-<div class="line"><span class="lineno">  748</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  749</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  750</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
-<div class="line"><span class="lineno">  751</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  752</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  753</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
-<div class="line"><span class="lineno">  754</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  755</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
-<div class="line"><span class="lineno">  756</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
-<div class="line"><span class="lineno">  757</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  758</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  759</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  760</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  761</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00783">783</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  787</span>{</div>
+<div class="line"><span class="lineno">  788</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  789</span>    <span class="comment">/* TODO: AVX-512 implementation */</span></div>
+<div class="line"><span class="lineno">  790</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  791</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  792</span>    <span class="comment">/* TODO: AVX-2 implementation */</span></div>
+<div class="line"><span class="lineno">  793</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  794</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  795</span>    <span class="comment">/* TODO: AVX implementation */</span></div>
+<div class="line"><span class="lineno">  796</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  797</span><span class="preprocessor">#elif defined(__SSE4_1__)</span></div>
+<div class="line"><span class="lineno">  798</span>    <span class="comment">/* TODO: SSE4.1 implementation */</span></div>
+<div class="line"><span class="lineno">  799</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  800</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  801</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  802</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  803</span>}</div>
 <div class="ttc" id="agemm__kernels__q5__k_8c_html_af70c58d2a66aba5bee573b46bee8222d"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q5_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00547">gemm_kernels_q5_k.c:547</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00547">gemv_q5_k_q8_k_ref()</a>.</p>
@@ -1384,7 +1495,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00369">dot_q5_k_q8_k_row()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00741">gemv_q5_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">gemv_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00783">gemv_q5_k_q8_k()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">gemv_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -1432,38 +1543,38 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">668</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  669</span>{</div>
-<div class="line"><span class="lineno">  670</span>    <span class="keywordflow">if</span> (!y || !W || !x || M &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno">  671</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  672</span>    }</div>
-<div class="line"><span class="lineno">  673</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de">ck_q5k_debug_fp32_fallback</a>()) {</div>
-<div class="line"><span class="lineno">  674</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  675</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  676</span>    }</div>
-<div class="line"><span class="lineno">  677</span>    <span class="keywordflow">if</span> (K % <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
-<div class="line"><span class="lineno">  678</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  679</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  680</span>    }</div>
-<div class="line"><span class="lineno">  681</span> </div>
-<div class="line"><span class="lineno">  682</span>    <span class="keyword">const</span> block_q5_K *blocks = (<span class="keyword">const</span> block_q5_K *)W;</div>
-<div class="line"><span class="lineno">  683</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">  684</span>    <span class="keywordflow">if</span> (blocks_per_row &gt; <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>) {</div>
-<div class="line"><span class="lineno">  685</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
-<div class="line"><span class="lineno">  686</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  687</span>    }</div>
-<div class="line"><span class="lineno">  688</span> </div>
-<div class="line"><span class="lineno">  689</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> x_q8[<a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>];</div>
-<div class="line"><span class="lineno">  690</span>    <span class="comment">/* Q8_K bytes are part of the numerical ABI. Use the shared provider,</span></div>
-<div class="line"><span class="lineno">  691</span><span class="comment">     * whose FP-contraction policy is validated against llama.cpp. */</span></div>
-<div class="line"><span class="lineno">  692</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(x, x_q8, K);</div>
-<div class="line"><span class="lineno">  693</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, blocks, x_q8, M, K);</div>
-<div class="line"><span class="lineno">  694</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">710</a> of file <a class="el" href="gemm__kernels__q5__k_8c_source.html">gemm_kernels_q5_k.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  711</span>{</div>
+<div class="line"><span class="lineno">  712</span>    <span class="keywordflow">if</span> (!y || !W || !x || M &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno">  713</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  714</span>    }</div>
+<div class="line"><span class="lineno">  715</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de">ck_q5k_debug_fp32_fallback</a>()) {</div>
+<div class="line"><span class="lineno">  716</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  717</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  718</span>    }</div>
+<div class="line"><span class="lineno">  719</span>    <span class="keywordflow">if</span> (K % <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a> != 0) {</div>
+<div class="line"><span class="lineno">  720</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  721</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  722</span>    }</div>
+<div class="line"><span class="lineno">  723</span> </div>
+<div class="line"><span class="lineno">  724</span>    <span class="keyword">const</span> block_q5_K *blocks = (<span class="keyword">const</span> block_q5_K *)W;</div>
+<div class="line"><span class="lineno">  725</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">  726</span>    <span class="keywordflow">if</span> (blocks_per_row &gt; <a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>) {</div>
+<div class="line"><span class="lineno">  727</span>        <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a>(y, W, x, M, K);</div>
+<div class="line"><span class="lineno">  728</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  729</span>    }</div>
+<div class="line"><span class="lineno">  730</span> </div>
+<div class="line"><span class="lineno">  731</span>    <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> x_q8[<a class="code hl_define" href="gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97">CK_Q5K_STACK_Q8_BLOCKS</a>];</div>
+<div class="line"><span class="lineno">  732</span>    <span class="comment">/* Q8_K bytes are part of the numerical ABI. Use the shared provider,</span></div>
+<div class="line"><span class="lineno">  733</span><span class="comment">     * whose FP-contraction policy is validated against llama.cpp. */</span></div>
+<div class="line"><span class="lineno">  734</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#a64b28ca8a25883986a0d22e39a574a32">quantize_row_q8_k</a>(x, x_q8, K);</div>
+<div class="line"><span class="lineno">  735</span>    <a class="code hl_function" href="gemm__kernels__q5__k_8c.html#af70c58d2a66aba5bee573b46bee8222d">gemv_q5_k_q8_k_ref</a>(y, blocks, x_q8, M, K);</div>
+<div class="line"><span class="lineno">  736</span>}</div>
 <div class="ttc" id="agemm__kernels__q5__k_8c_html_ab7421a7835c15bf10a2ea016fb114383"><div class="ttname"><a href="gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383">gemv_q5_k_ref_fp32</a></div><div class="ttdeci">static void gemv_q5_k_ref_fp32(float *y, const void *W, const float *x, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q5__k_8c_source.html#l00463">gemm_kernels_q5_k.c:463</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00048">ck_q5k_debug_fp32_fallback()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00046">CK_Q5K_STACK_Q8_BLOCKS</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00547">gemv_q5_k_q8_k_ref()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00463">gemv_q5_k_ref_fp32()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>, and <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00121">quantize_row_q8_k()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00786">gemv_q5_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00828">gemv_q5_k()</a>.</p>
 
 </div>
 </div>
@@ -1552,7 +1663,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00380">CK_FP16_TO_FP32</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00119">q5_k_quant_value()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00045">QK_K</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00095">unpack_q5_k_scales()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">gemv_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">gemv_q5_k_ref()</a>.</p>
 
 </div>
 </div>
@@ -1665,7 +1776,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ad7fa7d735b58b52c90cbd6160676e86f"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f">quantize_row_q8_k_sse</a></div><div class="ttdeci">void quantize_row_q8_k_sse(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="quantize__row__q8__k__sse_8c_source.html#l00022">quantize_row_q8_k_sse.c:22</a></div></div>
 <div class="ttc" id="agemm__kernels__q4k__q8k_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00061">gemm_kernels_q4k_q8k.c:61</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00596">gemm_nt_q5_k_prepared()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00623">gemm_nt_q5_k_prepared_m4()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00704">gemm_nt_q5_k_ref()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00668">gemv_q5_k_ref()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00596">gemm_nt_q5_k_prepared()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00623">gemm_nt_q5_k_prepared_m4()</a>, <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00746">gemm_nt_q5_k_ref()</a>, and <a class="el" href="gemm__kernels__q5__k_8c_source.html#l00710">gemv_q5_k_ref()</a>.</p>
 
 </div>
 </div>

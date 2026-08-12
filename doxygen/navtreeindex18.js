@@ -1,5 +1,11 @@
 var NAVTREEINDEX18 =
 {
+"structCPUInfo.html#a703824b64f9035d0adf5641c9d20527e":[1,0,66,38],
+"structCPUInfo.html#a72c59fe4c03be35b475dd733bd17860c":[1,0,66,20],
+"structCPUInfo.html#a7983ac279a57f5d5992248d720452dfe":[1,0,66,5],
+"structCPUInfo.html#a7cb0183778ff279baa23ce4816b99089":[1,0,66,14],
+"structCPUInfo.html#a7fed58e4df275a215e37074b900e0f96":[1,0,66,19],
+"structCPUInfo.html#a934706fb3c631457a24c2616c293b20e":[1,0,66,33],
 "structCPUInfo.html#a943858d53173dca145611d8cb192f0ca":[1,0,66,2],
 "structCPUInfo.html#aa4bcdef1bf48fa3860742a28a7d57d6d":[1,0,66,35],
 "structCPUInfo.html#aa67080f78191b764515728bdabf55924":[1,0,66,37],
@@ -243,11 +249,5 @@ var NAVTREEINDEX18 =
 "structck__capability__t.html#a691a1ed7473609bba2431299aab8bded":[1,0,12,4],
 "structck__capability__t.html#a9f5f0f74c73143705dc702efbee3a8d3":[1,0,12,1],
 "structck__capability__t.html#abe5ee8f28c062c14b0f243dfd0546068":[1,0,12,3],
-"structggml__init__params.html":[1,0,68],
-"structggml__init__params.html#a5b4bf877ba8af2df9bb60e82d7c1cf01":[1,0,68,2],
-"structggml__init__params.html#a5ede508e399874a98eeca731d71a7e0b":[1,0,68,1],
-"structggml__init__params.html#abe8bc32cccaebad17a238bd3055eac68":[1,0,68,0],
-"swiglu__kernels_8c.html":[2,0,1,1,86],
-"swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c":[2,0,1,1,86,5],
-"swiglu__kernels_8c.html#a18063a61725eeeeb371d7c9f1e0d410d":[2,0,1,1,86,7]
+"structggml__init__params.html":[1,0,68]
 };
