@@ -365,6 +365,7 @@ var ckernel__engine_8h =
     [ "quantize_row_q8_0", "ckernel__engine_8h.html#aaed08819c4a21e49ca43bc3094022eaa", null ],
     [ "quantize_row_q8_k", "ckernel__engine_8h.html#a8a2064dd87b86a56f41b163bef7bdd9d", null ],
     [ "recurrent_conv_state_update_backward", "ckernel__engine_8h.html#ae70cf86294508b950abfac4af0762266", null ],
+    [ "recurrent_conv_state_update_backward_workspace", "ckernel__engine_8h.html#a5c7d1c7ba5e9357c5dded473f54c0e2e", null ],
     [ "recurrent_conv_state_update_forward", "ckernel__engine_8h.html#a55ef0ed9f1f51ca4910e3f7457054044", null ],
     [ "recurrent_dt_gate_backward", "ckernel__engine_8h.html#af3e6a26ed748383231350f849f4ed039", null ],
     [ "recurrent_dt_gate_expanded_forward", "ckernel__engine_8h.html#a50f8cc0388e79a27e195ef4e25a9e64f", null ],

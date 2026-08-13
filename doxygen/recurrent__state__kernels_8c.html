@@ -131,6 +131,8 @@ $(document).ready(function(){initNavTree('recurrent__state__kernels_8c.html','')
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;<a class="el" href="ckernel__engine_8h_source.html">ckernel_engine.h</a>&quot;</code><br />
+<code>#include &lt;limits.h&gt;</code><br />
+<code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &lt;stdlib.h&gt;</code><br />
 <code>#include &lt;string.h&gt;</code><br />
 </div>
@@ -138,12 +140,122 @@ $(document).ready(function(){initNavTree('recurrent__state__kernels_8c.html','')
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a293da8c98ad512706fa5ea77b842d8c2" id="r_a293da8c98ad512706fa5ea77b842d8c2"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__state__kernels_8c.html#a293da8c98ad512706fa5ea77b842d8c2">recurrent_conv_backward_extents</a> (int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim, int *channels_out, int *total_len_out, size_t *elements_out)</td></tr>
+<tr class="separator:a293da8c98ad512706fa5ea77b842d8c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae70cf86294508b950abfac4af0762266" id="r_ae70cf86294508b950abfac4af0762266"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__state__kernels_8c.html#ae70cf86294508b950abfac4af0762266">recurrent_conv_state_update_backward</a> (const float *d_conv_x, const float *d_state_out, float *d_state_in, float *d_q, float *d_k, float *d_v, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</td></tr>
 <tr class="separator:ae70cf86294508b950abfac4af0762266"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c7d1c7ba5e9357c5dded473f54c0e2e" id="r_a5c7d1c7ba5e9357c5dded473f54c0e2e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__state__kernels_8c.html#a5c7d1c7ba5e9357c5dded473f54c0e2e">recurrent_conv_state_update_backward_workspace</a> (const float *d_conv_x, const float *d_state_out, float *d_state_in, float *d_q, float *d_k, float *d_v, float *d_conv_total, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</td></tr>
+<tr class="separator:a5c7d1c7ba5e9357c5dded473f54c0e2e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a55ef0ed9f1f51ca4910e3f7457054044" id="r_a55ef0ed9f1f51ca4910e3f7457054044"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__state__kernels_8c.html#a55ef0ed9f1f51ca4910e3f7457054044">recurrent_conv_state_update_forward</a> (const float *state_in, const float *q, const float *k, const float *v, float *conv_x, float *state_out, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</td></tr>
 <tr class="separator:a55ef0ed9f1f51ca4910e3f7457054044"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a293da8c98ad512706fa5ea77b842d8c2" name="a293da8c98ad512706fa5ea77b842d8c2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a293da8c98ad512706fa5ea77b842d8c2">&#9670;&#160;</a></span>recurrent_conv_backward_extents()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static int recurrent_conv_backward_extents </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>history_len</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_seqs</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>q_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>k_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *&#160;</td>
+          <td class="paramname"><em>channels_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int *&#160;</td>
+          <td class="paramname"><em>total_len_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t *&#160;</td>
+          <td class="paramname"><em>elements_out</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00058">58</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   66</span>                                                                 {</div>
+<div class="line"><span class="lineno">   67</span>    <span class="keywordflow">if</span> (history_len &lt; 0 || num_seqs &lt;= 0 || num_tokens &lt; 0 || q_dim &lt; 0 ||</div>
+<div class="line"><span class="lineno">   68</span>        k_dim &lt; 0 || v_dim &lt; 0 || q_dim &gt; INT_MAX - k_dim ||</div>
+<div class="line"><span class="lineno">   69</span>        q_dim + k_dim &gt; INT_MAX - v_dim || history_len &gt; INT_MAX - num_tokens) {</div>
+<div class="line"><span class="lineno">   70</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   71</span>    }</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
+<div class="line"><span class="lineno">   73</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
+<div class="line"><span class="lineno">   74</span>    <span class="keywordflow">if</span> (channels == 0 || total_len == 0) {</div>
+<div class="line"><span class="lineno">   75</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   76</span>    }</div>
+<div class="line"><span class="lineno">   77</span>    <span class="keywordtype">size_t</span> elements = (size_t)num_seqs;</div>
+<div class="line"><span class="lineno">   78</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)total_len &gt; SIZE_MAX / elements) {</div>
+<div class="line"><span class="lineno">   79</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   80</span>    }</div>
+<div class="line"><span class="lineno">   81</span>    elements *= (size_t)total_len;</div>
+<div class="line"><span class="lineno">   82</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)channels &gt; SIZE_MAX / elements) {</div>
+<div class="line"><span class="lineno">   83</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   84</span>    }</div>
+<div class="line"><span class="lineno">   85</span>    *channels_out = channels;</div>
+<div class="line"><span class="lineno">   86</span>    *total_len_out = total_len;</div>
+<div class="line"><span class="lineno">   87</span>    *elements_out = elements * (size_t)channels;</div>
+<div class="line"><span class="lineno">   88</span>    <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">   89</span>}</div>
+</div><!-- fragment -->
+<p class="reference">Referenced by <a class="el" href="recurrent__state__kernels_8c_source.html#l00160">recurrent_conv_state_update_backward()</a>, and <a class="el" href="recurrent__state__kernels_8c_source.html#l00091">recurrent_conv_state_update_backward_workspace()</a>.</p>
+
+</div>
+</div>
 <a id="ae70cf86294508b950abfac4af0762266" name="ae70cf86294508b950abfac4af0762266"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae70cf86294508b950abfac4af0762266">&#9670;&#160;</a></span>recurrent_conv_state_update_backward()</h2>
 
@@ -230,60 +342,189 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00056">56</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   67</span>                                                     {</div>
-<div class="line"><span class="lineno">   68</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
-<div class="line"><span class="lineno">   69</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
-<div class="line"><span class="lineno">   70</span>    <span class="keywordtype">float</span> *d_conv_total = (<span class="keywordtype">float</span> *) malloc((<span class="keywordtype">size_t</span>) num_seqs * (size_t) total_len * (<span class="keywordtype">size_t</span>) channels * <span class="keyword">sizeof</span>(float));</div>
-<div class="line"><span class="lineno">   71</span>    <span class="keywordflow">if</span> (!d_conv_total) {</div>
-<div class="line"><span class="lineno">   72</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   73</span>    }</div>
-<div class="line"><span class="lineno">   74</span> </div>
-<div class="line"><span class="lineno">   75</span>    memcpy(d_conv_total, d_conv_x, (<span class="keywordtype">size_t</span>) num_seqs * (<span class="keywordtype">size_t</span>) total_len * (<span class="keywordtype">size_t</span>) channels * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   76</span> </div>
-<div class="line"><span class="lineno">   77</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">   78</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_state_out_seq = d_state_out + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   79</span>        <span class="keywordtype">float</span> *d_conv_seq = d_conv_total + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
-<div class="line"><span class="lineno">   80</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   81</span>            <span class="keywordtype">float</span> *dst = d_conv_seq + (size_t) ch * (<span class="keywordtype">size_t</span>) total_len + (size_t) num_tokens;</div>
-<div class="line"><span class="lineno">   82</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src = d_state_out_seq + (size_t) ch * (<span class="keywordtype">size_t</span>) history_len;</div>
-<div class="line"><span class="lineno">   83</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = 0; idx &lt; history_len; ++idx) {</div>
-<div class="line"><span class="lineno">   84</span>                dst[idx] += src[idx];</div>
-<div class="line"><span class="lineno">   85</span>            }</div>
-<div class="line"><span class="lineno">   86</span>        }</div>
-<div class="line"><span class="lineno">   87</span>    }</div>
-<div class="line"><span class="lineno">   88</span> </div>
-<div class="line"><span class="lineno">   89</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">   90</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_conv_seq = d_conv_total + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
-<div class="line"><span class="lineno">   91</span>        <span class="keywordtype">float</span> *d_state_in_seq = d_state_in + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   92</span> </div>
-<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   94</span>            memcpy(</div>
-<div class="line"><span class="lineno">   95</span>                d_state_in_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
-<div class="line"><span class="lineno">   96</span>                d_conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len,</div>
-<div class="line"><span class="lineno">   97</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   98</span>        }</div>
-<div class="line"><span class="lineno">   99</span> </div>
-<div class="line"><span class="lineno">  100</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">  101</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> row = seq * num_tokens + tok;</div>
-<div class="line"><span class="lineno">  102</span>            <span class="keywordtype">float</span> *d_q_row = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">  103</span>            <span class="keywordtype">float</span> *d_k_row = d_k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
-<div class="line"><span class="lineno">  104</span>            <span class="keywordtype">float</span> *d_v_row = d_v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
-<div class="line"><span class="lineno">  105</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; q_dim; ++col) {</div>
-<div class="line"><span class="lineno">  106</span>                d_q_row[col] = d_conv_seq[(size_t) col * (<span class="keywordtype">size_t</span>) total_len + (size_t) (history_len + tok)];</div>
-<div class="line"><span class="lineno">  107</span>            }</div>
-<div class="line"><span class="lineno">  108</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; k_dim; ++col) {</div>
-<div class="line"><span class="lineno">  109</span>                d_k_row[col] = d_conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)];</div>
-<div class="line"><span class="lineno">  110</span>            }</div>
-<div class="line"><span class="lineno">  111</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; v_dim; ++col) {</div>
-<div class="line"><span class="lineno">  112</span>                d_v_row[col] = d_conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)];</div>
-<div class="line"><span class="lineno">  113</span>            }</div>
-<div class="line"><span class="lineno">  114</span>        }</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00160">160</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  171</span>                                                     {</div>
+<div class="line"><span class="lineno">  172</span>    <span class="keywordtype">int</span> channels = 0;</div>
+<div class="line"><span class="lineno">  173</span>    <span class="keywordtype">int</span> total_len = 0;</div>
+<div class="line"><span class="lineno">  174</span>    <span class="keywordtype">size_t</span> elements = 0;</div>
+<div class="line"><span class="lineno">  175</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="recurrent__state__kernels_8c.html#a293da8c98ad512706fa5ea77b842d8c2">recurrent_conv_backward_extents</a>(</div>
+<div class="line"><span class="lineno">  176</span>            history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim,</div>
+<div class="line"><span class="lineno">  177</span>            &amp;channels, &amp;total_len, &amp;elements) ||</div>
+<div class="line"><span class="lineno">  178</span>        elements &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) {</div>
+<div class="line"><span class="lineno">  179</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  180</span>    }</div>
+<div class="line"><span class="lineno">  181</span>    (void)channels;</div>
+<div class="line"><span class="lineno">  182</span>    (void)total_len;</div>
+<div class="line"><span class="lineno">  183</span>    <span class="keywordtype">float</span> *workspace = (<span class="keywordtype">float</span> *)malloc(elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  184</span>    <span class="keywordflow">if</span> (!workspace) {</div>
+<div class="line"><span class="lineno">  185</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  186</span>    }</div>
+<div class="line"><span class="lineno">  187</span>    <a class="code hl_function" href="recurrent__state__kernels_8c.html#a5c7d1c7ba5e9357c5dded473f54c0e2e">recurrent_conv_state_update_backward_workspace</a>(</div>
+<div class="line"><span class="lineno">  188</span>        d_conv_x, d_state_out, d_state_in, d_q, d_k, d_v, workspace,</div>
+<div class="line"><span class="lineno">  189</span>        history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim);</div>
+<div class="line"><span class="lineno">  190</span>    free(workspace);</div>
+<div class="line"><span class="lineno">  191</span>}</div>
+<div class="ttc" id="arecurrent__state__kernels_8c_html_a293da8c98ad512706fa5ea77b842d8c2"><div class="ttname"><a href="recurrent__state__kernels_8c.html#a293da8c98ad512706fa5ea77b842d8c2">recurrent_conv_backward_extents</a></div><div class="ttdeci">static int recurrent_conv_backward_extents(int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim, int *channels_out, int *total_len_out, size_t *elements_out)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__state__kernels_8c_source.html#l00058">recurrent_state_kernels.c:58</a></div></div>
+<div class="ttc" id="arecurrent__state__kernels_8c_html_a5c7d1c7ba5e9357c5dded473f54c0e2e"><div class="ttname"><a href="recurrent__state__kernels_8c.html#a5c7d1c7ba5e9357c5dded473f54c0e2e">recurrent_conv_state_update_backward_workspace</a></div><div class="ttdeci">void recurrent_conv_state_update_backward_workspace(const float *d_conv_x, const float *d_state_out, float *d_state_in, float *d_q, float *d_k, float *d_v, float *d_conv_total, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__state__kernels_8c_source.html#l00091">recurrent_state_kernels.c:91</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="recurrent__state__kernels_8c_source.html#l00058">recurrent_conv_backward_extents()</a>, and <a class="el" href="recurrent__state__kernels_8c_source.html#l00091">recurrent_conv_state_update_backward_workspace()</a>.</p>
+
+</div>
+</div>
+<a id="a5c7d1c7ba5e9357c5dded473f54c0e2e" name="a5c7d1c7ba5e9357c5dded473f54c0e2e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c7d1c7ba5e9357c5dded473f54c0e2e">&#9670;&#160;</a></span>recurrent_conv_state_update_backward_workspace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void recurrent_conv_state_update_backward_workspace </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_conv_x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>d_state_out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_state_in</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>d_conv_total</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>history_len</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_seqs</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>q_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>k_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00091">91</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  103</span>                                                                {</div>
+<div class="line"><span class="lineno">  104</span>    <span class="keywordtype">int</span> channels = 0;</div>
+<div class="line"><span class="lineno">  105</span>    <span class="keywordtype">int</span> total_len = 0;</div>
+<div class="line"><span class="lineno">  106</span>    <span class="keywordtype">size_t</span> elements = 0;</div>
+<div class="line"><span class="lineno">  107</span>    <span class="keywordflow">if</span> (!d_conv_x || !d_state_out || !d_state_in || !d_q || !d_k || !d_v ||</div>
+<div class="line"><span class="lineno">  108</span>        !d_conv_total || !<a class="code hl_function" href="recurrent__state__kernels_8c.html#a293da8c98ad512706fa5ea77b842d8c2">recurrent_conv_backward_extents</a>(</div>
+<div class="line"><span class="lineno">  109</span>            history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim,</div>
+<div class="line"><span class="lineno">  110</span>            &amp;channels, &amp;total_len, &amp;elements)) {</div>
+<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  112</span>    }</div>
+<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">if</span> (elements &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) {</div>
+<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  115</span>    }</div>
 <div class="line"><span class="lineno">  116</span> </div>
-<div class="line"><span class="lineno">  117</span>    free(d_conv_total);</div>
-<div class="line"><span class="lineno">  118</span>}</div>
+<div class="line"><span class="lineno">  117</span>    memcpy(d_conv_total, d_conv_x, elements * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  118</span> </div>
+<div class="line"><span class="lineno">  119</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">  120</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_state_out_seq = d_state_out + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
+<div class="line"><span class="lineno">  121</span>        <span class="keywordtype">float</span> *d_conv_seq = d_conv_total + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
+<div class="line"><span class="lineno">  122</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
+<div class="line"><span class="lineno">  123</span>            <span class="keywordtype">float</span> *dst = d_conv_seq + (size_t) ch * (<span class="keywordtype">size_t</span>) total_len + (size_t) num_tokens;</div>
+<div class="line"><span class="lineno">  124</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src = d_state_out_seq + (size_t) ch * (<span class="keywordtype">size_t</span>) history_len;</div>
+<div class="line"><span class="lineno">  125</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> idx = 0; idx &lt; history_len; ++idx) {</div>
+<div class="line"><span class="lineno">  126</span>                dst[idx] += src[idx];</div>
+<div class="line"><span class="lineno">  127</span>            }</div>
+<div class="line"><span class="lineno">  128</span>        }</div>
+<div class="line"><span class="lineno">  129</span>    }</div>
+<div class="line"><span class="lineno">  130</span> </div>
+<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">  132</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_conv_seq = d_conv_total + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
+<div class="line"><span class="lineno">  133</span>        <span class="keywordtype">float</span> *d_state_in_seq = d_state_in + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
+<div class="line"><span class="lineno">  134</span> </div>
+<div class="line"><span class="lineno">  135</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
+<div class="line"><span class="lineno">  136</span>            memcpy(</div>
+<div class="line"><span class="lineno">  137</span>                d_state_in_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
+<div class="line"><span class="lineno">  138</span>                d_conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len,</div>
+<div class="line"><span class="lineno">  139</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  140</span>        }</div>
+<div class="line"><span class="lineno">  141</span> </div>
+<div class="line"><span class="lineno">  142</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">  143</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> row = seq * num_tokens + tok;</div>
+<div class="line"><span class="lineno">  144</span>            <span class="keywordtype">float</span> *d_q_row = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
+<div class="line"><span class="lineno">  145</span>            <span class="keywordtype">float</span> *d_k_row = d_k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
+<div class="line"><span class="lineno">  146</span>            <span class="keywordtype">float</span> *d_v_row = d_v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
+<div class="line"><span class="lineno">  147</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; q_dim; ++col) {</div>
+<div class="line"><span class="lineno">  148</span>                d_q_row[col] = d_conv_seq[(size_t) col * (<span class="keywordtype">size_t</span>) total_len + (size_t) (history_len + tok)];</div>
+<div class="line"><span class="lineno">  149</span>            }</div>
+<div class="line"><span class="lineno">  150</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; k_dim; ++col) {</div>
+<div class="line"><span class="lineno">  151</span>                d_k_row[col] = d_conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)];</div>
+<div class="line"><span class="lineno">  152</span>            }</div>
+<div class="line"><span class="lineno">  153</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; v_dim; ++col) {</div>
+<div class="line"><span class="lineno">  154</span>                d_v_row[col] = d_conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)];</div>
+<div class="line"><span class="lineno">  155</span>            }</div>
+<div class="line"><span class="lineno">  156</span>        }</div>
+<div class="line"><span class="lineno">  157</span>    }</div>
+<div class="line"><span class="lineno">  158</span>}</div>
 </div><!-- fragment -->
+<p class="reference">References <a class="el" href="recurrent__state__kernels_8c_source.html#l00058">recurrent_conv_backward_extents()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="recurrent__state__kernels_8c_source.html#l00160">recurrent_conv_state_update_backward()</a>.</p>
+
 </div>
 </div>
 <a id="a55ef0ed9f1f51ca4910e3f7457054044" name="a55ef0ed9f1f51ca4910e3f7457054044"></a>
@@ -372,45 +613,45 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00006">6</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   17</span>                                                    {</div>
-<div class="line"><span class="lineno">   18</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
-<div class="line"><span class="lineno">   19</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
-<div class="line"><span class="lineno">   20</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">   21</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_seq = state_in + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   22</span>        <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
-<div class="line"><span class="lineno">   23</span>        <span class="keywordtype">float</span> *state_out_seq = state_out + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   24</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   25</span>            memcpy(</div>
-<div class="line"><span class="lineno">   26</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len,</div>
-<div class="line"><span class="lineno">   27</span>                state_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
-<div class="line"><span class="lineno">   28</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   29</span>        }</div>
-<div class="line"><span class="lineno">   30</span> </div>
-<div class="line"><span class="lineno">   31</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">   32</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> row = seq * num_tokens + tok;</div>
-<div class="line"><span class="lineno">   33</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_row = q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">   34</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_row = k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
-<div class="line"><span class="lineno">   35</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_row = v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
-<div class="line"><span class="lineno">   36</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; q_dim; ++col) {</div>
-<div class="line"><span class="lineno">   37</span>                conv_seq[(size_t) col * (<span class="keywordtype">size_t</span>) total_len + (size_t) (history_len + tok)] = q_row[col];</div>
-<div class="line"><span class="lineno">   38</span>            }</div>
-<div class="line"><span class="lineno">   39</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; k_dim; ++col) {</div>
-<div class="line"><span class="lineno">   40</span>                conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = k_row[col];</div>
-<div class="line"><span class="lineno">   41</span>            }</div>
-<div class="line"><span class="lineno">   42</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; v_dim; ++col) {</div>
-<div class="line"><span class="lineno">   43</span>                conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = v_row[col];</div>
-<div class="line"><span class="lineno">   44</span>            }</div>
-<div class="line"><span class="lineno">   45</span>        }</div>
-<div class="line"><span class="lineno">   46</span> </div>
-<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   48</span>            memcpy(</div>
-<div class="line"><span class="lineno">   49</span>                state_out_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
-<div class="line"><span class="lineno">   50</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len + (<span class="keywordtype">size_t</span>) num_tokens,</div>
-<div class="line"><span class="lineno">   51</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   52</span>        }</div>
-<div class="line"><span class="lineno">   53</span>    }</div>
-<div class="line"><span class="lineno">   54</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00008">8</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   19</span>                                                    {</div>
+<div class="line"><span class="lineno">   20</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
+<div class="line"><span class="lineno">   21</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
+<div class="line"><span class="lineno">   22</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
+<div class="line"><span class="lineno">   23</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_seq = state_in + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
+<div class="line"><span class="lineno">   24</span>        <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
+<div class="line"><span class="lineno">   25</span>        <span class="keywordtype">float</span> *state_out_seq = state_out + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
+<div class="line"><span class="lineno">   26</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
+<div class="line"><span class="lineno">   27</span>            memcpy(</div>
+<div class="line"><span class="lineno">   28</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len,</div>
+<div class="line"><span class="lineno">   29</span>                state_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
+<div class="line"><span class="lineno">   30</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   31</span>        }</div>
+<div class="line"><span class="lineno">   32</span> </div>
+<div class="line"><span class="lineno">   33</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
+<div class="line"><span class="lineno">   34</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> row = seq * num_tokens + tok;</div>
+<div class="line"><span class="lineno">   35</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_row = q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
+<div class="line"><span class="lineno">   36</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_row = k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
+<div class="line"><span class="lineno">   37</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_row = v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
+<div class="line"><span class="lineno">   38</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; q_dim; ++col) {</div>
+<div class="line"><span class="lineno">   39</span>                conv_seq[(size_t) col * (<span class="keywordtype">size_t</span>) total_len + (size_t) (history_len + tok)] = q_row[col];</div>
+<div class="line"><span class="lineno">   40</span>            }</div>
+<div class="line"><span class="lineno">   41</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; k_dim; ++col) {</div>
+<div class="line"><span class="lineno">   42</span>                conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = k_row[col];</div>
+<div class="line"><span class="lineno">   43</span>            }</div>
+<div class="line"><span class="lineno">   44</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; v_dim; ++col) {</div>
+<div class="line"><span class="lineno">   45</span>                conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = v_row[col];</div>
+<div class="line"><span class="lineno">   46</span>            }</div>
+<div class="line"><span class="lineno">   47</span>        }</div>
+<div class="line"><span class="lineno">   48</span> </div>
+<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
+<div class="line"><span class="lineno">   50</span>            memcpy(</div>
+<div class="line"><span class="lineno">   51</span>                state_out_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
+<div class="line"><span class="lineno">   52</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len + (<span class="keywordtype">size_t</span>) num_tokens,</div>
+<div class="line"><span class="lineno">   53</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   54</span>        }</div>
+<div class="line"><span class="lineno">   55</span>    }</div>
+<div class="line"><span class="lineno">   56</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00811">ck_test_recurrent_conv_state_update()</a>.</p>
 
