@@ -1,5 +1,6 @@
 var NAVTREEINDEX14 =
 {
+"recurrent__qk__norm__kernels_8c_source.html":[2,0,1,1,70],
 "recurrent__split__kernels_8c.html":[2,0,1,1,71],
 "recurrent__split__kernels_8c.html#a147c4ce1106e978ae62cdc54eff7002d":[2,0,1,1,71,0],
 "recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61":[2,0,1,1,71,2],
@@ -231,13 +232,15 @@ var NAVTREEINDEX14 =
 "src_2data__structures_2tries_2trie_8h_source.html":[2,0,1,0,0,1],
 "ssm__kernels_8c.html":[2,0,1,1,85],
 "ssm__kernels_8c.html#a365fda696bf3cca96c231bc4026bf77b":[2,0,1,1,85,0],
-"ssm__kernels_8c.html#a45c4fac663fed699857885012816a6a1":[2,0,1,1,85,5],
-"ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054":[2,0,1,1,85,7],
-"ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439":[2,0,1,1,85,2],
-"ssm__kernels_8c.html#a9f2633ab09cac4f4da73ff75542824b2":[2,0,1,1,85,6],
-"ssm__kernels_8c.html#ac2a4728f5217ee472cf208da9f68a994":[2,0,1,1,85,3],
-"ssm__kernels_8c.html#ad827366642547a76913f8052b643a0df":[2,0,1,1,85,4],
-"ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f":[2,0,1,1,85,1],
+"ssm__kernels_8c.html#a4395dd5f9bae2ec28fdb4145b1b85752":[2,0,1,1,85,1],
+"ssm__kernels_8c.html#a45c4fac663fed699857885012816a6a1":[2,0,1,1,85,7],
+"ssm__kernels_8c.html#a6e84239cff90dfd33ba8a31438ce5054":[2,0,1,1,85,9],
+"ssm__kernels_8c.html#a8d538046b58b388034896d555e1047f8":[2,0,1,1,85,5],
+"ssm__kernels_8c.html#a946087306bce247ac00d4c24f3ec9439":[2,0,1,1,85,3],
+"ssm__kernels_8c.html#a9f2633ab09cac4f4da73ff75542824b2":[2,0,1,1,85,8],
+"ssm__kernels_8c.html#ac2a4728f5217ee472cf208da9f68a994":[2,0,1,1,85,4],
+"ssm__kernels_8c.html#ad827366642547a76913f8052b643a0df":[2,0,1,1,85,6],
+"ssm__kernels_8c.html#ae4110c9033c9835558cbfe32d5f7265f":[2,0,1,1,85,2],
 "ssm__kernels_8c_source.html":[2,0,1,1,85],
 "structAffinityInfo.html":[1,0,0],
 "structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5":[1,0,0,3],
@@ -246,8 +249,5 @@ var NAVTREEINDEX14 =
 "structAffinityInfo.html#ac336f376702b1b1724111b291c9fac84":[1,0,0,4],
 "structAffinityInfo.html#ad7c543698d7fa66a65b006a8e16e5368":[1,0,0,1],
 "structAffinityInfo.html#aed549054fb9376cc874f3d8d710d1e89":[1,0,0,5],
-"structCKAudioWavInfo.html":[1,0,13],
-"structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90":[1,0,13,5],
-"structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd":[1,0,13,6],
-"structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19":[1,0,13,1]
+"structCKAudioWavInfo.html":[1,0,13]
 };
