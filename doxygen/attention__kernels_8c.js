@@ -33,6 +33,7 @@ var attention__kernels_8c =
     [ "attention_forward_causal_head_major_gqa_flash_strided_token_output", "attention__kernels_8c.html#aed9165e0811ee2f38c38aa7d6ad5048a", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract", "attention__kernels_8c.html#a1760eea773e5956fd3ae977e5029ab86", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract", "attention__kernels_8c.html#a669b5ad8474b002ce52839ec5694a237", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace", "attention__kernels_8c.html#ad1a72792cdc40d8fc00a3221a86e82cb", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract", "attention__kernels_8c.html#a6fadecb99c59f6d83845510bd60f862a", null ],
     [ "attention_forward_causal_head_major_shared_kv_gemma4", "attention__kernels_8c.html#a658a1295a31fdb0f9e6bf87dd8a941cf", null ],
     [ "attention_forward_chunk_head_major_gqa_flash_gemma4", "attention__kernels_8c.html#a55d297a433dfc0178b9df84151a1c6b0", null ],
