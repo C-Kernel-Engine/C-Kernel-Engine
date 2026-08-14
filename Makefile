@@ -3955,6 +3955,8 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) unittest/test_rmsnorm_strided.py
 	@$(PYTHON) unittest/test_nemotron_router.py
 	@$(PYTHON) unittest/test_moe_swiglu_expert.py
+	@$(PYTHON) unittest/test_moe_swiglu_q4k_q5k.py
+	@$(PYTHON) tests/test_v8_qwen35moe_contract.py
 	@PYTHONPATH=unittest $(PYTHON) -m pytest -q unittest/test_attention_f16kv_parallel.py
 	@$(PYTHON) -m pytest -q unittest/test_q5_0_q8_0_prefill_tiles.py
 	@if [ -n "$${CK_LLAMA_CPP_ROOT:-}" ] && [ -d "$${CK_LLAMA_CPP_ROOT}/build/bin" ]; then \

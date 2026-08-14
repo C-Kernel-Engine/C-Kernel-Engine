@@ -3111,6 +3111,25 @@ void moe_swiglu_expert_forward_bf16(const float *hidden,
                                     int n_experts,
                                     int top_k);
 
+size_t moe_swiglu_expert_q4k_q5k_workspace_bytes(int hidden_dim,
+                                                  int intermediate_dim);
+
+int moe_swiglu_expert_forward_q4k_q5k_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
 void moe_swiglu_shared_forward_bf16(const float *hidden,
                                     const float *routed,
                                     const uint16_t *shared_gate,

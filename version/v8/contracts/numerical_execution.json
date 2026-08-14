@@ -2375,6 +2375,48 @@
       "position_transform": null,
       "description": "Observed Instella FarSkip shared-expert reference order. BF16 weights feed FP32 ascending reductions; the shared result is reused for routed-inclusive and routed-free residual streams with the reference parenthesization. Full-model PyTorch certification is still required before promotion to validated."
     },
+    "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32": {
+      "operator_family": "moe_swiglu_expert",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "q4_k_q5_k",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "int8",
+        "weight": "int4_int5",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_k_then_q4_k_gate_up_then_ggml_swiglu_then_quantize_activation_q8_k_then_q5_k_down_then_selected_slot_order_weighted_sum"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "weighted_product",
+          "reduction_update",
+          "activation_intermediate_store",
+          "activation_intermediate_load",
+          "vector_exponential",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp32",
+        "merge_order": "selected_slot_order"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Observed compact routed SwiGLU composition for Q4_K gate/up and Q5_K down experts. Constituent primitives are certified; complete llama.cpp mul_mat_id and expert-merge parity remains required before promotion."
+    },
     "bf16_weight_bf16_input_pytorch_onednn_brgemm_bf16_output": {
       "status": "validated",
       "storage": {
