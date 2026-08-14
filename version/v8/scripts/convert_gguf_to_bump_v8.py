@@ -1112,6 +1112,118 @@ def describe_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
     return None
 
 
+def audit_qwen35moe_gguf_contract(
+    tensors: Dict[str, "TensorInfo"],
+    meta: Dict[str, object],
+) -> Dict[str, object]:
+    """Validate the structural Qwen3.5-MoE contract without reading weight data."""
+    arch = str(meta.get("general.architecture") or "").strip().lower()
+    if arch != "qwen35moe":
+        raise GGUFError(f"expected general.architecture=qwen35moe, got {arch or '<missing>'}")
+
+    def _meta_int(key: str) -> int:
+        value = meta.get(key)
+        if value is None:
+            raise GGUFError(f"qwen35moe metadata missing required key: {key}")
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise GGUFError(f"qwen35moe metadata {key} must be an integer, got {value!r}") from exc
+
+    block_count = _meta_int("qwen35moe.block_count")
+    hidden_dim = _meta_int("qwen35moe.embedding_length")
+    expert_count = _meta_int("qwen35moe.expert_count")
+    top_k = _meta_int("qwen35moe.expert_used_count")
+    expert_dim = _meta_int("qwen35moe.expert_feed_forward_length")
+    shared_expert_dim = _meta_int("qwen35moe.expert_shared_feed_forward_length")
+    full_attention_interval = _meta_int("qwen35moe.full_attention_interval")
+
+    if block_count <= 0 or hidden_dim <= 0 or expert_count <= 0 or expert_dim <= 0:
+        raise GGUFError("qwen35moe dimensions and expert counts must be positive")
+    if top_k <= 0 or top_k > expert_count:
+        raise GGUFError(
+            f"qwen35moe expert_used_count must be in [1, {expert_count}], got {top_k}"
+        )
+    if shared_expert_dim <= 0:
+        raise GGUFError("qwen35moe shared expert width must be positive")
+    if full_attention_interval <= 0:
+        raise GGUFError("qwen35moe full_attention_interval must be positive")
+
+    expected_expert_shapes = {
+        "ffn_gate_inp.weight": (hidden_dim, expert_count),
+        "ffn_gate_exps.weight": (hidden_dim, expert_dim, expert_count),
+        "ffn_up_exps.weight": (hidden_dim, expert_dim, expert_count),
+        "ffn_down_exps.weight": (expert_dim, hidden_dim, expert_count),
+        "ffn_gate_inp_shexp.weight": (hidden_dim,),
+        "ffn_gate_shexp.weight": (hidden_dim, shared_expert_dim),
+        "ffn_up_shexp.weight": (hidden_dim, shared_expert_dim),
+        "ffn_down_shexp.weight": (shared_expert_dim, hidden_dim),
+    }
+    layer_kinds: list[str] = []
+    quant_by_role: Dict[str, set[str]] = {
+        "expert_gate": set(),
+        "expert_up": set(),
+        "expert_down": set(),
+        "shared_gate": set(),
+        "shared_up": set(),
+        "shared_down": set(),
+    }
+    role_by_suffix = {
+        "ffn_gate_exps.weight": "expert_gate",
+        "ffn_up_exps.weight": "expert_up",
+        "ffn_down_exps.weight": "expert_down",
+        "ffn_gate_shexp.weight": "shared_gate",
+        "ffn_up_shexp.weight": "shared_up",
+        "ffn_down_shexp.weight": "shared_down",
+    }
+
+    for layer in range(block_count):
+        kind = gguf_ck_layer_kind_from_map("qwen35moe", _layer_tensor_suffixes(tensors, layer))
+        if kind not in {"recurrent_moe", "full_attention_moe"}:
+            raise GGUFError(
+                f"Layer {layer}: qwen35moe layer does not satisfy a registered recurrent/full-attention MoE contract"
+            )
+        expected_kind = (
+            "full_attention_moe"
+            if (layer + 1) % full_attention_interval == 0
+            else "recurrent_moe"
+        )
+        if kind != expected_kind:
+            raise GGUFError(
+                f"Layer {layer}: expected {expected_kind} from full_attention_interval="
+                f"{full_attention_interval}, got {kind}"
+            )
+        layer_kinds.append(kind)
+
+        for suffix, expected_shape in expected_expert_shapes.items():
+            name = f"blk.{layer}.{suffix}"
+            info = tensors.get(name)
+            if info is None:
+                raise GGUFError(f"Layer {layer}: missing required Qwen3.5-MoE tensor {name}")
+            if tuple(info.dims) != expected_shape:
+                raise GGUFError(
+                    f"{name}: expected GGUF dims={expected_shape}, got {tuple(info.dims)}"
+                )
+            role = role_by_suffix.get(suffix)
+            if role:
+                quant_by_role[role].add(ggml_type_name(info.ggml_type).lower())
+
+    return {
+        "architecture": arch,
+        "block_count": block_count,
+        "hidden_dim": hidden_dim,
+        "expert_count": expert_count,
+        "experts_per_token": top_k,
+        "expert_dim": expert_dim,
+        "shared_expert_dim": shared_expert_dim,
+        "full_attention_interval": full_attention_interval,
+        "layer_kinds": layer_kinds,
+        "quant_by_role": {
+            role: sorted(dtypes) for role, dtypes in quant_by_role.items()
+        },
+    }
+
+
 _QWEN35_MTP_TENSOR_SUFFIXES = frozenset({
     "eh_proj",
     "embed_tokens",
@@ -2399,6 +2511,31 @@ def main() -> None:
         "qwen35.ssm.inner_size",
         "qwen35.full_attention_interval",
         "qwen35.nextn_predict_layers",
+        # Qwen3.5 MoE hybrid keys. Keep these distinct from dense qwen35 so
+        # model-map validation can fail closed on router/expert mismatches.
+        "qwen35moe.block_count",
+        "qwen35moe.context_length",
+        "qwen35moe.embedding_length",
+        "qwen35moe.attention.head_count",
+        "qwen35moe.attention.head_count_kv",
+        "qwen35moe.attention.key_length",
+        "qwen35moe.attention.value_length",
+        "qwen35moe.attention.layer_norm_rms_epsilon",
+        "qwen35moe.rope.freq_base",
+        "qwen35moe.rope.dimension_count",
+        "qwen35moe.rope.dimension_sections",
+        "qwen35moe.ssm.conv_kernel",
+        "qwen35moe.ssm.state_size",
+        "qwen35moe.ssm.group_count",
+        "qwen35moe.ssm.time_step_rank",
+        "qwen35moe.ssm.inner_size",
+        "qwen35moe.full_attention_interval",
+        "qwen35moe.nextn_predict_layers",
+        "qwen35moe.expert_count",
+        "qwen35moe.expert_used_count",
+        "qwen35moe.expert_feed_forward_length",
+        "qwen35moe.expert_shared_feed_forward_length",
+        "qwen35moe.expert_weights_scale",
         # Nemotron-H Mamba/MLP/attention and MoE/Mamba hybrid keys
         "nemotron_h.block_count",
         "nemotron_h.context_length",
@@ -2676,6 +2813,37 @@ def main() -> None:
                     continue
                 print(f"  - {name}: {ggml_type_name(info.ggml_type)} dims={info.dims}")
 
+            if arch == "qwen35moe":
+                moe_audit = audit_qwen35moe_gguf_contract(tensors, meta)
+                quant = moe_audit["quant_by_role"]
+                recurrent_layers = sum(
+                    kind == "recurrent_moe" for kind in moe_audit["layer_kinds"]
+                )
+                full_layers = int(moe_audit["block_count"]) - recurrent_layers
+                print("[gguf] Qwen3.5-MoE contract:")
+                print(
+                    "  - layers="
+                    f"{moe_audit['block_count']} ({recurrent_layers} recurrent, {full_layers} full attention)"
+                )
+                print(
+                    "  - hidden="
+                    f"{moe_audit['hidden_dim']} experts={moe_audit['expert_count']} "
+                    f"top_k={moe_audit['experts_per_token']} expert_dim={moe_audit['expert_dim']} "
+                    f"shared_dim={moe_audit['shared_expert_dim']}"
+                )
+                print(
+                    "  - routed quant: "
+                    f"gate={','.join(quant['expert_gate'])} "
+                    f"up={','.join(quant['expert_up'])} "
+                    f"down={','.join(quant['expert_down'])}"
+                )
+                print(
+                    "  - shared quant: "
+                    f"gate={','.join(quant['shared_gate'])} "
+                    f"up={','.join(quant['shared_up'])} "
+                    f"down={','.join(quant['shared_down'])}"
+                )
+
             # Show per-layer quant types if --inspect-layers is set
             if args.inspect_layers:
                 # Count total layers
@@ -2748,6 +2916,15 @@ def main() -> None:
 
             # Exit after inspection (don't try to parse model config)
             return
+
+        if arch == "qwen35moe":
+            audit_qwen35moe_gguf_contract(tensors, meta)
+            raise GGUFError(
+                "Qwen3.5-MoE GGUF contract is recognized, but executable conversion is "
+                "not enabled yet. Missing exact providers: softmax top-k router, compact "
+                "Q4_K gate/up plus Q5_K down routed SwiGLU, and sigmoid-gated Q8_0 shared "
+                "SwiGLU. Refusing to substitute the incompatible Instella sigmoid/group router."
+            )
 
         # Pull core dims from metadata first; fall back to tensor shapes.
         # Support multiple architecture prefixes (llama, qwen2, etc.)
