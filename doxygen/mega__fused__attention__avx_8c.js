@@ -16,5 +16,6 @@ var mega__fused__attention__avx_8c =
     [ "mega_fuse_output_proj_residual", "mega__fused__attention__avx_8c.html#a28f0a742d715a18075ec198b4bc1a725", null ],
     [ "mega_fuse_rmsnorm_qkv_avx", "mega__fused__attention__avx_8c.html#a50a36bdd7432b126d7dfc71e897cef71", null ],
     [ "mega_fuse_rope_inplace_avx", "mega__fused__attention__avx_8c.html#a5ebf03c32d62ddf588b8525437ab2ebf", null ],
-    [ "mega_fused_attention_decode", "mega__fused__attention__avx_8c.html#a7b2cd3664e2858631e67aebb6576b1e2", null ]
+    [ "mega_fused_attention_decode", "mega__fused__attention__avx_8c.html#a7b2cd3664e2858631e67aebb6576b1e2", null ],
+    [ "mega_fused_attention_decode_workspace", "mega__fused__attention__avx_8c.html#ab74480f5b3519b41f21a0f8c25fd6498", null ]
 ];

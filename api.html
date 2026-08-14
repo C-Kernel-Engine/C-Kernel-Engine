@@ -4503,7 +4503,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (150)</summary>
+    <summary>Attention (151)</summary>
     <div class="accordion-content">
 
 
@@ -5941,7 +5941,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode(float * output, const float * input, const float * residual, const float * ln1_gamma, const float * wq, const float * bq, const float * wk, const float * bk, const float * wv, const float * bv, const float * wo, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Full mega-fused attention for decode.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Mega-fused attention for decode mode (single token)</p>
         </div>
 
 
@@ -5972,6 +5972,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int mega_fused_attention_decode_scratch_size(int AE, int H, int KV, int AD)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Calculate scratch buffer size needed for the kernel.</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">mega_fused_attention_decode_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode_workspace(float * output, const float * input, const float * residual, const float * ln1_gamma, const float * wq, const float * bq, const float * wk, const float * bk, const float * wv, const float * bv, const float * wo, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps, float * q_output_workspace, size_t q_output_workspace_bytes, float * kv_workspace, size_t kv_workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Full mega-fused attention for decode.</p>
         </div>
 
 
@@ -7515,7 +7525,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1257)</summary>
+    <summary>Other Functions (1260)</summary>
     <div class="accordion-content">
 
 
@@ -12047,6 +12057,26 @@ hugepage_mode
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_threadpool_pause(ck_threadpool_t * pool)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Pause workers — they sleep on condvar (0% CPU). Call between batches or during interactive waiting. Workers wake on next dispatch or resume.</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_threadpool_profile_reset</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_threadpool_profile_reset(ck_threadpool_t * pool)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Enable profiling and reset cumulative dispatch timing counters.</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_threadpool_profile_snapshot</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_threadpool_profile_snapshot(const ck_threadpool_t * pool, ck_threadpool_profile_t * profile)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Snapshot cumulative dispatch timing counters without stopping workers.</p>
         </div>
 
 
@@ -17049,6 +17079,16 @@ The IR graph structure (number of layers, op types)</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void moe_relu2_shared_forward_q5_1_q8_0(const float * hidden, const float * routed, const void * shared_up, const void * shared_down, float * output, int rows, int hidden_dim, int intermediate_dim)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">monotonic_ns</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">uint64_t monotonic_ns(void)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
 

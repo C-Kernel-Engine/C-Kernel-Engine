@@ -13,6 +13,7 @@ var annotated_dup =
     [ "CacheTopology", "structCacheTopology.html", "structCacheTopology" ],
     [ "ck_bump_alloc_t", "structck__bump__alloc__t.html", "structck__bump__alloc__t" ],
     [ "ck_capability_t", "structck__capability__t.html", "structck__capability__t" ],
+    [ "ck_threadpool_profile_t", "structck__threadpool__profile__t.html", "structck__threadpool__profile__t" ],
     [ "CKAudioWavInfo", "structCKAudioWavInfo.html", "structCKAudioWavInfo" ],
     [ "CKBPEConfig", "structCKBPEConfig.html", "structCKBPEConfig" ],
     [ "CKBufferSpec", "structCKBufferSpec.html", "structCKBufferSpec" ],

@@ -7,6 +7,7 @@ var mega__fused__attention_8h =
     [ "mega_fuse_rmsnorm_qkv", "mega__fused__attention_8h.html#aeeb0cc88f51b1af24d80deeea9bae2b4", null ],
     [ "mega_fuse_rmsnorm_qkv_rope", "mega__fused__attention_8h.html#a45deca0f8d6b12dd912c6b76dd49d80c", null ],
     [ "mega_fused_attention_decode", "mega__fused__attention_8h.html#a7b2cd3664e2858631e67aebb6576b1e2", null ],
+    [ "mega_fused_attention_decode_workspace", "mega__fused__attention_8h.html#ab74480f5b3519b41f21a0f8c25fd6498", null ],
     [ "mega_fused_attention_prefill", "mega__fused__attention_8h.html#a27249851108497d6b5fb85c55450dcc1", null ],
     [ "mega_fused_attention_prefill_q8_0", "mega__fused__attention_8h.html#acdd13869b94d435a14a0ada232c66e71", null ],
     [ "mega_fused_attention_prefill_q8_0_scratch_size", "mega__fused__attention_8h.html#a00f6e544eff204d7567bfe46076d3533", null ],

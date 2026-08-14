@@ -1,5 +1,10 @@
 var NAVTREEINDEX9 =
 {
+"deepseek__kernels_8c.html#ac451c9ff5160ef54c93e6a366cf06818":[2,0,1,1,10,2],
+"deepseek__kernels_8c.html#acc09ddbe71dd245541cf5b6dd50daf6f":[2,0,1,1,10,16],
+"deepseek__kernels_8c.html#adf428053e5873c00d89d3dfc311a73ef":[2,0,1,1,10,7],
+"deepseek__kernels_8c.html#aec87431dad26024ce459e7f7b751631c":[2,0,1,1,10,4],
+"deepseek__kernels_8c.html#af054a20437d37717f2cd75a4c36d2773":[2,0,1,1,10,12],
 "deepseek__kernels_8c.html#afde5ed3a0c7b1d8fc34069038c6f482f":[2,0,1,1,10,19],
 "deepseek__kernels_8c_source.html":[2,0,1,1,10],
 "deltanet__kernels_8c.html":[2,0,1,1,11],
@@ -93,8 +98,8 @@ var NAVTREEINDEX9 =
 "fp16__convert_8c.html#af6d772e480abb26bbd5533edb5e7e4dd":[2,0,1,1,15,3],
 "fp16__convert_8c.html#af7424d60e8ca1ef00a889407399ccf1f":[2,0,1,1,15,6],
 "fp16__convert_8c_source.html":[2,0,1,1,15],
-"functions.html":[1,2,0,0],
 "functions.html":[1,2,0],
+"functions.html":[1,2,0,0],
 "functions_b.html":[1,2,0,1],
 "functions_c.html":[1,2,0,2],
 "functions_d.html":[1,2,0,3],
@@ -115,8 +120,8 @@ var NAVTREEINDEX9 =
 "functions_t.html":[1,2,0,18],
 "functions_u.html":[1,2,0,19],
 "functions_v.html":[1,2,0,20],
-"functions_vars.html":[1,2,1,0],
 "functions_vars.html":[1,2,1],
+"functions_vars.html":[1,2,1,0],
 "functions_vars_b.html":[1,2,1,1],
 "functions_vars_c.html":[1,2,1,2],
 "functions_vars_d.html":[1,2,1,3],
@@ -244,10 +249,5 @@ var NAVTREEINDEX9 =
 "gemm__kernels_8c.html#a19bd64cbde3f643580eb69b050c8e61d":[2,0,1,1,22,2],
 "gemm__kernels_8c.html#a1cd1848bd75a4fb5874fe0feaa8716e4":[2,0,1,1,22,6],
 "gemm__kernels_8c.html#a22a37a53d15e04ad075a326967437567":[2,0,1,1,22,1],
-"gemm__kernels_8c.html#a24330b2f3614491ceed30ccb6d1acb3d":[2,0,1,1,22,8],
-"gemm__kernels_8c.html#a2731fd00008f7e887e94ec03af77325d":[2,0,1,1,22,13],
-"gemm__kernels_8c.html#a2ede2afc7813b9fa4fc663f93fa2e54d":[2,0,1,1,22,10],
-"gemm__kernels_8c.html#a3549b849a914ea46c5d51c7d485fecec":[2,0,1,1,22,12],
-"gemm__kernels_8c.html#a44c450ce25774bb9d5fab4e5fd172e98":[2,0,1,1,22,16],
-"gemm__kernels_8c.html#a84ce00fad7103b550ea75b52a21a98f7":[2,0,1,1,22,19]
+"gemm__kernels_8c.html#a24330b2f3614491ceed30ccb6d1acb3d":[2,0,1,1,22,8]
 };

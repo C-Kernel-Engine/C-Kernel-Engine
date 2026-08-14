@@ -185,8 +185,11 @@ Functions</h2></td></tr>
 <tr class="memdesc:a5ebf03c32d62ddf588b8525437ab2ebf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply RoPE to Q and K (in-place, from L1)  <br /></td></tr>
 <tr class="separator:a5ebf03c32d62ddf588b8525437ab2ebf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7b2cd3664e2858631e67aebb6576b1e2" id="r_a7b2cd3664e2858631e67aebb6576b1e2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mega__fused__attention__avx_8c.html#a7b2cd3664e2858631e67aebb6576b1e2">mega_fused_attention_decode</a> (float *output, const float *input, const float *residual, const float *ln1_gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, const float *wo, const float *bo, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps)</td></tr>
-<tr class="memdesc:a7b2cd3664e2858631e67aebb6576b1e2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Full mega-fused attention for decode.  <br /></td></tr>
+<tr class="memdesc:a7b2cd3664e2858631e67aebb6576b1e2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mega-fused attention for decode mode (single token)  <br /></td></tr>
 <tr class="separator:a7b2cd3664e2858631e67aebb6576b1e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab74480f5b3519b41f21a0f8c25fd6498" id="r_ab74480f5b3519b41f21a0f8c25fd6498"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mega__fused__attention__avx_8c.html#ab74480f5b3519b41f21a0f8c25fd6498">mega_fused_attention_decode_workspace</a> (float *output, const float *input, const float *residual, const float *ln1_gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, const float *wo, const float *bo, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps, float *q_output_workspace, size_t q_output_workspace_bytes, float *kv_workspace, size_t kv_workspace_bytes)</td></tr>
+<tr class="memdesc:ab74480f5b3519b41f21a0f8c25fd6498"><td class="mdescLeft">&#160;</td><td class="mdescRight">Full mega-fused attention for decode.  <br /></td></tr>
+<tr class="separator:ab74480f5b3519b41f21a0f8c25fd6498"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Mega-Fused Attention for AVX (256-bit) and AVX-512 (512-bit) </p>
@@ -200,7 +203,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <li>Pure computation - deterministic, no side effects</li>
 </ol>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full</p>
-<p>VIOLATION: Uses malloc for intermediate buffers and memcpy for layout. TODO: Refactor to use bump allocator workspace and strided access.</p>
+<p>The mapped decode provider receives planner-owned workspace. The legacy public wrapper retains one compatibility allocation for direct callers.</p>
 <p>Holy grail fusion: RMSNorm → QKV → RoPE → Flash Attention → OutProj + Residual</p>
 <p>AVX approach: Keep intermediates in L1 cache (not registers) AVX-512 approach: Keep intermediates in registers</p>
 <p>Both achieve the same goal: Eliminate DRAM traffic for intermediates. </p>
@@ -650,7 +653,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mega__fused__attention__avx_8c_source.html#l00118">MEGA_KV_TILE</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode_workspace()</a>.</p>
 
 </div>
 </div>
@@ -762,7 +765,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mega__fused__attention__avx_8c_source.html#l00054">ck_dot_f32()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode_workspace()</a>.</p>
 
 </div>
 </div>
@@ -1033,7 +1036,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mega__fused__attention__avx_8c_source.html#l00054">ck_dot_f32()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode_workspace()</a>.</p>
 
 </div>
 </div>
@@ -1208,7 +1211,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  417</span>    }</div>
 <div class="line"><span class="lineno">  418</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode_workspace()</a>.</p>
 
 </div>
 </div>
@@ -1376,118 +1379,355 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
+<p>Mega-fused attention for decode mode (single token) </p>
+<p>This is the "holy grail" - all operations fused, no intermediates to DRAM.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">output</td><td>Output [aligned_embed_dim] (includes residual add) </td></tr>
+    <tr><td class="paramname">input</td><td>Input [aligned_embed_dim] </td></tr>
+    <tr><td class="paramname">residual</td><td>Residual input [aligned_embed_dim] (or NULL) </td></tr>
+    <tr><td class="paramname">ln1_gamma</td><td>RMSNorm gamma [embed_dim] </td></tr>
+    <tr><td class="paramname">wq</td><td>Q weights (quantized) [num_heads * aligned_head_dim * aligned_embed_dim] </td></tr>
+    <tr><td class="paramname">bq</td><td>Q bias [num_heads * aligned_head_dim] (or NULL) </td></tr>
+    <tr><td class="paramname">wq_dt</td><td>Q weight dtype (CK_DT_Q5_0/CK_DT_Q8_0/CK_DT_FP32) </td></tr>
+    <tr><td class="paramname">wk</td><td>K weights (quantized) [num_kv_heads * aligned_head_dim * aligned_embed_dim] </td></tr>
+    <tr><td class="paramname">bk</td><td>K bias [num_kv_heads * aligned_head_dim] (or NULL) </td></tr>
+    <tr><td class="paramname">wk_dt</td><td>K weight dtype (CK_DT_Q5_0/CK_DT_Q8_0/CK_DT_FP32) </td></tr>
+    <tr><td class="paramname">wv</td><td>V weights (quantized) [num_kv_heads * aligned_head_dim * aligned_embed_dim] </td></tr>
+    <tr><td class="paramname">bv</td><td>V bias [num_kv_heads * aligned_head_dim] (or NULL) </td></tr>
+    <tr><td class="paramname">wv_dt</td><td>V weight dtype (CK_DT_Q5_0/CK_DT_Q8_0/CK_DT_FP32) </td></tr>
+    <tr><td class="paramname">wo</td><td>Output projection weights (quantized) [aligned_embed_dim * aligned_embed_dim] </td></tr>
+    <tr><td class="paramname">bo</td><td>Output bias [aligned_embed_dim] (or NULL) </td></tr>
+    <tr><td class="paramname">wo_dt</td><td>Output weight dtype (CK_DT_Q5_0/CK_DT_FP32) </td></tr>
+    <tr><td class="paramname">kv_cache_k</td><td>KV cache for K [num_kv_heads * cache_capacity * aligned_head_dim] </td></tr>
+    <tr><td class="paramname">kv_cache_v</td><td>KV cache for V [num_kv_heads * cache_capacity * aligned_head_dim] </td></tr>
+    <tr><td class="paramname">rope_cos</td><td>RoPE cos [max_seq, head_dim/2] </td></tr>
+    <tr><td class="paramname">rope_sin</td><td>RoPE sin [max_seq, head_dim/2] </td></tr>
+    <tr><td class="paramname">pos</td><td>Current position in sequence </td></tr>
+    <tr><td class="paramname">embed_dim</td><td>Model hidden dimension (unpadded) </td></tr>
+    <tr><td class="paramname">aligned_embed_dim</td><td>Aligned hidden dimension </td></tr>
+    <tr><td class="paramname">num_heads</td><td>Number of attention heads </td></tr>
+    <tr><td class="paramname">num_kv_heads</td><td>Number of KV heads (for GQA) </td></tr>
+    <tr><td class="paramname">head_dim</td><td>Head dimension (unpadded) </td></tr>
+    <tr><td class="paramname">aligned_head_dim</td><td>Aligned head dimension </td></tr>
+    <tr><td class="paramname">cache_capacity</td><td>KV cache capacity (stride in tokens) </td></tr>
+    <tr><td class="paramname">eps</td><td>RMSNorm epsilon </td></tr>
+    <tr><td class="paramname">scratch</td><td>Scratch buffer from <a class="el" href="mega__fused__attention_8h.html#a1bcc7ea2d222390ac04fd37f3d8081df" title="Get scratch buffer size for mega_fused_attention_prefill.">mega_fused_attention_prefill_scratch_size()</a> </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p class="definition">Definition at line <a class="el" href="mega__fused__attention__avx_8c_source.html#l00678">678</a> of file <a class="el" href="mega__fused__attention__avx_8c_source.html">mega_fused_attention_avx.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  700</span>{</div>
+<div class="line"><span class="lineno">  701</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  702</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  703</span>    }</div>
+<div class="line"><span class="lineno">  704</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_elems = (size_t)num_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  705</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  706</span>    <span class="keywordflow">if</span> (q_elems &gt; SIZE_MAX / (2 * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) ||</div>
+<div class="line"><span class="lineno">  707</span>        kv_elems &gt; SIZE_MAX / (2 * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) ||</div>
+<div class="line"><span class="lineno">  708</span>        q_elems &gt; SIZE_MAX / 2 - kv_elems) {</div>
+<div class="line"><span class="lineno">  709</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  710</span>    }</div>
+<div class="line"><span class="lineno">  711</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total_elems = 2 * (q_elems + kv_elems);</div>
+<div class="line"><span class="lineno">  712</span>    <span class="keywordflow">if</span> (total_elems &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) {</div>
+<div class="line"><span class="lineno">  713</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  714</span>    }</div>
+<div class="line"><span class="lineno">  715</span> </div>
+<div class="line"><span class="lineno">  716</span>    <span class="keywordtype">float</span> stack_workspace[4 * <a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>];</div>
+<div class="line"><span class="lineno">  717</span>    <span class="keywordtype">float</span> *workspace = stack_workspace;</div>
+<div class="line"><span class="lineno">  718</span>    <span class="keywordflow">if</span> (total_elems &gt; 4 * <a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>) {</div>
+<div class="line"><span class="lineno">  719</span>        workspace = (<span class="keywordtype">float</span> *)malloc(total_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  720</span>        <span class="keywordflow">if</span> (!workspace) {</div>
+<div class="line"><span class="lineno">  721</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  722</span>        }</div>
+<div class="line"><span class="lineno">  723</span>    }</div>
+<div class="line"><span class="lineno">  724</span> </div>
+<div class="line"><span class="lineno">  725</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_output_bytes = 2 * q_elems * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  726</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_bytes = 2 * kv_elems * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  727</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#ab74480f5b3519b41f21a0f8c25fd6498">mega_fused_attention_decode_workspace</a>(</div>
+<div class="line"><span class="lineno">  728</span>        output, input, residual, ln1_gamma,</div>
+<div class="line"><span class="lineno">  729</span>        wq, bq, wk, bk, wv, bv, wo, bo,</div>
+<div class="line"><span class="lineno">  730</span>        kv_cache_k, kv_cache_v, rope_cos, rope_sin,</div>
+<div class="line"><span class="lineno">  731</span>        pos, embed_dim, aligned_embed_dim, num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  732</span>        head_dim, aligned_head_dim, cache_capacity, eps,</div>
+<div class="line"><span class="lineno">  733</span>        workspace, q_output_bytes,</div>
+<div class="line"><span class="lineno">  734</span>        workspace + 2 * q_elems, kv_bytes);</div>
+<div class="line"><span class="lineno">  735</span> </div>
+<div class="line"><span class="lineno">  736</span>    <span class="keywordflow">if</span> (workspace != stack_workspace) {</div>
+<div class="line"><span class="lineno">  737</span>        free(workspace);</div>
+<div class="line"><span class="lineno">  738</span>    }</div>
+<div class="line"><span class="lineno">  739</span>}</div>
+<div class="ttc" id="amega__fused__attention__avx_8c_html_a83b70777dc5595bab8c9060d83e4bd91"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a></div><div class="ttdeci">#define MEGA_STACK_MAX</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00119">mega_fused_attention_avx.c:119</a></div></div>
+<div class="ttc" id="amega__fused__attention__avx_8c_html_ab74480f5b3519b41f21a0f8c25fd6498"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#ab74480f5b3519b41f21a0f8c25fd6498">mega_fused_attention_decode_workspace</a></div><div class="ttdeci">void mega_fused_attention_decode_workspace(float *output, const float *input, const float *residual, const float *ln1_gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, const float *wo, const float *bo, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps, float *q_output_workspace, size_t q_output_workspace_bytes, float *kv_workspace, size_t kv_workspace_bytes)</div><div class="ttdoc">Full mega-fused attention for decode.</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_avx.c:589</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">mega_fused_attention_decode_workspace()</a>, and <a class="el" href="mega__fused__attention__avx_8c_source.html#l00119">MEGA_STACK_MAX</a>.</p>
+
+</div>
+</div>
+<a id="ab74480f5b3519b41f21a0f8c25fd6498" name="ab74480f5b3519b41f21a0f8c25fd6498"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab74480f5b3519b41f21a0f8c25fd6498">&#9670;&#160;</a></span>mega_fused_attention_decode_workspace()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void mega_fused_attention_decode_workspace </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>residual</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>ln1_gamma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>wq</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bq</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>wk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bk</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>wv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>wo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>bo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>kv_cache_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>kv_cache_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>rope_cos</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>rope_sin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>pos</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>cache_capacity</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>q_output_workspace</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>q_output_workspace_bytes</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>kv_workspace</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>kv_workspace_bytes</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
 <p>Full mega-fused attention for decode. </p>
-<p>Mega-fused attention for decode mode (single token)</p>
 <p>RMSNorm → QKV → RoPE → Flash Attn → OutProj + Residual </p>
 
 <p class="definition">Definition at line <a class="el" href="mega__fused__attention__avx_8c_source.html#l00589">589</a> of file <a class="el" href="mega__fused__attention__avx_8c_source.html">mega_fused_attention_avx.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  611</span>{</div>
-<div class="line"><span class="lineno">  612</span>    <span class="keywordflow">if</span> (!output || !input || !ln1_gamma || !wq || !wk || !wv || !wo ||</div>
-<div class="line"><span class="lineno">  613</span>        !kv_cache_k || !kv_cache_v) {</div>
-<div class="line"><span class="lineno">  614</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  615</span>    }</div>
-<div class="line"><span class="lineno">  616</span>    <span class="keywordflow">if</span> (embed_dim &lt;= 0 || aligned_embed_dim &lt;= 0 || head_dim &lt;= 0 || aligned_head_dim &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  617</span>        num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="fragment"><div class="line"><span class="lineno">  615</span>{</div>
+<div class="line"><span class="lineno">  616</span>    <span class="keywordflow">if</span> (!output || !input || !ln1_gamma || !wq || !wk || !wv || !wo ||</div>
+<div class="line"><span class="lineno">  617</span>        !kv_cache_k || !kv_cache_v || !q_output_workspace || !kv_workspace) {</div>
 <div class="line"><span class="lineno">  618</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  619</span>    }</div>
-<div class="line"><span class="lineno">  620</span>    <span class="keywordflow">if</span> (pos &lt; 0 || pos &gt;= cache_capacity) {</div>
-<div class="line"><span class="lineno">  621</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  622</span>    }</div>
-<div class="line"><span class="lineno">  623</span>    <span class="keywordflow">if</span> (aligned_embed_dim &lt; embed_dim || aligned_head_dim &lt; head_dim) {</div>
-<div class="line"><span class="lineno">  624</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  625</span>    }</div>
-<div class="line"><span class="lineno">  626</span> </div>
-<div class="line"><span class="lineno">  627</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_elems = (size_t)num_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  628</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  629</span> </div>
-<div class="line"><span class="lineno">  630</span>    <span class="keywordtype">float</span> q_stack[<a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>];</div>
-<div class="line"><span class="lineno">  631</span>    <span class="keywordtype">float</span> k_stack[<a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>];</div>
-<div class="line"><span class="lineno">  632</span>    <span class="keywordtype">float</span> v_stack[<a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>];</div>
-<div class="line"><span class="lineno">  633</span>    <span class="keywordtype">float</span> o_stack[<a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>];</div>
-<div class="line"><span class="lineno">  634</span> </div>
-<div class="line"><span class="lineno">  635</span>    <span class="keywordtype">float</span> *q = q_stack;</div>
-<div class="line"><span class="lineno">  636</span>    <span class="keywordtype">float</span> *k = k_stack;</div>
-<div class="line"><span class="lineno">  637</span>    <span class="keywordtype">float</span> *v = v_stack;</div>
-<div class="line"><span class="lineno">  638</span>    <span class="keywordtype">float</span> *o = o_stack;</div>
-<div class="line"><span class="lineno">  639</span> </div>
-<div class="line"><span class="lineno">  640</span>    <span class="keywordtype">int</span> free_q = 0;</div>
-<div class="line"><span class="lineno">  641</span>    <span class="keywordtype">int</span> free_k = 0;</div>
-<div class="line"><span class="lineno">  642</span>    <span class="keywordtype">int</span> free_v = 0;</div>
-<div class="line"><span class="lineno">  643</span>    <span class="keywordtype">int</span> free_o = 0;</div>
-<div class="line"><span class="lineno">  644</span> </div>
-<div class="line"><span class="lineno">  645</span>    <span class="keywordflow">if</span> (q_elems &gt; <a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>) {</div>
-<div class="line"><span class="lineno">  646</span>        q = (<span class="keywordtype">float</span> *)malloc(q_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  647</span>        <span class="keywordflow">if</span> (!q) {</div>
-<div class="line"><span class="lineno">  648</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  649</span>        }</div>
-<div class="line"><span class="lineno">  650</span>        free_q = 1;</div>
-<div class="line"><span class="lineno">  651</span>    }</div>
-<div class="line"><span class="lineno">  652</span>    <span class="keywordflow">if</span> (kv_elems &gt; <a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>) {</div>
-<div class="line"><span class="lineno">  653</span>        k = (<span class="keywordtype">float</span> *)malloc(kv_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  654</span>        <span class="keywordflow">if</span> (!k) {</div>
-<div class="line"><span class="lineno">  655</span>            <span class="keywordflow">if</span> (free_q) free(q);</div>
-<div class="line"><span class="lineno">  656</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  657</span>        }</div>
-<div class="line"><span class="lineno">  658</span>        v = (<span class="keywordtype">float</span> *)malloc(kv_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  659</span>        <span class="keywordflow">if</span> (!v) {</div>
-<div class="line"><span class="lineno">  660</span>            <span class="keywordflow">if</span> (free_q) free(q);</div>
-<div class="line"><span class="lineno">  661</span>            free(k);</div>
-<div class="line"><span class="lineno">  662</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  663</span>        }</div>
-<div class="line"><span class="lineno">  664</span>        free_k = 1;</div>
-<div class="line"><span class="lineno">  665</span>        free_v = 1;</div>
-<div class="line"><span class="lineno">  666</span>    }</div>
-<div class="line"><span class="lineno">  667</span>    <span class="keywordflow">if</span> (q_elems &gt; <a class="code hl_define" href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a>) {</div>
-<div class="line"><span class="lineno">  668</span>        o = (<span class="keywordtype">float</span> *)malloc(q_elems * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  669</span>        <span class="keywordflow">if</span> (!o) {</div>
-<div class="line"><span class="lineno">  670</span>            <span class="keywordflow">if</span> (free_q) free(q);</div>
-<div class="line"><span class="lineno">  671</span>            <span class="keywordflow">if</span> (free_k) free(k);</div>
-<div class="line"><span class="lineno">  672</span>            <span class="keywordflow">if</span> (free_v) free(v);</div>
-<div class="line"><span class="lineno">  673</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  674</span>        }</div>
-<div class="line"><span class="lineno">  675</span>        free_o = 1;</div>
-<div class="line"><span class="lineno">  676</span>    }</div>
-<div class="line"><span class="lineno">  677</span> </div>
-<div class="line"><span class="lineno">  678</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a50a36bdd7432b126d7dfc71e897cef71">mega_fuse_rmsnorm_qkv_avx</a>(q, k, v, input, ln1_gamma,</div>
-<div class="line"><span class="lineno">  679</span>                              wq, bq, wk, bk, wv, bv,</div>
-<div class="line"><span class="lineno">  680</span>                              embed_dim, aligned_embed_dim,</div>
-<div class="line"><span class="lineno">  681</span>                              num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno">  682</span>                              head_dim, aligned_head_dim, eps);</div>
-<div class="line"><span class="lineno">  683</span> </div>
-<div class="line"><span class="lineno">  684</span>    <span class="keywordflow">if</span> (rope_cos &amp;&amp; rope_sin) {</div>
-<div class="line"><span class="lineno">  685</span>        <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a5ebf03c32d62ddf588b8525437ab2ebf">mega_fuse_rope_inplace_avx</a>(q, k, rope_cos, rope_sin, pos,</div>
-<div class="line"><span class="lineno">  686</span>                                   num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno">  687</span>                                   head_dim, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  688</span>    }</div>
-<div class="line"><span class="lineno">  689</span> </div>
-<div class="line"><span class="lineno">  690</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a6add8eaed40b7a32a537cf4cffb39709">kv_cache_write_head_major</a>(k, v,</div>
-<div class="line"><span class="lineno">  691</span>                              kv_cache_k, kv_cache_v,</div>
-<div class="line"><span class="lineno">  692</span>                              num_kv_heads, pos,</div>
-<div class="line"><span class="lineno">  693</span>                              cache_capacity,</div>
-<div class="line"><span class="lineno">  694</span>                              head_dim, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  695</span> </div>
-<div class="line"><span class="lineno">  696</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db">mega_fuse_flash_attention_avx</a>(o, q, kv_cache_k, kv_cache_v,</div>
-<div class="line"><span class="lineno">  697</span>                                  num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno">  698</span>                                  pos + 1, cache_capacity,</div>
-<div class="line"><span class="lineno">  699</span>                                  head_dim, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  700</span> </div>
-<div class="line"><span class="lineno">  701</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a28f0a742d715a18075ec198b4bc1a725">mega_fuse_output_proj_residual</a>(o, wo, bo, residual, output,</div>
-<div class="line"><span class="lineno">  702</span>                                   embed_dim, aligned_embed_dim,</div>
-<div class="line"><span class="lineno">  703</span>                                   num_heads, head_dim, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  704</span> </div>
-<div class="line"><span class="lineno">  705</span>    <span class="keywordflow">if</span> (free_q) free(q);</div>
-<div class="line"><span class="lineno">  706</span>    <span class="keywordflow">if</span> (free_k) free(k);</div>
-<div class="line"><span class="lineno">  707</span>    <span class="keywordflow">if</span> (free_v) free(v);</div>
-<div class="line"><span class="lineno">  708</span>    <span class="keywordflow">if</span> (free_o) free(o);</div>
-<div class="line"><span class="lineno">  709</span>}</div>
+<div class="line"><span class="lineno">  620</span>    <span class="keywordflow">if</span> (embed_dim &lt;= 0 || aligned_embed_dim &lt;= 0 || head_dim &lt;= 0 || aligned_head_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  621</span>        num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><span class="lineno">  622</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  623</span>    }</div>
+<div class="line"><span class="lineno">  624</span>    <span class="keywordflow">if</span> (pos &lt; 0 || pos &gt;= cache_capacity) {</div>
+<div class="line"><span class="lineno">  625</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  626</span>    }</div>
+<div class="line"><span class="lineno">  627</span>    <span class="keywordflow">if</span> (aligned_embed_dim &lt; embed_dim || aligned_head_dim &lt; head_dim) {</div>
+<div class="line"><span class="lineno">  628</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  629</span>    }</div>
+<div class="line"><span class="lineno">  630</span> </div>
+<div class="line"><span class="lineno">  631</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_elems = (size_t)num_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  632</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_elems = (size_t)num_kv_heads * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  633</span>    <span class="keywordflow">if</span> (q_elems &gt; SIZE_MAX / (2 * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>)) ||</div>
+<div class="line"><span class="lineno">  634</span>        kv_elems &gt; SIZE_MAX / (2 * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>))) {</div>
+<div class="line"><span class="lineno">  635</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  636</span>    }</div>
+<div class="line"><span class="lineno">  637</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_output_required = 2 * q_elems * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  638</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_required = 2 * kv_elems * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  639</span>    <span class="keywordflow">if</span> (q_output_workspace_bytes &lt; q_output_required ||</div>
+<div class="line"><span class="lineno">  640</span>        kv_workspace_bytes &lt; kv_required) {</div>
+<div class="line"><span class="lineno">  641</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  642</span>    }</div>
+<div class="line"><span class="lineno">  643</span> </div>
+<div class="line"><span class="lineno">  644</span>    <span class="keywordtype">float</span> *q = q_output_workspace;</div>
+<div class="line"><span class="lineno">  645</span>    <span class="keywordtype">float</span> *o = q + q_elems;</div>
+<div class="line"><span class="lineno">  646</span>    <span class="keywordtype">float</span> *k = kv_workspace;</div>
+<div class="line"><span class="lineno">  647</span>    <span class="keywordtype">float</span> *v = k + kv_elems;</div>
+<div class="line"><span class="lineno">  648</span> </div>
+<div class="line"><span class="lineno">  649</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a50a36bdd7432b126d7dfc71e897cef71">mega_fuse_rmsnorm_qkv_avx</a>(q, k, v, input, ln1_gamma,</div>
+<div class="line"><span class="lineno">  650</span>                              wq, bq, wk, bk, wv, bv,</div>
+<div class="line"><span class="lineno">  651</span>                              embed_dim, aligned_embed_dim,</div>
+<div class="line"><span class="lineno">  652</span>                              num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  653</span>                              head_dim, aligned_head_dim, eps);</div>
+<div class="line"><span class="lineno">  654</span> </div>
+<div class="line"><span class="lineno">  655</span>    <span class="keywordflow">if</span> (rope_cos &amp;&amp; rope_sin) {</div>
+<div class="line"><span class="lineno">  656</span>        <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a5ebf03c32d62ddf588b8525437ab2ebf">mega_fuse_rope_inplace_avx</a>(q, k, rope_cos, rope_sin, pos,</div>
+<div class="line"><span class="lineno">  657</span>                                   num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  658</span>                                   head_dim, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  659</span>    }</div>
+<div class="line"><span class="lineno">  660</span> </div>
+<div class="line"><span class="lineno">  661</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a6add8eaed40b7a32a537cf4cffb39709">kv_cache_write_head_major</a>(k, v,</div>
+<div class="line"><span class="lineno">  662</span>                              kv_cache_k, kv_cache_v,</div>
+<div class="line"><span class="lineno">  663</span>                              num_kv_heads, pos,</div>
+<div class="line"><span class="lineno">  664</span>                              cache_capacity,</div>
+<div class="line"><span class="lineno">  665</span>                              head_dim, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  666</span> </div>
+<div class="line"><span class="lineno">  667</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db">mega_fuse_flash_attention_avx</a>(o, q, kv_cache_k, kv_cache_v,</div>
+<div class="line"><span class="lineno">  668</span>                                  num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  669</span>                                  pos + 1, cache_capacity,</div>
+<div class="line"><span class="lineno">  670</span>                                  head_dim, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  671</span> </div>
+<div class="line"><span class="lineno">  672</span>    <a class="code hl_function" href="mega__fused__attention__avx_8c.html#a28f0a742d715a18075ec198b4bc1a725">mega_fuse_output_proj_residual</a>(o, wo, bo, residual, output,</div>
+<div class="line"><span class="lineno">  673</span>                                   embed_dim, aligned_embed_dim,</div>
+<div class="line"><span class="lineno">  674</span>                                   num_heads, head_dim, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  675</span> </div>
+<div class="line"><span class="lineno">  676</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a6add8eaed40b7a32a537cf4cffb39709"><div class="ttname"><a href="ckernel__engine_8h.html#a6add8eaed40b7a32a537cf4cffb39709">kv_cache_write_head_major</a></div><div class="ttdeci">void kv_cache_write_head_major(const float *__restrict k_token, const float *__restrict v_token, float *__restrict k_cache, float *__restrict v_cache, int num_kv_heads, int token_index, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="kv__cache__kernels_8c_source.html#l00081">kv_cache_kernels.c:81</a></div></div>
 <div class="ttc" id="amega__fused__attention__avx_8c_html_a28f0a742d715a18075ec198b4bc1a725"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a28f0a742d715a18075ec198b4bc1a725">mega_fuse_output_proj_residual</a></div><div class="ttdeci">static void mega_fuse_output_proj_residual(const float *attn_token, const float *wo, const float *bo, const float *residual, float *output, int embed_dim, int aligned_embed_dim, int num_heads, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00551">mega_fused_attention_avx.c:551</a></div></div>
 <div class="ttc" id="amega__fused__attention__avx_8c_html_a460bd562be1b122ecd6f7a1ed67278db"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a460bd562be1b122ecd6f7a1ed67278db">mega_fuse_flash_attention_avx</a></div><div class="ttdeci">void mega_fuse_flash_attention_avx(float *o_out, const float *q, const float *kv_cache_k, const float *kv_cache_v, int num_heads, int num_kv_heads, int seq_len, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdoc">Flash attention with online softmax (AVX version)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00444">mega_fused_attention_avx.c:444</a></div></div>
 <div class="ttc" id="amega__fused__attention__avx_8c_html_a50a36bdd7432b126d7dfc71e897cef71"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a50a36bdd7432b126d7dfc71e897cef71">mega_fuse_rmsnorm_qkv_avx</a></div><div class="ttdeci">void mega_fuse_rmsnorm_qkv_avx(float *q_out, float *k_out, float *v_out, const float *input, const float *gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, float eps)</div><div class="ttdoc">Fused RMSNorm + QKV for decode (single token)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00143">mega_fused_attention_avx.c:143</a></div></div>
 <div class="ttc" id="amega__fused__attention__avx_8c_html_a5ebf03c32d62ddf588b8525437ab2ebf"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a5ebf03c32d62ddf588b8525437ab2ebf">mega_fuse_rope_inplace_avx</a></div><div class="ttdeci">void mega_fuse_rope_inplace_avx(float *q, float *k, const float *rope_cos, const float *rope_sin, int pos, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim)</div><div class="ttdoc">Apply RoPE to Q and K (in-place, from L1)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00311">mega_fused_attention_avx.c:311</a></div></div>
-<div class="ttc" id="amega__fused__attention__avx_8c_html_a83b70777dc5595bab8c9060d83e4bd91"><div class="ttname"><a href="mega__fused__attention__avx_8c.html#a83b70777dc5595bab8c9060d83e4bd91">MEGA_STACK_MAX</a></div><div class="ttdeci">#define MEGA_STACK_MAX</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__avx_8c_source.html#l00119">mega_fused_attention_avx.c:119</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="kv__cache__kernels_8c_source.html#l00081">kv_cache_write_head_major()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00444">mega_fuse_flash_attention_avx()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00551">mega_fuse_output_proj_residual()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00143">mega_fuse_rmsnorm_qkv_avx()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00311">mega_fuse_rope_inplace_avx()</a>, and <a class="el" href="mega__fused__attention__avx_8c_source.html#l00119">MEGA_STACK_MAX</a>.</p>
+<p class="reference">References <a class="el" href="kv__cache__kernels_8c_source.html#l00081">kv_cache_write_head_major()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00444">mega_fuse_flash_attention_avx()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00551">mega_fuse_output_proj_residual()</a>, <a class="el" href="mega__fused__attention__avx_8c_source.html#l00143">mega_fuse_rmsnorm_qkv_avx()</a>, and <a class="el" href="mega__fused__attention__avx_8c_source.html#l00311">mega_fuse_rope_inplace_avx()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="mega__fused__attention__avx_8c_source.html#l00678">mega_fused_attention_decode()</a>.</p>
 
 </div>
 </div>

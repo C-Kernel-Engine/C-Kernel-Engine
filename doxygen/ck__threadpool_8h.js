@@ -1,5 +1,6 @@
 var ck__threadpool_8h =
 [
+    [ "ck_threadpool_profile_t", "structck__threadpool__profile__t.html", "structck__threadpool__profile__t" ],
     [ "CK_CACHE_LINE", "ck__threadpool_8h.html#a452e44b0d33892f36e77c590eba38daf", null ],
     [ "CK_THREADPOOL_MAX_THREADS", "ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5", null ],
     [ "CK_THREADPOOL_SPIN_COUNT", "ck__threadpool_8h.html#a4644600fdce88046ccbdf5089793819a", null ],
@@ -26,6 +27,8 @@ var ck__threadpool_8h =
     [ "ck_threadpool_n_threads", "ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10", null ],
     [ "ck_threadpool_parallel_for_n", "ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83", null ],
     [ "ck_threadpool_pause", "ck__threadpool_8h.html#a001490b08bc5ba893488e49d4b10d3bf", null ],
+    [ "ck_threadpool_profile_reset", "ck__threadpool_8h.html#a20acab131a0e931d50e567b3161de51b", null ],
+    [ "ck_threadpool_profile_snapshot", "ck__threadpool_8h.html#a7e98ca351ae336adf4d905db43847029", null ],
     [ "ck_threadpool_resume", "ck__threadpool_8h.html#a2c5c8ea3eb8087186ea7e8be2617c4f4", null ],
     [ "ck_threadpool_thread_id", "ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4", null ]
 ];
