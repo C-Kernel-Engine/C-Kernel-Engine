@@ -935,6 +935,24 @@
     </div>
 
     <div class="regression-section">
+      <h2>v8 Kernel Allocation Debt</h2>
+      <p class="regression-meta" id="kernel-allocation-meta"><code>make test-v8-kernel-allocations</code> status is not available in this report yet.</p>
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card"><div class="value" id="kernel-allocation-status">-</div><div class="label">Overall</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-total">0</div><div class="label">Allocation Calls</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-production">0</div><div class="label">Production Allocations</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-frees">0</div><div class="label">Free Calls</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-mapped">0</div><div class="label">Mapped Providers</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-missing-scratch">0</div><div class="label">Missing Scratch Contracts</div></div>
+        <div class="summary-card"><div class="value" id="kernel-allocation-warnings">0</div><div class="label">Warnings</div></div>
+      </div>
+      <table class="results-table">
+        <thead><tr><th>Class</th><th>Source</th><th>Function</th><th>Call</th><th>Mapped Provider</th></tr></thead>
+        <tbody id="kernel-allocation-tbody"><tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="regression-section">
       <h2>v7 Training Family Regression</h2>
       <p class="regression-meta" id="backprop-regression-meta">
         `make regression-training-full` status is not available in this report yet.
@@ -1171,6 +1189,9 @@
     <li><strong>Quantization Tests</strong>: Q4_K, Q6_K quantized kernel tests</li>
     <li><strong>v7 Kernel Map Contracts</strong>: sync + validator + contract tests for the active v7 map surface
       (<code>make v7-kernel-map-contracts</code>)</li>
+    <li><strong>v8 Kernel Allocation Debt</strong>: scans every C source under <code>src/kernels</code> for allocator and free calls,
+      classifies production, frontend, oracle, and test debt, rejects new call sites or count increases, and publishes remaining
+      mapped providers with scratch ownership status (<code>make test-v8-kernel-allocations</code>)</li>
     <li><strong>v7 Backprop Kernel Parity</strong>: Optimizer + QK-norm backward ISA matrix + RMSNorm/SwiGLU backward + GEMM backward sweep
       (<code>make v7-kernel-parity-train</code>)</li>
     <li><strong>v7 Training Family Regression</strong>: family-level <code>A/B/C/D/E/F</code> training regimen across the full decoder family matrix
@@ -1481,6 +1502,7 @@ function renderResults(data) {
   renderVisionEncoderAccuracy(data.vision_encoder_accuracy || null);
   renderVisionVisualizer(data.vision_visualizer || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
+  renderKernelAllocation(data.kernel_allocation || null);
   renderBackpropRegression(data.backprop_regression || null);
 
   const statusEl = document.getElementById('overall-status');
@@ -2003,6 +2025,47 @@ function renderKernelMapContracts(data) {
     tr.innerHTML = `<td class="regression-warning-cell">${item}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+function renderKernelAllocation(data) {
+  const metaEl = document.getElementById('kernel-allocation-meta');
+  const statusEl = document.getElementById('kernel-allocation-status');
+  const totalEl = document.getElementById('kernel-allocation-total');
+  const productionEl = document.getElementById('kernel-allocation-production');
+  const freesEl = document.getElementById('kernel-allocation-frees');
+  const mappedEl = document.getElementById('kernel-allocation-mapped');
+  const missingScratchEl = document.getElementById('kernel-allocation-missing-scratch');
+  const warningsEl = document.getElementById('kernel-allocation-warnings');
+  const tbody = document.getElementById('kernel-allocation-tbody');
+  if (!data) {
+    metaEl.textContent = 'make test-v8-kernel-allocations status is not available in this report yet.';
+    statusEl.textContent = '-';
+    [totalEl, productionEl, freesEl, mappedEl, missingScratchEl, warningsEl].forEach(el => { el.textContent = '0'; });
+    tbody.innerHTML = '<tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr>';
+    return;
+  }
+  const counts = data.counts || {};
+  const sites = Array.isArray(data.allocation_sites) ? data.allocation_sites : [];
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+  const status = String(data.status || 'not_run').toLowerCase();
+  metaEl.textContent = data.note || `Generated: ${data.generated_at || '-'}`;
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'warn' ? 'WARN' : status === 'fail' ? 'FAIL' : 'N/R';
+  totalEl.textContent = String(Number(counts.allocation_calls || 0));
+  productionEl.textContent = String(Number(counts.production_allocation_calls || 0));
+  freesEl.textContent = String(Number(counts.free_calls || 0));
+  mappedEl.textContent = String(Number(counts.mapped_allocating_providers || 0));
+  missingScratchEl.textContent = String(Number(counts.mapped_allocating_without_scratch_contract || 0));
+  warningsEl.textContent = String(warnings.length);
+  if (sites.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="regression-warning-cell">No kernel allocation call sites remain.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sites.map(row => `<tr>
+    <td>${escapeHtml(row.classification || '-')}</td>
+    <td><code>${escapeHtml(row.path || '-')}:${Number(row.line || 0)}</code></td>
+    <td><code>${escapeHtml(row.function || '-')}</code></td>
+    <td><code>${escapeHtml(row.allocator || '-')}()</code></td>
+    <td>${escapeHtml((row.provider_ids || []).join(', ') || '-')}</td></tr>`).join('');
 }
 
 function renderBackpropRegression(data) {
