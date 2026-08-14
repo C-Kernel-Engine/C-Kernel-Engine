@@ -1579,55 +1579,55 @@ $(document).ready(function(){initNavTree('gemm__kernels__bf16_8c_source.html',''
 <div class="line"><a id="l01405" name="l01405"></a><span class="lineno"> 1405</span>    dnnl_memory_desc_t any_src_md = NULL, any_weight_md = NULL, any_dst_md = NULL;</div>
 <div class="line"><a id="l01406" name="l01406"></a><span class="lineno"> 1406</span>    dnnl_primitive_desc_t conv_pd = NULL;</div>
 <div class="line"><a id="l01407" name="l01407"></a><span class="lineno"> 1407</span>    dnnl_primitive_t conv = NULL;</div>
-<div class="line"><a id="l01408" name="l01408"></a><span class="lineno"> 1408</span>    dnnl_memory_t user_src = NULL, user_weight = NULL, bias_mem = NULL, user_dst = NULL;</div>
-<div class="line"><a id="l01409" name="l01409"></a><span class="lineno"> 1409</span>    dnnl_memory_t conv_src = NULL, conv_weight = NULL, conv_dst = NULL;</div>
-<div class="line"><a id="l01410" name="l01410"></a><span class="lineno"> 1410</span>    dnnl_status_t status = dnnl_success;</div>
-<div class="line"><a id="l01411" name="l01411"></a><span class="lineno"> 1411</span> </div>
-<div class="line"><a id="l01412" name="l01412"></a><span class="lineno"> 1412</span><span class="preprocessor">#define CK_DNNL_CONV(call) do { status = (call); if (status != dnnl_success) goto cleanup_conv; } while (0)</span></div>
-<div class="line"><a id="l01413" name="l01413"></a><span class="lineno"> 1413</span>    pthread_mutex_lock(&amp;ck_pytorch_brgemm_lock);</div>
-<div class="line"><a id="l01414" name="l01414"></a><span class="lineno"> 1414</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01415" name="l01415"></a><span class="lineno"> 1415</span>        &amp;user_src_md, 5, src_dims, dnnl_bf16, dnnl_ncdhw));</div>
-<div class="line"><a id="l01416" name="l01416"></a><span class="lineno"> 1416</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01417" name="l01417"></a><span class="lineno"> 1417</span>        &amp;user_weight_md, 5, weight_dims, dnnl_bf16, dnnl_oidhw));</div>
-<div class="line"><a id="l01418" name="l01418"></a><span class="lineno"> 1418</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01419" name="l01419"></a><span class="lineno"> 1419</span>        &amp;bias_md, 1, bias_dims, dnnl_bf16, dnnl_x));</div>
-<div class="line"><a id="l01420" name="l01420"></a><span class="lineno"> 1420</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01421" name="l01421"></a><span class="lineno"> 1421</span>        &amp;user_dst_md, 5, dst_dims, dnnl_bf16, dnnl_ncdhw));</div>
-<div class="line"><a id="l01422" name="l01422"></a><span class="lineno"> 1422</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01423" name="l01423"></a><span class="lineno"> 1423</span>        &amp;any_src_md, 5, src_dims, dnnl_bf16, dnnl_format_tag_any));</div>
-<div class="line"><a id="l01424" name="l01424"></a><span class="lineno"> 1424</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01425" name="l01425"></a><span class="lineno"> 1425</span>        &amp;any_weight_md, 5, weight_dims, dnnl_bf16, dnnl_format_tag_any));</div>
-<div class="line"><a id="l01426" name="l01426"></a><span class="lineno"> 1426</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
-<div class="line"><a id="l01427" name="l01427"></a><span class="lineno"> 1427</span>        &amp;any_dst_md, 5, dst_dims, dnnl_bf16, dnnl_format_tag_any));</div>
-<div class="line"><a id="l01428" name="l01428"></a><span class="lineno"> 1428</span>    CK_DNNL_CONV(dnnl_convolution_forward_primitive_desc_create(</div>
-<div class="line"><a id="l01429" name="l01429"></a><span class="lineno"> 1429</span>        &amp;conv_pd, ck_pytorch_brgemm_engine, dnnl_forward_training,</div>
-<div class="line"><a id="l01430" name="l01430"></a><span class="lineno"> 1430</span>        dnnl_convolution_direct, any_src_md, any_weight_md, bias_md, any_dst_md,</div>
-<div class="line"><a id="l01431" name="l01431"></a><span class="lineno"> 1431</span>        strides, dilates, padding, padding, NULL));</div>
-<div class="line"><a id="l01432" name="l01432"></a><span class="lineno"> 1432</span> </div>
-<div class="line"><a id="l01433" name="l01433"></a><span class="lineno"> 1433</span>    const_dnnl_memory_desc_t conv_src_md =</div>
-<div class="line"><a id="l01434" name="l01434"></a><span class="lineno"> 1434</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_src_md, 0);</div>
-<div class="line"><a id="l01435" name="l01435"></a><span class="lineno"> 1435</span>    const_dnnl_memory_desc_t conv_weight_md =</div>
-<div class="line"><a id="l01436" name="l01436"></a><span class="lineno"> 1436</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_weights_md, 0);</div>
-<div class="line"><a id="l01437" name="l01437"></a><span class="lineno"> 1437</span>    const_dnnl_memory_desc_t conv_dst_md =</div>
-<div class="line"><a id="l01438" name="l01438"></a><span class="lineno"> 1438</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_dst_md, 0);</div>
-<div class="line"><a id="l01439" name="l01439"></a><span class="lineno"> 1439</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01440" name="l01440"></a><span class="lineno"> 1440</span>        &amp;user_src, user_src_md, ck_pytorch_brgemm_engine, input_bf16));</div>
-<div class="line"><a id="l01441" name="l01441"></a><span class="lineno"> 1441</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01442" name="l01442"></a><span class="lineno"> 1442</span>        &amp;user_weight, user_weight_md, ck_pytorch_brgemm_engine, (<span class="keywordtype">void</span> *)weights));</div>
-<div class="line"><a id="l01443" name="l01443"></a><span class="lineno"> 1443</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01444" name="l01444"></a><span class="lineno"> 1444</span>        &amp;bias_mem, bias_md, ck_pytorch_brgemm_engine, bias_bf16));</div>
-<div class="line"><a id="l01445" name="l01445"></a><span class="lineno"> 1445</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01446" name="l01446"></a><span class="lineno"> 1446</span>        &amp;user_dst, user_dst_md, ck_pytorch_brgemm_engine, output_bf16));</div>
-<div class="line"><a id="l01447" name="l01447"></a><span class="lineno"> 1447</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01448" name="l01448"></a><span class="lineno"> 1448</span>        &amp;conv_src, conv_src_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
-<div class="line"><a id="l01449" name="l01449"></a><span class="lineno"> 1449</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01450" name="l01450"></a><span class="lineno"> 1450</span>        &amp;conv_weight, conv_weight_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
-<div class="line"><a id="l01451" name="l01451"></a><span class="lineno"> 1451</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
-<div class="line"><a id="l01452" name="l01452"></a><span class="lineno"> 1452</span>        &amp;conv_dst, conv_dst_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
-<div class="line"><a id="l01453" name="l01453"></a><span class="lineno"> 1453</span> </div>
-<div class="line"><a id="l01454" name="l01454"></a><span class="lineno"> 1454</span>    dnnl_primitive_desc_t reorder_pd = NULL;</div>
-<div class="line"><a id="l01455" name="l01455"></a><span class="lineno"> 1455</span>    dnnl_primitive_t reorder = NULL;</div>
-<div class="line"><a id="l01456" name="l01456"></a><span class="lineno"> 1456</span>    dnnl_exec_arg_t reorder_args[2];</div>
+<div class="line"><a id="l01408" name="l01408"></a><span class="lineno"> 1408</span>    dnnl_primitive_desc_t reorder_pd = NULL;</div>
+<div class="line"><a id="l01409" name="l01409"></a><span class="lineno"> 1409</span>    dnnl_primitive_t reorder = NULL;</div>
+<div class="line"><a id="l01410" name="l01410"></a><span class="lineno"> 1410</span>    dnnl_exec_arg_t reorder_args[2];</div>
+<div class="line"><a id="l01411" name="l01411"></a><span class="lineno"> 1411</span>    dnnl_memory_t user_src = NULL, user_weight = NULL, bias_mem = NULL, user_dst = NULL;</div>
+<div class="line"><a id="l01412" name="l01412"></a><span class="lineno"> 1412</span>    dnnl_memory_t conv_src = NULL, conv_weight = NULL, conv_dst = NULL;</div>
+<div class="line"><a id="l01413" name="l01413"></a><span class="lineno"> 1413</span>    dnnl_status_t status = dnnl_success;</div>
+<div class="line"><a id="l01414" name="l01414"></a><span class="lineno"> 1414</span> </div>
+<div class="line"><a id="l01415" name="l01415"></a><span class="lineno"> 1415</span><span class="preprocessor">#define CK_DNNL_CONV(call) do { status = (call); if (status != dnnl_success) goto cleanup_conv; } while (0)</span></div>
+<div class="line"><a id="l01416" name="l01416"></a><span class="lineno"> 1416</span>    pthread_mutex_lock(&amp;ck_pytorch_brgemm_lock);</div>
+<div class="line"><a id="l01417" name="l01417"></a><span class="lineno"> 1417</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01418" name="l01418"></a><span class="lineno"> 1418</span>        &amp;user_src_md, 5, src_dims, dnnl_bf16, dnnl_ncdhw));</div>
+<div class="line"><a id="l01419" name="l01419"></a><span class="lineno"> 1419</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01420" name="l01420"></a><span class="lineno"> 1420</span>        &amp;user_weight_md, 5, weight_dims, dnnl_bf16, dnnl_oidhw));</div>
+<div class="line"><a id="l01421" name="l01421"></a><span class="lineno"> 1421</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01422" name="l01422"></a><span class="lineno"> 1422</span>        &amp;bias_md, 1, bias_dims, dnnl_bf16, dnnl_x));</div>
+<div class="line"><a id="l01423" name="l01423"></a><span class="lineno"> 1423</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01424" name="l01424"></a><span class="lineno"> 1424</span>        &amp;user_dst_md, 5, dst_dims, dnnl_bf16, dnnl_ncdhw));</div>
+<div class="line"><a id="l01425" name="l01425"></a><span class="lineno"> 1425</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01426" name="l01426"></a><span class="lineno"> 1426</span>        &amp;any_src_md, 5, src_dims, dnnl_bf16, dnnl_format_tag_any));</div>
+<div class="line"><a id="l01427" name="l01427"></a><span class="lineno"> 1427</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01428" name="l01428"></a><span class="lineno"> 1428</span>        &amp;any_weight_md, 5, weight_dims, dnnl_bf16, dnnl_format_tag_any));</div>
+<div class="line"><a id="l01429" name="l01429"></a><span class="lineno"> 1429</span>    CK_DNNL_CONV(dnnl_memory_desc_create_with_tag(</div>
+<div class="line"><a id="l01430" name="l01430"></a><span class="lineno"> 1430</span>        &amp;any_dst_md, 5, dst_dims, dnnl_bf16, dnnl_format_tag_any));</div>
+<div class="line"><a id="l01431" name="l01431"></a><span class="lineno"> 1431</span>    CK_DNNL_CONV(dnnl_convolution_forward_primitive_desc_create(</div>
+<div class="line"><a id="l01432" name="l01432"></a><span class="lineno"> 1432</span>        &amp;conv_pd, ck_pytorch_brgemm_engine, dnnl_forward_training,</div>
+<div class="line"><a id="l01433" name="l01433"></a><span class="lineno"> 1433</span>        dnnl_convolution_direct, any_src_md, any_weight_md, bias_md, any_dst_md,</div>
+<div class="line"><a id="l01434" name="l01434"></a><span class="lineno"> 1434</span>        strides, dilates, padding, padding, NULL));</div>
+<div class="line"><a id="l01435" name="l01435"></a><span class="lineno"> 1435</span> </div>
+<div class="line"><a id="l01436" name="l01436"></a><span class="lineno"> 1436</span>    const_dnnl_memory_desc_t conv_src_md =</div>
+<div class="line"><a id="l01437" name="l01437"></a><span class="lineno"> 1437</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_src_md, 0);</div>
+<div class="line"><a id="l01438" name="l01438"></a><span class="lineno"> 1438</span>    const_dnnl_memory_desc_t conv_weight_md =</div>
+<div class="line"><a id="l01439" name="l01439"></a><span class="lineno"> 1439</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_weights_md, 0);</div>
+<div class="line"><a id="l01440" name="l01440"></a><span class="lineno"> 1440</span>    const_dnnl_memory_desc_t conv_dst_md =</div>
+<div class="line"><a id="l01441" name="l01441"></a><span class="lineno"> 1441</span>        dnnl_primitive_desc_query_md(conv_pd, dnnl_query_dst_md, 0);</div>
+<div class="line"><a id="l01442" name="l01442"></a><span class="lineno"> 1442</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01443" name="l01443"></a><span class="lineno"> 1443</span>        &amp;user_src, user_src_md, ck_pytorch_brgemm_engine, input_bf16));</div>
+<div class="line"><a id="l01444" name="l01444"></a><span class="lineno"> 1444</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01445" name="l01445"></a><span class="lineno"> 1445</span>        &amp;user_weight, user_weight_md, ck_pytorch_brgemm_engine, (<span class="keywordtype">void</span> *)weights));</div>
+<div class="line"><a id="l01446" name="l01446"></a><span class="lineno"> 1446</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01447" name="l01447"></a><span class="lineno"> 1447</span>        &amp;bias_mem, bias_md, ck_pytorch_brgemm_engine, bias_bf16));</div>
+<div class="line"><a id="l01448" name="l01448"></a><span class="lineno"> 1448</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01449" name="l01449"></a><span class="lineno"> 1449</span>        &amp;user_dst, user_dst_md, ck_pytorch_brgemm_engine, output_bf16));</div>
+<div class="line"><a id="l01450" name="l01450"></a><span class="lineno"> 1450</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01451" name="l01451"></a><span class="lineno"> 1451</span>        &amp;conv_src, conv_src_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
+<div class="line"><a id="l01452" name="l01452"></a><span class="lineno"> 1452</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01453" name="l01453"></a><span class="lineno"> 1453</span>        &amp;conv_weight, conv_weight_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
+<div class="line"><a id="l01454" name="l01454"></a><span class="lineno"> 1454</span>    CK_DNNL_CONV(dnnl_memory_create(</div>
+<div class="line"><a id="l01455" name="l01455"></a><span class="lineno"> 1455</span>        &amp;conv_dst, conv_dst_md, ck_pytorch_brgemm_engine, DNNL_MEMORY_ALLOCATE));</div>
+<div class="line"><a id="l01456" name="l01456"></a><span class="lineno"> 1456</span> </div>
 <div class="line"><a id="l01457" name="l01457"></a><span class="lineno"> 1457</span>    CK_DNNL_CONV(dnnl_reorder_primitive_desc_create(</div>
 <div class="line"><a id="l01458" name="l01458"></a><span class="lineno"> 1458</span>        &amp;reorder_pd, user_src_md, ck_pytorch_brgemm_engine,</div>
 <div class="line"><a id="l01459" name="l01459"></a><span class="lineno"> 1459</span>        conv_src_md, ck_pytorch_brgemm_engine, NULL));</div>

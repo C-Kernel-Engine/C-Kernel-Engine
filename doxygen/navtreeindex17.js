@@ -1,5 +1,7 @@
 var NAVTREEINDEX17 =
 {
+"structCKMemSpan.html#af281883bfadbea82697819bbf12aa759":[1,0,42,2],
+"structCKMergeRule.html":[1,0,43],
 "structCKMergeRule.html#a2f4fb999c8ad7581926948836ad96949":[1,0,43,0],
 "structCKMergeRule.html#ad429814a773c9faa0526991078347e4f":[1,0,43,3],
 "structCKMergeRule.html#adacd50b760f95bfe3bd04d8618fb4c19":[1,0,43,1],
@@ -247,7 +249,5 @@ var NAVTREEINDEX17 =
 "structCKTrie.html":[1,0,64],
 "structCKTrie.html#a82ef124b5228ed534e3b9d861c12ad21":[1,0,64,0],
 "structCKTrie.html#a83868dcb850147794f7cb150568cece0":[1,0,64,1],
-"structCKTrie.html#a8684910b0e136ebc6be4bd48d57f3ce1":[1,0,64,2],
-"structCKTrieNode.html":[1,0,65],
-"structCKTrieNode.html#a316472d591daedc90299616e28bda4da":[1,0,65,1]
+"structCKTrie.html#a8684910b0e136ebc6be4bd48d57f3ce1":[1,0,64,2]
 };
