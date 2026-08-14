@@ -1,5 +1,11 @@
 var NAVTREEINDEX15 =
 {
+"ssm__kernels_8c_source.html":[2,0,1,1,85],
+"structAffinityInfo.html":[1,0,0],
+"structAffinityInfo.html#a335a14b8b3b93f722ef8e2b6455122f5":[1,0,0,3],
+"structAffinityInfo.html#a905e3d4bab481748227b9b65665a82fa":[1,0,0,0],
+"structAffinityInfo.html#aa8aceed4896f9d850b42199624e74f02":[1,0,0,2],
+"structAffinityInfo.html#ac336f376702b1b1724111b291c9fac84":[1,0,0,4],
 "structAffinityInfo.html#ad7c543698d7fa66a65b006a8e16e5368":[1,0,0,1],
 "structAffinityInfo.html#aed549054fb9376cc874f3d8d710d1e89":[1,0,0,5],
 "structCKAudioWavInfo.html":[1,0,13],
@@ -243,11 +249,5 @@ var NAVTREEINDEX15 =
 "structCKLayerForwardParams.html#a86060e45304124966b764eb8db0365b7":[1,0,32,24],
 "structCKLayerForwardParams.html#a8b216d5540d147750b5b7d6ebe238445":[1,0,32,5],
 "structCKLayerForwardParams.html#a97ce8698227c9cf419c8e21d17cebc12":[1,0,32,31],
-"structCKLayerForwardParams.html#a98753685d03e778a1d655f8f3cd486ea":[1,0,32,42],
-"structCKLayerForwardParams.html#a9b1930ef9e3d94dae2f16bacd354dc2d":[1,0,32,35],
-"structCKLayerForwardParams.html#a9b2e8d95ad724035dc4ef7d8f2aeb2b8":[1,0,32,37],
-"structCKLayerForwardParams.html#aace627c9eb6644fac5c3fc5a4748f1f4":[1,0,32,21],
-"structCKLayerForwardParams.html#ab2e6f98706c4822473bee01a6b4c46d6":[1,0,32,10],
-"structCKLayerForwardParams.html#ac1ce35724d91ff94c95707a6d879d0a9":[1,0,32,16],
-"structCKLayerForwardParams.html#ac49cad0850ce2e111044fc2114783d16":[1,0,32,38]
+"structCKLayerForwardParams.html#a98753685d03e778a1d655f8f3cd486ea":[1,0,32,42]
 };
