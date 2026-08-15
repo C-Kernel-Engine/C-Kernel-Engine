@@ -1493,6 +1493,45 @@
       overflow-wrap: normal;
       word-break: normal;
     }
+    /* Allocation-debt accordion */
+    .alloc-accordion summary {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--grey);
+      border-radius: 6px;
+      background: var(--dark-lighter);
+      color: var(--text-primary);
+      font-weight: 600;
+      list-style: none;
+      user-select: none;
+    }
+    .alloc-accordion summary::-webkit-details-marker { display: none; }
+    .alloc-accordion summary::before {
+      content: "\25B6";
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      transition: transform 0.15s ease;
+    }
+    .alloc-accordion[open] summary::before { transform: rotate(90deg); }
+    .alloc-accordion[open] summary { border-radius: 6px 6px 0 0; border-bottom: none; }
+    .alloc-accordion-count {
+      margin-left: auto;
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+    .alloc-guide {
+      margin: 0.75rem 0 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .alloc-class-production {
+      color: #ffc933;
+      font-weight: 600;
+    }
 
     /* What-this-tests explainers and status semantics */
     .contract-explainer {
@@ -1944,10 +1983,14 @@
         <div class="summary-card"><div class="value" id="kernel-allocation-warnings">0</div><div class="label">Warnings</div></div>
       </div>
       <div class="table-scroll">
+      <details class="alloc-accordion" id="kernel-allocation-details">
+        <summary><span class="alloc-accordion-title">Allocation call sites</span><span class="alloc-accordion-count" id="kernel-allocation-rowcount">click to expand</span></summary>
+        <p class="alloc-guide">How to read this table: raw <code>malloc()</code>/<code>free()</code> calls inside production kernels are <strong>allocation debt</strong> — every call should eventually be owned by an arena slot or a declared scratch contract. A row whose <em>Mapped Provider</em> is <code>-</code> marks an allocation no provider has claimed yet; that is outstanding debt, not proof of a leak. The leak signature to watch for instead is allocation calls without matching frees — compare <em>Allocation Calls</em> against <em>Free Calls</em> in the cards above.</p>
       <table class="results-table">
         <thead><tr><th>Class</th><th>Source</th><th>Function</th><th>Call</th><th>Mapped Provider</th></tr></thead>
         <tbody id="kernel-allocation-tbody"><tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr></tbody>
       </table>
+      </details>
       </div>
     </div>
 
@@ -3036,10 +3079,13 @@ function renderKernelAllocation(data) {
   const missingScratchEl = document.getElementById('kernel-allocation-missing-scratch');
   const warningsEl = document.getElementById('kernel-allocation-warnings');
   const tbody = document.getElementById('kernel-allocation-tbody');
+  const rowCountEl = document.getElementById('kernel-allocation-rowcount');
+  const setRowCount = (n) => { if (rowCountEl) rowCountEl.textContent = n > 0 ? `${n} call site${n === 1 ? '' : 's'}` : 'no call sites'; };
   if (!data) {
     metaEl.textContent = 'make test-v8-kernel-allocations status is not available in this report yet.';
     statusEl.textContent = '-';
     [totalEl, productionEl, freesEl, mappedEl, missingScratchEl, warningsEl].forEach(el => { el.textContent = '0'; });
+    setRowCount(0);
     tbody.innerHTML = '<tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr>';
     return;
   }
@@ -3056,15 +3102,21 @@ function renderKernelAllocation(data) {
   missingScratchEl.textContent = String(Number(counts.mapped_allocating_without_scratch_contract || 0));
   warningsEl.textContent = String(warnings.length);
   if (sites.length === 0) {
+    setRowCount(0);
     tbody.innerHTML = '<tr><td colspan="5" class="regression-warning-cell">No kernel allocation call sites remain.</td></tr>';
     return;
   }
-  tbody.innerHTML = sites.map(row => `<tr>
-    <td>${escapeHtml(row.classification || '-')}</td>
+  setRowCount(sites.length);
+  tbody.innerHTML = sites.map(row => {
+    const cls = String(row.classification || '-');
+    const clsHtml = cls === 'production' ? `<span class="alloc-class-production">${escapeHtml(cls)}</span>` : escapeHtml(cls);
+    return `<tr>
+    <td>${clsHtml}</td>
     <td><code>${escapeHtml(row.path || '-')}:${Number(row.line || 0)}</code></td>
     <td><code>${escapeHtml(row.function || '-')}</code></td>
     <td><code>${escapeHtml(row.allocator || '-')}()</code></td>
-    <td>${escapeHtml((row.provider_ids || []).join(', ') || '-')}</td></tr>`).join('');
+    <td>${escapeHtml((row.provider_ids || []).join(', ') || '-')}</td></tr>`;
+  }).join('');
 }
 
 function renderBackpropRegression(data) {
