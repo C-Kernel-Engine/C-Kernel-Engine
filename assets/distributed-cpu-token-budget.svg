@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 760">
+  <title>The 20 ms token budget: heterogeneous lanes ending at the same reduction boundary, with cache-resident current tile and DRAM streaming the next tile</title>
+  <desc>A model timeline for a 50 tokens-per-second target, 20 milliseconds per token, divided into three graph regions. In each region, Ryzen A and Ryzen B lanes carry smaller shards and a Xeon lane carries a larger shard, all ending at the same reduction boundary. Region one and region three close on a 16-kilobyte hidden-vector reduction; region two closes on a scalar norm reduction; each sync is labeled approximately x microseconds, unmeasured. A lower band shows the memory system per node: the current tile is cache-resident while DRAM streams the next tile and AVX or AMX compute consumes the current one. A side panel lists the worked model numbers: 93 layers gives about 215 microseconds per layer, 186 hidden-vector reductions per token totals about 3 megabytes before collective overhead, and at 80 gigabytes per second a node streams about 17.2 megabytes per layer. Every figure on the diagram is a THEORETICAL model label, not a measurement.</desc>
+
+  <defs>
+    <marker id="arrBud" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <marker id="arrBudAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+    <pattern id="budStripe" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#0c1d2a"/>
+      <rect x="0" y="0" width="3" height="9" fill="#123549"/>
+    </pattern>
+    <pattern id="budStripeXeon" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#1a2a0c"/>
+      <rect x="0" y="0" width="3" height="9" fill="#2a4212"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="760" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Token Budget: Where 20 ms Actually Goes</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Unequal shards, equal finish line — every number on this figure is a MODEL label, not a measurement</text>
+
+  <!-- budget banner -->
+  <rect x="240" y="72" width="480" height="40" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="97" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#ffd97a" text-anchor="middle">20 ms / TOKEN — 50 tok/s target (MODEL)</text>
+
+  <!-- ═══ three regions ═══ -->
+  <!-- region geometry: x-start 60/350/640, width 250; lanes end at x=290/580/870 -->
+  <g font-family="Inter, sans-serif">
+    <text x="175" y="146" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">REGION 1 — attention</text>
+    <text x="465" y="146" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">REGION 2 — norm</text>
+    <text x="755" y="146" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">REGION 3 — MLP</text>
+    <text x="175" y="164" font-size="10" fill="#808080" text-anchor="middle">≈215 µs / layer budget (MODEL)</text>
+    <text x="465" y="164" font-size="10" fill="#808080" text-anchor="middle">folded into region time</text>
+    <text x="755" y="164" font-size="10" fill="#808080" text-anchor="middle">≈215 µs / layer budget (MODEL)</text>
+  </g>
+
+  <!-- lanes, region 1: Ryzen A width 140, Ryzen B 140, Xeon 230 — all end at 290 -->
+  <g font-family="Inter, sans-serif" font-size="10.5">
+    <text x="146" y="186" fill="#b0b0b0" text-anchor="end">Ryzen A</text>
+    <rect x="150" y="174" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="146" y="212" fill="#b0b0b0" text-anchor="end">Ryzen B</text>
+    <rect x="150" y="200" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="56" y="238" fill="#b0b0b0" text-anchor="end">Xeon</text>
+    <rect x="60" y="226" width="230" height="20" rx="4" fill="url(#budStripeXeon)" stroke="#a3e635" stroke-width="1.5"/>
+
+    <!-- region 2: end at 580 -->
+    <rect x="440" y="174" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="440" y="200" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="350" y="226" width="230" height="20" rx="4" fill="url(#budStripeXeon)" stroke="#a3e635" stroke-width="1.5"/>
+
+    <!-- region 3: end at 870 -->
+    <rect x="730" y="174" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="730" y="200" width="140" height="20" rx="4" fill="url(#budStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="640" y="226" width="230" height="20" rx="4" fill="url(#budStripeXeon)" stroke="#a3e635" stroke-width="1.5"/>
+  </g>
+
+  <!-- boundary dashed lines -->
+  <line x1="290" y1="170" x2="290" y2="300" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <line x1="580" y1="170" x2="580" y2="300" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <line x1="870" y1="170" x2="870" y2="300" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+  <!-- legend for lane widths -->
+  <text x="60" y="276" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">lane length ∝ shard size ∝ measured node throughput (X-Ray calibration, HYPOTHESIS until validated)</text>
+
+  <!-- reduce blocks -->
+  <g font-family="Inter, sans-serif">
+    <rect x="215" y="306" width="150" height="58" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="290" y="330" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">REDUCE</text>
+    <text x="290" y="348" font-size="10.5" fill="#c8a04a" text-anchor="middle">hidden vector · 16 KB</text>
+
+    <rect x="505" y="306" width="150" height="58" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="580" y="330" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">REDUCE</text>
+    <text x="580" y="348" font-size="10.5" fill="#c8a04a" text-anchor="middle">norm statistic · scalar</text>
+
+    <rect x="795" y="306" width="150" height="58" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="870" y="330" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">REDUCE</text>
+    <text x="870" y="348" font-size="10.5" fill="#c8a04a" text-anchor="middle">hidden vector · 16 KB</text>
+  </g>
+
+  <!-- sync cost labels -->
+  <g font-family="Inter, sans-serif" font-size="11">
+    <text x="290" y="392" fill="#f8c471" text-anchor="middle">~x µs sync (unmeasured)</text>
+    <text x="580" y="392" fill="#f8c471" text-anchor="middle">~x µs sync (unmeasured)</text>
+    <text x="870" y="392" fill="#f8c471" text-anchor="middle">~x µs sync (unmeasured)</text>
+  </g>
+
+  <!-- ═══ per-node memory band ═══ -->
+  <text x="48" y="446" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc">Meanwhile, inside each node: cache is a staging mechanism, DRAM streams continuously</text>
+
+  <g font-family="Inter, sans-serif">
+    <!-- cache row -->
+    <text x="60" y="486" font-size="11.5" font-weight="700" fill="#a0a0a0">Cache</text>
+    <rect x="130" y="470" width="240" height="26" rx="5" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+    <text x="250" y="487" font-size="11" fill="#86efac" text-anchor="middle">current tile (resident)</text>
+    <rect x="378" y="470" width="150" height="26" rx="5" fill="#262626" stroke="#404040" stroke-dasharray="4 3"/>
+    <text x="453" y="487" font-size="10.5" fill="#808080" text-anchor="middle">next tile (prefetch)</text>
+
+    <!-- DRAM row -->
+    <text x="60" y="530" font-size="11.5" font-weight="700" fill="#a0a0a0">DRAM</text>
+    <rect x="130" y="514" width="560" height="26" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="410" y="531" font-size="11" fill="#b0d9ef" text-anchor="middle">weight stream — next tiles flow at B_i GB/s</text>
+    <line x1="560" y1="514" x2="453" y2="500" stroke="#808080" stroke-width="1.5" marker-end="url(#arrBud)"/>
+
+    <!-- compute row -->
+    <text x="60" y="574" font-size="11.5" font-weight="700" fill="#a0a0a0">Compute</text>
+    <rect x="130" y="558" width="240" height="26" rx="5" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="250" y="575" font-size="11" fill="#ffd97a" text-anchor="middle">AVX / AMX work on current tile</text>
+  </g>
+
+  <text x="720" y="531" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">streaming, not</text>
+  <text x="720" y="545" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">&quot;fit model in cache&quot;</text>
+
+  <!-- ═══ worked model numbers ═══ -->
+  <rect x="48" y="606" width="560" height="118" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="72" y="632" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Worked example — THEORETICAL, parameterized, no real-model attribution</text>
+  <g font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">
+    <text x="72" y="656">93 layers × ≈215 µs ≈ 20 ms / token budget</text>
+    <text x="72" y="676">2 hidden-vector reductions / layer → 186 × 16 KB ≈ 3 MB / token (before collective overhead)</text>
+    <text x="72" y="696">local stream per layer at 80 GB/s: 80 GB/s × 215 µs ≈ 17.2 MB — cache-resident tile + DRAM stream</text>
+    <text x="72" y="716">10 ms variant: halve every budget → the sync share doubles; the same model stress-tests 100 tok/s</text>
+  </g>
+
+  <!-- takeaway -->
+  <rect x="640" y="606" width="272" height="118" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="776" y="648" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#ffd97a" text-anchor="middle">useful local work ≫</text>
+  <text x="776" y="670" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#ffd97a" text-anchor="middle">bytes synchronized</text>
+  <text x="776" y="700" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">the ratio is the thesis;</text>
+  <text x="776" y="714" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">measurement decides</text>
+</svg>

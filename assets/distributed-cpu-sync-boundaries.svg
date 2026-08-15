@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560">
-  <title>Global synchronization boundaries per layer: conventional tensor parallelism versus a hyper-fused schedule</title>
-  <desc>Top flow: a conventional tensor-parallel layer runs QKV projection, collective, attention, collective, output projection, collective, MLP up, collective, activation, MLP down, collective — five global synchronization boundaries per layer. Bottom flow: a hyper-fused zip schedule runs one fused lane covering unpack, QKV, local heads, attention and the output-projection partial, then one merge, then the fused MLP lane, then one merge — two boundaries per layer. The metric is boundaries per layer, not tensor-parallel degree.</desc>
+  <title>Global synchronization boundaries per layer: a conventional operator-level TP schedule versus a whole-subgraph zip schedule</title>
+  <desc>Top flow: an established tensor-parallel layer pairs column-parallel and row-parallel linears — QKV projection (column-parallel, no collective), local attention, output projection (row-parallel), collective, MLP gate/up (column-parallel), SwiGLU, MLP down (row-parallel), collective — roughly two collectives per layer, not one per operator. Bottom flow: a whole-subgraph zip schedule runs one fused lane from unpack through the output-projection partial, one hidden-state merge, the fused MLP lane, and one final merge. The real contrast is not the nominal collective count but how long the shard layout stays unresolved before any global synchronization.</desc>
 
   <defs>
     <marker id="arrSync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -11,49 +11,52 @@
   <rect width="960" height="560" fill="#232323"/>
 
   <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Metric: Synchronization Boundaries per Layer</text>
-  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">"We support TP=2" says nothing about how often the nodes stop to agree</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Established TP already pairs linears down to ≈2 collectives / layer — the question is how long the graph can stay unresolved</text>
 
-  <!-- ═══ Conventional TP ═══ -->
-  <text x="48" y="104" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#f87171">Conventional TP: collective after nearly every operator</text>
+  <!-- ═══ Conventional operator-level TP ═══ -->
+  <text x="48" y="104" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#f87171">Conventional operator-level TP schedule — ≈2 collectives / layer (paired linears)</text>
 
   <g font-family="Inter, sans-serif">
-    <rect x="48" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
-    <text x="100" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">QKV GEMM</text>
+    <rect x="48" y="122" width="118" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="107" y="142" font-size="11.5" fill="#b0d9ef" text-anchor="middle">QKV GEMM</text>
+    <text x="107" y="158" font-size="9.5" fill="#5a8fb0" text-anchor="middle">column-parallel</text>
 
-    <rect x="160" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-    <text x="186" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+    <rect x="174" y="122" width="96" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="222" y="142" font-size="11.5" fill="#b0d9ef" text-anchor="middle">attention</text>
+    <text x="222" y="158" font-size="9.5" fill="#5a8fb0" text-anchor="middle">head-local</text>
 
-    <rect x="220" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
-    <text x="272" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">attention</text>
+    <rect x="278" y="122" width="112" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="334" y="142" font-size="11.5" fill="#b0d9ef" text-anchor="middle">out GEMM</text>
+    <text x="334" y="158" font-size="9.5" fill="#5a8fb0" text-anchor="middle">row-parallel</text>
 
-    <rect x="332" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-    <text x="358" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+    <rect x="398" y="122" width="44" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="420" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
 
-    <rect x="392" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
-    <text x="444" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">out GEMM</text>
+    <rect x="450" y="122" width="124" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="512" y="142" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP gate/up</text>
+    <text x="512" y="158" font-size="9.5" fill="#5a8fb0" text-anchor="middle">column-parallel</text>
 
-    <rect x="504" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-    <text x="530" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+    <rect x="582" y="122" width="84" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="624" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">SwiGLU</text>
 
-    <rect x="564" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
-    <text x="616" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP up</text>
+    <rect x="674" y="122" width="110" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="729" y="142" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP down</text>
+    <text x="729" y="158" font-size="9.5" fill="#5a8fb0" text-anchor="middle">row-parallel</text>
 
-    <rect x="676" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-    <text x="702" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+    <rect x="792" y="122" width="44" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="814" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
 
-    <rect x="736" y="122" width="86" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
-    <text x="779" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP down</text>
-
-    <rect x="830" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-    <text x="856" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+    <rect x="844" y="122" width="68" height="46" rx="6" fill="#262626" stroke="#404040"/>
+    <text x="878" y="142" font-size="9.5" fill="#808080" text-anchor="middle">next</text>
+    <text x="878" y="156" font-size="9.5" fill="#808080" text-anchor="middle">layer</text>
   </g>
 
-  <text x="48" y="196" font-family="Inter, sans-serif" font-size="11" fill="#808080">C = global collective (all-reduce / all-gather)</text>
-  <rect x="700" y="176" width="182" height="34" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
-  <text x="791" y="198" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#f87171" text-anchor="middle">≈ 5 boundaries / layer</text>
+  <text x="48" y="196" font-family="Inter, sans-serif" font-size="11" fill="#808080">C = global all-reduce. Column-parallel outputs feed the next op directly — no collective until the row-parallel partial.</text>
+  <rect x="700" y="176" width="212" height="34" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+  <text x="806" y="198" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#f87171" text-anchor="middle">≈ 2 collectives / layer</text>
 
-  <!-- ═══ Hyper-fused ═══ -->
-  <text x="48" y="268" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#86efac">Hyper-fused zip schedule: one merge per fused region</text>
+  <!-- ═══ Whole-subgraph zip schedule ═══ -->
+  <text x="48" y="268" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#86efac">Whole-subgraph zip schedule — 1 merge per fused region</text>
 
   <g font-family="Inter, sans-serif">
     <rect x="48" y="286" width="500" height="56" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
@@ -75,13 +78,15 @@
   <rect x="722" y="374" width="160" height="40" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
   <text x="802" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE 2</text>
 
-  <rect x="48" y="374" width="182" height="34" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
-  <text x="139" y="396" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#86efac" text-anchor="middle">2 boundaries / layer</text>
+  <rect x="48" y="366" width="280" height="48" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="188" y="386" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#86efac" text-anchor="middle">1 merge per fused region</text>
+  <text x="188" y="403" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">(2 / layer today — the span is the claim, not the count)</text>
 
   <!-- legend / takeaway -->
-  <rect x="48" y="446" width="864" height="82" rx="8" fill="#262626" stroke="#404040"/>
-  <text x="72" y="476" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">What changes</text>
-  <text x="72" y="498" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">Quantized unpack, scale decode, local accumulation, RoPE / QK norm, SwiGLU and the projection partials stay</text>
-  <text x="72" y="516" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">inside the lane. Only mathematically unavoidable reductions cross the fabric. Boundary count is the claim; the</text>
-  <text x="72" y="534" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">measured collective-time fraction is the evidence.</text>
+  <rect x="48" y="440" width="864" height="100" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="72" y="468" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">What actually changes</text>
+  <text x="72" y="490" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">Not the nominal collective count — the unresolved span. Paired TP already keeps activations sharded between its two</text>
+  <text x="72" y="508" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">boundaries; the zip schedule pushes the whole operator subgraph — quantized unpack, scale decode, local accumulation,</text>
+  <text x="72" y="526" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">RoPE / QK norm, SwiGLU, norm statistics, projection partials — into the shard layout, and asks experimentally whether</text>
+  <text x="72" y="544" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">Shard → Shard → Shard → PartialSum can stay unresolved for longer portions of the graph than existing schedules allow.</text>
 </svg>

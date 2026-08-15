@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660">
+  <title>The reduction algebra: what mathematically must cross the fabric, and how small it is</title>
+  <desc>Two panels. Panel one: a weight matrix split column-wise across N nodes; each node computes a local product Y_i equals X times W_i, then a local nonlinear function H_i equals f of Y_i, and only the final output projection requires a sum Z equals sum over i of H_i times V_i — labeled REDUCE: one hidden-size vector only. Panel two: RMSNorm as the scalar example; each shard accumulates a local sum of squares s_i, and the global statistic s is the sum of the s_i — labeled REDUCE: one scalar. A takeaway band states that a global mathematical dependency does not imply gathering the full tensor. All content is algebraic structure, not measurements.</desc>
+
+  <defs>
+    <marker id="arrAlg" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <pattern id="algStripe" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#0c1d2a"/>
+      <rect x="0" y="0" width="3" height="9" fill="#123549"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="660" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">What Must Cross the Fabric? The Reduction Algebra</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">The synchronization payload is fixed by the algebra, not by the implementation — and it is small</text>
+
+  <!-- ═══ Panel A: sharded projection chain ═══ -->
+  <text x="48" y="96" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc">A. Sharded projection chain — one hidden-size vector is the only meeting point</text>
+
+  <!-- W split -->
+  <text x="70" y="130" font-family="Inter, sans-serif" font-size="13" fill="#b0b0b0">W = [ W₁ | W₂ | … | W_N ]</text>
+  <g font-family="Inter, sans-serif">
+    <rect x="70" y="142" width="60" height="56" rx="4" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="100" y="175" font-size="12" fill="#b0d9ef" text-anchor="middle">W₁</text>
+    <rect x="134" y="142" width="60" height="56" rx="4" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="164" y="175" font-size="12" fill="#b0d9ef" text-anchor="middle">W₂</text>
+    <text x="214" y="175" font-size="14" fill="#808080" text-anchor="middle">…</text>
+    <rect x="238" y="142" width="60" height="56" rx="4" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="268" y="175" font-size="12" fill="#b0d9ef" text-anchor="middle">W_N</text>
+  </g>
+
+  <!-- local chain per node -->
+  <g font-family="Inter, sans-serif">
+    <rect x="340" y="120" width="150" height="34" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="415" y="141" font-size="12" fill="#b0d9ef" text-anchor="middle">Y_i = X · W_i</text>
+    <text x="505" y="141" font-size="11" fill="#5a8fb0">local GEMM</text>
+
+    <line x1="415" y1="154" x2="415" y2="176" stroke="#808080" stroke-width="1.5" marker-end="url(#arrAlg)"/>
+
+    <rect x="340" y="180" width="150" height="34" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="415" y="201" font-size="12" fill="#b0d9ef" text-anchor="middle">H_i = f(Y_i)</text>
+    <text x="505" y="201" font-size="11" fill="#5a8fb0">local: heads, SwiGLU, norms</text>
+
+    <line x1="415" y1="214" x2="415" y2="236" stroke="#808080" stroke-width="1.5" marker-end="url(#arrAlg)"/>
+
+    <rect x="340" y="240" width="150" height="34" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="415" y="261" font-size="12" fill="#86efac" text-anchor="middle">H_i · V_i (partial)</text>
+    <text x="505" y="261" font-size="11" fill="#5a9e78">local output-projection partial</text>
+  </g>
+
+  <!-- reduce -->
+  <line x1="415" y1="274" x2="415" y2="296" stroke="#ffb400" stroke-width="2" marker-end="url(#arrAlg)"/>
+  <rect x="270" y="300" width="290" height="52" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="415" y="322" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">Z = Σ_i H_i · V_i</text>
+  <text x="415" y="340" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">REDUCE: hidden-size vector only</text>
+
+  <text x="620" y="322" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">8192-dim BF16 → 16 KB / token</text>
+  <text x="620" y="342" font-family="Inter, sans-serif" font-size="11" fill="#808080">(MODEL label — not a measurement)</text>
+
+  <text x="70" y="240" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">Each node runs the whole chain</text>
+  <text x="70" y="258" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">on its shard with zero traffic.</text>
+  <text x="70" y="288" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">The first bytes that must meet</text>
+  <text x="70" y="306" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">are the partials of Z.</text>
+
+  <line x1="48" y1="384" x2="912" y2="384" stroke="#404040" stroke-width="1"/>
+
+  <!-- ═══ Panel B: RMSNorm scalar ═══ -->
+  <text x="48" y="420" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc">B. RMSNorm — a global dependency that reduces to one scalar</text>
+
+  <g font-family="Inter, sans-serif">
+    <rect x="70" y="440" width="180" height="40" rx="6" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="160" y="464" font-size="12" fill="#b0d9ef" text-anchor="middle">shard 1 of x</text>
+    <rect x="70" y="492" width="180" height="40" rx="6" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="160" y="516" font-size="12" fill="#b0d9ef" text-anchor="middle">shard 2 of x</text>
+    <rect x="70" y="544" width="180" height="40" rx="6" fill="url(#algStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="160" y="568" font-size="12" fill="#b0d9ef" text-anchor="middle">shard N of x</text>
+  </g>
+
+  <g font-family="Inter, sans-serif">
+    <rect x="320" y="440" width="230" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="435" y="464" font-size="12.5" fill="#b0d9ef" text-anchor="middle">s₁ = Σ x_j²  (j ∈ shard 1)</text>
+    <rect x="320" y="492" width="230" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="435" y="516" font-size="12.5" fill="#b0d9ef" text-anchor="middle">s₂ = Σ x_j²  (j ∈ shard 2)</text>
+    <rect x="320" y="544" width="230" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="435" y="568" font-size="12.5" fill="#b0d9ef" text-anchor="middle">s_N = Σ x_j²  (j ∈ shard N)</text>
+  </g>
+
+  <line x1="550" y1="500" x2="640" y2="500" stroke="#ffb400" stroke-width="2" marker-end="url(#arrAlg)"/>
+  <rect x="650" y="466" width="240" height="68" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="770" y="494" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">s = Σ_i s_i</text>
+  <text x="770" y="516" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">REDUCE: one scalar — bytes, not KB</text>
+
+  <text x="320" y="612" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">Norms look &quot;global&quot; in the math, yet each shard only exports its local sum of squares.</text>
+
+  <!-- takeaway -->
+  <rect x="48" y="626" width="864" height="1" fill="none"/>
+  <text x="480" y="648" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffb400" text-anchor="middle">A global mathematical dependency does not imply gathering the full tensor.</text>
+</svg>

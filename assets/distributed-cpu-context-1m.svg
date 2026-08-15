@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">
+  <title>Attention at one-million-token context: layer types come from the model config, and global-attention layers decompose as heads times context shards with exact online-softmax merging</title>
+  <desc>Panel A: the layer mix is model-config-dependent. Recurrent or local-attention layers carry bounded state and never need a cross-context dependency; global-attention layers see the full context and are the ones that need the two-dimensional decomposition. The ratio must be read from the exact model configuration, not assumed. Panel B: a global-attention layer at long context decomposes as head groups times context shards. Each node holds the KV slice for its context shard and computes a local attention tile for its head group, exporting only online-softmax sufficient statistics: local max m_i, local normalizer l_i, local weighted output o_i. A merge per head rescales and sums the partials into the exact global result. The L-times-L attention matrix is never materialized and never moves; KV stays on its owning node. All sizes are model labels, not measurements.</desc>
+
+  <defs>
+    <marker id="arrC1m" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <pattern id="c1mStripe" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#0c1d2a"/>
+      <rect x="0" y="0" width="3" height="9" fill="#123549"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="700" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Attention at 1M Context: Decompose the Layers That Actually Need It</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">MODEL labels throughout — the layer mix must be read from the exact model config, never hard-coded</text>
+
+  <!-- ═══ Panel A: layer types ═══ -->
+  <text x="48" y="92" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc">A. Which layers even have a long-context dependency?</text>
+
+  <rect x="48" y="108" width="420" height="120" rx="10" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="72" y="138" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac">recurrent / local-attention layers</text>
+  <text x="72" y="162" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">bounded state — no full-context dependency;</text>
+  <text x="72" y="180" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">schedule like any other region (1-D lanes,</text>
+  <text x="72" y="198" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">hidden-state reductions only)</text>
+
+  <rect x="492" y="108" width="420" height="120" rx="10" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="516" y="138" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc">global-attention layers</text>
+  <text x="516" y="162" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">full-context dependency — these are the layers</text>
+  <text x="516" y="180" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">that unzip into the heads × context grid below;</text>
+  <text x="516" y="198" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">their count comes from the model config</text>
+
+  <line x1="48" y1="256" x2="912" y2="256" stroke="#404040" stroke-width="1"/>
+
+  <!-- ═══ Panel B: global layer decomposition ═══ -->
+  <text x="48" y="290" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc">B. A global-attention layer: heads × context shards, exact online-softmax merge</text>
+
+  <!-- grid: 2 head-group columns × 3 context-shard rows -->
+  <g font-family="Inter, sans-serif">
+    <text x="200" y="322" font-size="11.5" font-weight="700" fill="#a0a0a0" text-anchor="middle">head group 1</text>
+    <text x="400" y="322" font-size="11.5" font-weight="700" fill="#a0a0a0" text-anchor="middle">head group 2</text>
+
+    <text x="120" y="362" font-size="11" fill="#a0a0a0" text-anchor="end">ctx shard 1</text>
+    <text x="120" y="442" font-size="11" fill="#a0a0a0" text-anchor="end">ctx shard 2</text>
+    <text x="120" y="522" font-size="11" fill="#a0a0a0" text-anchor="end">ctx shard 3</text>
+
+    <!-- cells -->
+    <rect x="140" y="334" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="340" y="334" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="140" y="414" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="340" y="414" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="140" y="494" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <rect x="340" y="494" width="120" height="60" rx="6" fill="url(#c1mStripe)" stroke="#07adf8" stroke-width="1.5"/>
+
+    <text x="200" y="360" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="200" y="376" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₁, l₁, o₁</text>
+    <text x="400" y="360" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="400" y="376" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₁, l₁, o₁</text>
+    <text x="200" y="440" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="200" y="456" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₂, l₂, o₂</text>
+    <text x="400" y="440" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="400" y="456" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₂, l₂, o₂</text>
+    <text x="200" y="520" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="200" y="536" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₃, l₃, o₃</text>
+    <text x="400" y="520" font-size="10.5" fill="#b0d9ef" text-anchor="middle">local tile</text>
+    <text x="400" y="536" font-size="10.5" fill="#b0d9ef" text-anchor="middle">+ m₃, l₃, o₃</text>
+  </g>
+
+  <!-- merge arrows per head-group column -->
+  <line x1="460" y1="364" x2="540" y2="364" stroke="#ffb400" stroke-width="2" marker-end="url(#arrC1m)"/>
+  <line x1="460" y1="444" x2="540" y2="444" stroke="#ffb400" stroke-width="2" marker-end="url(#arrC1m)"/>
+  <line x1="460" y1="524" x2="540" y2="524" stroke="#ffb400" stroke-width="2" marker-end="url(#arrC1m)"/>
+
+  <!-- merge boxes -->
+  <g font-family="Inter, sans-serif">
+    <rect x="550" y="334" width="180" height="220" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="640" y="362" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE per head</text>
+    <text x="640" y="392" font-size="11" fill="#c8a04a" text-anchor="middle">m = max_i m_i</text>
+    <text x="640" y="414" font-size="11" fill="#c8a04a" text-anchor="middle">l = Σ_i l_i · e^(m_i − m)</text>
+    <text x="640" y="436" font-size="11" fill="#c8a04a" text-anchor="middle">o = Σ_i o_i · e^(m_i − m) / l</text>
+    <text x="640" y="470" font-size="10.5" fill="#ffd97a" text-anchor="middle">exact global result —</text>
+    <text x="640" y="486" font-size="10.5" fill="#ffd97a" text-anchor="middle">identical math to single-node</text>
+    <text x="640" y="516" font-size="10" fill="#c8a04a" text-anchor="middle">payload: 3 small tensors per</text>
+    <text x="640" y="530" font-size="10" fill="#c8a04a" text-anchor="middle">head per shard — KBs, not GBs</text>
+  </g>
+
+  <!-- never moves -->
+  <rect x="756" y="334" width="156" height="100" rx="8" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+  <text x="834" y="362" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">never moves:</text>
+  <text x="834" y="386" font-family="Inter, sans-serif" font-size="10.5" fill="#f8a5a5" text-anchor="middle">L × L attention matrix</text>
+  <text x="834" y="404" font-family="Inter, sans-serif" font-size="10.5" fill="#f8a5a5" text-anchor="middle">(never materialized)</text>
+  <text x="834" y="422" font-family="Inter, sans-serif" font-size="10.5" fill="#f8a5a5" text-anchor="middle">KV leaves its node</text>
+
+  <text x="756" y="470" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">KV stays resident on</text>
+  <text x="756" y="486" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">the context shard that</text>
+  <text x="756" y="502" font-family="Inter, sans-serif" font-size="10.5" fill="#808080">owns it (see GQA note)</text>
+
+  <!-- footer -->
+  <rect x="48" y="596" width="864" height="76" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="72" y="624" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Why the merge is exact, not approximate</text>
+  <text x="72" y="646" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">Online softmax rescales each shard's partial by e^(m_i − m) before summing — the same algebra a single-node</text>
+  <text x="72" y="664" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">flash-attention kernel uses internally. Distribution changes where the tiles run, not the numerical contract.</text>
+</svg>

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+  <title>Decode versus prefill: the same weights present two different bottlenecks, so the planner uses different shard weights per phase</title>
+  <desc>Two panels. Decode: one token vector times the weight matrix, each packed weight byte is streamed and used once, arithmetic intensity is roughly two FLOPs per weight byte, so the region is bandwidth dominated and node capability for decode is approximately its packed-weight stream bandwidth. Prefill: a token matrix times the same weight matrix, each weight byte is reused across many tokens, arithmetic intensity grows with token count, so the region is GEMM and compute dominated and node capability for prefill is approximately its measured GEMM throughput. A bottom band shows the consequence: the planner may assign different shard fractions, or even a different topology, between prefill and decode for the same model on the same nodes. All labels are THEORETICAL model statements, not measurements.</desc>
+
+  <defs>
+    <marker id="arrDP" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <pattern id="dpStripe" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#0c1d2a"/>
+      <rect x="0" y="0" width="3" height="9" fill="#123549"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="600" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Same Weights, Two Bottlenecks: Decode vs Prefill</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">The phase decides whether node capability means stream bandwidth or GEMM throughput — MODEL, not measurement</text>
+
+  <!-- ═══ DECODE panel ═══ -->
+  <rect x="48" y="80" width="420" height="380" rx="10" fill="#262626" stroke="#404040"/>
+  <text x="258" y="112" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">DECODE — one token at a time</text>
+
+  <!-- vector × matrix -->
+  <rect x="92" y="140" width="26" height="120" rx="4" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="105" y="282" font-family="Inter, sans-serif" font-size="11" fill="#ffd97a" text-anchor="middle">x (1×d)</text>
+  <text x="140" y="205" font-family="Inter, sans-serif" font-size="16" fill="#808080">×</text>
+  <rect x="168" y="140" width="200" height="120" rx="4" fill="url(#dpStripe)" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="268" y="196" font-family="Inter, sans-serif" font-size="11.5" fill="#b0d9ef" text-anchor="middle">W shard</text>
+  <text x="268" y="212" font-family="Inter, sans-serif" font-size="10" fill="#5a8fb0" text-anchor="middle">packed weights</text>
+  <text x="268" y="282" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">every byte read once, used once</text>
+
+  <g font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">
+    <text x="78" y="330">arithmetic intensity ≈ 2 FLOP / weight byte</text>
+    <text x="78" y="352">bottleneck: <tspan fill="#f8c471" font-weight="700">memory bandwidth</tspan></text>
+  </g>
+
+  <rect x="72" y="376" width="372" height="60" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="258" y="400" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">P_i(decode) ≈ packed-weight stream bandwidth</text>
+  <text x="258" y="420" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">(model's quant format — e.g. MXFP4-class for the target model class)</text>
+
+  <!-- ═══ PREFILL panel ═══ -->
+  <rect x="492" y="80" width="420" height="380" rx="10" fill="#262626" stroke="#404040"/>
+  <text x="702" y="112" font-family="Inter, sans-serif" font-size="15" font-weight="700" fill="#7dd3fc" text-anchor="middle">PREFILL — many tokens at once</text>
+
+  <!-- matrix × matrix -->
+  <rect x="536" y="140" width="70" height="120" rx="4" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="571" y="282" font-family="Inter, sans-serif" font-size="11" fill="#ffd97a" text-anchor="middle">X (T×d)</text>
+  <text x="628" y="205" font-family="Inter, sans-serif" font-size="16" fill="#808080">×</text>
+  <rect x="656" y="140" width="200" height="120" rx="4" fill="url(#dpStripe)" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="756" y="196" font-family="Inter, sans-serif" font-size="11.5" fill="#b0d9ef" text-anchor="middle">same W shard</text>
+  <text x="756" y="212" font-family="Inter, sans-serif" font-size="10" fill="#5a8fb0" text-anchor="middle">packed weights</text>
+  <text x="756" y="282" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">each byte reused across T tokens</text>
+
+  <g font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">
+    <text x="522" y="330">arithmetic intensity grows with T (weight reuse)</text>
+    <text x="522" y="352">bottleneck: <tspan fill="#f8c471" font-weight="700">GEMM / compute throughput</tspan></text>
+  </g>
+
+  <rect x="516" y="376" width="372" height="60" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="702" y="400" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">P_i(prefill) ≈ measured GEMM throughput</text>
+  <text x="702" y="420" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">(ISA-dependent: AVX2 vs AVX-512 vs AMX node classes)</text>
+
+  <!-- ═══ consequence band ═══ -->
+  <rect x="48" y="486" width="864" height="88" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="72" y="516" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc">Consequence for the planner</text>
+  <text x="72" y="540" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">A bandwidth-strong node and a compute-strong node deserve <tspan font-weight="700">different shard fractions per phase</tspan> —</text>
+  <text x="72" y="558" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">and the best topology for prefill (GEMM-shaped) may differ from the best topology for decode (stream-shaped).</text>
+</svg>

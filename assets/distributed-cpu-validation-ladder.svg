@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">
+  <title>The validation ladder: ordered fleet configurations, the metrics published at each rung, and an empty predicted-versus-measured plot marked no data yet</title>
+  <desc>Left: a four-rung ladder — one Ryzen baseline, two Ryzen nodes, Ryzen plus Xeon heterogeneous, then a larger heterogeneous fleet. Each rung must publish predicted and measured region time, predicted and measured tokens per second, collective-time fraction, scaling efficiency, effective packed-weight stream bandwidth and prefill GEMM throughput, watts and hardware cost. Right: an empty plot frame with aggregate calibrated capability on the horizontal axis and decode tokens per second on the vertical axis, a dashed ideal-linear reference line, and a large watermark reading NO DATA YET — placeholder, because nothing has been measured. Bottom: the falsifiability rule with hypothetical example numbers — if doubling nodes moves decode from 0.20 to 0.38 tokens per second the sizing model is supported; if it moves to 0.21 an assumption is falsified and the measured breakdown shows where. The research claim is that CKE can predict how much useful throughput each added node, memory channel or ISA capability contributes — not that CPU beats GPU.</desc>
+
+  <defs>
+    <marker id="arrLad" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="700" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Validation Ladder: Prediction First, Measurement Second</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Every rung publishes predicted vs measured — the plot is empty because nothing has been measured yet</text>
+
+  <!-- ═══ ladder (left) ═══ -->
+  <g font-family="Inter, sans-serif">
+    <!-- rung 1 -->
+    <rect x="48" y="90" width="380" height="64" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="68" y="116" font-size="13" font-weight="700" fill="#7dd3fc">RUNG 1 — one node (baseline)</text>
+    <text x="68" y="138" font-size="11" fill="#b0d9ef">calibrate P_i: stream bandwidth + GEMM throughput per region</text>
+
+    <line x1="238" y1="154" x2="238" y2="172" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLad)"/>
+
+    <!-- rung 2 -->
+    <rect x="48" y="176" width="380" height="64" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="68" y="202" font-size="13" font-weight="700" fill="#7dd3fc">RUNG 2 — two identical nodes</text>
+    <text x="68" y="224" font-size="11" fill="#b0d9ef">purest scaling test: does T_token halve? where does sync appear?</text>
+
+    <line x1="238" y1="240" x2="238" y2="258" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLad)"/>
+
+    <!-- rung 3 -->
+    <rect x="48" y="262" width="380" height="64" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="68" y="288" font-size="13" font-weight="700" fill="#7dd3fc">RUNG 3 — heterogeneous pair</text>
+    <text x="68" y="310" font-size="11" fill="#b0d9ef">proportional shards: does weighting by measured P_i equalize lane time?</text>
+
+    <line x1="238" y1="326" x2="238" y2="344" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLad)"/>
+
+    <!-- rung 4 -->
+    <rect x="48" y="348" width="380" height="64" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="68" y="374" font-size="13" font-weight="700" fill="#7dd3fc">RUNG 4 — larger fleet</text>
+    <text x="68" y="396" font-size="11" fill="#b0d9ef">find the ceiling: when does synchronization stop scaling paying?</text>
+  </g>
+
+  <!-- published metrics box -->
+  <rect x="48" y="436" width="380" height="210" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="68" y="462" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Published at every rung</text>
+  <g font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">
+    <text x="68" y="486">· predicted vs measured region time</text>
+    <text x="68" y="506">· predicted vs measured tok/s</text>
+    <text x="68" y="526">· collective-time fraction (% of wall time)</text>
+    <text x="68" y="546">· scaling efficiency (measured / linear)</text>
+    <text x="68" y="566">· effective stream GB/s + prefill GEMM throughput</text>
+    <text x="68" y="586">· watts and hardware cost per added tok/s</text>
+    <text x="68" y="614" fill="#808080">no cherry-picking: the fraction is published</text>
+    <text x="68" y="632" fill="#808080">whatever it turns out to be</text>
+  </g>
+
+  <!-- ═══ empty plot (right) ═══ -->
+  <rect x="470" y="90" width="442" height="400" rx="10" fill="#262626" stroke="#404040"/>
+  <text x="691" y="118" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">predicted vs measured — the deliverable</text>
+
+  <!-- axes -->
+  <line x1="530" y1="430" x2="880" y2="430" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLad)"/>
+  <line x1="530" y1="430" x2="530" y2="150" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLad)"/>
+  <text x="705" y="458" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">aggregate calibrated capability Σ P_i</text>
+  <text x="506" y="290" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle" transform="rotate(-90 506 290)">decode tok/s</text>
+
+  <!-- ideal line -->
+  <line x1="540" y1="420" x2="870" y2="160" stroke="#47b475" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="800" y="200" font-family="Inter, sans-serif" font-size="10.5" fill="#86efac" text-anchor="middle" transform="rotate(-39 800 200)">ideal linear (model)</text>
+
+  <!-- watermark -->
+  <text x="705" y="300" font-family="Inter, sans-serif" font-size="26" font-weight="800" fill="#4a4a4a" text-anchor="middle">NO DATA YET</text>
+  <text x="705" y="328" font-family="Inter, sans-serif" font-size="13" fill="#4a4a4a" text-anchor="middle">placeholder — not a result</text>
+
+  <!-- ═══ falsifiability band ═══ -->
+  <rect x="470" y="514" width="442" height="118" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="491" y="542" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a">Falsifiability rule (hypothetical example numbers)</text>
+  <text x="491" y="566" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">1 → 2 nodes: 0.20 → 0.38 tok/s supports the model.</text>
+  <text x="491" y="586" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">0.20 → 0.21 tok/s falsifies an assumption — and the</text>
+  <text x="491" y="606" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">measured breakdown shows exactly which one.</text>
+
+  <text x="480" y="676" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffb400" text-anchor="middle">The claim under test: CKE can predict the throughput each added node, memory channel or ISA capability contributes.</text>
+</svg>

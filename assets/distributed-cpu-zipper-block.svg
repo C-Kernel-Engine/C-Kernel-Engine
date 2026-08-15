@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 880">
+  <title>What exactly is being sharded: the transformer block drawn as a zipper</title>
+  <desc>A replicated hidden state feeds four node lanes. Each lane runs a vertical local path — quantized unpack, local GEMM, activation and head work, output-projection partial — with open zipper teeth between the lanes meaning zero data movement. The zipper closes only at a mathematically necessary reduction (a hidden-state-sized partial sum), then unzips again for the MLP region, closing once more at the final reduction. A legend distinguishes three tensor states: replicated (solid border), sharded (striped fill), partial-sum (dashed border). All sizes are model labels, not measurements.</desc>
+
+  <defs>
+    <marker id="arrZipBlk" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <!-- open zipper teeth: two offset columns, not interlocked -->
+    <pattern id="zipOpen" width="20" height="28" patternUnits="userSpaceOnUse">
+      <rect x="2" y="3" width="7" height="10" rx="1.5" fill="#6a6a6a"/>
+      <rect x="11" y="16" width="7" height="10" rx="1.5" fill="#6a6a6a"/>
+    </pattern>
+    <!-- closed zipper teeth: interlocked continuous strip -->
+    <pattern id="zipClosed" width="14" height="12" patternUnits="userSpaceOnUse">
+      <rect x="0" y="2" width="7" height="8" rx="1.5" fill="#c8a04a"/>
+      <rect x="7" y="2" width="7" height="8" rx="1.5" fill="#7a6020"/>
+    </pattern>
+    <!-- sharded fill: diagonal stripes -->
+    <pattern id="shardStripe" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="9" height="9" fill="#0c1d2a"/>
+      <rect x="0" y="0" width="3" height="9" fill="#123549"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="880" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">What Exactly Is Being Sharded? The Block as a Zipper</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Lanes run local paths; the zipper closes only at mathematically necessary reductions — then unzips again (MODEL)</text>
+
+  <!-- legend: three tensor states -->
+  <g font-family="Inter, sans-serif" font-size="11.5">
+    <rect x="60" y="70" width="26" height="16" rx="3" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="94" y="82" fill="#b0b0b0">replicated</text>
+    <rect x="190" y="70" width="26" height="16" rx="3" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="224" y="82" fill="#b0b0b0">sharded</text>
+    <rect x="306" y="70" width="26" height="16" rx="3" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="340" y="82" fill="#b0b0b0">partial-sum</text>
+    <rect x="470" y="72" width="20" height="12" fill="url(#zipOpen)"/>
+    <text x="498" y="82" fill="#b0b0b0">zipper open = zero data movement</text>
+    <rect x="770" y="72" width="28" height="12" fill="url(#zipClosed)"/>
+    <text x="806" y="82" fill="#b0b0b0">closed = REDUCE</text>
+  </g>
+
+  <!-- replicated hidden state -->
+  <rect x="330" y="98" width="300" height="42" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="124" font-family="Inter, sans-serif" font-size="13.5" font-weight="600" fill="#ffd97a" text-anchor="middle">replicated hidden state x</text>
+
+  <line x1="400" y1="140" x2="140" y2="172" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZipBlk)"/>
+  <line x1="440" y1="140" x2="370" y2="172" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZipBlk)"/>
+  <line x1="520" y1="140" x2="600" y2="172" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZipBlk)"/>
+  <line x1="560" y1="140" x2="830" y2="172" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZipBlk)"/>
+
+  <!-- lane headers -->
+  <g font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">
+    <text x="140" y="166">Ryzen A</text>
+    <text x="370" y="166">Ryzen B</text>
+    <text x="600" y="166">Ryzen C</text>
+    <text x="830" y="166">Xeon</text>
+  </g>
+
+  <!-- ═══ REGION 1: attention ═══ -->
+  <rect x="40" y="180" width="880" height="300" rx="10" fill="none" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="54" y="200" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#07adf8">REGION 1 — ATTENTION (1-D lanes; unzips to 2-D only at long context)</text>
+
+  <!-- open zipper teeth between lanes -->
+  <rect x="239" y="208" width="20" height="258" fill="url(#zipOpen)"/>
+  <rect x="469" y="208" width="20" height="258" fill="url(#zipOpen)"/>
+  <rect x="699" y="208" width="20" height="258" fill="url(#zipOpen)"/>
+
+  <g font-family="Inter, sans-serif">
+    <!-- lane 1 -->
+    <rect x="65" y="212" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="140" y="236" font-size="11.5" fill="#b0d9ef" text-anchor="middle">quantized unpack W₁</text>
+    <rect x="65" y="266" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="140" y="290" font-size="11.5" fill="#b0d9ef" text-anchor="middle">local GEMM: QKV shard</text>
+    <rect x="65" y="320" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="140" y="337" font-size="11" fill="#b0d9ef" text-anchor="middle">head work: RoPE,</text>
+    <text x="140" y="351" font-size="11" fill="#b0d9ef" text-anchor="middle">QK-norm, attention</text>
+    <rect x="65" y="374" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="140" y="391" font-size="11" fill="#86efac" text-anchor="middle">output-projection</text>
+    <text x="140" y="405" font-size="11" fill="#86efac" text-anchor="middle">partial y₁</text>
+    <!-- lane 2 -->
+    <rect x="295" y="212" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="370" y="236" font-size="11.5" fill="#b0d9ef" text-anchor="middle">quantized unpack W₂</text>
+    <rect x="295" y="266" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="370" y="290" font-size="11.5" fill="#b0d9ef" text-anchor="middle">local GEMM: QKV shard</text>
+    <rect x="295" y="320" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="370" y="337" font-size="11" fill="#b0d9ef" text-anchor="middle">head work: RoPE,</text>
+    <text x="370" y="351" font-size="11" fill="#b0d9ef" text-anchor="middle">QK-norm, attention</text>
+    <rect x="295" y="374" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="370" y="391" font-size="11" fill="#86efac" text-anchor="middle">output-projection</text>
+    <text x="370" y="405" font-size="11" fill="#86efac" text-anchor="middle">partial y₂</text>
+    <!-- lane 3 -->
+    <rect x="525" y="212" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="600" y="236" font-size="11.5" fill="#b0d9ef" text-anchor="middle">quantized unpack W₃</text>
+    <rect x="525" y="266" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="600" y="290" font-size="11.5" fill="#b0d9ef" text-anchor="middle">local GEMM: QKV shard</text>
+    <rect x="525" y="320" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="600" y="337" font-size="11" fill="#b0d9ef" text-anchor="middle">head work: RoPE,</text>
+    <text x="600" y="351" font-size="11" fill="#b0d9ef" text-anchor="middle">QK-norm, attention</text>
+    <rect x="525" y="374" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="600" y="391" font-size="11" fill="#86efac" text-anchor="middle">output-projection</text>
+    <text x="600" y="405" font-size="11" fill="#86efac" text-anchor="middle">partial y₃</text>
+    <!-- lane 4 -->
+    <rect x="755" y="212" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="830" y="236" font-size="11.5" fill="#b0d9ef" text-anchor="middle">quantized unpack W₄</text>
+    <rect x="755" y="266" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="830" y="290" font-size="11.5" fill="#b0d9ef" text-anchor="middle">local GEMM: QKV shard</text>
+    <rect x="755" y="320" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="830" y="337" font-size="11" fill="#b0d9ef" text-anchor="middle">head work: RoPE,</text>
+    <text x="830" y="351" font-size="11" fill="#b0d9ef" text-anchor="middle">QK-norm, attention</text>
+    <rect x="755" y="374" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="830" y="391" font-size="11" fill="#86efac" text-anchor="middle">output-projection</text>
+    <text x="830" y="405" font-size="11" fill="#86efac" text-anchor="middle">partial y₄</text>
+  </g>
+
+  <text x="480" y="448" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">nothing crosses a lane boundary inside the region — the partial sums below are the first data that must meet</text>
+
+  <!-- ═══ ZIPPER CLOSED 1 ═══ -->
+  <rect x="40" y="490" width="880" height="46" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <rect x="48" y="508" width="864" height="12" fill="url(#zipClosed)"/>
+  <text x="480" y="503" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">ZIPPER CLOSED — REDUCE 1: y = y₁ + y₂ + y₃ + y₄</text>
+  <text x="480" y="533" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">payload: one hidden-state vector — 16 KB / token at 8192-dim BF16 (MODEL)</text>
+
+  <!-- ═══ REGION 2: MLP ═══ -->
+  <rect x="40" y="556" width="880" height="240" rx="10" fill="none" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="54" y="576" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#07adf8">REGION 2 — MLP (unzipped again on the reduced hidden state)</text>
+
+  <rect x="239" y="584" width="20" height="198" fill="url(#zipOpen)"/>
+  <rect x="469" y="584" width="20" height="198" fill="url(#zipOpen)"/>
+  <rect x="699" y="584" width="20" height="198" fill="url(#zipOpen)"/>
+
+  <g font-family="Inter, sans-serif">
+    <!-- lane 1 -->
+    <rect x="65" y="588" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="140" y="612" font-size="11.5" fill="#b0d9ef" text-anchor="middle">unpack gate/up shard</text>
+    <rect x="65" y="642" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="140" y="659" font-size="11" fill="#b0d9ef" text-anchor="middle">local GEMM +</text>
+    <text x="140" y="673" font-size="11" fill="#b0d9ef" text-anchor="middle">SwiGLU</text>
+    <rect x="65" y="696" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="140" y="713" font-size="11" fill="#86efac" text-anchor="middle">down-projection</text>
+    <text x="140" y="727" font-size="11" fill="#86efac" text-anchor="middle">partial z₁</text>
+    <!-- lane 2 -->
+    <rect x="295" y="588" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="370" y="612" font-size="11.5" fill="#b0d9ef" text-anchor="middle">unpack gate/up shard</text>
+    <rect x="295" y="642" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="370" y="659" font-size="11" fill="#b0d9ef" text-anchor="middle">local GEMM +</text>
+    <text x="370" y="673" font-size="11" fill="#b0d9ef" text-anchor="middle">SwiGLU</text>
+    <rect x="295" y="696" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="370" y="713" font-size="11" fill="#86efac" text-anchor="middle">down-projection</text>
+    <text x="370" y="727" font-size="11" fill="#86efac" text-anchor="middle">partial z₂</text>
+    <!-- lane 3 -->
+    <rect x="525" y="588" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="600" y="612" font-size="11.5" fill="#b0d9ef" text-anchor="middle">unpack gate/up shard</text>
+    <rect x="525" y="642" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="600" y="659" font-size="11" fill="#b0d9ef" text-anchor="middle">local GEMM +</text>
+    <text x="600" y="673" font-size="11" fill="#b0d9ef" text-anchor="middle">SwiGLU</text>
+    <rect x="525" y="696" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="600" y="713" font-size="11" fill="#86efac" text-anchor="middle">down-projection</text>
+    <text x="600" y="727" font-size="11" fill="#86efac" text-anchor="middle">partial z₃</text>
+    <!-- lane 4 -->
+    <rect x="755" y="588" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="830" y="612" font-size="11.5" fill="#b0d9ef" text-anchor="middle">unpack gate/up shard</text>
+    <rect x="755" y="642" width="150" height="40" rx="6" fill="url(#shardStripe)" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="830" y="659" font-size="11" fill="#b0d9ef" text-anchor="middle">local GEMM +</text>
+    <text x="830" y="673" font-size="11" fill="#b0d9ef" text-anchor="middle">SwiGLU</text>
+    <rect x="755" y="696" width="150" height="40" rx="6" fill="#232323" stroke="#47b475" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="830" y="713" font-size="11" fill="#86efac" text-anchor="middle">down-projection</text>
+    <text x="830" y="727" font-size="11" fill="#86efac" text-anchor="middle">partial z₄</text>
+  </g>
+
+  <!-- ═══ ZIPPER CLOSED 2 ═══ -->
+  <rect x="40" y="806" width="880" height="46" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <rect x="48" y="824" width="864" height="12" fill="url(#zipClosed)"/>
+  <text x="480" y="819" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">ZIPPER CLOSED — REDUCE 2: z = z₁ + z₂ + z₃ + z₄ → replicated next-layer input</text>
+  <text x="480" y="849" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">then unzips again for the next layer · norm reductions carry one scalar (see the reduction-algebra figure)</text>
+
+  <text x="480" y="872" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">All sizes on this figure are THEORETICAL / MODEL labels, not measurements.</text>
+</svg>
