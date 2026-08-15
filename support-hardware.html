@@ -1038,6 +1038,7 @@ body { overflow-x: hidden; }
 .fleet-dot.portable { background: var(--blue); }
 .fleet-dot.server { background: var(--green); }
 .fleet-dot.planned { background: var(--orange); }
+.fleet-dot.ordered { background: var(--blue); }
 .fleet-dot.future { background: #bc8cff; }
 .fleet-status { font: 700 .72rem 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .support-quote { color: var(--orange); font: 700 1.05rem 'JetBrains Mono', monospace; }
@@ -1077,7 +1078,7 @@ body { overflow-x: hidden; }
 <section class="support-investment">
   <div class="support-investment-head">
     <div><div class="support-kicker">Personal investment so far</div><h2 style="margin:.35rem 0 0">Founder-funded hardware already supporting CKE</h2></div>
-    <div class="support-investment-total">CAD $2,209.99</div>
+    <div class="support-investment-total">CAD $9,575.16</div>
   </div>
   <p>This is money personally spent on hardware now used for CKE development and evidence generation. It is separate from sponsor funding, donated or loaned equipment, and the future CAD $30,000 laboratory ceiling.</p>
   <table class="support-table">
@@ -1086,13 +1087,17 @@ body { overflow-x: hidden; }
       <tr><td>Lenovo ThinkPad T14 Gen 3 (used), Core i7-1260P, 24 GB DDR4-3200 (8 GB soldered + 16 GB SODIMM)</td><td>CAD $600</td><td>Portable Ubuntu development and documentation workstation, AVX2 portability node, and interactive control node for server experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
       <tr><td>Lenovo P3 Tiny, Core i7-14700T (20 physical / 28 logical CPUs, AVX2/FMA/AVX-VNNI), 32 GB DDR5</td><td>CAD $1,050</td><td>Dedicated minimal Ubuntu Server node for repeatable CKE execution, profiling, and unattended experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
       <tr><td>WD_BLACK SN850X 2 TB NVMe expansion for the P3 (CAD $499.99 + $35.00 PST + $25.00 GST), mounted at <code>/data</code></td><td>CAD $559.99</td><td>Artifact tier: model catalog, converted BUMP weights, isolated worktrees, X-Ray tensors, and VTune/Advisor/perf captures</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Memory Express order WEB-1200399 (2026-08-11): Ryzen 9 9950X3D bundle — ASUS TUF X870E-PLUS WIFI7, G.SKILL Flare X5 64 GB DDR5-6000 (2×32 GB), Cooler Master 360 Elite AIO (incl. GST, BC PST and shipping)</td><td>CAD $2,470.87</td><td>AMD evidence node core: native Zen 5 AVX-512 versus P3 AVX2/VNNI, cross-vendor numerics, distributed experiments</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Newegg order 574780872 (2026-08-11): MSI MPG A850GS 850 W PSU · Samsung 990 PRO 4 TB w/ heatsink · Corsair Vengeance 96 GB (2×48 GB) DDR5-6000 · ASUS TUF GT502 Horizon case · WD Red Plus 12 TB HDD · combo discount −$770.00 (incl. GST and PST)</td><td>CAD $4,177.52</td><td>Ryzen node chassis, power, memory and storage tiers; WD Red HDD for bulk artifact and corpus retention</td><td><span class="support-funded">Personally funded</span></td></tr>
+      <tr><td>Newegg order 574780892 (2026-08-11): Crucial 32 GB DDR5-5600 SODIMM (CT32G56C46S5) for the P3 (incl. ~12% GST+PST and $9.99 shipping)</td><td>CAD $716.78</td><td>P3 second SODIMM — 64 GB total after install; larger resident model lanes on the server node</td><td><span class="support-funded">Personally funded</span></td></tr>
     </tbody>
   </table>
-  <p><strong>Ledger scope:</strong> this total includes only the three dated purchases above. The 2014 ThinkPad W530 remains available as a legacy node, but its original cost is not currently documented — it is marked pending verification and excluded from the total rather than estimated. The ledger also excludes electricity, personal labor, the planned second 32 GB SODIMM for the P3, the planned Ryzen node quoted below, and future Xeon nodes. Future entries will separate personally funded, sponsor funded, donated, loaned, and discounted hardware.</p>
+  <p><strong>Ledger scope:</strong> this total includes only the six dated purchases above. The 2014 ThinkPad W530 remains available as a legacy node, but its original cost is not currently documented — it is marked pending verification and excluded from the total rather than estimated. The ledger also excludes electricity, personal labor, assembly, and future Xeon nodes. Future entries will separate personally funded, sponsor funded, donated, loaned, and discounted hardware.</p>
+  <p class="tex2jax_ignore"><strong>Price-inflation note:</strong> the 2026-08-11 orders were paid during the AI-demand memory and NAND price spike — DDR5 kits and high-capacity NVMe in these orders cost multiples of their historical-normal prices (for example the Crucial 32 GB SODIMM at \$629.99 before tax and the 64–96 GB DDR5 kits above). The ledger records what was actually paid, not what the parts would have cost in a normal market.</p>
 </section>
 
 <h2>Current CPU Fleet</h2>
-<p>The fleet is deliberately heterogeneous. Matched identical systems help controlled distributed scaling, but a mix of Intel generations, a planned AMD node, and one legacy machine exposes the ISA, scheduler, numerical, and provider-selection assumptions that identical hardware would silently hide. Each node below carries a status label: <strong>legacy/available</strong>, <strong>active portable</strong>, <strong>active server</strong>, <strong>planned/quoted</strong>, or <strong>future target</strong>.</p>
+<p>The fleet is deliberately heterogeneous. Matched identical systems help controlled distributed scaling, but a mix of Intel generations, an AMD node, and one legacy machine exposes the ISA, scheduler, numerical, and provider-selection assumptions that identical hardware would silently hide. Each node below carries a status label: <strong>legacy/available</strong>, <strong>active portable</strong>, <strong>active server</strong>, <strong>ordered/assembly pending</strong>, or <strong>future target</strong>.</p>
 
 <table class="support-table">
   <thead><tr><th>Node</th><th>Status</th><th>CPU &amp; ISA</th><th>Memory</th><th>Storage</th><th>OS role</th><th>Profiler</th><th>Research purpose</th></tr></thead>
@@ -1121,7 +1126,7 @@ body { overflow-x: hidden; }
       <td><strong>Lenovo P3 Tiny</strong></td>
       <td><span class="fleet-dot server"></span><span class="fleet-status">Active server</span></td>
       <td>Core i7-14700T · 20 physical / 28 logical · AVX2/FMA/AVX-VNNI · no AVX-512</td>
-      <td>32 GB DDR5 (second 32 GB SODIMM planned, not purchased)</td>
+      <td>32 GB DDR5 (second 32 GB SODIMM ordered 2026-08-11 — Crucial CT32G56C46S5; 64 GB after install)</td>
       <td>512 GB OEM system NVMe + 2 TB SN850X at <code>/data</code> (PCIe 4.0; 7,300 MB/s advertised)</td>
       <td>Minimal Ubuntu Server, unattended experiments</td>
       <td>Intel VTune + Advisor (existing Intel evidence; Advisor is deprecated) + perf</td>
@@ -1129,13 +1134,13 @@ body { overflow-x: hidden; }
     </tr>
     <tr>
       <td><strong>Ryzen 9 9950X3D node</strong></td>
-      <td><span class="fleet-dot planned"></span><span class="fleet-status">Planned / quoted</span></td>
+      <td><span class="fleet-dot ordered"></span><span class="fleet-status">Ordered / assembly pending</span></td>
       <td><a href="https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html">Ryzen 9 9950X3D</a> · Zen 5 · 16C/32T · AVX-512 + AVX2 · 128 MB L3</td>
-      <td>64 GB DDR5-6000 (quoted kit)</td>
-      <td>Planned <a href="https://semiconductor.samsung.com/consumer-storage/internal-ssd/9100-pro/">Samsung 9100 PRO</a> 4 TB, PCIe 5.0 (14,800/13,400 MB/s advertised vendor ratings)</td>
-      <td>Planned Linux evidence node</td>
+      <td>64 GB G.SKILL DDR5-6000 (bundle) + 96 GB Corsair DDR5-6000 ordered; final population decided at assembly</td>
+      <td>Ordered: Samsung 990 PRO 4 TB w/ heatsink (PCIe 4.0; 7,450 MB/s advertised) + WD Red Plus 12 TB HDD; the earlier 9100 PRO Gen5 quote was not purchased</td>
+      <td>Linux evidence node, to be commissioned</td>
       <td>perf + AMD uProf (VTune hardware event sampling requires a genuine Intel CPU — not promised on AMD)</td>
-      <td>Native AVX-512 versus AVX2/VNNI, Gen5 NVMe streaming and Memory Tetris research, cross-vendor numerics, distributed experiments with the P3</td>
+      <td>Native AVX-512 versus AVX2/VNNI, NVMe streaming and Memory Tetris research, cross-vendor numerics, distributed experiments with the P3</td>
     </tr>
     <tr>
       <td><strong>Xeon 636 → 650/670 class</strong></td>
@@ -1151,10 +1156,10 @@ body { overflow-x: hidden; }
 </table>
 
 <h3>Storage tiers on the P3 evidence node</h3>
-<p>The P3 keeps its original 512 GB Samsung OEM drive as the system disk and adds the SN850X as a dedicated artifact tier. The 7,300 MB/s figure is Western Digital's <a href="https://www.westerndigital.com/products/internal-drives/wd-black-sn850x-nvme-ssd">advertised</a> sequential rating, not a CKE measurement; no dated fio artifact is published for either drive yet. The Gen5 tier is a quoted plan, not an installed device.</p>
+<p>The P3 keeps its original 512 GB Samsung OEM drive as the system disk and adds the SN850X as a dedicated artifact tier. The 7,300 MB/s figure is Western Digital's <a href="https://www.westerndigital.com/products/internal-drives/wd-black-sn850x-nvme-ssd">advertised</a> sequential rating, not a CKE measurement; no dated fio artifact is published for either drive yet. The third tier shown is the Samsung 990 PRO 4 TB ordered on 2026-08-11 for the Ryzen node — a Gen4 drive at 7,450 MB/s advertised; the earlier Gen5 9100 PRO quote was not purchased.</p>
 
-<div class="img-container svg-viewer" data-title="P3 storage tiers: current 512 GB system drive, current 2 TB /data artifact tier, planned 4 TB Gen5 tensor tier">
-  <img src="assets/support-hardware-storage-tiers.svg" alt="Storage tier flow for the P3 evidence node: the current 512 GB Samsung OEM system NVMe boot drive, an arrow marked installed to the current 2 TB WD_BLACK SN850X /data artifact tier with advertised 7,300 MB/s read holding model catalogs, BUMP artifacts, worktrees, X-Ray tensors and profiler captures, then a dashed arrow marked planned to the planned 4 TB Samsung 9100 PRO PCIe 5.0 tensor tier with advertised 14,800 read and 13,400 write MB/s shown as a dated quote only. A note bar states that more capacity broadens experiments and artifact retention but storage does not remove RAM constraints and an SSD is not DRAM." style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+<div class="img-container svg-viewer" data-title="P3 storage tiers: current 512 GB system drive, current 2 TB /data artifact tier, ordered 4 TB Gen4 tensor tier for the Ryzen node">
+  <img src="assets/support-hardware-storage-tiers.svg" alt="Storage tier flow for the P3 evidence node: the current 512 GB Samsung OEM system NVMe boot drive, an arrow marked installed to the current 2 TB WD_BLACK SN850X /data artifact tier with advertised 7,300 MB/s read holding model catalogs, BUMP artifacts, worktrees, X-Ray tensors and profiler captures, then an arrow marked ordered 2026-08-11 to the Samsung 990 PRO 4 TB PCIe 4.0 tensor tier with advertised 7,450 MB/s read for the Ryzen node, replacing the earlier unpurchased Gen5 quote. A note bar states that more capacity broadens experiments and artifact retention but storage does not remove RAM constraints and an SSD is not DRAM." style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
 <h3>What the new /data tier unlocks</h3>
@@ -1168,26 +1173,26 @@ body { overflow-x: hidden; }
 </ul>
 <p><strong>Scope limit:</strong> capacity improves experimental breadth and artifact retention. It does not remove RAM constraints, and no storage tier makes an SSD equivalent to DRAM.</p>
 
-<h3>Planned AMD evidence node — quoted, not purchased</h3>
+<h3>AMD evidence node — ordered 2026-08-11, assembly pending</h3>
 <div class="support-callout">
-  <p style="margin-top:0"><strong>Status: planned/quoted.</strong> Two dated quotes from 2026-08-09 define the candidate configuration. Nothing below is purchased, and none of it enters the founder-funded ledger until a receipt exists and the hardware is verified.</p>
+  <p style="margin-top:0"><strong>Status: ordered, not yet received or verified.</strong> Two dated orders from 2026-08-11 supersede the earlier quotes. The hardware enters the evidence fleet only after arrival, assembly, and the standard verification packet (lscpu, detected ISA, memory topology, firmware, baseline stability).</p>
   <table class="support-table">
-    <thead><tr><th>Quote</th><th>Contents</th><th>Visible price</th></tr></thead>
+    <thead><tr><th>Order</th><th>Contents</th><th>Paid</th></tr></thead>
     <tbody>
       <tr>
-        <td>Memory Express bundle (dated quote, not a receipt)</td>
-        <td>AMD Ryzen 9 9950X3D (16C/32T, up to 5.7 GHz) · ASUS TUF Gaming X870E-PLUS WIFI7 · G.Skill Flare X5 64 GB DDR5-6000 CL36 (2×32 GB) · Cooler Master MasterLiquid 360 Elite</td>
-        <td><span class="support-quote">CAD $2,174.98</span></td>
+        <td>Memory Express WEB-1200399 (receipt, paid via Adyen)</td>
+        <td>AMD Ryzen 9 9950X3D (16C/32T, up to 5.7 GHz) · ASUS TUF Gaming X870E-PLUS WIFI7 · G.SKILL Flare X5 64 GB DDR5-6000 CL36 (2×32 GB) · Cooler Master MasterLiquid 360 Elite</td>
+        <td><span class="support-quote">CAD $2,470.87</span></td>
       </tr>
       <tr>
-        <td>Newegg cart (volatile quote, not a receipt)</td>
-        <td>Fractal Design Define 7 Compact · Corsair RM850e 850 W · Samsung 9100 PRO 4 TB with heatsink (PCIe 5.0 x4)</td>
-        <td><span class="support-quote">CAD $1,319.94 est. before tax</span></td>
+        <td>Newegg 574780872 + 574780892 (order confirmation)</td>
+        <td>MSI MPG A850GS 850 W PSU · Samsung 990 PRO 4 TB w/ heatsink (PCIe 4.0 x4) · Corsair Vengeance 96 GB (2×48 GB) DDR5-6000 · ASUS TUF GT502 Horizon case · WD Red Plus 12 TB HDD · Crucial 32 GB DDR5-5600 SODIMM (for the P3)</td>
+        <td><span class="support-quote">CAD $4,894.30</span></td>
       </tr>
     </tbody>
   </table>
-  <p>The Newegg figure is the cart's visible estimated total after combo savings and before tax calculation; carts are volatile and the number is indicative only. Samsung's 14,800/13,400 MB/s sequential figures for the 9100 PRO 4 TB are <a href="https://semiconductor.samsung.com/consumer-storage/internal-ssd/9100-pro/">vendor ratings</a> until measured on the final motherboard. CPU claims follow the <a href="https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html">AMD product page</a>: Zen 5, 16 cores / 32 threads, AVX-512 and AVX2, 128 MB L3, PCIe 5.0, dual-channel DDR5, 170 W.</p>
-  <p style="margin-bottom:0"><strong>Research role:</strong> native Zen 5 AVX-512 versus P3 AVX2/AVX-VNNI comparisons; a 64 GB initial high-memory model lane (expansion evaluated separately); PCIe 5 NVMe streaming and Memory Tetris experiments; cross-vendor numerical repeatability and provider selection; larger Gemma, GLM, Kimi, Qwen3.6, Whisper, and multimodal artifact-backed tests where memory permits; and distributed CKE experiments with the P3 as the Intel node and Ryzen as the AMD node — no scaling claim until measured. On AMD, Linux perf and AMD uProf (hardware counters, event-based profiling, IBS) are the primary PMU tools; Intel documents VTune hardware event-based sampling as requiring a genuine Intel processor, so no VTune PMU analysis is promised on Ryzen, and the deprecated Advisor remains an Intel-only evidence tool. This node is an intermediate founder-funded AVX-512 and storage lane — it does not replace the Xeon AMX/BF16/memory-channel sponsorship roadmap below.</p>
+  <p class="tex2jax_ignore">Paid figures are the order totals including GST, PST and shipping; the combo discount (−\$770.00) is already applied in the Newegg total. These orders replaced the 2026-08-09 quotes, which are kept here for the record: the Memory Express bundle quoted CAD \$2,174.98 (actually paid \$2,470.87 including tax and shipping) and the Newegg cart estimated CAD \$1,319.94 before tax for a smaller basket — the final order grew to include the 96 GB DDR5 kit, the 12 TB HDD, and the P3 SODIMM. Samsung's 7,450 MB/s sequential figure for the 990 PRO 4 TB is a <a href="https://semiconductor.samsung.com/consumer-storage/internal-ssd/990-pro/">vendor rating</a> until measured on the final motherboard; the earlier 9100 PRO Gen5 quote (14,800/13,400 MB/s advertised) was not purchased. CPU claims follow the <a href="https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html">AMD product page</a>: Zen 5, 16 cores / 32 threads, AVX-512 and AVX2, 128 MB L3, PCIe 5.0, dual-channel DDR5, 170 W. Memory pricing in these orders reflects the 2026 AI-demand spike — see the ledger's inflation note above.</p>
+  <p style="margin-bottom:0"><strong>Research role:</strong> native Zen 5 AVX-512 versus P3 AVX2/AVX-VNNI comparisons; a high-memory model lane (64 GB in the bundle, 96 GB additional kit ordered — final population decided at assembly); NVMe streaming and Memory Tetris experiments on the 990 PRO tier; cross-vendor numerical repeatability and provider selection; larger Gemma, GLM, Kimi, Qwen3.6, Whisper, and multimodal artifact-backed tests where memory permits; and distributed CKE experiments with the P3 as the Intel node and Ryzen as the AMD node — no scaling claim until measured. On AMD, Linux perf and AMD uProf (hardware counters, event-based profiling, IBS) are the primary PMU tools; Intel documents VTune hardware event-based sampling as requiring a genuine Intel processor, so no VTune PMU analysis is promised on Ryzen, and the deprecated Advisor remains an Intel-only evidence tool. This node is an intermediate founder-funded AVX-512 and storage lane — it does not replace the Xeon AMX/BF16/memory-channel sponsorship roadmap below.</p>
 </div>
 
 <h2>The Immediate Goal</h2>
