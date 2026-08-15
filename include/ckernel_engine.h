@@ -3197,6 +3197,19 @@ void topk_softmax_f32(const float *scores,
                       int *indices,
                       float *weights);
 
+size_t moe_softmax_topk_router_workspace_bytes(int n_experts);
+
+int moe_softmax_topk_router_llama_f32_workspace(
+    const float *logits,
+    int *indices,
+    float *weights,
+    int rows,
+    int n_experts,
+    int top_k,
+    float routed_scaling_factor,
+    void *workspace,
+    size_t workspace_bytes);
+
 // Backward for hard top-k followed by softmax over selected values.
 void topk_softmax_backward_f32(const int *indices,
                                const float *weights,

@@ -24,7 +24,7 @@
 #include <float.h>
 #include <math.h>
 
-#ifdef __AVX512F__
+#if defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
 
@@ -170,6 +170,159 @@ void topk_softmax_f32(const float *scores,
     for (int i = 0; i < k; i++) {
         weights[i] *= inv_sum;
     }
+}
+
+size_t moe_softmax_topk_router_workspace_bytes(int n_experts)
+{
+    if (n_experts <= 0) {
+        return 0;
+    }
+    return ((size_t)n_experts * sizeof(float) + 63u) & ~(size_t)63u;
+}
+
+#if defined(__AVX2__) && defined(__FMA__)
+static inline __m256 ck_moe_ggml_expf256(__m256 x)
+{
+    const __m256 r = _mm256_set1_ps(0x1.8p23f);
+    const __m256 z = _mm256_fmadd_ps(x, _mm256_set1_ps(0x1.715476p+0f), r);
+    const __m256 n = _mm256_sub_ps(z, r);
+    const __m256 b = _mm256_fnmadd_ps(
+        n,
+        _mm256_set1_ps(0x1.7f7d1cp-20f),
+        _mm256_fnmadd_ps(n, _mm256_set1_ps(0x1.62e4p-1f), x));
+    const __m256i e = _mm256_slli_epi32(_mm256_castps_si256(z), 23);
+    const __m256 k = _mm256_castsi256_ps(
+        _mm256_add_epi32(e, _mm256_castps_si256(_mm256_set1_ps(1))));
+    const __m256i c = _mm256_castps_si256(_mm256_cmp_ps(
+        _mm256_andnot_ps(_mm256_set1_ps(-0.f), n),
+        _mm256_set1_ps(126),
+        _CMP_GT_OQ));
+    const __m256 u = _mm256_mul_ps(b, b);
+    const __m256 j = _mm256_fmadd_ps(
+        _mm256_fmadd_ps(
+            _mm256_fmadd_ps(
+                _mm256_set1_ps(0x1.0e4020p-7f),
+                b,
+                _mm256_set1_ps(0x1.573e2ep-5f)),
+            u,
+            _mm256_fmadd_ps(
+                _mm256_set1_ps(0x1.555e66p-3f),
+                b,
+                _mm256_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm256_mul_ps(_mm256_set1_ps(0x1.ffffecp-1f), b));
+    if (!_mm256_movemask_ps(_mm256_castsi256_ps(c))) {
+        return _mm256_fmadd_ps(j, k, k);
+    }
+    const __m256i g = _mm256_and_si256(
+        _mm256_castps_si256(_mm256_cmp_ps(
+            n, _mm256_setzero_ps(), _CMP_LE_OQ)),
+        _mm256_set1_epi32(0x82000000u));
+    const __m256 s1 = _mm256_castsi256_ps(
+        _mm256_add_epi32(g, _mm256_set1_epi32(0x7f000000u)));
+    const __m256 s2 = _mm256_castsi256_ps(_mm256_sub_epi32(e, g));
+    const __m256i d = _mm256_castps_si256(_mm256_cmp_ps(
+        _mm256_andnot_ps(_mm256_set1_ps(-0.f), n),
+        _mm256_set1_ps(192),
+        _CMP_GT_OQ));
+    return _mm256_or_ps(
+        _mm256_and_ps(_mm256_castsi256_ps(d), _mm256_mul_ps(s1, s1)),
+        _mm256_andnot_ps(
+            _mm256_castsi256_ps(d),
+            _mm256_or_ps(
+                _mm256_and_ps(
+                    _mm256_castsi256_ps(c),
+                    _mm256_mul_ps(_mm256_fmadd_ps(s2, j, s2), s1)),
+                _mm256_andnot_ps(
+                    _mm256_castsi256_ps(c),
+                    _mm256_fmadd_ps(k, j, k)))));
+}
+#endif
+
+static double ck_moe_llama_softmax_row(float *probabilities,
+                                        const float *logits,
+                                        int n_experts,
+                                        float max_value)
+{
+    double sum = 0.0;
+    int expert = 0;
+#if defined(__AVX2__) && defined(__FMA__)
+    for (; expert + 7 < n_experts; expert += 8) {
+        const __m256 value = ck_moe_ggml_expf256(_mm256_sub_ps(
+            _mm256_loadu_ps(logits + expert), _mm256_set1_ps(max_value)));
+        _mm256_storeu_ps(probabilities + expert, value);
+        __m128 half = _mm_add_ps(
+            _mm256_extractf128_ps(value, 1), _mm256_castps256_ps128(value));
+        half = _mm_add_ps(half, _mm_movehl_ps(half, half));
+        half = _mm_add_ss(half, _mm_movehdup_ps(half));
+        sum += (double)_mm_cvtss_f32(half);
+    }
+#endif
+    for (; expert < n_experts; ++expert) {
+        const float value = expf(logits[expert] - max_value);
+        probabilities[expert] = value;
+        sum += (double)value;
+    }
+    return sum;
+}
+
+int moe_softmax_topk_router_llama_f32_workspace(
+    const float *logits,
+    int *indices,
+    float *weights,
+    int rows,
+    int n_experts,
+    int top_k,
+    float routed_scaling_factor,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_softmax_topk_router_workspace_bytes(n_experts);
+    if (!logits || !indices || !weights || !workspace || rows <= 0 ||
+        n_experts <= 0 || top_k <= 0 || top_k > n_experts ||
+        !isfinite(routed_scaling_factor) || required == 0 ||
+        workspace_bytes < required) {
+        return -1;
+    }
+
+    float *probabilities = (float *)workspace;
+    for (int row = 0; row < rows; ++row) {
+        const float *row_logits = logits + (size_t)row * (size_t)n_experts;
+        int *row_indices = indices + (size_t)row * (size_t)top_k;
+        float *row_weights = weights + (size_t)row * (size_t)top_k;
+        float max_value = -INFINITY;
+        for (int expert = 0; expert < n_experts; ++expert) {
+            if (!isfinite(row_logits[expert])) {
+                return -2;
+            }
+            if (row_logits[expert] > max_value) {
+                max_value = row_logits[expert];
+            }
+        }
+
+        const double softmax_sum = ck_moe_llama_softmax_row(
+            probabilities, row_logits, n_experts, max_value);
+        const float inverse_softmax_sum = (float)(1.0 / softmax_sum);
+        for (int expert = 0; expert < n_experts; ++expert) {
+            probabilities[expert] *= inverse_softmax_sum;
+        }
+
+        topk_f32(probabilities, n_experts, top_k, row_indices, NULL);
+        double selected_sum_f64 = 0.0;
+        for (int slot = 0; slot < top_k; ++slot) {
+            row_weights[slot] = probabilities[row_indices[slot]];
+            selected_sum_f64 += (double)row_weights[slot];
+        }
+        float selected_sum = (float)selected_sum_f64;
+        if (selected_sum < 6.103515625e-5f) {
+            selected_sum = 6.103515625e-5f;
+        }
+        for (int slot = 0; slot < top_k; ++slot) {
+            row_weights[slot] =
+                (row_weights[slot] / selected_sum) * routed_scaling_factor;
+        }
+    }
+    return 0;
 }
 
 /**

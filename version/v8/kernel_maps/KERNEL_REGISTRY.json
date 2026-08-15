@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 283,
+      "total": 284,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -32,6 +32,7 @@
         "feature_concat": 1,
         "feature_slice_copy": 1,
         "final_logit_softcap": 1,
+        "full_softmax_topk_router": 1,
         "fused_attention_block": 3,
         "fused_linear_bias": 3,
         "fused_mlp_block": 1,
@@ -26770,6 +26771,235 @@
       },
       "name": "moe_relu2_shared_forward_q5_1_q8_0",
       "_source_file": "moe_relu2_shared_forward_q5_1_q8_0.json"
+    },
+    {
+      "id": "moe_softmax_topk_router_llama_f32",
+      "op": "full_softmax_topk_router",
+      "operation_interface": "moe_router.full_softmax.topk_renorm.fp32.v1",
+      "selection": {
+        "status": "candidate",
+        "priority": 200,
+        "equivalence_group": "llama_full_softmax_topk_selected_renorm_fp32_avx2",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "llama_full_softmax_topk_selected_renorm_fp32_avx2",
+      "variant": "llama_avx2_fma",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "logits",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "E"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "probabilities",
+          "dtype": "fp32",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(E * 4)",
+          "desc": "Planner-owned full-softmax probability row reused across input rows."
+        }
+      ],
+      "dims": [
+        "R",
+        "E",
+        "K"
+      ],
+      "params": [
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "fp32"
+        }
+      ],
+      "constraints": {
+        "requires": [
+          "avx2",
+          "fma"
+        ],
+        "shape": {
+          "E_multiple": 8
+        },
+        "notes": "Distinct-score expert ordering is certified against the pinned llama.cpp AVX2 implementation. Equal-score ordering is deterministic in CKE but remains outside cross-toolchain certification."
+      },
+      "impl": {
+        "function": "moe_softmax_topk_router_llama_f32_workspace",
+        "c_declaration": "int moe_softmax_topk_router_llama_f32_workspace(const float *logits, int *indices, float *weights, int rows, int n_experts, int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/topk_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "logits",
+            "source": "activation:logits",
+            "cast": "const float*",
+            "ports": [
+              "input:logits"
+            ]
+          },
+          {
+            "name": "indices",
+            "source": "output:indices",
+            "cast": "int*",
+            "ports": [
+              "output:indices"
+            ]
+          },
+          {
+            "name": "weights",
+            "source": "output:weights",
+            "cast": "float*",
+            "ports": [
+              "output:weights"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "n_experts",
+            "source": "dim:E"
+          },
+          {
+            "name": "top_k",
+            "source": "dim:K"
+          },
+          {
+            "name": "routed_scaling_factor",
+            "source": "param:routed_scaling_factor"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:probabilities",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:probabilities"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_moe_softmax_topk_router.py"
+        ],
+        "parity": [
+          {
+            "kind": "llama.cpp",
+            "command": "CK_LLAMA_CPP_ROOT=llama.cpp .venv/bin/python -m pytest -q unittest/test_moe_softmax_topk_router.py",
+            "tolerance": "bit-exact distinct-score rows"
+          }
+        ]
+      },
+      "reference": {
+        "status": "candidate",
+        "notes": "The full-softmax exponential, reduction and normalization are bit-exact with pinned llama.cpp AVX2. Promotion waits for generated-circuit E2E expert-selection parity."
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "llama_full_softmax_topk_selected_renorm_fp32_avx2",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_softmax_topk_router_llama_f32_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "selected_slot_order",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Allocation-free full-softmax top-k router for Qwen3.5-style MoE semantics. It computes all expert probabilities before selection, renormalizes selected weights, and applies the routed scaling factor.",
+      "name": "moe_softmax_topk_router_llama_f32",
+      "_source_file": "moe_softmax_topk_router_llama_f32.json"
     },
     {
       "id": "moe_swiglu_expert_backward_f32",

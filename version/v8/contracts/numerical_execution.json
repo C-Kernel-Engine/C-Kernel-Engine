@@ -2375,6 +2375,47 @@
       "position_transform": null,
       "description": "Observed Instella FarSkip shared-expert reference order. BF16 weights feed FP32 ascending reductions; the shared result is reused for routed-inclusive and routed-free residual streams with the reference parenthesization. Full-model PyTorch certification is still required before promotion to validated."
     },
+    "llama_full_softmax_topk_selected_renorm_fp32_avx2": {
+      "operator_family": "moe_router",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "enabled",
+        "evaluation_order": "full_vector_max_then_avx2_fma_exponential_chunks_then_fp64_chunk_sum_then_fp32_probability_scale_then_topk_then_fp64_selected_sum_cast_fp32_clamp_divide_and_scale"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "vector_exponential",
+          "reduction_update",
+          "softmax_probability_store",
+          "reduction_finalize",
+          "output_divide",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp64",
+        "merge_order": "selected_slot_order"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Observed llama.cpp-compatible AVX2 full-softmax top-k MoE routing order. Distinct-score Qwen3.5 production shapes are bit-exact; equal-score cross-toolchain ordering remains uncertified."
+    },
     "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32": {
       "operator_family": "moe_swiglu_expert",
       "status": "observed",
