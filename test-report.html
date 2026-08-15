@@ -1008,15 +1008,18 @@
       border-radius: 8px;
       padding: 1.5rem;
       text-align: center;
+      min-width: 0;
     }
     .summary-card .value {
       font-size: 2rem;
       font-weight: bold;
       color: var(--text-primary);
+      overflow-wrap: break-word;
     }
     .summary-card .label {
       color: var(--text-secondary);
       font-size: 0.9rem;
+      overflow-wrap: break-word;
     }
     .summary-card.passed .value { color: #48bb78; }
     .summary-card.failed .value { color: #f56565; }
@@ -1475,6 +1478,21 @@
       overflow-x: auto;
       margin-top: 0.7rem;
     }
+    /* Wide audit tables (e.g. kernel allocation debt) stay inside their panel:
+       the wrapper scrolls as a last resort, and long code spans wrap in-cell. */
+    .table-scroll {
+      overflow-x: auto;
+    }
+    .table-scroll .results-table td code {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    /* Short call names (malloc(), aligned_alloc()) stay on one line. */
+    #kernel-allocation-tbody td:nth-child(4) code {
+      white-space: nowrap;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
 
     /* What-this-tests explainers and status semantics */
     .contract-explainer {
@@ -1925,10 +1943,12 @@
         <div class="summary-card"><div class="value" id="kernel-allocation-missing-scratch">0</div><div class="label">Missing Scratch Contracts</div></div>
         <div class="summary-card"><div class="value" id="kernel-allocation-warnings">0</div><div class="label">Warnings</div></div>
       </div>
+      <div class="table-scroll">
       <table class="results-table">
         <thead><tr><th>Class</th><th>Source</th><th>Function</th><th>Call</th><th>Mapped Provider</th></tr></thead>
         <tbody id="kernel-allocation-tbody"><tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr></tbody>
       </table>
+      </div>
     </div>
 
     <div class="regression-section">
@@ -3436,7 +3456,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-14</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-15</p>
             </div>
         </div>
     </footer>
