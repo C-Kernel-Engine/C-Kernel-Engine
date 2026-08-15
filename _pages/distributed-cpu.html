@@ -1,0 +1,331 @@
+<!-- TITLE: Distributed CPU: Zip Fusion Beyond Tensor Parallelism -->
+<!-- NAV: research -->
+
+<style>
+@media (max-width: 640px) {
+    main table { display: block; overflow-x: auto; }
+}
+</style>
+
+<h1>Distributed CPU: Zip Fusion Beyond Tensor Parallelism</h1>
+
+<p class="lead">
+    A research design for treating a cluster of CPU nodes as one pool of compute that re-shapes per graph
+    region: fused one-dimensional lanes that unzip into two-dimensional head-by-context attention at long
+    context, then zip back. The metric is global synchronization boundaries per layer, not tensor-parallel
+    degree.
+</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div style="min-width: 0;">
+        <strong>Status: research design</strong><br>
+        Zip fusion is <strong>not implemented in the production runtime</strong>. All performance figures on
+        this page are <strong>idealized arithmetic, not measurements</strong>, and experimental validation is
+        <strong>pending</strong>. This HTML page is the canonical public design and visual reference; the
+        engineering note <code>DISTRIBUTED_CPU_ZIP_FUSION.md</code> (in <code>docs/notes/</code>)
+        is subordinate to it. Nothing here is a supported feature, a measured speedup, or a committed
+        hardware-compatibility claim.
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">What it is</h3>
+        <ul>
+            <li><strong>Whole-graph algebraic scheduling:</strong> per graph region, pick the representation that maximizes the independent local path before any global synchronization &mdash; including work usually treated as implementation detail (quantized unpack, scale decode, local accumulation, SwiGLU, RMSNorm partial statistics, output projection, expert routing, Memory-Tetris residency).</li>
+            <li><strong>A cluster as one pool of compute</strong> that re-shapes per region: 1-D fused lanes for projections and MLP, a 2-D head-by-context decomposition for long-context attention, and back.</li>
+            <li><strong>A measurement program</strong> whose deliverable is a topology-versus-context map and a published collective-time fraction &mdash; not a single tok/s number.</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">What it is not</h3>
+        <ul>
+            <li><strong>Not a claim that CKE invented head or context parallelism.</strong> Megatron Core, DeepSpeed-Ulysses, Unified Sequence Parallelism, LoongTrain and ATTENTION2D all got there first; the prior-art section below says so plainly.</li>
+            <li><strong>Not a promise that link bandwidth equals application throughput.</strong> The ~10&nbsp;&micro;s figure on this page is a division by nominal bandwidth, not a measurement.</li>
+            <li><strong>Not implemented.</strong> No production code path distributes a model across nodes today; the experimental gates decide whether the idea earns promotion.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>The Parallelism Taxonomy: Where Each Method Syncs</h2>
+
+<p>
+    Every distributed method shards something different and pays for it at a different synchronization
+    boundary. The honest distinctions that matter for CKE:
+</p>
+
+<ul>
+    <li><strong>Data parallelism</strong> replicates the model and shards requests. It scales throughput across independent requests but never puts two nodes on the <em>same</em> request.</li>
+    <li><strong>Tensor parallelism (TP)</strong> shards each weight tensor and synchronizes with a collective after nearly every operator. All nodes work on the same request simultaneously.</li>
+    <li><strong>Pipeline parallelism (PP)</strong> shards layers into stages. It is excellent for capacity and for throughput when several microbatches are in flight, but it does <strong>not</strong> aggregate compute for a single request &mdash; one token still flows stage to stage.</li>
+    <li><strong>Context / sequence parallelism (CP)</strong> shards the token sequence and pays an all-to-all or ring exchange around attention. All nodes work on the same request.</li>
+    <li><strong>Expert parallelism (EP)</strong> shards MoE experts and synchronizes at routing dispatch and combine per MoE layer.</li>
+    <li><strong>Head parallelism</strong> shards attention heads; head-local attention is fully independent and only softmax statistics and an output reduction ever meet.</li>
+</ul>
+
+<div class="img-container svg-viewer" data-title="Parallelism taxonomy: what each method shards, where its synchronization boundary sits, and whether it aggregates single-request compute">
+    <img src="assets/distributed-cpu-parallel-methods.svg" alt="Six-row comparison of data, tensor, pipeline, context, expert and head parallelism showing what each shards, where it synchronizes, and whether all nodes work on the same request at once. Data parallelism and pipeline parallelism do not aggregate single-request compute; tensor, context, expert and head parallelism do. Tensor parallelism pays a collective after nearly every operator; head parallelism needs only softmax statistics and an output reduction" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    TP, head and context parallelism are the interesting family for latency: they can make every CPU in the
+    cluster work on the <em>same</em> request at the <em>same</em> time. Zip fusion composes them as one
+    scheduling problem instead of three separate flags.
+</p>
+
+<h2>Prior Art, Candidly</h2>
+
+<p>
+    CKE did <strong>not</strong> invent head-shard or context-shard attention, and this page does not claim
+    otherwise:
+</p>
+
+<ul>
+    <li><strong>Megatron Core</strong> combines tensor, pipeline, context and expert parallelism, and treats context parallelism as a first-class way to partition long sequences.</li>
+    <li><strong>DeepSpeed</strong> provides pipeline, tensor and expert parallelism; its MoE API can distribute experts differently per MoE layer.</li>
+    <li><strong>vLLM</strong> supports combinations such as data-parallel attention with expert- or tensor-parallel MoE layers.</li>
+    <li><strong>DeepSpeed-Ulysses</strong> partitions along sequence length and uses all-to-all communication for attention.</li>
+    <li><strong>Unified Sequence Parallelism</strong> combines Ulysses with Ring Attention.</li>
+    <li><strong>LoongTrain</strong> explicitly combines head parallelism and context parallelism as a 2-D attention decomposition.</li>
+    <li><strong>ATTENTION2D</strong> similarly partitions attention along query and key/value dimensions.</li>
+</ul>
+
+<p>
+    The distinctive claim is deliberately narrower: <strong>whole-graph algebraic scheduling on CPU-first
+    economics</strong>. Rather than exposing named strategies, the scheduler asks, per graph region: what
+    representation lets N CPU nodes execute the longest independent local path before any global
+    synchronization? The unit of distribution is the whole quantized operator subgraph &mdash; including
+    packed-weight unpack, scale decode, quantized dot products, local accumulation, SwiGLU, RMSNorm partial
+    statistics, attention-head work, output projection, expert routing and Memory-Tetris residency &mdash;
+    not just GEMM or attention. Whether that combination is worth anything is an experimental question,
+    not a marketing one.
+</p>
+
+<h2>The Zip Schedule</h2>
+
+<p>
+    The centerpiece. Most of a transformer layer does not need a 2-D decomposition at all: each node can run
+    a fused 1-D lane &mdash; unpack its local packed-weight shard, run its QKV shard, its local heads, its
+    local output-projection partial, its local reduction. Crucially, heads are <strong>never concatenated
+    into one giant intermediate tensor</strong>: each node applies its local output-projection shard to its
+    own attention output, so the first communication boundary is already hidden-state-sized, not
+    attention-sized.
+</p>
+
+<p>
+    For attention at long context, the decomposition <strong>unzips</strong> into 2-D &mdash; head groups on
+    one axis, context shards on the other &mdash; because head count alone eventually stops exposing enough
+    parallelism while the sequence keeps growing. After attention, the schedule <strong>zips back</strong>
+    to the 1-D lane for the MLP. The cluster is one pool of compute that re-shapes per graph region.
+</p>
+
+<div class="img-container svg-viewer" data-title="The zip schedule: two nodes run fused 1-D lanes, unzip to 2-D head-by-context attention at long context, merge softmax statistics, and zip back to the 1-D MLP lane, with real payload sizes on the merge edges">
+    <img src="assets/distributed-cpu-zip-schedule.svg" alt="Two-node lane diagram. A replicated hidden state feeds Node A and Node B, each running a fused one-dimensional lane: unpack weight shard, QKV shard, local heads with RoPE and QK norm. The attention region unzips into a two-dimensional head-groups-times-context-shards decomposition computing local attention tiles, merged by online-softmax sufficient statistics: local max, local normalization sum, local weighted output. Each node then applies its local output-projection shard and the first merge sums hidden-state partials: sixteen kilobytes per token at 8192-dimensional BF16, about 512 kilobytes for a 32-token batch. The schedule zips back into the one-dimensional MLP lane, gate and up shards through local SwiGLU to down-projection partials, ending in one final merge. Raw attention matrices never move" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    Communication boundaries carry only the mathematically unavoidable reductions:
+</p>
+
+<ul>
+    <li><strong>Hidden-state-sized partial sums:</strong> 16 KB per token at 8192-dimensional BF16 (8192 &times; 2 bytes); roughly 512 KB for a 32-token batch. Tiny compared with the arithmetic that produced those values.</li>
+    <li><strong>Online-softmax sufficient statistics</strong> for cross-context attention merges: the local max, the local normalization sum and the local weighted output per partition &mdash; never the raw attention matrix.</li>
+</ul>
+
+<p>
+    <strong>GQA note.</strong> Modern Qwen-like models use grouped-query attention &mdash; conceptually 32
+    query heads against 8 KV heads rather than 32 independent Q/K/V sets. Head sharding must partition
+    query-head groups so the needed KV heads are local or cheaply replicated. Because CPU RAM is plentiful,
+    replicating K/V-head metadata or even some KV data can be preferable to forcing communication &mdash;
+    the abundance-of-memory thesis again.
+</p>
+
+<h2>Two-Dimensional Attention at Long Context</h2>
+
+<p>
+    Head parallelism exhausts itself: with 32 heads, 32 nodes means one head per node, and the head axis is
+    spent. At 128K&ndash;1M context the sequence is the next parallel axis. A 6-node cluster can decompose
+    as 3 context shards &times; 2 head groups, each node computing large local attention tiles over 1/3 of
+    the context and 1/2 of the heads, then merging across context partitions with online-softmax sufficient
+    statistics.
+</p>
+
+<div class="img-container svg-viewer" data-title="Six-node two-dimensional attention grid: three context shards times two head groups, merged by online-softmax statistics instead of moving the full attention matrix">
+    <img src="assets/distributed-cpu-attention-2d.svg" alt="A six-node grid: two head-group columns and three context-shard rows, each node owning half the heads and a third of a one-million-token context and computing local attention tiles independently. Per head-group column, context partitions merge with online-softmax sufficient statistics: local max, local normalization sum, local weighted output. A struck-through panel contrasts this with moving the full one-million by one-million attention matrix, and notes that grouped-query attention requires partitioning query-head groups so needed KV heads are local or replicated" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>The Metric: Synchronization Boundaries per Layer</h2>
+
+<p>
+    &ldquo;We support TP=2&rdquo; says nothing about how often nodes stop to agree. The useful metric is
+    <strong>global synchronization boundaries per layer</strong>. A conventional TP schedule inserts a
+    collective after nearly every GEMM, attention and MLP operator; a hyper-fused schedule keeps quantized
+    unpack, scale decode, local accumulation, activations and projection partials inside the lane and pays
+    one merge per fused region.
+</p>
+
+<div class="img-container svg-viewer" data-title="Conventional tensor parallelism versus the hyper-fused zip schedule, counted as synchronization boundaries per layer">
+    <img src="assets/distributed-cpu-sync-boundaries.svg" alt="Top flow: a conventional tensor-parallel layer alternates operators and collectives — QKV GEMM, collective, attention, collective, output GEMM, collective, MLP up, collective, MLP down, collective — about five global synchronization boundaries per layer. Bottom flow: a hyper-fused zip schedule runs one fused lane from unpack through the output-projection partial, one hidden-state merge, the fused MLP lane, and one final merge — two boundaries per layer. The measured collective-time fraction is the evidence" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>Communication Must Be Measured</h2>
+
+<p>
+    The fast-switch intuition, stated honestly: 512 KB at a nominal 400 Gb/s (&asymp; 50 GB/s) link
+    serializes in about <strong>10 &micro;s</strong> &mdash; and that figure is a <strong>division, not a
+    measurement</strong>. Real end-to-end synchronization adds RDMA/collective latency, software overhead,
+    PCIe traversal, memory access and barrier cost. None of that is in the division.
+</p>
+
+<p>
+    The thesis stands on the <strong>ratio</strong>, not the absolute number: if each node performs
+    milliseconds of useful attention/GEMM work between boundaries, hundreds of kilobytes of communication is
+    not scary &mdash; and at 1M context the compute/communication ratio can become particularly favorable.
+    But this is a <strong>research hypothesis</strong>. It must be demonstrated on the real NICs and switch,
+    not assumed from a link sheet, and the measurement plan below publishes the collective-time fraction
+    whatever it turns out to be.
+</p>
+
+<div class="img-container svg-viewer" data-title="Compute versus communication ratio: milliseconds of local work against an idealized ten-microsecond serialization labeled as a division, plus the real overheads a sync adds">
+    <img src="assets/distributed-cpu-comm-ratio.svg" alt="A timeline with a long bar of millisecond-scale local attention and GEMM work between boundaries and a sliver for the 512-kilobyte boundary payload. One panel shows the idealized arithmetic: 400 gigabits per second is about 50 gigabytes per second, 512 kilobytes divided by 50 gigabytes per second is about 10 microseconds, labeled a division not a measurement. A second panel lists what a real sync adds: RDMA and collective latency, software overhead, PCIe traversal, memory access, barrier and straggler cost. A hypothesis band states that a fused schedule might cut collective time from about 25 percent of wall time to 5 to 10 percent, both figures marked as hypotheses to test" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>CPU-First Economics: Spend DRAM to Eliminate Communication</h2>
+
+<p>
+    GPU frameworks shard because HBM is scarce &mdash; state often cannot be replicated. CPU nodes can carry
+    150 GB, 256 GB, 512 GB or eventually terabytes of DRAM, which inverts the optimization objective: CKE
+    can deliberately <strong>spend memory to eliminate communication</strong>:
+</p>
+
+<ul>
+    <li>replicate the hidden input, norm parameters and routing metadata;</li>
+    <li>keep multiple packed layouts of the same weights;</li>
+    <li>replicate GQA KV heads for locality instead of communicating them;</li>
+    <li>cache hot experts on several nodes.</li>
+</ul>
+
+<p>
+    Memory Tetris adds the dimension the mainstream parallelism literature usually does not center:
+    <strong>tensor residency itself is part of scheduling</strong>. Per tensor, the planner could choose to
+    compute from a resident tensor, fetch from remote DRAM over RDMA, fetch from local or remote NVMe,
+    recompute, replicate for future reuse, or route the activation to a remote resident expert. See
+    <a href="memory-tetris.html">Memory Tetris: DRAM as a Tensor Cache over NVMe</a> for the residency
+    design &mdash; itself a research design at the same status as this page.
+</p>
+
+<h2>Heterogeneous Topology</h2>
+
+<p>
+    Megatron-style systems generally assume fairly regular accelerator groups. The CKE lab fleet is
+    explicitly heterogeneous &mdash; an Intel i7-14700T node (<strong>active</strong>), a Ryzen 9950X3D node
+    (<strong>planned</strong>) and Xeon AMX hardware (<strong>future</strong>) &mdash; so equal ranks are the
+    wrong default. Shards should be proportional to <strong>X-Ray-measured throughput</strong>: Node A might
+    take 30% of a tensor shard and Node B 70%, because X-Ray measured them that way. The target is
+    distributed graph compilation over heterogeneous CPU resources. See
+    <a href="support-hardware.html">Support Hardware</a> for the lab fleet.
+</p>
+
+<div class="img-container svg-viewer" data-title="Heterogeneous nodes with proportional shards: X-Ray measured throughput feeds a scheduler that splits a shard 30/70, with Memory-Tetris residency choices per tensor">
+    <img src="assets/distributed-cpu-heterogeneous.svg" alt="X-Ray per-node throughput measurement feeds the CKE scheduler, which assigns a thirty-percent shard lane to an Intel i7-14700T node marked active and a seventy-percent shard lane to a Ryzen 9950X3D node marked planned. A panel lists Memory-Tetris residency choices per tensor: compute from resident local DRAM, fetch from remote DRAM over RDMA, fetch from local or remote NVMe, recompute, replicate for future reuse, or route the activation to a remote resident expert. A second panel records the fabric assumption of 200 or 400 gigabit RDMA-class links to be validated, and the fleet status: i7-14700T active, Ryzen 9950X3D planned, Xeon AMX future" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>The Topology-versus-Context Thesis</h2>
+
+<p>
+    For a tiny decode prompt there is not enough arithmetic between synchronization points to justify
+    distributing aggressively. As context grows &mdash; 32K, 128K, 500K, 1M &mdash; the attention work
+    becomes enormous and the optimal topology plausibly changes: one node for small context, TP=2 for
+    medium, head-parallel plus TP for long, and head-by-context 2-D for very long. The interesting output
+    of this research is the <strong>measured map</strong> of which topology wins at which context &mdash;
+    not a single tok/s figure.
+</p>
+
+<div class="img-container svg-viewer" data-title="Topology versus context map: one node for small context, tensor-parallel two for medium, head-parallel plus TP for long, and two-dimensional head-by-context for 128K to 1M tokens">
+    <img src="assets/distributed-cpu-context-topology.svg" alt="A stepped map along the context-length axis. Small context: one CPU node, because there is not enough arithmetic between synchronization points to justify distributing. Medium context around 32K: tensor-parallel 2 with two fused lanes and hidden-state merges. Long context around 128K: head-parallel plus tensor parallelism, heads split across nodes with softmax-statistic and output reductions. Very long context, 128K to one million tokens: a six-node two-dimensional grid of three context shards times two head groups with online-softmax merging, where the compute-to-communication ratio is most favorable. A footer states the zone boundaries are hypotheses to be mapped experimentally" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>Experimental Plan and Promotion Gates</h2>
+
+<p>
+    Same rigor as Memory Tetris: ordered experiments, each with a promotion gate, every result cell
+    <strong>not yet certified</strong> until measured and recorded to CKE's evidence standard.
+</p>
+
+<table>
+    <tr>
+        <th>Experiment</th>
+        <th>What it measures</th>
+        <th>Result</th>
+        <th>Status</th>
+    </tr>
+    <tr>
+        <td>Single-node baseline</td>
+        <td>fully resident model; per-region kernel times</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Two-node TP reference</td>
+        <td>conventional TP=2; percentage of wall time in collectives</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Hyper-fused schedule</td>
+        <td>boundaries per layer; total sync time; collective-time fraction</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Head &times; context 2-D</td>
+        <td>6-node 3&times;2 grid with online-softmax merging at long context</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Numerical parity</td>
+        <td>distributed schedule vs single-node baseline under the zero-tolerance numerical contract rules; layer/checkpoint outputs, not just tokens</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Topology-vs-context map</td>
+        <td>winning topology per context length, published as a map</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+</table>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The hypothesis to test &mdash; not a result</h3>
+    <p style="margin-bottom: 0;">
+        If two nodes running a conventional TP implementation spend, say, ~25% of wall time in collectives,
+        a hyper-fused schedule might cut that to ~5&ndash;10%. Both numbers are <strong>hypotheses</strong>
+        the experiments are designed to confirm or refute, and the collective-time fraction gets published
+        either way.
+    </p>
+</div>
+
+<h3>Failure modes to measure</h3>
+
+<ul>
+    <li><strong>Barrier stalls</strong> &mdash; every boundary is a place where one slow node holds the cluster.</li>
+    <li><strong>Stragglers on heterogeneous nodes</strong> &mdash; does proportional sharding actually equalize lane time?</li>
+    <li><strong>GQA KV replication cost</strong> &mdash; when does replicating KV beat communicating it?</li>
+    <li><strong>Switch congestion</strong> &mdash; does the fabric stay cheap at 6+ nodes, or become the boundary condition?</li>
+</ul>
+
+<h2>Related Pages</h2>
+
+<ul>
+    <li><a href="memory-tetris.html">Memory Tetris</a> &mdash; the residency design that makes tensor placement a scheduling dimension</li>
+    <li><a href="support-hardware.html">Support Hardware</a> &mdash; the heterogeneous lab fleet this research targets</li>
+    <li><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> &mdash; the zero-tolerance parity rules every distributed schedule must satisfy</li>
+    <li><a href="kernel-maps.html">Kernel Maps and Provider Selection</a> &mdash; how physical kernels are selected today, per node</li>
+    <li><a href="scaling.html">Scaling Philosophy</a> &mdash; the CPU-only, Linux-first hardware bet behind this research</li>
+    <li><a href="research.html">Research Tracker</a> &mdash; other proposed techniques and their status</li>
+</ul>

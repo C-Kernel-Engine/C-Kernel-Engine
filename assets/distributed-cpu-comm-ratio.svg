@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
+  <title>Compute versus communication ratio: the idealized ten-microsecond figure and the real overheads that must be measured</title>
+  <desc>A timeline shows milliseconds of local attention and GEMM work between synchronization boundaries, against an idealized ten-microsecond serialization of 512 kilobytes at 50 gigabytes per second — labeled as a division, not a measurement. A panel lists what real synchronization adds: RDMA and collective latency, software overhead, PCIe traversal, memory access, and barrier cost. The thesis is the ratio, and it must be demonstrated on real NICs and a real switch.</desc>
+
+  <defs>
+    <marker id="arrComm" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="620" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Ratio Is the Thesis — and It Must Be Measured</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Milliseconds of local work between boundaries versus hundreds of kilobytes on the wire</text>
+
+  <!-- compute bar -->
+  <text x="48" y="104" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc">Between boundaries: local compute</text>
+  <rect x="48" y="118" width="700" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="398" y="141" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#b0d9ef" text-anchor="middle">ms-scale attention / GEMM work per node</text>
+  <text x="398" y="160" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">grows with context — especially favorable toward 1M tokens</text>
+
+  <!-- comm sliver -->
+  <rect x="748" y="118" width="14" height="52" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <line x1="762" y1="144" x2="820" y2="144" stroke="#808080" stroke-width="1" marker-end="url(#arrComm)"/>
+  <text x="826" y="136" font-family="Inter, sans-serif" font-size="11" fill="#ffd97a">512 KB</text>
+  <text x="826" y="152" font-family="Inter, sans-serif" font-size="11" fill="#ffd97a">boundary</text>
+
+  <!-- idealized math panel -->
+  <rect x="48" y="196" width="420" height="180" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="72" y="226" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a">The idealized arithmetic</text>
+  <text x="72" y="254" font-family="JetBrains Mono, monospace" font-size="12.5" fill="#e8d9b0">400 Gb/s ≈ 50 GB/s</text>
+  <text x="72" y="278" font-family="JetBrains Mono, monospace" font-size="12.5" fill="#e8d9b0">512 KB ÷ 50 GB/s ≈ 10 µs</text>
+  <text x="72" y="310" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffb400">⚠ a division, not a measurement</text>
+  <text x="72" y="334" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">nominal link bandwidth only; no latency,</text>
+  <text x="72" y="352" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">no software path, no barrier cost included</text>
+
+  <!-- real overheads panel -->
+  <rect x="492" y="196" width="420" height="180" rx="8" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+  <text x="516" y="226" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#f87171">What a real sync adds</text>
+  <g font-family="Inter, sans-serif" font-size="12" fill="#d0a0a0">
+    <text x="516" y="254">· RDMA / collective latency</text>
+    <text x="516" y="276">· software overhead in the runtime path</text>
+    <text x="516" y="298">· PCIe traversal</text>
+    <text x="516" y="320">· memory access on both ends</text>
+    <text x="516" y="342">· barrier and straggler cost</text>
+  </g>
+  <text x="516" y="366" font-family="Inter, sans-serif" font-size="11.5" font-weight="600" fill="#f87171">end-to-end time is an open question, not a constant</text>
+
+  <!-- hypothesis band -->
+  <rect x="48" y="404" width="864" height="92" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="72" y="434" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac">The research hypothesis</text>
+  <text x="72" y="458" font-family="Inter, sans-serif" font-size="12" fill="#b0d9b0">If nodes do milliseconds of useful work between boundaries, hundreds of KB per boundary is not scary — the</text>
+  <text x="72" y="476" font-family="Inter, sans-serif" font-size="12" fill="#b0d9b0">compute/communication ratio carries the design. A fused schedule might cut collective time from ~25% of wall</text>
+  <text x="72" y="494" font-family="Inter, sans-serif" font-size="12" fill="#b0d9b0">time to ~5–10%. Both figures are hypotheses to test, not results.</text>
+
+  <!-- measurement plan strip -->
+  <rect x="48" y="516" width="864" height="72" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="72" y="544" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Measurement plan</text>
+  <text x="72" y="566" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">Demonstrate on the real NICs and switch: per-boundary bytes and latency, collective-time fraction of wall time,</text>
+  <text x="72" y="584" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">barrier stalls, stragglers, switch congestion — published whatever the numbers turn out to be.</text>
+</svg>

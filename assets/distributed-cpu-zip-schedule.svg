@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 920">
+  <title>The zip schedule: fused 1-D lanes unzip to 2-D for long-context attention and zip back for the MLP</title>
+  <desc>Two CPU nodes each run a fused one-dimensional lane: unpack the local packed weight shard, QKV projection, local heads with RoPE and QK norm, attention, local output-projection partial. At long context the attention region unzips into a two-dimensional decomposition of head groups times context shards, merged with online-softmax sufficient statistics. The nodes then exchange one hidden-state-sized partial sum, sixteen kilobytes per token at 8192-dimensional BF16, and zip back into the one-dimensional MLP lane: gate and up shards, local SwiGLU, local down-projection partial, and one final merge. Raw attention matrices never cross the fabric.</desc>
+
+  <defs>
+    <marker id="arrZip" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="920" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Zip Schedule: One Cluster, Re-Shaped per Graph Region</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">1-D fused lanes → unzip to 2-D for attention at long context → zip back to 1-D for the MLP</text>
+
+  <!-- replicated hidden state -->
+  <rect x="330" y="78" width="300" height="42" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="104" font-family="Inter, sans-serif" font-size="13.5" font-weight="600" fill="#ffd97a" text-anchor="middle">replicated hidden state x</text>
+
+  <line x1="430" y1="120" x2="270" y2="158" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="530" y1="120" x2="690" y2="158" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+
+  <!-- node lane headers -->
+  <text x="270" y="152" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc" text-anchor="middle">Node A</text>
+  <text x="690" y="152" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7dd3fc" text-anchor="middle">Node B</text>
+
+  <!-- ═══ 1-D fused lane region ═══ -->
+  <rect x="130" y="166" width="700" height="160" rx="10" fill="none" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="144" y="186" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#07adf8">1-D FUSED LANE</text>
+
+  <rect x="160" y="196" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="270" y="221" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">unpack W_A + QKV shard</text>
+  <rect x="580" y="196" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="690" y="221" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">unpack W_B + QKV shard</text>
+
+  <rect x="160" y="250" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="270" y="275" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">heads 0..H/2 · RoPE · QK norm</text>
+  <rect x="580" y="250" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="690" y="275" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">heads H/2..H · RoPE · QK norm</text>
+
+  <line x1="270" y1="290" x2="270" y2="352" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="690" y1="290" x2="690" y2="352" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+
+  <!-- ═══ unzip: 2-D attention region ═══ -->
+  <rect x="90" y="356" width="780" height="216" rx="10" fill="rgba(255,180,0,0.05)" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="104" y="378" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#ffb400">UNZIP → 2-D ATTENTION (long context): head groups × context shards</text>
+
+  <rect x="160" y="392" width="220" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="270" y="414" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">local attention tiles</text>
+  <text x="270" y="432" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">Q_h·K_hᵀ → softmax → ×V_h</text>
+  <rect x="580" y="392" width="220" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="690" y="414" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">local attention tiles</text>
+  <text x="690" y="432" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">independent of Node A</text>
+
+  <!-- softmax stats merge -->
+  <line x1="270" y1="444" x2="420" y2="482" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="690" y1="444" x2="540" y2="482" stroke="#47b475" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <rect x="330" y="484" width="300" height="54" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="480" y="505" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#86efac" text-anchor="middle">merge softmax sufficient statistics</text>
+  <text x="480" y="523" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">local max · local norm sum · local weighted output</text>
+
+  <text x="120" y="560" font-family="Inter, sans-serif" font-size="11" fill="#f85149">never moved:</text>
+  <text x="205" y="560" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">raw attention matrices</text>
+
+  <!-- local Wo partial -->
+  <line x1="420" y1="538" x2="270" y2="588" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="540" y1="538" x2="690" y2="588" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <rect x="160" y="590" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="270" y="615" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">local Wo shard → partial y_A</text>
+  <rect x="580" y="590" width="220" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="690" y="615" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">local Wo shard → partial y_B</text>
+
+  <!-- merge 1 -->
+  <line x1="270" y1="630" x2="440" y2="668" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="690" y1="630" x2="520" y2="668" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <rect x="300" y="670" width="360" height="46" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="689" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE 1: y = partial_A + partial_B</text>
+  <text x="480" y="706" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">16 KB / token (8192-dim BF16) · ≈512 KB for a 32-token batch</text>
+
+  <!-- ═══ zip back: MLP lane ═══ -->
+  <rect x="130" y="734" width="700" height="120" rx="10" fill="none" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="144" y="754" font-family="Inter, sans-serif" font-size="11.5" font-weight="700" fill="#07adf8">ZIP BACK → 1-D MLP LANE</text>
+
+  <line x1="440" y1="716" x2="270" y2="762" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="520" y1="716" x2="690" y2="762" stroke="#808080" stroke-width="1.5" marker-end="url(#arrZip)"/>
+
+  <rect x="160" y="764" width="220" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="270" y="786" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">gate/up shard → SwiGLU</text>
+  <text x="270" y="804" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">→ down-proj partial</text>
+  <rect x="580" y="764" width="220" height="52" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="690" y="786" font-family="Inter, sans-serif" font-size="12.5" fill="#b0d9ef" text-anchor="middle">gate/up shard → SwiGLU</text>
+  <text x="690" y="804" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">→ down-proj partial</text>
+
+  <!-- merge 2 -->
+  <line x1="270" y1="816" x2="440" y2="864" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <line x1="690" y1="816" x2="520" y2="864" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arrZip)"/>
+  <rect x="300" y="866" width="360" height="40" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="891" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE 2: one hidden-state reduction</text>
+</svg>

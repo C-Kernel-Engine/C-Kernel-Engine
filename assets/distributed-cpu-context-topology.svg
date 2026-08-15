@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+  <title>Topology versus context map: from one node to two-dimensional head-times-context decomposition as context grows toward one million tokens</title>
+  <desc>A map along the context-length axis. Small context: a single CPU node, because there is not enough arithmetic between synchronization points to justify distributing. Medium context: tensor-parallel 2. Long context: head parallelism plus tensor parallelism. Very long context, 128K to 1M tokens: a two-dimensional head-times-context decomposition, possibly with tensor parallelism inside the projections. The interesting output of this research is the map itself, not a single tokens-per-second figure.</desc>
+
+  <defs>
+    <marker id="arrTopo" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="600" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Topology-vs-Context Map (Hypothesis)</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">The optimal decomposition changes with context length — the map is the deliverable, not one tok/s number</text>
+
+  <!-- context axis -->
+  <line x1="60" y1="470" x2="900" y2="470" stroke="#808080" stroke-width="2" marker-end="url(#arrTopo)"/>
+  <text x="690" y="462" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="end">context length →</text>
+  <g font-family="Inter, sans-serif" font-size="11.5" fill="#808080" text-anchor="middle">
+    <text x="150" y="494">small</text>
+    <text x="150" y="510">("Hello")</text>
+    <text x="370" y="494">medium</text>
+    <text x="370" y="510">(~32K)</text>
+    <text x="590" y="494">long</text>
+    <text x="590" y="510">(~128K)</text>
+    <text x="810" y="494">very long</text>
+    <text x="810" y="510">(128K–1M)</text>
+  </g>
+
+  <!-- zone 1: single node -->
+  <rect x="70" y="300" width="180" height="150" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="160" y="330" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#b0d9ef" text-anchor="middle">1 CPU node</text>
+  <text x="160" y="354" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">not enough arithmetic</text>
+  <text x="160" y="372" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">between sync points to</text>
+  <text x="160" y="390" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">justify distributing</text>
+  <rect x="130" y="404" width="60" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="160" y="424" font-family="Inter, sans-serif" font-size="11" fill="#b0d9ef" text-anchor="middle">CPU</text>
+
+  <!-- zone 2: TP=2 -->
+  <rect x="280" y="260" width="180" height="190" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="370" y="290" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#b0d9ef" text-anchor="middle">TP = 2</text>
+  <text x="370" y="314" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">two fused lanes,</text>
+  <text x="370" y="332" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">hidden-state merges</text>
+  <rect x="300" y="360" width="60" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="330" y="380" font-family="Inter, sans-serif" font-size="11" fill="#b0d9ef" text-anchor="middle">A</text>
+  <rect x="380" y="360" width="60" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="410" y="380" font-family="Inter, sans-serif" font-size="11" fill="#b0d9ef" text-anchor="middle">B</text>
+  <line x1="360" y1="375" x2="380" y2="375" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="370" y="420" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">2 boundaries / layer</text>
+
+  <!-- zone 3: head-parallel + TP -->
+  <rect x="490" y="220" width="180" height="230" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="580" y="250" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#b0d9ef" text-anchor="middle">head-parallel + TP</text>
+  <text x="580" y="274" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">heads split across nodes,</text>
+  <text x="580" y="292" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0" text-anchor="middle">TP inside projections</text>
+  <g>
+    <rect x="505" y="310" width="70" height="26" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="540" y="327" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">heads 0–7</text>
+    <rect x="585" y="310" width="70" height="26" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="620" y="327" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">heads 8–15</text>
+    <rect x="505" y="344" width="70" height="26" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="540" y="361" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">16–23</text>
+    <rect x="585" y="344" width="70" height="26" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="620" y="361" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">24–31</text>
+  </g>
+  <text x="580" y="400" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">stats + output reductions</text>
+
+  <!-- zone 4: 2-D -->
+  <rect x="700" y="160" width="200" height="290" rx="8" fill="rgba(255,180,0,0.06)" stroke="#ffb400" stroke-width="2"/>
+  <text x="800" y="190" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">head × context 2-D</text>
+  <text x="800" y="214" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">head axis exhausted →</text>
+  <text x="800" y="232" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">shard the sequence too</text>
+  <g>
+    <rect x="716" y="252" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="756" y="271" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n0</text>
+    <rect x="804" y="252" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="844" y="271" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n1</text>
+    <rect x="716" y="290" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="756" y="309" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n2</text>
+    <rect x="804" y="290" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="844" y="309" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n3</text>
+    <rect x="716" y="328" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="756" y="347" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n4</text>
+    <rect x="804" y="328" width="80" height="30" rx="4" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="844" y="347" font-family="Inter, sans-serif" font-size="10" fill="#b0d9ef" text-anchor="middle">n5</text>
+  </g>
+  <text x="800" y="382" font-family="Inter, sans-serif" font-size="10" fill="#5a8fb0" text-anchor="middle">3 context × 2 head groups</text>
+  <text x="800" y="400" font-family="Inter, sans-serif" font-size="10" fill="#5a8fb0" text-anchor="middle">online-softmax merge</text>
+  <text x="800" y="428" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">compute/comm ratio most</text>
+  <text x="800" y="444" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">favorable here</text>
+
+  <!-- step risers -->
+  <line x1="250" y1="450" x2="280" y2="450" stroke="#404040" stroke-width="2"/>
+  <line x1="460" y1="450" x2="490" y2="450" stroke="#404040" stroke-width="2"/>
+  <line x1="670" y1="450" x2="700" y2="450" stroke="#404040" stroke-width="2"/>
+
+  <!-- footer note -->
+  <rect x="60" y="530" width="840" height="52" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="84" y="552" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">Zone boundaries are hypotheses to be mapped experimentally — the research output is the measured map itself:</text>
+  <text x="84" y="570" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">which topology wins at which context, and what each synchronization boundary actually costs.</text>
+</svg>

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560">
+  <title>Global synchronization boundaries per layer: conventional tensor parallelism versus a hyper-fused schedule</title>
+  <desc>Top flow: a conventional tensor-parallel layer runs QKV projection, collective, attention, collective, output projection, collective, MLP up, collective, activation, MLP down, collective — five global synchronization boundaries per layer. Bottom flow: a hyper-fused zip schedule runs one fused lane covering unpack, QKV, local heads, attention and the output-projection partial, then one merge, then the fused MLP lane, then one merge — two boundaries per layer. The metric is boundaries per layer, not tensor-parallel degree.</desc>
+
+  <defs>
+    <marker id="arrSync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="560" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Metric: Synchronization Boundaries per Layer</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">"We support TP=2" says nothing about how often the nodes stop to agree</text>
+
+  <!-- ═══ Conventional TP ═══ -->
+  <text x="48" y="104" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#f87171">Conventional TP: collective after nearly every operator</text>
+
+  <g font-family="Inter, sans-serif">
+    <rect x="48" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="100" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">QKV GEMM</text>
+
+    <rect x="160" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="186" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+
+    <rect x="220" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="272" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">attention</text>
+
+    <rect x="332" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="358" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+
+    <rect x="392" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="444" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">out GEMM</text>
+
+    <rect x="504" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="530" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+
+    <rect x="564" y="122" width="104" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="616" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP up</text>
+
+    <rect x="676" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="702" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+
+    <rect x="736" y="122" width="86" height="46" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="779" y="149" font-size="11.5" fill="#b0d9ef" text-anchor="middle">MLP down</text>
+
+    <rect x="830" y="122" width="52" height="46" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="856" y="149" font-size="11.5" font-weight="700" fill="#f87171" text-anchor="middle">C</text>
+  </g>
+
+  <text x="48" y="196" font-family="Inter, sans-serif" font-size="11" fill="#808080">C = global collective (all-reduce / all-gather)</text>
+  <rect x="700" y="176" width="182" height="34" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+  <text x="791" y="198" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#f87171" text-anchor="middle">≈ 5 boundaries / layer</text>
+
+  <!-- ═══ Hyper-fused ═══ -->
+  <text x="48" y="268" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#86efac">Hyper-fused zip schedule: one merge per fused region</text>
+
+  <g font-family="Inter, sans-serif">
+    <rect x="48" y="286" width="500" height="56" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="298" y="309" font-size="12.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">fused lane: unpack → QKV → local heads → attention</text>
+    <text x="298" y="328" font-size="11.5" fill="#5a8fb0" text-anchor="middle">→ local output-projection partial (heads never concatenated)</text>
+
+    <rect x="580" y="286" width="110" height="56" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+    <text x="635" y="309" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE 1</text>
+    <text x="635" y="326" font-size="10" fill="#c8a04a" text-anchor="middle">hidden-state sum</text>
+
+    <rect x="722" y="286" width="160" height="56" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+    <text x="802" y="309" font-size="12" font-weight="600" fill="#b0d9ef" text-anchor="middle">fused MLP lane</text>
+    <text x="802" y="326" font-size="10" fill="#5a8fb0" text-anchor="middle">gate/up → SwiGLU → down</text>
+  </g>
+
+  <line x1="548" y1="314" x2="578" y2="314" stroke="#808080" stroke-width="1.5" marker-end="url(#arrSync)"/>
+  <line x1="690" y1="314" x2="720" y2="314" stroke="#808080" stroke-width="1.5" marker-end="url(#arrSync)"/>
+  <line x1="802" y1="342" x2="802" y2="372" stroke="#808080" stroke-width="1.5" marker-end="url(#arrSync)"/>
+  <rect x="722" y="374" width="160" height="40" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="802" y="398" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#ffd97a" text-anchor="middle">MERGE 2</text>
+
+  <rect x="48" y="374" width="182" height="34" rx="6" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="139" y="396" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#86efac" text-anchor="middle">2 boundaries / layer</text>
+
+  <!-- legend / takeaway -->
+  <rect x="48" y="446" width="864" height="82" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="72" y="476" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">What changes</text>
+  <text x="72" y="498" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">Quantized unpack, scale decode, local accumulation, RoPE / QK norm, SwiGLU and the projection partials stay</text>
+  <text x="72" y="516" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">inside the lane. Only mathematically unavoidable reductions cross the fabric. Boundary count is the claim; the</text>
+  <text x="72" y="534" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">measured collective-time fraction is the evidence.</text>
+</svg>

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
+  <title>Parallelism taxonomy: what each method shards, where it synchronizes, and whether it aggregates single-request compute</title>
+  <desc>A six-row comparison of data, tensor, pipeline, context-sequence, expert and head parallelism. Data parallelism shards requests across replicas and never aggregates single-request compute. Tensor parallelism shards each GEMM and synchronizes with a collective after nearly every operator. Pipeline parallelism shards layers and moves activations between stages; it adds capacity and microbatch throughput but does not shorten a single request. Context parallelism shards the token sequence and synchronizes around attention. Expert parallelism shards MoE experts and synchronizes at routing dispatch and combine. Head parallelism shards attention heads and needs only softmax statistics and an output reduction.</desc>
+
+  <rect width="960" height="640" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Where Each Parallelism Method Synchronizes</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Only TP, CP, EP and head parallelism put all nodes on the same request at the same time</text>
+
+  <!-- column headers -->
+  <text x="48" y="100" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Method</text>
+  <text x="200" y="100" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">What it shards</text>
+  <text x="440" y="100" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">Sync boundary</text>
+  <text x="720" y="100" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">One request,</text>
+  <text x="720" y="116" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#a0a0a0">all nodes?</text>
+  <line x1="40" y1="128" x2="920" y2="128" stroke="#404040" stroke-width="1.5"/>
+
+  <!-- Row 1: DP -->
+  <rect x="40" y="140" width="880" height="66" rx="6" fill="#262626" stroke="#383838"/>
+  <text x="48" y="168" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#e0e0e0">Data</text>
+  <text x="48" y="186" font-family="Inter, sans-serif" font-size="11" fill="#808080">DP</text>
+  <text x="200" y="168" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">requests / batches</text>
+  <text x="200" y="186" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">across full replicas</text>
+  <text x="440" y="168" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">gradient sync in training;</text>
+  <text x="440" y="186" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">none per inference request</text>
+  <text x="720" y="172" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#f87171">No — replicas serve</text>
+  <text x="720" y="190" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#f87171">different requests</text>
+
+  <!-- Row 2: TP -->
+  <rect x="40" y="216" width="880" height="66" rx="6" fill="#262626" stroke="#383838"/>
+  <text x="48" y="244" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#e0e0e0">Tensor</text>
+  <text x="48" y="262" font-family="Inter, sans-serif" font-size="11" fill="#808080">TP</text>
+  <text x="200" y="244" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">rows / columns of</text>
+  <text x="200" y="262" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">each weight tensor</text>
+  <text x="440" y="244" font-family="Inter, sans-serif" font-size="12" fill="#f8c471">collective after nearly every</text>
+  <text x="440" y="262" font-family="Inter, sans-serif" font-size="12" fill="#f8c471">GEMM / attention / MLP op</text>
+  <text x="720" y="248" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">Yes</text>
+
+  <!-- Row 3: PP -->
+  <rect x="40" y="292" width="880" height="66" rx="6" fill="#262626" stroke="#383838"/>
+  <text x="48" y="320" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#e0e0e0">Pipeline</text>
+  <text x="48" y="338" font-family="Inter, sans-serif" font-size="11" fill="#808080">PP</text>
+  <text x="200" y="320" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">layers across</text>
+  <text x="200" y="338" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">stages</text>
+  <text x="440" y="320" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">activations passed</text>
+  <text x="440" y="338" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">stage to stage</text>
+  <text x="720" y="316" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#f87171">No — capacity and</text>
+  <text x="720" y="334" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#f87171">microbatch throughput</text>
+
+  <!-- Row 4: CP -->
+  <rect x="40" y="368" width="880" height="66" rx="6" fill="#262626" stroke="#383838"/>
+  <text x="48" y="396" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#e0e0e0">Context / seq</text>
+  <text x="48" y="414" font-family="Inter, sans-serif" font-size="11" fill="#808080">CP</text>
+  <text x="200" y="396" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">the token sequence</text>
+  <text x="200" y="414" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">(long context)</text>
+  <text x="440" y="396" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">all-to-all or ring exchange</text>
+  <text x="440" y="414" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">around attention</text>
+  <text x="720" y="400" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">Yes</text>
+
+  <!-- Row 5: EP -->
+  <rect x="40" y="444" width="880" height="66" rx="6" fill="#262626" stroke="#383838"/>
+  <text x="48" y="472" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#e0e0e0">Expert</text>
+  <text x="48" y="490" font-family="Inter, sans-serif" font-size="11" fill="#808080">EP</text>
+  <text x="200" y="472" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">MoE experts</text>
+  <text x="200" y="490" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">across nodes</text>
+  <text x="440" y="472" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">routing dispatch + combine</text>
+  <text x="440" y="490" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">per MoE layer</text>
+  <text x="720" y="476" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">Yes (routed</text>
+  <text x="720" y="494" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">subset per token)</text>
+
+  <!-- Row 6: head-parallel -->
+  <rect x="40" y="520" width="880" height="66" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="48" y="548" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#7dd3fc">Head</text>
+  <text x="48" y="566" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0">head-parallel</text>
+  <text x="200" y="548" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">attention heads</text>
+  <text x="200" y="566" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">(GQA-aware groups)</text>
+  <text x="440" y="548" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">softmax stats + hidden-state</text>
+  <text x="440" y="566" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">output reduction only</text>
+  <text x="720" y="552" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">Yes</text>
+
+  <text x="480" y="618" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Zip fusion composes TP-style lanes, head parallelism and CP as one scheduling problem</text>
+</svg>

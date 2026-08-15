@@ -348,7 +348,9 @@ CKE  = planner that schedules ownership, transfer and consumption</code></pre>
     recomputation, or <strong>another CKE node</strong>. The planner can then compare resident reuse, local
     NVMe transfer, recomputation and network transfer without encoding distributed behavior into individual
     kernels. <strong>Distributed tensor loading is not implemented</strong> &mdash; this is an interface
-    requirement for later stages, not a current capability.
+    requirement for later stages, not a current capability. The
+    <a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a> research design builds on this transfer
+    abstraction: residency choices across nodes become a scheduling dimension for distributed execution.
 </p>
 
 <h2>Implementation Stages and Promotion Criteria</h2>
@@ -392,6 +394,7 @@ CKE  = planner that schedules ownership, transfer and consumption</code></pre>
 
 <ul>
     <li><a href="deterministic-memory.html">Deterministic Memory</a> &mdash; compile-time known offsets that make slot lifetimes auditable</li>
+    <li><a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a> &mdash; the distributed-execution research design that treats residency as a scheduling dimension</li>
     <li><a href="memory-safety.html">Memory Safety</a> &mdash; bump allocator, canaries and arena discipline</li>
     <li><a href="memory-reality.html">Memory Reality</a> &mdash; honest memory-capacity accounting for large models</li>
     <li><a href="scaling.html">Scaling Philosophy</a> &mdash; the CPU-only, Linux-first hardware bet behind this research</li>

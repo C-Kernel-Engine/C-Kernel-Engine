@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
+  <title>Heterogeneous topology: shards proportional to X-Ray measured throughput, with Memory-Tetris residency as a scheduling dimension</title>
+  <desc>X-Ray measures per-node throughput and feeds a scheduler that assigns shards proportionally instead of assuming equal ranks: a thirty-percent lane for a slower node and a seventy-percent lane for a faster one. Each node also carries Memory-Tetris residency choices — local DRAM, remote DRAM over RDMA, local or remote NVMe, recompute, replicate. The lab fleet is an Intel i7-14700T node that is active, a Ryzen 9950X3D node that is planned, and Xeon AMX hardware in the future.</desc>
+
+  <defs>
+    <marker id="arrHet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="640" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">Heterogeneous Nodes, Proportional Shards</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Measured throughput decides the split — not the assumption of equal ranks</text>
+
+  <!-- X-Ray input -->
+  <rect x="48" y="84" width="280" height="64" rx="8" fill="#1a1530" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="188" y="110" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#c4b5fd" text-anchor="middle">X-Ray measurement</text>
+  <text x="188" y="130" font-family="Inter, sans-serif" font-size="11" fill="#8b7fc0" text-anchor="middle">per-node kernel throughput</text>
+
+  <line x1="328" y1="116" x2="398" y2="116" stroke="#808080" stroke-width="1.5" marker-end="url(#arrHet)"/>
+
+  <!-- scheduler -->
+  <rect x="400" y="84" width="220" height="64" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="510" y="110" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">CKE scheduler</text>
+  <text x="510" y="130" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">shards ∝ measured speed</text>
+
+  <!-- shard lanes -->
+  <line x1="480" y1="148" x2="180" y2="204" stroke="#808080" stroke-width="1.5" marker-end="url(#arrHet)"/>
+  <line x1="540" y1="148" x2="736" y2="204" stroke="#808080" stroke-width="1.5" marker-end="url(#arrHet)"/>
+
+  <rect x="48" y="208" width="264" height="76" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="180" y="233" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">Node A — Intel i7-14700T</text>
+  <text x="180" y="254" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#b0d9ef" text-anchor="middle">30% of shard</text>
+  <text x="180" y="272" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">lab status: active</text>
+
+  <rect x="560" y="208" width="352" height="76" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2"/>
+  <text x="736" y="233" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">Node B — Ryzen 9950X3D</text>
+  <text x="736" y="254" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#b0d9ef" text-anchor="middle">70% of shard</text>
+  <text x="736" y="272" font-family="Inter, sans-serif" font-size="10.5" fill="#5a8fb0" text-anchor="middle">lab status: planned</text>
+
+  <!-- proportional bar -->
+  <text x="48" y="314" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">one tensor shard, split by measured throughput:</text>
+  <rect x="48" y="324" width="259" height="26" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+  <rect x="307" y="324" width="605" height="26" fill="#12283a" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="177" y="342" font-family="Inter, sans-serif" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">A: 30%</text>
+  <text x="609" y="342" font-family="Inter, sans-serif" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">B: 70%</text>
+
+  <!-- residency choices -->
+  <rect x="48" y="372" width="500" height="220" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="1.5"/>
+  <text x="72" y="402" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac">Memory-Tetris residency: a scheduling dimension</text>
+  <text x="72" y="424" font-family="Inter, sans-serif" font-size="11.5" fill="#5a9e78">per tensor, the planner may choose:</text>
+  <g font-family="Inter, sans-serif" font-size="12" fill="#b0d9b0">
+    <text x="72" y="450">· compute from resident tensor (local DRAM)</text>
+    <text x="72" y="472">· fetch from remote DRAM over RDMA</text>
+    <text x="72" y="494">· fetch from local or remote NVMe</text>
+    <text x="72" y="516">· recompute instead of fetch</text>
+    <text x="72" y="538">· replicate for future reuse</text>
+    <text x="72" y="560">· route activation to a remote resident expert</text>
+  </g>
+  <text x="72" y="582" font-family="Inter, sans-serif" font-size="11" fill="#5a9e78">see memory-tetris.html for the residency design</text>
+
+  <!-- fabric + fleet -->
+  <rect x="580" y="372" width="332" height="220" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="604" y="402" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0">Fabric and fleet (honest status)</text>
+  <g font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0">
+    <text x="604" y="430">· links: 200/400G RDMA-class,</text>
+    <text x="618" y="448">to be validated by measurement</text>
+    <text x="604" y="474">· i7-14700T node: active</text>
+    <text x="604" y="496">· Ryzen 9950X3D node: planned</text>
+    <text x="604" y="518">· Xeon AMX node: future</text>
+  </g>
+  <text x="604" y="552" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">Megatron-style stacks assume regular</text>
+  <text x="604" y="570" font-family="Inter, sans-serif" font-size="11.5" fill="#808080">accelerator groups; CKE does not.</text>
+
+  <text x="480" y="624" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Target: distributed graph compilation over heterogeneous CPU resources — see support-hardware.html for the lab</text>
+</svg>
