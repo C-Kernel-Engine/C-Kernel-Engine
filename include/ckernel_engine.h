@@ -3130,6 +3130,23 @@ int moe_swiglu_expert_forward_q4k_q5k_workspace(
     void *workspace,
     size_t workspace_bytes);
 
+size_t moe_swiglu_shared_q8_0_gated_workspace_bytes(int hidden_dim,
+                                                    int intermediate_dim);
+
+int moe_swiglu_shared_forward_q8_0_gated_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes);
+
 void moe_swiglu_shared_forward_bf16(const float *hidden,
                                     const float *routed,
                                     const uint16_t *shared_gate,

@@ -1,0 +1,78 @@
+{
+  "id": "moe_swiglu_shared_forward_q8_0_gated",
+  "op": "shared_swiglu_expert_mlp",
+  "operation_interface": "moe_shared_swiglu.q8_0_weights.fp32_scalar_gate.fp32_output.v1",
+  "selection": {
+    "status": "candidate",
+    "priority": 200,
+    "equivalence_group": "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add",
+    "phases": ["prefill", "decode"]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add",
+  "variant": "compact_q8_0_gated",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "q8_0", "activation": "fp32_to_q8_0", "output": "fp32"},
+  "inputs": [
+    {"name": "hidden", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "routed", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "optional"}
+  ],
+  "weights": [
+    {"name": "shared_gate", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "shared_up", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "shared_down", "dtype": "q8_0", "shape": ["H", "I"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "shared_gate_input", "dtype": "fp32", "shape": ["1", "H"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [
+    {"name": "workspace", "dtype": "u8", "alignment": 64, "lifetime": "kernel_call", "size_resolution": "required", "size_bytes": "align64(q8_0_row_bytes(H)) + align64(2 * I * 4) + align64(q8_0_row_bytes(I)) + align64(H * 4)", "desc": "Planner-owned hidden quantization, gate/up, activation quantization, and shared-output workspace."}
+  ],
+  "dims": ["R", "H", "I"],
+  "constraints": {
+    "alignment": {"H": 32, "I": 32},
+    "notes": "The gated shared multiply is rounded before the routed add to preserve the two llama.cpp graph-operation boundaries."
+  },
+  "impl": {
+    "function": "moe_swiglu_shared_forward_q8_0_gated_workspace",
+    "c_declaration": "int moe_swiglu_shared_forward_q8_0_gated_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, const float *shared_gate_input, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);",
+    "sources": ["src/kernels/axpy_kernels.c", "src/kernels/gemm_kernels_q8_0.c", "src/kernels/gemm_kernels.c", "src/kernels/swiglu_kernels.c"]
+  },
+  "implementation": {
+    "isa_dispatch": "runtime",
+    "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "hidden", "source": "activation:hidden", "cast": "const float*", "ports": ["input:hidden"]},
+      {"name": "routed", "source": "activation:routed", "cast": "const float*", "ports": ["input:routed"]},
+      {"name": "shared_gate", "source": "weight:shared_gate", "ports": ["weight:shared_gate"]},
+      {"name": "shared_up", "source": "weight:shared_up", "ports": ["weight:shared_up"]},
+      {"name": "shared_down", "source": "weight:shared_down", "ports": ["weight:shared_down"]},
+      {"name": "shared_gate_input", "source": "weight:shared_gate_input", "cast": "const float*", "ports": ["weight:shared_gate_input"]},
+      {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+      {"name": "rows", "source": "dim:R"},
+      {"name": "hidden_dim", "source": "dim:H"},
+      {"name": "intermediate_dim", "source": "dim:I"},
+      {"name": "workspace", "source": "scratch:workspace", "cast": "void*"},
+      {"name": "workspace_bytes", "source": "scratch_size:workspace"}
+    ]
+  },
+  "tests": {"unit": ["unittest/test_moe_swiglu_shared_q8_0.py"]},
+  "reference": {"status": "candidate", "notes": "The composition is bit-exact with its independently called CKE primitives. A pinned llama.cpp shared-expert boundary oracle is required before production selection."},
+  "numerical_capabilities": [
+    {
+      "contract_id": "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add",
+      "status": "observed",
+      "phases": ["prefill", "decode"],
+      "function": "moe_swiglu_shared_forward_q8_0_gated_workspace",
+      "explicit_selector": true,
+      "implementation": {"isa_dispatch": "runtime", "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+      "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+    }
+  ],
+  "notes": "Compact Qwen3.5-style gated shared SwiGLU candidate with no internal allocation or prepared-weight expansion."
+}

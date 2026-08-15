@@ -561,17 +561,17 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 284)
+        self.assertEqual(report["counts"]["kernel_maps"], 285)
         self.assertEqual(report["counts"]["physical_layout_maps"], 4)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 90)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 37)
+        self.assertEqual(report["counts"]["resolver_governed_maps"], 91)
+        self.assertEqual(report["counts"]["interface_hardened_maps"], 38)
         self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 37
+            report["counts"]["interface_abi_crossvalidated_maps"], 38
         )
         self.assertEqual(report["counts"]["contract_pending_maps"], 53)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 142)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 143)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 28)
-        self.assertEqual(report["counts"]["selection_managed_maps"], 53)
+        self.assertEqual(report["counts"]["selection_managed_maps"], 54)
         self.assertEqual(report["selection"]["legacy_selection_if_statements"], 73)
         self.assertEqual(report["selection"]["operation_specific_if_statements"], 35)
 

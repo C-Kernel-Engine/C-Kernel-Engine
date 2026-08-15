@@ -2416,6 +2416,26 @@
       "position_transform": null,
       "description": "Observed llama.cpp-compatible AVX2 full-softmax top-k MoE routing order. Distinct-score Qwen3.5 production shapes are bit-exact; equal-score cross-toolchain ordering remains uncertified."
     },
+    "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add": {
+      "operator_family": "moe_shared_swiglu",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "q8_0", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int8",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_0_then_q8_0_gate_up_then_ggml_swiglu_then_quantize_activation_q8_0_then_q8_0_down_then_fp32_scalar_gate_then_sigmoid_then_rounded_shared_multiply_then_routed_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "weighted_product", "output_store"]
+      },
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed compact Q8_0 shared SwiGLU composition with a separate FP32 sigmoid gate. The gated shared product is rounded before routed addition to retain graph-operation semantics."
+    },
     "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32": {
       "operator_family": "moe_swiglu_expert",
       "status": "observed",
