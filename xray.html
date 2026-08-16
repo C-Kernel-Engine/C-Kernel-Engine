@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Research Tracker  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>X-Ray: Numerical Evidence and Divergence Attribution | C-Kernel-Engine</title>
+    <meta name="description" content="How CKE's X-Ray evidence system works: join-don't-instrument pipeline from call IR, kernel registry and oracle backends into schema-validated reports; checkpoint records; three-state verdicts and the honest scorecard; capture neutrality gates; failure classes; fix ownership; report taxonomy; and the IR visualizer X-Ray tab.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/research.html">
-    <meta property="og:title" content="Research Tracker  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/xray.html">
+    <meta property="og:title" content="X-Ray: Numerical Evidence and Divergence Attribution | C-Kernel-Engine">
+    <meta property="og:description" content="How CKE's X-Ray evidence system works: join-don't-instrument pipeline from call IR, kernel registry and oracle backends into schema-validated reports; checkpoint records; three-state verdicts and the honest scorecard; capture neutrality gates; failure classes; fix ownership; report taxonomy; and the IR visualizer X-Ray tab.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/research.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/xray.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -979,487 +979,404 @@
     </header>
     <main>
 
-<h1>Research Tracker</h1>
+<style>
+@media (max-width: 640px) {
+    main code { overflow-wrap: anywhere; }
+    main table { display: block; overflow-x: auto; }
+}
+</style>
 
-<p>Tracking new techniques from recent papers for potential implementation in C-Kernel-Engine. This helps stay current with the field and plan future kernel additions.</p>
+<h1>X-Ray: Numerical Evidence and Divergence Attribution</h1>
+
+<p class="lead">
+    X-Ray is CKE's evidence system for numerical correctness. It compares the generated CK runtime
+    against pinned oracle backends checkpoint by checkpoint, joins the results with the call IR and
+    the kernel registry, and reduces every failure to <strong>one first divergent semantic edge, one
+    failure class, one named fix owner, and one recommended action</strong>.
+</p>
 
 <div class="alert alert-info">
     <div class="alert-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
-    <div>
-        <strong>Living Document</strong><br>
-        Updated as new papers are reviewed. Techniques marked "Planned" are candidates for implementation.
+    <div style="min-width: 0;">
+        <strong>Status: implemented production diagnostic tooling (v8).</strong><br>
+        X-Ray is not a proposal — it is the harness CKE uses to bring up model families and to keep
+        parity honest. The visual surface lives in the IR visualizer's X-Ray tab; the machine-readable
+        surface is a family of schema-validated JSON reports under <code>build/xray/</code>. Figures on
+        this page are schematics that explain marker semantics; real evidence lives in run directories,
+        the <a href="test-report.html">test report</a>, and the nightly injected-fault validator.
     </div>
 </div>
 
-<a href="training-intuition.html" class="card-link">
-    <div class="card card-blue">
-        <h3 style="margin-top: 0;">New: Deep Training Intuition Playbook</h3>
-        <p>An infographic roadmap for gradient intuition: checkpoint-efficient logging, failure pattern triage, and a 12-experiment curriculum from tiny models to Qwen-scale runs.</p>
-        <div class="card-arrow">Open training-intuition.html -></div>
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">What X-Ray is</h3>
+        <ul>
+            <li>An <strong>attribution tool</strong>: it joins artifacts that already exist — the call IR (every op with its resolved provider and numerical contract), the kernel registry, and oracle runs — into one schema-validated evidence chain.</li>
+            <li>A <strong>fail-closed capture system</strong>: a captured tensor is evidence only if the captured execution reproduces the uncaptured execution bit-for-bit on the same causal token history.</li>
+            <li>A <strong>fix-ownership policy encoded in the reports</strong>: <code>first_divergence.fix_owner</code> and <code>architecture_policy</code> travel with the failure, so the next agent receives the rule with the diagnosis.</li>
+            <li>A <strong>regression surface</strong>: nightly gates inject predetermined faults and require X-Ray to name the predetermined first boundary.</li>
+        </ul>
     </div>
-</a>
-
-<a href="v7-cross-entropy-parity.html" class="card-link">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">New: v7 Cross-Entropy Parity Deep Dive</h3>
-        <p>Detailed CE math and production numerics: <code>p - one_hot</code> derivation, PyTorch reduction semantics, ignore-index behavior, long-horizon drift history, and final stabilization changes.</p>
-        <div class="card-arrow">Open v7-cross-entropy-parity.html -></div>
+    <div class="card">
+        <h3 style="margin-top: 0;">What X-Ray is not</h3>
+        <ul>
+            <li><strong>Not permission to hardcode the observed answer.</strong> A diagnosis never becomes a model-name branch in the DSL or codegen; the fix lands in the circuit, the kernel map, the kernel, or the reference adapter.</li>
+            <li><strong>Not a tolerance-relaxation mechanism.</strong> X-Ray exists to find the edge that violates a contract, not to widen the contract until the edge disappears.</li>
+            <li><strong>Not a hardware profiler.</strong> It covers roughly 90–95% of ordinary model-integration failures; compiler instruction scheduling and hardware-specific transcendental behavior still need isolated kernel instrumentation after X-Ray identifies the edge.</li>
+            <li><strong>Not a single command.</strong> There is deliberately no <code>xray</code> binary: each script pins exactly one oracle backend, and you select the backend by selecting the script.</li>
+        </ul>
     </div>
-</a>
+</div>
 
-<a href="xray.html" class="card-link">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">New: X-Ray — Evidence and Divergence Attribution</h3>
-        <p>How CKE proves numerical correctness: the join-don't-instrument evidence pipeline, checkpoint records and verdict semantics, capture neutrality gates, the failure-class vocabulary, fix ownership, and the IR visualizer X-Ray tab — with purpose-built infographics for each stage.</p>
-        <div class="card-arrow">Open xray.html -&gt;</div>
-    </div>
-</a>
+<h2>The Evidence Pipeline: Join, Don't Instrument</h2>
 
-<a href="constraint-model.html" class="card-link">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">New: The CKE Constraint Model</h3>
-        <p>Design vocabulary tying the research program together: Theory of Constraints as runtime math — per-region clocks, max-plus-unhidden-sync region time, the exposed-transfer equation, the critical-path heterogeneous shard scheduler, and the prediction-error control loop connecting Scaling, CKU, Memory Tetris and Zip Fusion.</p>
-        <div class="card-arrow">Open constraint-model.html -&gt;</div>
-    </div>
-</a>
-
-<a href="memory-tetris.html" class="card-link">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">New: Memory Tetris — DRAM as a Tensor Cache over NVMe</h3>
-        <p>Research design (not implemented): lifetime-aware reuse of a fixed DRAM arena over NVMe — arena-slot reuse, compute/I/O overlap, candidate Linux I/O paths, MoE expert residency, fail-closed safety contracts, and the X-Ray and hardware gates required before any promotion.</p>
-        <div class="card-arrow">Open memory-tetris.html -></div>
-    </div>
-</a>
-
-<h2>Implementation Status Legend</h2>
 <p>
-    <span class="badge badge-green">Implemented</span>
-    <span class="badge badge-amber">Planned</span>
-    <span class="badge badge-indigo">Researching</span>
-    <span class="badge" style="background: #444; color: #999;">Archived</span>
+    The design principle is <strong>join, don't instrument</strong>. The call IR already carries every
+    operation with its resolved kernel and contract. X-Ray reports already carry per-stop metrics. The
+    kernel registry is already loaded. X-Ray connects the three instead of adding a parallel
+    instrumentation stack inside the runtime.
 </p>
 
-<hr>
+<p>
+    The binding begins before any tensor exists. A circuit declares <strong>versioned semantic
+    checkpoints</strong>; BuildIR binds each checkpoint to a generated operation, an exact kernel ID, a
+    public function, a phase, a layer, a layout and named axes. GraphIR, LoweredIR and call IR retain
+    the same metadata, so the checkpoint-manifest adapter takes tensor identity from the call IR rather
+    than from backend-specific file names. Backend profiles hold observed storage policy and dtype
+    tolerances <em>outside</em> the circuits.
+</p>
 
-<h2>Attention Variants</h2>
+<div class="img-container svg-viewer" data-title="X-Ray evidence pipeline: call IR, kernel registry and oracle backends feed schema-validated capture; the comparator checks metadata before numerics; classification assigns failure class, fix owner and action; surfaces are the visualizer tab, the test report and nightly gates">
+    <img src="assets/xray-evidence-pipeline.svg" alt="X-Ray evidence pipeline. Sources on the left: call IR carrying every operation with resolved provider, numerical contract, phase, layer, layout and named axes; the kernel registry with provider IDs, contracts, ISA and required versus resolved capability; and oracle backends PyTorch and llama.cpp with one pinned backend per script. These feed capture and schema validation producing per-checkpoint tensors with dtype, shape, sha256, cache layout and strides, neutrality-gated and fail closed. The comparator checks metadata contracts first — storage, layout, reduction, position, execution policy — and computes numerical metrics only after metadata agrees: max absolute error, RMSE, exact ratio and top-1 ranking. Metadata faults never reach metrics. Classification reports the first divergent semantic edge with one failure class, one fix owner and one recommended action, embedded in the report rather than only in documentation. Three surfaces consume the evidence: the IR visualizer X-Ray tab with its backend board, drift chart, circuit rows, ranking strips, runbook and live reload; the test report with scoped scorecards that never show a bare 100 percent; and nightly gates whose injected-fault validator tests the diagnostic itself against predetermined first boundaries. The footer states that X-Ray is an attribution tool, not permission to hardcode the observed answer" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    The ordering rule is strict: <strong>metadata contracts are validated before tensor values are
+    loaded</strong>. A storage, layout, reduction, position or execution-policy mismatch stops the
+    comparison before any expensive model execution or numerical metric runs — a dtype disagreement is a
+    contract fault, not a large RMSE. Named axes canonicalize compatible physical layouts, sparse
+    checkpoints identify a failing interval, and the planner then requests only the internal edges of
+    the first failing block.
+</p>
+
+<h2>What a Checkpoint Record Carries</h2>
+
+<p>
+    Every captured artifact is self-describing and content-addressed. A trimmed real record from the
+    checked-in fixture (<code>version/v8/tests/fixtures/xray/xray_execution_trace.json</code>,
+    schema <code>cke.xray_execution_trace</code>):
+</p>
+
+<pre><code>{
+ "checkpoint_id": "layer.0.attention.kv_append",
+ "role": "new_key",
+ "tensor_path": "tensors/layer0_new_key.f32",
+ "dtype": "fp32",
+ "shape": [1, 8, 1, 64],
+ "sha256": "1a2b3c4d…"
+}
+
+state: position 8 · cache_token_count 9 · append_index 8
+cache_layout: kv_cache_v1 · layer/head/token/channel strides</code></pre>
+
+<p>
+    The execution trace records the <em>schedule</em> alongside the tensors: prefill segmentation,
+    per-call kernel batches with kernel ID and numerical/effective contract IDs, cache actions, position
+    progression, and the physical cache layout with its strides. Two runs whose schedules differ are
+    different executions, and X-Ray says so before comparing a single value — a combined 1,307-row
+    prefill is not numerical evidence about a backend that executes 33, 1,008 and 266-row segments.
+</p>
+
+<h2>Verdict Semantics and the Honest Scorecard</h2>
+
+<p>Every report lands in one of three states:</p>
 
 <table>
     <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
+        <th>Verdict</th>
+        <th>Meaning</th>
+        <th>Consequence</th>
     </tr>
     <tr>
-        <td><strong>Multi-Head Attention</strong></td>
-        <td>Transformer (2017)</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Base attention with causal mask</td>
+        <td><span class="badge badge-green">pass · within gate</span></td>
+        <td>all checkpoints inside thresholds</td>
+        <td>scorecard may be published, fully scoped</td>
     </tr>
     <tr>
-        <td><strong>Grouped Query Attention (GQA)</strong></td>
-        <td>Llama 2</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Shared K/V heads, reduces KV cache</td>
+        <td><span class="badge badge-orange">cosmetic drift</span></td>
+        <td>thresholds crossed, but no top-1 logit flips</td>
+        <td>diagnose; not yet a behavioral claim</td>
     </tr>
     <tr>
-        <td><strong>Multi-Query Attention (MQA)</strong></td>
-        <td>PaLM, Falcon</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>GQA with kv_heads=1</td>
-    </tr>
-    <tr>
-        <td><strong>Sliding Window Attention</strong></td>
-        <td>Mistral, Gemma 2</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Local attention window, reduces memory for long context</td>
-    </tr>
-    <tr>
-        <td><strong>Multi-Head Latent Attention (MLA)</strong></td>
-        <td>DeepSeek-V2</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Low-rank KV compression, massive KV cache reduction</td>
-    </tr>
-    <tr>
-        <td><strong>Native Sparse Attention (NSA)</strong></td>
-        <td>DeepSeek-V3</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Hardware-aligned sparse attention patterns</td>
-    </tr>
-    <tr>
-        <td><strong>Differential Attention</strong></td>
-        <td>Microsoft (2024)</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Subtracts two softmax attentions to reduce noise</td>
+        <td><span class="badge" style="background: #5a2a2a; color: #f0a0a0;">behavioral divergence</span></td>
+        <td>at least one top-1 flip</td>
+        <td>generation behavior changed; the first flip is the bug to fix</td>
     </tr>
 </table>
 
-<h3>Deep Dive: Multi-Head Latent Attention (MLA)</h3>
+<p>
+    When a backend reaches full parity the board may say so, but the claim stays scoped. The honest
+    banner is <code>79/79 edges within gate — FP32 · PyTorch · fixture 20260725 · 1 thread</code>,
+    never a bare "100%". Parity is always scoped to model family, dtype, backend version, fixture or
+    seed, thread count and sample. Live mode keeps the scorecard a continuously re-proven state: the
+    next agent run that regresses an edge flips the card back to amber or red with the first-divergence
+    pin.
+</p>
+
+<h2>Anatomy of the Drift Chart</h2>
+
+<p>
+    The visualizer's drift chart is the fastest way to read a run: stop index in execution order on the
+    x-axis, log-scale <code>max_abs</code> and RMSE on the y-axis, one curve per loaded report, layer
+    facets behind the points. The markers are the language of the chart:
+</p>
+
+<div class="img-container svg-viewer" data-title="Anatomy of the X-Ray drift chart: byte-exact prefix, gate threshold, first non-exact pin, per-edge jump marker, monotonicity break marker, first material divergence pin, with clickable checkpoint detail and explicit coverage">
+    <img src="assets/xray-drift-anatomy.svg" alt="Schematic drift chart labelled as illustrative, not real run data. Checkpoint stop index in execution order on the horizontal axis, log-scale error on the vertical axis, alternating layer facet bands. A green shaded byte-exact prefix ends at an amber pin marking the first non-exact checkpoint. The error curve rises past a purple triangle marking a per-edge jump greater than three times, crosses a dashed amber gate threshold line, passes a magenta diamond marking a monotonicity break, and reaches a red pin marking the first material divergence where a top-1 logit flips. Three callout cards: every point is clickable and opens checkpoint detail with op, function, buffer, shape, sha256 and required versus resolved contract; three verdict states are pass within gate, cosmetic drift, and behavioral divergence; coverage is explicit because operations without a checkpoint render gray and the header states how many of how many ops have X-ray edges" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<ul>
+    <li><strong>Green byte-exact prefix</strong> — checkpoints that match the oracle exactly; the prefix length is itself evidence.</li>
+    <li><strong>Amber pin</strong> — first non-exact checkpoint: where exactness ends, not necessarily where the bug is.</li>
+    <li><strong>Purple ▲</strong> — a per-edge error jump greater than 3&times;: the edge where drift accelerates.</li>
+    <li><strong>Magenta ◆</strong> — a monotonicity break in the error curve.</li>
+    <li><strong>Red pin</strong> — first <em>material</em> divergence: a top-1 logit flip, the point where generation behavior changes.</li>
+    <li><strong>Gray circuit rows</strong> — ops without a checkpoint stay visible; the header states coverage explicitly (<code>N/M ops have X-ray edges</code>) so a gap can never masquerade as a pass.</li>
+</ul>
+
+<h2>Capture Neutrality: Evidence Must Not Change the Answer</h2>
+
+<p>
+    Checkpoint export is additional work inside the observed process — environment checks, memory
+    copies, path formatting, file I/O between model operations. That work changes timing and cache
+    state, and an existing race, unsafe scratch-buffer lifetime or scheduling-dependent reduction can
+    become visible <em>only</em> when instrumentation perturbs the run. A plausible tensor dump is not
+    sufficient: <strong>a captured tensor is evidence only if the captured execution reproduces an
+    uncaptured execution on the same causal token history.</strong>
+</p>
+
+<div class="img-container svg-viewer" data-title="X-Ray capture neutrality acceptance sequence: two uncaptured controls, repeatability gate, aggregate capture, neutrality gate, isolated-boundary fallback, fail-closed rejection">
+    <img src="assets/xray-neutrality-gates.svg" alt="Capture neutrality acceptance sequence. Control A, an uncaptured execution, and Control B, an uncaptured forced replay of the same tokens, enter the repeatability gate. If they are not bit-identical, attribution is rejected before capture as uncaptured runtime is not repeatable, with an optional one-thread SIMD diagnostic. If identical, an aggregate capture replays the same forced tokens with all requested checkpoints enabled and faces the neutrality gate: captured logits must be bit-identical to Control B. If they differ, the isolated-boundary fallback runs one replay per boundary, each independently compared, which is unavailable for coupled KV and binary-parity captures. Accepted artifacts are returned in aggregate or isolated mode. Any remaining failure fails closed: rejected artifacts stay labelled, never enter the accepted list, and produce a nonzero CLI result even when CKE and the oracle otherwise agree. Two footers explain that same-runtime comparison is bit-exact because instrumentation must not change any output bit, while cross-engine comparison legitimately uses numerical metrics because reduction orders may differ" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    The neutrality comparison is <strong>bit-exact on purpose</strong>, and only within the same
+    runtime. Two executions of the same CKE runtime, provider map, thread count and forced history have
+    a strict contract: instrumentation must not change any output bit. A numerical tolerance here could
+    hide precisely the small perturbation a deep recurrent model later amplifies. Cross-engine
+    comparison is a different question — CKE and llama.cpp may legitimately use different reduction
+    orders — so oracle parity uses numerical metrics and token decisions, never a bit-exact demand. If a
+    production provider is intentionally nondeterministic, that fact must first be measured and declared
+    as its own contract; X-Ray must not silently absorb it into a tolerance.
+</p>
 
 <div class="card card-accent">
-    <h4 style="margin-top: 0;">The KV Cache Problem</h4>
-    <p>Standard attention requires storing K and V tensors for each token in the sequence. For long contexts, this becomes massive:</p>
-    <pre>KV Cache size = 2 × num_layers × seq_len × num_heads × head_dim × bytes_per_element
-
-Example (70B model, 128K context):
-= 2 × 80 × 128,000 × 64 × 128 × 2 bytes (FP16)
-= 167 GB just for KV cache!</pre>
-    <p>GQA/MQA reduce this by sharing K/V heads, but MLA takes a different approach.</p>
+    <h3 style="margin-top: 0;">Why this gate exists: the Qwen3.6 qualification finding</h3>
+    <p style="margin-bottom: 0;">
+        During real Qwen3.6-27B Q4_K_M qualification, the neutrality contract rejected capture
+        <em>before instrumentation</em>: two uncaptured 24-thread runs on the same forced trajectory
+        first differed at generated step 76 — top-1 tokens still matched, but the full logits were not
+        bit-identical (cosine 0.999641, RMSE 0.069543, max abs 0.326646). That corrected an earlier
+        provisional interpretation that tensor export was perturbing CKE, and established production-path
+        run-to-run nondeterminism as its own bug. For the same trajectory, two one-thread CKE runs were
+        bit-exact (one worker; SIMD still enabled), making the one-thread SIMD diagnostic a useful
+        internal reference — while llama.cpp remains the independent external oracle, reported
+        separately.
+    </p>
 </div>
 
-<div class="card card-green">
-    <h4 style="margin-top: 0;">MLA: Low-Rank KV Compression</h4>
-    <p>Instead of reducing heads, MLA compresses the KV cache into a low-rank latent space:</p>
-    <pre>Standard Attention:
-  h → W_K → K (full size)
-  h → W_V → V (full size)
-  Cache: [K, V] per layer
+<h2>Failure Classes</h2>
 
-MLA:
-  h → W_compress → c (small latent vector, e.g., 1024-dim)
-  Cache: [c] per layer  ← 93% smaller!
-
-  At attention time:
-  c → W_decompress_K → K (reconstruct)
-  c → W_decompress_V → V (reconstruct)</pre>
-</div>
-
-<div class="card">
-    <h4 style="margin-top: 0;">MLA Results (DeepSeek-V2)</h4>
-    <table class="table">
-        <thead>
-            <tr><th>Metric</th><th>Standard</th><th>MLA</th><th>Improvement</th></tr>
-        </thead>
-        <tbody>
-            <tr><td>KV Cache Size</td><td>100%</td><td>6.7%</td><td><strong>93.3% reduction</strong></td></tr>
-            <tr><td>Generation Throughput</td><td>1x</td><td>5.76x</td><td><strong>5.76x faster</strong></td></tr>
-            <tr><td>Training Cost</td><td>100%</td><td>57.5%</td><td><strong>42.5% cheaper</strong></td></tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h4 style="margin-top: 0;">RoPE Compatibility Challenge</h4>
-    <p>RoPE encodes position in both Q and K, but MLA compresses K into a latent space. DeepSeek's solution:</p>
-    <ul>
-        <li>Keep RoPE on a <em>subset</em> of dimensions (not compressed)</li>
-        <li>Compress the remaining dimensions (NoPE - no positional encoding)</li>
-        <li>Requires careful dimension partitioning</li>
-    </ul>
-    <pre>Q = [Q_rope (with position), Q_nope (compressed)]
-K = [K_rope (with position), K_nope (from latent)]</pre>
-</div>
-
-<div class="card">
-    <h4 style="margin-top: 0;">Implementation Considerations for C-Kernel-Engine</h4>
-    <ul>
-        <li><strong>New kernel:</strong> <code>mla_compress</code> - h → latent (small matmul)</li>
-        <li><strong>New kernel:</strong> <code>mla_decompress</code> - latent → K, V (during attention)</li>
-        <li><strong>Modified attention:</strong> Handle split RoPE/NoPE dimensions</li>
-        <li><strong>KV cache layout:</strong> Store latent vectors instead of full K/V</li>
-        <li><strong>Memory savings:</strong> Critical for long context on CPU (limited RAM vs GPU)</li>
-    </ul>
-    <p><strong>Priority:</strong> High for long-context inference. The 93% KV cache reduction is huge for CPU deployment.</p>
-</div>
-
-<div class="card">
-    <h4 style="margin-top: 0;">References</h4>
-    <ul>
-        <li><a href="https://arxiv.org/abs/2405.04434" target="_blank">DeepSeek-V2 Paper</a> - Original MLA introduction</li>
-        <li><a href="https://medium.com/data-science/deepseek-v3-explained-1-multi-head-latent-attention-ed6bee2a67c4" target="_blank">DeepSeek-V3 MLA Explained</a> - Visual walkthrough</li>
-        <li><a href="https://planetbanatt.net/articles/mla.html" target="_blank">Understanding MLA</a> - Technical deep dive</li>
-        <li><a href="https://arxiv.org/abs/2502.07864" target="_blank">TransMLA</a> - Converting GQA models to MLA</li>
-    </ul>
-</div>
-
-<h2>Position Encodings</h2>
+<p>
+    Classification is a closed vocabulary — every failure resolves to one class with a recommended
+    action, and metadata faults never proceed to numerical metrics:
+</p>
 
 <table>
     <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
+        <th>Group</th>
+        <th>Classes</th>
+        <th>Typical owner</th>
     </tr>
     <tr>
-        <td><strong>RoPE</strong></td>
-        <td>RoFormer, Llama</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Rotary position embedding, relative position via rotation</td>
+        <td>Metadata &amp; contract</td>
+        <td><code>MISSING_CHECKPOINT</code> · <code>CIRCUIT_PRODUCER_MISMATCH</code> · <code>LAYOUT_MISMATCH</code> · <code>STORAGE_CONTRACT_MISMATCH</code> · <code>REDUCTION_CONTRACT_MISMATCH</code> · <code>POSITION_CONTRACT_MISMATCH</code> · <code>NUMERICAL_CONTRACT_MISMATCH</code> · <code>KERNEL_BINDING_MISMATCH</code> · <code>DIAGNOSTIC_EXPORT_MAPPING</code> · <code>MISSING_TOLERANCE_PROFILE</code></td>
+        <td>circuit, kernel map, reference adapter</td>
     </tr>
     <tr>
-        <td><strong>ALiBi</strong></td>
-        <td>BLOOM</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Linear bias, no learned params, easy length extrapolation</td>
+        <td>Execution &amp; state</td>
+        <td><code>EXECUTION_POLICY_MISMATCH</code> · <code>CACHE_STATE_METADATA_MISMATCH</code> · <code>STATE_CACHE_DIVERGENCE</code></td>
+        <td>circuit, runtime schedule, cache provider</td>
     </tr>
     <tr>
-        <td><strong>YaRN (RoPE scaling)</strong></td>
-        <td>Together AI</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>NTK-aware RoPE interpolation for context extension</td>
-    </tr>
-    <tr>
-        <td><strong>Longrope</strong></td>
-        <td>Microsoft</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Progressive interpolation for very long context</td>
+        <td>Numerical &amp; behavioral</td>
+        <td><code>KERNEL_IMPLEMENTATION_DIVERGENCE</code> · <code>ATTENTION_ARITHMETIC_DIVERGENCE</code> · <code>NONFINITE_OUTPUT</code> · <code>RANKING_DIVERGENCE</code></td>
+        <td>kernel, provider arithmetic</td>
     </tr>
 </table>
 
-<h2>Normalization</h2>
+<p>
+    The nightly <strong>injected-fault validator</strong> tests this vocabulary directly: public
+    two-layer fixtures each change one tensor, metadata field, circuit edge or state transition, and
+    X-Ray must report the predetermined first boundary — a BF16 storage boundary must come back as
+    <code>STORAGE_CONTRACT_MISMATCH</code>, an off-by-one KV append index as
+    <code>CACHE_STATE_METADATA_MISMATCH</code>, and so on. A clean control run must produce no false
+    positive. The diagnostic itself is under test, not only the models.
+</p>
+
+<h2>Fix Ownership: Where a Diagnosis Is Allowed to Land</h2>
+
+<p>
+    X-Ray is an attribution tool, not permission to hardcode the observed answer into code generation.
+    Every accepted parity fix has exactly one explicit owner:
+</p>
 
 <table>
     <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
+        <th>Owner</th>
+        <th>Owns</th>
     </tr>
     <tr>
-        <td><strong>RMSNorm</strong></td>
-        <td>Llama, Mistral</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Simpler than LayerNorm, no mean centering</td>
+        <td><strong>Circuit</strong></td>
+        <td>model topology, producer/consumer edges, operation order, position semantics, required storage/rounding/reduction contracts</td>
     </tr>
     <tr>
-        <td><strong>LayerNorm</strong></td>
-        <td>Original Transformer</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Full normalization with mean and variance</td>
+        <td><strong>Kernel map</strong></td>
+        <td>exact public function, supported numerical contract, ISA, shape eligibility, threading/reduction capability</td>
     </tr>
     <tr>
-        <td><strong>QK-Norm</strong></td>
-        <td>Gemma 2</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>RMSNorm on Q and K before attention, training stability</td>
+        <td><strong>Kernel</strong></td>
+        <td>identical inputs produce incorrect values — reproduce in an isolated scalar/reference test, then run the applicable PyTorch or llama.cpp parity gate before promotion</td>
     </tr>
     <tr>
-        <td><strong>Deep Norm</strong></td>
-        <td>Microsoft</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Scaled residual connections for very deep models</td>
+        <td><strong>Reference adapter / profile</strong></td>
+        <td>backend tensor naming, logical-axis mapping, exported boundaries, dtype-specific comparison tolerances</td>
+    </tr>
+    <tr>
+        <td><strong>Generic compiler hardening</strong></td>
+        <td>schema validation, fail-closed resolution, metadata propagation, deterministic emission, removal of implicit assumptions — only when the missing behavior is model-independent infrastructure</td>
     </tr>
 </table>
 
-<h2>Activations & MLP</h2>
+<p>
+    The DSL and code generator remain a deterministic consumer of circuit requirements and resolved
+    kernel-map decisions. No model-name, checkpoint-name or one-off parity branches in DSL/codegen: if
+    X-Ray reports a model-specific mismatch, the fix lands in the circuit requirement, the kernel
+    capability/map, the kernel arithmetic, or the reference adapter. Reports encode this rule in
+    <code>first_divergence.fix_owner</code> and <code>architecture_policy</code>, so the policy arrives
+    with the failure instead of living only in documentation. The full additive fix progression —
+    execution policy first, cache state before attention math, first divergent edge, rerun from the last
+    passing checkpoint — lives in
+    <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a>.
+</p>
+
+<h2>Report Taxonomy</h2>
+
+<p>
+    Each X-Ray artifact is schema-validated JSON with a declared <code>schema</code> ID and version;
+    unknown or malformed evidence fails closed. The principal report types:
+</p>
 
 <table>
     <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
+        <th>Schema</th>
+        <th>Purpose</th>
     </tr>
     <tr>
-        <td><strong>SwiGLU</strong></td>
-        <td>Llama, Mistral</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Gated activation: Swish(xW_gate) * (xW_up)</td>
+        <td><code>cke.xray_execution_trace</code></td>
+        <td>schedule + capture evidence: kernel batches, contracts, cache actions, position progression, cache layout/strides, content-addressed tensors</td>
     </tr>
     <tr>
-        <td><strong>GELU</strong></td>
-        <td>GPT-2, BERT</td>
-        <td><span class="badge badge-green">Implemented</span></td>
-        <td>Gaussian Error Linear Unit</td>
+        <td><code>cke.xray_ranking_report</code></td>
+        <td>shared ranking ABI for mixed-prefill, teacher-forced and persistent-vs-replay checks; per-position top-1 agreement with cosine — evaluated only after tensor checkpoints pass</td>
     </tr>
     <tr>
-        <td><strong>GeGLU</strong></td>
-        <td>GLU Variants</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>GELU-gated variant</td>
+        <td><code>cke.xray_execution_state_report</code></td>
+        <td>bounded state comparison that stops at one of four boundaries: execution policy, cache metadata/content, attention input, attention arithmetic</td>
     </tr>
     <tr>
-        <td><strong>Mixture of Experts (MoE)</strong></td>
-        <td>Mixtral, DeepSeek</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Sparse expert routing, key for scaling</td>
+        <td><code>cke.xray.capture-neutrality.v1</code></td>
+        <td>control repeatability, aggregate and isolated capture verdicts, accepted/rejected artifact lists, final accepted mode</td>
     </tr>
     <tr>
-        <td><strong>Shared Expert MoE</strong></td>
-        <td>DeepSeek-V2</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Some experts always active, rest routed</td>
+        <td><code>cke.xray_attention_sensitivity</code></td>
+        <td>forward amplification probe: sends reference and perturbed tensors through the same authoritative PyTorch operator to test whether a small forward difference is amplified downstream — diagnostic evidence, not a parity verdict</td>
+    </tr>
+    <tr>
+        <td><code>cke.xray_monotonic_provider_gate</code></td>
+        <td>provider-promotion ratchet: a candidate must not regress beyond epsilon against the baseline across the gate rows</td>
     </tr>
 </table>
 
-<h2>Quantization & Efficiency</h2>
+<h2>The Visualizer Surface</h2>
 
-<table>
-    <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
-    </tr>
-    <tr>
-        <td><strong>FP8 Training</strong></td>
-        <td>DeepSeek-V3</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>8-bit floating point for training efficiency</td>
-    </tr>
-    <tr>
-        <td><strong>INT8 Inference</strong></td>
-        <td>Various</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Post-training quantization for inference</td>
-    </tr>
-    <tr>
-        <td><strong>GPTQ</strong></td>
-        <td>Frantar et al.</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>One-shot weight quantization</td>
-    </tr>
-    <tr>
-        <td><strong>AWQ</strong></td>
-        <td>MIT</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Activation-aware weight quantization</td>
-    </tr>
-</table>
+<p>
+    The IR visualizer's X-Ray tab is where a human watching an agent bring up a model sees, in seconds,
+    which backend diverges, at which op, under which kernel contract, and whether it flips output
+    tokens:
+</p>
 
-<h2>Training Techniques</h2>
+<ul>
+    <li><strong>Backend status board</strong> — one card per loaded report: backend chip, three-state verdict, first non-exact and first material divergence stops, thresholds, provenance, source path.</li>
+    <li><strong>Run context bar</strong> — backend, phase badge (PREFILL / DECODE / TEACHER_FORCED), seed, threads, backend version; a phase toggle appears when two or more phases are present.</li>
+    <li><strong>Drift chart</strong> — the marker language above, with clickable checkpoints and an export-SVG button for docs-ready figures.</li>
+    <li><strong>Circuit X-Ray</strong> — one row per call-IR op in execution order, joined with checkpoints at the same stop: provider chip (click jumps to Kernel Flow), required-vs-resolved contract chip (amber = substituted), log-severity heat cells for max_abs, RMSE, exact_ratio, phase.</li>
+    <li><strong>Ranking strips</strong> — per-position top-1 agreement grouped by check kind.</li>
+    <li><strong>Execution trace and state stages</strong> — ordered divergence stages with the first broken stage and what it poisoned downstream.</li>
+    <li><strong>Operator runbook</strong> — pre-filled reproduction commands for the report's run directory.</li>
+    <li><strong>Live mode</strong> — X-Ray filenames are registered in live polling, so the tab hot-reloads while agents emit new reports.</li>
+</ul>
 
-<table>
-    <tr>
-        <th>Technique</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Notes</th>
-    </tr>
-    <tr>
-        <td><strong>AdamW</strong></td>
-        <td>Standard</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Decoupled weight decay, next after SGD</td>
-    </tr>
-    <tr>
-        <td><strong>Gradient Checkpointing</strong></td>
-        <td>Various</td>
-        <td><span class="badge badge-amber">Planned</span></td>
-        <td>Trade compute for memory during backprop</td>
-    </tr>
-    <tr>
-        <td><strong>μP (Maximal Update)</strong></td>
-        <td>Microsoft</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Hyperparameter transfer across model sizes</td>
-    </tr>
-    <tr>
-        <td><strong>Multi-Token Prediction</strong></td>
-        <td>Meta (2024)</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>Predict N tokens at once, better representations</td>
-    </tr>
-    <tr>
-        <td><strong>Auxiliary-Loss-Free Load Balancing</strong></td>
-        <td>DeepSeek-V3</td>
-        <td><span class="badge badge-indigo">Researching</span></td>
-        <td>MoE balancing without aux loss</td>
-    </tr>
-</table>
+<p>
+    Known gaps are disclosed rather than smoothed over: the ranking-to-drift overlay is intentionally
+    not rendered (token positions do not map cleanly onto op stops); the phase toggle has not been
+    visually verified against real multi-phase data; rendered evidence so far comes from checked-in
+    fixtures; failure-narrative sequencing and bug-bundle export are designed but not built.
+</p>
 
-<hr>
+<h2>Gates and Commands</h2>
 
-<h2>Paper Deep Dives</h2>
+<pre><code># lightweight gate: schema, resolver, canonicalization, classification, bisection, manifest tests
+make test-bf16-xray
 
-<p>Detailed notes on key papers for implementation reference.</p>
+# validator self-test: injected faults must produce the predetermined first diagnosis
+make test-xray-validator-selftest
 
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">DeepSeek-V3 (Dec 2024)</h3>
-    <p><strong>Key innovations:</strong></p>
-    <ul>
-        <li><strong>MLA (Multi-Head Latent Attention)</strong> - Compresses KV cache via low-rank projection</li>
-        <li><strong>DeepSeekMoE</strong> - Fine-grained experts with shared experts</li>
-        <li><strong>FP8 Training</strong> - Mixed precision with FP8 for efficiency</li>
-        <li><strong>Auxiliary-Loss-Free Balancing</strong> - Expert load balancing without extra loss terms</li>
-        <li><strong>Multi-Token Prediction</strong> - Speculative decoding friendly</li>
-    </ul>
-    <p><strong>Relevance:</strong> MLA could significantly reduce memory for long context. MoE is key for scaling.</p>
+# real diagnosis, one pinned oracle per invocation
+make xray-vision-parity BACKEND=llamacpp GGUF=&lt;mmproj.gguf&gt; XRAY_OUTPUT_DIR=build/xray/qwen3vl_llamacpp
+make xray-vision-parity BACKEND=pytorch CHECKPOINT=&lt;hf_ckpt&gt; RUNTIME_DIR=&lt;dir&gt; \
+  WEIGHTS_BUMP=&lt;weights.bump&gt; CALL_IR=&lt;call.json&gt; XRAY_OUTPUT_DIR=build/xray/qwen3vl_bf16</code></pre>
+
+<p>
+    The lightweight gate downloads no model weights and is included in <code>make test-bf16</code> and
+    the BF16 nightly category; the injected-fault validator runs nightly as a dedicated test-report row.
+    End-to-end: run the same model through N backend-pinned scripts, place the N schema-validated JSONs
+    in the run directory, regenerate or live-serve the visualizer — the board groups cards by backend
+    automatically.
+</p>
+
+<h2>X-Ray in the Wider Architecture</h2>
+
+<p>
+    X-Ray is the evidence layer other CKE subsystems report into:
+</p>
+
+<ul>
+    <li><a href="kernel-maps.html">Kernel Maps</a> — provider selection is recorded by ID: the selected provider plus every rejection reason, proving compatibility filtering precedes priority ranking. Unknown or legacy identity stays null and disclosed, never inferred from filenames.</li>
+    <li><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> — the additive fix progression, the execution-contract X-Ray (segmentation, cache and position transitions, runtime hashes), the measured BF16 vision progression, and forward-sensitivity probing.</li>
+    <li><a href="memory-tetris.html">Memory Tetris</a> — the proposed storage-tier X-Ray fields (request/first-byte/completion/first-use timestamps, prefetch lead, exposed wait, residency, eviction reason, checksum and provenance status) extend the same evidence discipline to tensor transfers; proposed, not implemented.</li>
+    <li><a href="cke-throughput-unit.html">CKU</a> — one public CKU with X-Ray explaining the execution composition behind it.</li>
+    <li><a href="test-report.html">Test Report</a> — scoped scorecards and the nightly injected-fault validator row.</li>
+    <li><a href="divergence-harness.html">Divergence Harness</a> — the layer-by-layer comparison workflow X-Ray evidence feeds.</li>
+</ul>
+
+<div class="contract-note">
+    <strong>Standing rule:</strong> X-Ray never relaxes a tolerance, never substitutes a provider, and
+    never fabricates identity. It narrows a failure to one semantic edge and names its owner — the fix
+    is then made where the contract lives, and the rerun must move the first divergence to a later edge.
 </div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Gemma 2 (Jun 2024)</h3>
-    <p><strong>Key innovations:</strong></p>
-    <ul>
-        <li><strong>Sliding Window + Global Attention</strong> - Alternating layers</li>
-        <li><strong>QK-Norm</strong> - RMSNorm on Q/K for stability</li>
-        <li><strong>Logit Soft-Capping</strong> - Prevents extreme attention scores</li>
-        <li><strong>Knowledge Distillation</strong> - Smaller models trained from larger</li>
-    </ul>
-    <p><strong>Relevance:</strong> Sliding window is practical for CPU (local memory access). QK-Norm is simple to add.</p>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Qwen2 (Jun 2024)</h3>
-    <p><strong>Key innovations:</strong></p>
-    <ul>
-        <li><strong>GQA</strong> - Standard grouped query attention</li>
-        <li><strong>SwiGLU</strong> - Standard gated activation</li>
-        <li><strong>RoPE with YaRN</strong> - Extended context via interpolation</li>
-        <li><strong>Dual Chunk Attention</strong> - For very long context variants</li>
-    </ul>
-    <p><strong>Relevance:</strong> Mostly implemented. YaRN scaling would extend context capability.</p>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">MiniMax-01 (Jan 2025)</h3>
-    <p><strong>Key innovations:</strong></p>
-    <ul>
-        <li><strong>Lightning Attention</strong> - Linear attention variant</li>
-        <li><strong>Mixture of Experts</strong> - Sparse activation</li>
-        <li><strong>1M+ context</strong> - Very long context support</li>
-    </ul>
-    <p><strong>Relevance:</strong> Linear attention could be interesting for CPU (no N² memory). Needs investigation.</p>
-</div>
-
-<hr>
-
-<h2>Implementation Priority</h2>
-
-<p>Based on impact and feasibility for C-Kernel-Engine:</p>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">High Priority (Next Up)</h3>
-    <ol>
-        <li><strong>AdamW optimizer</strong> - Required for real training</li>
-        <li><strong>Sliding Window Attention</strong> - Memory efficiency for long context</li>
-        <li><strong>QK-Norm</strong> - Simple addition, helps stability</li>
-        <li><strong>ALiBi</strong> - Alternative to RoPE, easy length extrapolation</li>
-    </ol>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Medium Priority</h3>
-    <ul>
-        <li>YaRN (RoPE scaling)</li>
-        <li>Gradient checkpointing</li>
-        <li>Basic MoE routing</li>
-        <li>INT8 inference kernels</li>
-    </ul>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Research/Long-term</h3>
-    <ul>
-        <li>MLA (requires deeper architectural changes)</li>
-        <li>FP8 training (CPU support unclear)</li>
-        <li>Linear attention variants</li>
-        <li>Multi-token prediction</li>
-    </ul>
-</div>
-
-<h2>Adding New Papers</h2>
-
-<p>When reviewing a new paper, add an entry with:</p>
-<ol>
-    <li>Technique name and source</li>
-    <li>Status: <code>Researching</code> → <code>Planned</code> → <code>Implemented</code></li>
-    <li>Implementation notes: what kernels affected, complexity estimate</li>
-    <li>Relevance to CPU training (some techniques are GPU-specific)</li>
-</ol>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

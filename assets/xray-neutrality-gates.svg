@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
+  <title>X-Ray capture neutrality acceptance sequence: two uncaptured controls must be bit-exact before capture is attempted, the captured replay must be bit-exact against the control, with an isolated-boundary fallback and fail-closed rejection</title>
+  <desc>A left-to-right flow. Control A, an uncaptured execution, and Control B, an uncaptured forced replay of the same tokens, enter the repeatability gate. If the two controls are not bit-identical, attribution is rejected as uncaptured runtime is not repeatable, with an optional one-thread SIMD diagnostic. If they pass, an aggregate capture replays the same tokens with all checkpoints enabled and faces the neutrality gate: captured logits must be bit-identical to Control B. Failure routes to the isolated-boundary fallback, one replay per boundary, each independently compared. Accepted artifacts are returned; rejected artifacts stay labelled rejected and produce a nonzero CLI result even when CKE and the oracle otherwise agree. A footer explains why the same-runtime comparison is bit-exact while cross-engine comparison uses numerical metrics.</desc>
+
+  <rect width="960" height="620" fill="#232323"/>
+
+  <text x="480" y="42" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">Capture Neutrality: Evidence Must Not Change the Answer</text>
+  <text x="480" y="66" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0" text-anchor="middle">checkpoint export is extra work inside the observed process — a captured tensor is evidence only if the captured run reproduces the uncaptured run</text>
+
+  <!-- main flow boxes -->
+  <!-- Control A -->
+  <rect x="30" y="120" width="150" height="86" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="105" y="146" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">Control A</text>
+  <text x="105" y="164" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">uncaptured execution</text>
+  <text x="105" y="178" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">reference tokens + logits</text>
+
+  <!-- Control B -->
+  <rect x="30" y="236" width="150" height="86" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="105" y="262" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">Control B</text>
+  <text x="105" y="280" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">uncaptured forced replay</text>
+  <text x="105" y="294" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">identical causal prefix</text>
+
+  <!-- arrows to gate 1 -->
+  <line x1="180" y1="163" x2="238" y2="196" stroke="#4a4a4a" stroke-width="2"/>
+  <line x1="180" y1="279" x2="238" y2="246" stroke="#4a4a4a" stroke-width="2"/>
+
+  <!-- Gate 1: repeatability -->
+  <polygon points="300,176 368,221 300,266 232,221" fill="#2a2416" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="300" y="214" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ffb400" text-anchor="middle">Repeatability</text>
+  <text x="300" y="228" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ffb400" text-anchor="middle">gate</text>
+  <text x="300" y="244" font-family="Inter, sans-serif" font-size="9" fill="#d8c89a" text-anchor="middle">bit-exact?</text>
+
+  <!-- reject 1 -->
+  <line x1="300" y1="266" x2="300" y2="330" stroke="#e05d5d" stroke-width="2"/>
+  <polygon points="295,330 305,330 300,340" fill="#e05d5d"/>
+  <rect x="212" y="344" width="176" height="100" rx="8" fill="#2e1a1a" stroke="#e05d5d" stroke-width="1.5"/>
+  <text x="300" y="368" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#f0a0a0" text-anchor="middle">REJECT before capture</text>
+  <text x="300" y="386" font-family="Inter, sans-serif" font-size="9" fill="#d8a8a8" text-anchor="middle">uncaptured_runtime_is_not_</text>
+  <text x="300" y="398" font-family="Inter, sans-serif" font-size="9" fill="#d8a8a8" text-anchor="middle">repeatable</text>
+  <text x="300" y="416" font-family="Inter, sans-serif" font-size="9" fill="#a06868" text-anchor="middle">optional one-thread SIMD</text>
+  <text x="300" y="428" font-family="Inter, sans-serif" font-size="9" fill="#a06868" text-anchor="middle">diagnostic (opt-in)</text>
+
+  <!-- pass arrow to capture -->
+  <line x1="368" y1="221" x2="428" y2="221" stroke="#47b475" stroke-width="2"/>
+  <polygon points="428,216 428,226 438,221" fill="#47b475"/>
+  <text x="398" y="212" font-family="Inter, sans-serif" font-size="9" fill="#86efac" text-anchor="middle">identical</text>
+
+  <!-- aggregate capture -->
+  <rect x="442" y="176" width="160" height="90" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="522" y="202" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">Aggregate capture</text>
+  <text x="522" y="220" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">same forced tokens +</text>
+  <text x="522" y="234" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">all requested checkpoints</text>
+  <text x="522" y="248" font-family="Inter, sans-serif" font-size="9.5" fill="#a8c8d8" text-anchor="middle">enabled</text>
+
+  <!-- arrow to gate 2 -->
+  <line x1="602" y1="221" x2="650" y2="221" stroke="#4a4a4a" stroke-width="2"/>
+
+  <!-- Gate 2: neutrality -->
+  <polygon points="712,176 780,221 712,266 644,221" fill="#2a2416" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="712" y="214" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ffb400" text-anchor="middle">Neutrality</text>
+  <text x="712" y="228" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ffb400" text-anchor="middle">gate</text>
+  <text x="712" y="244" font-family="Inter, sans-serif" font-size="9" fill="#d8c89a" text-anchor="middle">vs Control B</text>
+
+  <!-- accept -->
+  <line x1="780" y1="221" x2="830" y2="221" stroke="#47b475" stroke-width="2"/>
+  <polygon points="830,216 830,226 840,221" fill="#47b475"/>
+  <text x="806" y="212" font-family="Inter, sans-serif" font-size="9" fill="#86efac" text-anchor="middle">identical</text>
+  <rect x="844" y="176" width="100" height="90" rx="8" fill="#16281e" stroke="#47b475" stroke-width="1.5"/>
+  <text x="894" y="214" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">ACCEPT</text>
+  <text x="894" y="230" font-family="Inter, sans-serif" font-size="9" fill="#a8d8b8" text-anchor="middle">aggregate mode</text>
+
+  <!-- fail to fallback -->
+  <line x1="712" y1="266" x2="712" y2="330" stroke="#e05d5d" stroke-width="2"/>
+  <polygon points="707,330 717,330 712,340" fill="#e05d5d"/>
+  <text x="726" y="312" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">differs</text>
+
+  <!-- fallback -->
+  <rect x="622" y="344" width="180" height="100" rx="8" fill="#2a2416" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="712" y="368" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ffb400" text-anchor="middle">Isolated-boundary fallback</text>
+  <text x="712" y="386" font-family="Inter, sans-serif" font-size="9.5" fill="#d8c89a" text-anchor="middle">one replay per boundary,</text>
+  <text x="712" y="400" font-family="Inter, sans-serif" font-size="9.5" fill="#d8c89a" text-anchor="middle">each compared to Control B</text>
+  <text x="712" y="418" font-family="Inter, sans-serif" font-size="9" fill="#8a7a4a" text-anchor="middle">unavailable for coupled KV /</text>
+  <text x="712" y="430" font-family="Inter, sans-serif" font-size="9" fill="#8a7a4a" text-anchor="middle">binary-parity captures</text>
+
+  <!-- fallback accept -->
+  <line x1="802" y1="394" x2="872" y2="394" stroke="#47b475" stroke-width="2"/>
+  <polygon points="872,389 872,399 882,394" fill="#47b475"/>
+  <rect x="886" y="352" width="64" height="84" rx="8" fill="#16281e" stroke="#47b475" stroke-width="1.5"/>
+  <text x="918" y="386" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#86efac" text-anchor="middle">ACCEPT</text>
+  <text x="918" y="402" font-family="Inter, sans-serif" font-size="8.5" fill="#a8d8b8" text-anchor="middle">isolated</text>
+  <text x="918" y="414" font-family="Inter, sans-serif" font-size="8.5" fill="#a8d8b8" text-anchor="middle">mode</text>
+
+  <!-- fallback fail -->
+  <line x1="622" y1="394" x2="470" y2="394" stroke="#e05d5d" stroke-width="2" stroke-dasharray="6 4"/>
+  <polygon points="470,389 470,399 460,394" fill="#e05d5d"/>
+  <rect x="430" y="470" width="220" height="96" rx="8" fill="#2e1a1a" stroke="#e05d5d" stroke-width="1.5"/>
+  <text x="540" y="494" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#f0a0a0" text-anchor="middle">FAIL CLOSED</text>
+  <text x="540" y="512" font-family="Inter, sans-serif" font-size="9.5" fill="#d8a8a8" text-anchor="middle">rejected artifacts stay labelled, never</text>
+  <text x="540" y="526" font-family="Inter, sans-serif" font-size="9.5" fill="#d8a8a8" text-anchor="middle">enter the accepted list; nonzero CLI</text>
+  <text x="540" y="540" font-family="Inter, sans-serif" font-size="9.5" fill="#d8a8a8" text-anchor="middle">even when CKE and the oracle agree</text>
+  <line x1="712" y1="444" x2="712" y2="470" stroke="#e05d5d" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="712" y1="470" x2="650" y2="470" stroke="#e05d5d" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <polygon points="650,465 650,475 640,470" fill="#e05d5d"/>
+  <text x="682" y="462" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0">any boundary fails</text>
+
+  <!-- why bit-exact footer -->
+  <rect x="30" y="470" width="360" height="96" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="210" y="492" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#e0e0e0" text-anchor="middle">Why bit-exact here?</text>
+  <text x="210" y="510" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">Same runtime + same provider map + same threads +</text>
+  <text x="210" y="524" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">same forced history ⇒ instrumentation must not change</text>
+  <text x="210" y="538" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">any output bit. A tolerance could hide exactly the</text>
+  <text x="210" y="552" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">perturbation a deep model later amplifies.</text>
+
+  <!-- cross-engine note -->
+  <rect x="680" y="470" width="270" height="96" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="815" y="492" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#e0e0e0" text-anchor="middle">Cross-engine is different</text>
+  <text x="815" y="510" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">CKE vs llama.cpp / PyTorch may legitimately</text>
+  <text x="815" y="524" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">differ in reduction order ⇒ compared with</text>
+  <text x="815" y="538" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">numerical metrics and token decisions,</text>
+  <text x="815" y="552" font-family="Inter, sans-serif" font-size="9.5" fill="#b0b0b0" text-anchor="middle">never a bit-exact demand.</text>
+</svg>

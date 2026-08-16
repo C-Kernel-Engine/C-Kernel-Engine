@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560">
+  <title>X-Ray evidence pipeline: three already-loaded sources joined by capture and schema validation into a comparator that checks metadata before numerics, then classifies failures with an explicit fix owner</title>
+  <desc>Three source boxes on the left — call IR carrying each operation with its resolved provider and numerical contract, the kernel registry, and oracle backends PyTorch and llama.cpp — feed a capture and schema-validation stage producing per-checkpoint tensor dumps with sha256 provenance. The comparator validates metadata contracts first and only computes numerical metrics when metadata agrees. Classification assigns one failure class, one fix owner and one recommended action. Surfaces on the right: the IR visualizer X-Ray tab, the test report, and nightly injected-fault gates. The design principle join, do not instrument, is stated in the footer.</desc>
+
+  <rect width="960" height="560" fill="#232323"/>
+
+  <text x="480" y="42" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">X-Ray: Join, Don't Instrument</text>
+  <text x="480" y="66" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0" text-anchor="middle">the call IR, the kernel registry and oracle runs already exist — X-Ray connects them into schema-validated evidence</text>
+
+  <!-- sources column -->
+  <text x="130" y="104" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#7dd3fc" text-anchor="middle" letter-spacing="2">SOURCES</text>
+
+  <rect x="30" y="118" width="200" height="92" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="130" y="142" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">Call IR</text>
+  <text x="130" y="160" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">every op with resolved provider,</text>
+  <text x="130" y="174" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">numerical contract, phase, layer,</text>
+  <text x="130" y="188" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">layout, named axes</text>
+
+  <rect x="30" y="226" width="200" height="72" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="130" y="250" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">Kernel Registry</text>
+  <text x="130" y="268" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">provider IDs, contracts, ISA,</text>
+  <text x="130" y="282" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">required vs resolved capability</text>
+
+  <rect x="30" y="314" width="200" height="72" rx="8" fill="#1b2a33" stroke="#07adf8" stroke-width="1.5"/>
+  <text x="130" y="338" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">Oracle Backends</text>
+  <text x="130" y="356" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">PyTorch · llama.cpp</text>
+  <text x="130" y="370" font-family="Inter, sans-serif" font-size="10" fill="#a8c8d8" text-anchor="middle">one pinned backend per script</text>
+
+  <!-- arrows sources -> capture -->
+  <line x1="230" y1="164" x2="288" y2="220" stroke="#4a4a4a" stroke-width="2"/>
+  <line x1="230" y1="262" x2="288" y2="252" stroke="#4a4a4a" stroke-width="2"/>
+  <line x1="230" y1="350" x2="288" y2="290" stroke="#4a4a4a" stroke-width="2"/>
+
+  <!-- capture stage -->
+  <rect x="292" y="180" width="176" height="150" rx="8" fill="#2a2416" stroke="#ffb400" stroke-width="1.5"/>
+  <text x="380" y="206" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffb400" text-anchor="middle">Capture +</text>
+  <text x="380" y="222" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffb400" text-anchor="middle">Schema Validation</text>
+  <text x="380" y="246" font-family="Inter, sans-serif" font-size="10" fill="#d8c89a" text-anchor="middle">per-checkpoint tensors,</text>
+  <text x="380" y="260" font-family="Inter, sans-serif" font-size="10" fill="#d8c89a" text-anchor="middle">dtype · shape · sha256,</text>
+  <text x="380" y="274" font-family="Inter, sans-serif" font-size="10" fill="#d8c89a" text-anchor="middle">cache layout + strides,</text>
+  <text x="380" y="288" font-family="Inter, sans-serif" font-size="10" fill="#d8c89a" text-anchor="middle">neutrality-gated</text>
+  <text x="380" y="314" font-family="Inter, sans-serif" font-size="9.5" fill="#8a7a4a" text-anchor="middle">cke.xray.* schemas, fail closed</text>
+
+  <!-- arrow capture -> comparator -->
+  <line x1="468" y1="255" x2="508" y2="255" stroke="#4a4a4a" stroke-width="2"/>
+  <polygon points="508,250 508,260 518,255" fill="#4a4a4a"/>
+
+  <!-- comparator -->
+  <rect x="522" y="168" width="190" height="174" rx="8" fill="#16281e" stroke="#47b475" stroke-width="1.5"/>
+  <text x="617" y="194" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">Comparator</text>
+  <text x="617" y="216" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">1 · metadata contracts first</text>
+  <text x="617" y="232" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">storage · layout · reduction ·</text>
+  <text x="617" y="246" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">position · execution policy</text>
+  <text x="617" y="270" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">2 · numerics only after agree:</text>
+  <text x="617" y="286" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">max_abs · RMSE · exact_ratio ·</text>
+  <text x="617" y="300" font-family="Inter, sans-serif" font-size="10" fill="#a8d8b8" text-anchor="middle">top-1 ranking</text>
+  <text x="617" y="326" font-family="Inter, sans-serif" font-size="9.5" fill="#5a9e78" text-anchor="middle">metadata faults never reach metrics</text>
+
+  <!-- arrow comparator -> classification -->
+  <line x1="712" y1="255" x2="752" y2="255" stroke="#4a4a4a" stroke-width="2"/>
+  <polygon points="752,250 752,260 762,255" fill="#4a4a4a"/>
+
+  <!-- classification -->
+  <rect x="766" y="168" width="164" height="174" rx="8" fill="#2e1a1a" stroke="#e05d5d" stroke-width="1.5"/>
+  <text x="848" y="194" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#f0a0a0" text-anchor="middle">Classification</text>
+  <text x="848" y="216" font-family="Inter, sans-serif" font-size="10" fill="#d8a8a8" text-anchor="middle">first divergent semantic edge</text>
+  <text x="848" y="238" font-family="Inter, sans-serif" font-size="10" fill="#d8a8a8" text-anchor="middle">one failure class</text>
+  <text x="848" y="256" font-family="Inter, sans-serif" font-size="10" fill="#d8a8a8" text-anchor="middle">one fix owner</text>
+  <text x="848" y="274" font-family="Inter, sans-serif" font-size="10" fill="#d8a8a8" text-anchor="middle">one recommended action</text>
+  <text x="848" y="298" font-family="Inter, sans-serif" font-size="9.5" fill="#a06868" text-anchor="middle">embedded in the report —</text>
+  <text x="848" y="312" font-family="Inter, sans-serif" font-size="9.5" fill="#a06868" text-anchor="middle">not only in documentation</text>
+
+  <!-- surfaces row -->
+  <text x="480" y="392" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#7dd3fc" text-anchor="middle" letter-spacing="2">SURFACES</text>
+
+  <line x1="380" y1="330" x2="200" y2="404" stroke="#4a4a4a" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <line x1="617" y1="342" x2="480" y2="404" stroke="#4a4a4a" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <line x1="848" y1="342" x2="770" y2="404" stroke="#4a4a4a" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+  <rect x="90" y="408" width="230" height="88" rx="8" fill="#2a2a2a" stroke="#555" stroke-width="1"/>
+  <text x="205" y="432" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#e0e0e0" text-anchor="middle">IR Visualizer X-Ray Tab</text>
+  <text x="205" y="450" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">backend board · drift chart ·</text>
+  <text x="205" y="464" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">circuit rows · ranking strips ·</text>
+  <text x="205" y="478" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">runbook · live reload</text>
+
+  <rect x="365" y="408" width="230" height="88" rx="8" fill="#2a2a2a" stroke="#555" stroke-width="1"/>
+  <text x="480" y="432" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#e0e0e0" text-anchor="middle">Test Report</text>
+  <text x="480" y="450" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">scoped scorecards: edges, dtype,</text>
+  <text x="480" y="464" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">backend version, fixture, threads —</text>
+  <text x="480" y="478" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">never a bare "100%"</text>
+
+  <rect x="640" y="408" width="230" height="88" rx="8" fill="#2a2a2a" stroke="#555" stroke-width="1"/>
+  <text x="755" y="432" font-family="Inter, sans-serif" font-size="12" font-weight="700" fill="#e0e0e0" text-anchor="middle">Nightly Gates</text>
+  <text x="755" y="450" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">injected-fault validator: the</text>
+  <text x="755" y="464" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">diagnostic itself is tested against</text>
+  <text x="755" y="478" font-family="Inter, sans-serif" font-size="10" fill="#a0a0a0" text-anchor="middle">predetermined first boundaries</text>
+
+  <!-- footer -->
+  <rect x="110" y="514" width="740" height="34" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="480" y="535" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0" text-anchor="middle">X-Ray is an attribution tool, not permission to hardcode the observed answer — the DSL/codegen stays a deterministic consumer.</text>
+</svg>

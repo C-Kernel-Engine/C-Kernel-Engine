@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+  <title>Anatomy of the X-Ray drift chart: log-scale max absolute error per checkpoint stop, byte-exact prefix, threshold line, first non-exact pin, three-times jump marker, monotonicity break marker, and first material divergence pin</title>
+  <desc>A schematic drift chart, explicitly labelled as illustrative. The horizontal axis is the checkpoint stop index in execution order and the vertical axis is log-scale error. Alternating vertical bands mark layer facets. A green shaded prefix marks the byte-exact region. The error curve stays at zero through the prefix, then an amber pin marks the first non-exact checkpoint, a purple triangle marks a per-edge error jump greater than three times, a dashed amber threshold line is crossed, a magenta diamond marks a monotonicity break, and a red pin marks the first material divergence where a top-1 logit flips. Callouts explain each marker. Clicking a point in the real visualizer opens checkpoint detail: op, function, buffer, shape, sha256s, required versus resolved contract.</desc>
+
+  <rect width="960" height="600" fill="#232323"/>
+
+  <text x="480" y="40" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">Anatomy of the Drift Chart</text>
+  <text x="480" y="63" font-family="Inter, sans-serif" font-size="12" fill="#b0b0b0" text-anchor="middle">SCHEMATIC — illustrates marker semantics; not real run data</text>
+
+  <!-- plot area: x 90..900, y 100..470 -->
+  <!-- layer facet bands -->
+  <rect x="90" y="100" width="135" height="370" fill="#262626"/>
+  <rect x="225" y="100" width="135" height="370" fill="#2b2b2b"/>
+  <rect x="360" y="100" width="135" height="370" fill="#262626"/>
+  <rect x="495" y="100" width="135" height="370" fill="#2b2b2b"/>
+  <rect x="630" y="100" width="135" height="370" fill="#262626"/>
+  <rect x="765" y="100" width="135" height="370" fill="#2b2b2b"/>
+  <text x="157" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 0</text>
+  <text x="292" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 1</text>
+  <text x="427" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 2</text>
+  <text x="562" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 3</text>
+  <text x="697" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 4</text>
+  <text x="832" y="116" font-family="Inter, sans-serif" font-size="9" fill="#666" text-anchor="middle">layer 5</text>
+
+  <!-- byte-exact prefix shading -->
+  <rect x="90" y="100" width="240" height="370" fill="#47b475" opacity="0.10"/>
+  <text x="210" y="456" font-family="Inter, sans-serif" font-size="10" fill="#86efac" text-anchor="middle">byte-exact prefix</text>
+
+  <!-- axes -->
+  <line x1="90" y1="470" x2="900" y2="470" stroke="#555" stroke-width="1.5"/>
+  <line x1="90" y1="100" x2="90" y2="470" stroke="#555" stroke-width="1.5"/>
+  <text x="495" y="492" font-family="Inter, sans-serif" font-size="11" fill="#999" text-anchor="middle">checkpoint stop index (execution order)</text>
+  <text x="34" y="285" font-family="Inter, sans-serif" font-size="11" fill="#999" text-anchor="middle" transform="rotate(-90 34 285)">max_abs / RMSE (log scale)</text>
+
+  <!-- log ticks -->
+  <text x="82" y="462" font-family="Inter, sans-serif" font-size="9" fill="#777" text-anchor="end">0</text>
+  <text x="82" y="382" font-family="Inter, sans-serif" font-size="9" fill="#777" text-anchor="end">1e-6</text>
+  <text x="82" y="302" font-family="Inter, sans-serif" font-size="9" fill="#777" text-anchor="end">1e-4</text>
+  <text x="82" y="222" font-family="Inter, sans-serif" font-size="9" fill="#777" text-anchor="end">1e-2</text>
+  <text x="82" y="142" font-family="Inter, sans-serif" font-size="9" fill="#777" text-anchor="end">1e0</text>
+
+  <!-- threshold line -->
+  <line x1="90" y1="250" x2="900" y2="250" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="8 5"/>
+  <text x="896" y="242" font-family="Inter, sans-serif" font-size="9.5" fill="#ffb400" text-anchor="end">gate threshold</text>
+
+  <!-- drift curve: zero prefix then rising -->
+  <path d="M 90 462 L 330 462 C 370 460, 390 445, 415 420 C 445 388, 470 330, 500 300 C 530 272, 555 268, 585 258 C 620 246, 650 236, 690 220 C 730 202, 760 190, 800 176 C 830 166, 860 158, 895 150"
+        fill="none" stroke="#07adf8" stroke-width="2.5"/>
+
+  <!-- markers -->
+  <!-- amber pin: first non-exact -->
+  <circle cx="330" cy="462" r="6" fill="#ffb400"/>
+  <line x1="330" y1="456" x2="330" y2="392" stroke="#ffb400" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="330" y="382" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#ffb400" text-anchor="middle">first non-exact</text>
+
+  <!-- purple triangle: >3x jump -->
+  <polygon points="500,288 492,304 508,304" fill="#c084fc"/>
+  <text x="468" y="270" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#c084fc" text-anchor="middle">&#9650; per-edge jump &gt; 3&#215;</text>
+
+  <!-- magenta diamond: monotonicity break -->
+  <polygon points="690,208 702,220 690,232 678,220" fill="#f472b6"/>
+  <text x="688" y="184" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#f472b6" text-anchor="middle">&#9670; monotonicity break</text>
+
+  <!-- red pin: first material divergence -->
+  <circle cx="800" cy="176" r="7" fill="#e05d5d"/>
+  <line x1="800" y1="169" x2="800" y2="146" stroke="#e05d5d" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="786" y="138" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#e05d5d" text-anchor="end">first material divergence (top-1 flip)</text>
+
+  <!-- callout cards -->
+  <rect x="110" y="508" width="240" height="72" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="230" y="528" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#e0e0e0" text-anchor="middle">Every point is clickable</text>
+  <text x="230" y="544" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">op · function · buffer · shape · sha256 ·</text>
+  <text x="230" y="557" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">required vs resolved contract</text>
+
+  <rect x="380" y="508" width="240" height="72" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="500" y="528" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#e0e0e0" text-anchor="middle">Three verdict states</text>
+  <text x="500" y="544" font-family="Inter, sans-serif" font-size="9" fill="#86efac" text-anchor="middle">pass · within gate — <tspan fill="#ffb400">cosmetic drift —</tspan></text>
+  <text x="500" y="557" font-family="Inter, sans-serif" font-size="9" fill="#f0a0a0" text-anchor="middle">behavioral divergence (top-1 flip)</text>
+
+  <rect x="650" y="508" width="240" height="72" rx="6" fill="#2a2a2a" stroke="#3a3a3a"/>
+  <text x="770" y="528" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#e0e0e0" text-anchor="middle">Coverage is explicit</text>
+  <text x="770" y="544" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">ops without a checkpoint render gray;</text>
+  <text x="770" y="557" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">header states "N/M ops have X-ray edges"</text>
+</svg>
