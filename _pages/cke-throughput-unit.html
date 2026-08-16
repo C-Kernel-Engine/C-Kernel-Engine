@@ -1,6 +1,13 @@
 <!-- TITLE: CKE Throughput Unit -->
 <!-- NAV: cku -->
 
+<style>
+@media (max-width: 640px) {
+    main pre { overflow-x: auto; }
+    main mjx-container[display="true"] { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+}
+</style>
+
 <h1>CKE Throughput Unit</h1>
 
 <div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
@@ -304,6 +311,96 @@ nodes_needed =
     also reach enormous aggregate bandwidth, but a 1 TB resident model may need
     many expensive HBM devices just for capacity before it even starts serving
     traffic.
+</p>
+
+<h3>Refinement: Not All Bytes Cross All Roofs</h3>
+
+<p>
+    The single <code>min(memory, compute, network)</code> roof is the right first
+    approximation, but the <a href="distributed-cpu.html">zip schedule</a> shows
+    where it over-pessimizes: byte classes have different paths. A node may
+    process 18 MB of local weight bytes in a region while synchronizing only
+    16 KB at its boundary &mdash; <code>B_local ≠ B_network</code>. Applying the
+    network roof to all active bytes understates the node. The
+    <a href="constraint-model.html">CKE Constraint Model</a> therefore treats CKU
+    as a per-path vector and makes the token time a critical-path quantity:
+</p>
+
+<pre><code>cku_path = { cku_compute, cku_memory, cku_network, cku_storage }
+
+T_token = T_critical_path
+        = Σ_r [ max(T_compute,r, T_fresh_memory,r, T_exposed_storage,r)
+                + T_unhidden_sync,r ]
+
+cku = useful_active_path_bytes / T_token</code></pre>
+
+<p>
+    Read this way, CKU is the <strong>observable result of the scheduler</strong>:
+    the measurement the control loop tries to raise by moving whichever roof is
+    the active constraint &mdash; not a static property of the silicon.
+</p>
+
+<h2>Two CKUs: Potential and Realized</h2>
+
+<p>
+    Distributed CKE needs the unit to separate what the hardware <em>could</em> do from what the
+    system <em>does</em> do. <strong>Potential CKU</strong> sums independently measured node
+    capability; <strong>realized CKU</strong> is the useful path advanced per wall-clock second end
+    to end:
+</p>
+
+\[ CKU_{\text{potential}} = \sum_i CKU_i^{\text{isolated}}, \qquad CKU_{\text{realized}} = \frac{B_{\text{useful,total}}}{T_{\text{wall}}}, \qquad \eta_{\text{CKE}} = \frac{CKU_{\text{realized}}}{CKU_{\text{potential}}} \]
+
+<p>
+    The efficiency \(\eta_{\text{CKE}}\) is the metric the
+    <a href="distributed-cpu.html">distributed-CPU research</a> exists to raise. An illustrative
+    example (all numbers hypothetical): if one Ryzen advances 1 TB of useful model-path bytes in
+    600 s, it contributes \(1.67 \times 10^{-6}\) CKU; two perfectly scaling Ryzens would give
+    \(3.4 \times 10^{-6}\), but measured \(3.1 \times 10^{-6}\) is \(\eta \approx 91\%\); add a Xeon
+    measured in isolation at \(7 \times 10^{-6}\) and the ideal cluster is \(10.4 \times 10^{-6}\) &mdash;
+    a realized \(9.5 \times 10^{-6}\) is again \(\approx 91\%\). &ldquo;We combined CPUs with
+    different cores, caches, memory channels and ISA capabilities and retained 91% of their
+    independently measured useful throughput&rdquo; is a much sharper claim than any tok/s figure.
+</p>
+
+<div class="img-container svg-viewer" data-title="The CKU convergence diagram: potential versus realized CKU, the efficiency eta between them, and the constraint-map planner loop converging toward the 1 PB/s north star">
+    <img src="assets/cku-convergence.svg" alt="A convergence diagram. At top the north star: 1 CKU equals 1 petabyte per second of useful model-path rate, a convergence target not a per-node expectation. Two boxes below: Potential CKU, the sum of isolated node capabilities, and Realized CKU, useful bytes advanced per wall time end to end. Their ratio eta is the CKE scaling efficiency the research program drives toward one. Below, the constraint map with compute, DRAM, network and storage roofs; the slowest roof is the active constraint. The CKE planner shapes shards, tiles, placement, prefetch, overlap and synchronization against it — balancing completion time across nodes, not bytes — emits generated C, measures, and loops back into the next plan. A footer notes every optimization is a delta in the same unit and that eta has not been measured yet" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h3>CKU is per region and node, not per machine</h3>
+
+<p>
+    A node does not have one universal CKU. The same Ryzen can be DRAM/unpack-limited on a decode
+    region, compute-limited on a prefill region, bandwidth-limited on a KV scan, and far faster on a
+    cache-hot region. The planner profile is therefore a <strong>table of rates</strong> &mdash;
+    \(CKU_i^{\text{decode}}\), \(CKU_i^{\text{prefill}}\), \(CKU_i^{\text{KV}}\),
+    \(CKU_i^{\text{cache-hot}}\), \(CKU_i^{\text{reduction}}\), &hellip; &mdash; and each generated
+    region is priced with the rate that matches its shape. Shard assignment then synchronizes
+    <em>completion time</em>, not bytes: choose \(s_i\) so \(B_i / CKU_i \approx B_j / CKU_j\) for
+    every participating node, and all lanes reach the reduction boundary together &mdash;
+    <strong>CKU synchronization</strong>. If the Xeon contributes four times a Ryzen's CKU for one
+    kernel and a different ratio for another, its share changes per region accordingly.
+</p>
+
+<h3>The Theory of Constraints underneath CKU</h3>
+
+<p>
+    Per region, the roofs give per-resource rates &mdash; say memory \(5 \times 10^{-6}\), arithmetic
+    \(3 \times 10^{-6}\), network \(20 \times 10^{-6}\) (hypothetical). Effective CKU is the minimum,
+    \(3 \times 10^{-6}\), and arithmetic is the constraint: do not buy a faster NIC, do not tune DRAM
+    first &mdash; elevate arithmetic. When arithmetic rises to \(8 \times 10^{-6}\), the minimum moves
+    to memory at \(5 \times 10^{-6}\), and the constraint has moved. That is the loop:
+</p>
+
+\[ \text{identify constraint} \rightarrow \text{elevate constraint} \rightarrow \text{recompute CKU} \rightarrow \text{repeat} \]
+
+<p>
+    and it makes the 1 PB/s north star a <strong>convergence target</strong> rather than a slogan:
+    every optimization &mdash; another node, more channels, a better kernel, more cache reuse, less
+    exposed stall &mdash; is a delta in the same unit, and the research question is whether
+    \(\eta_{\text{CKE}} \rightarrow 1\) as hardware is added. The
+    <a href="constraint-model.html">CKE Constraint Model</a> defines the clocks and the
+    exposed-stall vocabulary this loop runs on.
 </p>
 
 <h2>Memory Placement Is a Scheduling Problem</h2>

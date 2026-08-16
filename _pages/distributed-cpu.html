@@ -406,6 +406,43 @@
     <img src="assets/distributed-cpu-comm-ratio.svg" alt="A timeline with a long bar of millisecond-scale local attention and GEMM work between boundaries and a sliver for the 512-kilobyte boundary payload. One panel shows the idealized arithmetic: 400 gigabits per second is about 50 gigabytes per second, 512 kilobytes divided by 50 gigabytes per second is about 10 microseconds, labeled a division not a measurement. A second panel lists what a real sync adds: RDMA and collective latency, software overhead, PCIe traversal, memory access, barrier and straggler cost. A hypothesis band states that a fused schedule might cut collective time from about 25 percent of wall time to 5 to 10 percent, both figures marked as hypotheses to test" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
+<h3>The synchronization root is also a constraint</h3>
+
+<p>
+    One appealing small-cluster shape is a <strong>star</strong>: Ryzen leaf nodes with direct
+    high-speed links to a PCIe-rich Xeon hub, which hosts the reduction. The appeal is determinism
+    &mdash; CKE knows exactly which link each rank uses, its measured latency and bandwidth, where the
+    reduction happens and how long broadcast takes, with no external switch fabric whose congestion
+    must be modeled. And the hub is asked to combine <em>partial results</em>, not model tensors:
+    leaves keep weights local (\(B_{\text{local weights}} \gg B_{\text{sync}}\)), send their partials,
+    and the hub computes \(z = \sum_i z_i\) and broadcasts \(z\).
+</p>
+
+<p>
+    But the star just <em>moves</em> the constraint &mdash; it never deletes it. The hub's PCIe
+    bandwidth, NIC DMA capability, memory system, reduction compute and per-message processing bound
+    \(T_{\text{star}}(N)\); what is perfectly reasonable at 4 leaves may fail at 32. The planner must
+    therefore treat <strong>topology itself as a variable</strong> &mdash; star, hierarchical tree of
+    hubs, or peer-to-peer reduction &mdash; and say, at a measured node count, &ldquo;the hub is now
+    the active constraint; change topology.&rdquo; This is the
+    <a href="constraint-model.html">constraint model</a> applied to the fabric: every topology has a
+    slowest active boundary, including the one CKE just created on purpose.
+</p>
+
+<h3>Streaming reductions: keep the pipeline moving</h3>
+
+<p>
+    Reductions are associative, so the hub need not wait for every partial before doing anything:
+    reduce-as-arrive (\(z^{(1)} = z_1 + z_2\), then \(z^{(2)} = z^{(1)} + z_3\), &hellip;) overlaps
+    network reception with reduction compute, and sufficiently segmented results can begin broadcast
+    as soon as portions resolve. &ldquo;Receive everything &rarr; reduce everything &rarr; send
+    everything&rdquo; becomes a streaming reduction &mdash; the flowing-pipeline discipline of the
+    <a href="constraint-model.html">constraint model</a> applied to the collective itself. One hard
+    boundary remains: reduction order is part of the
+    <a href="v8-numerical-contracts.html">numerical contract</a>, so any streaming order must be
+    fixed, declared and certified &mdash; never an opportunistic arrival-order sum.
+</p>
+
 <h2>CPU-First Economics: Spend DRAM to Eliminate Communication</h2>
 
 <p>
@@ -484,6 +521,22 @@
     penalties, stragglers, collective algorithms and software overhead; and
     <strong>THEORETICAL</strong> &mdash; the model exists to be validated or falsified by the
     ladder below, not to advertise a number.
+</p>
+
+<p>
+    On heterogeneous nodes the region finishes at the <em>slowest</em> lane's time, not the
+    fastest: lanes measuring 180, 182, 179 and 95 &micro;s produce a &asymp;182 &micro;s region,
+    with the fast node wasting 87 &micro;s at the barrier. Shard assignment is therefore the
+    critical-path minimization:
+</p>
+
+\[ \underset{s_1,\dots,s_N}{\arg\min}\ \left[ \max_i T_i(s_i)\ +\ T_{\text{sync}}(N, B) \right] \quad \text{subject to } \sum_i s_i = 1 \]
+
+<p>
+    Rebalance until the lanes tie &mdash; 180, 181, 179, 180 &mdash; and \(\max_i T_i\) is
+    minimized. This equation is the distributed instance of the
+    <a href="constraint-model.html">CKE Constraint Model</a>, which defines the shared
+    per-resource clocks and the exposed-versus-hidden vocabulary this page uses throughout.
 </p>
 
 <h2>The Topology-versus-Context Thesis</h2>
@@ -606,6 +659,7 @@
 <h2>Related Pages</h2>
 
 <ul>
+    <li><a href="constraint-model.html">The CKE Constraint Model</a> &mdash; the umbrella math: per-resource clocks, exposed-vs-hidden transfers, and the critical-path scheduler this page instantiates</li>
     <li><a href="memory-tetris.html">Memory Tetris</a> &mdash; the residency design that makes tensor placement a scheduling dimension</li>
     <li><a href="support-hardware.html">Support Hardware</a> &mdash; the heterogeneous lab fleet this research targets</li>
     <li><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> &mdash; the zero-tolerance parity rules every distributed schedule must satisfy</li>

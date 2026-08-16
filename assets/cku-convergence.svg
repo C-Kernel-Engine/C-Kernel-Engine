@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720">
+  <title>The CKU convergence diagram: potential CKU summed over isolated nodes, realized CKU measured end to end, efficiency eta as their ratio, and the constraint map feeding the planner loop toward the 1 PB/s north star</title>
+  <desc>A convergence diagram. At the top, the north star: 1 CKU equals 1 petabyte per second of useful model-path rate. Below it, two boxes: Potential CKU, the sum of isolated node capabilities, and Realized CKU, the actual end-to-end rate CKE achieves. Their ratio is eta, the CKE scaling efficiency, which the research program drives toward one. Below, the constraint map with its compute, DRAM, network and storage roofs; the slowest roof is the active constraint. The CKE planner shapes shards, tiles, placement, prefetch, overlap and synchronization against it, emits generated C, measures, and loops back. Every optimization is expressible as a delta of the same unit: more compute, more memory channels, better kernels, more cache reuse, less exposed stall. This is a design diagram; eta has not been measured yet.</desc>
+
+  <defs>
+    <marker id="arrConv" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <marker id="arrConvAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="720" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">CKU: The Convergence Target and the Efficiency That Matters</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Not "how fast is one node" — how close does the cluster come to the sum of its parts</text>
+
+  <!-- north star -->
+  <rect x="330" y="76" width="300" height="52" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="99" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#ffd97a" text-anchor="middle">1 CKU = 1 PB/s useful model-path rate</text>
+  <text x="480" y="118" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a" text-anchor="middle">a convergence target, not a per-node expectation</text>
+
+  <line x1="480" y1="128" x2="480" y2="150" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+
+  <!-- potential vs realized -->
+  <g font-family="Inter, sans-serif">
+    <rect x="100" y="154" width="330" height="76" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="265" y="180" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">POTENTIAL CKU</text>
+    <text x="265" y="200" font-size="11" fill="#b0d9ef" text-anchor="middle">Σ CKU_i isolated — what the installed</text>
+    <text x="265" y="216" font-size="11" fill="#b0d9ef" text-anchor="middle">hardware could contribute independently</text>
+
+    <rect x="530" y="154" width="330" height="76" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="695" y="180" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">REALIZED CKU</text>
+    <text x="695" y="200" font-size="11" fill="#b0d9ef" text-anchor="middle">B_useful,total / T_wall — what CKE</text>
+    <text x="695" y="216" font-size="11" fill="#b0d9ef" text-anchor="middle">actually advances end to end</text>
+  </g>
+
+  <!-- eta -->
+  <line x1="265" y1="230" x2="400" y2="262" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+  <line x1="695" y1="230" x2="560" y2="262" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+  <rect x="340" y="266" width="280" height="56" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="480" y="290" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">η_CKE = realized / potential</text>
+  <text x="480" y="308" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">the research question: keep η → 1 as hardware is added</text>
+
+  <line x1="480" y1="322" x2="480" y2="344" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+
+  <!-- constraint map -->
+  <rect x="200" y="348" width="560" height="96" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="372" font-family="Inter, sans-serif" font-size="12.5" font-weight="700" fill="#ffd97a" text-anchor="middle">CONSTRAINT MAP — per region, per phase, per node</text>
+  <g font-family="Inter, sans-serif" font-size="11">
+    <rect x="230" y="386" width="110" height="40" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="285" y="410" fill="#b0d9ef" text-anchor="middle">compute</text>
+    <rect x="360" y="386" width="110" height="40" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="415" y="410" fill="#b0d9ef" text-anchor="middle">DRAM</text>
+    <rect x="490" y="386" width="110" height="40" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="545" y="410" fill="#b0d9ef" text-anchor="middle">network</text>
+    <rect x="620" y="386" width="110" height="40" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="675" y="410" fill="#b0d9ef" text-anchor="middle">storage</text>
+  </g>
+
+  <line x1="480" y1="444" x2="480" y2="466" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+  <text x="494" y="462" font-family="Inter, sans-serif" font-size="10.5" fill="#c8a04a">slowest roof = active constraint</text>
+
+  <!-- planner -->
+  <rect x="240" y="470" width="480" height="70" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="480" y="496" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">CKE PLANNER — elevate the constraint</text>
+  <text x="480" y="516" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">shard · tile · place · prefetch · overlap · reduce · synchronize</text>
+  <text x="480" y="531" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">balance completion time across nodes, not bytes</text>
+
+  <line x1="480" y1="540" x2="480" y2="562" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+
+  <!-- generated C / measure -->
+  <g font-family="Inter, sans-serif">
+    <rect x="240" y="566" width="230" height="44" rx="8" fill="#262626" stroke="#404040"/>
+    <text x="355" y="593" font-size="12" fill="#b0b0b0" text-anchor="middle">GENERATED C</text>
+    <rect x="490" y="566" width="230" height="44" rx="8" fill="#262626" stroke="#404040"/>
+    <text x="605" y="593" font-size="12" fill="#b0b0b0" text-anchor="middle">MEASURE — X-Ray / CKU</text>
+  </g>
+  <line x1="470" y1="588" x2="488" y2="588" stroke="#808080" stroke-width="1.5" marker-end="url(#arrConv)"/>
+
+  <!-- feedback loop left side: from MEASURE up to eta/constraint map -->
+  <path d="M 605 610 L 605 640 L 140 640 L 140 296 L 338 296" fill="none" stroke="#ffb400" stroke-width="2" marker-end="url(#arrConvAmber)"/>
+  <text x="122" y="470" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle" transform="rotate(-90 122 470)">measured η feeds the next plan</text>
+
+  <!-- footer -->
+  <rect x="130" y="660" width="700" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="680" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0" text-anchor="middle">every optimization is a delta in the same unit: +compute, +channels, +kernel, +reuse, −exposed stall</text>
+  <text x="480" y="697" font-family="Inter, sans-serif" font-size="10.5" fill="#808080" text-anchor="middle">DESIGN DIAGRAM — η_CKE has not been measured; the ladder on the distributed-CPU page is where it comes from</text>
+</svg>

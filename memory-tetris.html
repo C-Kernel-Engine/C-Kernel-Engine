@@ -979,6 +979,12 @@
     </header>
     <main>
 
+<style>
+@media (max-width: 640px) {
+    main mjx-container[display="true"] { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+}
+</style>
+
 <h1>Memory Tetris: DRAM as a Tensor Cache over NVMe</h1>
 
 <p class="lead">
@@ -1066,6 +1072,24 @@ CKE  = planner that schedules ownership, transfer and consumption</code></pre>
 <div class="img-container svg-viewer" data-title="CPU execution and asynchronous I/O timeline: hidden transfer versus exposed storage stall">
     <img src="assets/memory-tetris-overlap.svg" alt="Two timelines. Scenario A: the CPU computes L17, L18 and L19 while I/O loads L18, L19 and L20 one layer ahead; each load completes before first use so the transfer is hidden with zero exposed stall. Scenario B: the load of L32 completes after its first use, so the CPU stalls between computing L31 and L32 while the consumer is blocked waiting for the completion event" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
+
+<h3>The exposure equation</h3>
+
+<p>
+    &ldquo;Hidden vs exposed&rdquo; is one equation, and it is the same equation the
+    <a href="constraint-model.html">CKE Constraint Model</a> applies to every tier &mdash; DRAM
+    prefetch, network synchronization and NVMe alike:
+</p>
+
+\[ T_{\text{exposed transfer}} = \max\!\left( 0,\ T_{\text{transfer}} - T_{\text{overlap window}} \right) \]
+
+<p>
+    A 250 &micro;s NVMe prefetch beneath 300 &micro;s of compute contributes <em>zero</em> exposed
+    storage time; a 500 &micro;s transfer beneath the same compute exposes 200 &micro;s of stall.
+    Memory Tetris's residency choices exist to drive this term to zero: grow the overlap window
+    (look-ahead, double/triple buffering) or shrink the transfer (quantized artifacts, resident hot
+    tensors), whichever the measured constraint rewards.
+</p>
 
 <h3>Bandwidth arithmetic without overstating it</h3>
 
@@ -1371,6 +1395,7 @@ CKE  = planner that schedules ownership, transfer and consumption</code></pre>
 <h2>Related Pages</h2>
 
 <ul>
+    <li><a href="constraint-model.html">The CKE Constraint Model</a> &mdash; the shared math this page's exposure equation belongs to</li>
     <li><a href="deterministic-memory.html">Deterministic Memory</a> &mdash; compile-time known offsets that make slot lifetimes auditable</li>
     <li><a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a> &mdash; the distributed-execution research design that treats residency as a scheduling dimension</li>
     <li><a href="memory-safety.html">Memory Safety</a> &mdash; bump allocator, canaries and arena discipline</li>

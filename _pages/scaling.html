@@ -62,6 +62,15 @@
     </p>
 </div>
 
+<p style="font-size: 1.05em; line-height: 1.7; margin: 0 0 1.5rem 0; padding: 1rem 1.25rem; border-left: 4px solid #ffb400; background: #26261a; border-radius: 0 8px 8px 0;">
+    <strong>Part of one theory:</strong> this page is the <em>why</em>. The
+    <a href="constraint-model.html">CKE Constraint Model</a> states the shared math;
+    <a href="cke-throughput-unit.html">CKU</a> measures it;
+    <a href="memory-tetris.html">Memory Tetris</a> places bytes;
+    <a href="distributed-cpu.html">Distributed Zip</a> parallelizes regions &mdash;
+    and measurement closes the loop.
+</p>
+
 <!-- ── Engineering Compass SVG ── -->
 <div style="margin: 2.5rem 0 0.5rem 0; text-align: center;">
     <img src="assets/engineering-compass.svg" alt="Engineering Compass — Profile, Find Bottleneck, Fix Kernel, Measure, Repeat" style="width: 100%; max-width: 1200px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);" />
@@ -715,15 +724,16 @@ Infrastructure: Standard data center power
     <pre>
 Accelerator Cluster at Scale:
   Local domain:    High-bandwidth scale-up fabric
-  Between domains: Scale-out network (constraint)
-  System speed:    Limited by the active communication boundary
+  Between domains: Scale-out network (one active boundary)
+  System speed:    Set by whichever boundary the schedule exposes
 
 CPU Cluster at Scale:
-  Within node:  DDR5 460 GB/s
-  Between nodes: Ethernet 50 GB/s (same constraint!)
-  System speed = 50 GB/s (same bottleneck)
+  Within node:  DDR5 ~460 GB/s class
+  Between nodes: Ethernet ~50 GB/s class
+  System speed: NOT 50 GB/s if the network never carries the same bytes
 
-AT SCALE, THEY HIT THE SAME WALL.
+EVERY TOPOLOGY HAS A SLOWEST ACTIVE BOUNDARY.
+CKE MODELS IT EXPLICITLY.
     </pre>
 </div>
 
@@ -746,8 +756,8 @@ AT SCALE, THEY HIT THE SAME WALL.
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
     </div>
     <div>
-        <strong>The Ethernet Equalizer Shows Both Hit the Same Wall &mdash; But the Pain Is Wildly Different</strong><br>
-        Every system has a fastest thing (compute) and a slowest thing (cross-node data movement). C-Kernel-Engine's entire goal is to bring these two into sync. On CPUs, they're close enough that software can bridge the gap. On GPUs, they're orders of magnitude apart &mdash; no software fixes that.
+        <strong>The Ethernet Equalizer: Every Topology Has a Slowest Active Boundary</strong><br>
+        Every system has a fastest thing (compute) and a slowest thing (cross-node data movement). C-Kernel-Engine's entire goal is to bring these two into sync. On CPUs, they're close enough that software can bridge the gap. On accelerator clusters, the gap at the scale-out boundary is larger &mdash; and the amount of software that closes it depends on topology, scale-up domains, and overlap. CKE's answer on either is the same: model the boundary explicitly.
     </div>
 </div>
 
@@ -758,9 +768,12 @@ AT SCALE, THEY HIT THE SAME WALL.
     <strong>That's what C-Kernel-Engine is built to do.</strong>
 </p>
 <p style="font-size: 1.1em; line-height: 1.75; margin-bottom: 1.5rem;">
-    On GPUs, the fastest and slowest are worlds apart. GPU peak compute is orders of magnitude faster than the Ethernet pipe that feeds it at cluster scale.
-    It's the difference between the summit of <strong>Mt. Everest</strong> and the floor of the <strong>Mariana Trench</strong>.
-    Most of that compute sits permanently idle, burning power, waiting for data that will never arrive fast enough. No amount of software engineering changes the physics.
+    On accelerators, peak compute sits much further from the scale-out network than on CPUs &mdash;
+    though how much that hurts depends enormously on topology: scale-up domains, communication
+    overlap, and model-parallel schedules all narrow the effective gap. The claim here is narrower
+    and more honest: <strong>every topology has a slowest active boundary, and the interesting
+    question is whether the runtime models it explicitly</strong> rather than pretending every byte
+    crosses every roof. CKE is built around modeling that boundary on CPU-first economics.
 </p>
 
 <div class="img-container svg-viewer" data-title="The Compute-to-Bandwidth Chasm: CPU Rolling Hills vs GPU Everest-to-Mariana">
@@ -779,14 +792,14 @@ AT SCALE, THEY HIT THE SAME WALL.
         <p>The terrain is gentle enough to walk. C-Kernel-Engine's job is to build the bridge: bring compute throughput and data movement into sync through aggressive kernel engineering.</p>
     </div>
     <div class="card" style="border-left: 4px solid #ff6b6b;">
-        <h3 style="margin-top: 0;">GPU: Everest to Mariana &mdash; Unbridgeable</h3>
+        <h3 style="margin-top: 0;">GPU: Everest to Mariana &mdash; but Topology Matters</h3>
         <ul>
-            <li><strong>Fastest (compute)</strong> and <strong>slowest (network)</strong> are orders of magnitude apart</li>
-            <li><strong>Intra-node interconnects</strong> are fast, but only reach a handful of GPUs</li>
-            <li><strong>At cluster scale</strong>, everything hits the same Ethernet wall</li>
-            <li><strong>Most compute capacity</strong> sits permanently idle, starved for data</li>
+            <li><strong>Fastest (compute)</strong> and <strong>slowest (scale-out network)</strong> are far apart</li>
+            <li><strong>Scale-up domains</strong> (NVLink/NVSwitch-class fabrics) keep part of the workload off that boundary</li>
+            <li><strong>Communication overlap and parallel schedules</strong> narrow the effective gap further</li>
+            <li><strong>The honest claim:</strong> the boundary exists on every topology &mdash; the question is whether the runtime models it explicitly</li>
         </ul>
-        <p>The terrain is a cliff face. No bridge spans from the peak of Everest to the bottom of the Mariana Trench. The gap is structural &mdash; physics, not engineering.</p>
+        <p>CKE's bet is not that accelerator compute sits idle &mdash; it is that CPU-first economics plus an explicit constraint model make the boundary cheap to approach. The equation is the same everywhere; only the clock speeds differ.</p>
     </div>
 </div>
 
@@ -796,7 +809,7 @@ AT SCALE, THEY HIT THE SAME WALL.
     </div>
     <div>
         <strong>C-Kernel-Engine's Optimization Thesis</strong><br>
-        The goal is straightforward: bring the fastest-moving thing and the slowest-moving thing as close to sync as possible. On CPUs, they're already neighbors &mdash; the remaining work is tiling, cache management, prefetching, and overlapping computation with communication. That is a solvable engineering problem, and it's exactly what this project is built to solve. On GPUs at cluster scale, the gap between compute and data movement is structural. No kernel optimization closes it.
+        The goal is straightforward: bring the fastest-moving thing and the slowest-moving thing as close to sync as possible. On CPUs, they're already neighbors &mdash; the remaining work is tiling, cache management, prefetching, and overlapping computation with communication. That is a solvable engineering problem, and it's exactly what this project is built to solve. The <a href="constraint-model.html">CKE Constraint Model</a> states the general form: every topology has a slowest active boundary, and region time is the maximum of its overlapped clocks plus the synchronization that could not be hidden &mdash; on Ryzen DDR, dual-socket NUMA, ConnectX, NVMe, HBM or NVLink alike.
     </div>
 </div>
 

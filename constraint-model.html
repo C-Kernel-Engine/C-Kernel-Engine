@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine</title>
-    <meta name="description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <title>The CKE Constraint Model | C-Kernel-Engine</title>
+    <meta name="description" content="Theory of Constraints as runtime math: per-region clocks for compute, cache, DRAM, network and storage; region time as max-plus-unhidden-sync; the exposed-transfer equation; the critical-path heterogeneous shard scheduler; CKU as the observable result; and the prediction-error control loop connecting Scaling Philosophy, CKU, Memory Tetris and Distributed Zip Fusion into one theory.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
-    <meta property="og:title" content="CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine">
-    <meta property="og:description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/constraint-model.html">
+    <meta property="og:title" content="The CKE Constraint Model | C-Kernel-Engine">
+    <meta property="og:description" content="Theory of Constraints as runtime math: per-region clocks for compute, cache, DRAM, network and storage; region time as max-plus-unhidden-sync; the exposed-transfer equation; the critical-path heterogeneous shard scheduler; CKU as the observable result; and the prediction-error control loop connecting Scaling Philosophy, CKU, Memory Tetris and Distributed Zip Fusion into one theory.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/constraint-model.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -908,9 +908,9 @@
             <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
             <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
-            <a href="cke-throughput-unit.html" class="active" style="color:var(--orange)">CKU</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger ">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -981,534 +981,368 @@
 
 <style>
 @media (max-width: 640px) {
-    main pre { overflow-x: auto; }
+    main table { display: block; overflow-x: auto; }
     main mjx-container[display="true"] { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
 }
 </style>
 
-<h1>CKE Throughput Unit</h1>
-
-<div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
-    <h2 style="margin-top: 0; color: #ffb400;">The 1 PB/s North-Star Unit</h2>
-    <p style="font-size: 1.12em; line-height: 1.7;">
-        C-Kernel-Engine cares about a practical systems question:
-        <strong>how fast can the cumulative compute system cycle active model data to produce tokens?</strong>
-        FLOPS and TOPS are useful hardware numbers, but they do not directly answer whether a real model can move its weights, activations, KV cache, intermediate buffers, and network payloads quickly enough to generate the next token.
-    </p>
-    <p style="font-size: 1.12em; line-height: 1.7; margin-bottom: 0;">
-        The proposed CKE unit is aggregate bytes cycled per second across the full token path.
-        The north-star target is <strong>1 petabyte/sec</strong>, which is the same as <strong>1000 terabytes/sec</strong>, or <strong>1 terabyte every millisecond</strong>.
-    </p>
-    <p style="font-size: 1.08em; line-height: 1.7; margin-top: 1.2rem; margin-bottom: 0;">
-        The reference CKU is <strong>useful model-math byte throughput</strong>, not a copy-bandwidth score.
-        A DSA engine can move bytes, but CKU asks whether active weights, activations, and cache/state are
-        fed through GEMM/FMA/attention work to advance the model. The clean upper-bound reference is
-        full-context prefill, where active weights are cycled through mostly GEMM. Decode is a related but
-        different path: mostly GEMV plus KV/cache reads and writes.
-    </p>
-</div>
-
-<div class="img-container svg-viewer" data-title="CKE Throughput Unit">
-    <img src="assets/cke-throughput-unit.svg" alt="CKE throughput unit: active bytes per token divided by token latency equals aggregate bytes cycled per second.">
-</div>
-
-<h2>The Unit</h2>
-
-<pre><code>CKU = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    CKU means <strong>C-Kernel throughput unit</strong>.
-    The unit is not just DRAM bandwidth from one socket and it is not just matrix FLOPS.
-    It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse through useful model compute in order to produce tokens.
-    Plain copies are not enough; the bytes have to arrive in the right layout at the right kernel and participate in the model's math.
-    Depending on the model and phase, that can include:
-</p>
-
-<ul>
-    <li>active weights read for the token path</li>
-    <li>activation buffers and scratch buffers</li>
-    <li>KV cache reads and writes, or recurrent state updates for SSM-style models</li>
-    <li>prefill token blocks, decode token steps, and batching effects</li>
-    <li>NUMA traffic, cache movement, and inter-node communication</li>
-    <li>quantized layout conversion, repacking, and dequantization overhead</li>
-</ul>
-
-<h2>Not Just Weights</h2>
-
-<p>
-    A common shortcut is to say, "a 1 TB model at 1 ms/token needs 1 PB/s."
-    That is a useful intuition, but it is not the full CKU definition.
-    CKU is not only parameter bytes divided by token time.
-    It is the <strong>active byte path</strong> divided by token time.
-    The active byte path includes both the model data being read and the runtime
-    data being produced, consumed, stored, and moved while the token is generated.
-</p>
-
-<p>
-    In decode, weights are often the streaming bottleneck because many layers
-    repeatedly read projection and MLP weights for each new token.
-    In prefill, long prompts can make activation and KV/cache writes matter much
-    more because the system processes many token rows at once.
-    In training, activation saves, gradient writes, optimizer state, and backward
-    reads all become part of the active path.
-    In distributed execution, activation transfers, KV/state movement, gradient
-    exchange, and pipeline bubbles must be counted too.
-</p>
-
-<p>
-    This distinction matters because two runs with the same stored model size can
-    have very different CKU. A dense 1 GB model may touch nearly all weights on
-    every decode token. A sparse MoE model may store far more total weights but
-    only touch selected experts. A vision-language prefill run may move less
-    weight than expected but spend heavily on image-token activations and bridge
-    buffers. CKU asks what the system actually had to cycle for this token path.
-</p>
-
-<h2>Why 1 PB/s?</h2>
-
-<p>
-    A very large modern model can easily imply hundreds of gigabytes to terabytes of active weight and state movement across the token path, especially before accounting for prefill, KV cache, MoE routing, recurrent state, or distributed execution.
-    Quantization and MoE reduce the active bytes touched per token, but the optimization problem remains the same: the faster the system can cycle the active bytes, the faster it can produce useful output.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Active bytes per token</th>
-            <th>Token latency</th>
-            <th>Required aggregate rate</th>
-            <th>Implied token rate</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1 TB</td>
-            <td>1 second</td>
-            <td>1 TB/s</td>
-            <td>1 token/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>10 ms</td>
-            <td>100 TB/s</td>
-            <td>100 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>1 ms</td>
-            <td>1 PB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>100 GB</td>
-            <td>1 ms</td>
-            <td>100 TB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-    </tbody>
-</table>
-
-<p>
-    This is why the 1 PB/s unit matters.
-    It turns a vague performance goal into a concrete systems target:
-    if the active token path is one terabyte and the target is one millisecond per token, the cumulative runtime has to behave like a one-petabyte-per-second machine.
-    That machine does not have to be one CPU.
-    It can be a coordinated set of CPU sockets, memory channels, NUMA domains, and Linux nodes.
-</p>
-
-<p>
-    In CKE, this is intentionally anchored to the hardest clean reference:
-    <strong>full-context prefill over the active model path</strong>.
-    Prefill is mostly GEMM-shaped work over many token rows, so the system must
-    stream active weights, reuse activations, execute reductions, and write the
-    next layer state at high rate. Decode is measured too, but it is usually a
-    different shape: mostly GEMV over one or a few token rows, plus KV/cache
-    reads and writes. That is why CKU should report the phase and workload
-    shape, not only the headline byte rate.
-</p>
-
-<h2>What Counts as Active Bytes?</h2>
-
-<p>
-    Active bytes are the bytes that matter for the current token path.
-    They are not the total size of every file on disk and they are not necessarily the total parameter count of the model.
-    For a dense model, the active path may touch most weights every token.
-    For a Mixture-of-Experts model, only the selected experts are active.
-    For recurrent or SSM-style models, the KV-cache term may shrink or disappear for many layers, but recurrent state updates still count.
-</p>
-
-<p>
-    This makes CKU useful across model families.
-    A 5 TB model with quantization, MoE routing, and sparse activation may have a much smaller active-byte path per token than its full stored footprint.
-    CKE cares about the measured active path: which weights are actually read, which activations are produced, which cache/state buffers are updated, and which bytes cross sockets or nodes.
-</p>
-
-<h2>Lifecycle Envelope and Concurrency</h2>
-
-<p>
-    CKU is first a <strong>single-stream lifecycle unit</strong>.
-    It asks what the runtime must cycle for one model instance serving one token
-    path at the model's intended operating envelope.
-    If a model advertises a 1 million token context length with an 8K embedding
-    dimension, the lifecycle envelope should include the memory behavior needed
-    to support that context: the active weights, the full KV/cache or recurrent
-    state footprint, the activations needed by prefill/decode, and the load/store
-    traffic required to keep the token path moving.
-</p>
-
-<p>
-    That does not mean every CKU number automatically includes every concurrent
-    user. Concurrency is a separate service-level multiplier.
-    A single-user CKU report answers, "Can this system run one full-context model
-    stream at this token rate?"
-    A service report then asks, "How many such streams can the cluster run at the
-    same time, and what token rate does each user receive?"
-</p>
-
-<pre><code>single_user_cku = active_lifecycle_bytes_per_token / seconds_per_token
-
-service_cku     = single_user_cku * concurrent_streams
-
-per_user_rate   = total_generated_tokens_per_second / concurrent_streams</code></pre>
-
-<p>
-    For example, a cluster might target 1 token/sec for 1000 concurrent users on
-    a very large model. That is a different operating point from 1000 tokens/sec
-    for one user, even if both produce 1000 aggregate tokens/sec.
-    CKU should make both cases explicit: the active lifecycle bytes per user, the
-    concurrency count, the total aggregate byte rate, and the per-user token rate.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Byte class</th>
-            <th>Examples</th>
-            <th>When it dominates</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Weights</td>
-            <td>Q/K/V projections, MLP gate/up/down, expert weights, output head</td>
-            <td>Decode and small-batch inference, especially dense models</td>
-        </tr>
-        <tr>
-            <td>Activations</td>
-            <td>Layer inputs/outputs, normalized streams, Q8 views, fused scratch</td>
-            <td>Prefill, vision/audio encoders, large token blocks, unfused paths</td>
-        </tr>
-        <tr>
-            <td>Cache and state</td>
-            <td>KV cache reads/writes, recurrent state, Mamba/DeltaNet state</td>
-            <td>Long context, recurrent models, decode with large history</td>
-        </tr>
-        <tr>
-            <td>Training state</td>
-            <td>Saved activations, gradients, optimizer moments, checkpoints</td>
-            <td>Backward pass, fine-tuning, long-context training</td>
-        </tr>
-        <tr>
-            <td>Communication</td>
-            <td>Pipeline activations, tensor-parallel shards, MPI/RDMA transfers</td>
-            <td>Multi-node inference/training and CPU clusters</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>Node Roofline Math</h2>
-
-<p>
-    CKU is not only a memory-bandwidth number and it is not only a FLOPS number.
-    A CPU node can only contribute the useful part of the slowest roof: memory
-    bandwidth, compute throughput, or network movement when the run is
-    distributed. This is why CKU belongs next to roofline analysis.
-</p>
-
-<div class="img-container svg-viewer" data-title="CKU Node Roofline Math">
-    <img src="assets/cke-node-roofline-math.svg" alt="CKU node roofline math: required service CKU divided by effective node CKU yields the number of CPU nodes needed.">
-</div>
-
-<pre><code>required_service_cku =
-    active_lifecycle_bytes_per_token
-  * tokens_per_second_per_user
-  * concurrent_streams
-
-node_memory_roof =
-    sockets
-  * memory_channels_per_socket
-  * transfer_rate_MTps
-  * 8 bytes_per_channel_transfer
-
-node_compute_roof_bytes =
-    useful_flops_per_second / arithmetic_intensity_flops_per_byte
-
-effective_node_cku =
-    min(node_memory_roof, node_compute_roof_bytes, node_network_roof)
-  * runtime_efficiency
-
-nodes_needed =
-    required_service_cku / effective_node_cku</code></pre>
-
-<p>
-    For DDR memory, a practical first-pass estimate is:
-    <code>channel_GBps = MT/s * 8 bytes / 1000</code>.
-    DDR5-6600 is about 52.8 GB/s per channel.
-    A 12-channel socket is therefore about 633.6 GB/s theoretical, and a
-    dual-socket system is about 1.27 TB/s theoretical before NUMA effects,
-    memory-controller efficiency, page placement, and OS noise.
-    At 8800 MT/s, the same 12-channel socket is about 844.8 GB/s, or about
-    1.69 TB/s for two sockets.
-</p>
-
-<p>
-    Compute has its own roof. For an AVX-512 FP32 FMA path, a rough dense-core
-    estimate is:
-    <code>cores * GHz * FMA_units_per_core * lanes_per_vector * 2 FLOPs_per_FMA</code>.
-    That estimate changes for BF16, INT8, AMX tile paths, VNNI, SVE, or Neon.
-    Quantized Q4/Q6 kernels are often limited by unpacking, metadata,
-    reductions, cache reuse, and memory traffic, so AMX is not automatically the
-    answer. In many CKE paths, AVX-512/VNNI-style layout work is the more direct
-    lever.
-</p>
-
-<p>
-    This also keeps the 1 PB/s north star honest. If a dual-socket CPU node can
-    deliver 1.2 TB/s of useful lifecycle movement, then 1 PB/s requires roughly
-    833 such nodes in the perfect case. At 60-70% useful efficiency, the number
-    is closer to 1200-1400 nodes. If quantization, MoE routing, locality, and
-    cache reuse reduce the active path to 100 GB/token at 100 tokens/sec, the
-    requirement becomes 10 TB/s, which is a very different cluster shape.
-</p>
-
-<p>
-    The CPU thesis is not that one socket beats an H100 at dense tensor math.
-    The thesis is that commodity capacity, many memory channels, many physical
-    cores, SIMD/matrix units, Linux tuning, MPI/RDMA placement, and generated C
-    scheduling can combine into a measurable aggregate byte machine. GPUs can
-    also reach enormous aggregate bandwidth, but a 1 TB resident model may need
-    many expensive HBM devices just for capacity before it even starts serving
-    traffic.
-</p>
-
-<h3>Refinement: Not All Bytes Cross All Roofs</h3>
-
-<p>
-    The single <code>min(memory, compute, network)</code> roof is the right first
-    approximation, but the <a href="distributed-cpu.html">zip schedule</a> shows
-    where it over-pessimizes: byte classes have different paths. A node may
-    process 18 MB of local weight bytes in a region while synchronizing only
-    16 KB at its boundary &mdash; <code>B_local ≠ B_network</code>. Applying the
-    network roof to all active bytes understates the node. The
-    <a href="constraint-model.html">CKE Constraint Model</a> therefore treats CKU
-    as a per-path vector and makes the token time a critical-path quantity:
-</p>
-
-<pre><code>cku_path = { cku_compute, cku_memory, cku_network, cku_storage }
-
-T_token = T_critical_path
-        = Σ_r [ max(T_compute,r, T_fresh_memory,r, T_exposed_storage,r)
-                + T_unhidden_sync,r ]
-
-cku = useful_active_path_bytes / T_token</code></pre>
-
-<p>
-    Read this way, CKU is the <strong>observable result of the scheduler</strong>:
-    the measurement the control loop tries to raise by moving whichever roof is
-    the active constraint &mdash; not a static property of the silicon.
-</p>
-
-<h2>Two CKUs: Potential and Realized</h2>
-
-<p>
-    Distributed CKE needs the unit to separate what the hardware <em>could</em> do from what the
-    system <em>does</em> do. <strong>Potential CKU</strong> sums independently measured node
-    capability; <strong>realized CKU</strong> is the useful path advanced per wall-clock second end
-    to end:
-</p>
-
-\[ CKU_{\text{potential}} = \sum_i CKU_i^{\text{isolated}}, \qquad CKU_{\text{realized}} = \frac{B_{\text{useful,total}}}{T_{\text{wall}}}, \qquad \eta_{\text{CKE}} = \frac{CKU_{\text{realized}}}{CKU_{\text{potential}}} \]
-
-<p>
-    The efficiency \(\eta_{\text{CKE}}\) is the metric the
-    <a href="distributed-cpu.html">distributed-CPU research</a> exists to raise. An illustrative
-    example (all numbers hypothetical): if one Ryzen advances 1 TB of useful model-path bytes in
-    600 s, it contributes \(1.67 \times 10^{-6}\) CKU; two perfectly scaling Ryzens would give
-    \(3.4 \times 10^{-6}\), but measured \(3.1 \times 10^{-6}\) is \(\eta \approx 91\%\); add a Xeon
-    measured in isolation at \(7 \times 10^{-6}\) and the ideal cluster is \(10.4 \times 10^{-6}\) &mdash;
-    a realized \(9.5 \times 10^{-6}\) is again \(\approx 91\%\). &ldquo;We combined CPUs with
-    different cores, caches, memory channels and ISA capabilities and retained 91% of their
-    independently measured useful throughput&rdquo; is a much sharper claim than any tok/s figure.
-</p>
-
-<div class="img-container svg-viewer" data-title="The CKU convergence diagram: potential versus realized CKU, the efficiency eta between them, and the constraint-map planner loop converging toward the 1 PB/s north star">
-    <img src="assets/cku-convergence.svg" alt="A convergence diagram. At top the north star: 1 CKU equals 1 petabyte per second of useful model-path rate, a convergence target not a per-node expectation. Two boxes below: Potential CKU, the sum of isolated node capabilities, and Realized CKU, useful bytes advanced per wall time end to end. Their ratio eta is the CKE scaling efficiency the research program drives toward one. Below, the constraint map with compute, DRAM, network and storage roofs; the slowest roof is the active constraint. The CKE planner shapes shards, tiles, placement, prefetch, overlap and synchronization against it — balancing completion time across nodes, not bytes — emits generated C, measures, and loops back into the next plan. A footer notes every optimization is a delta in the same unit and that eta has not been measured yet" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
-</div>
-
-<h3>CKU is per region and node, not per machine</h3>
-
-<p>
-    A node does not have one universal CKU. The same Ryzen can be DRAM/unpack-limited on a decode
-    region, compute-limited on a prefill region, bandwidth-limited on a KV scan, and far faster on a
-    cache-hot region. The planner profile is therefore a <strong>table of rates</strong> &mdash;
-    \(CKU_i^{\text{decode}}\), \(CKU_i^{\text{prefill}}\), \(CKU_i^{\text{KV}}\),
-    \(CKU_i^{\text{cache-hot}}\), \(CKU_i^{\text{reduction}}\), &hellip; &mdash; and each generated
-    region is priced with the rate that matches its shape. Shard assignment then synchronizes
-    <em>completion time</em>, not bytes: choose \(s_i\) so \(B_i / CKU_i \approx B_j / CKU_j\) for
-    every participating node, and all lanes reach the reduction boundary together &mdash;
-    <strong>CKU synchronization</strong>. If the Xeon contributes four times a Ryzen's CKU for one
-    kernel and a different ratio for another, its share changes per region accordingly.
-</p>
-
-<h3>The Theory of Constraints underneath CKU</h3>
-
-<p>
-    Per region, the roofs give per-resource rates &mdash; say memory \(5 \times 10^{-6}\), arithmetic
-    \(3 \times 10^{-6}\), network \(20 \times 10^{-6}\) (hypothetical). Effective CKU is the minimum,
-    \(3 \times 10^{-6}\), and arithmetic is the constraint: do not buy a faster NIC, do not tune DRAM
-    first &mdash; elevate arithmetic. When arithmetic rises to \(8 \times 10^{-6}\), the minimum moves
-    to memory at \(5 \times 10^{-6}\), and the constraint has moved. That is the loop:
-</p>
-
-\[ \text{identify constraint} \rightarrow \text{elevate constraint} \rightarrow \text{recompute CKU} \rightarrow \text{repeat} \]
-
-<p>
-    and it makes the 1 PB/s north star a <strong>convergence target</strong> rather than a slogan:
-    every optimization &mdash; another node, more channels, a better kernel, more cache reuse, less
-    exposed stall &mdash; is a delta in the same unit, and the research question is whether
-    \(\eta_{\text{CKE}} \rightarrow 1\) as hardware is added. The
-    <a href="constraint-model.html">CKE Constraint Model</a> defines the clocks and the
-    exposed-stall vocabulary this loop runs on.
-</p>
-
-<h2>Memory Placement Is a Scheduling Problem</h2>
-
-<p>
-    Capacity and throughput cannot be separated from placement. Accelerator
-    systems often move selected activations, parameters, or optimizer state
-    from scarce HBM into host DRAM. CPU-native execution removes that specific
-    host-to-device boundary for CPU-resident state, but it does not remove data
-    movement. Cache fills, DRAM traffic, NUMA hops, network transfers, and
-    storage reads still have to be placed and scheduled against useful work.
-</p>
-
-<p>
-    NVIDIA's JAX host-offloading study provides a useful measured example. On
-    its DeepSeek-V3 671B configuration, optimized activation offloading with a
-    latency-hiding scheduler and pipelined copies reached 908.2 TFLOPs/s/device,
-    compared with 578.3 TFLOPs/s/device for no offload with activation
-    rematerialization. But host offloading without those scheduling mechanisms
-    reached only 541.6 TFLOPs/s/device. The placement policy created capacity;
-    overlap determined whether that capacity translated into throughput.
-</p>
-
-<p>
-    The same study reported a smaller but equally important result for Llama
-    3.1 405B: QKV offloading with latency hiding improved throughput by 2.9%,
-    while disabling latency hiding made the offloaded run slower than the
-    no-offload baseline. The 70.9 GiB host allocation represented QKV storage
-    across all layers, while scan-based backward execution needed only one
-    layer's QKV activations resident on the GPU at a time. This is a lifetime
-    and scheduling result, not a raw bandwidth claim.
-</p>
-
-<p>CKE should apply the same discipline to CPU nodes and clusters:</p>
-
-<ul>
-    <li><strong>Place by lifetime:</strong> keep the active layer, tile, KV/state window, or optimizer shard near the compute that consumes it.</li>
-    <li><strong>Overlap explicitly:</strong> prefetch the next tile or shard while the current kernel performs useful work.</li>
-    <li><strong>Budget staging memory:</strong> double buffers and prefetched data consume capacity even when they improve throughput.</li>
-    <li><strong>Measure exposed transfer time:</strong> a transfer hidden behind compute and the same transfer on the critical path have different performance consequences.</li>
-    <li><strong>Keep rematerialization in the comparison:</strong> recomputing an activation may cost less than moving it, depending on arithmetic intensity and topology.</li>
-</ul>
-
-<pre><code>effective_step_time =
-    useful_compute_time
-  + exposed_memory_time
-  + exposed_network_time
-  + synchronization_time
-
-staging_capacity = resident_working_set + prefetched_buffers + in_flight_outputs</code></pre>
-
-<p>
-    This refines the CKU interpretation. Logical active bytes describe the
-    model state needed by the operation. Physical bytes include every movement
-    required by the chosen placement plan. A valid CKU report must state what
-    was resident, what was transferred or rematerialized, how much transfer was
-    overlapped, and which movement remained on the critical path.
-</p>
-
-<p>
-    Reference:
-    <a href="https://developer.nvidia.com/blog/reducing-high-bandwidth-memory-bottlenecks-in-jax-based-llm-training-with-host-offloading/" target="_blank" rel="noopener noreferrer">NVIDIA, Reducing High-Bandwidth Memory Bottlenecks in JAX-Based LLM Training with Host Offloading</a>.
-</p>
-
-<h2>What CKE Optimizes</h2>
-
-<p>
-    CKE does not optimize a single number in isolation.
-    It tries to organize the whole token path so useful bytes stay close to useful compute:
-</p>
-
-<ul>
-    <li><strong>Kernel layout:</strong> Q4/Q5/Q6/Q8 formats, packed layouts, SIMD-friendly loops, and shape-gated dispatch.</li>
-    <li><strong>Memory layout:</strong> contiguous bump files, planned activation buffers, cache-aligned sections, and deterministic offsets.</li>
-    <li><strong>Runtime scheduling:</strong> prefill vs decode kernels, persistent thread pools, batching, lifetime-aware placement, asynchronous prefetch, and pipeline staging.</li>
-    <li><strong>Linux tuning:</strong> CPU affinity, huge pages, NUMA placement, cache behavior, and perf/VTune/Advisor measurement.</li>
-    <li><strong>Cluster scaling:</strong> model/layer ownership, activation movement, gradient movement, MPI/RDMA paths, and topology-aware placement.</li>
-</ul>
-
-<h2>How to Measure It</h2>
-
-<p>
-    CKU is meant to be measured, not asserted.
-    A practical report should show the model, phase, context length, batch size, active-byte estimate, token latency, and the resulting aggregate rate.
-    The same run should also show CPU utilization, memory bandwidth, cache behavior, and network transfer if the run spans nodes.
-</p>
-
-<pre><code>active_bytes_per_token = weights_read_or_reused
-                       + activations_read_written
-                       + cache_or_state_read_written
-                       + scratch_and_layout_traffic
-                       + communication_read_written
-
-seconds_per_token      = measured_wall_time / generated_tokens
-
-CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    A stricter report can also split <em>logical active bytes</em> from
-    <em>physical traffic</em>.
-    Logical active bytes describe the model/runtime tensors that participate in
-    the token path. Physical traffic includes cache-line rereads, layout
-    conversion, write-allocate behavior, NUMA hops, and network retransfers.
-    CKE tracks the logical path first, then uses perf, VTune, Advisor, and
-    benchmark counters to find where physical traffic is higher than it should be.
-</p>
-
-<p>
-    This is the reason CKE keeps investing in visualizers, memory layouts, <a href="kernel-maps.html">kernel maps</a>, perf counters, VTune/Advisor profiles, and future MPI lanes.
-    The generated C code is only one part of the system.
-    The larger optimization problem is arranging the full data path so the machine spends less time waiting for bytes and more time turning those bytes into useful output.
-</p>
-
-<h2>Not a FLOPS Replacement</h2>
-
-<p>
-    FLOPS still matter. Matrix units still matter. SIMD still matters.
-    But for LLM inference and training, raw arithmetic throughput is only useful when the data reaches the execution units at the right time and in the right layout.
-    CKU is a complementary metric: it asks whether the whole system can cycle the bytes that the model actually needs.
+<h1>The CKE Constraint Model</h1>
+
+<p class="lead">
+    Theory of Constraints expressed as runtime math. Every generated region has several clocks running
+    &mdash; compute, cache, DRAM, network, storage &mdash; and the region takes as long as the slowest
+    required path plus the synchronization that could not be hidden. Scaling says <em>why</em>, CKU
+    <em>measures</em>, Memory Tetris <em>places</em>, Distributed Zip <em>parallelizes</em> &mdash; and
+    measurement closes the loop.
 </p>
 
 <div class="alert alert-warning">
     <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </div>
-    <div>
-        <strong>This is a north-star systems unit, not a current laptop benchmark.</strong><br>
-        A single workstation is not expected to cycle 1 PB/s today. The point is to make the long-horizon optimization problem explicit: organize CPU kernels, memory hierarchy, Linux scheduling, and distributed nodes so aggregate active-byte throughput keeps rising.
+    <div style="min-width: 0;">
+        <strong>Status: design vocabulary</strong><br>
+        The constraint model is the shared mathematical language of CKE's research pages. The
+        measurement and planning stages it names (X-Ray, kernel maps, numerical contracts) exist today;
+        the closed replanning loop is the <strong>research program, not a shipped feature</strong>.
+        Every equation on this page is a model to be validated &mdash; the distributed-CPU
+        <a href="distributed-cpu.html">validation ladder</a> is where the numbers come from.
     </div>
 </div>
+
+<h2>One Theory, Four Pages</h2>
+
+<p>
+    Four CKE documents have been circling the same idea from different altitudes. They are one theory:
+</p>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">1. Scaling Philosophy &mdash; Why</h3>
+        <p>The system advances at the rate of its active constraint. Profile the slowest element; do not optimize irrelevant peaks. <a href="scaling.html">Open Scaling Philosophy</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">2. CKU &mdash; Measure</h3>
+        <p>How much useful model-state work did the entire system advance per unit time? The common throughput unit and the node roofline. <a href="cke-throughput-unit.html">Open CKU</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">3. Memory Tetris &mdash; Place</h3>
+        <p>Where should each byte live, and when should it move? NVMe &rarr; DRAM &rarr; cache &rarr; compute, with known lifetimes, staging windows and exposed stalls. <a href="memory-tetris.html">Open Memory Tetris</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">4. Distributed Zip &mdash; Parallelize</h3>
+        <p>Which algebraic pieces can execute independently across nodes, and when must they synchronize? Shard &rarr; local execution &rarr; partial sum &rarr; minimal reduction. <a href="distributed-cpu.html">Open Zip Fusion</a>. Then measure CKU again.</p>
+    </div>
+</div>
+
+<h2>The Per-Region Clocks</h2>
+
+<p>
+    For any generated region \(r\), a CPU node has several clocks running concurrently. Compute:
+</p>
+
+\[ T_{\text{compute},r} = \frac{F_r}{P_{\text{effective}}} \]
+
+<p>
+    DRAM, on <strong>fresh bytes</strong> (what DRAM must actually deliver after cache reuse):
+</p>
+
+\[ T_{\text{DRAM},r} = \frac{B_{\text{fresh},r}}{BW_{\text{DRAM}}} \]
+
+\[ T_{\text{cache},r} = \frac{B_{\text{cache},r}}{BW_{\text{cache}}} \]
+
+<p>
+    Network, where latency usually dominates the payload:
+</p>
+
+\[ T_{\text{network},r} = L_{\text{collective}} + \frac{B_{\text{sync},r}}{BW_{\text{network}}} \]
+
+<p>
+    and, when Memory Tetris tiering is involved, storage:
+</p>
+
+\[ T_{\text{storage},r} = L_{\text{storage}} + \frac{B_{\text{NVMe},r}}{BW_{\text{NVMe}}} \]
+
+<p>
+    When independent clocks overlap, region time is approximately their <strong>maximum</strong>,
+    not their sum &mdash; plus whatever synchronization could not be hidden:
+</p>
+
+\[ \boxed{\; T_r = \max\!\left( T_{\text{compute}},\ T_{\text{fresh-memory}},\ T_{\text{exposed-storage}} \right) + T_{\text{unhidden-sync}} \;} \]
+
+<p>
+    The slowest required path is the constraint. Optimizing any other clock buys nothing until the
+    constraint moves &mdash; that is Goldratt's observation, restated as runtime math.
+</p>
+
+<h2>Exposed vs Hidden: The Overlap Equation</h2>
+
+<p>
+    A transfer only costs wall time when it is <em>exposed</em> &mdash; longer than the work that
+    could have hidden it. One equation covers every tier:
+</p>
+
+\[ \boxed{\; T_{\text{exposed}} = \max\!\left( 0,\ T_{\text{transfer}} - T_{\text{overlap window}} \right) \;} \]
+
+<p>
+    Instantiated per path:
+</p>
+
+\[ T_{\text{exposed DRAM}} = \max(0,\ T_{\text{DRAM}} - T_{\text{compute}}) \]
+
+\[ T_{\text{exposed SSD}} = \max(0,\ T_{\text{SSD}} - T_{\text{lookahead}}) \]
+
+\[ T_{\text{exposed net}} = \max(0,\ T_{\text{network}} - T_{\text{independent work}}) \]
+
+<p>
+    A 250 &micro;s NVMe prefetch under 300 &micro;s of compute contributes <em>zero</em> exposed
+    storage time; a 500 &micro;s transfer under the same compute exposes 200 &micro;s. Memory Tetris's
+    residency choices, the zip schedule's independent lanes, and ordinary cache prefetch are all the
+    same move: <strong>grow the overlap window or shrink the transfer until the exposure is zero.</strong>
+</p>
+
+<h2>Shape the Clocks: The Flowing Pipeline</h2>
+
+<p>
+    The maximum in the core equation is a bound, not the goal. The goal is to <strong>shape the work
+    assigned to every node so the clocks line up</strong> &mdash; during a region,
+    \(T_{\text{compute},i} \approx T_{\text{stream},i} \approx T_{\text{prefetch},i}\), with
+    synchronization from neighboring regions hidden or extremely short. The contrast is between a
+    stall pipeline (<code>fetch &rarr; stall &rarr; compute &rarr; stall &rarr; sync</code>) and a
+    flowing one, where DRAM streams continuously, the cache prefetches \(N+1\) and \(N+2\) ahead of
+    use, the CPU never waits, and the sync rides the boundary:
+</p>
+
+<div class="img-container svg-viewer" data-title="Stall pipeline versus flowing pipeline: the objective is to shape work so compute, stream and prefetch clocks line up and stall tends to zero">
+    <img src="assets/constraint-model-flowing-pipeline.svg" alt="Two timelines. The stall pipeline runs fetch, stall, compute, stall, sync, fetch — sequential phases with dead gaps where one clock waits on another. The flowing pipeline shows four lanes across a region boundary: DRAM streams region N weights then region N+1 weights continuously, the cache prefetches N+1 and N+2 ahead of use, the CPU computes region N then N+1 without gaps, and a small network sync rides the boundary while the next region is already flowing. The target is to minimize critical-path time plus stall time over shard, tile and prefetch choices, with the ideal that compute, stream and prefetch times per node are approximately equal and stall time goes to zero" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    The optimization target is therefore not a single roof but a schedule:
+</p>
+
+\[ \min_{\{s_i,\ \text{tile}_i,\ \text{prefetch}_i\}} \left[ T_{\text{critical path}} + T_{\text{stall}} \right] \qquad \text{ideally } T_{\text{stall}} \rightarrow 0 \]
+
+<h3>Supply meets demand: the node gets what it can finish on time</h3>
+
+<p>
+    A node does not get &ldquo;its fair share&rdquo; &mdash; one fourth because there are four nodes.
+    It gets <strong>what it can finish before the boundary</strong>. If a Ryzen sustains
+    \(BW_i = 80\) GB/s on the actual CKE packed-weight path and its kernel can process a tile in
+    150 &micro;s, the memory system can only <em>supply</em> \(80 \times 150\,\mu s = 12\) MB of fresh
+    bytes in that window. With 4 MB of useful hot data already in cache, the region can operate on
+    roughly 16 MB. Assign 30 MB and the CPU waits on memory; assign 5 MB and memory capacity sits
+    unused while the CPU starves. The planner searches for:
+</p>
+
+\[ B_{\text{fresh},i} \approx BW_i \times T_{\text{compute},i} \qquad \text{(subject to cache reuse and overlap)} \]
+
+<p>
+    &mdash; arithmetic demand matched to the memory supply rate (all figures MODEL labels).
+</p>
+
+<h3>Cache as a queue: elasticity between unequal rates</h3>
+
+<p>
+    When arithmetic is the slower clock &mdash; \(T_{\text{fetch}} = 100\,\mu s\) against
+    \(T_{\text{compute}} = 250\,\mu s\) &mdash; memory gets ahead, and a large cache earns its keep in
+    a second way: it is a <strong>queue between two unequal rates</strong>,
+    DRAM producer &rarr; LLC buffer &rarr; CPU consumer. While the CPU computes tile \(N\), DRAM can
+    prefetch \(N+1\) and possibly \(N+2\), capacity and associativity permitting. When the CPU is
+    faster than DRAM, the planner's moves are the Theory-of-Constraints levers: smaller tiles, more
+    reuse, another memory-producing node or channel, or a restructured operator.
+</p>
+
+<h2>The Refined Core Equation</h2>
+
+<p>
+    With the overlap vocabulary in hand, the core equation sharpens from a max-of-roofs to a
+    <strong>critical path plus exposed stall</strong>:
+</p>
+
+\[ \boxed{\; T_r = T_{\text{critical-path},r} + T_{\text{exposed-stall},r} \;} \]
+
+\[ T_{\text{critical-path},r} = \max_i \left[ \max\!\left( \frac{B_{\text{fresh},i}}{BW_i},\ \frac{F_i}{P_i} \right) \right] \]
+
+\[ T_{\text{exposed-stall}} = T_{\text{sync not hidden}} + T_{\text{prefetch not hidden}} + T_{\text{storage not hidden}} \]
+
+<p>
+    and CKE's two jobs follow directly: <strong>minimize \(T_{\text{exposed-stall}}\)</strong> (hide
+    everything hidable) and <strong>minimize \(\max_i T_i\)</strong> (balance what cannot be hidden).
+    Theory of Constraints plus scheduling, in one line each.
+</p>
+
+<h2>The Heterogeneous Scheduler: Minimize the Critical-Path Maximum</h2>
+
+<p>
+    On heterogeneous nodes the region does not finish at the fastest lane's time &mdash; it finishes
+    at the slowest lane's time, plus synchronization. If the lanes measure 180, 182, 179 and
+    95 &micro;s, the region takes &asymp;182 &micro;s \(+\ T_{\text{sync}}\), and the fast node wastes
+    87 &micro;s waiting. The planner's objective is therefore the critical-path maximum:
+</p>
+
+\[ \boxed{\; \underset{s_1,\dots,s_N}{\arg\min}\ \left[ \max_i T_i(s_i)\ +\ T_{\text{sync}}(N, B) \right] \quad \text{subject to } \sum_i s_i = 1 \;} \]
+
+<p>
+    where \(s_i\) is node \(i\)'s shard fraction and \(T_i\) follows from its measured
+    \(P_i(r, \text{phase}, \text{dtype})\). Rebalance until the lanes tie &mdash; 180, 181, 179, 180
+    &mdash; and \(\max_i T_i\) is minimized. This is the deterministic form of the
+    <a href="distributed-cpu.html">distributed-CPU sizing model</a>: shard geometry derived from
+    measured capability, not static ratios.
+</p>
+
+<h3>Balanced completion time, not balanced bytes</h3>
+
+<p>
+    The per-node estimate credits cache-resident reuse \(C_i\) against the fresh-byte term:
+</p>
+
+\[ T_i(s_i) = \max\!\left( \frac{B_i(s_i) - C_i}{BW_i},\ \frac{F_i(s_i)}{P_i} \right) \]
+
+<p>
+    and the planner solves \(T_1 \approx T_2 \approx \dots \approx T_N\) subject to
+    \(\sum_i s_i = 1\). Note what this does <em>not</em> do: it does not split bytes by bandwidth
+    ratio. With stream rates 80 : 80 : 400 GB/s but compute rates 2 : 2 : 8 TF/s, the correct split
+    is 80 : 80 : 400 <em>only if the region is bandwidth-bound</em> &mdash; for a compute-bound
+    region the 2 : 2 : 8 ratio governs, and for anything in between the max() decides per node.
+    The goal is balanced <strong>completion time</strong>; the byte split is a consequence, not the
+    objective.
+</p>
+
+<h2>Worked Example: One Ryzen Region (MODEL)</h2>
+
+<p>
+    A parameterized example, all labels THEORETICAL. DDR5-5600 dual channel:
+</p>
+
+\[ 5600\ \text{MT/s} \times 8\ \text{B} = 44.8\ \text{GB/s per channel} \;\Rightarrow\; 89.6\ \text{GB/s theoretical DRAM} \]
+
+<p>
+    A ConnectX-class fabric at a nominal 400 Gb/s:
+</p>
+
+\[ 400\ \text{Gb/s} \;/\; 8 = 50\ \text{GB/s raw line rate} \]
+
+<p>
+    The hierarchy reads cache \(\gg\) 89.6 GB/s DRAM \(>\) 50 GB/s network &mdash; but the network does
+    <strong>not</strong> limit the transformer to 50 GB/s, because it does not carry the same bytes as
+    DRAM. That is the central zip insight. Suppose a 200 &micro;s region consumes 18 MB of local
+    weight data and synchronizes only 16 KB at its boundary:
+</p>
+
+\[ \frac{18\ \text{MB}}{89.6\ \text{GB/s}} \approx 201\ \mu\text{s} \qquad \frac{16\ \text{KB}}{50\ \text{GB/s}} \approx 0.32\ \mu\text{s} \]
+
+<p>
+    Network <em>bandwidth</em> is nearly irrelevant; the network <em>latency</em> is not. With a
+    collective latency of 8 &micro;s (unmeasured, MODEL):
+</p>
+
+\[ T_{\text{sync}} \approx 8 + 0.32 = 8.3\ \mu\text{s} \qquad T_r \approx 201 + 8.3 \approx 209\ \mu\text{s} \]
+
+<p>
+    This is the kind of calculation CKE should generate for every region &mdash; then replace with a
+    measurement. Note how it connects to the
+    <a href="distributed-cpu.html">token ruler</a>: 186 such boundaries per token make the
+    \(L_{\text{collective}}\) term, not the 0.32 &micro;s of transmission, the term to engineer down.
+</p>
+
+<h2>CKU Refined: The Critical-Path Unit</h2>
+
+<p>
+    The <a href="cke-throughput-unit.html">CKU roofline</a> already bounds a node by the minimum of
+    its memory, compute and network roofs. The zip schedule refines what &ldquo;network roof&rdquo;
+    means: not all active bytes cross all roofs. A node may process \(B_{\text{local}} = 18\) MB while
+    synchronizing only \(B_{\text{sync}} = 16\) KB. The byte classes have different paths, so CKU
+    becomes a per-path vector:
+</p>
+
+\[ CKU_{\text{path}} = \{\, CKU_{\text{compute}},\ CKU_{\text{memory}},\ CKU_{\text{network}},\ CKU_{\text{storage}} \,\} \]
+
+\[ B_{\text{local}} \neq B_{\text{network}} \]
+
+<p>
+    and effective throughput is constrained by the <strong>critical path</strong>, not by pretending
+    every byte crosses every roof:
+</p>
+
+\[ T_{\text{token}} = T_{\text{critical path}}, \qquad CKU = \frac{B_{\text{useful active path}}}{T_{\text{token}}} \]
+
+<p>
+    CKU is then the <em>observable result of the scheduler</em> &mdash; the number the control loop
+    tries to raise by moving the constraint.
+</p>
+
+<h2>&ldquo;Deterministic&rdquo; Means Predictable</h2>
+
+<p>
+    CKE knows the exact graph, exact tensor shapes, exact lifetimes, exact planned placements, exact
+    communication boundaries and calibrated machine capabilities. It can therefore produce an
+    execution schedule and <strong>predict its critical path</strong>:
+</p>
+
+\[ \text{IR} + \text{hardware profile} \rightarrow \text{constraint model} \rightarrow \text{schedule} \rightarrow \text{generated C} \rightarrow \text{measured execution} \]
+
+<p>
+    Prediction error becomes a first-class metric:
+</p>
+
+\[ \boxed{\; E = \frac{|\,T_{\text{measured}} - T_{\text{predicted}}\,|}{T_{\text{predicted}}} \;} \]
+
+<p>
+    The research program in one sentence: keep shrinking \(E\). If CKE predicts 2.4 tok/s and measures
+    2.2, the system model is good; add a node, change the shard geometry, predict 4.1, measure 3.9
+    &mdash; each cycle is a validated or falsified claim about the constraint map (illustrative
+    numbers, not results). That is deterministic computing in a stronger sense than deterministic
+    kernels: <strong>the runtime knows what it is about to cost.</strong>
+</p>
+
+<h2>The Control Loop</h2>
+
+<div class="img-container svg-viewer" data-title="The CKE constraint-model control loop: model and IR feed a constraint map, three resource lanes feed the planner, generated C executes, X-Ray measurement produces CKU, and the found constraint loops back into replanning">
+    <img src="assets/constraint-model-loop.svg" alt="A vertical control loop. Model and IR feed a constraint map of FLOPs, fresh bytes, lifetimes and dependencies. Three lanes branch out: compute roofline answered by the CKU page, memory placement answered by Memory Tetris, and network minimization answered by Distributed Zip. They converge into the CKE planner, which emits a schedule as generated C. Execution produces X-Ray and perf data, which produces the measured CKU and the active constraint. A feedback arrow returns from constraint found back to the constraint map for replanning. A footer states each pass aims to shrink the prediction error E. The measurement and planning stages exist today; the closed loop is the research program" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>The Planner Discipline</h2>
+
+<p>
+    Each resource &mdash; arithmetic, cache, DRAM, NUMA, network, storage, synchronization &mdash;
+    presents the same quotient:
+</p>
+
+\[ \text{candidate time} = \frac{\text{required work}}{\text{measured capability}} \]
+
+<p>
+    and the planner attacks the active constraint in a fixed order:
+</p>
+
+<ol>
+    <li><strong>Reduce required work</strong> &mdash; smaller payloads, fewer boundaries, dead-tensor elimination.</li>
+    <li><strong>Overlap independent work</strong> &mdash; grow the window that hides the transfer.</li>
+    <li><strong>Rebalance shards</strong> &mdash; minimize the critical-path maximum across heterogeneous nodes.</li>
+    <li><strong>Eliminate unnecessary movement</strong> &mdash; residency, replication and placement choices.</li>
+    <li><strong>Minimize exposed synchronization</strong> &mdash; latency on the boundary, not bandwidth, is the term to engineer down.</li>
+    <li><strong>Add hardware only then</strong> &mdash; when the remaining constraint is physical, and the model says which one.</li>
+</ol>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The universal statement</h3>
+    <p style="margin-bottom: 0;">
+        <strong>Every topology has a slowest active boundary; CKE explicitly models it.</strong>
+        Ryzen DDR, dual-socket NUMA, ConnectX, NVMe, HBM or NVLink &mdash; the clocks differ, the
+        equation does not.
+    </p>
+</div>
+
+<h2>Related Pages</h2>
+
+<ul>
+    <li><a href="scaling.html">Scaling Philosophy</a> &mdash; why the constraint, not the peak, is the unit of progress</li>
+    <li><a href="cke-throughput-unit.html">CKE Throughput Unit</a> &mdash; the measurement the loop optimizes</li>
+    <li><a href="memory-tetris.html">Memory Tetris</a> &mdash; placement: hiding slower tiers behind useful work</li>
+    <li><a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a> &mdash; parallelization: the sizing model, token budget and validation ladder</li>
+    <li><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> &mdash; the parity rules every schedule must satisfy</li>
+    <li><a href="research.html">Research Tracker</a> &mdash; status of all proposed techniques</li>
+</ul>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

@@ -1,0 +1,367 @@
+<!-- TITLE: The CKE Constraint Model -->
+<!-- NAV: research -->
+
+<style>
+@media (max-width: 640px) {
+    main table { display: block; overflow-x: auto; }
+    main mjx-container[display="true"] { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+}
+</style>
+
+<h1>The CKE Constraint Model</h1>
+
+<p class="lead">
+    Theory of Constraints expressed as runtime math. Every generated region has several clocks running
+    &mdash; compute, cache, DRAM, network, storage &mdash; and the region takes as long as the slowest
+    required path plus the synchronization that could not be hidden. Scaling says <em>why</em>, CKU
+    <em>measures</em>, Memory Tetris <em>places</em>, Distributed Zip <em>parallelizes</em> &mdash; and
+    measurement closes the loop.
+</p>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div style="min-width: 0;">
+        <strong>Status: design vocabulary</strong><br>
+        The constraint model is the shared mathematical language of CKE's research pages. The
+        measurement and planning stages it names (X-Ray, kernel maps, numerical contracts) exist today;
+        the closed replanning loop is the <strong>research program, not a shipped feature</strong>.
+        Every equation on this page is a model to be validated &mdash; the distributed-CPU
+        <a href="distributed-cpu.html">validation ladder</a> is where the numbers come from.
+    </div>
+</div>
+
+<h2>One Theory, Four Pages</h2>
+
+<p>
+    Four CKE documents have been circling the same idea from different altitudes. They are one theory:
+</p>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">1. Scaling Philosophy &mdash; Why</h3>
+        <p>The system advances at the rate of its active constraint. Profile the slowest element; do not optimize irrelevant peaks. <a href="scaling.html">Open Scaling Philosophy</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">2. CKU &mdash; Measure</h3>
+        <p>How much useful model-state work did the entire system advance per unit time? The common throughput unit and the node roofline. <a href="cke-throughput-unit.html">Open CKU</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">3. Memory Tetris &mdash; Place</h3>
+        <p>Where should each byte live, and when should it move? NVMe &rarr; DRAM &rarr; cache &rarr; compute, with known lifetimes, staging windows and exposed stalls. <a href="memory-tetris.html">Open Memory Tetris</a>.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">4. Distributed Zip &mdash; Parallelize</h3>
+        <p>Which algebraic pieces can execute independently across nodes, and when must they synchronize? Shard &rarr; local execution &rarr; partial sum &rarr; minimal reduction. <a href="distributed-cpu.html">Open Zip Fusion</a>. Then measure CKU again.</p>
+    </div>
+</div>
+
+<h2>The Per-Region Clocks</h2>
+
+<p>
+    For any generated region \(r\), a CPU node has several clocks running concurrently. Compute:
+</p>
+
+\[ T_{\text{compute},r} = \frac{F_r}{P_{\text{effective}}} \]
+
+<p>
+    DRAM, on <strong>fresh bytes</strong> (what DRAM must actually deliver after cache reuse):
+</p>
+
+\[ T_{\text{DRAM},r} = \frac{B_{\text{fresh},r}}{BW_{\text{DRAM}}} \]
+
+\[ T_{\text{cache},r} = \frac{B_{\text{cache},r}}{BW_{\text{cache}}} \]
+
+<p>
+    Network, where latency usually dominates the payload:
+</p>
+
+\[ T_{\text{network},r} = L_{\text{collective}} + \frac{B_{\text{sync},r}}{BW_{\text{network}}} \]
+
+<p>
+    and, when Memory Tetris tiering is involved, storage:
+</p>
+
+\[ T_{\text{storage},r} = L_{\text{storage}} + \frac{B_{\text{NVMe},r}}{BW_{\text{NVMe}}} \]
+
+<p>
+    When independent clocks overlap, region time is approximately their <strong>maximum</strong>,
+    not their sum &mdash; plus whatever synchronization could not be hidden:
+</p>
+
+\[ \boxed{\; T_r = \max\!\left( T_{\text{compute}},\ T_{\text{fresh-memory}},\ T_{\text{exposed-storage}} \right) + T_{\text{unhidden-sync}} \;} \]
+
+<p>
+    The slowest required path is the constraint. Optimizing any other clock buys nothing until the
+    constraint moves &mdash; that is Goldratt's observation, restated as runtime math.
+</p>
+
+<h2>Exposed vs Hidden: The Overlap Equation</h2>
+
+<p>
+    A transfer only costs wall time when it is <em>exposed</em> &mdash; longer than the work that
+    could have hidden it. One equation covers every tier:
+</p>
+
+\[ \boxed{\; T_{\text{exposed}} = \max\!\left( 0,\ T_{\text{transfer}} - T_{\text{overlap window}} \right) \;} \]
+
+<p>
+    Instantiated per path:
+</p>
+
+\[ T_{\text{exposed DRAM}} = \max(0,\ T_{\text{DRAM}} - T_{\text{compute}}) \]
+
+\[ T_{\text{exposed SSD}} = \max(0,\ T_{\text{SSD}} - T_{\text{lookahead}}) \]
+
+\[ T_{\text{exposed net}} = \max(0,\ T_{\text{network}} - T_{\text{independent work}}) \]
+
+<p>
+    A 250 &micro;s NVMe prefetch under 300 &micro;s of compute contributes <em>zero</em> exposed
+    storage time; a 500 &micro;s transfer under the same compute exposes 200 &micro;s. Memory Tetris's
+    residency choices, the zip schedule's independent lanes, and ordinary cache prefetch are all the
+    same move: <strong>grow the overlap window or shrink the transfer until the exposure is zero.</strong>
+</p>
+
+<h2>Shape the Clocks: The Flowing Pipeline</h2>
+
+<p>
+    The maximum in the core equation is a bound, not the goal. The goal is to <strong>shape the work
+    assigned to every node so the clocks line up</strong> &mdash; during a region,
+    \(T_{\text{compute},i} \approx T_{\text{stream},i} \approx T_{\text{prefetch},i}\), with
+    synchronization from neighboring regions hidden or extremely short. The contrast is between a
+    stall pipeline (<code>fetch &rarr; stall &rarr; compute &rarr; stall &rarr; sync</code>) and a
+    flowing one, where DRAM streams continuously, the cache prefetches \(N+1\) and \(N+2\) ahead of
+    use, the CPU never waits, and the sync rides the boundary:
+</p>
+
+<div class="img-container svg-viewer" data-title="Stall pipeline versus flowing pipeline: the objective is to shape work so compute, stream and prefetch clocks line up and stall tends to zero">
+    <img src="assets/constraint-model-flowing-pipeline.svg" alt="Two timelines. The stall pipeline runs fetch, stall, compute, stall, sync, fetch — sequential phases with dead gaps where one clock waits on another. The flowing pipeline shows four lanes across a region boundary: DRAM streams region N weights then region N+1 weights continuously, the cache prefetches N+1 and N+2 ahead of use, the CPU computes region N then N+1 without gaps, and a small network sync rides the boundary while the next region is already flowing. The target is to minimize critical-path time plus stall time over shard, tile and prefetch choices, with the ideal that compute, stream and prefetch times per node are approximately equal and stall time goes to zero" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    The optimization target is therefore not a single roof but a schedule:
+</p>
+
+\[ \min_{\{s_i,\ \text{tile}_i,\ \text{prefetch}_i\}} \left[ T_{\text{critical path}} + T_{\text{stall}} \right] \qquad \text{ideally } T_{\text{stall}} \rightarrow 0 \]
+
+<h3>Supply meets demand: the node gets what it can finish on time</h3>
+
+<p>
+    A node does not get &ldquo;its fair share&rdquo; &mdash; one fourth because there are four nodes.
+    It gets <strong>what it can finish before the boundary</strong>. If a Ryzen sustains
+    \(BW_i = 80\) GB/s on the actual CKE packed-weight path and its kernel can process a tile in
+    150 &micro;s, the memory system can only <em>supply</em> \(80 \times 150\,\mu s = 12\) MB of fresh
+    bytes in that window. With 4 MB of useful hot data already in cache, the region can operate on
+    roughly 16 MB. Assign 30 MB and the CPU waits on memory; assign 5 MB and memory capacity sits
+    unused while the CPU starves. The planner searches for:
+</p>
+
+\[ B_{\text{fresh},i} \approx BW_i \times T_{\text{compute},i} \qquad \text{(subject to cache reuse and overlap)} \]
+
+<p>
+    &mdash; arithmetic demand matched to the memory supply rate (all figures MODEL labels).
+</p>
+
+<h3>Cache as a queue: elasticity between unequal rates</h3>
+
+<p>
+    When arithmetic is the slower clock &mdash; \(T_{\text{fetch}} = 100\,\mu s\) against
+    \(T_{\text{compute}} = 250\,\mu s\) &mdash; memory gets ahead, and a large cache earns its keep in
+    a second way: it is a <strong>queue between two unequal rates</strong>,
+    DRAM producer &rarr; LLC buffer &rarr; CPU consumer. While the CPU computes tile \(N\), DRAM can
+    prefetch \(N+1\) and possibly \(N+2\), capacity and associativity permitting. When the CPU is
+    faster than DRAM, the planner's moves are the Theory-of-Constraints levers: smaller tiles, more
+    reuse, another memory-producing node or channel, or a restructured operator.
+</p>
+
+<h2>The Refined Core Equation</h2>
+
+<p>
+    With the overlap vocabulary in hand, the core equation sharpens from a max-of-roofs to a
+    <strong>critical path plus exposed stall</strong>:
+</p>
+
+\[ \boxed{\; T_r = T_{\text{critical-path},r} + T_{\text{exposed-stall},r} \;} \]
+
+\[ T_{\text{critical-path},r} = \max_i \left[ \max\!\left( \frac{B_{\text{fresh},i}}{BW_i},\ \frac{F_i}{P_i} \right) \right] \]
+
+\[ T_{\text{exposed-stall}} = T_{\text{sync not hidden}} + T_{\text{prefetch not hidden}} + T_{\text{storage not hidden}} \]
+
+<p>
+    and CKE's two jobs follow directly: <strong>minimize \(T_{\text{exposed-stall}}\)</strong> (hide
+    everything hidable) and <strong>minimize \(\max_i T_i\)</strong> (balance what cannot be hidden).
+    Theory of Constraints plus scheduling, in one line each.
+</p>
+
+<h2>The Heterogeneous Scheduler: Minimize the Critical-Path Maximum</h2>
+
+<p>
+    On heterogeneous nodes the region does not finish at the fastest lane's time &mdash; it finishes
+    at the slowest lane's time, plus synchronization. If the lanes measure 180, 182, 179 and
+    95 &micro;s, the region takes &asymp;182 &micro;s \(+\ T_{\text{sync}}\), and the fast node wastes
+    87 &micro;s waiting. The planner's objective is therefore the critical-path maximum:
+</p>
+
+\[ \boxed{\; \underset{s_1,\dots,s_N}{\arg\min}\ \left[ \max_i T_i(s_i)\ +\ T_{\text{sync}}(N, B) \right] \quad \text{subject to } \sum_i s_i = 1 \;} \]
+
+<p>
+    where \(s_i\) is node \(i\)'s shard fraction and \(T_i\) follows from its measured
+    \(P_i(r, \text{phase}, \text{dtype})\). Rebalance until the lanes tie &mdash; 180, 181, 179, 180
+    &mdash; and \(\max_i T_i\) is minimized. This is the deterministic form of the
+    <a href="distributed-cpu.html">distributed-CPU sizing model</a>: shard geometry derived from
+    measured capability, not static ratios.
+</p>
+
+<h3>Balanced completion time, not balanced bytes</h3>
+
+<p>
+    The per-node estimate credits cache-resident reuse \(C_i\) against the fresh-byte term:
+</p>
+
+\[ T_i(s_i) = \max\!\left( \frac{B_i(s_i) - C_i}{BW_i},\ \frac{F_i(s_i)}{P_i} \right) \]
+
+<p>
+    and the planner solves \(T_1 \approx T_2 \approx \dots \approx T_N\) subject to
+    \(\sum_i s_i = 1\). Note what this does <em>not</em> do: it does not split bytes by bandwidth
+    ratio. With stream rates 80 : 80 : 400 GB/s but compute rates 2 : 2 : 8 TF/s, the correct split
+    is 80 : 80 : 400 <em>only if the region is bandwidth-bound</em> &mdash; for a compute-bound
+    region the 2 : 2 : 8 ratio governs, and for anything in between the max() decides per node.
+    The goal is balanced <strong>completion time</strong>; the byte split is a consequence, not the
+    objective.
+</p>
+
+<h2>Worked Example: One Ryzen Region (MODEL)</h2>
+
+<p>
+    A parameterized example, all labels THEORETICAL. DDR5-5600 dual channel:
+</p>
+
+\[ 5600\ \text{MT/s} \times 8\ \text{B} = 44.8\ \text{GB/s per channel} \;\Rightarrow\; 89.6\ \text{GB/s theoretical DRAM} \]
+
+<p>
+    A ConnectX-class fabric at a nominal 400 Gb/s:
+</p>
+
+\[ 400\ \text{Gb/s} \;/\; 8 = 50\ \text{GB/s raw line rate} \]
+
+<p>
+    The hierarchy reads cache \(\gg\) 89.6 GB/s DRAM \(>\) 50 GB/s network &mdash; but the network does
+    <strong>not</strong> limit the transformer to 50 GB/s, because it does not carry the same bytes as
+    DRAM. That is the central zip insight. Suppose a 200 &micro;s region consumes 18 MB of local
+    weight data and synchronizes only 16 KB at its boundary:
+</p>
+
+\[ \frac{18\ \text{MB}}{89.6\ \text{GB/s}} \approx 201\ \mu\text{s} \qquad \frac{16\ \text{KB}}{50\ \text{GB/s}} \approx 0.32\ \mu\text{s} \]
+
+<p>
+    Network <em>bandwidth</em> is nearly irrelevant; the network <em>latency</em> is not. With a
+    collective latency of 8 &micro;s (unmeasured, MODEL):
+</p>
+
+\[ T_{\text{sync}} \approx 8 + 0.32 = 8.3\ \mu\text{s} \qquad T_r \approx 201 + 8.3 \approx 209\ \mu\text{s} \]
+
+<p>
+    This is the kind of calculation CKE should generate for every region &mdash; then replace with a
+    measurement. Note how it connects to the
+    <a href="distributed-cpu.html">token ruler</a>: 186 such boundaries per token make the
+    \(L_{\text{collective}}\) term, not the 0.32 &micro;s of transmission, the term to engineer down.
+</p>
+
+<h2>CKU Refined: The Critical-Path Unit</h2>
+
+<p>
+    The <a href="cke-throughput-unit.html">CKU roofline</a> already bounds a node by the minimum of
+    its memory, compute and network roofs. The zip schedule refines what &ldquo;network roof&rdquo;
+    means: not all active bytes cross all roofs. A node may process \(B_{\text{local}} = 18\) MB while
+    synchronizing only \(B_{\text{sync}} = 16\) KB. The byte classes have different paths, so CKU
+    becomes a per-path vector:
+</p>
+
+\[ CKU_{\text{path}} = \{\, CKU_{\text{compute}},\ CKU_{\text{memory}},\ CKU_{\text{network}},\ CKU_{\text{storage}} \,\} \]
+
+\[ B_{\text{local}} \neq B_{\text{network}} \]
+
+<p>
+    and effective throughput is constrained by the <strong>critical path</strong>, not by pretending
+    every byte crosses every roof:
+</p>
+
+\[ T_{\text{token}} = T_{\text{critical path}}, \qquad CKU = \frac{B_{\text{useful active path}}}{T_{\text{token}}} \]
+
+<p>
+    CKU is then the <em>observable result of the scheduler</em> &mdash; the number the control loop
+    tries to raise by moving the constraint.
+</p>
+
+<h2>&ldquo;Deterministic&rdquo; Means Predictable</h2>
+
+<p>
+    CKE knows the exact graph, exact tensor shapes, exact lifetimes, exact planned placements, exact
+    communication boundaries and calibrated machine capabilities. It can therefore produce an
+    execution schedule and <strong>predict its critical path</strong>:
+</p>
+
+\[ \text{IR} + \text{hardware profile} \rightarrow \text{constraint model} \rightarrow \text{schedule} \rightarrow \text{generated C} \rightarrow \text{measured execution} \]
+
+<p>
+    Prediction error becomes a first-class metric:
+</p>
+
+\[ \boxed{\; E = \frac{|\,T_{\text{measured}} - T_{\text{predicted}}\,|}{T_{\text{predicted}}} \;} \]
+
+<p>
+    The research program in one sentence: keep shrinking \(E\). If CKE predicts 2.4 tok/s and measures
+    2.2, the system model is good; add a node, change the shard geometry, predict 4.1, measure 3.9
+    &mdash; each cycle is a validated or falsified claim about the constraint map (illustrative
+    numbers, not results). That is deterministic computing in a stronger sense than deterministic
+    kernels: <strong>the runtime knows what it is about to cost.</strong>
+</p>
+
+<h2>The Control Loop</h2>
+
+<div class="img-container svg-viewer" data-title="The CKE constraint-model control loop: model and IR feed a constraint map, three resource lanes feed the planner, generated C executes, X-Ray measurement produces CKU, and the found constraint loops back into replanning">
+    <img src="assets/constraint-model-loop.svg" alt="A vertical control loop. Model and IR feed a constraint map of FLOPs, fresh bytes, lifetimes and dependencies. Three lanes branch out: compute roofline answered by the CKU page, memory placement answered by Memory Tetris, and network minimization answered by Distributed Zip. They converge into the CKE planner, which emits a schedule as generated C. Execution produces X-Ray and perf data, which produces the measured CKU and the active constraint. A feedback arrow returns from constraint found back to the constraint map for replanning. A footer states each pass aims to shrink the prediction error E. The measurement and planning stages exist today; the closed loop is the research program" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<h2>The Planner Discipline</h2>
+
+<p>
+    Each resource &mdash; arithmetic, cache, DRAM, NUMA, network, storage, synchronization &mdash;
+    presents the same quotient:
+</p>
+
+\[ \text{candidate time} = \frac{\text{required work}}{\text{measured capability}} \]
+
+<p>
+    and the planner attacks the active constraint in a fixed order:
+</p>
+
+<ol>
+    <li><strong>Reduce required work</strong> &mdash; smaller payloads, fewer boundaries, dead-tensor elimination.</li>
+    <li><strong>Overlap independent work</strong> &mdash; grow the window that hides the transfer.</li>
+    <li><strong>Rebalance shards</strong> &mdash; minimize the critical-path maximum across heterogeneous nodes.</li>
+    <li><strong>Eliminate unnecessary movement</strong> &mdash; residency, replication and placement choices.</li>
+    <li><strong>Minimize exposed synchronization</strong> &mdash; latency on the boundary, not bandwidth, is the term to engineer down.</li>
+    <li><strong>Add hardware only then</strong> &mdash; when the remaining constraint is physical, and the model says which one.</li>
+</ol>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">The universal statement</h3>
+    <p style="margin-bottom: 0;">
+        <strong>Every topology has a slowest active boundary; CKE explicitly models it.</strong>
+        Ryzen DDR, dual-socket NUMA, ConnectX, NVMe, HBM or NVLink &mdash; the clocks differ, the
+        equation does not.
+    </p>
+</div>
+
+<h2>Related Pages</h2>
+
+<ul>
+    <li><a href="scaling.html">Scaling Philosophy</a> &mdash; why the constraint, not the peak, is the unit of progress</li>
+    <li><a href="cke-throughput-unit.html">CKE Throughput Unit</a> &mdash; the measurement the loop optimizes</li>
+    <li><a href="memory-tetris.html">Memory Tetris</a> &mdash; placement: hiding slower tiers behind useful work</li>
+    <li><a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a> &mdash; parallelization: the sizing model, token budget and validation ladder</li>
+    <li><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> &mdash; the parity rules every schedule must satisfy</li>
+    <li><a href="research.html">Research Tracker</a> &mdash; status of all proposed techniques</li>
+</ul>

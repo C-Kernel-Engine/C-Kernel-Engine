@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 860">
+  <title>The CKE constraint-model control loop: model and IR feed a constraint map, three resource lanes feed the planner, generated C executes, X-Ray measurement produces CKU, and the found constraint loops back into replanning</title>
+  <desc>A vertical control loop. Model and IR feed a constraint map of FLOPs, fresh bytes, lifetimes and dependencies. Three lanes branch out: compute roofline answered by the CKU page, memory placement answered by Memory Tetris, and network minimization answered by Distributed Zip. They converge into the CKE planner, which emits a schedule and generated C. Execution produces X-Ray and perf data, which produces the measured CKU and the active constraint. A feedback arrow returns from constraint found back to the constraint map for replanning. A footer states that each pass aims to shrink the prediction error E equals absolute difference of measured and predicted time over predicted time. This is a design diagram — the loop is only partially implemented today.</desc>
+
+  <defs>
+    <marker id="arrLoop" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+    <marker id="arrLoopAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="860" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The CKE Constraint Model: One Control Loop</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Scaling says why · CKU measures · Memory Tetris places · Zip parallelizes · measurement closes the loop</text>
+
+  <!-- MODEL / IR -->
+  <rect x="330" y="76" width="300" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="103" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#b0b0b0" text-anchor="middle">MODEL / IR — the exact graph</text>
+
+  <line x1="480" y1="120" x2="480" y2="142" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- CONSTRAINT MAP -->
+  <rect x="290" y="146" width="380" height="76" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="172" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#ffd97a" text-anchor="middle">CONSTRAINT MAP</text>
+  <text x="480" y="192" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">FLOPs · fresh bytes · tensor lifetimes · dependencies</text>
+  <text x="480" y="210" font-family="Inter, sans-serif" font-size="10" fill="#c8a04a" text-anchor="middle">per region, per phase, per dtype — known before a byte runs</text>
+
+  <!-- three lanes -->
+  <line x1="400" y1="222" x2="180" y2="256" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+  <line x1="480" y1="222" x2="480" y2="256" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+  <line x1="560" y1="222" x2="780" y2="256" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <g font-family="Inter, sans-serif">
+    <rect x="60" y="260" width="240" height="110" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="180" y="286" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">COMPUTE ROOFLINE</text>
+    <text x="180" y="308" font-size="11" fill="#b0d9ef" text-anchor="middle">FLOPs ÷ measured GEMM rate</text>
+    <text x="180" y="328" font-size="10.5" fill="#5a8fb0" text-anchor="middle">page: CKU — Measure</text>
+    <text x="180" y="348" font-size="10.5" fill="#5a8fb0" text-anchor="middle">P_i(r, phase, dtype)</text>
+
+    <rect x="360" y="260" width="240" height="110" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="480" y="286" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">MEMORY TETRIS</text>
+    <text x="480" y="308" font-size="11" fill="#b0d9ef" text-anchor="middle">fresh bytes ÷ tier bandwidth</text>
+    <text x="480" y="328" font-size="10.5" fill="#5a8fb0" text-anchor="middle">page: Memory Tetris — Place</text>
+    <text x="480" y="348" font-size="10.5" fill="#5a8fb0" text-anchor="middle">hide transfer behind compute</text>
+
+    <rect x="660" y="260" width="240" height="110" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="780" y="286" font-size="12.5" font-weight="700" fill="#7dd3fc" text-anchor="middle">NETWORK ZIP</text>
+    <text x="780" y="308" font-size="11" fill="#b0d9ef" text-anchor="middle">minimize bytes × latency on path</text>
+    <text x="780" y="328" font-size="10.5" fill="#5a8fb0" text-anchor="middle">page: Distributed CPU — Parallelize</text>
+    <text x="780" y="348" font-size="10.5" fill="#5a8fb0" text-anchor="middle">shard → local → partial-sum</text>
+  </g>
+
+  <!-- converge -->
+  <line x1="180" y1="370" x2="420" y2="404" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+  <line x1="480" y1="370" x2="480" y2="404" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+  <line x1="780" y1="370" x2="540" y2="404" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- PLANNER -->
+  <rect x="300" y="408" width="360" height="52" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="2"/>
+  <text x="480" y="430" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">CKE PLANNER</text>
+  <text x="480" y="448" font-family="Inter, sans-serif" font-size="10.5" fill="#5a9e78" text-anchor="middle">argmin over shard geometry of max lane time + sync</text>
+
+  <line x1="480" y1="460" x2="480" y2="482" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- GENERATED C -->
+  <rect x="330" y="486" width="300" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="513" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#b0b0b0" text-anchor="middle">GENERATED C — the schedule, compiled</text>
+
+  <line x1="480" y1="530" x2="480" y2="552" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- EXECUTE -->
+  <rect x="330" y="556" width="300" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="583" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#b0b0b0" text-anchor="middle">EXECUTE — real hardware, real tokens</text>
+
+  <line x1="480" y1="600" x2="480" y2="622" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- X-RAY -->
+  <rect x="330" y="626" width="300" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="653" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#b0b0b0" text-anchor="middle">X-RAY / PERF — measured region times</text>
+
+  <line x1="480" y1="670" x2="480" y2="692" stroke="#808080" stroke-width="1.5" marker-end="url(#arrLoop)"/>
+
+  <!-- CKU / constraint found -->
+  <rect x="290" y="696" width="380" height="64" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="722" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">CKU — useful bytes advanced / time</text>
+  <text x="480" y="742" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle">constraint found: the resource whose clock bound the region</text>
+
+  <!-- feedback loop: right side, from CKU box up to CONSTRAINT MAP -->
+  <path d="M 670 728 L 910 728 L 910 184 L 672 184" fill="none" stroke="#ffb400" stroke-width="2" marker-end="url(#arrLoopAmber)"/>
+  <text x="928" y="440" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a" text-anchor="middle" transform="rotate(90 928 440)">replan against the measured constraint</text>
+
+  <!-- footer -->
+  <rect x="130" y="796" width="700" height="44" rx="8" fill="#262626" stroke="#404040"/>
+  <text x="480" y="816" font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0" text-anchor="middle">each pass aims to shrink E = |T_measured − T_predicted| / T_predicted</text>
+  <text x="480" y="833" font-family="Inter, sans-serif" font-size="10.5" fill="#808080" text-anchor="middle">DESIGN DIAGRAM — the measurement and planning stages exist today; the closed loop is the research program</text>
+</svg>

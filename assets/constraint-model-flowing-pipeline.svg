@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
+  <title>Stall pipeline versus flowing pipeline: the objective is to shape work so compute, stream and prefetch clocks line up and stall tends to zero</title>
+  <desc>Two timelines. The stall pipeline runs fetch, stall, compute, stall, sync, fetch — sequential phases with dead gaps where one clock waits on another. The flowing pipeline shows three lanes across a region boundary: DRAM streams continuously, the cache prefetches region N+1 then N+2 ahead of use, the CPU computes region N then N+1 without gaps, and a tiny network sync rides the boundary. The ideal is T_compute approximately equal to T_stream approximately equal to T_prefetch per node, with T_stall going to zero. All timings are MODEL labels, not measurements.</desc>
+
+  <defs>
+    <marker id="arrFlow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#808080"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="620" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The Objective: Shape the Work So the Clocks Line Up</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Not merely max(compute, memory, network) — assign work so T_compute ≈ T_stream ≈ T_prefetch and T_stall → 0</text>
+
+  <!-- ═══ STALL PIPELINE ═══ -->
+  <text x="48" y="104" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#f87171">The stall pipeline — phases with dead gaps</text>
+
+  <g font-family="Inter, sans-serif" font-size="11.5">
+    <rect x="60" y="122" width="110" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="115" y="146" fill="#b0d9ef" text-anchor="middle">fetch</text>
+    <rect x="178" y="122" width="70" height="40" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="213" y="146" fill="#f87171" text-anchor="middle">stall</text>
+    <rect x="256" y="122" width="130" height="40" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="321" y="146" fill="#ffd97a" text-anchor="middle">compute</text>
+    <rect x="394" y="122" width="70" height="40" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="429" y="146" fill="#f87171" text-anchor="middle">stall</text>
+    <rect x="472" y="122" width="90" height="40" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="517" y="146" fill="#f87171" text-anchor="middle">sync</text>
+    <rect x="570" y="122" width="110" height="40" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="625" y="146" fill="#b0d9ef" text-anchor="middle">fetch</text>
+    <rect x="688" y="122" width="70" height="40" rx="6" fill="#331414" stroke="#f85149" stroke-width="1.5"/>
+    <text x="723" y="146" fill="#f87171" text-anchor="middle">stall</text>
+    <rect x="766" y="122" width="130" height="40" rx="6" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="831" y="146" fill="#ffd97a" text-anchor="middle">compute</text>
+  </g>
+
+  <text x="480" y="190" font-family="Inter, sans-serif" font-size="11" fill="#f8a5a5" text-anchor="middle">every phase waits on the previous one — the clocks never overlap, so the slowest hand-off defines the rate</text>
+
+  <line x1="48" y1="216" x2="912" y2="216" stroke="#404040" stroke-width="1"/>
+
+  <!-- ═══ FLOWING PIPELINE ═══ -->
+  <text x="48" y="248" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#86efac">The flowing pipeline — every lane busy, boundary costs tiny</text>
+
+  <!-- region boundary -->
+  <line x1="520" y1="262" x2="520" y2="470" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="480" y="278" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#c8a04a" text-anchor="end">region N</text>
+  <text x="528" y="278" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#c8a04a">region N+1</text>
+
+  <g font-family="Inter, sans-serif" font-size="11">
+    <!-- DRAM lane -->
+    <text x="60" y="316" font-weight="700" fill="#a0a0a0">DRAM</text>
+    <rect x="130" y="300" width="382" height="26" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="321" y="317" fill="#b0d9ef" text-anchor="middle">stream region N weights</text>
+    <rect x="528" y="300" width="382" height="26" rx="5" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="719" y="317" fill="#b0d9ef" text-anchor="middle">stream region N+1 weights</text>
+
+    <!-- Cache lane -->
+    <text x="60" y="362" font-weight="700" fill="#a0a0a0">Cache</text>
+    <rect x="240" y="346" width="272" height="26" rx="5" fill="#262626" stroke="#404040" stroke-dasharray="4 3"/>
+    <text x="376" y="363" fill="#b0b0b0" text-anchor="middle">prefetch N+1 (ahead of use)</text>
+    <rect x="640" y="346" width="270" height="26" rx="5" fill="#262626" stroke="#404040" stroke-dasharray="4 3"/>
+    <text x="775" y="363" fill="#b0b0b0" text-anchor="middle">prefetch N+2</text>
+
+    <!-- CPU lane -->
+    <text x="60" y="408" font-weight="700" fill="#a0a0a0">CPU</text>
+    <rect x="130" y="392" width="382" height="26" rx="5" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="321" y="409" fill="#ffd97a" text-anchor="middle">compute region N</text>
+    <rect x="528" y="392" width="382" height="26" rx="5" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="719" y="409" fill="#ffd97a" text-anchor="middle">compute region N+1</text>
+
+    <!-- Network lane -->
+    <text x="60" y="454" font-weight="700" fill="#a0a0a0">Network</text>
+    <rect x="470" y="438" width="100" height="26" rx="5" fill="#2a2410" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="520" y="455" fill="#ffd97a" text-anchor="middle">sync</text>
+  </g>
+
+  <text x="480" y="496" font-family="Inter, sans-serif" font-size="11.5" fill="#86efac" text-anchor="middle">the sync rides the boundary while the next region is already flowing — nothing waits</text>
+
+  <!-- ═══ target band ═══ -->
+  <rect x="130" y="524" width="700" height="72" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="552" font-family="Inter, sans-serif" font-size="13.5" font-weight="700" fill="#ffd97a" text-anchor="middle">min over {shard, tile, prefetch} of T_critical-path + T_stall</text>
+  <text x="480" y="576" font-family="Inter, sans-serif" font-size="11.5" fill="#c8a04a" text-anchor="middle">ideal: T_compute,i ≈ T_stream,i ≈ T_prefetch,i per node · T_stall → 0 · MODEL labels, not measurements</text>
+</svg>
