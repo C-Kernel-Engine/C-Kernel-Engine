@@ -1043,11 +1043,11 @@
     <li><strong>Pipeline parallelism (PP)</strong> shards layers into stages. It is excellent for capacity and for throughput when several microbatches are in flight, but it does <strong>not</strong> aggregate compute for a single request &mdash; one token still flows stage to stage.</li>
     <li><strong>Context / sequence parallelism (CP)</strong> shards the token sequence and pays an all-to-all or ring exchange around attention. All nodes work on the same request.</li>
     <li><strong>Expert parallelism (EP)</strong> shards MoE experts and synchronizes at routing dispatch and combine per MoE layer.</li>
-    <li><strong>Head parallelism</strong> shards attention heads; head-local attention is fully independent and only softmax statistics and an output reduction ever meet.</li>
+    <li><strong>Head parallelism</strong> shards attention heads and is fully head-independent: each head's softmax is computed locally, heads meet only where the output projection mixes them, and the sole reduction is hidden-state-sized. The online-softmax statistic merge appears only when head parallelism is <em>combined</em> with context parallelism.</li>
 </ul>
 
 <div class="img-container svg-viewer" data-title="Parallelism taxonomy: what each method shards, where its synchronization boundary sits, and whether it aggregates single-request compute">
-    <img src="assets/distributed-cpu-parallel-methods.svg" alt="Six-row comparison of data, tensor, pipeline, context, expert and head parallelism showing what each shards, where it synchronizes, and whether all nodes work on the same request at once. Data parallelism and pipeline parallelism do not aggregate single-request compute; tensor, context, expert and head parallelism do. Tensor parallelism pairs column-parallel with row-parallel linears and pays roughly two collectives per layer; head parallelism needs only softmax statistics and an output reduction" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+    <img src="assets/distributed-cpu-parallel-methods.svg" alt="Six-row comparison of data, tensor, pipeline, context, expert and head parallelism showing what each shards, where it synchronizes, and whether all nodes work on the same request at once. Data parallelism and pipeline parallelism do not aggregate single-request compute; tensor, context, expert and head parallelism do. Tensor parallelism pairs column-parallel with row-parallel linears and pays roughly two collectives per layer; head parallelism is fully head-independent and needs only the output-projection reduction, with the online-softmax statistic merge appearing only when context is also sharded" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
 <p>
@@ -1214,6 +1214,25 @@
     <img src="assets/distributed-cpu-context-1m.svg" alt="Panel A: the layer mix is model-config-dependent — recurrent or local-attention layers carry bounded state and schedule like any other region, while global-attention layers see the full context and need the two-dimensional decomposition; the ratio comes from the exact model config. Panel B: a global-attention layer decomposes as head groups times context shards. Each node holds the KV slice for its context shard, computes a local attention tile for its head group, and exports only online-softmax sufficient statistics: local max m_i, local normalizer l_i, local weighted output o_i. A merge per head rescales by the exponential of m_i minus the global max and sums the partials into the exact global result. A struck-through panel notes the L-times-L attention matrix is never materialized and KV never leaves its owning node. The merge is the same algebra a single-node flash-attention kernel uses, so distribution does not change the numerical contract" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
+<h3>Decode at 1M is not prefill at 1M</h3>
+
+<p>
+    The grid above is shared, but the two phases pay radically different communication over it. At
+    <strong>decode</strong> there is one new query, \(Q: 1 \times d\), against \(K, V: L \times d\)
+    &mdash; each context shard returns the sufficient statistics for that single query per head
+    (a scalar max, a scalar normalizer, one \(d_{\text{head}}\) vector): bytes-to-KB per head per
+    shard, independent of \(L\). This is where the long-context communication thesis is strongest.
+    At <strong>prefill</strong>, \(T\) queries run simultaneously, so the sufficient statistics
+    themselves carry the query dimension &mdash; the merge payload scales with \(T\) and must be
+    tiled or streamed, priced like a GEMM-shaped region rather than a decode-shaped one. Same exact
+    algebra; different payload shape. Any 1M-context claim on this page that does not name its phase
+    is incomplete.
+</p>
+
+<div class="img-container svg-viewer" data-title="One-million-token context: decode merges tiny per-query statistics while prefill statistics carry the query dimension and must be tiled or streamed">
+    <img src="assets/distributed-cpu-context-1m-phases.svg" alt="Two panels over the same head-groups-times-context-shards grid. Decode: one new query, Q is 1 by d, against K and V of L by d — each context shard returns the online-softmax sufficient statistics for that single query per head, a payload of bytes to kilobytes per head per shard, independent of L. Prefill: T simultaneous queries, Q is T by d — the sufficient statistics carry the query dimension, so the merge payload scales with T and must be tiled or streamed, budgeted like a GEMM-shaped region, not a decode-shaped one. A footer notes both merges are the same exact online-softmax algebra; distribution changes the payload shape, never the numerical contract" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
 <h2>The Metric: Synchronization Boundaries per Layer</h2>
 
 <p>
@@ -1257,18 +1276,51 @@
 \[ 93 \times 2 \times 16\ \text{KB} \approx 3\ \text{MB / token} \quad \text{(before collective-algorithm overhead)} \]
 
 <p>
-    Meanwhile each node must stream its weight shard from DRAM inside the same 215 &micro;s. At a
-    sustained stream bandwidth \(B_i\), the bytes a node can touch per layer are:
+    Meanwhile each node must stream its weight shard from DRAM inside the same 215 &micro;s. The
+    first-class variable is <strong>fresh bytes</strong> &mdash; the bytes DRAM must actually deliver,
+    after cache reuse:
 </p>
 
-\[ \text{fresh bytes / layer} = B_i \times 215\ \mu\text{s} \qquad \text{e.g. } 80\ \text{GB/s} \times 215\ \mu\text{s} \approx 17.2\ \text{MB} \]
+\[ B_{\text{fresh}} = B_{\text{required}} - B_{\text{cache hits / reuse}} \]
+
+<p>
+    This is why a large-cache node can outperform what its nominal two-channel DRAM bandwidth suggests
+    on some regions: the planner cares about \(B_{\text{fresh}}\), not total weight bytes. At a
+    sustained stream bandwidth \(B_i\), the fresh bytes a node can absorb per layer are:
+</p>
+
+\[ B_{\text{fresh}}\ \text{/ layer} = B_i \times 215\ \mu\text{s} \qquad \text{e.g. } 80\ \text{GB/s} \times 215\ \mu\text{s} \approx 17.2\ \text{MB} \]
 
 <p>
     That is the sense in which <strong>cache is a staging mechanism, not a model residence</strong>:
     the current tile is cache-resident while DRAM streams the next one, and AVX/AMX compute consumes
-    the current one. A 100 tok/s variant simply halves every budget &mdash; which doubles the sync
-    share of wall time, making the same model a stress test of the communication path.
+    the current one &mdash; compute current tile in parallel with fetch next tile. A 100 tok/s variant
+    simply halves every budget &mdash; which doubles the sync share of wall time, making the same model
+    a stress test of the communication path.
 </p>
+
+<h3>The latency arithmetic: why 3 MB is not the story</h3>
+
+<p>
+    The 3 MB/token payload sounds trivially cheap &mdash; and on bandwidth it is. The danger is
+    <strong>latency, paid serially</strong>. The reductions do not overlap each other; each layer's
+    boundary waits for its collective, so per-token synchronization cost is:
+</p>
+
+\[ T_{\text{collective / token}} = 186 \times L_{\text{collective}} \]
+
+<p>
+    At \(L = 10\,\mu s\) that is 1.86 ms &mdash; <strong>9.3% of the 20 ms budget</strong> gone to
+    waiting, before any collective-algorithm overhead. At a 100 tok/s target the same 10 &micro;s
+    collective costs 18.6%. The whole distributed-CPU thesis therefore reduces to one measurable
+    question: <strong>can CKE get its real small-vector reduction into the latency regime the target
+    token budget requires?</strong> The ruler below makes the budget, the serial ticks and the
+    latency table one picture.
+</p>
+
+<div class="img-container svg-viewer" data-title="The 20 ms token ruler: 93 layers of local work separated by 186 serial reduction ticks, with a table converting per-reduction collective latency into token-budget share">
+    <img src="assets/distributed-cpu-token-ruler.svg" alt="A horizontal 20-millisecond token ruler for a 50 tokens-per-second target: layer slots of local work separated by thin reduction ticks, 93 layers times 2 reductions equals 186 reductions per token, so collective time per token is 186 times the per-reduction latency. A table converts latency into sequential cost and budget share: 2 microseconds costs 0.372 milliseconds or 1.9 percent, 5 microseconds 0.93 ms or 4.7 percent, 10 microseconds 1.86 ms or 9.3 percent, 20 microseconds 3.72 ms or 18.6 percent, 50 microseconds 9.3 ms or 46.5 percent. At a 100 tokens-per-second target every share doubles. The experimental gate: can CKE get its real small-vector reduction into the latency regime the target token budget requires — measured latency answers this, not the link sheet. All figures are theoretical model arithmetic" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
 
 <div class="img-container svg-viewer" data-title="The 20 ms token budget: three regions with unequal heterogeneous shards ending at the same reduction boundary, cache-resident current tile with DRAM streaming the next, and the worked model numbers">
     <img src="assets/distributed-cpu-token-budget.svg" alt="A model timeline for a 50 tokens-per-second target, 20 milliseconds per token, in three regions. In each region Ryzen A and Ryzen B lanes carry smaller shards and a Xeon lane carries a larger shard, all ending at the same reduction boundary: regions one and three close on a 16-kilobyte hidden-vector reduction, region two on a scalar norm reduction, each sync labeled approximately x microseconds, unmeasured. A lower band shows the current tile cache-resident while DRAM streams the next tile at B_i gigabytes per second and AVX or AMX compute consumes the current tile — streaming, not fitting the model in cache. A side panel lists the worked theoretical numbers: 93 layers at about 215 microseconds per layer, 186 reductions of 16 kilobytes totaling about 3 megabytes per token before collective overhead, and about 17.2 megabytes streamed per layer at 80 gigabytes per second. The takeaway: useful local work is much greater than bytes synchronized — the ratio is the thesis, measurement decides" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
@@ -1278,8 +1330,18 @@
 
 <p>
     One model, two operating points. <strong>Decode</strong> multiplies a one-token vector by the
-    weight matrix: every packed weight byte is read once and used once, arithmetic intensity is
-    \(\approx 2\) FLOP per weight byte, and the region is <strong>bandwidth dominated</strong>.
+    weight matrix: every packed weight byte is read once and used once, and the region is
+    <strong>bandwidth dominated</strong>. The arithmetic intensity is set by the <em>format</em>,
+    not a universal constant &mdash; the honest expression is:
+</p>
+
+\[ AI_{\text{decode}} \approx \frac{2 \times P_{\text{active}}}{B_{\text{packed weights}}} \]
+
+<p>
+    FP32 gives 0.5 FLOP/byte, BF16 gives 1, and ideal packed 4-bit weights give
+    \(\approx 4\) FLOP/byte before scale/block metadata, unpack overhead and activation traffic
+    &mdash; e.g. a 100B-parameter model at \(\approx\)50 GB packed streams 200 GFLOP against 50 GB,
+    \(\approx 4\) FLOP/byte. CKE computes this from the actual format rather than assuming one.
     <strong>Prefill</strong> multiplies a token matrix by the same weights: each byte is reused across
     \(T\) tokens, arithmetic intensity grows with \(T\), and the region is <strong>GEMM/compute
     dominated</strong>. Node capability is therefore phase-dependent:
@@ -1297,7 +1359,7 @@
 </p>
 
 <div class="img-container svg-viewer" data-title="Decode versus prefill: vector-times-matrix is bandwidth dominated, matrix-times-matrix is GEMM dominated, so the planner assigns different shard fractions per phase">
-    <img src="assets/distributed-cpu-decode-vs-prefill.svg" alt="Two panels. Decode: a one-token vector times the weight shard, every packed weight byte read once and used once, arithmetic intensity about two FLOPs per weight byte, bottleneck memory bandwidth — node capability for decode is approximately packed-weight stream bandwidth in the model's quant format. Prefill: a token matrix times the same weight shard, each byte reused across T tokens, arithmetic intensity growing with T, bottleneck GEMM and compute throughput — node capability for prefill is approximately measured GEMM throughput, ISA-dependent across AVX2, AVX-512 and AMX node classes. A consequence band states the planner may assign different shard fractions per phase, and the best prefill topology may differ from the best decode topology" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+    <img src="assets/distributed-cpu-decode-vs-prefill.svg" alt="Two panels. Decode: a one-token vector times the weight shard, every packed weight byte read once and used once, arithmetic intensity set by the format — about one FLOP per byte for BF16 and four for ideal four-bit packing, for example 200 gigaFLOPs against 50 gigabytes — bottleneck memory bandwidth; node capability for decode is approximately packed-weight stream bandwidth in the model's quant format. Prefill: a token matrix times the same weight shard, each byte reused across T tokens, arithmetic intensity growing with T, bottleneck GEMM and compute throughput — node capability for prefill is approximately measured GEMM throughput, ISA-dependent across AVX2, AVX-512 and AMX node classes. A consequence band states the planner may assign different shard fractions per phase, and the best prefill topology may differ from the best decode topology" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
 <h2>Communication Must Be Measured</h2>
@@ -1366,28 +1428,40 @@
 
 <p>
     Heterogeneous sharding needs a quantitative rule, not a vibe. Let \(P_i\) be node \(i\)'s
-    <strong>X-Ray-measured CKE throughput for the relevant region</strong> &mdash; stream bandwidth
-    for decode-shaped regions, GEMM throughput for prefill-shaped regions, never nominal FLOPS. The
-    shard fractions follow directly:
+    <strong>X-Ray-measured CKE throughput for the relevant region</strong> &mdash; and note that
+    \(P_i\) is really \(P_i(r, \text{phase}, \text{dtype})\): stream bandwidth for decode-shaped
+    regions, GEMM throughput for prefill-shaped regions, something like
+    \(f(BW_{\text{KV}}, F_{\text{attention}})\) for long-context attention &mdash; never nominal
+    FLOPS, and not one constant per node. The same Xeon/Ryzen ratio does not apply everywhere,
+    which is exactly where this differs from a static <code>--tensor-split 0.2,0.2,0.6</code>:
+    <strong>the shard size is operator- and phase-dependent.</strong> The fractions follow directly:
 </p>
 
-\[ s_i = \frac{P_i}{\sum_j P_j} \]
+\[ s_i(r) = \frac{P_i(r)}{\sum_j P_j(r)} \]
 
 <p>
-    Region time is bounded below by whichever resource saturates first, plus the synchronization the
-    algebra forces:
+    Region time is bounded below by whichever resource saturates first &mdash; on
+    <strong>fresh bytes</strong>, not total weight bytes &mdash; plus the synchronization the
+    algebra forces, which is a measured, node-count-dependent term \(C_r(N)\):
 </p>
 
-\[ T_r = \max\!\left( \frac{B_r}{\sum_i BW_{i,r}},\ \frac{F_r}{\sum_i FLOPS_{i,r}} \right) + T_{\text{sync},r} \]
-
-\[ T_{\text{token}} = \sum_r T_r, \qquad \text{tok/s} = \frac{1}{T_{\text{token}}} \]
+\[ T_r = \max\!\left( \frac{B_{\text{fresh},r}}{\sum_i BW_{i,r}},\ \frac{F_r}{\sum_i F_{i,r}} \right) + C_r(N) \]
 
 <p>
-    where \(B_r\) and \(F_r\) are the region's bytes and FLOPs. Two labels apply to every use of
-    these equations on this page: <strong>OPTIMISTIC LOWER BOUND</strong> &mdash; measured time will
-    be <em>&ge;</em> predicted, because the max() ignores overlap penalties, stragglers, collective
-    algorithms and software overhead; and <strong>THEORETICAL</strong> &mdash; the model exists to be
-    validated or falsified by the ladder below, not to advertise a number.
+    Elevated to the headline equation &mdash; the whole distributed-CPU hypothesis in one line:
+</p>
+
+\[ \boxed{\; T_{\text{token}} = \sum_r \left[ \max\!\left( \frac{B_{\text{fresh},r}}{\sum_i BW_{i,r}},\ \frac{F_r}{\sum_i F_{i,r}} \right) + C_r(N) \right] \;} \]
+
+\[ \text{tok/s} = \frac{1000}{T_{\text{token}}\ \text{(ms)}} \]
+
+<p>
+    where \(B_{\text{fresh},r}\) and \(F_r\) are the region's fresh bytes and FLOPs. Two labels
+    apply to every use of these equations on this page: <strong>OPTIMISTIC LOWER BOUND</strong>
+    &mdash; measured time will be <em>&ge;</em> predicted, because the max() ignores overlap
+    penalties, stragglers, collective algorithms and software overhead; and
+    <strong>THEORETICAL</strong> &mdash; the model exists to be validated or falsified by the
+    ladder below, not to advertise a number.
 </p>
 
 <h2>The Topology-versus-Context Thesis</h2>
@@ -1747,7 +1821,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-16</p>
             </div>
         </div>
     </footer>

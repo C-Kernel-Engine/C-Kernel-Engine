@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">
+  <title>The 20 ms token ruler: 186 small reductions per token make collective latency, not bandwidth, the binding constraint</title>
+  <desc>A horizontal 20-millisecond token ruler for a 50 tokens-per-second target, divided into layer slots of local work separated by thin reduction ticks: 93 layers times 2 hidden-vector reductions equals 186 reductions per token. Below, a table converts per-reduction collective latency into sequential cost per token: 2 microseconds costs 0.372 milliseconds (1.9 percent of the budget), 5 microseconds costs 0.93 ms (4.7 percent), 10 microseconds costs 1.86 ms (9.3 percent), 20 microseconds costs 3.72 ms (18.6 percent), and 50 microseconds costs 9.3 ms (46.5 percent). At a 100 tokens-per-second target every percentage doubles. The experimental gate: can CKE get its real small-vector reduction into the latency regime the target token budget requires. All figures are THEORETICAL model arithmetic, not measurements.</desc>
+
+  <rect width="960" height="700" fill="#232323"/>
+
+  <text x="480" y="34" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">The 20 ms Token Ruler: Latency, Not Bandwidth, Is the Danger</text>
+  <text x="480" y="56" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">186 tiny reductions per token — the payload is 3 MB, but the latency is serial. MODEL arithmetic, not measurement</text>
+
+  <!-- budget banner -->
+  <rect x="270" y="72" width="420" height="38" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="96" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#ffd97a" text-anchor="middle">50 tok/s = 20 ms / token (MODEL)</text>
+
+  <!-- ruler axis -->
+  <line x1="80" y1="140" x2="880" y2="140" stroke="#808080" stroke-width="1.5"/>
+  <line x1="80" y1="132" x2="80" y2="148" stroke="#808080" stroke-width="1.5"/>
+  <line x1="880" y1="132" x2="880" y2="148" stroke="#808080" stroke-width="1.5"/>
+  <text x="80" y="128" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">0 ms</text>
+  <text x="880" y="128" font-family="Inter, sans-serif" font-size="11" fill="#a0a0a0" text-anchor="middle">20 ms</text>
+
+  <!-- layer blocks with reduce ticks -->
+  <g font-family="Inter, sans-serif">
+    <!-- Layer 0 -->
+    <rect x="80" y="162" width="150" height="56" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="155" y="186" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">Layer 0</text>
+    <text x="155" y="203" font-size="10" fill="#5a8fb0" text-anchor="middle">LOCAL WORK ≈215 µs</text>
+    <rect x="234" y="162" width="5" height="56" fill="#ffb400"/>
+    <!-- Layer 1 -->
+    <rect x="252" y="162" width="150" height="56" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="327" y="186" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">Layer 1</text>
+    <text x="327" y="203" font-size="10" fill="#5a8fb0" text-anchor="middle">LOCAL WORK</text>
+    <rect x="406" y="162" width="5" height="56" fill="#ffb400"/>
+    <!-- Layer 2 -->
+    <rect x="424" y="162" width="150" height="56" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="499" y="186" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">Layer 2</text>
+    <text x="499" y="203" font-size="10" fill="#5a8fb0" text-anchor="middle">LOCAL WORK</text>
+    <rect x="578" y="162" width="5" height="56" fill="#ffb400"/>
+    <!-- ellipsis -->
+    <text x="635" y="196" font-size="20" fill="#808080" text-anchor="middle">⋯</text>
+    <!-- Layer 92 -->
+    <rect x="672" y="162" width="150" height="56" rx="6" fill="#0c1d2a" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="747" y="186" font-size="11.5" font-weight="600" fill="#b0d9ef" text-anchor="middle">Layer 92</text>
+    <text x="747" y="203" font-size="10" fill="#5a8fb0" text-anchor="middle">LOCAL WORK</text>
+    <rect x="826" y="162" width="5" height="56" fill="#ffb400"/>
+  </g>
+
+  <!-- reduce tick legend -->
+  <rect x="640" y="232" width="12" height="12" fill="#ffb400"/>
+  <text x="660" y="242" font-family="Inter, sans-serif" font-size="11" fill="#c8a04a">reduce — L each, unmeasured</text>
+
+  <text x="480" y="268" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">93 layers × 2 reductions = 186 reductions / token → T_collective/token = 186 × L</text>
+
+  <!-- ═══ latency table ═══ -->
+  <rect x="130" y="296" width="700" height="250" rx="10" fill="#262626" stroke="#404040"/>
+  <text x="480" y="326" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#a0a0a0" text-anchor="middle">What one small-vector all-reduce costs the whole token</text>
+
+  <g font-family="Inter, sans-serif" font-size="12.5">
+    <text x="220" y="358" font-weight="700" fill="#808080">collective latency L</text>
+    <text x="480" y="358" font-weight="700" fill="#808080">186 × L per token</text>
+    <text x="700" y="358" font-weight="700" fill="#808080">share of 20 ms</text>
+
+    <text x="220" y="388" fill="#b0b0b0">2 µs</text>
+    <text x="480" y="388" fill="#b0b0b0">0.372 ms</text>
+    <text x="700" y="388" fill="#86efac">1.9%</text>
+
+    <text x="220" y="416" fill="#b0b0b0">5 µs</text>
+    <text x="480" y="416" fill="#b0b0b0">0.93 ms</text>
+    <text x="700" y="416" fill="#86efac">4.7%</text>
+
+    <text x="220" y="444" fill="#b0b0b0">10 µs</text>
+    <text x="480" y="444" fill="#b0b0b0">1.86 ms</text>
+    <text x="700" y="444" fill="#f8c471">9.3%</text>
+
+    <text x="220" y="472" fill="#b0b0b0">20 µs</text>
+    <text x="480" y="472" fill="#b0b0b0">3.72 ms</text>
+    <text x="700" y="472" fill="#f8c471">18.6%</text>
+
+    <text x="220" y="500" fill="#b0b0b0">50 µs</text>
+    <text x="480" y="500" fill="#b0b0b0">9.3 ms</text>
+    <text x="700" y="500" fill="#f87171">46.5%</text>
+  </g>
+
+  <line x1="160" y1="368" x2="800" y2="368" stroke="#404040" stroke-width="1"/>
+
+  <text x="480" y="532" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">at 100 tok/s (10 ms/token) every share doubles — the same collective that costs 9.3% at 50 tok/s costs 18.6%</text>
+
+  <!-- gate band -->
+  <rect x="130" y="566" width="700" height="100" rx="10" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
+  <text x="480" y="598" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffd97a" text-anchor="middle">The experimental gate</text>
+  <text x="480" y="624" font-family="Inter, sans-serif" font-size="12.5" fill="#b0b0b0" text-anchor="middle">Can CKE get its real small-vector reduction into the latency regime</text>
+  <text x="480" y="644" font-family="Inter, sans-serif" font-size="12.5" fill="#b0b0b0" text-anchor="middle">the target token budget requires? Measured L answers this, not the link sheet.</text>
+</svg>

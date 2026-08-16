@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
   <title>Parallelism taxonomy: what each method shards, where it synchronizes, and whether it aggregates single-request compute</title>
-  <desc>A six-row comparison of data, tensor, pipeline, context-sequence, expert and head parallelism. Data parallelism shards requests across replicas and never aggregates single-request compute. Tensor parallelism shards each weight tensor and, by pairing column-parallel with row-parallel linears, pays roughly two collectives per transformer layer. Pipeline parallelism shards layers and moves activations between stages; it adds capacity and microbatch throughput but does not shorten a single request. Context parallelism shards the token sequence and synchronizes around attention. Expert parallelism shards MoE experts and synchronizes at routing dispatch and combine. Head parallelism shards attention heads and needs only softmax statistics and an output reduction.</desc>
+  <desc>A six-row comparison of data, tensor, pipeline, context-sequence, expert and head parallelism. Data parallelism shards requests across replicas and never aggregates single-request compute. Tensor parallelism shards each weight tensor and, by pairing column-parallel with row-parallel linears, pays roughly two collectives per transformer layer. Pipeline parallelism shards layers and moves activations between stages; it adds capacity and microbatch throughput but does not shorten a single request. Context parallelism shards the token sequence and synchronizes around attention. Expert parallelism shards MoE experts and synchronizes at routing dispatch and combine. Head parallelism shards attention heads and is fully head-independent: each head's softmax is computed locally, and only the output projection mixes heads, so the sole reduction is hidden-state-sized. The online-softmax statistic merge appears only when head parallelism is combined with context parallelism.</desc>
 
   <rect width="960" height="640" fill="#232323"/>
 
@@ -74,8 +74,9 @@
   <text x="48" y="566" font-family="Inter, sans-serif" font-size="11" fill="#5a8fb0">head-parallel</text>
   <text x="200" y="548" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">attention heads</text>
   <text x="200" y="566" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">(GQA-aware groups)</text>
-  <text x="440" y="548" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">softmax stats + hidden-state</text>
-  <text x="440" y="566" font-family="Inter, sans-serif" font-size="12" fill="#b0d9ef">output reduction only</text>
+  <text x="440" y="540" font-family="Inter, sans-serif" font-size="11.5" fill="#b0d9ef">out-projection reduction only;</text>
+  <text x="440" y="556" font-family="Inter, sans-serif" font-size="11.5" fill="#b0d9ef">heads are fully independent</text>
+  <text x="440" y="572" font-family="Inter, sans-serif" font-size="10" fill="#5a8fb0">(softmax stats merge only if context is also sharded)</text>
   <text x="720" y="552" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#86efac">Yes</text>
 
   <text x="480" y="618" font-family="Inter, sans-serif" font-size="12" fill="#808080" text-anchor="middle">Zip fusion composes TP-style lanes, head parallelism and CP as one scheduling problem</text>

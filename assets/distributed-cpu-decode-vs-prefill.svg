@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
   <title>Decode versus prefill: the same weights present two different bottlenecks, so the planner uses different shard weights per phase</title>
-  <desc>Two panels. Decode: one token vector times the weight matrix, each packed weight byte is streamed and used once, arithmetic intensity is roughly two FLOPs per weight byte, so the region is bandwidth dominated and node capability for decode is approximately its packed-weight stream bandwidth. Prefill: a token matrix times the same weight matrix, each weight byte is reused across many tokens, arithmetic intensity grows with token count, so the region is GEMM and compute dominated and node capability for prefill is approximately its measured GEMM throughput. A bottom band shows the consequence: the planner may assign different shard fractions, or even a different topology, between prefill and decode for the same model on the same nodes. All labels are THEORETICAL model statements, not measurements.</desc>
+  <desc>Two panels. Decode: one token vector times the weight matrix, each packed weight byte is streamed and used once, and arithmetic intensity is format-dependent — roughly 2 times active parameters divided by packed weight bytes, about 1 FLOP per byte for BF16 and 4 FLOP per byte for ideal 4-bit packing — so the region is bandwidth dominated and node capability for decode is approximately its packed-weight stream bandwidth. Prefill: a token matrix times the same weight matrix, each weight byte is reused across many tokens, arithmetic intensity grows with token count, so the region is GEMM and compute dominated and node capability for prefill is approximately its measured GEMM throughput. A bottom band shows the consequence: the planner may assign different shard fractions, or even a different topology, between prefill and decode for the same model on the same nodes. All labels are THEORETICAL model statements, not measurements.</desc>
 
   <defs>
     <marker id="arrDP" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -31,8 +31,9 @@
   <text x="268" y="282" font-family="Inter, sans-serif" font-size="11" fill="#808080" text-anchor="middle">every byte read once, used once</text>
 
   <g font-family="Inter, sans-serif" font-size="11.5" fill="#b0b0b0">
-    <text x="78" y="330">arithmetic intensity ≈ 2 FLOP / weight byte</text>
-    <text x="78" y="352">bottleneck: <tspan fill="#f8c471" font-weight="700">memory bandwidth</tspan></text>
+    <text x="78" y="322">AI ≈ 2·P_active / B_packed — set by the format</text>
+    <text x="78" y="342" font-size="10.5" fill="#808080">BF16: 1 FLOP/B · ideal 4-bit: 4 FLOP/B · e.g. 200 GFLOP / 50 GB ≈ 4 FLOP/B</text>
+    <text x="78" y="364">bottleneck: <tspan fill="#f8c471" font-weight="700">memory bandwidth</tspan></text>
   </g>
 
   <rect x="72" y="376" width="372" height="60" rx="8" fill="#2a2410" stroke="#ffb400" stroke-width="2"/>
