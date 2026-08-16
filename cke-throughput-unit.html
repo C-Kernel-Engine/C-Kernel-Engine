@@ -1345,19 +1345,45 @@ cku = useful_active_path_bytes / T_token</code></pre>
     <img src="assets/cku-convergence.svg" alt="A convergence diagram. At top the north star: 1 CKU equals 1 petabyte per second of useful model-path rate, a convergence target not a per-node expectation. Two boxes below: Potential CKU, the sum of isolated node capabilities, and Realized CKU, useful bytes advanced per wall time end to end. Their ratio eta is the CKE scaling efficiency the research program drives toward one. Below, the constraint map with compute, DRAM, network and storage roofs; the slowest roof is the active constraint. The CKE planner shapes shards, tiles, placement, prefetch, overlap and synchronization against it — balancing completion time across nodes, not bytes — emits generated C, measures, and loops back into the next plan. A footer notes every optimization is a delta in the same unit and that eta has not been measured yet" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
-<h3>CKU is per region and node, not per machine</h3>
+<h3>One public CKU; per-region rates are the planner's pricing</h3>
 
 <p>
-    A node does not have one universal CKU. The same Ryzen can be DRAM/unpack-limited on a decode
-    region, compute-limited on a prefill region, bandwidth-limited on a KV scan, and far faster on a
-    cache-hot region. The planner profile is therefore a <strong>table of rates</strong> &mdash;
-    \(CKU_i^{\text{decode}}\), \(CKU_i^{\text{prefill}}\), \(CKU_i^{\text{KV}}\),
-    \(CKU_i^{\text{cache-hot}}\), \(CKU_i^{\text{reduction}}\), &hellip; &mdash; and each generated
-    region is priced with the rate that matches its shape. Shard assignment then synchronizes
-    <em>completion time</em>, not bytes: choose \(s_i\) so \(B_i / CKU_i \approx B_j / CKU_j\) for
-    every participating node, and all lanes reach the reduction boundary together &mdash;
-    <strong>CKU synchronization</strong>. If the Xeon contributes four times a Ryzen's CKU for one
-    kernel and a different ratio for another, its share changes per region accordingly.
+    The public metric stays singular &mdash; <strong>one CKU</strong>: useful model-path work
+    advanced per wall-clock second. What varies per region is not the metric but the
+    <em>price</em> a node pays to advance it. The same Ryzen can be DRAM/unpack-limited on a
+    decode region, compute-limited on a prefill region, bandwidth-limited on a KV scan, and
+    far faster on a cache-hot region. The planner profile is therefore a <strong>table of
+    internal rates</strong> &mdash; \(CKU_i^{\text{decode}}\), \(CKU_i^{\text{prefill}}\),
+    \(CKU_i^{\text{KV}}\), \(CKU_i^{\text{cache-hot}}\), \(CKU_i^{\text{reduction}}\), &hellip;
+    &mdash; used to price each generated region with the rate that matches its shape. Shard
+    assignment then synchronizes <em>completion time</em>, not bytes: choose \(s_i\) so
+    \(B_i / CKU_i \approx B_j / CKU_j\) for every participating node, and all lanes reach the
+    reduction boundary together &mdash; <strong>CKU synchronization</strong>. If the Xeon
+    contributes four times a Ryzen's rate for one kernel and a different ratio for another,
+    its share changes per region accordingly.
+</p>
+
+<p>
+    These per-region flavors are <strong>not separate headline metrics</strong>. CKE reports
+    one realized CKU, and X-Ray explains its composition &mdash; an illustrative breakdown,
+    not a measurement:
+</p>
+
+<pre><code>CKU realized:       0.000014          (illustrative, not measured)
+
+Execution composition:
+  Dense GEMM:       71%
+  Attention/state:  14%
+  synchronization:   6%
+  exposed DRAM:      7%
+  other:             2%</code></pre>
+
+<p>
+    The optimization objective is then always the same &mdash; <strong>increase realized
+    CKU</strong> &mdash; and the composition tells you where to work: dense GEMM slow
+    &rarr; arithmetic; exposed DRAM visible &rarr; staging and tiles; synchronization visible
+    &rarr; sharding; KV dominating &rarr; head/context sharding. No new fundamental metric
+    each time the bottleneck moves.
 </p>
 
 <h3>The Theory of Constraints underneath CKU</h3>

@@ -1362,6 +1362,67 @@
     <img src="assets/distributed-cpu-decode-vs-prefill.svg" alt="Two panels. Decode: a one-token vector times the weight shard, every packed weight byte read once and used once, arithmetic intensity set by the format — about one FLOP per byte for BF16 and four for ideal four-bit packing, for example 200 gigaFLOPs against 50 gigabytes — bottleneck memory bandwidth; node capability for decode is approximately packed-weight stream bandwidth in the model's quant format. Prefill: a token matrix times the same weight shard, each byte reused across T tokens, arithmetic intensity growing with T, bottleneck GEMM and compute throughput — node capability for prefill is approximately measured GEMM throughput, ISA-dependent across AVX2, AVX-512 and AMX node classes. A consequence band states the planner may assign different shard fractions per phase, and the best prefill topology may differ from the best decode topology" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
 </div>
 
+<h2>Prefill First, Then One Matrix-Work Scheduler</h2>
+
+<p>
+    Prefill is the cleanest place to prove CKE's deterministic scaling story first. A prefill
+    region multiplies a token matrix by the weight matrix, \(X_{B \times d}\,W_{d \times k}\),
+    so the same weight tile is reused across \(B\) token rows and arithmetic intensity rises
+    with \(B\). When the region is genuinely dense &mdash; compute time exceeds streaming time:
+</p>
+
+\[ \frac{F_r}{P} > \frac{B_{\text{fresh},r}}{BW} \quad\Longrightarrow\quad T_r \approx \frac{F_r}{P_{\text{cluster}}} + T_{\text{sync}} \]
+
+<p>
+    &mdash; the first objective becomes simple to state: <strong>maximize sustained useful GEMM
+    throughput across the cluster</strong>, and check whether adding a node adds its measured
+    compute minus a small, visible synchronization term. No bandwidth cliff, no cache
+    phenomenology &mdash; those enter later, on their own measured terms.
+</p>
+
+<p>
+    Decode then stops being a separate architecture. Batch-1 decode multiplies one token row by
+    the weights, but continuous batching packs every runnable sequence into the same product:
+</p>
+
+\[ X = \begin{bmatrix} x_1 \\ x_2 \\ \vdots \\ x_B \end{bmatrix}, \qquad XW \]
+
+<p>
+    As \(B\) grows, the workload slides along a continuum &mdash; GEMV-like, small GEMM, large
+    GEMM &mdash; and CKE needs <strong>one matrix-work scheduler</strong>, not a &ldquo;prefill
+    runtime&rdquo; and a &ldquo;decode runtime&rdquo;. The scheduler's question is always the
+    same: <em>how many compatible activation rows are ready for this weight region, and which
+    tiling and sharding gives the shortest critical path</em> &mdash; continuously packing
+    available token work toward dense GEMM while respecting per-user latency constraints.
+</p>
+
+<div class="img-container svg-viewer" data-title="The batch continuum: CKU versus runnable token rows, rising from the bandwidth regime through a transition to the compute plateau, with the two-node plateau sketched as a hypothesis">
+    <img src="assets/cku-token-row-continuum.svg" alt="A schematic plot with runnable token rows B on a logarithmic axis from 1 to 128 and useful throughput on the vertical axis. The single-node curve sits flat in the bandwidth regime at B equals 1 to 4 where every weight byte is read once, steepens through a transition around B equals 16 to 32 where reuse begins to pay, and flattens into the compute plateau, the dense-GEMM regime, near B equals 64 to 128. The saturation point marks enough rows to feed the cores. A dashed curve above sketches the two-node plateau as approximately P1 plus P2 minus synchronization, explicitly labeled a hypothesis. The footer states the experiment: the first Ryzen sweep of B equals 1 through 128 measures effective gigaFLOPs per second, gigabytes per second and CKU, replacing the schematic with the real transition point, then repeats distributed on two nodes. The shape is a schematic model to be measured, not data" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
+</div>
+
+<p>
+    The transition point on that curve is an experimental deliverable, not an assumption:
+    MXFP4-class unpacking, scaling, tile shapes, ISA utilization and cache behavior decide
+    where a real node stops being bandwidth-bound. The first Ryzen experiment sweeps
+    \(B = 1, 2, 4, \ldots, 128\) and measures effective GFLOP/s, effective GB/s and CKU per
+    point; the two-node repeat should show the plateau move to approximately
+    \(P_1 + P_2\) minus synchronization if the scheduler is honest.
+</p>
+
+<p>
+    <strong>KV and recurrent state stay special &mdash; but as regions, not as an
+    architecture.</strong> Even when batching makes the dense projections GEMM-like, every
+    sequence carries independent state, \(KV_1, KV_2, \ldots, KV_B\), so attention has a
+    different data-access structure from the projections. CKE treats it as another region in
+    the same schedule &mdash; dense projection, local attention/KV work, small reduction if
+    required &mdash; and lets X-Ray report which regions ran below peak and why. Models with
+    recurrent or linear-attention layers may shrink the long-context KV burden; that is a
+    per-model measurement, never a CKE core assumption. The overall objective stays singular:
+    <strong>keep as much of the execution graph in the dense-GEMM regime as possible</strong>,
+    and optimize the whole architecture around that rather than around the worst batch-1
+    decode case.
+</p>
+
 <h2>Communication Must Be Measured</h2>
 
 <p>
@@ -1567,6 +1628,12 @@
     <tr>
         <td>Head &times; context 2-D</td>
         <td>6-node 3&times;2 grid with online-softmax merging at long context</td>
+        <td>&mdash;</td>
+        <td><span class="badge badge-grey">Not yet certified</span></td>
+    </tr>
+    <tr>
+        <td>Token-row sweep</td>
+        <td>B = 1&hellip;128 batch continuum; effective GFLOP/s, GB/s and CKU per point; locates the bandwidth-to-compute transition; repeated on two nodes</td>
         <td>&mdash;</td>
         <td><span class="badge badge-grey">Not yet certified</span></td>
     </tr>
