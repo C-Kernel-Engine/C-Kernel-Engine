@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from server.schemas.annotations import FileCitation, URLCitation, FilePath
 from server.schemas.common import (
     ErrorCode,
@@ -355,10 +357,78 @@ def test_streaming_events():
     assert completed.type == "response.completed"
 
     delta = ResponseTextDeltaEvent(
-        response_id="resp_1",
+        item_id="msg_1",
         output_index=0,
         content_index=0,
         delta="Hello",
+        sequence_number=3,
     )
     assert delta.type == "response.output_text.delta"
     assert delta.delta == "Hello"
+    assert delta.item_id == "msg_1"
+    assert delta.sequence_number == 3
+
+
+def test_response_status_includes_queued_and_incomplete():
+    assert ResponseStatus.cancelled == "cancelled"
+    assert ResponseStatus.queued == "queued"
+    assert ResponseStatus.incomplete == "incomplete"
+
+
+def test_reasoning_request_effort():
+    req = CreateResponseRequest(model="gpt-5", reasoning={"effort": "medium"})
+    assert req.reasoning.effort == "medium"
+    assert "enabled" not in req.reasoning.model_dump()
+
+
+def test_reasoning_item_shape():
+    ri = ReasoningItem(
+        content=[{"type": "reasoning_text", "text": "think"}],
+        summary=[{"type": "summary_text", "text": "sum"}],
+    )
+    d = ri.model_dump()
+    assert d["type"] == "reasoning"
+    assert d["content"][0]["type"] == "reasoning_text"
+    assert d["summary"][0]["type"] == "summary_text"
+    assert d["encrypted_content"] is None
+
+
+def test_create_request_rejects_chat_completions_params():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CreateResponseRequest(model="gpt-5", n=2)
+    with pytest.raises(ValidationError):
+        CreateResponseRequest(model="gpt-5", seed=42)
+    with pytest.raises(ValidationError):
+        CreateResponseRequest(model="gpt-5", stop="END")
+
+
+def test_response_includes_aligned_fields():
+    resp = Response(
+        id="resp_abc",
+        created_at=1234567890,
+        completed_at=1234567890,
+        status=ResponseStatus.completed,
+        model="gpt-5",
+        output_text="hi",
+    )
+    d = resp.model_dump()
+    assert d["completed_at"] == 1234567890
+    assert d["output_text"] == "hi"
+    assert d["conversation"] is None
+    assert "token_usage" not in d
+    assert "conversation_id" not in d
+    assert "include" not in d
+
+
+def test_usage_details_typed():
+    u = Usage(
+        input_tokens=1,
+        output_tokens=2,
+        total_tokens=3,
+        input_tokens_details={"cache_write_tokens": 4, "cached_tokens": 5},
+        output_tokens_details={"reasoning_tokens": 6},
+    )
+    assert u.input_tokens_details.cached_tokens == 5
+    assert u.output_tokens_details.reasoning_tokens == 6

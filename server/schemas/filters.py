@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ class ComparisonFilter(BaseModel):
 
 
 class CompoundFilter(BaseModel):
-    filters: list[ComparisonFilter | Any]
+    filters: list["ComparisonFilter | CompoundFilter"]
     type: Literal["and", "or"]
 
 

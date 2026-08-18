@@ -35,6 +35,10 @@ Raw CLI examples:
 After a run exists:
   ./build/ck-cli-v8 --list
 
+Serve over HTTP/SSE (OpenAI Responses shape):
+  version/v8/scripts/cks-v8-run serve hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \\
+    --port 8080
+
 Advanced options:
   version/v8/scripts/cks-v8-run run --help
 EOF
@@ -174,6 +178,10 @@ if [ -n "$SELECTED_PY" ]; then
   PY_BIN="$SELECTED_PY"
 elif [ -x "$VENV_PY" ]; then
   PY_BIN="$VENV_PY"
+fi
+
+if [ "${1:-}" = "serve" ]; then
+  exec "$PY_BIN" "$SCRIPT_DIR/ck_serve_v8.py" "${@:2}"
 fi
 
 exec "$PY_BIN" "$SCRIPT_DIR/ck_run_v8.py" "$@"

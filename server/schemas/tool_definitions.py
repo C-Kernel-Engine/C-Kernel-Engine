@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .filters import Filter, RankingOptions
 
@@ -49,6 +49,7 @@ class WebSearchUserLocation(BaseModel):
 
 class WebSearchTool(BaseModel):
     type: Literal["web_search", "web_search_2025_08_26"]
+    external_web_access: bool | None = None
     filters: dict[str, list[str]] | None = None
     search_context_size: Literal["low", "medium", "high"] | None = None
     user_location: WebSearchUserLocation | None = None
@@ -102,7 +103,16 @@ class McpTool(BaseModel):
     allowed_callers: list[Literal["direct", "programmatic"]] | None = None
     allowed_tools: list[str] | McpToolFilter | None = None
     authorization: str | None = None
-    connector_id: str | None = None
+    connector_id: Literal[
+        "connector_dropbox",
+        "connector_gmail",
+        "connector_googlecalendar",
+        "connector_googledrive",
+        "connector_microsoftteams",
+        "connector_outlookcalendar",
+        "connector_outlookemail",
+        "connector_sharepoint",
+    ] | None = None
     defer_loading: bool | None = None
     headers: dict[str, str] | None = None
     require_approval: McpToolApprovalFilter | Literal["always", "never"] | None = None
@@ -111,7 +121,7 @@ class McpTool(BaseModel):
     tunnel_id: str | None = None
 
 
-ToolDefinition = (
+ToolDefinition = Annotated[
     FunctionTool
     | FileSearchTool
     | ComputerTool
@@ -120,5 +130,6 @@ ToolDefinition = (
     | McpTool
     | CodeInterpreterTool
     | ProgrammaticToolCallingTool
-    | ImageGenerationTool
-)
+    | ImageGenerationTool,
+    Field(discriminator="type"),
+]

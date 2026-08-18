@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CKS v8 live text-generation</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 0; padding: 24px; background: #11151c; color: #d6dbe2; }
+  h1 { font-size: 18px; margin: 0 0 16px; color: #7fd1a8; }
+  .panel { background: #181d26; border: 1px solid #262d3a; border-radius: 8px; padding: 16px; max-width: 860px; margin: 0 auto; }
+  label { display: block; font-size: 12px; color: #8a93a3; margin: 10px 0 4px; }
+  input[type=text], textarea, select { width: 100%; background: #0f141b; color: #e4e9f0; border: 1px solid #333c4d; border-radius: 6px; padding: 8px; font: inherit; }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+  button { margin-top: 14px; padding: 9px 18px; border: 0; border-radius: 6px; background: #2f8f6b; color: #0b0f14; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .thinking { margin-top: 16px; border: 1px dashed #5a4a2a; background: #201d14; border-radius: 6px; }
+  .thinking summary { padding: 8px 12px; cursor: pointer; color: #c9a86a; font-weight: 700; }
+  .thinking .body { padding: 8px 12px 12px; color: #8a8f7a; white-space: pre-wrap; }
+  #answer { margin-top: 14px; white-space: pre-wrap; line-height: 1.5; min-height: 40px; }
+  #status { font-size: 12px; color: #6a7383; margin-top: 10px; }
+  #perf { margin-top: 12px; border-top: 1px solid #333c4d; padding-top: 10px; color: #7f8aa0; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>CKS v8 · live text generation</h1>
+
+  <label for="prompt">Prompt</label>
+  <textarea id="prompt" placeholder="Ask the model anything...">Explain the kernel in one sentence.</textarea>
+
+  <div class="row">
+    <div>
+      <label for="temperature">Temperature</label>
+      <input id="temperature" type="text" value="0.7">
+    </div>
+    <div>
+      <label for="max_tokens">Max tokens</label>
+      <input id="max_tokens" type="text" value="512">
+    </div>
+  </div>
+
+  <div class="toggle">
+    <input id="reasoning" type="checkbox" checked>
+    <label for="reasoning" style="margin:0">Reasoning</label>
+  </div>
+  <div class="toggle">
+    <input id="stream" type="checkbox" checked>
+    <label for="stream" style="margin:0">Streaming</label>
+  </div>
+
+  <button id="run">Generate</button>
+
+  <details class="thinking" id="thinking-box" open>
+    <summary>Thinking</summary>
+    <div class="body" id="thinking"></div>
+  </details>
+
+  <div id="answer"></div>
+  <div id="status"></div>
+  <div id="perf"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const runBtn = $("run");
+  const thinkingBox = $("thinking-box");
+  const thinkingEl = $("thinking");
+  const answerEl = $("answer");
+  const statusEl = $("status");
+  const perfEl = $("perf");
+
+  runBtn.addEventListener("click", run);
+
+  async function run() {
+    const prompt = $("prompt").value;
+    const temperature = parseFloat($("temperature").value) || 0.7;
+    const max_output_tokens = parseInt($("max_tokens").value, 10) || 512;
+    const reasoning = $("reasoning").checked ? { effort: "medium" } : null;
+    const stream = $("stream").checked;
+
+    answerEl.textContent = "";
+    thinkingEl.textContent = "";
+    perfEl.textContent = "";
+    thinkingBox.open = true;
+
+    const body = {
+      model: "ck-v8",
+      input: prompt,
+      instructions: "You are a helpful assistant.",
+      temperature: temperature,
+      max_output_tokens: max_output_tokens,
+      stream: stream,
+    };
+    if (reasoning) body.reasoning = reasoning;
+
+    runBtn.disabled = true;
+    statusEl.textContent = "requesting...";
+
+    try {
+      const res = await fetch("/v1/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        statusEl.textContent = "HTTP " + res.status;
+        return;
+      }
+      if (stream && res.body) {
+        await consumeStream(res);
+      } else {
+        const response = await res.json();
+        renderCompleted(response.response || response);
+        statusEl.textContent = "done";
+      }
+    } catch (err) {
+      statusEl.textContent = "error: " + err.message;
+      perfEl.textContent = "";
+    } finally {
+      runBtn.disabled = false;
+    }
+
+    async function consumeStream(res) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sep;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          handleBlock(block);
+        }
+      }
+      statusEl.textContent = "done";
+    }
+
+    function renderCompleted(response) {
+      if (!response) return;
+      const perf = response.performance;
+      if (perf) {
+        perfEl.textContent =
+          "prompt eval: " + (perf.prefill_ms || 0).toFixed(1) + " ms (" +
+          (perf.prefill_tokens_per_sec || 0).toFixed(1) + " tok/s)  " +
+          "decode: " + (perf.decode_ms || 0).toFixed(1) + " ms (" +
+          (perf.decode_ms_per_token || 0).toFixed(2) + " ms/tok, " +
+          (perf.decode_tokens_per_sec || 0).toFixed(1) + " tok/s)  " +
+          "total: " + (perf.total_ms || 0).toFixed(1) + " ms  " +
+          "stop: " + perf.stop_reason;
+      }
+      const out = response.output || [];
+      let thinking = null;
+      let text = "";
+      for (const item of out) {
+        if (item.type === "reasoning" && item.content && item.content[0]) {
+          thinking = item.content[0].text;
+        } else if (item.type === "message" && item.content && item.content[0]) {
+          text = item.content[0].text;
+        }
+      }
+      if (thinking) {
+        thinkingBox.open = true;
+        thinkingEl.textContent = thinking;
+      } else {
+        thinkingBox.open = false;
+        thinkingEl.textContent = "";
+      }
+      answerEl.textContent = text;
+      if (response.usage) {
+        statusEl.textContent = "done — in: " + response.usage.input_tokens +
+          ", out: " + response.usage.output_tokens;
+      }
+    }
+
+    function handleBlock(block) {
+      let event = "message";
+      const dataLines = [];
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice("event: ".length);
+        else if (line.startsWith("data: ")) dataLines.push(line.slice("data: ".length));
+      }
+      if (event === "response.completed") {
+        try {
+          const payload = JSON.parse(dataLines.join("\n"));
+          renderCompleted(payload.response || {});
+        } catch (e) { /* ignore */ }
+        return;
+      }
+      if (event === "response.failed") {
+        statusEl.textContent = "failed";
+        return;
+      }
+      if (!dataLines.length) return;
+      const data = dataLines.join("\n");
+      let payload;
+      try { payload = JSON.parse(data); } catch (e) { return; }
+      const delta = payload.delta;
+      if (typeof delta !== "string") return;
+      if (event === "response.reasoning_text.delta") {
+        thinkingBox.open = true;
+        thinkingEl.textContent += delta;
+      } else if (event === "response.output_text.delta") {
+        answerEl.textContent += delta;
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>

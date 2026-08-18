@@ -147,11 +147,23 @@ class ToolSearchOutput(BaseModel):
     status: ItemStatus | None = None
 
 
+class ReasoningTextContent(BaseModel):
+    text: str
+    type: Literal["reasoning_text"] = "reasoning_text"
+
+
+class SummaryTextContent(BaseModel):
+    text: str
+    type: Literal["summary_text"] = "summary_text"
+
+
 class ReasoningItem(BaseModel):
     type: Literal["reasoning"] = "reasoning"
     id: str | None = None
     status: ItemStatus | None = None
-    summary: list[dict[str, Any]] | None = None
+    content: list[ReasoningTextContent] | None = None
+    summary: list[SummaryTextContent] = Field(default_factory=list)
+    encrypted_content: str | None = None
 
 
 ResponseOutputItem = Annotated[

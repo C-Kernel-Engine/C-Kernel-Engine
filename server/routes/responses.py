@@ -33,8 +33,10 @@ def _make_mock_response(model: str) -> Response:
     resp = Response(
         id=resp_id,
         created_at=now,
+        completed_at=now,
         status=ResponseStatus.completed,
         model=model,
+        output_text=MOCK_TEXT,
         output=[
             ResponseOutputMessage(
                 id=f"msg_{uuid.uuid4().hex[:24]}",

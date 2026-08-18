@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,7 +46,39 @@ class ResponseStatus(StrEnum):
     completed = "completed"
     failed = "failed"
     in_progress = "in_progress"
-    cancelled =("cancelled",)
+    cancelled = "cancelled"
+    queued = "queued"
+    incomplete = "incomplete"
+
+
+class ReasoningEffort(StrEnum):
+    none = "none"
+    minimal = "minimal"
+    low = "low"
+    medium = "medium"
+    high = "high"
+    xhigh = "xhigh"
+    max = "max"
+
+
+class ReasoningMode(StrEnum):
+    standard = "standard"
+    pro = "pro"
+
+
+class ServiceTier(StrEnum):
+    auto = "auto"
+    default = "default"
+    flex = "flex"
+    scale = "scale"
+    priority = "priority"
+    fast = "fast"
+    ultrafast = "ultrafast"
+
+
+class Truncation(StrEnum):
+    auto = "auto"
+    disabled = "disabled"
 
 
 class ErrorCode(StrEnum):
@@ -172,6 +203,15 @@ class ResponseError(BaseModel):
     message: str
 
 
+class UsageInputTokensDetails(BaseModel):
+    cache_write_tokens: int = 0
+    cached_tokens: int = 0
+
+
+class UsageOutputTokensDetails(BaseModel):
+    reasoning_tokens: int = 0
+
+
 class Usage(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -179,5 +219,5 @@ class Usage(BaseModel):
     output_tokens: int = 0
     total_tokens: int = 0
 
-    input_tokens_details: dict[str, Any] | None = None
-    output_tokens_details: dict[str, Any] | None = None
+    input_tokens_details: UsageInputTokensDetails | None = None
+    output_tokens_details: UsageOutputTokensDetails | None = None

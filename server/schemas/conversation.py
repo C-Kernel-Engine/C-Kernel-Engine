@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Conversation(BaseModel):
     id: str
     object: str = "conversation"
     created_at: int
-    items: list[Any] = []
+    items: list[Any] = Field(default_factory=list)
 
 
 class CreateConversationRequest(BaseModel):
