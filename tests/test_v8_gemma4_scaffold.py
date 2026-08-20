@@ -20,6 +20,7 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
 from build_ir_v8 import (  # type: ignore
     _apply_circuit_runtime_defaults,
     _load_builtin_template_doc,
+    apply_layer_attention_dims,
     _validate_lowered_activation_memory,
     build_activation_specs,
 )
@@ -302,6 +303,35 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertEqual(plan["layer_rotary_dim"], [256, 512, 256, 512])
         self.assertEqual(plan["layer_q_dim"], [2048, 4096, 2048, 4096])
         self.assertEqual(plan["layer_kv_dim"], [512, 1024, 512, 1024])
+        self.assertEqual(plan["layer_attention_output_dim"], [2048, 4096, 2048, 4096])
+
+    def test_full_attention_output_projection_uses_per_layer_value_width(self) -> None:
+        config = {
+            "embed_dim": 2560,
+            "num_heads": 8,
+            "num_kv_heads": 2,
+            "head_dim": 512,
+            "attn_out_dim": 2048,
+            "layer_q_head_dim": [256, 512],
+            "layer_k_head_dim": [256, 512],
+            "layer_v_head_dim": [256, 512],
+            "layer_q_dim": [2048, 4096],
+            "layer_attention_output_dim": [2048, 4096],
+            "layer_rotary_dim": [256, 512],
+            "layer_sliding_window": [512, 0],
+            "layer_rope_kind": ["swa", "full"],
+        }
+
+        out_proj = {}
+        apply_layer_attention_dims("out_proj", out_proj, 1, config)
+        self.assertEqual(out_proj["_output_dim"], 2560)
+        self.assertEqual(out_proj["_input_dim"], 4096)
+        self.assertEqual(out_proj["input_dim"], 4096)
+
+        quantize = {}
+        apply_layer_attention_dims("quantize_out_proj_input", quantize, 1, config)
+        self.assertEqual(quantize["_input_dim"], 4096)
+        self.assertEqual(quantize["input_dim"], 4096)
 
     def test_gemma4_template_declares_q_only_shared_kv_kinds(self) -> None:
         template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"

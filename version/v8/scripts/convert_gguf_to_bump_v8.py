@@ -1237,6 +1237,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
     layer_rotary_dim: list[int] = []
     layer_q_dim: list[int] = []
     layer_kv_dim: list[int] = []
+    layer_attention_output_dim: list[int] = []
     layer_attention_plan: list[Dict[str, object]] = []
 
     for layer, sliding_flag in enumerate(sliding_window_pattern):
@@ -1261,6 +1262,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
         rope_dim = (rotary_dim_swa if attention_kind == "sliding" and rotary_dim_swa else rotary_dim) or q_head_dim
         q_dim = int(num_heads or 0) * int(q_head_dim)
         kv_dim = int(num_kv_heads or 0) * int(k_head_dim)
+        attention_output_dim = int(num_heads or 0) * int(v_head_dim)
 
         layer_kinds.append(kind)
         layer_kv_policy.append(kv_policy)
@@ -1273,6 +1275,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
         layer_rotary_dim.append(int(rope_dim))
         layer_q_dim.append(int(q_dim))
         layer_kv_dim.append(int(kv_dim))
+        layer_attention_output_dim.append(int(attention_output_dim))
         layer_attention_plan.append({
             "layer": layer,
             "kind": kind,
@@ -1287,6 +1290,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
             "rotary_dim": int(rope_dim),
             "q_dim": int(q_dim),
             "kv_dim": int(kv_dim),
+            "attention_output_dim": int(attention_output_dim),
         })
 
     layer_k_cache_offset: list[int] = []
@@ -1314,6 +1318,7 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
         "layer_rotary_dim": layer_rotary_dim,
         "layer_q_dim": layer_q_dim,
         "layer_kv_dim": layer_kv_dim,
+        "layer_attention_output_dim": layer_attention_output_dim,
         "layer_k_cache_offset": layer_k_cache_offset,
         "layer_v_cache_offset": layer_v_cache_offset,
         "kv_cache_layer_stride_variable": True,
@@ -5809,30 +5814,8 @@ def main() -> None:
                         config["mrope_sections"] = [int(v) for v in mrope_sections]
                         config["mrope_n_dims"] = int(mrope_n_dims)
                 if arch == "gemma4":
+                    config.update(attention_plan)
                     config.update({
-                        "layer_kinds": attention_plan["layer_kinds"],
-                        "layer_attention_plan": attention_plan["layer_attention_plan"],
-                        "layer_kv_policy": attention_plan["layer_kv_policy"],
-                        "layer_kv_source": attention_plan["layer_kv_source"],
-                        "layer_sliding_window": attention_plan["layer_sliding_window"],
-                        "layer_rope_kind": attention_plan["layer_rope_kind"],
-                        "layer_q_head_dim": attention_plan["layer_q_head_dim"],
-                        "layer_k_head_dim": attention_plan["layer_k_head_dim"],
-                        "layer_v_head_dim": attention_plan["layer_v_head_dim"],
-                        "layer_rotary_dim": attention_plan["layer_rotary_dim"],
-                        "layer_q_dim": attention_plan["layer_q_dim"],
-                        "layer_kv_dim": attention_plan["layer_kv_dim"],
-                        "layer_k_cache_offset": attention_plan["layer_k_cache_offset"],
-                        "layer_v_cache_offset": attention_plan["layer_v_cache_offset"],
-                        "kv_cache_layer_stride_variable": attention_plan["kv_cache_layer_stride_variable"],
-                        "kv_cache_token_stride_total": attention_plan["kv_cache_token_stride_total"],
-                        "max_q_head_dim": attention_plan["max_q_head_dim"],
-                        "max_k_head_dim": attention_plan["max_k_head_dim"],
-                        "max_v_head_dim": attention_plan["max_v_head_dim"],
-                        "kv_cache_head_dim": attention_plan["kv_cache_head_dim"],
-                        "max_rotary_dim": attention_plan["max_rotary_dim"],
-                        "shared_kv_layers": attention_plan["shared_kv_layers"],
-                        "first_shared_kv_layer": attention_plan["first_shared_kv_layer"],
                         "gemma4_materialized_shared_kv": bool(gemma4_materialized_shared_kv),
                         "gemma4_per_layer_embedding": True,
                         "per_layer_dim": int(gemma4_per_layer_dim),
