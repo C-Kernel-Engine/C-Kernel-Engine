@@ -1,0 +1,54 @@
+{
+  "families": [
+    {
+      "id": "gemma4",
+      "label": "Gemma4 E4B IT Certification",
+      "enabled": true,
+      "model_env": "V8_GEMMA4_MODEL",
+      "model": "hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf",
+      "context_len": 2048,
+      "runtime_args": [
+        "--chat-template",
+        "gemma4",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "coherence_gate": true,
+      "repeatability": {
+        "prompt": "hello",
+        "runs": 3,
+        "require_nonempty": true
+      },
+      "response_contract": {
+        "stop_text_markers": [
+          "<end_of_turn>"
+        ],
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital",
+        "code_bundle"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "gemma4"
+        },
+        "manifest": {
+          "config.chat_contract.name": "gemma4"
+        }
+      }
+    }
+  ]
+}

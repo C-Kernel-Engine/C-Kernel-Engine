@@ -199,7 +199,12 @@ def load_families(path: Path, prompts: dict[str, PromptSpec]) -> list[FamilySpec
         if family_id in seen:
             raise ValueError(f"duplicate family id: {family_id}")
         seen.add(family_id)
-        model = str(row.get("model") or "").strip()
+        model_env = str(row.get("model_env") or "").strip()
+        model = (
+            os.environ.get(model_env, "").strip()
+            if model_env
+            else ""
+        ) or str(row.get("model") or "").strip()
         if not model:
             raise ValueError(f"family {family_id} missing model")
         smoke_prompts = [str(x) for x in row.get("smoke_prompts") or []]

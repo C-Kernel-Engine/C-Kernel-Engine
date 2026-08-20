@@ -130,6 +130,14 @@ class NightlyArtifactStatusTests(unittest.TestCase):
             "v8_xeon_decoder_family_sweep",
             runner.NIGHTLY_PROFILES["xeon-e2e"],
         )
+        self.assertIn("v8_gemma4_highmem", default_targets)
+        self.assertIn("v8_gemma4_highmem", inference_targets)
+        self.assertEqual(
+            runner.NIGHTLY_PROFILES["gemma4-e2e"],
+            ["v8_gemma4_highmem"],
+        )
+        gemma4 = runner.MAKE_TARGETS["v8_gemma4_highmem"]
+        self.assertEqual(gemma4["status_artifact"], "build/v8_gemma4_certification/summary.json")
 
     def test_make_target_explicit_skip_is_not_reported_as_pass(self) -> None:
         runner = _load_runner()

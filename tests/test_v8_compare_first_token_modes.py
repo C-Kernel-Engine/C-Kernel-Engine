@@ -5,6 +5,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version" / "v8" / "scripts" / "compare_first_token_logits_v8.py"
@@ -40,3 +42,33 @@ def test_auto_llama_mode_mirrors_explicit_ck_mode() -> None:
 def test_explicit_llama_mode_is_never_rewritten() -> None:
     assert compare.resolve_llama_decode_mode("batched", "sequential", "sequential_decode") == "batched"
     assert compare.resolve_llama_decode_mode("sequential", "batched", "batched") == "sequential"
+
+
+def test_logit_hash_is_stable_for_canonical_float32_storage() -> None:
+    values = np.array([1.0, -2.5, 3.25], dtype=np.float64)
+    expected = compare.logits_sha256(values.astype("<f4"))
+    assert compare.logits_sha256(values) == expected
+
+
+def test_repeatability_reports_first_bitwise_difference() -> None:
+    first = np.array([1.0, 2.0], dtype=np.float32)
+    same = first.copy()
+    changed = np.array([1.0, 2.0001], dtype=np.float32)
+
+    exact = compare.summarize_repeatability([first, same])
+    drift = compare.summarize_repeatability([first, same, changed])
+
+    assert exact["exact"] is True
+    assert exact["first_different_run"] is None
+    assert drift["exact"] is False
+    assert drift["first_different_run"] == 2
+
+
+def test_repeatability_distinguishes_signed_zero_bits() -> None:
+    positive_zero = np.array([0.0], dtype=np.float32)
+    negative_zero = np.array([-0.0], dtype=np.float32)
+
+    result = compare.summarize_repeatability([positive_zero, negative_zero])
+
+    assert result["exact"] is False
+    assert result["first_different_run"] == 1

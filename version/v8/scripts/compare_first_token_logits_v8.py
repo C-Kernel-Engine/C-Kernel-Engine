@@ -94,6 +94,27 @@ def parse_tokens_csv(text: str) -> list[int]:
     return tokens
 
 
+def logits_sha256(logits: np.ndarray) -> str:
+    canonical = np.ascontiguousarray(logits, dtype=np.dtype("<f4"))
+    return hashlib.sha256(canonical.tobytes()).hexdigest()
+
+
+def summarize_repeatability(logit_rows: list[np.ndarray]) -> dict[str, Any]:
+    if not logit_rows:
+        raise ValueError("repeatability requires at least one logits row")
+    hashes = [logits_sha256(row) for row in logit_rows]
+    exact = len(set(hashes)) == 1
+    return {
+        "exact": bool(exact),
+        "runs": len(logit_rows),
+        "logits_sha256": hashes,
+        "first_different_run": next(
+            (index for index, value in enumerate(hashes[1:], start=1) if value != hashes[0]),
+            None,
+        ),
+    }
+
+
 def discover_ck_model_dir(path: Path) -> Path:
     p = path.expanduser().resolve()
     # Prefer isolated build dirs first; parent run-dir copies can be stale.
@@ -817,8 +838,17 @@ def main() -> int:
     ap.add_argument("--require-top1-match", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--min-topk-overlap", type=float, default=0.50)
     ap.add_argument("--max-abs-threshold", type=float, default=1.0e9)
+    ap.add_argument(
+        "--ck-repeatability-runs",
+        type=int,
+        default=1,
+        help="Run the CK replay repeatedly and require bit-exact first-token logits.",
+    )
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
+
+    if int(args.ck_repeatability_runs) <= 0:
+        ap.error("--ck-repeatability-runs must be positive")
 
     model_dir = discover_ck_model_dir(args.model_dir)
     gguf_path = discover_gguf(args.gguf, model_dir)
@@ -844,13 +874,20 @@ def main() -> int:
         decode_mode=llama_decode_mode,
         no_repack=bool(args.llama_no_repack),
     )
-    ck = load_ck_logits(model_dir, tokens, ck_prefill_mode=str(args.ck_prefill_mode))
+    ck_runs = [
+        load_ck_logits(model_dir, tokens, ck_prefill_mode=str(args.ck_prefill_mode))
+        for _ in range(int(args.ck_repeatability_runs))
+    ]
+    ck = ck_runs[0]
+    ck_repeatability = summarize_repeatability(
+        [np.asarray(row["logits"], dtype=np.float32) for row in ck_runs]
+    )
     cmp = compare_logits(ck["logits"], ll["logits"], int(args.top_k))
 
     overlap_ok = cmp["topk_overlap_ratio"] >= float(args.min_topk_overlap)
     top1_ok = (not bool(args.require_top1_match)) or cmp["top1_match"]
     max_abs_ok = cmp["max_abs_diff"] <= float(args.max_abs_threshold)
-    passed = bool(top1_ok and overlap_ok and max_abs_ok)
+    passed = bool(top1_ok and overlap_ok and max_abs_ok and ck_repeatability["exact"])
 
     report = {
         "status": "pass" if passed else "fail",
@@ -880,6 +917,8 @@ def main() -> int:
             "prefill_policy": str(ck.get("prefill_policy", "batched")),
             "contract_prefill_policy": str(ck.get("contract_prefill_policy", "batched")),
             "requested_prefill_mode": str(ck.get("ck_prefill_mode", "auto")),
+            "logits_sha256": logits_sha256(ck["logits"]),
+            "repeatability": ck_repeatability,
         },
         "llama": {
             "n_vocab": int(ll["meta"]["n_vocab"]),
@@ -888,6 +927,7 @@ def main() -> int:
             "no_repack": bool(args.llama_no_repack),
             "topk_count": int(len(ll["meta"].get("topk", []) or [])),
             "topk_sample": ll["meta"].get("topk", [])[: min(8, int(args.top_k))],
+            "logits_sha256": logits_sha256(ll["logits"]),
         },
         "compare": cmp,
     }

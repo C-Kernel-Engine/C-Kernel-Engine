@@ -98,6 +98,23 @@ class RegressionHarnessV8Tests(unittest.TestCase):
         qwen35_lowered = by_id["qwen35"].runtime_expect.get("lowered_ops", [])
         self.assertEqual(qwen35_lowered[0].get("function_prefix"), "mrope_qk_text")
 
+    def test_family_model_env_overrides_portable_default(self) -> None:
+        prompts = regression.load_prompts(
+            ROOT / "version" / "v8" / "regression" / "prompts.json"
+        )
+        manifest = ROOT / "version" / "v8" / "regression" / "families_gemma4_certification.json"
+        with mock.patch.dict(
+            os.environ,
+            {"V8_GEMMA4_MODEL": "/models/local-gemma4.gguf"},
+            clear=False,
+        ):
+            families = regression.load_families(manifest, prompts)
+        self.assertEqual(len(families), 1)
+        self.assertEqual(families[0].family_id, "gemma4")
+        self.assertEqual(families[0].model, "/models/local-gemma4.gguf")
+        self.assertTrue(families[0].coherence_gate)
+        self.assertEqual(families[0].repeatability["runs"], 3)
+
     def test_resolve_gguf_path_accepts_direct_cache_root_layout(self) -> None:
         cache_root = Path("/tmp/test_run_regression_v8_cache")
         repo_dir = cache_root / "unsloth--gemma-3-270m-it-GGUF"

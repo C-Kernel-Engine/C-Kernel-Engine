@@ -952,10 +952,11 @@ MAKE_TARGETS = {
         "timeout_sec": 3600,
     },
     "v8_gemma4_highmem": {
-        "name": "v8 Gemma4 High-Memory Smoke",
+        "name": "v8 Gemma4 High-Memory Certification",
         "category": "inference",
         "target": "test-v8-gemma4-highmem",
-        "timeout_sec": 5400,
+        "timeout_sec": 21600,
+        "status_artifact": "build/v8_gemma4_certification/summary.json",
         "sweep_storage": {
             "required_gb": 20,
             "model_env": "V8_GEMMA4_MODEL",
@@ -1070,6 +1071,9 @@ NIGHTLY_PROFILES = {
         "v8_kimi_highmem",
         "v8_gemma4_highmem",
         "v8_xeon_decoder_family_sweep",
+    ],
+    "gemma4-e2e": [
+        "v8_gemma4_highmem",
     ],
 }
 

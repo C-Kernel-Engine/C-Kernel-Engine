@@ -289,6 +289,9 @@ V8_GEMMA4_MIN_MEM_GB ?= 50
 V8_GEMMA4_CONTEXT ?= 2048
 V8_GEMMA4_MAX_TOKENS ?= 64
 V8_GEMMA4_PROMPT ?= Give me a short example of C code.
+V8_GEMMA4_CERT_WORK_ROOT ?= $(HOME)/.cache/ck-engine-v8/nightly/gemma4-certification
+V8_GEMMA4_CERT_REPORT ?= build/v8_gemma4_certification/summary.json
+V8_GEMMA4_CERT_THREADS ?= 16
 V8_GEMMA4_VISION_CONTEXT ?= 1024
 V8_GEMMA4_VISION_MAX_TOKENS ?= 8
 V8_GEMMA4_VISION_IMAGE ?= version/v8/test_assets/v8_vision_doc_card_72.ppm
@@ -4096,22 +4099,16 @@ test-architecture-contracts: test-v8-template-circuit-audit v8-kernel-map-contra
 	@$(PYTHON) version/v8/scripts/collect_architecture_contracts_v8.py --json-out "$(V8_ARCH_CONTRACT_JSON)"
 
 test-v8-gemma4-highmem:
-	@avail_kb=$$(awk '/MemAvailable:/ {print $$2}' /proc/meminfo 2>/dev/null || echo 0); \
-	threshold_kb=$$(( $(V8_GEMMA4_MIN_MEM_GB) * 1024 * 1024 )); \
-	if [ "$$avail_kb" -lt "$$threshold_kb" ]; then \
-		avail_gb=$$(( $$avail_kb / 1024 / 1024 )); \
-		echo "SKIP: Gemma4 v8 smoke needs >=$(V8_GEMMA4_MIN_MEM_GB) GiB MemAvailable; found $${avail_gb} GiB"; \
-	else \
-		echo "Running v8 Gemma4 high-memory smoke..."; \
-		CK_NUM_THREADS=$${CK_NUM_THREADS:-24} OMP_NUM_THREADS=$${OMP_NUM_THREADS:-1} \
-			$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/ck_run_v8.py run "$(V8_GEMMA4_MODEL)" \
+	@echo "Running artifact-backed Gemma4 nightly certification..."
+	@CK_NUM_THREADS=$(V8_GEMMA4_CERT_THREADS) OMP_NUM_THREADS=1 \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_gemma4_certification_v8.py \
+			--model "$(V8_GEMMA4_MODEL)" \
+			--work-root "$(V8_GEMMA4_CERT_WORK_ROOT)" \
+			--report "$(V8_GEMMA4_CERT_REPORT)" \
 			--context-len $(V8_GEMMA4_CONTEXT) \
-			--force-convert --force-compile \
-			--prompt "$(V8_GEMMA4_PROMPT)" \
-			--chat-template gemma4 \
-			--max-tokens $(V8_GEMMA4_MAX_TOKENS) \
-			--temperature 0.0; \
-	fi
+			--threads $(V8_GEMMA4_CERT_THREADS) \
+			--repeatability-runs 3 \
+			--min-memory-gb $(V8_GEMMA4_MIN_MEM_GB)
 
 test-v8-nemotron9-highmem:
 	@avail_kb=$$(awk '/MemAvailable:/ {print $$2}' /proc/meminfo 2>/dev/null || echo 0); \
@@ -5411,13 +5408,16 @@ nightly-parity:
 nightly-xeon-e2e:
 	@$(PYTHON) scripts/nightly_runner.py --profile xeon-e2e --json $(BUILD_DIR)/nightly_xeon_e2e_report.json
 
+nightly-gemma4-e2e:
+	@$(PYTHON) scripts/nightly_runner.py --profile gemma4-e2e --json $(BUILD_DIR)/nightly_gemma4_e2e_report.json
+
 nightly-archive:
 	@$(PYTHON) scripts/nightly_runner.py --category archive
 
 nightly-list:
 	@$(PYTHON) scripts/nightly_runner.py --list
 
-.PHONY: nightly nightly-quick nightly-json nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-archive nightly-list
+.PHONY: nightly nightly-quick nightly-json nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
 .PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto libckernel_audio.so
 
 # ============================================================================
