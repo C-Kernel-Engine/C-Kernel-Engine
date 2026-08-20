@@ -107,6 +107,12 @@ typedef struct {
 } block_q8_0;
 /* Total: 34 bytes per 32 weights */
 
+#if defined(__cplusplus)
+static_assert(sizeof(block_q8_0) == 34, "block_q8_0 ABI size changed");
+#else
+_Static_assert(sizeof(block_q8_0) == 34, "block_q8_0 ABI size changed");
+#endif
+
 /* ============================================================================
  * Q4_K: K-Quant 4-bit with Nested Scales (Primary Target)
  * - 256 weights per super-block
@@ -156,6 +162,12 @@ typedef struct {
     int16_t bsums[QK_K / 16]; /* 32 bytes: block sums for optimization */
 } block_q8_K;
 /* Total: 292 bytes per 256 weights */
+
+#if defined(__cplusplus)
+static_assert(sizeof(block_q8_K) == 292, "block_q8_K ABI size changed");
+#else
+_Static_assert(sizeof(block_q8_K) == 292, "block_q8_K ABI size changed");
+#endif
 
 /* ============================================================================
  * Size Calculation Utilities

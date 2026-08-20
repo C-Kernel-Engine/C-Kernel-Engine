@@ -2866,6 +2866,61 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(outputs["init_ir"].name, "init.json")
         self.assertEqual(outputs["init_call"].name, "init_call.json")
 
+    def test_ck_run_v8_step_build_ir_rejects_stale_planner_provenance(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_build_ir_provenance_") as tmpdir:
+            tmp = Path(tmpdir)
+            manifest_path = tmp / "weights_manifest.json"
+            manifest_path.write_text("{}", encoding="utf-8")
+            output_dir = tmp / "run"
+            calls: list[list[str]] = []
+
+            def fake_run_cmd(cmd: list[str], *, cwd=None, env=None, capture=False):
+                calls.append(list(cmd))
+                if "--init-output" in cmd:
+                    init_ir = Path(cmd[cmd.index("--init-output") + 1])
+                    init_ir.parent.mkdir(parents=True, exist_ok=True)
+                    init_ir.write_text("{}", encoding="utf-8")
+                    (init_ir.parent / "init_call.json").write_text("{}", encoding="utf-8")
+                for flag in (
+                    "--output",
+                    "--layout-output",
+                    "--lowered-output",
+                    "--call-output",
+                    "--manifest-map-output",
+                ):
+                    if flag in cmd:
+                        Path(cmd[cmd.index(flag) + 1]).write_text("{}", encoding="utf-8")
+                return subprocess.CompletedProcess(cmd, 0, "", "")
+
+            common = (
+                mock.patch.object(ck_run_v8, "run_cmd", side_effect=fake_run_cmd),
+                mock.patch.object(
+                    ck_run_v8,
+                    "step_regenerate_kernel_registry",
+                    return_value=ck_run_v8.KERNEL_REGISTRY_PATH,
+                ),
+            )
+            with common[0], common[1], mock.patch.object(
+                ck_run_v8, "_tree_identity", return_value={"planner": "v1"}
+            ):
+                ck_run_v8.step_build_ir(manifest_path, output_dir, context_len=1024)
+                ck_run_v8.step_build_ir(manifest_path, output_dir, context_len=1024)
+
+            self.assertEqual(len(calls), 2, "matching IR provenance must reuse the cache")
+
+            with mock.patch.object(ck_run_v8, "run_cmd", side_effect=fake_run_cmd), \
+                 mock.patch.object(
+                     ck_run_v8,
+                     "step_regenerate_kernel_registry",
+                     return_value=ck_run_v8.KERNEL_REGISTRY_PATH,
+                 ), \
+                 mock.patch.object(
+                     ck_run_v8, "_tree_identity", return_value={"planner": "v2"}
+                 ):
+                ck_run_v8.step_build_ir(manifest_path, output_dir, context_len=1024)
+
+            self.assertEqual(len(calls), 4, "changed planner provenance must rebuild both modes")
+
     def test_ck_run_v8_step_codegen_passes_prefill_layout_for_hybrid_runtime(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_codegen_prefill_layout_") as tmpdir:
             tmp = Path(tmpdir)

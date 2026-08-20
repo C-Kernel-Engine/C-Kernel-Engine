@@ -11,10 +11,11 @@
     "output_storage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["format", "block_elements", "block_elements_symbol", "c_block_type"],
+      "required": ["format", "block_elements", "block_bytes", "block_elements_symbol", "c_block_type"],
       "properties": {
         "format": {"enum": ["q8_0", "q8_k"]},
         "block_elements": {"type": "integer", "minimum": 1},
+        "block_bytes": {"type": "integer", "minimum": 1},
         "block_elements_symbol": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
         "c_block_type": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}
       }

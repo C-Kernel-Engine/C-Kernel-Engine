@@ -162,6 +162,7 @@ def _quantize_op(
         "output_storage": {
             "format": storage,
             "block_elements": 256 if is_q8_k else 32,
+            "block_bytes": 292 if is_q8_k else 34,
             "block_elements_symbol": "QK_K" if is_q8_k else "QK8_0",
             "c_block_type": "block_q8_K" if is_q8_k else "block_q8_0",
         },
@@ -290,11 +291,12 @@ class V8CodegenCapabilityTests(unittest.TestCase):
 
     def test_quantization_maps_own_exact_output_storage_abi(self) -> None:
         expected = {
-            "quantize_row_q8_0.json": ("q8_0", 32, "QK8_0", "block_q8_0"),
-            "quantize_row_q8_k.json": ("q8_k", 256, "QK_K", "block_q8_K"),
+            "quantize_row_q8_0.json": ("q8_0", 32, 34, "QK8_0", "block_q8_0"),
+            "quantize_row_q8_k.json": ("q8_k", 256, 292, "QK_K", "block_q8_K"),
             "quantize_row_q8_k_llama_repack.json": (
                 "q8_k",
                 256,
+                292,
                 "QK_K",
                 "block_q8_K",
             ),
@@ -312,6 +314,7 @@ class V8CodegenCapabilityTests(unittest.TestCase):
                     (
                         capability["output_storage"]["format"],
                         capability["output_storage"]["block_elements"],
+                        capability["output_storage"]["block_bytes"],
                         capability["output_storage"]["block_elements_symbol"],
                         capability["output_storage"]["c_block_type"],
                     ),

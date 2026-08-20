@@ -75,7 +75,13 @@ def resolved_activation_quantization_emission(op: Dict[str, Any]) -> Dict[str, A
     storage = capability.get("output_storage")
     if not isinstance(storage, dict):
         raise RuntimeError("resolved activation quantization capability has no output storage")
-    required = {"format", "block_elements", "block_elements_symbol", "c_block_type"}
+    required = {
+        "format",
+        "block_elements",
+        "block_bytes",
+        "block_elements_symbol",
+        "c_block_type",
+    }
     if set(storage) != required:
         raise RuntimeError(
             "resolved activation quantization storage must define exact format and block ABI"
@@ -83,6 +89,7 @@ def resolved_activation_quantization_emission(op: Dict[str, Any]) -> Dict[str, A
     result = {
         "format": str(storage["format"]),
         "block_elements": int(storage["block_elements"]),
+        "block_bytes": int(storage["block_bytes"]),
         "block_elements_symbol": str(storage["block_elements_symbol"]),
         "c_block_type": str(storage["c_block_type"]),
     }

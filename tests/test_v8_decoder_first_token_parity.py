@@ -35,6 +35,82 @@ decoder_parity_v8 = _load_module("decoder_first_token_parity_v8_tests", V8_DECOD
 
 
 class V8DecoderFirstTokenParityTests(unittest.TestCase):
+    def test_xray_verifies_planner_memory_contract_without_recomputing_extent(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_memory_contract_") as tmpdir:
+            root = Path(tmpdir)
+            paths = {}
+            for phase in ("prefill", "decode"):
+                path = root / f"layout_{phase}.json"
+                path.write_text(
+                    json.dumps(
+                        {
+                            "validation": {
+                                "activation_memory": {
+                                    "status": "PASS",
+                                    "arena_bytes": 4096,
+                                    "writes": [
+                                        {
+                                            "op": "quantize_input",
+                                            "layer": 0,
+                                            "provider": "quantize_row_q8_k",
+                                            "buffer": "layer_input",
+                                            "required_bytes": 2920,
+                                            "available_bytes": 2920,
+                                        }
+                                    ],
+                                }
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                paths[phase] = path
+
+            report = decoder_parity_v8._verify_runtime_memory_contracts(
+                {
+                    "prefill_layout_path": paths["prefill"],
+                    "decode_layout_path": paths["decode"],
+                }
+            )
+            self.assertEqual(report["status"], "PASS")
+            self.assertEqual(report["phases"]["prefill"]["checked_writes"], 1)
+
+    def test_xray_rejects_planner_memory_contract_overflow(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_memory_contract_bad_") as tmpdir:
+            path = Path(tmpdir) / "layout.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "validation": {
+                            "activation_memory": {
+                                "status": "PASS",
+                                "writes": [
+                                    {
+                                        "op": "quantize_input",
+                                        "layer": 3,
+                                        "provider": "quantize_row_q8_k",
+                                        "buffer": "layer_input",
+                                        "required_bytes": 292000,
+                                        "available_bytes": 272000,
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "phase=prefill.*required=292000 available=272000",
+            ):
+                decoder_parity_v8._verify_runtime_memory_contracts(
+                    {
+                        "prefill_layout_path": path,
+                        "decode_layout_path": path,
+                    }
+                )
+
     def test_llama_capture_preserves_explicit_prefix_and_decode_schedules(self) -> None:
         captured: list[str] = []
 

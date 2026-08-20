@@ -17,7 +17,12 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     classify_layer_contract,
     describe_layer_contract,
 )
-from build_ir_v8 import _apply_circuit_runtime_defaults, _load_builtin_template_doc  # type: ignore
+from build_ir_v8 import (  # type: ignore
+    _apply_circuit_runtime_defaults,
+    _load_builtin_template_doc,
+    _validate_lowered_activation_memory,
+    build_activation_specs,
+)
 
 
 def _write_tiny_bpe_tokenizer(checkpoint: Path, vocab_size: int) -> None:
@@ -80,6 +85,116 @@ def _tensor(name: str, dims: tuple[int, ...]) -> TensorInfo:
 
 
 class V8Gemma4ScaffoldTests(unittest.TestCase):
+    def test_q8_k_mlp_workspace_uses_canonical_block_size(self) -> None:
+        specs = build_activation_specs(
+            {
+                "embed_dim": 2560,
+                "intermediate_size": 10240,
+                "num_layers": 42,
+            },
+            mode="prefill",
+            context_len=25,
+        )
+        expected = 25 * (10240 // 256) * 292
+        self.assertEqual(specs["layer_input"]["size"], expected)
+        self.assertGreater(specs["layer_input"]["size"], 25 * 2560 * 4)
+
+    def test_quantized_write_extent_rejects_neighbor_overwrite(self) -> None:
+        operation = {
+            "op": "quantize_mlp_down_input",
+            "kernel": "quantize_row_q8_k",
+            "layer": 0,
+            "params": {"rows": 25, "_input_dim": 10240},
+            "resolved_codegen_capability": {
+                "operator_family": "activation_quantization",
+                "output_storage": {
+                    "format": "q8_k",
+                    "block_elements": 256,
+                    "block_bytes": 292,
+                },
+            },
+            "outputs": {
+                "output": {"buffer": "layer_input", "activation_offset": 0}
+            },
+        }
+        layout = {
+            "memory": {
+                "activations": {
+                    "size": 528000,
+                    "buffers": [
+                        {"name": "layer_input", "offset": 0, "size": 272000},
+                        {"name": "residual", "offset": 272000, "size": 256000},
+                    ],
+                }
+            }
+        }
+        with self.assertRaisesRegex(RuntimeError, "writes 292000 bytes.*only 272000"):
+            _validate_lowered_activation_memory({"operations": [operation]}, layout)
+
+        layout["memory"]["activations"] = {
+            "size": 548000,
+            "buffers": [
+                {"name": "layer_input", "offset": 0, "size": 292000},
+                {"name": "residual", "offset": 292000, "size": 256000},
+            ],
+        }
+        report = _validate_lowered_activation_memory(
+            {"operations": [operation]}, layout
+        )
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["quantized_write_count"], 1)
+        self.assertEqual(report["writes"][0]["required_bytes"], 292000)
+        self.assertEqual(report["writes"][0]["available_bytes"], 292000)
+
+    def test_quantized_write_extent_rejects_provider_block_abi_drift(self) -> None:
+        operation = {
+            "op": "quantize_mlp_down_input",
+            "kernel": "quantize_row_q8_k",
+            "layer": 0,
+            "params": {"rows": 25, "_input_dim": 10240},
+            "resolved_codegen_capability": {
+                "operator_family": "activation_quantization",
+                "output_storage": {
+                    "format": "q8_k",
+                    "block_elements": 256,
+                    "block_bytes": 272,
+                },
+            },
+            "outputs": {
+                "output": {"buffer": "layer_input", "activation_offset": 0}
+            },
+        }
+        layout = {
+            "memory": {
+                "activations": {
+                    "size": 292000,
+                    "buffers": [
+                        {"name": "layer_input", "offset": 0, "size": 292000}
+                    ],
+                }
+            }
+        }
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "declares block_bytes=272 for q8_k.*canonical ABI requires 292",
+        ):
+            _validate_lowered_activation_memory({"operations": [operation]}, layout)
+
+    def test_activation_layout_rejects_overlapping_intervals(self) -> None:
+        layout = {
+            "memory": {
+                "activations": {
+                    "size": 192,
+                    "buffers": [
+                        {"name": "a", "offset": 0, "size": 128},
+                        {"name": "b", "offset": 64, "size": 128},
+                    ],
+                }
+            }
+        }
+        with self.assertRaisesRegex(RuntimeError, "b starts at 64 before a ends at 128"):
+            _validate_lowered_activation_memory({"operations": []}, layout)
+
     def test_load_template_chat_contract_gemma4(self) -> None:
         contract = load_template_chat_contract("gemma4")
         self.assertIsNotNone(contract)

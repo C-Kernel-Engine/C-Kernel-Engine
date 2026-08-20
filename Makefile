@@ -6326,7 +6326,7 @@ v8-validate-contracts:
 v8-kernel-map-contracts: test-kernel-maps
 	@$(PYTHON) -m unittest tests.test_build_ir_v8_scaffold
 
-.PHONY: test-kernel-maps test-v8-kernel-allocations v8-kernel-registry-freshness
+.PHONY: test-kernel-maps test-v8-kernel-allocations v8-kernel-registry-freshness v8-model-memory-plans-nightly
 
 # Aggregate kernel-map gate: interface audit ratchet, provider-selection,
 # call-ABI, shared-provider migration tests, and registry freshness. Emits the
@@ -6343,6 +6343,7 @@ test-kernel-maps:
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q \
 		tests/test_v8_circuit_interface_validation.py \
 		tests/test_v8_kernel_allocation_audit.py \
+		tests/test_v8_quantized_write_bounds.py \
 		tests/test_v8_provider_selection.py \
 		tests/test_v8_kernel_call_abi.py \
 		tests/test_v8_shared_provider_migration.py \
@@ -6361,6 +6362,10 @@ v8-kernel-registry-freshness:
 		echo "FAIL: KERNEL_REGISTRY.json is stale; regenerate via ck_run_v8.step_regenerate_kernel_registry"; \
 		exit 1; \
 	}
+
+v8-model-memory-plans-nightly:
+	@echo "Certifying v8 model memory plans without code generation or inference..."
+	@$(PYTHON) version/v8/scripts/certify_model_memory_plans_v8.py
 
 v8-kernel-map-gate:
 	@$(MAKE) --no-print-directory v8-kernel-map-contracts

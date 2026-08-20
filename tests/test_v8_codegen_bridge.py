@@ -56,30 +56,30 @@ def _make_qwen3_decoder_manifest() -> dict:
         entries.append(item)
         offset += int(item["nbytes"])
 
-    add("token_emb", "q8_0", [64, 16])
-    add("layer.0.ln1_gamma", "fp32", [16])
-    add("layer.0.ln2_gamma", "fp32", [16])
-    add("layer.0.q_norm", "fp32", [4])
-    add("layer.0.k_norm", "fp32", [4])
-    add("layer.0.wq", "q4_k", [16, 16])
-    add("layer.0.wk", "q4_k", [16, 16])
-    add("layer.0.wv", "q6_k", [16, 16])
-    add("layer.0.wo", "q4_k", [16, 16])
-    add("layer.0.w1", "q4_k", [32, 16])
-    add("layer.0.w2", "q6_k", [16, 32])
-    add("layer.0.w3", "q4_k", [32, 16])
-    add("final_ln_weight", "fp32", [16])
+    add("token_emb", "q8_0", [64, 256])
+    add("layer.0.ln1_gamma", "fp32", [256])
+    add("layer.0.ln2_gamma", "fp32", [256])
+    add("layer.0.q_norm", "fp32", [64])
+    add("layer.0.k_norm", "fp32", [64])
+    add("layer.0.wq", "q4_k", [256, 256])
+    add("layer.0.wk", "q4_k", [256, 256])
+    add("layer.0.wv", "q6_k", [256, 256])
+    add("layer.0.wo", "q4_k", [256, 256])
+    add("layer.0.w1", "q4_k", [256, 256])
+    add("layer.0.w2", "q6_k", [256, 256])
+    add("layer.0.w3", "q4_k", [256, 256])
+    add("final_ln_weight", "fp32", [256])
 
     return {
         "config": {
             "model": "qwen3",
             "arch": "qwen3",
             "num_layers": 1,
-            "embed_dim": 16,
+            "embed_dim": 256,
             "num_heads": 4,
             "num_kv_heads": 4,
-            "head_dim": 4,
-            "intermediate_size": 32,
+            "head_dim": 64,
+            "intermediate_size": 256,
             "context_length": 32,
             "max_seq_len": 32,
             "vocab_size": 64,
@@ -112,30 +112,30 @@ def _make_qwen2_decoder_manifest() -> dict:
         entries.append(item)
         offset += int(item["nbytes"])
 
-    add("token_emb", "q8_0", [64, 16])
-    add("layer.0.ln1_gamma", "fp32", [16])
-    add("layer.0.ln2_gamma", "fp32", [16])
-    add("layer.0.wq", "q5_0", [16, 16])
-    add("layer.0.bq", "fp32", [16])
-    add("layer.0.wk", "q5_0", [16, 16])
-    add("layer.0.bk", "fp32", [16])
-    add("layer.0.wv", "q8_0", [16, 16])
-    add("layer.0.bv", "fp32", [16])
-    add("layer.0.wo", "q5_0", [16, 16])
-    add("layer.0.w1", "q5_0", [32, 16])
-    add("layer.0.w2", "q6_k", [16, 16])
-    add("final_ln_weight", "fp32", [16])
+    add("token_emb", "q8_0", [64, 256])
+    add("layer.0.ln1_gamma", "fp32", [256])
+    add("layer.0.ln2_gamma", "fp32", [256])
+    add("layer.0.wq", "q5_0", [256, 256])
+    add("layer.0.bq", "fp32", [256])
+    add("layer.0.wk", "q5_0", [256, 256])
+    add("layer.0.bk", "fp32", [256])
+    add("layer.0.wv", "q8_0", [256, 256])
+    add("layer.0.bv", "fp32", [256])
+    add("layer.0.wo", "q5_0", [256, 256])
+    add("layer.0.w1", "q5_0", [256, 256])
+    add("layer.0.w2", "q6_k", [256, 256])
+    add("final_ln_weight", "fp32", [256])
 
     return {
         "config": {
             "model": "qwen2",
             "arch": "qwen2",
             "num_layers": 1,
-            "embed_dim": 16,
+            "embed_dim": 256,
             "num_heads": 4,
             "num_kv_heads": 4,
-            "head_dim": 4,
-            "intermediate_size": 16,
+            "head_dim": 64,
+            "intermediate_size": 256,
             "context_length": 32,
             "max_seq_len": 32,
             "vocab_size": 64,
@@ -167,31 +167,31 @@ def _make_qwen3vl_decoder_manifest() -> dict:
         entries.append(item)
         offset += int(item["nbytes"])
 
-    add("token_emb", "q8_0", [64, 16])
-    add("output.weight", "q8_0", [64, 16])
-    add("layer.0.ln1_gamma", "fp32", [16])
-    add("layer.0.ln2_gamma", "fp32", [16])
-    add("layer.0.q_norm", "fp32", [4])
-    add("layer.0.k_norm", "fp32", [4])
-    add("layer.0.wq", "q4_k", [16, 16])
-    add("layer.0.wk", "q4_k", [16, 16])
-    add("layer.0.wv", "q6_k", [16, 16])
-    add("layer.0.wo", "q4_k", [16, 16])
-    add("layer.0.w1", "q4_k", [32, 16])
-    add("layer.0.w2", "q6_k", [16, 32])
-    add("layer.0.w3", "q4_k", [32, 16])
-    add("final_ln_weight", "fp32", [16])
+    add("token_emb", "q8_0", [64, 256])
+    add("output.weight", "q8_0", [64, 256])
+    add("layer.0.ln1_gamma", "fp32", [256])
+    add("layer.0.ln2_gamma", "fp32", [256])
+    add("layer.0.q_norm", "fp32", [64])
+    add("layer.0.k_norm", "fp32", [64])
+    add("layer.0.wq", "q4_k", [256, 256])
+    add("layer.0.wk", "q4_k", [256, 256])
+    add("layer.0.wv", "q6_k", [256, 256])
+    add("layer.0.wo", "q4_k", [256, 256])
+    add("layer.0.w1", "q4_k", [256, 256])
+    add("layer.0.w2", "q6_k", [256, 256])
+    add("layer.0.w3", "q4_k", [256, 256])
+    add("final_ln_weight", "fp32", [256])
 
     return {
         "config": {
             "model": "qwen3vl",
             "arch": "qwen3vl",
             "num_layers": 1,
-            "embed_dim": 16,
+            "embed_dim": 256,
             "num_heads": 4,
             "num_kv_heads": 4,
-            "head_dim": 4,
-            "intermediate_size": 32,
+            "head_dim": 64,
+            "intermediate_size": 256,
             "context_length": 32,
             "max_seq_len": 32,
             "vocab_size": 64,
@@ -285,7 +285,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             "mrope_qk_text_imrope_bf16_pytorch_storage",
         )
         self.assertIn(
-            "ck_residual_add_token_major_bf16_storage(dst_row, src, dst_row, 1, 16);",
+            "ck_residual_add_token_major_bf16_storage(dst_row, src, dst_row, 1, 256);",
             helper,
         )
         self.assertNotIn("dst_row[i] += src[i]", helper)
@@ -477,6 +477,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
                 {
                     "format": "q8_k",
                     "block_elements": 256,
+                    "block_bytes": 292,
                     "block_elements_symbol": "QK_K",
                     "c_block_type": "block_q8_K",
                 },
@@ -682,7 +683,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
                 "int debug_mlp_down_fp32 = debug_mlp_down_env ? (atoi(debug_mlp_down_env) != 0) : 0;",
                 text,
             )
-            self.assertIn("return ck_model_forward_mixed_ex(prefix_embeddings, prefix_tokens, (16), tokens, token_count, output);", text)
+            self.assertIn("return ck_model_forward_mixed_ex(prefix_embeddings, prefix_tokens, (256), tokens, token_count, output);", text)
             self.assertNotIn("static int g_bridge_deepstack_active;", text)
             self.assertNotIn("static void ck_decode_embedded(CKModel *model)", text)
             self.assertNotIn("static int ck_bridge_forward_staged", text)

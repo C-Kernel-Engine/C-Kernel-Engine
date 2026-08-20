@@ -60,6 +60,7 @@ AUTO_MMPROJ_SPECS = (
     },
 )
 CODEGEN_STAMP_NAME = ".ck_codegen_bundle.json"
+IR_STAMP_NAME = ".ck_ir_bundle.json"
 RUNTIME_STAMP_NAME = ".ck_runtime_bundle.json"
 RUNTIME_BUNDLE_SCHEMA = "ck-v8-runtime-bundle-v2"
 
@@ -1245,9 +1246,35 @@ def step_build_ir(
     }
 
     decode_ready = all(path.exists() for path in outputs.values())
-    if decode_ready and not force:
+    stamp_path = output_dir / IR_STAMP_NAME
+    ir_inputs = {
+        "schema": "ck-v8-ir-bundle-v1",
+        "manifest": _file_identity(manifest_path),
+        "context_len": int(context_len) if context_len is not None else None,
+        "logits_layout": logits_layout,
+        "planner_sources": _tree_identity(
+            [
+                SCRIPTS_DIR / "build_ir_v8.py",
+                SCRIPTS_DIR / "memory_planner_v8.py",
+                SCRIPTS_DIR / "validate_circuit_interfaces_v8.py",
+                SCRIPTS_DIR / "resolve_layout_chain_v8.py",
+                SCRIPTS_DIR / "resolve_attention_contracts_v8.py",
+                SCRIPTS_DIR / "resolve_numerical_execution_contracts_v8.py",
+                V8_ROOT / "contracts",
+                V8_ROOT / "schemas",
+                KERNEL_REGISTRY_PATH,
+            ]
+        ),
+    }
+    if decode_ready and not force and _bundle_is_current(
+        stamp_path,
+        inputs=ir_inputs,
+        outputs=outputs,
+    ):
         log(f"  Using cached IR artifacts in {output_dir}", C_DIM)
         return outputs
+    if decode_ready and not force:
+        log("  Cached IR provenance is stale; rebuilding", C_DIM)
 
     def _build_mode(mode: str) -> None:
         cmd = [
@@ -1277,6 +1304,16 @@ def step_build_ir(
 
     _build_mode("prefill")
     _build_mode("decode")
+    _write_bundle_stamp(
+        stamp_path,
+        {
+            "inputs": ir_inputs,
+            "outputs": {
+                name: _file_identity(path)
+                for name, path in sorted(outputs.items())
+            },
+        },
+    )
     return outputs
 
 
@@ -1879,6 +1916,9 @@ def run_pipeline(args: argparse.Namespace) -> int:
         context_len=args.context_len,
         logits_layout=args.logits_layout,
     )
+    if getattr(args, "plan_only", False):
+        log(f"  Memory plan certified without code generation: {work_dir}", C_GREEN)
+        return 0
     model_c_path = step_codegen(
         work_dir,
         ir_paths,
@@ -2240,6 +2280,11 @@ Examples:
     run_parser.add_argument("--force-compile", action="store_true")
     run_parser.add_argument("--generate-visualizer", action="store_true")
     run_parser.add_argument("--generate-only", action="store_true")
+    run_parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Download/convert as needed and certify prefill/decode memory plans without code generation or execution",
+    )
     run_parser.add_argument("--profile", action="store_true", help="Emit CK_PROFILE timing wrappers into the generated runtime")
     run_parser.add_argument(
         "--gemm-schedule",

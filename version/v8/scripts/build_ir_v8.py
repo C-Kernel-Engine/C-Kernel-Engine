@@ -3296,7 +3296,13 @@ def build_activation_specs(
     if backbone_hidden_size > 0:
         add("backbone_stream", seq_len * backbone_hidden_size * 4, f"[{seq_len}, {backbone_hidden_size}]")
     add("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
-    add("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+    q8k_blocks = (intermediate_size + 255) // 256
+    q8k_size = q8k_blocks * _dtype_size_bytes("q8_k_block") * seq_len
+    add(
+        "layer_input",
+        max(embedded_size, q8k_size),
+        f"[{seq_len}, max({embed_dim}, Q8_K({intermediate_size}))]",
+    )
     add("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
 
     # KV cache + RoPE
@@ -4192,9 +4198,124 @@ def _dtype_size_bytes(dtype: str) -> int:
         "i32": 4,
         "int32": 4,
         "q8_0": 1,
+        "q8_0_block": 34,
         "q8_k": 1,
         "q8_k_block": 292,
     }.get(str(dtype or "").strip().lower(), 4)
+
+
+def _validate_lowered_activation_memory(
+    lowered_ir: Dict[str, Any], layout: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Fail closed when a lowered write can exceed its physical allocation."""
+    activation_memory = layout.get("memory", {}).get("activations", {})
+    buffers = activation_memory.get("buffers", [])
+    total_size = int(activation_memory.get("size", 0) or 0)
+    by_name = {str(buf.get("name")): buf for buf in buffers}
+
+    previous_end = 0
+    previous_name = "<activation-base>"
+    for buf in sorted(buffers, key=lambda item: int(item.get("offset", 0) or 0)):
+        name = str(buf.get("name", "<unnamed>"))
+        offset = int(buf.get("offset", 0) or 0)
+        size = int(buf.get("size", 0) or 0)
+        end = offset + size
+        if offset < 0 or size < 0 or end > total_size:
+            raise RuntimeError(
+                f"HARD ACTIVATION LAYOUT FAULT: {name} interval [{offset}, {end}) "
+                f"is outside arena [0, {total_size})"
+            )
+        if offset < previous_end:
+            raise RuntimeError(
+                f"HARD ACTIVATION LAYOUT FAULT: {name} starts at {offset} before "
+                f"{previous_name} ends at {previous_end}"
+            )
+        previous_end = end
+        previous_name = name
+
+    write_contracts: List[Dict[str, Any]] = []
+    operations = lowered_ir.get("operations", []) if isinstance(lowered_ir, dict) else []
+    for op in operations:
+        capability = op.get("resolved_codegen_capability") or {}
+        if capability.get("operator_family") != "activation_quantization":
+            continue
+        storage = capability.get("output_storage") or {}
+        fmt = str(storage.get("format", "") or "").lower()
+        block_elements = int(storage.get("block_elements", 0) or 0)
+        block_bytes = int(storage.get("block_bytes", 0) or 0)
+        if fmt not in {"q8_0", "q8_k"} or block_elements <= 0 or block_bytes <= 0:
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('kernel')} has incomplete "
+                f"quantized output storage metadata: {storage}"
+            )
+        canonical_block_bytes = _dtype_size_bytes(f"{fmt}_block")
+        if block_bytes != canonical_block_bytes:
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('kernel')} declares "
+                f"block_bytes={block_bytes} for {fmt}, but the canonical ABI requires "
+                f"{canonical_block_bytes}"
+            )
+        params = op.get("params") or {}
+        rows = int(
+            params.get(
+                "rows",
+                params.get("_m", params.get("m", params.get("seq_len", 0))),
+            )
+            or 0
+        )
+        width = int(
+            params.get("_input_dim", params.get("k", params.get("K", 0))) or 0
+        )
+        if rows <= 0 or width <= 0 or width % block_elements != 0:
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('op')} layer={op.get('layer')} "
+                f"cannot resolve quantized extent rows={rows}, width={width}, block={block_elements}"
+            )
+        output = (op.get("outputs") or {}).get("output")
+        if not isinstance(output, dict):
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('op')} layer={op.get('layer')} "
+                "has no concrete output allocation"
+            )
+        buffer_name = str(output.get("buffer", ""))
+        allocation = by_name.get(buffer_name)
+        if allocation is None:
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('op')} layer={op.get('layer')} "
+                f"targets unknown buffer {buffer_name!r}"
+            )
+        required = rows * (width // block_elements) * block_bytes
+        allocation_offset = int(allocation.get("offset", 0) or 0)
+        output_offset = int(
+            output.get("activation_offset", allocation_offset) or allocation_offset
+        )
+        relative_offset = output_offset - allocation_offset
+        available = int(allocation.get("size", 0) or 0) - relative_offset
+        if relative_offset < 0 or required > available:
+            raise RuntimeError(
+                f"HARD ACTIVATION EXTENT FAULT: {op.get('op')} layer={op.get('layer')} "
+                f"provider={op.get('kernel')} writes {required} bytes to {buffer_name} "
+                f"at relative offset {relative_offset}, but only {available} bytes are available"
+            )
+        write_contracts.append(
+            {
+                "op": str(op.get("op", "")),
+                "layer": int(op.get("layer", -1) or -1),
+                "provider": str(op.get("kernel", "")),
+                "buffer": buffer_name,
+                "relative_offset": relative_offset,
+                "required_bytes": required,
+                "available_bytes": available,
+            }
+        )
+
+    return {
+        "status": "PASS",
+        "activation_buffer_count": len(buffers),
+        "quantized_write_count": len(write_contracts),
+        "arena_bytes": total_size,
+        "writes": write_contracts,
+    }
 
 
 def _kernel_scratch_size_bytes(
@@ -10158,9 +10279,10 @@ def generate_memory_layout(
 
     # Layer input buffer (for ping-pong)
     # Must be large enough for Q8_K quantization of MLP intermediate (n_ff elements)
-    # Q8_K uses 272 bytes per 256 elements: ceil(n_ff/256) * 272 * seq_len
+    # Size this from the canonical block ABI; packed Q8_K includes 256 int8
+    # values, one fp32 scale, and 16 int16 block sums.
     q8k_blocks = (intermediate_size + 255) // 256
-    q8k_size = q8k_blocks * 272 * seq_len
+    q8k_size = q8k_blocks * _dtype_size_bytes("q8_k_block") * seq_len
     layer_input_size = max(embedded_size, q8k_size)
     add_buffer("layer_input", layer_input_size, f"[{seq_len}, max({embed_dim}, Q8_K({intermediate_size}))]")
 
@@ -14150,6 +14272,11 @@ def main(args: List[str]) -> int:
     # IR Lower 2: Add concrete memory offsets to IR Lower 1
     # This produces the final lowered IR with explicit pointer expressions
     lowered_ir = generate_ir_lower_2(ir_lower_1, layout, manifest, registry, parsed_args.mode)
+    activation_memory_validation = _validate_lowered_activation_memory(lowered_ir, layout)
+    layout.setdefault("validation", {})["activation_memory"] = activation_memory_validation
+    lowered_ir.setdefault("validation", {})["activation_memory"] = copy.deepcopy(
+        activation_memory_validation
+    )
 
     # CRITICAL: Update context_length in lowered_ir to match layout
     # This ensures codegen uses the correct MAX_SEQ_LEN for KV cache strides

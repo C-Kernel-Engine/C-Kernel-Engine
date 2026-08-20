@@ -818,6 +818,12 @@ MAKE_TARGETS = {
         "target": "v8-kernel-map-contracts",
         "timeout_sec": 600,
     },
+    "v8_model_memory_plans": {
+        "name": "v8 Model Memory Plan Matrix",
+        "category": "inference",
+        "target": "v8-model-memory-plans-nightly",
+        "timeout_sec": 21600,
+    },
     "v8_numerical_contracts": {
         "name": "v8 Numerical Kernel Contracts",
         "category": "parity",
@@ -1089,6 +1095,7 @@ MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v7-stabilization-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "training_stabilization_scorecard_latest.json",
     "test-architecture-contracts": ROOT / "version" / "v8" / ".cache" / "reports" / "architecture_contracts_latest.json",
     "v8-kernel-map-contracts": ROOT / "version" / "v8" / ".cache" / "reports" / "kernel_interface_audit_latest.json",
+    "v8-model-memory-plans-nightly": ROOT / "version" / "v8" / ".cache" / "reports" / "model_memory_plans_latest.json",
     "v8-visualizer-vision-artifacts": ROOT / "version" / "v8" / ".cache" / "reports" / "vision_visualizer_latest.json",
     "vision-encoder-full": ROOT / "build" / "vision_encoder_accuracy" / "summary.json",
 }
@@ -1180,6 +1187,25 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
             f"kernel_frees={allocation_counts.get('free_calls')} "
             f"mapped_allocators={allocation_counts.get('mapped_allocating_providers')} "
             f"allocation_warnings={len(allocation_warnings)}"
+        )
+
+    if target == "v8-model-memory-plans-nightly":
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
+        failures = [
+            row for row in rows
+            if isinstance(row, dict) and row.get("status") == "FAIL"
+        ]
+        detail = " | ".join(
+            f"{row.get('model_id')}@{row.get('context_len')}:{row.get('reason')}"
+            for row in failures[:3]
+        )
+        return (
+            f"{prefix}; status={summary.get('status')} pass={summary.get('passed')} "
+            f"fail={summary.get('failed')} skip={summary.get('skipped')} "
+            f"writes={summary.get('extent_validated_writes')}/"
+            f"{summary.get('writable_operations')}"
+            + (f"; failures={detail}" if detail else "")
         )
 
     if target == "regression-training-full":

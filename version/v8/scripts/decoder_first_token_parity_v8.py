@@ -87,6 +87,48 @@ def _load_bridge_report(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _verify_runtime_memory_contracts(runtime: dict[str, Any]) -> dict[str, Any]:
+    """Verify planner-produced write extents without recomputing kernel sizes."""
+    phase_paths = {
+        "prefill": runtime.get("prefill_layout_path"),
+        "decode": runtime.get("decode_layout_path"),
+    }
+    if not any(phase_paths.values()):
+        return {"status": "unavailable", "phases": {}}
+
+    phases: dict[str, Any] = {}
+    for phase, raw_path in phase_paths.items():
+        if raw_path is None:
+            raise RuntimeError(f"X-Ray memory contract is missing {phase} layout")
+        path = Path(raw_path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        contract = (
+            (payload.get("validation") or {}).get("activation_memory") or {}
+        )
+        if contract.get("status") != "PASS":
+            raise RuntimeError(
+                f"X-Ray memory contract is missing or failed for {phase}: {path}"
+            )
+        writes = list(contract.get("writes") or [])
+        for write in writes:
+            required = int(write.get("required_bytes", -1))
+            available = int(write.get("available_bytes", -1))
+            if required < 0 or available < required:
+                raise RuntimeError(
+                    "X-Ray memory extent failure: "
+                    f"phase={phase} op={write.get('op')} layer={write.get('layer')} "
+                    f"provider={write.get('provider')} buffer={write.get('buffer')} "
+                    f"required={required} available={available}"
+                )
+        phases[phase] = {
+            "layout_path": str(path),
+            "status": "PASS",
+            "checked_writes": len(writes),
+            "arena_bytes": int(contract.get("arena_bytes", 0) or 0),
+        }
+    return {"status": "PASS", "phases": phases}
+
+
 def _resolve_prompt_token_segments(
     tokenizer: GGUFTokenizer,
     *,
@@ -1876,6 +1918,7 @@ def main(argv: list[str] | None = None) -> int:
             parity_dump=args.dump_dir is not None,
             context_override=resolved_ctx_len,
         )
+    memory_contract = _verify_runtime_memory_contracts(decoder_runtime)
     llama_prefix_path = _materialize_llama_prefix(
         prefix_embeddings,
         prefix_tokens,
@@ -1978,6 +2021,7 @@ def main(argv: list[str] | None = None) -> int:
             "so_path": str(decoder_runtime["so_path"]),
             "c_path": str(decoder_runtime["c_path"]),
         },
+        "memory_contract": memory_contract,
         "bridge_report_path": None if args.bridge_report is None else str(args.bridge_report.resolve()),
         "prompt": resolved_prompt,
         "formatted_prompt": str(prompt_meta.get("formatted_prompt") or resolved_prompt),
