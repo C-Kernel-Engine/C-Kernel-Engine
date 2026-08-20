@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -16,6 +17,12 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     TensorInfo,
     audit_qwen35moe_gguf_contract,
     gguf_ck_arch_contract,
+    resolve_qwen35_prefill_policy,
+)
+from build_ir_v8 import (  # type: ignore
+    TEMPLATE_OP_WEIGHTS,
+    _kernel_scratch_size_bytes,
+    _resolve_body_ops_for_layer,
 )
 
 
@@ -78,9 +85,14 @@ def fixture(layer_count: int = 4) -> tuple[dict[str, TensorInfo], dict[str, obje
 
 
 class Qwen35MoeContractTests(unittest.TestCase):
+    def test_moe_conversion_owns_safe_prefill_policy(self) -> None:
+        self.assertEqual(resolve_qwen35_prefill_policy(moe=True), "sequential_decode")
+        self.assertEqual(resolve_qwen35_prefill_policy(moe=False), "batched")
+
     def test_model_map_owns_metadata_and_all_expert_tensors(self) -> None:
         contract = gguf_ck_arch_contract("qwen35moe")
         self.assertEqual(contract["family"], "qwen35")
+        self.assertEqual(contract["template"], "qwen35")
         self.assertEqual(contract["metadata_map"]["expert_count"], "qwen35moe.expert_count")
         tensor_map = contract["tensor_map"]
         for suffix in (
@@ -94,6 +106,123 @@ class Qwen35MoeContractTests(unittest.TestCase):
             "ffn_down_shexp.weight",
         ):
             self.assertIn(f"blk.{{L}}.{suffix}", tensor_map)
+
+    def test_shared_circuit_selects_dense_or_moe_tail_mechanically(self) -> None:
+        circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"
+        circuit = json.loads(circuit_path.read_text(encoding="utf-8"))
+        body = circuit["block_types"]["decoder"]["body"]
+
+        dense_ops = _resolve_body_ops_for_layer(
+            body,
+            {"layer_kinds": ["recurrent"], "mlp_execution_mode": "dense"},
+            0,
+        )
+        moe_ops = _resolve_body_ops_for_layer(
+            body,
+            {"layer_kinds": ["recurrent"], "mlp_execution_mode": "qwen35moe"},
+            0,
+        )
+
+        self.assertEqual(dense_ops[-5:], [
+            "post_attention_norm", "mlp_gate_up", "silu_mul", "mlp_down", "residual_add",
+        ])
+        self.assertEqual(moe_ops[-6:], [
+            "post_attention_norm",
+            "moe_router",
+            "full_softmax_topk_router",
+            "moe_swiglu_expert_mlp",
+            "gated_shared_swiglu_expert_mlp",
+            "residual_add",
+        ])
+        self.assertNotIn("moe_router", dense_ops)
+        self.assertNotIn("mlp_gate_up", moe_ops)
+        self.assertEqual(dense_ops.count("post_attention_norm"), 1)
+        self.assertEqual(moe_ops.count("post_attention_norm"), 1)
+
+    def test_shared_circuit_selects_exact_moe_provider_candidates(self) -> None:
+        circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"
+        kernels = json.loads(circuit_path.read_text(encoding="utf-8"))["kernels"]
+        self.assertEqual(
+            kernels["full_softmax_topk_router"],
+            "moe_softmax_topk_router_llama_f32",
+        )
+        self.assertEqual(
+            kernels["moe_swiglu_expert_mlp"],
+            "moe_swiglu_expert_forward_q4k_q5k",
+        )
+        self.assertEqual(
+            kernels["gated_shared_swiglu_expert_mlp"],
+            "moe_swiglu_shared_forward_q8_0_gated",
+        )
+        self.assertEqual(
+            TEMPLATE_OP_WEIGHTS["gated_shared_swiglu_expert_mlp"],
+            ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
+        )
+
+    def test_moe_tail_consumes_the_normalized_main_stream(self) -> None:
+        circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"
+        circuit = json.loads(circuit_path.read_text(encoding="utf-8"))
+        body = circuit["block_types"]["decoder"]["body"]
+        for branch in ("recurrent", "full_attention"):
+            entries = {
+                entry["op"]: entry
+                for entry in body["ops_by_kind"][branch]
+                if isinstance(entry, dict) and entry.get("op")
+            }
+            with self.subTest(branch=branch):
+                self.assertEqual(
+                    entries["moe_router"]["graph_slots"]["inputs"]["x"],
+                    "normalized_stream",
+                )
+                self.assertEqual(
+                    entries["moe_swiglu_expert_mlp"]["graph_slots"]["inputs"]["hidden"],
+                    "normalized_stream",
+                )
+                self.assertEqual(
+                    entries["gated_shared_swiglu_expert_mlp"]["graph_slots"]["inputs"]["hidden"],
+                    "normalized_stream",
+                )
+
+    def test_map_owned_moe_workspace_formulas_resolve_at_real_shape(self) -> None:
+        config = {
+            "embed_dim": HIDDEN,
+            "moe_intermediate_size": EXPERT_DIM,
+            "n_routed_experts": EXPERTS,
+            "experts_per_tok": TOP_K,
+        }
+        cases = {
+            "moe_softmax_topk_router_llama_f32.json": 1024,
+            "moe_swiglu_expert_forward_q4k_q5k.json": 15296,
+            "moe_swiglu_shared_forward_q8_0_gated.json": 15040,
+        }
+        maps_dir = REPO_ROOT / "version" / "v8" / "kernel_maps"
+        for filename, expected in cases.items():
+            provider = json.loads((maps_dir / filename).read_text(encoding="utf-8"))
+            with self.subTest(provider=provider["id"]):
+                self.assertEqual(
+                    _kernel_scratch_size_bytes(provider["scratch"][0], {}, config),
+                    expected,
+                )
+
+    def test_required_scratch_expression_fails_closed(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "unsupported size_bytes"):
+            _kernel_scratch_size_bytes(
+                {
+                    "size_bytes": "unknown_size(H)",
+                    "size_resolution": "required",
+                },
+                {},
+                {"embed_dim": HIDDEN},
+            )
+
+    def test_legacy_optional_scratch_expression_remains_unresolved(self) -> None:
+        self.assertIsNone(
+            _kernel_scratch_size_bytes(
+                {"size_bytes": "min(M, 8) * sizeof(block_q8_1)"},
+                {"_m": 8},
+                {},
+            )
+        )
 
     def test_real_shape_contract_reports_quant_and_layer_cadence(self) -> None:
         tensors, meta = fixture()

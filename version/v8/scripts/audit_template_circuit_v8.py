@@ -50,6 +50,8 @@ CRITICAL_TEMPLATE_INPUTS: dict[str, tuple[str, ...]] = {
     "mlp_gate_up": ("x",),
     "moe_swiglu_expert_mlp": ("hidden", "indices", "routing_weights"),
     "shared_swiglu_expert_mlp": ("hidden", "routed"),
+    "full_softmax_topk_router": ("logits",),
+    "gated_shared_swiglu_expert_mlp": ("hidden", "routed"),
     "mlp_up": ("x",),
     "mamba_in_proj": ("x",),
     "recurrent_qkv_proj": ("x",),

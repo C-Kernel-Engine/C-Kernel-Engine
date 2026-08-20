@@ -1,6 +1,6 @@
 {
   "id": "moe_swiglu_shared_forward_q8_0_gated",
-  "op": "shared_swiglu_expert_mlp",
+  "op": "gated_shared_swiglu_expert_mlp",
   "operation_interface": "moe_shared_swiglu.q8_0_weights.fp32_scalar_gate.fp32_output.v1",
   "selection": {
     "status": "candidate",
@@ -19,10 +19,10 @@
     {"name": "routed", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "optional"}
   ],
   "weights": [
-    {"name": "shared_gate", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
-    {"name": "shared_up", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
-    {"name": "shared_down", "dtype": "q8_0", "shape": ["H", "I"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
-    {"name": "shared_gate_input", "dtype": "fp32", "shape": ["1", "H"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+    {"name": "moe_shared_gate", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_shared_up", "dtype": "q8_0", "shape": ["I", "H"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_shared_down", "dtype": "q8_0", "shape": ["H", "I"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_shared_router", "dtype": "fp32", "shape": ["1", "H"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
   ],
   "outputs": [
     {"name": "output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
@@ -49,10 +49,10 @@
     "params": [
       {"name": "hidden", "source": "activation:hidden", "cast": "const float*", "ports": ["input:hidden"]},
       {"name": "routed", "source": "activation:routed", "cast": "const float*", "ports": ["input:routed"]},
-      {"name": "shared_gate", "source": "weight:shared_gate", "ports": ["weight:shared_gate"]},
-      {"name": "shared_up", "source": "weight:shared_up", "ports": ["weight:shared_up"]},
-      {"name": "shared_down", "source": "weight:shared_down", "ports": ["weight:shared_down"]},
-      {"name": "shared_gate_input", "source": "weight:shared_gate_input", "cast": "const float*", "ports": ["weight:shared_gate_input"]},
+      {"name": "shared_gate", "source": "weight:moe_shared_gate", "ports": ["weight:moe_shared_gate"]},
+      {"name": "shared_up", "source": "weight:moe_shared_up", "ports": ["weight:moe_shared_up"]},
+      {"name": "shared_down", "source": "weight:moe_shared_down", "ports": ["weight:moe_shared_down"]},
+      {"name": "shared_gate_input", "source": "weight:moe_shared_router", "cast": "const float*", "ports": ["weight:moe_shared_router"]},
       {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
       {"name": "rows", "source": "dim:R"},
       {"name": "hidden_dim", "source": "dim:H"},

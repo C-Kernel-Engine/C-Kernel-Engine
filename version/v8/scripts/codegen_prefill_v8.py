@@ -1356,7 +1356,7 @@ def emit_prefill_op(
         output = _hidden_arg("C", "output", "out")
         _emit_hidden_full(output, "moe_router_logits", _hidden_mul("num_tokens", width))
         _emit_hidden_last(output, "moe_router_logits", width)
-    elif op_type == "group_limited_topk_router":
+    elif op_type in ("group_limited_topk_router", "full_softmax_topk_router"):
         width = _hidden_arg("top_k") or "NUM_EXPERTS_PER_TOK"
         weights = _hidden_arg("weights")
         _emit_hidden_full(weights, "moe_routing_weights", _hidden_mul("num_tokens", width))
@@ -1365,7 +1365,7 @@ def emit_prefill_op(
         output = _hidden_arg("output", "out")
         _emit_hidden_full(output, "moe_routed_output", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(output, "moe_routed_output", "EMBED_DIM")
-    elif op_type == "shared_swiglu_expert_mlp":
+    elif op_type in ("shared_swiglu_expert_mlp", "gated_shared_swiglu_expert_mlp"):
         output = _hidden_arg("output", "out")
         _emit_hidden_full(output, "moe_combined_output", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(output, "moe_combined_output", "EMBED_DIM")

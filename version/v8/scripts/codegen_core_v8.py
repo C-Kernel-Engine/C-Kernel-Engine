@@ -2065,7 +2065,7 @@ def emit_op(
         width = _hidden_arg("N", "n", "n_experts")
         _emit_hidden_export(output, "moe_router_logits", _mul_expr(rows, width))
         _emit_hidden_export_last_row(output, "moe_router_logits", width)
-    elif op_name == "group_limited_topk_router":
+    elif op_name in ("group_limited_topk_router", "full_softmax_topk_router"):
         weights = _hidden_arg("weights")
         rows = _hidden_arg("rows", "M", "m", "tokens")
         width = _hidden_arg("top_k")
@@ -2077,7 +2077,7 @@ def emit_op(
         width = _hidden_arg("hidden_dim", "embed_dim") or "EMBED_DIM"
         _emit_hidden_export(output, "moe_routed_output", _mul_expr(rows, width))
         _emit_hidden_export_last_row(output, "moe_routed_output", width)
-    elif op_name == "shared_swiglu_expert_mlp":
+    elif op_name in ("shared_swiglu_expert_mlp", "gated_shared_swiglu_expert_mlp"):
         output = _hidden_arg("output", "out")
         rows = _hidden_arg("rows", "M", "m", "tokens")
         width = _hidden_arg("hidden_dim", "embed_dim") or "EMBED_DIM"

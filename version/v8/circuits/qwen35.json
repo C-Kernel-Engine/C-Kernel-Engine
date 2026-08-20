@@ -12,7 +12,10 @@
     "hybrid_block_pattern": "3x_recurrent_then_1x_full_attention"
   },
   "kernels": {
-    "rope_qk": "mrope_qk_text"
+    "rope_qk": "mrope_qk_text",
+    "full_softmax_topk_router": "moe_softmax_topk_router_llama_f32",
+    "moe_swiglu_expert_mlp": "moe_swiglu_expert_forward_q4k_q5k",
+    "gated_shared_swiglu_expert_mlp": "moe_swiglu_shared_forward_q8_0_gated"
   },
   "contract": {
     "runtime_defaults": {
@@ -871,7 +874,8 @@
       "template_ops": ["silu_mul"],
       "selector": {
         "config_not_equals": {
-          "recurrent_qkv_weight_dtype": "bf16"
+          "recurrent_qkv_weight_dtype": "bf16",
+          "mlp_execution_mode": "qwen35moe"
         }
       },
       "phases": {
@@ -900,6 +904,9 @@
       "selector": {
         "config_equals": {
           "recurrent_qkv_weight_dtype": "bf16"
+        },
+        "config_not_equals": {
+          "mlp_execution_mode": "qwen35moe"
         }
       },
       "phases": {
@@ -993,10 +1000,15 @@
             "recurrent_norm_gate",
             "recurrent_out_proj",
             "residual_add",
-            "post_attention_norm",
-            "mlp_gate_up",
-            "silu_mul",
-            "mlp_down",
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"mlp_gate_up","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"silu_mul","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"mlp_down","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"moe_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"mlp_scratch"}}},
+            {"op":"full_softmax_topk_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"logits":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
             "residual_add"
           ],
           "full_attention": [
@@ -1011,10 +1023,15 @@
             "attn_gate_sigmoid_mul",
             "out_proj",
             "residual_add",
-            "post_attention_norm",
-            "mlp_gate_up",
-            "silu_mul",
-            "mlp_down",
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"mlp_gate_up","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"silu_mul","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"mlp_down","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"moe_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"mlp_scratch"}}},
+            {"op":"full_softmax_topk_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"logits":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
             "residual_add"
           ]
         }

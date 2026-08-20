@@ -38,6 +38,7 @@
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
         "gated_deltanet": 7,
+        "gated_shared_swiglu_expert_mlp": 1,
         "geglu": 4,
         "gelu": 6,
         "gemm": 22,
@@ -97,7 +98,7 @@
         "rope_init": 3,
         "rowwise_bias_add": 1,
         "shared_relu2_expert_mlp": 1,
-        "shared_swiglu_expert_mlp": 4,
+        "shared_swiglu_expert_mlp": 3,
         "softmax": 1,
         "spatial_merge": 3,
         "speculative_commit_or_reject": 1,
@@ -27445,7 +27446,7 @@
       ],
       "weights": [
         {
-          "name": "expert_gate",
+          "name": "moe_expert_gate",
           "dtype": "q4_k",
           "shape": [
             "E",
@@ -27459,7 +27460,7 @@
           "consumption": "required"
         },
         {
-          "name": "expert_up",
+          "name": "moe_expert_up",
           "dtype": "q4_k",
           "shape": [
             "E",
@@ -27473,7 +27474,7 @@
           "consumption": "required"
         },
         {
-          "name": "expert_down",
+          "name": "moe_expert_down",
           "dtype": "q5_k",
           "shape": [
             "E",
@@ -27579,23 +27580,23 @@
           },
           {
             "name": "expert_gate",
-            "source": "weight:expert_gate",
+            "source": "weight:moe_expert_gate",
             "ports": [
-              "weight:expert_gate"
+              "weight:moe_expert_gate"
             ]
           },
           {
             "name": "expert_up",
-            "source": "weight:expert_up",
+            "source": "weight:moe_expert_up",
             "ports": [
-              "weight:expert_up"
+              "weight:moe_expert_up"
             ]
           },
           {
             "name": "expert_down",
-            "source": "weight:expert_down",
+            "source": "weight:moe_expert_down",
             "ports": [
-              "weight:expert_down"
+              "weight:moe_expert_down"
             ]
           },
           {
@@ -28003,7 +28004,7 @@
     },
     {
       "id": "moe_swiglu_shared_forward_q8_0_gated",
-      "op": "shared_swiglu_expert_mlp",
+      "op": "gated_shared_swiglu_expert_mlp",
       "operation_interface": "moe_shared_swiglu.q8_0_weights.fp32_scalar_gate.fp32_output.v1",
       "selection": {
         "status": "candidate",
@@ -28058,7 +28059,7 @@
       ],
       "weights": [
         {
-          "name": "shared_gate",
+          "name": "moe_shared_gate",
           "dtype": "q8_0",
           "shape": [
             "I",
@@ -28071,7 +28072,7 @@
           "consumption": "required"
         },
         {
-          "name": "shared_up",
+          "name": "moe_shared_up",
           "dtype": "q8_0",
           "shape": [
             "I",
@@ -28084,7 +28085,7 @@
           "consumption": "required"
         },
         {
-          "name": "shared_down",
+          "name": "moe_shared_down",
           "dtype": "q8_0",
           "shape": [
             "H",
@@ -28097,7 +28098,7 @@
           "consumption": "required"
         },
         {
-          "name": "shared_gate_input",
+          "name": "moe_shared_router",
           "dtype": "fp32",
           "shape": [
             "1",
@@ -28192,31 +28193,31 @@
           },
           {
             "name": "shared_gate",
-            "source": "weight:shared_gate",
+            "source": "weight:moe_shared_gate",
             "ports": [
-              "weight:shared_gate"
+              "weight:moe_shared_gate"
             ]
           },
           {
             "name": "shared_up",
-            "source": "weight:shared_up",
+            "source": "weight:moe_shared_up",
             "ports": [
-              "weight:shared_up"
+              "weight:moe_shared_up"
             ]
           },
           {
             "name": "shared_down",
-            "source": "weight:shared_down",
+            "source": "weight:moe_shared_down",
             "ports": [
-              "weight:shared_down"
+              "weight:moe_shared_down"
             ]
           },
           {
             "name": "shared_gate_input",
-            "source": "weight:shared_gate_input",
+            "source": "weight:moe_shared_router",
             "cast": "const float*",
             "ports": [
-              "weight:shared_gate_input"
+              "weight:moe_shared_router"
             ]
           },
           {

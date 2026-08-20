@@ -54,6 +54,7 @@ LOWERING CONTRACT:
 """
 
 import argparse
+import ast
 import copy
 import fnmatch
 import importlib.util
@@ -1863,6 +1864,13 @@ OP_DATAFLOW = {
         "inputs": {"x": "layer_input"},
         "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
     },
+    "full_softmax_topk_router": {
+        "inputs": {"logits": "mlp_scratch"},
+        "outputs": {
+            "indices": {"slot": "q_scratch", "dtype": "i32"},
+            "weights": {"slot": "k_scratch", "dtype": "fp32"},
+        },
+    },
     "group_limited_topk_router": {
         "inputs": {"scores": "mlp_scratch"},
         "outputs": {
@@ -1920,6 +1928,13 @@ OP_DATAFLOW = {
         "outputs": {"output": {"slot": "mlp_scratch", "dtype": "fp32"}},
     },
     "shared_swiglu_expert_mlp": {
+        "inputs": {
+            "hidden": "layer_input",
+            "routed": "mlp_scratch",
+        },
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "gated_shared_swiglu_expert_mlp": {
         "inputs": {
             "hidden": "layer_input",
             "routed": "mlp_scratch",
@@ -3547,11 +3562,13 @@ TEMPLATE_TO_KERNEL_OP = {
     "mamba_rmsnorm_gate": "mamba_rmsnorm_gate",
     "mamba_out_proj": "matmul",
     "moe_router": "matmul",
+    "full_softmax_topk_router": "full_softmax_topk_router",
     "group_limited_topk_router": "group_limited_topk_router",
     "moe_relu2_expert_mlp": "moe_relu2_expert_mlp",
     "shared_relu2_expert_mlp": "shared_relu2_expert_mlp",
     "moe_swiglu_expert_mlp": "moe_swiglu_expert_mlp",
     "shared_swiglu_expert_mlp": "shared_swiglu_expert_mlp",
+    "gated_shared_swiglu_expert_mlp": "gated_shared_swiglu_expert_mlp",
     "farskip_routed_shared_combine": "farskip_routed_shared_combine",
     "kv_a_proj": "matmul",
     "kv_a_layernorm": "rmsnorm",
@@ -4322,12 +4339,94 @@ def _kernel_scratch_size_bytes(
     scratch: Dict[str, Any], params: Dict[str, Any], config: Dict[str, Any]
 ) -> Optional[int]:
     """Resolve a kernel-map scratch shape using the operation's concrete dimensions."""
+    values = dict(config)
+    values.update(params)
+
+    size_expression = scratch.get("size_bytes")
+    if isinstance(size_expression, int):
+        return int(size_expression) if size_expression >= 0 else None
+    if isinstance(size_expression, str) and size_expression.strip():
+        symbols = {
+            "R": values.get("_m", values.get("seq_len")),
+            "H": values.get("embed_dim", values.get("hidden_size")),
+            "I": values.get(
+                "moe_intermediate_size", values.get("intermediate_size")
+            ),
+            "E": values.get("n_routed_experts", values.get("num_experts")),
+            "K": values.get("experts_per_tok", values.get("num_experts_per_tok")),
+        }
+
+        def _row_bytes(extent: int, block_elements: int, block_bytes: int) -> int:
+            if extent <= 0 or extent % block_elements != 0:
+                raise RuntimeError(
+                    "HARD SCRATCH CONTRACT FAULT: quantized row extent "
+                    f"{extent} is not divisible by {block_elements}"
+                )
+            return (extent // block_elements) * block_bytes
+
+        functions = {
+            "align64": lambda value: (value + 63) & ~63,
+            "q8_k_row_bytes": lambda value: _row_bytes(value, 256, 292),
+            "q8_0_row_bytes": lambda value: _row_bytes(value, 32, 34),
+        }
+
+        def _evaluate(node: ast.AST) -> int:
+            if isinstance(node, ast.Expression):
+                return _evaluate(node.body)
+            if isinstance(node, ast.Constant) and isinstance(node.value, int):
+                return int(node.value)
+            if isinstance(node, ast.Name):
+                value = symbols.get(node.id)
+                if value is None:
+                    raise ValueError(node.id)
+                return int(value)
+            if isinstance(node, ast.BinOp) and isinstance(
+                node.op, (ast.Add, ast.Sub, ast.Mult, ast.FloorDiv)
+            ):
+                left = _evaluate(node.left)
+                right = _evaluate(node.right)
+                if isinstance(node.op, ast.Add):
+                    return left + right
+                if isinstance(node.op, ast.Sub):
+                    return left - right
+                if isinstance(node.op, ast.Mult):
+                    return left * right
+                if right == 0:
+                    raise RuntimeError("HARD SCRATCH CONTRACT FAULT: division by zero")
+                return left // right
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in functions
+                and len(node.args) == 1
+                and not node.keywords
+            ):
+                return int(functions[node.func.id](_evaluate(node.args[0])))
+            raise RuntimeError(
+                "HARD SCRATCH CONTRACT FAULT: unsupported size_bytes expression node "
+                f"{type(node).__name__}"
+            )
+
+        try:
+            resolved_size = _evaluate(ast.parse(size_expression, mode="eval"))
+        except ValueError:
+            return None
+        except RuntimeError:
+            if scratch.get("size_resolution") != "required":
+                return None
+            raise
+        except (SyntaxError, TypeError) as exc:
+            raise RuntimeError(
+                f"HARD SCRATCH CONTRACT FAULT: invalid size_bytes expression {size_expression!r}"
+            ) from exc
+        if resolved_size < 0:
+            raise RuntimeError("HARD SCRATCH CONTRACT FAULT: scratch size must be non-negative")
+        return resolved_size
+
     shape = scratch.get("shape")
     if not isinstance(shape, list) or not shape:
         raw_size = scratch.get("size")
         return int(raw_size) if isinstance(raw_size, int) else None
-    values = dict(config)
-    values.update(params)
     k_extent = values.get("_k", values.get("_input_dim"))
     if "K_blocks" in shape and k_extent is not None and int(k_extent) % 256 != 0:
         raise RuntimeError(
@@ -4803,7 +4902,11 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return int(config.get("kv_lora_rank", 0) or 0) + int(config.get("qk_rope_head_dim", 0) or 0), embed
     if op_name in ("moe_relu2_expert_mlp", "moe_swiglu_expert_mlp"):
         return int(config.get("moe_intermediate_size", inter) or inter), embed
-    if op_name in ("shared_relu2_expert_mlp", "shared_swiglu_expert_mlp"):
+    if op_name in (
+        "shared_relu2_expert_mlp",
+        "shared_swiglu_expert_mlp",
+        "gated_shared_swiglu_expert_mlp",
+    ):
         return int(config.get("moe_shared_expert_intermediate_size", config.get("moe_intermediate_size", inter)) or inter), embed
     if op_name in ("mlp_gate_up",):
         return inter * 2, embed
@@ -6842,11 +6945,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     "mamba_rmsnorm_gate": ["mamba_norm"],
     "mamba_out_proj": ["mamba_out_proj"],
     "moe_router": ["moe_router"],
+    "full_softmax_topk_router": [],
     "group_limited_topk_router": ["moe_router_bias"],
     "moe_relu2_expert_mlp": ["moe_expert_up", "moe_expert_down"],
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
     "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_up", "moe_expert_down"],
     "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
+    "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
     "kv_a_proj": ["mla_kv_a_proj"],
     "kv_a_layernorm": ["mla_kv_a_norm"],
@@ -9592,6 +9697,7 @@ WEIGHT_PATTERNS = {
     "moe_shared_gate": ["layer.{L}.moe_shared_gate"],
     "moe_shared_up": ["layer.{L}.moe_shared_up"],
     "moe_shared_down": ["layer.{L}.moe_shared_down"],
+    "moe_shared_router": ["layer.{L}.moe_shared_router"],
 
     # Output projection
     "wo": ["layer.{L}.wo", "layers.{L}.attention.wo", "layer.{L}.attn_output", "layer.{L}.attn_o", "layer.{L}.mla_out_proj"],
@@ -9775,6 +9881,7 @@ TEMPLATE_OP_WEIGHTS = {
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
     "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_up", "moe_expert_down"],
     "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
+    "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
     "kv_a_proj": ["mla_kv_a_proj"],
     "kv_a_layernorm": ["mla_kv_a_norm"],
@@ -12395,6 +12502,27 @@ def generate_ir_lower_2(
 
         # Keep _m aligned with effective seq_len for token-major kernels.
         params["_m"] = params.get("seq_len", 1)
+        if op_type in {
+            "full_softmax_topk_router",
+            "moe_swiglu_expert_mlp",
+            "gated_shared_swiglu_expert_mlp",
+        }:
+            params.update({
+                "R": int(params["_m"]),
+                "H": int(config.get("embed_dim", config.get("hidden_size", 0)) or 0),
+                "I": int(config.get("moe_intermediate_size", config.get("intermediate_size", 0)) or 0),
+                "E": int(config.get("n_routed_experts", config.get("num_experts", 0)) or 0),
+                "K": int(config.get("experts_per_tok", config.get("num_experts_per_tok", 0)) or 0),
+            })
+            if op_type == "gated_shared_swiglu_expert_mlp":
+                params["I"] = int(
+                    config.get("moe_shared_expert_intermediate_size", params["I"])
+                    or params["I"]
+                )
+        if op_type == "full_softmax_topk_router":
+            params["routed_scaling_factor"] = float(
+                config.get("routed_scaling_factor", 1.0) or 1.0
+            )
         if op_type in ("cross_k_proj", "cross_v_proj"):
             params["_m"] = int(config.get("encoder_memory_length", 0) or 0)
         if op_type == "cross_attn":

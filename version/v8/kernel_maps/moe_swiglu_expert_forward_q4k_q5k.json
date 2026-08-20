@@ -26,9 +26,9 @@
     {"name": "routing_weights", "dtype": "fp32", "shape": ["R", "K"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}
   ],
   "weights": [
-    {"name": "expert_gate", "dtype": "q4_k", "shape": ["E", "I", "H"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
-    {"name": "expert_up", "dtype": "q4_k", "shape": ["E", "I", "H"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
-    {"name": "expert_down", "dtype": "q5_k", "shape": ["E", "H", "I"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+    {"name": "moe_expert_gate", "dtype": "q4_k", "shape": ["E", "I", "H"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_expert_up", "dtype": "q4_k", "shape": ["E", "I", "H"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_expert_down", "dtype": "q5_k", "shape": ["E", "H", "I"], "layout": "expert_major_opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
   ],
   "outputs": [
     {"name": "output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
@@ -61,9 +61,9 @@
       {"name": "hidden", "source": "activation:hidden", "cast": "const float*", "ports": ["input:hidden"]},
       {"name": "indices", "source": "activation:indices", "cast": "const int*", "ports": ["input:indices"]},
       {"name": "routing_weights", "source": "activation:routing_weights", "cast": "const float*", "ports": ["input:routing_weights"]},
-      {"name": "expert_gate", "source": "weight:expert_gate", "ports": ["weight:expert_gate"]},
-      {"name": "expert_up", "source": "weight:expert_up", "ports": ["weight:expert_up"]},
-      {"name": "expert_down", "source": "weight:expert_down", "ports": ["weight:expert_down"]},
+      {"name": "expert_gate", "source": "weight:moe_expert_gate", "ports": ["weight:moe_expert_gate"]},
+      {"name": "expert_up", "source": "weight:moe_expert_up", "ports": ["weight:moe_expert_up"]},
+      {"name": "expert_down", "source": "weight:moe_expert_down", "ports": ["weight:moe_expert_down"]},
       {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
       {"name": "rows", "source": "dim:R"},
       {"name": "hidden_dim", "source": "dim:H"},
