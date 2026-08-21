@@ -2905,10 +2905,16 @@ void sigmoid_backward_bf16(const uint16_t *input,
 	                          int tokens,
 	                          int dim);
 
-	void swiglu_forward_ggml(const float *input,
-	                         float *output,
-	                         int tokens,
-	                         int dim);
+void swiglu_forward_ggml(const float *input,
+                         float *output,
+                         int tokens,
+                         int dim);
+
+void swiglu_forward_ggml_split(const float *gate,
+                               const float *up,
+                               float *output,
+                               int tokens,
+                               int dim);
 
 	void swiglu_forward_pytorch_bf16_storage(const float *input,
 	                                         float *output,
@@ -3162,7 +3168,41 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
     void *workspace,
     size_t workspace_bytes);
 
+int moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    const void *expert_gate_packed,
+    const void *expert_up_packed,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
 int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
     const float *hidden,
     const int *indices,
     const float *routing_weights,

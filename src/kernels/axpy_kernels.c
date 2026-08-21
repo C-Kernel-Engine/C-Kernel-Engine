@@ -55,6 +55,14 @@ void gemm_q5_k_q8_k_compact_rows4(float *output,
                                    int rows,
                                    int output_dim,
                                    int input_dim);
+void gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4(
+    float *output,
+    const void *weights_packed,
+    const void *input_q8,
+    int rows,
+    int output_dim,
+    int input_dim);
+size_t q4_k_packed_vnni_x8_block_size(void);
 
 /* =============================================================================
  * AXPY: y = y + alpha * x
@@ -791,6 +799,11 @@ static int ck_moe_bucket_layout(int rows,
     if (ck_moe_size_add(
             worker_bytes,
             ck_moe_align64(4u * ck_dtype_row_bytes(
+                CK_DT_Q8_K, (size_t)hidden_dim)),
+            &worker_bytes) != 0 ||
+        ck_moe_size_add(
+            worker_bytes,
+            ck_moe_align64(4u * ck_dtype_row_bytes(
                 CK_DT_Q8_K, (size_t)intermediate_dim)),
             &worker_bytes) != 0 ||
         ck_moe_size_add(
@@ -889,12 +902,15 @@ typedef struct {
     const uint8_t *hidden_q8;
     const uint8_t *gate_base;
     const uint8_t *up_base;
+    const uint8_t *gate_packed_base;
+    const uint8_t *up_packed_base;
     const uint8_t *down_base;
     float *output;
     uint8_t *workers;
     size_t worker_stride;
     size_t hidden_q8_row_bytes;
     size_t q4_expert_stride;
+    size_t q4_packed_expert_stride;
     size_t q5_expert_stride;
     int hidden_dim;
     int intermediate_dim;
@@ -933,6 +949,10 @@ static void ck_moe_q4k_q5k_bucket_work(int ith, int nth, void *opaque)
     float *gate_up = (float *)cursor;
     cursor += ck_moe_align64(
         8u * (size_t)args->intermediate_dim * sizeof(float));
+    uint8_t *hidden_q8_batch = cursor;
+    const size_t hidden_q8_batch_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q8_K, (size_t)args->hidden_dim);
+    cursor += ck_moe_align64(4u * hidden_q8_batch_row_bytes);
     void *act_q8 = cursor;
     cursor += ck_moe_align64(
         4u * ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)args->intermediate_dim));
@@ -961,6 +981,14 @@ static void ck_moe_q4k_q5k_bucket_work(int ith, int nth, void *opaque)
                 (size_t)expert * args->q4_expert_stride;
             const uint8_t *up = args->up_base +
                 (size_t)expert * args->q4_expert_stride;
+            const uint8_t *gate_packed = args->gate_packed_base
+                ? args->gate_packed_base +
+                    (size_t)expert * args->q4_packed_expert_stride
+                : NULL;
+            const uint8_t *up_packed = args->up_packed_base
+                ? args->up_packed_base +
+                    (size_t)expert * args->q4_packed_expert_stride
+                : NULL;
             const uint8_t *down = args->down_base +
                 (size_t)expert * args->q5_expert_stride;
 
@@ -975,21 +1003,44 @@ static void ck_moe_q4k_q5k_bucket_work(int ith, int nth, void *opaque)
                     output_rows[batch_row] = row;
                     hidden_rows[batch_row] = args->hidden_q8 +
                         (size_t)row * args->hidden_q8_row_bytes;
+                    if (gate_packed && up_packed) {
+                        memcpy(
+                            hidden_q8_batch +
+                                (size_t)batch_row * hidden_q8_batch_row_bytes,
+                            hidden_rows[batch_row],
+                            args->hidden_q8_row_bytes);
+                    }
                 }
                 for (int batch_row = batch_rows; batch_row < 4; ++batch_row) {
                     hidden_rows[batch_row] = hidden_rows[0];
                 }
 
-                const int gate_up_stride = 2 * args->intermediate_dim;
-                gemm_q4_k_q8_k_compact_rows4(
-                    gate_up, gate_up_stride, gate, hidden_rows, batch_rows,
-                    args->intermediate_dim, args->hidden_dim);
-                gemm_q4_k_q8_k_compact_rows4(
-                    gate_up + args->intermediate_dim, gate_up_stride, up,
-                    hidden_rows, batch_rows,
-                    args->intermediate_dim, args->hidden_dim);
-                swiglu_forward_ggml(
-                    gate_up, gate_up, batch_rows, args->intermediate_dim);
+                if (gate_packed && up_packed) {
+                    float *up_rows = gate_up +
+                        4u * (size_t)args->intermediate_dim;
+                    gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4(
+                        gate_up, gate_packed, hidden_q8_batch,
+                        batch_rows, args->intermediate_dim,
+                        args->hidden_dim);
+                    gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4(
+                        up_rows, up_packed, hidden_q8_batch,
+                        batch_rows, args->intermediate_dim,
+                        args->hidden_dim);
+                    swiglu_forward_ggml_split(
+                        gate_up, up_rows, gate_up, batch_rows,
+                        args->intermediate_dim);
+                } else {
+                    const int gate_up_stride = 2 * args->intermediate_dim;
+                    gemm_q4_k_q8_k_compact_rows4(
+                        gate_up, gate_up_stride, gate, hidden_rows, batch_rows,
+                        args->intermediate_dim, args->hidden_dim);
+                    gemm_q4_k_q8_k_compact_rows4(
+                        gate_up + args->intermediate_dim, gate_up_stride, up,
+                        hidden_rows, batch_rows,
+                        args->intermediate_dim, args->hidden_dim);
+                    swiglu_forward_ggml(
+                        gate_up, gate_up, batch_rows, args->intermediate_dim);
+                }
                 for (int batch_row = 0; batch_row < batch_rows; ++batch_row) {
                     void *activation = (uint8_t *)act_q8 +
                         (size_t)batch_row * act_q8_row_bytes;
@@ -1024,13 +1075,15 @@ static void ck_moe_q4k_q5k_bucket_work(int ith, int nth, void *opaque)
     }
 }
 
-int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+static int ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl(
     const float *hidden,
     const int *indices,
     const float *routing_weights,
     const void *expert_gate,
     const void *expert_up,
     const void *expert_down,
+    const void *expert_gate_packed,
+    const void *expert_up_packed,
     float *output,
     int rows,
     int hidden_dim,
@@ -1043,6 +1096,7 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
     ck_moe_q4k_q5k_bucket_layout_t layout;
     if (!hidden || !indices || !routing_weights || !expert_gate || !expert_up ||
         !expert_down || !output || !workspace ||
+        ((expert_gate_packed == NULL) != (expert_up_packed == NULL)) ||
         ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim, n_experts,
                              top_k, &layout) != 0 ||
         workspace_bytes < layout.total_bytes) {
@@ -1103,6 +1157,9 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
 
     const size_t q4_expert_stride = (size_t)intermediate_dim *
         ck_dtype_row_bytes(CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t q4_packed_expert_stride =
+        (size_t)((intermediate_dim + 7) / 8) *
+        (size_t)(hidden_dim / 256) * q4_k_packed_vnni_x8_block_size();
     const size_t q5_expert_stride = (size_t)hidden_dim *
         ck_dtype_row_bytes(CK_DT_Q5_K, (size_t)intermediate_dim);
     for (int slot = 0; slot < top_k; ++slot) {
@@ -1114,12 +1171,15 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
             .hidden_q8 = hidden_q8,
             .gate_base = (const uint8_t *)expert_gate,
             .up_base = (const uint8_t *)expert_up,
+            .gate_packed_base = (const uint8_t *)expert_gate_packed,
+            .up_packed_base = (const uint8_t *)expert_up_packed,
             .down_base = (const uint8_t *)expert_down,
             .output = output,
             .workers = workers,
             .worker_stride = layout.worker_stride,
             .hidden_q8_row_bytes = layout.hidden_q8_row_bytes,
             .q4_expert_stride = q4_expert_stride,
+            .q4_packed_expert_stride = q4_packed_expert_stride,
             .q5_expert_stride = q5_expert_stride,
             .hidden_dim = hidden_dim,
             .intermediate_dim = intermediate_dim,
@@ -1140,6 +1200,55 @@ int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
         }
     }
     return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    return ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl(
+        hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down, NULL, NULL, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes);
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    const void *expert_gate_packed,
+    const void *expert_up_packed,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    return ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl(
+        hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down,
+        expert_gate_packed, expert_up_packed, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes);
 }
 
 int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(

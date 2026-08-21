@@ -42,6 +42,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -121,6 +122,7 @@ extern void gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m(
     int M, int N, int K, int threads);
 extern size_t q4_k_packed_vnni_x8_block_size(void);
 extern int ck_q4k_packed_vnni_x8_available(void);
+extern int ck_q4k_packed_vnni_x8_compact_order_available(void);
 extern void pack_q4_k_to_packed_vnni_x8(
     const void *src, void *dst, int N, int K);
 extern void gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m(
@@ -166,6 +168,22 @@ extern void gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni(const void *A_
                                                                    int M, int D, int K,
                                                                    int tile_m,
                                                                    int active_threads);
+extern int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+extern int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+extern int moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    const void *expert_gate_packed, const void *expert_up_packed,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
 extern void gemm_nt_q4_k_packed_meta_q8_k_tile(const void *A_q8,
                                                const void *B_packed,
                                                const float *bias,
@@ -1048,6 +1066,86 @@ int ck_q4k_prepare_vnni_x8_weight(const void *B, int N, int K)
 {
     if (!ck_q4k_packed_vnni_x8_available()) return 0;
     return ck_get_q4k_packed_vnni_x8_cached(B, N, K) != NULL;
+}
+
+static const void *ck_find_prepared_q4k_packed_vnni_x8(
+        const void *B, int N, int K)
+{
+    if (!B || N <= 0 || K <= 0 || (K % QK_K) != 0) return NULL;
+
+    pthread_mutex_lock(&ck_q4k_packed_vnni_x8_cache_mu);
+    for (ck_q4k_packed_vnni_x8_cache_entry_t *entry =
+             ck_q4k_packed_vnni_x8_cache_head;
+         entry; entry = entry->next) {
+        if (entry->src == B && entry->N == N && entry->K == K) {
+            const void *packed = entry->packed;
+            pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
+            return packed;
+        }
+    }
+    pthread_mutex_unlock(&ck_q4k_packed_vnni_x8_cache_mu);
+    return NULL;
+}
+
+int ck_moe_prepare_q4k_gate_up_vnni_x8(
+    const void *gate,
+    const void *up,
+    int intermediate_dim,
+    int hidden_dim,
+    int n_experts)
+{
+    if (!gate || !up || intermediate_dim <= 0 || hidden_dim <= 0 ||
+        n_experts <= 0 || intermediate_dim > INT_MAX / n_experts ||
+        !ck_q4k_packed_vnni_x8_compact_order_available()) {
+        return 0;
+    }
+    const int output_rows = intermediate_dim * n_experts;
+    return ck_q4k_prepare_vnni_x8_weight(gate, output_rows, hidden_dim) +
+           ck_q4k_prepare_vnni_x8_weight(up, output_rows, hidden_dim);
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    if (rows < 512 || intermediate_dim <= 0 || n_experts <= 0 ||
+        intermediate_dim > INT_MAX / n_experts) {
+        return moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+            hidden, indices, routing_weights,
+            expert_gate, expert_up, expert_down, output,
+            rows, hidden_dim, intermediate_dim, n_experts, top_k,
+            workspace, workspace_bytes);
+    }
+
+    const int output_rows = intermediate_dim * n_experts;
+    const void *gate_packed = ck_find_prepared_q4k_packed_vnni_x8(
+        expert_gate, output_rows, hidden_dim);
+    const void *up_packed = ck_find_prepared_q4k_packed_vnni_x8(
+        expert_up, output_rows, hidden_dim);
+    if (!gate_packed || !up_packed) {
+        return moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+            hidden, indices, routing_weights,
+            expert_gate, expert_up, expert_down, output,
+            rows, hidden_dim, intermediate_dim, n_experts, top_k,
+            workspace, workspace_bytes);
+    }
+    return moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+        hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down, gate_packed, up_packed, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes);
 }
 
 static void *ck_get_q4k_packed_vnni_x16_cached(const void *B, int N, int K)

@@ -27821,7 +27821,7 @@
       "physical_contract_version": 1,
       "contract_schema_version": 1,
       "numerical_contract": "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32",
-      "variant": "slot_ordered_expert_bucketed_compact_rows4_q4_k_gate_up_q5_k_down",
+      "variant": "slot_ordered_expert_bucketed_prepared_x8_q4_k_gate_up_q5_k_down",
       "modes": {
         "inference": true,
         "training": false,
@@ -27941,8 +27941,8 @@
           "alignment": 64,
           "lifetime": "kernel_call",
           "size_resolution": "required",
-          "size_bytes": "align64(R * align64(q8_k_row_bytes(H))) + align64(R * K * 4) + align64(K * (E + 1) * 4) + 2 * align64(E * 4) + 64 * (align64(8 * I * 4) + align64(4 * q8_k_row_bytes(I)) + align64(4 * H * 4))",
-          "desc": "Planner-owned prequantized hidden rows, stable per-slot expert buckets, and four-row per-worker gate/up/down scratch."
+          "size_bytes": "align64(R * align64(q8_k_row_bytes(H))) + align64(R * K * 4) + align64(K * (E + 1) * 4) + 2 * align64(E * 4) + 64 * (align64(8 * I * 4) + align64(4 * q8_k_row_bytes(H)) + align64(4 * q8_k_row_bytes(I)) + align64(4 * H * 4))",
+          "desc": "Planner-owned prequantized hidden rows, stable per-slot expert buckets, four-row gathered Q8_K input, and per-worker gate/up/down scratch."
         }
       ],
       "dims": [
@@ -27972,18 +27972,34 @@
           "bucketed_min_rows": 512,
           "fallback": "moe_swiglu_expert_forward_q4k_q5k"
         },
-        "notes": "Rows at or above 512 are grouped by expert independently for each selected slot and processed in compact four-row batches. A pool barrier between slots preserves selected-slot accumulation order exactly. Shorter prefill and decode retain the row-parallel provider because measured dispatch and bucketing costs outweigh reuse."
+        "notes": "Rows at or above 512 are grouped by expert independently for each selected slot. Prepared AVX-VNNI x8 gate/up weights process four gathered rows per worker; unavailable or over-budget preparation falls back to compact rows4. A pool barrier between slots preserves selected-slot accumulation order exactly. Shorter prefill and decode retain the row-parallel provider because measured dispatch and bucketing costs outweigh reuse."
       },
       "impl": {
-        "function": "moe_swiglu_expert_forward_q4k_q5k_auto_workspace",
-        "c_declaration": "int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);",
+        "function": "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace",
+        "c_declaration": "int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);",
         "sources": [
           "src/kernels/axpy_kernels.c",
           "src/kernels/gemm_kernels_q4k_q8k.c",
           "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
           "src/kernels/gemm_kernels_q5_k.c",
-          "src/kernels/swiglu_kernels.c"
+          "src/kernels/swiglu_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
+      },
+      "weight_preparation": {
+        "function": "ck_moe_prepare_q4k_gate_up_vnni_x8",
+        "arguments": {
+          "GATE": "expert_gate",
+          "UP": "expert_up",
+          "I": "intermediate_dim",
+          "H": "hidden_dim",
+          "E": "n_experts"
+        },
+        "prepared_format": "expert_major_q4_k_packed_vnni_x8",
+        "prepared_bytes": "2 * ((E * I + 7) / 8) * (H / 256) * 1192",
+        "max_total_bytes": 17179869184,
+        "fallback": "moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace",
+        "notes": "Prepare complete expert-major gate and up tensors at model load when AVX-VNNI is available and all selected layers fit within the 16 GiB aggregate budget. The canonical compact tensors remain authoritative and are used when preparation is unavailable or over budget."
       },
       "implementation": {
         "isa_dispatch": "runtime",
@@ -28103,7 +28119,7 @@
             "prefill",
             "decode"
           ],
-          "function": "moe_swiglu_expert_forward_q4k_q5k_auto_workspace",
+          "function": "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "runtime",
@@ -28128,7 +28144,7 @@
           }
         }
       ],
-      "notes": "Locality candidate for routed Qwen3.5-style SwiGLU. It keeps compact expert weights, quantizes each hidden row once, reuses each unpacked Q4/Q5 block across four rows, groups work by expert, and retains exact selected-slot merge order.",
+      "notes": "Locality candidate for routed Qwen3.5-style SwiGLU. It quantizes each hidden row once, groups work by expert, uses a map-owned prepared x8 gate/up layout when available, retains compact fallback, and preserves exact selected-slot merge order.",
       "name": "moe_swiglu_expert_forward_q4k_q5k_bucketed",
       "_source_file": "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
     },

@@ -573,6 +573,49 @@ void swiglu_forward_ggml(const float *input,
     }
 }
 
+void swiglu_forward_ggml_split(const float *gate,
+                               const float *up,
+                               float *output,
+                               int tokens,
+                               int dim)
+{
+    if (!gate || !up || !output || tokens <= 0 || dim <= 0) {
+        return;
+    }
+    for (int t = 0; t < tokens; ++t) {
+        const float *gate_row = gate + (size_t)t * (size_t)dim;
+        const float *up_row = up + (size_t)t * (size_t)dim;
+        float *out_row = output + (size_t)t * (size_t)dim;
+        int d = 0;
+
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+        for (; d + 16 <= dim; d += 16) {
+            const __m512 gate_v = _mm512_loadu_ps(gate_row + d);
+            const __m512 up_v = _mm512_loadu_ps(up_row + d);
+            const __m512 neg_gate = _mm512_sub_ps(_mm512_setzero_ps(), gate_v);
+            const __m512 denom = _mm512_add_ps(
+                _mm512_set1_ps(1.0f), ck_ggml_expf_avx512(neg_gate));
+            const __m512 silu = _mm512_div_ps(gate_v, denom);
+            _mm512_storeu_ps(out_row + d, _mm512_mul_ps(silu, up_v));
+        }
+#elif defined(__AVX2__) && defined(__FMA__)
+        for (; d + 8 <= dim; d += 8) {
+            const __m256 gate_v = _mm256_loadu_ps(gate_row + d);
+            const __m256 up_v = _mm256_loadu_ps(up_row + d);
+            const __m256 neg_gate = _mm256_sub_ps(_mm256_setzero_ps(), gate_v);
+            const __m256 denom = _mm256_add_ps(
+                _mm256_set1_ps(1.0f), ck_ggml_expf_avx2(neg_gate));
+            const __m256 silu = _mm256_div_ps(gate_v, denom);
+            _mm256_storeu_ps(out_row + d, _mm256_mul_ps(silu, up_v));
+        }
+#endif
+        for (; d < dim; ++d) {
+            const float gate_v = gate_row[d];
+            out_row[d] = (gate_v / (1.0f + expf(-gate_v))) * up_row[d];
+        }
+    }
+}
+
 #if defined(__AVX512F__)
 typedef __m512 (*ck_sleef_expf16_fn)(__m512);
 

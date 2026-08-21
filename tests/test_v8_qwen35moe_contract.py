@@ -208,6 +208,30 @@ class Qwen35MoeContractTests(unittest.TestCase):
         )
         self.assertIn(f"int {function}(\n", header)
 
+    def test_bucketed_provider_owns_bounded_gate_up_preparation(self) -> None:
+        provider = json.loads(
+            (
+                REPO_ROOT
+                / "version"
+                / "v8"
+                / "kernel_maps"
+                / "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+            ).read_text(encoding="utf-8")
+        )
+        preparation = provider["weight_preparation"]
+        self.assertEqual(
+            preparation["function"], "ck_moe_prepare_q4k_gate_up_vnni_x8"
+        )
+        self.assertEqual(
+            preparation["prepared_format"],
+            "expert_major_q4_k_packed_vnni_x8",
+        )
+        self.assertEqual(preparation["max_total_bytes"], 16 * 1024**3)
+        self.assertEqual(
+            preparation["fallback"],
+            "moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace",
+        )
+
     def test_moe_tail_consumes_the_normalized_main_stream(self) -> None:
         circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"
         circuit = json.loads(circuit_path.read_text(encoding="utf-8"))
@@ -220,8 +244,12 @@ class Qwen35MoeContractTests(unittest.TestCase):
             }
             with self.subTest(branch=branch):
                 self.assertEqual(
-                    entries["moe_router"]["graph_slots"]["inputs"]["x"],
+                    entries["moe_router"]["graph_slots"]["inputs"]["A"],
                     "normalized_stream",
+                )
+                self.assertEqual(
+                    entries["moe_router"]["graph_slots"]["outputs"]["C"],
+                    "mlp_scratch",
                 )
                 self.assertEqual(
                     entries["moe_swiglu_expert_mlp"]["graph_slots"]["inputs"]["hidden"],

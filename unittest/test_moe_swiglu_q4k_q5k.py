@@ -90,6 +90,27 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
         LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace.restype = (
             ctypes.c_int
         )
+        LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace.argtypes = [
+            FPTR,
+            IPTR,
+            FPTR,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            FPTR,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+        ]
+        LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace.restype = (
+            ctypes.c_int
+        )
         LIB.quantize_row_q8_k.argtypes = [FPTR, ctypes.c_void_p, ctypes.c_int]
         LIB.gemv_q4_k_q8_k.argtypes = [
             FPTR,
@@ -100,6 +121,15 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
         ]
         LIB.gemv_q5_k_q8_k.argtypes = LIB.gemv_q4_k_q8_k.argtypes
         LIB.swiglu_forward_ggml.argtypes = [FPTR, FPTR, ctypes.c_int, ctypes.c_int]
+        LIB.swiglu_forward_ggml_split.argtypes = [
+            FPTR, FPTR, FPTR, ctypes.c_int, ctypes.c_int
+        ]
+        LIB.q4_k_packed_vnni_x8_block_size.restype = ctypes.c_size_t
+        LIB.ck_q4k_packed_vnni_x8_available.restype = ctypes.c_int
+        LIB.ck_q4k_packed_vnni_x8_compact_order_available.restype = ctypes.c_int
+        LIB.pack_q4_k_to_packed_vnni_x8.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int
+        ]
         LIB.axpy_f32.argtypes = [FPTR, FPTR, ctypes.c_float, ctypes.c_int]
 
     def setUp(self) -> None:
@@ -304,6 +334,145 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
                 bucketed_workspace, bucketed_bytes,
             ),
             0,
+        )
+        np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+    def test_prepared_bucketed_gate_up_matches_compact_bit_exact(self) -> None:
+        if not LIB.ck_q4k_packed_vnni_x8_compact_order_available():
+            self.skipTest("AVX-512 compact-order x8 provider is unavailable")
+        rows = 9
+        rng = np.random.default_rng(9321)
+        hidden = np.ascontiguousarray(
+            rng.normal(0.0, 0.2, size=(rows, self.hidden)).astype(np.float32)
+        )
+        indices = np.ascontiguousarray(
+            rng.integers(0, self.experts, size=(rows, self.top_k), dtype=np.int32)
+        )
+        routing = np.ascontiguousarray(
+            rng.uniform(0.1, 0.9, size=(rows, self.top_k)).astype(np.float32)
+        )
+        expected = np.empty((rows, self.hidden), dtype=np.float32)
+        actual = np.empty_like(expected)
+        workspace_bytes = LIB.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
+            rows, self.hidden, self.intermediate, self.experts, self.top_k
+        )
+        compact_workspace = ctypes.create_string_buffer(workspace_bytes)
+        prepared_workspace = ctypes.create_string_buffer(workspace_bytes)
+        packed_blocks = (
+            ((self.experts * self.intermediate + 7) // 8)
+            * (self.hidden // QK_K)
+        )
+        packed_bytes = packed_blocks * LIB.q4_k_packed_vnni_x8_block_size()
+        gate_packed = ctypes.create_string_buffer(packed_bytes)
+        up_packed = ctypes.create_string_buffer(packed_bytes)
+        LIB.pack_q4_k_to_packed_vnni_x8(
+            self.gate, gate_packed, self.experts * self.intermediate, self.hidden
+        )
+        LIB.pack_q4_k_to_packed_vnni_x8(
+            self.up, up_packed, self.experts * self.intermediate, self.hidden
+        )
+
+        self.assertEqual(
+            LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+                _fptr(hidden), _iptr(indices), _fptr(routing),
+                self.gate, self.up, self.down, _fptr(expected),
+                rows, self.hidden, self.intermediate, self.experts, self.top_k,
+                compact_workspace, workspace_bytes,
+            ),
+            0,
+        )
+        self.assertEqual(
+            LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+                _fptr(hidden), _iptr(indices), _fptr(routing),
+                self.gate, self.up, self.down, gate_packed, up_packed,
+                _fptr(actual), rows, self.hidden, self.intermediate,
+                self.experts, self.top_k, prepared_workspace, workspace_bytes,
+            ),
+            0,
+        )
+        np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+    def test_prepared_bucketed_matches_compact_at_qwen35_expert_shape(self) -> None:
+        if not LIB.ck_q4k_packed_vnni_x8_compact_order_available():
+            self.skipTest("AVX-512 compact-order x8 provider is unavailable")
+
+        rows = 17
+        hidden = 2048
+        intermediate = 512
+        experts = 2
+        top_k = 2
+        rng = np.random.default_rng(13579)
+        activations = np.ascontiguousarray(
+            rng.normal(0.0, 0.2, size=(rows, hidden)).astype(np.float32)
+        )
+        indices = np.ascontiguousarray(
+            rng.integers(0, experts, size=(rows, top_k), dtype=np.int32)
+        )
+        routing = np.ascontiguousarray(
+            rng.uniform(0.1, 0.9, size=(rows, top_k)).astype(np.float32)
+        )
+        q4_blocks = experts * intermediate * (hidden // QK_K)
+        q5_blocks = experts * hidden * (intermediate // QK_K)
+        gate = _weight_blocks(q4_blocks, Q4_K_BYTES, 101)
+        up = _weight_blocks(q4_blocks, Q4_K_BYTES, 102)
+        down = _weight_blocks(q5_blocks, Q5_K_BYTES, 103)
+        expected = np.empty((rows, hidden), dtype=np.float32)
+        actual = np.empty_like(expected)
+        workspace_bytes = LIB.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
+            rows, hidden, intermediate, experts, top_k
+        )
+        compact_workspace = ctypes.create_string_buffer(workspace_bytes)
+        prepared_workspace = ctypes.create_string_buffer(workspace_bytes)
+        packed_blocks = (
+            ((experts * intermediate + 7) // 8) * (hidden // QK_K)
+        )
+        packed_bytes = packed_blocks * LIB.q4_k_packed_vnni_x8_block_size()
+        gate_packed = ctypes.create_string_buffer(packed_bytes)
+        up_packed = ctypes.create_string_buffer(packed_bytes)
+        LIB.pack_q4_k_to_packed_vnni_x8(
+            gate, gate_packed, experts * intermediate, hidden
+        )
+        LIB.pack_q4_k_to_packed_vnni_x8(
+            up, up_packed, experts * intermediate, hidden
+        )
+
+        self.assertEqual(
+            LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+                _fptr(activations), _iptr(indices), _fptr(routing),
+                gate, up, down, _fptr(expected), rows, hidden, intermediate,
+                experts, top_k, compact_workspace, workspace_bytes,
+            ),
+            0,
+        )
+        self.assertEqual(
+            LIB.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace(
+                _fptr(activations), _iptr(indices), _fptr(routing),
+                gate, up, down, gate_packed, up_packed, _fptr(actual),
+                rows, hidden, intermediate, experts, top_k,
+                prepared_workspace, workspace_bytes,
+            ),
+            0,
+        )
+        np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+    def test_split_swiglu_matches_interleaved_bit_exact(self) -> None:
+        rng = np.random.default_rng(2026)
+        gate = np.ascontiguousarray(
+            rng.normal(size=(3, self.intermediate)).astype(np.float32)
+        )
+        up = np.ascontiguousarray(
+            rng.normal(size=(3, self.intermediate)).astype(np.float32)
+        )
+        interleaved = np.ascontiguousarray(
+            np.concatenate((gate, up), axis=1), dtype=np.float32
+        )
+        expected = np.empty_like(gate)
+        actual = np.empty_like(gate)
+        LIB.swiglu_forward_ggml(
+            _fptr(interleaved), _fptr(expected), 3, self.intermediate
+        )
+        LIB.swiglu_forward_ggml_split(
+            _fptr(gate), _fptr(up), _fptr(actual), 3, self.intermediate
         )
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
 

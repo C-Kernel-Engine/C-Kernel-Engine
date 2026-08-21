@@ -52,9 +52,31 @@ void ck_q4k_packed_weight_cache_clear(void);
  */
 int ck_q4k_prepare_vnni_x16_weight(const void *B, int N, int K);
 int ck_q4k_prepare_vnni_x8_weight(const void *B, int N, int K);
+int ck_moe_prepare_q4k_gate_up_vnni_x8(
+    const void *gate,
+    const void *up,
+    int intermediate_dim,
+    int hidden_dim,
+    int n_experts);
 int ck_q5_0_prepare_q8_0_weight(const void *B, int N, int K);
 int ck_q5_k_prepare_expanded_weight(const void *B, int N, int K);
 int ck_q6_k_prepare_expanded_weight(const void *B, int N, int K);
+
+int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
 
 void gated_deltanet_llama_prefill_parallel_dispatch(
     const float *q, const float *k, const float *v,

@@ -77,6 +77,23 @@ def _configure_library(path: Path) -> ctypes.CDLL:
     lib.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace.restype = ctypes.c_int
     lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace.argtypes = call_args
     lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace.restype = ctypes.c_int
+    lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace.argtypes = [
+        *call_args[:6],
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        *call_args[6:],
+    ]
+    lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace.restype = (
+        ctypes.c_int
+    )
+    lib.q4_k_packed_vnni_x8_block_size.restype = ctypes.c_size_t
+    lib.ck_q4k_packed_vnni_x8_compact_order_available.restype = ctypes.c_int
+    lib.pack_q4_k_to_packed_vnni_x8.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
     return lib
 
 
@@ -102,7 +119,9 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--rows", type=int, nargs="+", default=[32, 128, 512, 4096])
     parser.add_argument(
-        "--provider", choices=("both", "row_parallel", "bucketed"), default="both"
+        "--provider",
+        choices=("both", "all", "row_parallel", "bucketed", "prepared"),
+        default="both",
     )
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
@@ -125,6 +144,7 @@ def main() -> int:
         raise SystemExit(f"missing manifest entries: {missing}")
 
     results: list[dict[str, object]] = []
+    preparation: dict[str, object] | None = None
     with args.weights.open("r+b", buffering=0) as weights_file:
         weights_map = mmap.mmap(weights_file.fileno(), 0, access=mmap.ACCESS_COPY)
         try:
@@ -132,6 +152,35 @@ def main() -> int:
                 key: _weight_pointer(weights_map, entries[name][0])
                 for key, name in names.items()
             }
+            prepared_weights: dict[str, ctypes.Array[ctypes.c_char]] = {}
+            if args.provider in {"all", "prepared"}:
+                if not lib.ck_q4k_packed_vnni_x8_compact_order_available():
+                    raise SystemExit(
+                        "prepared provider requires AVX-512 VNNI compact-order support"
+                    )
+                packed_blocks = (
+                    ((experts * intermediate_dim + 7) // 8)
+                    * (hidden_dim // 256)
+                )
+                packed_bytes = (
+                    packed_blocks * lib.q4_k_packed_vnni_x8_block_size()
+                )
+                prepared_weights = {
+                    "gate": ctypes.create_string_buffer(packed_bytes),
+                    "up": ctypes.create_string_buffer(packed_bytes),
+                }
+                prepare_start = time.perf_counter()
+                for name in ("gate", "up"):
+                    lib.pack_q4_k_to_packed_vnni_x8(
+                        weight_ptrs[name],
+                        prepared_weights[name],
+                        experts * intermediate_dim,
+                        hidden_dim,
+                    )
+                preparation = {
+                    "seconds": time.perf_counter() - prepare_start,
+                    "bytes": 2 * packed_bytes,
+                }
             for rows in args.rows:
                 if rows <= 0:
                     raise SystemExit("rows must be positive")
@@ -143,6 +192,7 @@ def main() -> int:
                 outputs = {
                     "row_parallel": np.empty((rows, hidden_dim), dtype=np.float32),
                     "bucketed": np.empty((rows, hidden_dim), dtype=np.float32),
+                    "prepared": np.empty((rows, hidden_dim), dtype=np.float32),
                 }
                 row_stride = lib.moe_swiglu_expert_q4k_q5k_workspace_bytes(
                     hidden_dim, intermediate_dim
@@ -152,11 +202,15 @@ def main() -> int:
                     int(os.environ.get("CK_NUM_THREADS", os.cpu_count() or 1)),
                     64,
                 )
+                bucketed_workspace_bytes = (
+                    lib.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
+                        rows, hidden_dim, intermediate_dim, experts, top_k
+                    )
+                )
                 workspace_bytes = {
                     "row_parallel": row_stride * active_threads,
-                    "bucketed": lib.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
-                        rows, hidden_dim, intermediate_dim, experts, top_k
-                    ),
+                    "bucketed": bucketed_workspace_bytes,
+                    "prepared": bucketed_workspace_bytes,
                 }
                 workspaces = {
                     name: ctypes.create_string_buffer(size)
@@ -167,12 +221,16 @@ def main() -> int:
                         lib.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace
                     ),
                     "bucketed": lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace,
+                    "prepared": (
+                        lib.moe_swiglu_expert_forward_q4k_q5k_bucketed_prepared_workspace
+                    ),
                 }
-                selected = (
-                    ["row_parallel", "bucketed"]
-                    if args.provider == "both"
-                    else [args.provider]
-                )
+                if args.provider == "both":
+                    selected = ["row_parallel", "bucketed"]
+                elif args.provider == "all":
+                    selected = ["row_parallel", "bucketed", "prepared"]
+                else:
+                    selected = [args.provider]
 
                 row_result: dict[str, object] = {
                     "rows": rows,
@@ -185,14 +243,15 @@ def main() -> int:
                 samples: dict[str, list[float]] = {name: [] for name in selected}
 
                 def run_provider(name: str) -> float:
-                    start = time.perf_counter()
-                    status = functions[name](
+                    common_args = (
                         _fptr(hidden),
                         _iptr(indices),
                         _fptr(routing),
                         weight_ptrs["gate"],
                         weight_ptrs["up"],
                         weight_ptrs["down"],
+                    )
+                    trailing_args = (
                         _fptr(outputs[name]),
                         rows,
                         hidden_dim,
@@ -202,6 +261,16 @@ def main() -> int:
                         workspaces[name],
                         workspace_bytes[name],
                     )
+                    start = time.perf_counter()
+                    if name == "prepared":
+                        status = functions[name](
+                            *common_args,
+                            prepared_weights["gate"],
+                            prepared_weights["up"],
+                            *trailing_args,
+                        )
+                    else:
+                        status = functions[name](*common_args, *trailing_args)
                     elapsed = time.perf_counter() - start
                     if status != 0:
                         raise RuntimeError(f"{name} returned {status}")
@@ -224,27 +293,30 @@ def main() -> int:
                         "samples_seconds": samples[name],
                     }
 
-                if args.provider == "both":
-                    exact = np.array_equal(
-                        outputs["row_parallel"].view(np.uint32),
-                        outputs["bucketed"].view(np.uint32),
+                if len(selected) > 1:
+                    reference = selected[0]
+                    exact = all(
+                        np.array_equal(
+                            outputs[reference].view(np.uint32),
+                            outputs[name].view(np.uint32),
+                        )
+                        for name in selected[1:]
                     )
                     row_result["bit_exact"] = exact
                     if not exact:
-                        mismatches = np.flatnonzero(
-                            outputs["row_parallel"].view(np.uint32).ravel()
-                            != outputs["bucketed"].view(np.uint32).ravel()
-                        )
                         raise RuntimeError(
-                            f"provider outputs differ at {mismatches.size} values"
+                            f"provider outputs differ for rows={rows}"
                         )
-                    old_time = row_result["providers"]["row_parallel"][
+                    reference_time = row_result["providers"][reference][
                         "median_seconds"
                     ]
-                    new_time = row_result["providers"]["bucketed"][
-                        "median_seconds"
-                    ]
-                    row_result["speedup"] = old_time / new_time
+                    for name in selected[1:]:
+                        provider_time = row_result["providers"][name][
+                            "median_seconds"
+                        ]
+                        row_result[f"speedup_{name}_vs_{reference}"] = (
+                            reference_time / provider_time
+                        )
                 results.append(row_result)
                 print(json.dumps(row_result, sort_keys=True), flush=True)
         finally:
@@ -254,6 +326,7 @@ def main() -> int:
         "library": str(args.library.resolve()),
         "weights": str(args.weights.resolve()),
         "provider": args.provider,
+        "preparation": preparation,
         "results": results,
     }
     if args.output:

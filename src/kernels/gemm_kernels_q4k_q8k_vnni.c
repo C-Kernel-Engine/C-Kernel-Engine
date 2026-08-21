@@ -1025,6 +1025,166 @@ static inline void accum_q4_k_packed_vnni_x8_q8_k_4m_superblock(
 #endif
 }
 
+/* Output-lane x8 packing with the compact MoE provider's FP32 update order.
+ * Integer dots are shared across eight output columns, but every lane applies
+ * low, low-min, high, high-min terms in the same sequence as
+ * dot_q4_k_q8_k_vnni_block_rows4(). */
+static inline void dot_q4_k_packed_vnni_x8_q8_k_compact_order(
+        float block_sums[4][8],
+        const block_q4_K_packed_vnni_x8 *w,
+        const block_q8_K *x[4],
+        int rows)
+{
+#if defined(CK_HAS_AVX_VNNI_256)
+    float wd[8];
+    float wdmin[8];
+    for (int lane = 0; lane < 8; ++lane) {
+        wd[lane] = CK_FP16_TO_FP32(w->d[lane]);
+        wdmin[lane] = CK_FP16_TO_FP32(w->dmin[lane]);
+    }
+    const __m256 weight_scale = _mm256_loadu_ps(wd);
+    const __m256 weight_min_scale = _mm256_loadu_ps(wdmin);
+    const __m256i nibble_mask = _mm256_set1_epi8(0x0f);
+
+    for (int pair = 0; pair < QK_K / 64; ++pair) {
+        const int j = pair * 64;
+        const int is = pair * 2;
+        __m256i sum_lo[4];
+        __m256i sum_hi[4];
+        for (int row = 0; row < rows; ++row) {
+            sum_lo[row] = _mm256_setzero_si256();
+            sum_hi[row] = _mm256_setzero_si256();
+        }
+
+        for (int segment = 0; segment < 8; ++segment) {
+            const __m256i packed = _mm256_loadu_si256(
+                (const __m256i *)(w->qs + (size_t)pair * 256u +
+                                  (size_t)segment * 32u));
+            const __m256i q4_lo = _mm256_and_si256(packed, nibble_mask);
+            const __m256i q4_hi = _mm256_and_si256(
+                _mm256_srli_epi16(packed, 4), nibble_mask);
+            for (int row = 0; row < rows; ++row) {
+                int32_t q8_lo_word;
+                int32_t q8_hi_word;
+                memcpy(&q8_lo_word, x[row]->qs + j + segment * 4,
+                       sizeof(q8_lo_word));
+                memcpy(&q8_hi_word, x[row]->qs + j + 32 + segment * 4,
+                       sizeof(q8_hi_word));
+                sum_lo[row] = ck_dpbusd_i32x8(
+                    sum_lo[row], q4_lo, _mm256_set1_epi32(q8_lo_word));
+                sum_hi[row] = ck_dpbusd_i32x8(
+                    sum_hi[row], q4_hi, _mm256_set1_epi32(q8_hi_word));
+            }
+        }
+
+        const __m256 scale_lo = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(
+            _mm_loadl_epi64((const __m128i *)w->sc[is])));
+        const __m256 scale_hi = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(
+            _mm_loadl_epi64((const __m128i *)w->sc[is + 1])));
+        const __m256 min_lo = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(
+            _mm_loadl_epi64((const __m128i *)w->m[is])));
+        const __m256 min_hi = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(
+            _mm_loadl_epi64((const __m128i *)w->m[is + 1])));
+
+        for (int row = 0; row < rows; ++row) {
+            const __m256 row_scale = _mm256_set1_ps(x[row]->d);
+            const __m256 d = _mm256_mul_ps(weight_scale, row_scale);
+            const __m256 dmin = _mm256_mul_ps(weight_min_scale, row_scale);
+            __m256 value = _mm256_loadu_ps(block_sums[row]);
+            value = _mm256_fmadd_ps(
+                _mm256_mul_ps(d, scale_lo),
+                _mm256_cvtepi32_ps(sum_lo[row]), value);
+            const int32_t bsum_lo =
+                (int32_t)x[row]->bsums[j / 16] +
+                (int32_t)x[row]->bsums[j / 16 + 1];
+            value = _mm256_fnmadd_ps(
+                _mm256_mul_ps(dmin, min_lo),
+                _mm256_set1_ps((float)bsum_lo), value);
+            value = _mm256_fmadd_ps(
+                _mm256_mul_ps(d, scale_hi),
+                _mm256_cvtepi32_ps(sum_hi[row]), value);
+            const int32_t bsum_hi =
+                (int32_t)x[row]->bsums[(j + 32) / 16] +
+                (int32_t)x[row]->bsums[(j + 32) / 16 + 1];
+            value = _mm256_fnmadd_ps(
+                _mm256_mul_ps(dmin, min_hi),
+                _mm256_set1_ps((float)bsum_hi), value);
+            _mm256_storeu_ps(block_sums[row], value);
+        }
+    }
+#else
+    (void)block_sums;
+    (void)w;
+    (void)x;
+    (void)rows;
+#endif
+}
+
+void gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4(
+        float *output,
+        const void *weights_packed,
+        const void *input_q8,
+        int rows,
+        int output_dim,
+        int input_dim)
+{
+    if (!output || !weights_packed || !input_q8 || rows <= 0 || rows > 4 ||
+        output_dim <= 0 || input_dim <= 0 || (input_dim % QK_K) != 0) {
+        return;
+    }
+#if defined(CK_HAS_AVX_VNNI_256)
+    const block_q8_K *input = (const block_q8_K *)input_q8;
+    const block_q4_K_packed_vnni_x8 *weights =
+        (const block_q4_K_packed_vnni_x8 *)weights_packed;
+    const int blocks_per_row = input_dim / QK_K;
+    const int groups = (output_dim + 7) / 8;
+    for (int group = 0; group < groups; ++group) {
+        const int n0 = group * 8;
+        const int active = n0 + 8 <= output_dim ? 8 : output_dim - n0;
+        float acc[4][8] = {{0}};
+        for (int block = 0; block < blocks_per_row; ++block) {
+            float block_sums[4][8] = {{0}};
+            const block_q8_K *input_rows[4] = {NULL, NULL, NULL, NULL};
+            for (int row = 0; row < rows; ++row) {
+                input_rows[row] = input +
+                    (size_t)row * (size_t)blocks_per_row + (size_t)block;
+            }
+            dot_q4_k_packed_vnni_x8_q8_k_compact_order(
+                block_sums,
+                weights + (size_t)group * (size_t)blocks_per_row +
+                    (size_t)block,
+                input_rows,
+                rows);
+            for (int row = 0; row < rows; ++row) {
+                const __m256 prior = _mm256_loadu_ps(acc[row]);
+                const __m256 current = _mm256_loadu_ps(block_sums[row]);
+                _mm256_storeu_ps(acc[row], _mm256_add_ps(prior, current));
+            }
+        }
+        for (int row = 0; row < rows; ++row) {
+            for (int lane = 0; lane < active; ++lane) {
+                output[(size_t)row * (size_t)output_dim +
+                       (size_t)n0 + (size_t)lane] = acc[row][lane];
+            }
+        }
+    }
+#else
+    (void)rows;
+    (void)output_dim;
+    (void)input_dim;
+#endif
+}
+
+int ck_q4k_packed_vnni_x8_compact_order_available(void)
+{
+#if defined(CK_HAS_AVX_VNNI_256) && defined(__AVX512F__) && \
+    defined(__AVX512VNNI__) && defined(__AVX512VL__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 /*
  * AVX-512 VNNI 16N microkernel. A scheduling tile may contain up to 16 token
  * rows; rows are evaluated in groups of eight so the integer dot accumulators
