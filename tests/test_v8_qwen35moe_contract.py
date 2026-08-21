@@ -21,12 +21,14 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
 )
 from build_ir_v8 import (  # type: ignore
     TEMPLATE_OP_WEIGHTS,
+    _apply_prefill_policy_override,
     _kernel_port_size_bytes,
     _required_kernel_call_scratch_bytes,
     _kernel_scratch_size_bytes,
     _resolve_body_ops_for_layer,
     _validate_lowered_activation_memory,
 )
+from resolve_attention_contracts_v8 import load_kernel_execution_capabilities  # type: ignore
 
 
 HIDDEN = 2048
@@ -92,6 +94,16 @@ class Qwen35MoeContractTests(unittest.TestCase):
         self.assertEqual(resolve_qwen35_prefill_policy(moe=True), "sequential_decode")
         self.assertEqual(resolve_qwen35_prefill_policy(moe=False), "batched")
 
+    def test_explicit_prefill_override_retains_declared_policy(self) -> None:
+        manifest = {"config": {"prefill_policy": "sequential_decode"}}
+        _apply_prefill_policy_override(manifest, "batched")
+
+        self.assertEqual(manifest["config"]["prefill_policy"], "batched")
+        self.assertEqual(
+            manifest["config"]["prefill_policy_declared"], "sequential_decode"
+        )
+        self.assertEqual(manifest["config"]["prefill_policy_source"], "cli_override")
+
     def test_model_map_owns_metadata_and_all_expert_tensors(self) -> None:
         contract = gguf_ck_arch_contract("qwen35moe")
         self.assertEqual(contract["family"], "qwen35")
@@ -146,12 +158,16 @@ class Qwen35MoeContractTests(unittest.TestCase):
         circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"
         kernels = json.loads(circuit_path.read_text(encoding="utf-8"))["kernels"]
         self.assertEqual(
+            kernels["moe_router"],
+            "gemm_nt_f32_llama_production",
+        )
+        self.assertEqual(
             kernels["full_softmax_topk_router"],
             "moe_softmax_topk_router_llama_f32",
         )
         self.assertEqual(
             kernels["moe_swiglu_expert_mlp"],
-            "moe_swiglu_expert_forward_q4k_q5k",
+            "moe_swiglu_expert_forward_q4k_q5k_bucketed",
         )
         self.assertEqual(
             kernels["gated_shared_swiglu_expert_mlp"],
@@ -161,6 +177,36 @@ class Qwen35MoeContractTests(unittest.TestCase):
             TEMPLATE_OP_WEIGHTS["gated_shared_swiglu_expert_mlp"],
             ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
         )
+
+    def test_bucketed_provider_satisfies_execution_capability_schema(self) -> None:
+        capabilities = load_kernel_execution_capabilities(
+            REPO_ROOT / "version" / "v8" / "kernel_maps"
+        )
+        provider = capabilities["kernels"][
+            "moe_swiglu_expert_forward_q4k_q5k_bucketed"
+        ]
+        threading = provider["implementation"]["threading"]
+        self.assertEqual(threading["schedule"], "dynamic_work_claim")
+        self.assertEqual(
+            threading["barriers"],
+            ["hidden_quantization_complete", "selected_slot_complete"],
+        )
+
+    def test_bucketed_provider_abi_is_publicly_declared(self) -> None:
+        provider = json.loads(
+            (
+                REPO_ROOT
+                / "version"
+                / "v8"
+                / "kernel_maps"
+                / "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+            ).read_text(encoding="utf-8")
+        )
+        function = provider["impl"]["function"]
+        header = (REPO_ROOT / "include" / "ckernel_engine.h").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"int {function}(\n", header)
 
     def test_moe_tail_consumes_the_normalized_main_stream(self) -> None:
         circuit_path = REPO_ROOT / "version" / "v8" / "circuits" / "qwen35.json"

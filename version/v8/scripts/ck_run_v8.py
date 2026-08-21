@@ -1225,6 +1225,7 @@ def step_build_ir(
     force: bool = False,
     context_len: int | None = None,
     logits_layout: str | None = None,
+    prefill_policy: str = "auto",
 ) -> dict[str, Path]:
     log_step(3, "Building v8 IR")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1252,6 +1253,7 @@ def step_build_ir(
         "manifest": _file_identity(manifest_path),
         "context_len": int(context_len) if context_len is not None else None,
         "logits_layout": logits_layout,
+        "prefill_policy": str(prefill_policy),
         "planner_sources": _tree_identity(
             [
                 SCRIPTS_DIR / "build_ir_v8.py",
@@ -1300,6 +1302,7 @@ def step_build_ir(
             cmd.extend(["--context-len", str(int(context_len))])
         if logits_layout:
             cmd.extend(["--logits-layout", logits_layout])
+        cmd.extend(["--prefill-policy-override", str(prefill_policy)])
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
     _build_mode("prefill")
@@ -1915,6 +1918,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
         force=args.force_compile,
         context_len=args.context_len,
         logits_layout=args.logits_layout,
+        prefill_policy=getattr(args, "prefill_policy", "auto"),
     )
     if getattr(args, "plan_only", False):
         log(f"  Memory plan certified without code generation: {work_dir}", C_GREEN)
@@ -2256,6 +2260,15 @@ Examples:
     run_parser.add_argument("--run", dest="run_dir", default=None, help="Optional explicit run directory")
     run_parser.add_argument("--context-len", type=int, default=None, help="Context length override")
     run_parser.add_argument("--logits-layout", choices=["auto", "last", "full"], default="auto")
+    run_parser.add_argument(
+        "--prefill-policy",
+        choices=["auto", "batched", "sequential_decode"],
+        default="auto",
+        help=(
+            "Generated-runtime prefill policy. auto preserves the model contract; "
+            "use an explicit override only for certification or diagnostics."
+        ),
+    )
     run_parser.add_argument("--temperature", type=float, default=0.7)
     run_parser.add_argument("--max-tokens", type=int, default=512)
     run_parser.add_argument("--top-k", type=int, default=40)

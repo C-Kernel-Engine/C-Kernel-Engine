@@ -1,23 +1,57 @@
 {
   "id": "gemm_nt_f32_llama_production",
   "op": "gemm",
+  "operation_interface": "gemm.fp32_activation.fp32_weight.fp32_output.v1",
+  "selection": {
+    "status": "production",
+    "priority": 220,
+    "equivalence_group": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
+    "phases": ["prefill", "decode"]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
   "variant": "llamafile_x86_native_fp32_output",
+  "modes": {"inference": true, "training": false, "backward": false},
   "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
   "inputs": [
-    {"name": "A", "dtype": "fp32", "shape": ["M", "K"]}
+    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}
   ],
   "weights": [
-    {"name": "B", "dtype": "fp32", "shape": ["N", "K"]},
-    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true}
+    {"name": "B", "dtype": "fp32", "shape": ["N", "K"], "layout": "output_feature_major_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "optional"}
   ],
   "outputs": [
-    {"name": "C", "dtype": "fp32", "shape": ["M", "N"]}
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
+  "scratch": [],
   "dims": ["M", "N", "K"],
+  "constraints": {
+    "isa": ["avx"],
+    "shape_classes": {"M": {"min": 1}, "N": {"min": 1}, "K": {"min": 1}},
+    "notes": "Independent output dots permit deterministic parallel ownership. The provider uses native-width arithmetic selected at compile time."
+  },
   "impl": {
     "function": "gemm_nt_f32_llama_production",
     "c_declaration": "void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels.c"]
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "weight_storage": {"format": "fp32", "block_elements": 1, "block_bytes": 4},
+    "activation_storage": {"format": "fp32", "block_elements": 1},
+    "diagnostic_providers": {
+      "fp32_activation": "gemm_nt_f32_llama_production",
+      "row_quantized": "gemm_nt_f32_llama_production"
+    },
+    "threading": {
+      "runtime": "openmp",
+      "work_partition": ["output_tiles"],
+      "dispatch": ["openmp_parallel_for"],
+      "schedule": "static_partition",
+      "barriers": ["provider_complete"],
+      "reduction_order_effect": "none"
+    }
   },
   "numerical_capabilities": [{
     "contract_id": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
@@ -45,20 +79,46 @@
   "call_abi": {
     "version": 1,
     "params": [
-      {"name": "A", "source": "activation:a", "cast": "const float*"},
-      {"name": "B", "source": "weight:_first_weight", "cast": "const float*"},
-      {"name": "bias", "source": "weight_f:_bias"},
-      {"name": "C", "source": "output:c", "cast": "float*"},
+      {"name": "A", "source": "activation:a", "cast": "const float*", "ports": ["input:A"]},
+      {"name": "B", "source": "weight:_first_weight", "cast": "const float*", "ports": ["weight:B"]},
+      {"name": "bias", "source": "weight_f:_bias", "ports": ["weight:bias"]},
+      {"name": "C", "source": "output:c", "cast": "float*", "ports": ["output:C"]},
       {"name": "M", "source": "runtime:seq_len"},
       {"name": "N", "source": "dim:_output_dim"},
       {"name": "K", "source": "dim:_input_dim"}
     ]
   },
+  "production": {
+    "function": "gemm_nt_f32_llama_production",
+    "threaded_function": "gemm_nt_f32_llama_production",
+    "reference_comparison": {
+      "requirement": "bit_exact",
+      "absolute_tolerance": 0.0,
+      "relative_tolerance": 0.0,
+      "tests": ["unittest/test_f32_gemm_llama_production.cpp"]
+    }
+  },
+  "reference": {
+    "function": "gemm_nt_f32_llama_production",
+    "kind": "llama_repacked_graph_oracle",
+    "adapter": "direct",
+    "validation": {
+      "status": "validated",
+      "tests": ["unittest/test_f32_gemm_llama_production.cpp"],
+      "external_oracles": [
+        {
+          "backend": "llama.cpp_ggml_cpu_graph",
+          "status": "validated",
+          "evidence": "Bit exact for M=1,4,65, N=48, K=5120 and the Qwen3.5 router shape M=65, N=256, K=2048 across 1,16,20,24,32 threads."
+        }
+      ]
+    }
+  },
   "tests": {
     "unit": ["unittest/test_f32_gemm_llama_production.cpp"],
     "parity": [{
       "oracle": "llama.cpp GGML_OP_MUL_MAT CPU graph",
-      "criteria": "bit exact for M=1,4,65, N=48, K=5120 across 1,16,20,24 threads"
+      "criteria": "bit exact for M=1,4,65, N=48, K=5120 and M=65, N=256, K=2048 across 1,16,20,24,32 threads"
     }]
   },
   "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths.",

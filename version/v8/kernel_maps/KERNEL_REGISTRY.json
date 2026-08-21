@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 285,
+      "total": 286,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -65,7 +65,7 @@
         "mla_kv_cache_batch_store": 1,
         "mla_kv_cache_store": 1,
         "moe_relu2_expert_mlp": 4,
-        "moe_swiglu_expert_mlp": 4,
+        "moe_swiglu_expert_mlp": 5,
         "multimodal_position_builder": 1,
         "multimodal_prefix_insert": 1,
         "optimizer": 4,
@@ -16927,7 +16927,25 @@
     {
       "id": "gemm_nt_f32_llama_production",
       "op": "gemm",
+      "operation_interface": "gemm.fp32_activation.fp32_weight.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 220,
+        "equivalence_group": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
       "variant": "llamafile_x86_native_fp32_output",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
       "quant": {
         "weight": "fp32",
         "activation": "fp32",
@@ -16940,7 +16958,12 @@
           "shape": [
             "M",
             "K"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "weights": [
@@ -16950,7 +16973,12 @@
           "shape": [
             "N",
             "K"
-          ]
+          ],
+          "layout": "output_feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
         },
         {
           "name": "bias",
@@ -16958,7 +16986,11 @@
           "shape": [
             "N"
           ],
-          "optional": true
+          "layout": "feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional"
         }
       ],
       "outputs": [
@@ -16968,20 +17000,73 @@
           "shape": [
             "M",
             "N"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
+      "scratch": [],
       "dims": [
         "M",
         "N",
         "K"
       ],
+      "constraints": {
+        "isa": [
+          "avx"
+        ],
+        "shape_classes": {
+          "M": {
+            "min": 1
+          },
+          "N": {
+            "min": 1
+          },
+          "K": {
+            "min": 1
+          }
+        },
+        "notes": "Independent output dots permit deterministic parallel ownership. The provider uses native-width arithmetic selected at compile time."
+      },
       "impl": {
         "function": "gemm_nt_f32_llama_production",
         "c_declaration": "void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
         "sources": [
           "src/kernels/gemm_kernels.c"
         ]
+      },
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "weight_storage": {
+          "format": "fp32",
+          "block_elements": 1,
+          "block_bytes": 4
+        },
+        "activation_storage": {
+          "format": "fp32",
+          "block_elements": 1
+        },
+        "diagnostic_providers": {
+          "fp32_activation": "gemm_nt_f32_llama_production",
+          "row_quantized": "gemm_nt_f32_llama_production"
+        },
+        "threading": {
+          "runtime": "openmp",
+          "work_partition": [
+            "output_tiles"
+          ],
+          "dispatch": [
+            "openmp_parallel_for"
+          ],
+          "schedule": "static_partition",
+          "barriers": [
+            "provider_complete"
+          ],
+          "reduction_order_effect": "none"
+        }
       },
       "numerical_capabilities": [
         {
@@ -17021,21 +17106,33 @@
           {
             "name": "A",
             "source": "activation:a",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:A"
+            ]
           },
           {
             "name": "B",
             "source": "weight:_first_weight",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "weight:B"
+            ]
           },
           {
             "name": "bias",
-            "source": "weight_f:_bias"
+            "source": "weight_f:_bias",
+            "ports": [
+              "weight:bias"
+            ]
           },
           {
             "name": "C",
             "source": "output:c",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:C"
+            ]
           },
           {
             "name": "M",
@@ -17051,6 +17148,36 @@
           }
         ]
       },
+      "production": {
+        "function": "gemm_nt_f32_llama_production",
+        "threaded_function": "gemm_nt_f32_llama_production",
+        "reference_comparison": {
+          "requirement": "bit_exact",
+          "absolute_tolerance": 0.0,
+          "relative_tolerance": 0.0,
+          "tests": [
+            "unittest/test_f32_gemm_llama_production.cpp"
+          ]
+        }
+      },
+      "reference": {
+        "function": "gemm_nt_f32_llama_production",
+        "kind": "llama_repacked_graph_oracle",
+        "adapter": "direct",
+        "validation": {
+          "status": "validated",
+          "tests": [
+            "unittest/test_f32_gemm_llama_production.cpp"
+          ],
+          "external_oracles": [
+            {
+              "backend": "llama.cpp_ggml_cpu_graph",
+              "status": "validated",
+              "evidence": "Bit exact for M=1,4,65, N=48, K=5120 and the Qwen3.5 router shape M=65, N=256, K=2048 across 1,16,20,24,32 threads."
+            }
+          ]
+        }
+      },
       "tests": {
         "unit": [
           "unittest/test_f32_gemm_llama_production.cpp"
@@ -17058,7 +17185,7 @@
         "parity": [
           {
             "oracle": "llama.cpp GGML_OP_MUL_MAT CPU graph",
-            "criteria": "bit exact for M=1,4,65, N=48, K=5120 across 1,16,20,24 threads"
+            "criteria": "bit exact for M=1,4,65, N=48, K=5120 and M=65, N=256, K=2048 across 1,16,20,24,32 threads"
           }
         ]
       },
@@ -27677,6 +27804,333 @@
       "notes": "Compact routed SwiGLU candidate for expert-major Q4_K gate/up and Q5_K down weights. It quantizes each hidden row once, never expands all experts, and statically partitions independent rows across planner-owned per-worker workspaces.",
       "name": "moe_swiglu_expert_forward_q4k_q5k",
       "_source_file": "moe_swiglu_expert_forward_q4k_q5k.json"
+    },
+    {
+      "id": "moe_swiglu_expert_forward_q4k_q5k_bucketed",
+      "op": "moe_swiglu_expert_mlp",
+      "operation_interface": "moe_swiglu_expert.q4_k_gate_up.q5_k_down.fp32_output.v1",
+      "selection": {
+        "status": "candidate",
+        "priority": 210,
+        "equivalence_group": "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32",
+      "variant": "slot_ordered_expert_bucketed_compact_rows4_q4_k_gate_up_q5_k_down",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "gate_weight": "q4_k",
+        "up_weight": "q4_k",
+        "down_weight": "q5_k",
+        "activation": "fp32_to_q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "routing_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "moe_expert_gate",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_up",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_down",
+          "dtype": "q5_k",
+          "shape": [
+            "E",
+            "H",
+            "I"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(R * align64(q8_k_row_bytes(H))) + align64(R * K * 4) + align64(K * (E + 1) * 4) + 2 * align64(E * 4) + 64 * (align64(8 * I * 4) + align64(4 * q8_k_row_bytes(I)) + align64(4 * H * 4))",
+          "desc": "Planner-owned prequantized hidden rows, stable per-slot expert buckets, and four-row per-worker gate/up/down scratch."
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "K"
+      ],
+      "constraints": {
+        "isa": [
+          "avx512f",
+          "avx512bw",
+          "avx512_vnni",
+          "fma"
+        ],
+        "alignment": {
+          "H": 256,
+          "I": 256
+        },
+        "shape_classes": {
+          "R": {
+            "min": 1
+          }
+        },
+        "runtime_selection": {
+          "bucketed_min_rows": 512,
+          "fallback": "moe_swiglu_expert_forward_q4k_q5k"
+        },
+        "notes": "Rows at or above 512 are grouped by expert independently for each selected slot and processed in compact four-row batches. A pool barrier between slots preserves selected-slot accumulation order exactly. Shorter prefill and decode retain the row-parallel provider because measured dispatch and bucketing costs outweigh reuse."
+      },
+      "impl": {
+        "function": "moe_swiglu_expert_forward_q4k_q5k_auto_workspace",
+        "c_declaration": "int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/axpy_kernels.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
+          "src/kernels/gemm_kernels_q5_k.c",
+          "src/kernels/swiglu_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_experts",
+            "independent_rows"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "schedule": "dynamic_work_claim",
+          "barriers": [
+            "hidden_quantization_complete",
+            "selected_slot_complete"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "indices",
+            "source": "activation:indices",
+            "cast": "const int*",
+            "ports": [
+              "input:indices"
+            ]
+          },
+          {
+            "name": "routing_weights",
+            "source": "activation:routing_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:routing_weights"
+            ]
+          },
+          {
+            "name": "expert_gate",
+            "source": "weight:moe_expert_gate",
+            "ports": [
+              "weight:moe_expert_gate"
+            ]
+          },
+          {
+            "name": "expert_up",
+            "source": "weight:moe_expert_up",
+            "ports": [
+              "weight:moe_expert_up"
+            ]
+          },
+          {
+            "name": "expert_down",
+            "source": "weight:moe_expert_down",
+            "ports": [
+              "weight:moe_expert_down"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:H"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:I"
+          },
+          {
+            "name": "n_experts",
+            "source": "dim:E"
+          },
+          {
+            "name": "top_k",
+            "source": "dim:K"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          }
+        ]
+      },
+      "reference": {
+        "status": "candidate",
+        "notes": "Must remain bit-exact with the compact row provider for every routing distribution and thread count before circuit selection."
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_swiglu_expert_forward_q4k_q5k_auto_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "independent_experts",
+                "independent_rows"
+              ],
+              "dispatch": [
+                "ck_threadpool_dispatch_n"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "selected_slot_order",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Locality candidate for routed Qwen3.5-style SwiGLU. It keeps compact expert weights, quantizes each hidden row once, reuses each unpacked Q4/Q5 block across four rows, groups work by expert, and retains exact selected-slot merge order.",
+      "name": "moe_swiglu_expert_forward_q4k_q5k_bucketed",
+      "_source_file": "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
     },
     {
       "id": "moe_swiglu_shared_backward_f32",

@@ -19,7 +19,7 @@
           "required": ["runtime", "work_partition", "dispatch", "reduction_order_effect"],
           "properties": {
             "runtime": {"enum": ["serial", "ck_threadpool", "openmp"]},
-            "work_partition": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["serial", "independent_rows", "independent_columns", "independent_heads", "independent_query_blocks", "kv_chunks_by_workers", "output_tiles", "split_k"]}},
+            "work_partition": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["serial", "independent_rows", "independent_columns", "independent_experts", "independent_heads", "independent_query_blocks", "kv_chunks_by_workers", "output_tiles", "split_k"]}},
             "dispatch": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["inline", "ck_threadpool_dispatch_n", "ck_threadpool_parallel_for_n", "openmp_parallel_for", "internal_threaded"]}},
             "reduction_order_effect": {"enum": ["none", "contract_defined", "implementation_defined"]}
           }

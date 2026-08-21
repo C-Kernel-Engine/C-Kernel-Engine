@@ -4899,6 +4899,24 @@ def _backfill_template_runtime_flags(manifest: Dict[str, Any]) -> None:
     config.setdefault("decode_kv_cache_dtype", _resolve_decode_kv_cache_dtype(template, config))
 
 
+def _apply_prefill_policy_override(manifest: Dict[str, Any], requested: str) -> None:
+    """Apply an explicit runtime policy override and retain its provenance."""
+    policy = str(requested or "auto").strip().lower()
+    if policy == "auto":
+        return
+    if policy not in {"batched", "sequential_decode"}:
+        raise RuntimeError(f"unsupported prefill policy override: {requested}")
+
+    config = manifest.get("config")
+    if not isinstance(config, dict):
+        config = {}
+        manifest["config"] = config
+    declared = str(config.get("prefill_policy") or "").strip().lower()
+    config["prefill_policy_declared"] = declared or "unspecified"
+    config["prefill_policy"] = policy
+    config["prefill_policy_source"] = "cli_override"
+
+
 def _backfill_vision_contract_config(manifest: Dict[str, Any]) -> None:
     config = manifest.get("config")
     if not isinstance(config, dict):
@@ -14523,6 +14541,15 @@ def main(args: List[str]) -> int:
         help="Logits buffer layout (auto=decode last/prefill full)"
     )
     parser.add_argument(
+        "--prefill-policy-override",
+        choices=["auto", "batched", "sequential_decode"],
+        default="auto",
+        help=(
+            "Explicit generated-runtime prefill policy. auto preserves the model "
+            "contract; non-auto values are recorded as CLI overrides."
+        ),
+    )
+    parser.add_argument(
         "--no-fusion",
         action="store_true",
         help="Disable kernel fusion pass (use unfused ops)"
@@ -14586,6 +14613,7 @@ def main(args: List[str]) -> int:
     _hydrate_manifest_template(manifest)
     _backfill_template_runtime_flags(manifest)
     manifest["config"] = _normalize_manifest_config(manifest.get("config", {}))
+    _apply_prefill_policy_override(manifest, parsed_args.prefill_policy_override)
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True
     # Override logits layout if requested (propagates into layout + codegen config)

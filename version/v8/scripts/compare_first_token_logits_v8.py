@@ -182,6 +182,29 @@ def load_runtime_contract(model_dir: Path) -> dict[str, Any]:
     return contract
 
 
+CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL = 1 << 6
+
+
+def validate_compiled_prefill_capability(
+    prefill_policy: str,
+    runtime_capabilities: int | None,
+) -> None:
+    """Reject a requested batched path unless the loaded binary advertises it."""
+    policy = str(prefill_policy or "").strip().lower()
+    if policy not in {"batched", "hybrid"}:
+        return
+    if runtime_capabilities is None:
+        raise RuntimeError(
+            "batched prefill requested but the runtime does not expose compiled "
+            "capabilities; refusing to infer execution mode from JSON metadata"
+        )
+    if not runtime_capabilities & CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL:
+        raise RuntimeError(
+            "batched prefill requested but the loaded runtime was compiled without "
+            "generated prefill support"
+        )
+
+
 def _run(
     cmd: list[str],
     cwd: Path | None = None,
@@ -610,6 +633,10 @@ def load_ck_logits_segmented(
     if has_strict:
         lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
         lib.ck_set_strict_parity.restype = None
+    has_capabilities = hasattr(lib, "ck_model_get_capabilities")
+    if has_capabilities:
+        lib.ck_model_get_capabilities.argtypes = []
+        lib.ck_model_get_capabilities.restype = ctypes.c_uint64
 
     init_candidates = [model_dir / "weights.bump", model_dir]
     if model_dir.name in {".ck_build", "ck_build"}:
@@ -652,6 +679,10 @@ def load_ck_logits_segmented(
             prefill_policy = "hybrid"
         else:
             raise ValueError(f"unsupported CK prefill mode: {ck_prefill_mode}")
+        runtime_capabilities = (
+            int(lib.ck_model_get_capabilities()) if has_capabilities else None
+        )
+        validate_compiled_prefill_capability(prefill_policy, runtime_capabilities)
         vocab = int(lib.ck_model_get_vocab_size())
         if vocab <= 0:
             raise RuntimeError(f"invalid CK vocab size: {vocab}")
@@ -715,6 +746,7 @@ def load_ck_logits_segmented(
             "prefill_policy": prefill_policy,
             "contract_prefill_policy": contract_prefill_policy,
             "ck_prefill_mode": requested_mode,
+            "runtime_capabilities": runtime_capabilities,
             "logits": logits,
         }
     finally:

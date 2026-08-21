@@ -117,6 +117,7 @@ int main() {
         {"decode_narrow", 1, 48, 5120},
         {"prefill_four", 4, 48, 5120},
         {"prefill_chunk_tail", 65, 48, 5120},
+        {"qwen35_router_chunk", 65, 256, 2048},
     };
     int passed = 0;
     for (const case_spec & spec : cases) {

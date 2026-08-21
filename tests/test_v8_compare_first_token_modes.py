@@ -72,3 +72,21 @@ def test_repeatability_distinguishes_signed_zero_bits() -> None:
 
     assert result["exact"] is False
     assert result["first_different_run"] == 1
+
+
+def test_batched_mode_requires_compiled_prefill_capability() -> None:
+    compare.validate_compiled_prefill_capability(
+        "batched", compare.CK_MODEL_CAP_MIXED_EMBEDDING_PREFILL
+    )
+
+    for capabilities in (None, 0):
+        try:
+            compare.validate_compiled_prefill_capability("batched", capabilities)
+        except RuntimeError as exc:
+            assert "batched prefill requested" in str(exc)
+        else:
+            raise AssertionError("missing compiled prefill capability was accepted")
+
+
+def test_sequential_mode_does_not_require_compiled_prefill_capability() -> None:
+    compare.validate_compiled_prefill_capability("sequential_decode", None)

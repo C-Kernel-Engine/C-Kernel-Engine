@@ -3,6 +3,15 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "fp32_weight_fp32_input_llamafile_x86_native_fp32_output": {
+      "status": "validated",
+      "weight": {"format": "fp32", "block_size": 1, "layout": "output_feature_major_contiguous"},
+      "activation": {"format": "fp32", "block_size": 1, "layout": "token_major_contiguous", "quantization": "none"},
+      "dot": {"integer_accumulator": "none", "block_scale_application": "native_width_fp32_fma", "block_order": "ascending_k"},
+      "output": {"accumulator": "fp32", "horizontal_reduction": "llama_x86_lane_order", "bias": "after_complete_dot", "storage": "fp32"},
+      "parallel_reduction": {"kind": "independent_outputs", "reduction_order_effect": "none"},
+      "description": "FP32 activations times FP32 output-feature-major weights using llama.cpp-compatible native-width x86 accumulation and independent output ownership."
+    },
     "q4_k_x_q8_k_fp32_block_order": {
       "status": "validated",
       "weight": {"format": "q4_k", "block_size": 256, "layout": "ggml_q4_k"},

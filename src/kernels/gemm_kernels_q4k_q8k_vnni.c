@@ -3408,6 +3408,105 @@ void gemv_q4_k_q8_k_vnni(float *y,
     gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
 }
 
+#if defined(CK_HAS_AVX_VNNI_256)
+static inline void dot_q4_k_q8_k_vnni_block_rows4(
+        const block_q4_K *w,
+        const block_q8_K *const x[4],
+        int rows,
+        float out[4])
+{
+    uint8_t sc[8], m_val[8];
+    unpack_q4_k_scales(w->scales, sc, m_val);
+    for (int row = 0; row < rows; ++row) out[row] = 0.0f;
+
+    for (int j = 0, is = 0, q_offset = 0;
+         j < QK_K; j += 64, is += 2, q_offset += 32) {
+        const __m256i packed = _mm256_loadu_si256(
+            (const __m256i *)(const void *)&w->qs[q_offset]);
+        const __m256i q4_lo = q4_k_unpack_32_vnni_bytes(packed, 0);
+        const __m256i q4_hi = q4_k_unpack_32_vnni_bytes(packed, 1);
+
+        for (int row = 0; row < rows; ++row) {
+            const block_q8_K *xr = x[row];
+            const __m256i q8_lo = _mm256_loadu_si256(
+                (const __m256i *)(const void *)&xr->qs[j]);
+            const __m256i q8_hi = _mm256_loadu_si256(
+                (const __m256i *)(const void *)&xr->qs[j + 32]);
+            const int32_t sum_lo =
+                dot_q4_k_q8_k_32_vnni_q4v_q8v(q4_lo, q8_lo);
+            const int32_t sum_hi =
+                dot_q4_k_q8_k_32_vnni_q4v_q8v(q4_hi, q8_hi);
+            const int32_t bsum_lo = (int32_t)xr->bsums[j / 16] +
+                                    (int32_t)xr->bsums[j / 16 + 1];
+            const int32_t bsum_hi = (int32_t)xr->bsums[(j + 32) / 16] +
+                                    (int32_t)xr->bsums[(j + 32) / 16 + 1];
+            const float d = CK_FP16_TO_FP32(w->d) * xr->d;
+            const float dmin = CK_FP16_TO_FP32(w->dmin) * xr->d;
+
+            out[row] += d * (float)sc[is] * (float)sum_lo;
+            out[row] -= dmin * (float)m_val[is] * (float)bsum_lo;
+            out[row] += d * (float)sc[is + 1] * (float)sum_hi;
+            out[row] -= dmin * (float)m_val[is + 1] * (float)bsum_hi;
+        }
+    }
+}
+#endif
+
+void gemm_q4_k_q8_k_compact_rows4(float *output,
+                                   int output_stride,
+                                   const void *weights,
+                                   const void *const input_rows[4],
+                                   int rows,
+                                   int output_dim,
+                                   int input_dim)
+{
+    if (!output || !weights || !input_rows || rows <= 0 || rows > 4 ||
+        output_stride < output_dim || output_dim <= 0 || input_dim <= 0 ||
+        (input_dim % QK_K) != 0) {
+        return;
+    }
+    for (int row = 0; row < rows; ++row) {
+        if (!input_rows[row]) return;
+    }
+
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+    const block_q4_K *blocks = (const block_q4_K *)weights;
+    const int blocks_per_row = input_dim / QK_K;
+    const block_q8_K *inputs[4] = {
+        (const block_q8_K *)input_rows[0],
+        (const block_q8_K *)input_rows[rows > 1 ? 1 : 0],
+        (const block_q8_K *)input_rows[rows > 2 ? 2 : 0],
+        (const block_q8_K *)input_rows[rows > 3 ? 3 : 0],
+    };
+    for (int n = 0; n < output_dim; ++n) {
+        const block_q4_K *weight_row =
+            blocks + (size_t)n * (size_t)blocks_per_row;
+        float sums[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        for (int block = 0; block < blocks_per_row; ++block) {
+            const block_q8_K *block_rows[4] = {
+                &inputs[0][block], &inputs[1][block],
+                &inputs[2][block], &inputs[3][block],
+            };
+            float block_sums[4];
+            dot_q4_k_q8_k_vnni_block_rows4(
+                &weight_row[block], block_rows, rows, block_sums);
+            for (int row = 0; row < rows; ++row) {
+                sums[row] += block_sums[row];
+            }
+        }
+        for (int row = 0; row < rows; ++row) {
+            output[(size_t)row * (size_t)output_stride + (size_t)n] = sums[row];
+        }
+    }
+#else
+    for (int row = 0; row < rows; ++row) {
+        gemv_q4_k_q8_k(
+            output + (size_t)row * (size_t)output_stride,
+            weights, input_rows[row], output_dim, input_dim);
+    }
+#endif
+}
+
 
 static inline float ck_q4k_silu_f32(float x)
 {

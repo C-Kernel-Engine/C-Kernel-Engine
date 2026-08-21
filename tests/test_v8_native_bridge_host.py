@@ -52,11 +52,15 @@ vision_bridge_runtime_v8 = _load_module(
 
 
 def _entry(name: str, dtype: str, shape: list[int], offset: int) -> dict:
-    nbytes_per = {"fp32": 4, "fp16": 2, "q8_0": 1}.get(dtype, 4)
-    size = 1
+    elements = 1
     for dim in shape:
-        size *= int(dim)
-    size *= nbytes_per
+        elements *= int(dim)
+    if dtype == "q8_0":
+        if not shape or int(shape[-1]) % 32 != 0:
+            raise ValueError(f"Q8_0 fixture row must be 32-value aligned: {name} {shape}")
+        size = (elements // 32) * 34
+    else:
+        size = elements * {"fp32": 4, "fp16": 2, "i32": 4, "u8": 1}.get(dtype, 4)
     return {
         "name": name,
         "dtype": dtype,
@@ -77,19 +81,19 @@ def _make_qwen3_decoder_manifest(*, include_tokenizer_contract: bool = False) ->
         entries.append(item)
         offset += int(item["size"])
 
-    add("token_emb", "q8_0", [64, 16])
-    add("layer.0.ln1_gamma", "fp32", [16])
-    add("layer.0.ln2_gamma", "fp32", [16])
-    add("layer.0.q_norm", "fp32", [4])
-    add("layer.0.k_norm", "fp32", [4])
-    add("layer.0.wq", "q8_0", [16, 16])
-    add("layer.0.wk", "q8_0", [16, 16])
-    add("layer.0.wv", "q8_0", [16, 16])
-    add("layer.0.wo", "q8_0", [16, 16])
-    add("layer.0.w1", "q8_0", [32, 16])
-    add("layer.0.w2", "q8_0", [16, 32])
-    add("layer.0.w3", "q8_0", [32, 16])
-    add("final_ln_weight", "fp32", [16])
+    add("token_emb", "q8_0", [64, 32])
+    add("layer.0.ln1_gamma", "fp32", [32])
+    add("layer.0.ln2_gamma", "fp32", [32])
+    add("layer.0.q_norm", "fp32", [8])
+    add("layer.0.k_norm", "fp32", [8])
+    add("layer.0.wq", "q8_0", [32, 32])
+    add("layer.0.wk", "q8_0", [32, 32])
+    add("layer.0.wv", "q8_0", [32, 32])
+    add("layer.0.wo", "q8_0", [32, 32])
+    add("layer.0.w1", "q8_0", [32, 32])
+    add("layer.0.w2", "q8_0", [32, 32])
+    add("layer.0.w3", "q8_0", [32, 32])
+    add("final_ln_weight", "fp32", [32])
 
     vocab_tokens = [f"<|tok_{idx}|>" for idx in range(64)]
     vocab_tokens[0] = "<|pad|>"
@@ -114,10 +118,10 @@ def _make_qwen3_decoder_manifest(*, include_tokenizer_contract: bool = False) ->
             "model": "qwen3",
             "arch": "qwen3",
             "num_layers": 1,
-            "embed_dim": 16,
+            "embed_dim": 32,
             "num_heads": 4,
             "num_kv_heads": 4,
-            "head_dim": 4,
+            "head_dim": 8,
             "intermediate_size": 32,
             "context_length": 32,
             "max_seq_len": 32,
@@ -845,6 +849,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                     "--generate-visualizer",
                     "--gemm-schedule",
                     "static",
+                    "--prefill-policy",
+                    "batched",
                 ]
             )
 
@@ -853,6 +859,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(args.chat_template, "llama")
         self.assertTrue(args.generate_visualizer)
         self.assertEqual(args.gemm_schedule, "static")
+        self.assertEqual(args.prefill_policy, "batched")
 
     def test_ck_run_v8_parser_accepts_canonical_v7_surface_examples(self) -> None:
         commands = [
@@ -1529,7 +1536,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             tmp = Path(tmpdir)
             so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
             prefix_path = tmp / "prefix.f32"
-            prefix_path.write_bytes(array("f", [0.0] * (3 * 16)).tobytes())
+            prefix_path.write_bytes(array("f", [0.0] * (3 * 32)).tobytes())
 
             result = subprocess.run(
                 [
@@ -1557,7 +1564,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             combined = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=combined)
             self.assertIn(
-                "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=3 embed_dim=16 prompt_tokens=4",
+                "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=3 embed_dim=32 prompt_tokens=4",
                 combined,
             )
             self.assertNotIn("Model does not have built-in tokenizer", combined)
@@ -1675,13 +1682,13 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             tmp = Path(tmpdir)
             so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
             prefix_path = tmp / "prefix.f32"
-            prefix_path.write_bytes(array("f", [0.0] * (3 * 16)).tobytes())
+            prefix_path.write_bytes(array("f", [0.0] * (3 * 32)).tobytes())
             report_path = tmp / "bridge_report.json"
             report_path.write_text(
                 json.dumps(
                     {
                         "prefix_dump_path": str(prefix_path),
-                        "prefix_embed_dim": 16,
+                        "prefix_embed_dim": 32,
                         "prompt_tokens_before_image": [],
                         "prompt_tokens_after_image": [1, 2, 3, 4],
                         "stop_token_ids": [],
@@ -1722,7 +1729,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=combined)
             self.assertRegex(
                 combined,
-                r"\[DEBUG\] Running ck_model_forward_mixed(?:_ex)? with prefix_tokens=3 embed_dim=16 prompt_tokens=4",
+                r"\[DEBUG\] Running ck_model_forward_mixed(?:_ex)? with prefix_tokens=3 embed_dim=32 prompt_tokens=4",
             )
             self.assertNotIn("Model does not have built-in tokenizer", combined)
             trace = json.loads(token_trace_path.read_text(encoding="utf-8"))
@@ -1742,13 +1749,13 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             tmp = Path(tmpdir)
             so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
             prefix_path = tmp / "prefix.f32"
-            prefix_path.write_bytes(array("f", [0.0] * (3 * 16)).tobytes())
+            prefix_path.write_bytes(array("f", [0.0] * (3 * 32)).tobytes())
             report_path = tmp / "bridge_report.json"
             report_path.write_text(
                 json.dumps(
                     {
                         "prefix_dump_path": str(prefix_path),
-                        "prefix_embed_dim": 16,
+                        "prefix_embed_dim": 32,
                         "prompt_tokens_before_image": [],
                         "prompt_tokens_after_image": [1, 2, 3, 4],
                         "stop_token_ids": [9],
@@ -1791,7 +1798,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="v8_native_bridge_decoder_") as tmpdir:
             tmp = Path(tmpdir)
             so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
-            prefix = array("f", [0.0] * (3 * 16))
+            prefix = array("f", [0.0] * (3 * 32))
             prefix_path = tmp / "prefix.f32"
             prefix_path.write_bytes(prefix.tobytes())
             token_ids = [1, 2, 3, 4]
@@ -2858,11 +2865,21 @@ class V8NativeBridgeHostTests(unittest.TestCase):
 
             with mock.patch.object(ck_run_v8, "run_cmd", side_effect=fake_run_cmd), \
                  mock.patch.object(ck_run_v8, "step_regenerate_kernel_registry", return_value=ck_run_v8.KERNEL_REGISTRY_PATH):
-                outputs = ck_run_v8.step_build_ir(manifest_path, output_dir, force=True, context_len=1024)
+                outputs = ck_run_v8.step_build_ir(
+                    manifest_path,
+                    output_dir,
+                    force=True,
+                    context_len=1024,
+                    prefill_policy="batched",
+                )
 
         self.assertEqual(len(calls), 2)
         decode_cmd = calls[1]
         self.assertIn("--init-output", decode_cmd)
+        self.assertEqual(
+            decode_cmd[decode_cmd.index("--prefill-policy-override") + 1],
+            "batched",
+        )
         self.assertEqual(outputs["init_ir"].name, "init.json")
         self.assertEqual(outputs["init_call"].name, "init_call.json")
 

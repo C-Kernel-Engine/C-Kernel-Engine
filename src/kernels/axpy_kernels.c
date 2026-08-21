@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +40,21 @@
 #ifdef __AVX2__
 #include <immintrin.h>
 #endif
+
+void gemm_q4_k_q8_k_compact_rows4(float *output,
+                                   int output_stride,
+                                   const void *weights,
+                                   const void *const input_rows[4],
+                                   int rows,
+                                   int output_dim,
+                                   int input_dim);
+void gemm_q5_k_q8_k_compact_rows4(float *output,
+                                   int output_stride,
+                                   const void *weights,
+                                   const void *const input_rows[4],
+                                   int rows,
+                                   int output_dim,
+                                   int input_dim);
 
 /* =============================================================================
  * AXPY: y = y + alpha * x
@@ -720,6 +736,440 @@ int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
         if (args.status[ith] != 0) return args.status[ith];
     }
     return 0;
+}
+
+typedef struct {
+    size_t hidden_q8_offset;
+    size_t route_rows_offset;
+    size_t slot_offsets_offset;
+    size_t counts_offset;
+    size_t cursors_offset;
+    size_t workers_offset;
+    size_t hidden_q8_row_bytes;
+    size_t worker_stride;
+    size_t total_bytes;
+} ck_moe_q4k_q5k_bucket_layout_t;
+
+static int ck_moe_size_add(size_t a, size_t b, size_t *result)
+{
+    if (!result || a > SIZE_MAX - b) return -1;
+    *result = a + b;
+    return 0;
+}
+
+static int ck_moe_size_mul(size_t a, size_t b, size_t *result)
+{
+    if (!result || (a != 0 && b > SIZE_MAX / a)) return -1;
+    *result = a * b;
+    return 0;
+}
+
+static int ck_moe_bucket_layout(int rows,
+                                int hidden_dim,
+                                int intermediate_dim,
+                                int n_experts,
+                                int top_k,
+                                ck_moe_q4k_q5k_bucket_layout_t *layout)
+{
+    if (!layout || rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0 ||
+        n_experts <= 0 || top_k <= 0 || top_k > n_experts ||
+        hidden_dim % 256 != 0 || intermediate_dim % 256 != 0) {
+        return -1;
+    }
+
+    memset(layout, 0, sizeof(*layout));
+    layout->hidden_q8_row_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+
+    size_t gate_up_bytes = 0;
+    size_t worker_bytes = 0;
+    if (ck_moe_size_mul(8u * sizeof(float), (size_t)intermediate_dim,
+                        &gate_up_bytes) != 0) {
+        return -1;
+    }
+    worker_bytes = ck_moe_align64(gate_up_bytes);
+    if (ck_moe_size_add(
+            worker_bytes,
+            ck_moe_align64(4u * ck_dtype_row_bytes(
+                CK_DT_Q8_K, (size_t)intermediate_dim)),
+            &worker_bytes) != 0 ||
+        ck_moe_size_add(
+            worker_bytes,
+            ck_moe_align64(4u * (size_t)hidden_dim * sizeof(float)),
+            &worker_bytes) != 0) {
+        return -1;
+    }
+    layout->worker_stride = worker_bytes;
+
+    size_t cursor = 0;
+    size_t bytes = 0;
+    layout->hidden_q8_offset = cursor;
+    if (ck_moe_size_mul((size_t)rows, layout->hidden_q8_row_bytes, &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+
+    layout->route_rows_offset = cursor;
+    if (ck_moe_size_mul((size_t)rows, (size_t)top_k, &bytes) != 0 ||
+        ck_moe_size_mul(bytes, sizeof(int), &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+
+    layout->slot_offsets_offset = cursor;
+    if (ck_moe_size_mul((size_t)top_k, (size_t)n_experts + 1u, &bytes) != 0 ||
+        ck_moe_size_mul(bytes, sizeof(int), &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+
+    layout->counts_offset = cursor;
+    if (ck_moe_size_mul((size_t)n_experts, sizeof(int), &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+
+    layout->cursors_offset = cursor;
+    if (ck_moe_size_mul((size_t)n_experts, sizeof(int), &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+
+    layout->workers_offset = cursor;
+    if (ck_moe_size_mul((size_t)CK_THREADPOOL_MAX_THREADS,
+                        layout->worker_stride, &bytes) != 0 ||
+        ck_moe_size_add(cursor, ck_moe_align64(bytes), &cursor) != 0) {
+        return -1;
+    }
+    layout->total_bytes = cursor;
+    return 0;
+}
+
+size_t moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k)
+{
+    ck_moe_q4k_q5k_bucket_layout_t layout;
+    if (ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim, n_experts,
+                             top_k, &layout) != 0) {
+        return 0;
+    }
+    return layout.total_bytes;
+}
+
+typedef struct {
+    const float *hidden;
+    uint8_t *hidden_q8;
+    int rows;
+    int hidden_dim;
+    size_t hidden_q8_row_bytes;
+} ck_moe_q4k_q5k_quantize_args_t;
+
+static void ck_moe_q4k_q5k_quantize_work(int ith, int nth, void *opaque)
+{
+    ck_moe_q4k_q5k_quantize_args_t *args =
+        (ck_moe_q4k_q5k_quantize_args_t *)opaque;
+    const int begin = (args->rows * ith) / nth;
+    const int end = (args->rows * (ith + 1)) / nth;
+    for (int row = begin; row < end; ++row) {
+        quantize_row_q8_k(
+            args->hidden + (size_t)row * (size_t)args->hidden_dim,
+            args->hidden_q8 + (size_t)row * args->hidden_q8_row_bytes,
+            args->hidden_dim);
+    }
+}
+
+typedef struct {
+    const int *bucket_rows;
+    const int *bucket_offsets;
+    const float *routing_weights;
+    const uint8_t *hidden_q8;
+    const uint8_t *gate_base;
+    const uint8_t *up_base;
+    const uint8_t *down_base;
+    float *output;
+    uint8_t *workers;
+    size_t worker_stride;
+    size_t hidden_q8_row_bytes;
+    size_t q4_expert_stride;
+    size_t q5_expert_stride;
+    int hidden_dim;
+    int intermediate_dim;
+    int n_experts;
+    int top_k;
+    int slot;
+    int total_tasks;
+    atomic_int next_task;
+} ck_moe_q4k_q5k_bucket_work_t;
+
+enum { CK_MOE_Q4K_Q5K_TASK_ROWS = 16 };
+
+static int ck_moe_bucket_expert_for_position(const int *offsets,
+                                             int n_experts,
+                                             int position)
+{
+    int lo = 0;
+    int hi = n_experts;
+    while (lo < hi) {
+        const int mid = lo + (hi - lo) / 2;
+        if (offsets[mid + 1] <= position) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+static void ck_moe_q4k_q5k_bucket_work(int ith, int nth, void *opaque)
+{
+    (void)nth;
+    ck_moe_q4k_q5k_bucket_work_t *args =
+        (ck_moe_q4k_q5k_bucket_work_t *)opaque;
+    uint8_t *cursor = args->workers + (size_t)ith * args->worker_stride;
+    float *gate_up = (float *)cursor;
+    cursor += ck_moe_align64(
+        8u * (size_t)args->intermediate_dim * sizeof(float));
+    void *act_q8 = cursor;
+    cursor += ck_moe_align64(
+        4u * ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)args->intermediate_dim));
+    float *expert_output = (float *)cursor;
+    const size_t act_q8_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q8_K, (size_t)args->intermediate_dim);
+
+    for (;;) {
+        const int task = atomic_fetch_add_explicit(
+            &args->next_task, 1, memory_order_relaxed);
+        if (task >= args->total_tasks) break;
+
+        int position = task * CK_MOE_Q4K_Q5K_TASK_ROWS;
+        const int task_end = position + CK_MOE_Q4K_Q5K_TASK_ROWS <
+                args->bucket_offsets[args->n_experts]
+            ? position + CK_MOE_Q4K_Q5K_TASK_ROWS
+            : args->bucket_offsets[args->n_experts];
+        int expert = ck_moe_bucket_expert_for_position(
+            args->bucket_offsets, args->n_experts, position);
+
+        while (position < task_end && expert < args->n_experts) {
+            const int expert_end = args->bucket_offsets[expert + 1];
+            const int segment_end = expert_end < task_end
+                ? expert_end : task_end;
+            const uint8_t *gate = args->gate_base +
+                (size_t)expert * args->q4_expert_stride;
+            const uint8_t *up = args->up_base +
+                (size_t)expert * args->q4_expert_stride;
+            const uint8_t *down = args->down_base +
+                (size_t)expert * args->q5_expert_stride;
+
+            for (int i = position; i < segment_end; i += 4) {
+                const int batch_rows = segment_end - i < 4
+                    ? segment_end - i : 4;
+                const void *hidden_rows[4] = {NULL, NULL, NULL, NULL};
+                const void *activation_rows[4] = {NULL, NULL, NULL, NULL};
+                int output_rows[4] = {0, 0, 0, 0};
+                for (int batch_row = 0; batch_row < batch_rows; ++batch_row) {
+                    const int row = args->bucket_rows[i + batch_row];
+                    output_rows[batch_row] = row;
+                    hidden_rows[batch_row] = args->hidden_q8 +
+                        (size_t)row * args->hidden_q8_row_bytes;
+                }
+                for (int batch_row = batch_rows; batch_row < 4; ++batch_row) {
+                    hidden_rows[batch_row] = hidden_rows[0];
+                }
+
+                const int gate_up_stride = 2 * args->intermediate_dim;
+                gemm_q4_k_q8_k_compact_rows4(
+                    gate_up, gate_up_stride, gate, hidden_rows, batch_rows,
+                    args->intermediate_dim, args->hidden_dim);
+                gemm_q4_k_q8_k_compact_rows4(
+                    gate_up + args->intermediate_dim, gate_up_stride, up,
+                    hidden_rows, batch_rows,
+                    args->intermediate_dim, args->hidden_dim);
+                swiglu_forward_ggml(
+                    gate_up, gate_up, batch_rows, args->intermediate_dim);
+                for (int batch_row = 0; batch_row < batch_rows; ++batch_row) {
+                    void *activation = (uint8_t *)act_q8 +
+                        (size_t)batch_row * act_q8_row_bytes;
+                    quantize_row_q8_k(
+                        gate_up + (size_t)batch_row *
+                            (size_t)args->intermediate_dim,
+                        activation, args->intermediate_dim);
+                    activation_rows[batch_row] = activation;
+                }
+                for (int batch_row = batch_rows; batch_row < 4; ++batch_row) {
+                    activation_rows[batch_row] = activation_rows[0];
+                }
+                gemm_q5_k_q8_k_compact_rows4(
+                    expert_output, args->hidden_dim, down, activation_rows,
+                    batch_rows, args->hidden_dim, args->intermediate_dim);
+
+                for (int batch_row = 0; batch_row < batch_rows; ++batch_row) {
+                    const int row = output_rows[batch_row];
+                    const size_t route_index = (size_t)row *
+                        (size_t)args->top_k + (size_t)args->slot;
+                    axpy_f32(
+                        args->output + (size_t)row *
+                            (size_t)args->hidden_dim,
+                        expert_output + (size_t)batch_row *
+                            (size_t)args->hidden_dim,
+                        args->routing_weights[route_index], args->hidden_dim);
+                }
+            }
+            position = segment_end;
+            ++expert;
+        }
+    }
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    ck_moe_q4k_q5k_bucket_layout_t layout;
+    if (!hidden || !indices || !routing_weights || !expert_gate || !expert_up ||
+        !expert_down || !output || !workspace ||
+        ck_moe_bucket_layout(rows, hidden_dim, intermediate_dim, n_experts,
+                             top_k, &layout) != 0 ||
+        workspace_bytes < layout.total_bytes) {
+        return -1;
+    }
+
+    uint8_t *base = (uint8_t *)workspace;
+    uint8_t *hidden_q8 = base + layout.hidden_q8_offset;
+    int *route_rows = (int *)(base + layout.route_rows_offset);
+    int *slot_offsets = (int *)(base + layout.slot_offsets_offset);
+    int *counts = (int *)(base + layout.counts_offset);
+    int *cursors = (int *)(base + layout.cursors_offset);
+    uint8_t *workers = base + layout.workers_offset;
+
+    for (int slot = 0; slot < top_k; ++slot) {
+        memset(counts, 0, (size_t)n_experts * sizeof(*counts));
+        for (int row = 0; row < rows; ++row) {
+            const int expert = indices[(size_t)row * (size_t)top_k +
+                                       (size_t)slot];
+            if (expert < 0 || expert >= n_experts) return -2;
+            counts[expert] += 1;
+        }
+
+        int *offsets = slot_offsets + (size_t)slot * ((size_t)n_experts + 1u);
+        offsets[0] = 0;
+        for (int expert = 0; expert < n_experts; ++expert) {
+            offsets[expert + 1] = offsets[expert] + counts[expert];
+            cursors[expert] = offsets[expert];
+        }
+        int *rows_for_slot = route_rows + (size_t)slot * (size_t)rows;
+        for (int row = 0; row < rows; ++row) {
+            const int expert = indices[(size_t)row * (size_t)top_k +
+                                       (size_t)slot];
+            rows_for_slot[cursors[expert]++] = row;
+        }
+    }
+
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > rows) active = rows;
+    if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
+    if (active < 1) active = 1;
+
+    ck_moe_q4k_q5k_quantize_args_t quantize_args = {
+        .hidden = hidden,
+        .hidden_q8 = hidden_q8,
+        .rows = rows,
+        .hidden_dim = hidden_dim,
+        .hidden_q8_row_bytes = layout.hidden_q8_row_bytes,
+    };
+    if (active > 1 && pool) {
+        ck_threadpool_dispatch_n(
+            pool, active, ck_moe_q4k_q5k_quantize_work, &quantize_args);
+    } else {
+        ck_moe_q4k_q5k_quantize_work(0, 1, &quantize_args);
+    }
+
+    const size_t q4_expert_stride = (size_t)intermediate_dim *
+        ck_dtype_row_bytes(CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t q5_expert_stride = (size_t)hidden_dim *
+        ck_dtype_row_bytes(CK_DT_Q5_K, (size_t)intermediate_dim);
+    for (int slot = 0; slot < top_k; ++slot) {
+        ck_moe_q4k_q5k_bucket_work_t args = {
+            .bucket_rows = route_rows + (size_t)slot * (size_t)rows,
+            .bucket_offsets = slot_offsets +
+                (size_t)slot * ((size_t)n_experts + 1u),
+            .routing_weights = routing_weights,
+            .hidden_q8 = hidden_q8,
+            .gate_base = (const uint8_t *)expert_gate,
+            .up_base = (const uint8_t *)expert_up,
+            .down_base = (const uint8_t *)expert_down,
+            .output = output,
+            .workers = workers,
+            .worker_stride = layout.worker_stride,
+            .hidden_q8_row_bytes = layout.hidden_q8_row_bytes,
+            .q4_expert_stride = q4_expert_stride,
+            .q5_expert_stride = q5_expert_stride,
+            .hidden_dim = hidden_dim,
+            .intermediate_dim = intermediate_dim,
+            .n_experts = n_experts,
+            .top_k = top_k,
+            .slot = slot,
+            .total_tasks = (rows + CK_MOE_Q4K_Q5K_TASK_ROWS - 1) /
+                CK_MOE_Q4K_Q5K_TASK_ROWS,
+        };
+        atomic_init(&args.next_task, 0);
+        int task_threads = active;
+        if (task_threads > args.total_tasks) task_threads = args.total_tasks;
+        if (active > 1 && pool) {
+            ck_threadpool_dispatch_n(
+                pool, task_threads, ck_moe_q4k_q5k_bucket_work, &args);
+        } else {
+            ck_moe_q4k_q5k_bucket_work(0, 1, &args);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    if (rows < 512) {
+        return moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+            hidden, indices, routing_weights,
+            expert_gate, expert_up, expert_down, output,
+            rows, hidden_dim, intermediate_dim, n_experts, top_k,
+            workspace, workspace_bytes);
+    }
+    return moe_swiglu_expert_forward_q4k_q5k_bucketed_workspace(
+        hidden, indices, routing_weights,
+        expert_gate, expert_up, expert_down, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes);
 }
 
 size_t moe_swiglu_shared_q8_0_gated_workspace_bytes(int hidden_dim,
