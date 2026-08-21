@@ -16,6 +16,12 @@
       "recurrent_beta_proj": "fp32"
     }
   },
+  "kernels": {
+    "moe_router": "gemm_nt_f32_llama_production",
+    "full_softmax_topk_router": "moe_softmax_topk_router_llama_f32",
+    "moe_swiglu_expert_mlp": "moe_swiglu_expert_forward_q4k_q5k_bucketed",
+    "gated_shared_swiglu_expert_mlp": "moe_swiglu_shared_forward_q8_0_gated"
+  },
   "contract": {
     "tokenizer_contract": {
       "tokenizer_type": "bpe",
@@ -140,10 +146,15 @@
             "recurrent_norm_gate",
             "recurrent_out_proj",
             "residual_add",
-            "post_attention_norm",
-            "mlp_gate_up",
-            "silu_mul",
-            "mlp_down",
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"mlp_gate_up","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"silu_mul","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"mlp_down","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"moe_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"mlp_scratch"}}},
+            {"op":"full_softmax_topk_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"logits":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
             "residual_add"
           ],
           "full_attention": [
@@ -158,10 +169,15 @@
             "attn_gate_sigmoid_mul",
             "out_proj",
             "residual_add",
-            "post_attention_norm",
-            "mlp_gate_up",
-            "silu_mul",
-            "mlp_down",
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"post_attention_norm","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"mlp_gate_up","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"silu_mul","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"mlp_down","when":{"config_key":"mlp_execution_mode","not_equals":"qwen35moe"}},
+            {"op":"moe_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"mlp_scratch"}}},
+            {"op":"full_softmax_topk_router","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"logits":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","when":{"config_key":"mlp_execution_mode","equals":"qwen35moe"},"graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
             "residual_add"
           ]
         }

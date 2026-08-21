@@ -84,6 +84,20 @@ class BuildIrV8ScaffoldTests(unittest.TestCase):
                 for key in build_ir_v8._FORBIDDEN_TEMPLATE_FLAG_KEYS:
                     self.assertNotIn(key, flags)
 
+    def test_v7_seed_parser_filters_conditional_graph_branches(self) -> None:
+        section = [
+            {"op": "dense", "when": {"config_key": "mode", "not_equals": "moe"}},
+            {"op": "routed", "when": {"config_key": "mode", "equals": "moe"}},
+        ]
+        self.assertEqual(build_ir_v7._extract_template_ops(section, {"mode": "dense"}), ["dense"])
+        self.assertEqual(build_ir_v7._extract_template_ops(section, {"mode": "moe"}), ["routed"])
+
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            build_ir_v7._extract_template_ops(
+                [{"op": "invalid", "when": {"config_key": "mode"}}],
+                {"mode": "dense"},
+            )
+
     def test_v8_rope_resolution_requires_explicit_compatible_kernel(self) -> None:
         cases = [
             ({}, {"rope_qk": "rope_forward_qk"}),

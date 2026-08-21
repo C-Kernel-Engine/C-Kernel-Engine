@@ -1587,13 +1587,38 @@ def _resolve_config_layer_kind(
     return default_kind
 
 
-def _extract_template_ops(section: Any) -> List[str]:
+def _template_item_is_active(item: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> bool:
+    condition = item.get("when")
+    if condition is None or config is None:
+        return True
+    if not isinstance(condition, dict) or not isinstance(condition.get("config_key"), str):
+        raise RuntimeError(
+            "HARD TEMPLATE CONDITION FAULT: template op 'when' requires config_key "
+            "and exactly one of equals/not_equals."
+        )
+    predicates = [name for name in ("equals", "not_equals") if name in condition]
+    if len(predicates) != 1:
+        raise RuntimeError(
+            "HARD TEMPLATE CONDITION FAULT: template op 'when' requires exactly one "
+            "of equals/not_equals."
+        )
+    current: Any = config
+    for part in condition["config_key"].split("."):
+        if not isinstance(current, dict) or part not in current:
+            current = None
+            break
+        current = current[part]
+    predicate = predicates[0]
+    return current == condition[predicate] if predicate == "equals" else current != condition[predicate]
+
+
+def _extract_template_ops(section: Any, config: Optional[Dict[str, Any]] = None) -> List[str]:
     out: List[str] = []
     if isinstance(section, list):
         for item in section:
             if isinstance(item, dict):
                 op = item.get("op")
-                if isinstance(op, str) and op:
+                if isinstance(op, str) and op and _template_item_is_active(item, config):
                     out.append(op)
             elif isinstance(item, str):
                 out.append(item)
@@ -1645,7 +1670,7 @@ def should_insert_residual_save(layer_ops: List[str], op_idx: int) -> bool:
 def _resolve_body_ops_for_layer(body_def: Dict[str, Any], config: Dict[str, Any], layer_idx: int) -> List[str]:
     ops_by_kind = body_def.get("ops_by_kind")
     if not isinstance(ops_by_kind, dict):
-        return _extract_template_ops(body_def.get("ops", []))
+        return _extract_template_ops(body_def.get("ops", []), config)
 
     # Contract note:
     #   Do not hard-code family-specific graph stitching here.
@@ -1671,16 +1696,16 @@ def _resolve_body_ops_for_layer(body_def: Dict[str, Any], config: Dict[str, Any]
         raise RuntimeError(
             f"Template body missing ops_by_kind['{layer_kind}'] for layer {layer_idx}."
         )
-    return _extract_template_ops(ops)
+    return _extract_template_ops(ops, config)
 
 
 def _collect_body_ops_for_validation(body_def: Any, config: Dict[str, Any]) -> List[str]:
     if not isinstance(body_def, dict):
-        return _extract_template_ops(body_def)
+        return _extract_template_ops(body_def, config)
 
     ops_by_kind = body_def.get("ops_by_kind")
     if not isinstance(ops_by_kind, dict):
-        return _extract_template_ops(body_def.get("ops", []))
+        return _extract_template_ops(body_def.get("ops", []), config)
 
     kinds: List[str] = []
     configured_kinds = config.get(str(body_def.get("kind_config_key", "layer_kinds") or "layer_kinds"))
@@ -1695,7 +1720,7 @@ def _collect_body_ops_for_validation(body_def: Any, config: Dict[str, Any]) -> L
 
     collected: List[str] = []
     for kind in kinds:
-        collected.extend(_extract_template_ops(ops_by_kind.get(kind, [])))
+        collected.extend(_extract_template_ops(ops_by_kind.get(kind, []), config))
     return _dedupe_preserve_order(collected)
 
 
