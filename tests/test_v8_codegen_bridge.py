@@ -221,6 +221,58 @@ def _make_qwen3vl_decoder_manifest() -> dict:
 
 
 class V8CodegenBridgeTests(unittest.TestCase):
+    def test_sequential_decode_policy_omits_unused_batched_prefill(self) -> None:
+        manifest = _make_qwen3_decoder_manifest()
+        manifest["config"]["prefill_policy"] = "sequential_decode"
+
+        with tempfile.TemporaryDirectory(prefix="v8_codegen_sequential_prefill_") as tmpdir:
+            tmp = Path(tmpdir)
+            manifest_path = tmp / "weights_manifest.json"
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+            paths = {}
+            for mode in ("prefill", "decode"):
+                paths[mode] = {
+                    "ir1": tmp / f"ir1_{mode}.json",
+                    "layout": tmp / f"layout_{mode}.json",
+                    "lowered": tmp / f"lowered_{mode}.json",
+                    "call": tmp / f"call_{mode}.json",
+                }
+                rc = build_ir_v8.main(
+                    [
+                        "--manifest", str(manifest_path),
+                        "--mode", mode,
+                        "--output", str(paths[mode]["ir1"]),
+                        "--layout-output", str(paths[mode]["layout"]),
+                        "--lowered-output", str(paths[mode]["lowered"]),
+                        "--call-output", str(paths[mode]["call"]),
+                    ]
+                )
+                self.assertEqual(rc, 0, msg=f"build_ir_v8 failed for mode={mode}")
+
+            c_path = tmp / "decoder_sequential.c"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(V8_CODEGEN_PATH),
+                    "--ir", str(paths["decode"]["call"]),
+                    "--prefill", str(paths["prefill"]["call"]),
+                    "--prefill-layout", str(paths["prefill"]["layout"]),
+                    "--layout", str(paths["decode"]["layout"]),
+                    "--output", str(c_path),
+                ],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+            text = c_path.read_text(encoding="utf-8")
+            decode_layout = json.loads(paths["decode"]["layout"].read_text(encoding="utf-8"))
+            decode_total = int(decode_layout["memory"]["arena"]["total_size"])
+            self.assertNotIn("#define CK_HAS_PREFILL 1", text)
+            self.assertIn(f"#define BUMP_TOTAL_SIZE {decode_total}ULL", text)
+
     def test_named_activation_api_uses_aligned_arena_base(self) -> None:
         layout = {
             "memory": {

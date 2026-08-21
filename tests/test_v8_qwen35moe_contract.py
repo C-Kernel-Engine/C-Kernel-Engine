@@ -21,8 +21,11 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
 )
 from build_ir_v8 import (  # type: ignore
     TEMPLATE_OP_WEIGHTS,
+    _kernel_port_size_bytes,
+    _required_kernel_call_scratch_bytes,
     _kernel_scratch_size_bytes,
     _resolve_body_ops_for_layer,
+    _validate_lowered_activation_memory,
 )
 
 
@@ -192,7 +195,7 @@ class Qwen35MoeContractTests(unittest.TestCase):
         }
         cases = {
             "moe_softmax_topk_router_llama_f32.json": 1024,
-            "moe_swiglu_expert_forward_q4k_q5k.json": 15296,
+            "moe_swiglu_expert_forward_q4k_q5k.json": 64 * 15296,
             "moe_swiglu_shared_forward_q8_0_gated.json": 15040,
         }
         maps_dir = REPO_ROOT / "version" / "v8" / "kernel_maps"
@@ -203,6 +206,149 @@ class Qwen35MoeContractTests(unittest.TestCase):
                     _kernel_scratch_size_bytes(provider["scratch"][0], {}, config),
                     expected,
                 )
+
+    def test_moe_output_extent_resolves_from_physical_port_contract(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "moe_swiglu_expert_forward_q4k_q5k.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            _kernel_port_size_bytes(
+                provider["outputs"][0],
+                {"R": 1},
+                {"embed_dim": HIDDEN},
+            ),
+            HIDDEN * 4,
+        )
+
+    def test_required_provider_workspace_is_reserved_by_memory_planner(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "moe_swiglu_expert_forward_q4k_q5k.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        config = {
+            "embed_dim": HIDDEN,
+            "moe_intermediate_size": EXPERT_DIM,
+            "n_routed_experts": EXPERTS,
+            "experts_per_tok": TOP_K,
+            "context_length": 512,
+        }
+        self.assertEqual(
+            _required_kernel_call_scratch_bytes(
+                [
+                    {
+                        "kernel": provider["id"],
+                        "params": {},
+                        "scratch": provider["scratch"],
+                    }
+                ],
+                config,
+                1,
+            ),
+            64 * 15296,
+        )
+
+    def test_required_q5_workspace_uses_logical_projection_dimensions(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "gemm_nt_q5_k.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            _required_kernel_call_scratch_bytes(
+                [
+                    {
+                        "op": "mlp_down",
+                        "kernel": provider["id"],
+                        "params": {},
+                        "scratch": provider["scratch"],
+                    }
+                ],
+                {
+                    "embed_dim": HIDDEN,
+                    "intermediate_size": EXPERT_DIM,
+                    "context_length": 512,
+                },
+                3,
+            ),
+            3 * (EXPERT_DIM // 256) * 292,
+        )
+
+    def test_unresolved_required_provider_workspace_fails_planning(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError, "planner cannot resolve required workspace"
+        ):
+            _required_kernel_call_scratch_bytes(
+                [
+                    {
+                        "kernel": "synthetic_required_workspace",
+                        "scratch": [
+                            {
+                                "name": "workspace",
+                                "size_resolution": "required",
+                                "shape": ["missing_extent"],
+                            }
+                        ],
+                    }
+                ],
+                {},
+                1,
+            )
+
+    def test_required_moe_workspace_must_not_alias_live_output(self) -> None:
+        layout = {
+            "memory": {
+                "arena": {"total_size": 32768},
+                "activations": {
+                    "size": 32768,
+                    "buffers": [
+                        {"name": "mlp_scratch", "offset": 0, "size": 32768},
+                    ],
+                },
+            },
+        }
+        lowered = {
+            "operations": [
+                {
+                    "op": "moe_swiglu_expert_mlp",
+                    "layer": 0,
+                    "kernel": "moe_swiglu_expert_forward_q4k_q5k",
+                    "scratch": [
+                        {
+                            "name": "workspace",
+                            "scratch_offset": 0,
+                            "size": 15296,
+                            "disjoint_from": [
+                                {
+                                    "kind": "output",
+                                    "name": "output",
+                                    "offset": 0,
+                                    "size": HIDDEN * 4,
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        with self.assertRaisesRegex(RuntimeError, "HARD SCRATCH ALIAS FAULT"):
+            _validate_lowered_activation_memory(lowered, layout)
+
+        lowered["operations"][0]["scratch"][0]["scratch_offset"] = HIDDEN * 4
+        report = _validate_lowered_activation_memory(lowered, layout)
+        self.assertEqual(report["scratch_contract_count"], 1)
+        self.assertEqual(report["scratch"][0]["disjoint_port_count"], 1)
 
     def test_required_scratch_expression_fails_closed(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "unsupported size_bytes"):

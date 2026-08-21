@@ -70,6 +70,10 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
             ctypes.c_size_t,
         ]
         LIB.moe_swiglu_expert_forward_q4k_q5k_workspace.restype = ctypes.c_int
+        LIB.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace.argtypes = (
+            LIB.moe_swiglu_expert_forward_q4k_q5k_workspace.argtypes
+        )
+        LIB.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace.restype = ctypes.c_int
         LIB.quantize_row_q8_k.argtypes = [FPTR, ctypes.c_void_p, ctypes.c_int]
         LIB.gemv_q4_k_q8_k.argtypes = [
             FPTR,
@@ -173,6 +177,32 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
             workspace_bytes,
         )
         self.assertEqual(status, 0)
+        np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+    def test_parallel_rows_match_serial_provider_bit_exact(self) -> None:
+        expected = np.empty((self.rows, self.hidden), dtype=np.float32)
+        actual = np.empty_like(expected)
+        row_workspace_bytes = LIB.moe_swiglu_expert_q4k_q5k_workspace_bytes(
+            self.hidden, self.intermediate
+        )
+        serial_workspace = ctypes.create_string_buffer(row_workspace_bytes)
+        parallel_workspace = ctypes.create_string_buffer(
+            row_workspace_bytes * self.rows
+        )
+        serial_status = LIB.moe_swiglu_expert_forward_q4k_q5k_workspace(
+            _fptr(self.x), _iptr(self.indices), _fptr(self.routing),
+            self.gate, self.up, self.down, _fptr(expected),
+            self.rows, self.hidden, self.intermediate, self.experts, self.top_k,
+            serial_workspace, row_workspace_bytes,
+        )
+        parallel_status = LIB.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+            _fptr(self.x), _iptr(self.indices), _fptr(self.routing),
+            self.gate, self.up, self.down, _fptr(actual),
+            self.rows, self.hidden, self.intermediate, self.experts, self.top_k,
+            parallel_workspace, len(parallel_workspace),
+        )
+        self.assertEqual(serial_status, 0)
+        self.assertEqual(parallel_status, 0)
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
 
     def test_workspace_and_indices_fail_closed(self) -> None:

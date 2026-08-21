@@ -791,6 +791,12 @@ def _build_hybrid_decode_prefill_layout(
     return out
 
 
+def _uses_generated_batched_prefill(ir_obj: Dict[str, Any]) -> bool:
+    """Return whether the runtime contract permits the generated prefill path."""
+    policy = str((ir_obj.get("config") or {}).get("prefill_policy") or "").strip().lower()
+    return policy not in {"sequential_decode", "decode"}
+
+
 def _extract_c_function(code: str, signature: str) -> tuple[int, int, str] | None:
     start = code.find(signature)
     if start < 0:
@@ -1518,13 +1524,14 @@ def main(argv: list[str] | None = None) -> int:
         ir_obj = _patch_codegen_config(json.load(f))
     with open(args.layout, "r", encoding="utf-8") as f:
         layout_obj = _patch_codegen_config(json.load(f))
+    uses_generated_batched_prefill = _uses_generated_batched_prefill(ir_obj)
     prefill_obj = None
     prefill_layout_obj = None
-    if args.prefill_layout is not None:
+    if args.prefill_layout is not None and uses_generated_batched_prefill:
         with open(args.prefill_layout, "r", encoding="utf-8") as f:
             prefill_layout_obj = _patch_codegen_config(json.load(f))
         layout_obj = _build_hybrid_decode_prefill_layout(layout_obj, prefill_layout_obj)
-    if args.prefill is not None:
+    if args.prefill is not None and uses_generated_batched_prefill:
         with open(args.prefill, "r", encoding="utf-8") as f:
             prefill_obj = _patch_codegen_config(json.load(f))
         prefill_obj = _normalize_prefill_for_decode_layout(prefill_obj, layout_obj)
