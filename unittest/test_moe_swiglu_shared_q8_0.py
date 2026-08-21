@@ -45,6 +45,21 @@ class MoeSharedQ80Test(unittest.TestCase):
             ctypes.c_size_t,
         ]
         cls.lib.moe_swiglu_shared_forward_q8_0_gated_workspace.restype = ctypes.c_int
+        cls.lib.moe_swiglu_shared_forward_q8_0_gated_parallel_workspace.argtypes = [
+            F32P,
+            F32P,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            F32P,
+            F32P,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+        ]
+        cls.lib.moe_swiglu_shared_forward_q8_0_gated_parallel_workspace.restype = ctypes.c_int
         cls.lib.quantize_row_q8_0.argtypes = [F32P, ctypes.c_void_p, ctypes.c_int]
         cls.lib.quantize_row_q8_0.restype = None
         cls.lib.gemv_q8_0_q8_0.argtypes = [
@@ -168,6 +183,79 @@ class MoeSharedQ80Test(unittest.TestCase):
             expected[row] = routed[row] + shared * gate_scale[0]
         np.testing.assert_array_equal(
             outputs[0].view(np.uint32), expected.view(np.uint32)
+        )
+
+    def test_parallel_provider_is_bit_exact_with_serial_provider(self) -> None:
+        rng = np.random.default_rng(0x3509)
+        rows, hidden, intermediate = 67, 64, 32
+        x = rng.normal(size=(rows, hidden)).astype(np.float32)
+        routed = rng.normal(size=(rows, hidden)).astype(np.float32)
+        gate = self._quantize_matrix(rng.normal(size=(intermediate, hidden)))
+        up = self._quantize_matrix(rng.normal(size=(intermediate, hidden)))
+        down = self._quantize_matrix(rng.normal(size=(hidden, intermediate)))
+        scalar_gate = rng.normal(size=(1, hidden)).astype(np.float32)
+        stride = self.lib.moe_swiglu_shared_q8_0_gated_workspace_bytes(
+            hidden, intermediate
+        )
+        serial_output = np.empty_like(x)
+        serial_workspace = np.empty(stride, dtype=np.uint8)
+        self.assertEqual(
+            self.lib.moe_swiglu_shared_forward_q8_0_gated_workspace(
+                _f32(x),
+                _f32(routed),
+                gate.ctypes.data_as(ctypes.c_void_p),
+                up.ctypes.data_as(ctypes.c_void_p),
+                down.ctypes.data_as(ctypes.c_void_p),
+                _f32(scalar_gate),
+                _f32(serial_output),
+                rows,
+                hidden,
+                intermediate,
+                serial_workspace.ctypes.data_as(ctypes.c_void_p),
+                serial_workspace.nbytes,
+            ),
+            0,
+        )
+
+        parallel_output = np.empty_like(x)
+        parallel_workspace = np.empty(64 * stride, dtype=np.uint8)
+        self.assertEqual(
+            self.lib.moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+                _f32(x),
+                _f32(routed),
+                gate.ctypes.data_as(ctypes.c_void_p),
+                up.ctypes.data_as(ctypes.c_void_p),
+                down.ctypes.data_as(ctypes.c_void_p),
+                _f32(scalar_gate),
+                _f32(parallel_output),
+                rows,
+                hidden,
+                intermediate,
+                parallel_workspace.ctypes.data_as(ctypes.c_void_p),
+                parallel_workspace.nbytes,
+            ),
+            0,
+        )
+        np.testing.assert_array_equal(
+            parallel_output.view(np.uint32), serial_output.view(np.uint32)
+        )
+
+        self.assertEqual(
+            self.lib.moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+                _f32(x),
+                _f32(routed),
+                gate.ctypes.data_as(ctypes.c_void_p),
+                up.ctypes.data_as(ctypes.c_void_p),
+                down.ctypes.data_as(ctypes.c_void_p),
+                _f32(scalar_gate),
+                _f32(parallel_output),
+                rows,
+                hidden,
+                intermediate,
+                parallel_workspace.ctypes.data_as(ctypes.c_void_p),
+                stride - 1,
+            ),
+            -1,
         )
 
     def test_workspace_and_shapes_fail_closed(self) -> None:

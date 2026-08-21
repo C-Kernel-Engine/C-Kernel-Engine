@@ -806,6 +806,109 @@ int moe_swiglu_shared_forward_q8_0_gated_workspace(
     return 0;
 }
 
+typedef struct {
+    const float *hidden;
+    const float *routed;
+    const void *shared_gate;
+    const void *shared_up;
+    const void *shared_down;
+    const float *shared_gate_input;
+    float *output;
+    int rows;
+    int hidden_dim;
+    int intermediate_dim;
+    uint8_t *workspace;
+    size_t workspace_stride;
+    int status[CK_THREADPOOL_MAX_THREADS];
+} ck_moe_shared_q8_0_parallel_args_t;
+
+static void ck_moe_shared_q8_0_parallel_work(int ith, int nth, void *opaque)
+{
+    ck_moe_shared_q8_0_parallel_args_t *args =
+        (ck_moe_shared_q8_0_parallel_args_t *)opaque;
+    const int begin = (args->rows * ith) / nth;
+    const int end = (args->rows * (ith + 1)) / nth;
+    if (begin >= end) {
+        args->status[ith] = 0;
+        return;
+    }
+
+    args->status[ith] = moe_swiglu_shared_forward_q8_0_gated_workspace(
+        args->hidden + (size_t)begin * (size_t)args->hidden_dim,
+        args->routed
+            ? args->routed + (size_t)begin * (size_t)args->hidden_dim
+            : NULL,
+        args->shared_gate,
+        args->shared_up,
+        args->shared_down,
+        args->shared_gate_input,
+        args->output + (size_t)begin * (size_t)args->hidden_dim,
+        end - begin,
+        args->hidden_dim,
+        args->intermediate_dim,
+        args->workspace + (size_t)ith * args->workspace_stride,
+        args->workspace_stride);
+}
+
+int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t stride = moe_swiglu_shared_q8_0_gated_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !shared_gate || !shared_up || !shared_down ||
+        !shared_gate_input || !output || !workspace || stride == 0 || rows <= 0) {
+        return -1;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > rows) active = rows;
+    if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
+    if ((size_t)active > SIZE_MAX / stride ||
+        workspace_bytes < stride * (size_t)active) {
+        return -1;
+    }
+    if (active <= 1) {
+        return moe_swiglu_shared_forward_q8_0_gated_workspace(
+            hidden, routed, shared_gate, shared_up, shared_down,
+            shared_gate_input, output, rows, hidden_dim, intermediate_dim,
+            workspace, stride);
+    }
+
+    ck_moe_shared_q8_0_parallel_args_t args = {
+        .hidden = hidden,
+        .routed = routed,
+        .shared_gate = shared_gate,
+        .shared_up = shared_up,
+        .shared_down = shared_down,
+        .shared_gate_input = shared_gate_input,
+        .output = output,
+        .rows = rows,
+        .hidden_dim = hidden_dim,
+        .intermediate_dim = intermediate_dim,
+        .workspace = (uint8_t *)workspace,
+        .workspace_stride = stride,
+        .status = {0},
+    };
+    ck_threadpool_dispatch_n(
+        pool, active, ck_moe_shared_q8_0_parallel_work, &args);
+    for (int ith = 0; ith < active; ++ith) {
+        if (args.status[ith] != 0) return args.status[ith];
+    }
+    return 0;
+}
+
 void moe_swiglu_expert_backward_f32(const float *d_output,
                                     const float *hidden,
                                     const int *indices,

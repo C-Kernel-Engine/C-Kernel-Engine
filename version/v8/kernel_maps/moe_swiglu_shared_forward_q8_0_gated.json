@@ -28,21 +28,21 @@
     {"name": "output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
   "scratch": [
-    {"name": "workspace", "dtype": "u8", "alignment": 64, "lifetime": "kernel_call", "size_resolution": "required", "size_bytes": "align64(q8_0_row_bytes(H)) + align64(2 * I * 4) + align64(q8_0_row_bytes(I)) + align64(H * 4)", "desc": "Planner-owned hidden quantization, gate/up, activation quantization, and shared-output workspace."}
+    {"name": "workspace", "dtype": "u8", "alignment": 64, "lifetime": "kernel_call", "size_resolution": "required", "size_bytes": "64 * (align64(q8_0_row_bytes(H)) + align64(2 * I * 4) + align64(q8_0_row_bytes(I)) + align64(H * 4))", "desc": "Planner-owned per-worker hidden quantization, gate/up, activation quantization, and shared-output workspaces for at most 64 persistent-pool workers."}
   ],
   "dims": ["R", "H", "I"],
   "constraints": {
     "alignment": {"H": 32, "I": 32},
-    "notes": "The gated shared multiply is rounded before the routed add to preserve the two llama.cpp graph-operation boundaries."
+    "notes": "The gated shared multiply is rounded before the routed add to preserve the two llama.cpp graph-operation boundaries. Token rows are statically partitioned; every worker owns a disjoint output range and workspace slice."
   },
   "impl": {
-    "function": "moe_swiglu_shared_forward_q8_0_gated_workspace",
-    "c_declaration": "int moe_swiglu_shared_forward_q8_0_gated_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, const float *shared_gate_input, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);",
+    "function": "moe_swiglu_shared_forward_q8_0_gated_parallel_workspace",
+    "c_declaration": "int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, const float *shared_gate_input, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);",
     "sources": ["src/kernels/axpy_kernels.c", "src/kernels/gemm_kernels_q8_0.c", "src/kernels/gemm_kernels.c", "src/kernels/swiglu_kernels.c"]
   },
   "implementation": {
     "isa_dispatch": "runtime",
-    "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+    "threading": {"runtime": "ck_threadpool", "work_partition": ["independent_rows"], "dispatch": ["ck_threadpool_dispatch_n"], "reduction_order_effect": "none"}
   },
   "call_abi": {
     "version": 1,
@@ -68,11 +68,11 @@
       "contract_id": "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add",
       "status": "observed",
       "phases": ["prefill", "decode"],
-      "function": "moe_swiglu_shared_forward_q8_0_gated_workspace",
+      "function": "moe_swiglu_shared_forward_q8_0_gated_parallel_workspace",
       "explicit_selector": true,
-      "implementation": {"isa_dispatch": "runtime", "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+      "implementation": {"isa_dispatch": "runtime", "threading": {"runtime": "ck_threadpool", "work_partition": ["independent_rows"], "dispatch": ["ck_threadpool_dispatch_n"], "reduction_order_effect": "none"}},
       "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
     }
   ],
-  "notes": "Compact Qwen3.5-style gated shared SwiGLU candidate with no internal allocation or prepared-weight expansion."
+  "notes": "Compact Qwen3.5-style gated shared SwiGLU candidate with no internal allocation or prepared-weight expansion. Independent token rows execute through the persistent thread pool without changing per-row arithmetic."
 }

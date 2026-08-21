@@ -196,7 +196,7 @@ class Qwen35MoeContractTests(unittest.TestCase):
         cases = {
             "moe_softmax_topk_router_llama_f32.json": 1024,
             "moe_swiglu_expert_forward_q4k_q5k.json": 64 * 15296,
-            "moe_swiglu_shared_forward_q8_0_gated.json": 15040,
+            "moe_swiglu_shared_forward_q8_0_gated.json": 64 * 15040,
         }
         maps_dir = REPO_ROOT / "version" / "v8" / "kernel_maps"
         for filename, expected in cases.items():
