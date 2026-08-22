@@ -87,7 +87,8 @@ static ck_zip_state_t ck_zip_state = {
     .socket_fd = -1,
 };
 static pthread_once_t ck_zip_once = PTHREAD_ONCE_INIT;
-static ck_routed_fn ck_real_routed = NULL;
+static ck_routed_fn ck_real_routed_parallel = NULL;
+static ck_routed_fn ck_real_routed_prepared = NULL;
 static ck_shared_fn ck_real_shared = NULL;
 
 static uint64_t ck_zip_now_ns(void)
@@ -138,11 +139,15 @@ static void ck_zip_initialize(void)
         return;
     }
 
-    ck_real_routed = (ck_routed_fn)dlsym(
+    ck_real_routed_parallel = (ck_routed_fn)dlsym(
         RTLD_NEXT, "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace");
+    ck_real_routed_prepared = (ck_routed_fn)dlsym(
+        RTLD_NEXT,
+        "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace");
     ck_real_shared = (ck_shared_fn)dlsym(
         RTLD_NEXT, "moe_swiglu_shared_forward_q8_0_gated_workspace");
-    if (!ck_real_routed || !ck_real_shared) {
+    if ((!ck_real_routed_parallel && !ck_real_routed_prepared) ||
+        !ck_real_shared) {
         fprintf(stderr, "ck_zip: failed to resolve production MoE providers: %s\n",
                 dlerror());
         return;
@@ -311,19 +316,24 @@ static void ck_zip_receive_response(float *output, int rows, int hidden_dim)
     ck_zip_state.request_pending = 0;
 }
 
-int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+static int ck_zip_routed_workspace(
+    ck_routed_fn *real_routed, const char *symbol,
     const float *hidden, const int *indices, const float *routing_weights,
     const void *expert_gate, const void *expert_up, const void *expert_down,
     float *output, int rows, int hidden_dim, int intermediate_dim,
     int n_experts, int top_k, void *workspace, size_t workspace_bytes)
 {
     pthread_once(&ck_zip_once, ck_zip_initialize);
+    if (!*real_routed) {
+        *real_routed = (ck_routed_fn)dlsym(RTLD_NEXT, symbol);
+    }
+    if (!*real_routed) {
+        fprintf(stderr, "ck_zip: failed to resolve routed provider %s: %s\n",
+                symbol, dlerror());
+        return -1;
+    }
     if (!ck_zip_state.enabled || rows <= 1) {
-        if (!ck_real_routed) {
-            ck_real_routed = (ck_routed_fn)dlsym(
-                RTLD_NEXT, "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace");
-        }
-        return ck_real_routed(
+        return (*real_routed)(
             hidden, indices, routing_weights, expert_gate, expert_up,
             expert_down, output, rows, hidden_dim, intermediate_dim, n_experts,
             top_k, workspace, workspace_bytes);
@@ -337,13 +347,41 @@ int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
 
     const int local_rows = ck_zip_local_rows(rows);
     const uint64_t compute_started = ck_zip_now_ns();
-    const int status = ck_real_routed(
+    const int status = (*real_routed)(
         hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
         output, local_rows, hidden_dim, intermediate_dim, n_experts, top_k,
         workspace, workspace_bytes);
     ck_zip_state.routed_ns += ck_zip_now_ns() - compute_started;
     ck_zip_state.routed_calls += 1;
     return status;
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes)
+{
+    return ck_zip_routed_workspace(
+        &ck_real_routed_parallel,
+        "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace", hidden,
+        indices, routing_weights, expert_gate, expert_up, expert_down, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k, workspace,
+        workspace_bytes);
+}
+
+int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes)
+{
+    return ck_zip_routed_workspace(
+        &ck_real_routed_prepared,
+        "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace", hidden,
+        indices, routing_weights, expert_gate, expert_up, expert_down, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k, workspace,
+        workspace_bytes);
 }
 
 int moe_swiglu_shared_forward_q8_0_gated_workspace(

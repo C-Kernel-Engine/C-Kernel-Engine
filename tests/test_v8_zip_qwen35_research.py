@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -13,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKER_PATH = ROOT / "version/v8/scripts/run_zip_qwen35_moe_worker_v8.py"
 RANK_PATH = ROOT / "version/v8/scripts/run_zip_qwen35_prefill_rank_v8.py"
 PRELOAD_PATH = ROOT / "benchmarks/zip/ck_zip_moe_preload.c"
+ROUTED_MAP_PATH = (
+    ROOT
+    / "version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+)
 
 
 def _load_module(name: str, path: Path):
@@ -79,6 +84,13 @@ def test_zip_preload_compiles_strictly(tmp_path: Path) -> None:
         check=True,
     )
     assert output.is_file() and output.stat().st_size > 0
+    dynamic_symbols = subprocess.check_output(
+        ["nm", "-D", "--defined-only", str(output)], text=True
+    )
+    routed_map = json.loads(ROUTED_MAP_PATH.read_text(encoding="utf-8"))
+    active_routed_symbol = routed_map["impl"]["function"]
+    assert active_routed_symbol in dynamic_symbols
+    assert "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace" in dynamic_symbols
 
 
 def test_zip_transport_does_not_enter_numerical_kernel_sources() -> None:
@@ -88,4 +100,5 @@ def test_zip_transport_does_not_enter_numerical_kernel_sources() -> None:
     assert "socket(" not in kernel_source
     assert "CK_ZIP_RESEARCH_ROLE" in transport_source
     assert "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace" in transport_source
+    assert "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace" in transport_source
     assert "moe_swiglu_shared_forward_q8_0_gated_workspace" in transport_source
