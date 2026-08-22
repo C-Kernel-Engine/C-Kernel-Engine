@@ -22,7 +22,7 @@ import time
 import codecs
 import unicodedata
 from pathlib import Path
-from typing import Optional, List
+from typing import Callable, Optional, List
 
 import numpy as np
 
@@ -2546,6 +2546,32 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     return _response_text()
 
 
+_CHAT_REPL_COMMANDS = frozenset(
+    {"/exit", "/quit", "exit", "quit", "/help", "/stats", "/validate"}
+)
+
+
+def _read_interactive_turn(
+    *,
+    multiline_input: bool,
+    input_fn: Callable[[str], str] = input,
+) -> str:
+    """Read one complete REPL turn without splitting multiline paste input."""
+    if not multiline_input:
+        return input_fn("\033[92mYou: \033[0m").strip()
+
+    lines: List[str] = []
+    prompt = "\033[92mYou [multiline]: \033[0m"
+    while True:
+        line = input_fn(prompt if not lines else "\033[92m... \033[0m")
+        stripped = line.strip()
+        if not lines and stripped.lower() in _CHAT_REPL_COMMANDS:
+            return stripped
+        if stripped in {"/", "/send"}:
+            return "\n".join(lines).strip()
+        lines.append(line.rstrip("\r\n"))
+
+
 def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               show_stats: bool = True, validator: Optional['AutoValidator'] = None,
               no_prefill: bool = False, safe_display: bool = True,
@@ -2559,8 +2585,10 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               repeat_last_n: int = 64,
               no_repeat_ngram_size: int = 0,
               memory_enabled: bool = False,
+              multiline_input: bool = False,
               stop_on_text: Optional[List[str]] = None,
-              speculative: Optional[SpeculativeConfig] = None):
+              speculative: Optional[SpeculativeConfig] = None,
+              input_fn: Callable[[str], str] = input):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
@@ -2572,13 +2600,18 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
         print("  Memory: ON (--memory keeps previous prompts)")
     else:
         print("  Memory: OFF (use --memory to keep previous prompts and full chat history)")
+    if multiline_input:
+        print("  Multiline input: ON (finish each turn with /send or / on its own line)")
     print("=" * 60 + "\n")
 
     conversation = []
 
     while True:
         try:
-            user_input = input("\033[92mYou: \033[0m").strip()
+            user_input = _read_interactive_turn(
+                multiline_input=multiline_input,
+                input_fn=input_fn,
+            )
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye!")
             break
@@ -2695,6 +2728,8 @@ def main():
                        help="Override contract thinking mode for chat-capable models (auto, visible, or suppressed)")
     parser.add_argument("--memory", action="store_true",
                        help="Keep previous prompts/responses in interactive chat (default: off)")
+    parser.add_argument("-mli", "--multiline-input", action="store_true",
+                       help="Accept pasted multiline turns; submit with /send or / on its own line")
     parser.add_argument("--speculative-draft-model-dir",
                        help="Path to a compiled draft model directory for greedy speculative decoding")
     parser.add_argument("--speculative-draft-tokens", type=int, default=4,
@@ -2850,6 +2885,7 @@ def main():
                      repeat_last_n=args.repeat_last_n,
                      no_repeat_ngram_size=args.no_repeat_ngram_size,
                      memory_enabled=args.memory,
+                     multiline_input=args.multiline_input,
                      stop_on_text=stop_markers,
                      speculative=speculative)
     finally:

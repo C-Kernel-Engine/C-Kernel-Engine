@@ -356,6 +356,7 @@ typedef struct {
     bool verbose;
     bool quiet_output;
     bool no_chat_template;
+    bool multiline_input;
     ChatTemplateType chat_template;
     int eos_ids[CK_CLI_EOS_MAX];
     int eos_count;
@@ -5096,6 +5097,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  --require-generated-abi Reject legacy artifacts without the versioned capability ABI\n");
     fprintf(stderr, "  --synthetic-prefix-tokens N  Use N zero prefix rows with ck_model_forward_mixed\n");
     fprintf(stderr, "  --prompt, -p TEXT       Run single prompt (non-interactive)\n");
+    fprintf(stderr, "  -mli, --multiline-input Accept pasted multiline turns; submit with /send or /\n");
     fprintf(stderr, "  --prompt-tokens IDS     Comma-separated prompt token IDs for tokenizer-free runtimes\n");
     fprintf(stderr, "  --token-trace-json PATH Write exact generated token IDs and timings atomically\n");
     fprintf(stderr, "  --system, -S TEXT       System prompt\n");
@@ -5191,6 +5193,8 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
             opt->synthetic_prefix_tokens = atoi(argv[++i]);
         } else if ((!strcmp(arg, "--prompt") || !strcmp(arg, "-p")) && i + 1 < argc) {
             opt->prompt_once = argv[++i];
+        } else if (!strcmp(arg, "--multiline-input") || !strcmp(arg, "-mli")) {
+            opt->multiline_input = true;
         } else if (!strcmp(arg, "--prompt-tokens") && i + 1 < argc) {
             opt->prompt_tokens_csv = argv[++i];
         } else if (!strcmp(arg, "--token-trace-json") && i + 1 < argc) {
@@ -5410,6 +5414,102 @@ static bool process_repl_command(const char *line, CLIOptions *opt, ModelAPI *ap
 
     printf("Unknown command: %s\n", line);
     return true;
+}
+
+static char *read_repl_line(const char *prompt) {
+#ifdef HAVE_READLINE
+    return readline(prompt);
+#else
+    printf("%s", prompt);
+    fflush(stdout);
+    char *line = NULL;
+    size_t capacity = 0;
+    ssize_t length = getline(&line, &capacity, stdin);
+    if (length < 0) {
+        free(line);
+        return NULL;
+    }
+    while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r')) {
+        line[--length] = '\0';
+    }
+    return line;
+#endif
+}
+
+static bool is_repl_submit_line(const char *line) {
+    if (!line) return false;
+    while (*line && isspace((unsigned char)*line)) line++;
+    size_t length = strlen(line);
+    while (length > 0 && isspace((unsigned char)line[length - 1])) length--;
+    return (length == 1 && line[0] == '/') ||
+           (length == 5 && !strncmp(line, "/send", 5));
+}
+
+static bool append_repl_line(char **turn, size_t *length, size_t *capacity, const char *line) {
+    const size_t line_length = strlen(line);
+    const size_t separator = *length > 0 ? 1 : 0;
+    const size_t needed = *length + separator + line_length + 1;
+    if (needed > *capacity) {
+        size_t next = *capacity ? *capacity : 256;
+        while (next < needed) {
+            if (next > SIZE_MAX / 2) return false;
+            next *= 2;
+        }
+        char *grown = (char *)realloc(*turn, next);
+        if (!grown) return false;
+        *turn = grown;
+        *capacity = next;
+    }
+    if (separator) (*turn)[(*length)++] = '\n';
+    memcpy(*turn + *length, line, line_length);
+    *length += line_length;
+    (*turn)[*length] = '\0';
+    return true;
+}
+
+static char *read_repl_turn(bool multiline_input) {
+    char *turn = NULL;
+    size_t length = 0;
+    size_t capacity = 0;
+
+    for (;;) {
+        char *line = read_repl_line(
+            length == 0 ? "\033[1;32mYou:\033[0m " : "\033[1;32m...\033[0m "
+        );
+        if (!line) {
+            free(turn);
+            return NULL;
+        }
+
+        if (!multiline_input) {
+#ifdef HAVE_READLINE
+            if (*line) add_history(line);
+#endif
+            return line;
+        }
+
+        if (length == 0 && line[0] == '/' && !is_repl_submit_line(line)) {
+#ifdef HAVE_READLINE
+            add_history(line);
+#endif
+            return line;
+        }
+        if (is_repl_submit_line(line)) {
+            free(line);
+            if (!turn) turn = strdup("");
+#ifdef HAVE_READLINE
+            if (turn && *turn) add_history(turn);
+#endif
+            return turn;
+        }
+        if (!append_repl_line(&turn, &length, &capacity, line)) {
+            fprintf(stderr, "Error: multiline input exceeds available memory\n");
+            free(line);
+            free(turn);
+            return NULL;
+        }
+        free(line);
+    }
 }
 
 /* ============================================================================
@@ -5838,48 +5938,29 @@ int main(int argc, char **argv) {
         }
 #endif
 
+        if (opt.multiline_input) {
+            printf("[Multiline input enabled; finish each turn with /send or / on its own line]\n");
+        }
+
         while (!g_exit_requested) {
-#ifdef HAVE_READLINE
-            char *line = readline("\033[1;32mYou:\033[0m ");
+            char *line = read_repl_turn(opt.multiline_input);
             if (!line) break;
-            if (*line) add_history(line);
-#else
-            printf("\033[1;32mYou:\033[0m ");
-            fflush(stdout);
-            char line_buf[4096];
-            if (!fgets(line_buf, sizeof(line_buf), stdin)) {
-                if (feof(stdin) || g_exit_requested) break;
-                if (errno == EINTR) break;
-                continue;
-            }
-            /* Remove trailing newline */
-            size_t len = strlen(line_buf);
-            if (len > 0 && line_buf[len-1] == '\n') line_buf[len-1] = '\0';
-            char *line = line_buf;
-#endif
 
             if (line[0] == '\0') {
-#ifdef HAVE_READLINE
                 free(line);
-#endif
                 continue;
             }
 
             if (line[0] == '/') {
                 process_repl_command(line, &opt, &api);
-#ifdef HAVE_READLINE
                 free(line);
-#endif
                 continue;
             }
 
             printf("\033[1;34mAssistant:\033[0m ");
             fflush(stdout);
             run_prompt(&api, &opt, line);
-
-#ifdef HAVE_READLINE
             free(line);
-#endif
         }
 
 #ifdef HAVE_READLINE

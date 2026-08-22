@@ -1708,6 +1708,8 @@ def step_run_chat(work_dir: Path, args: argparse.Namespace, *, gguf_path: Path |
         cmd.append("--python-tokenizer")
     if args.memory:
         cmd.append("--memory")
+    if getattr(args, "multiline_input", False):
+        cmd.append("--multiline-input")
     if getattr(args, "speculative_draft_model_dir", None):
         cmd.extend(["--speculative-draft-model-dir", str(args.speculative_draft_model_dir)])
     if getattr(args, "speculative_draft_tokens", None) is not None:
@@ -2284,6 +2286,12 @@ Examples:
     run_parser.add_argument("--thinking-mode", choices=["auto", "visible", "suppressed"], default="auto")
     run_parser.add_argument("--python-tokenizer", action="store_true")
     run_parser.add_argument("--memory", action="store_true")
+    run_parser.add_argument(
+        "-mli",
+        "--multiline-input",
+        action="store_true",
+        help="Accept pasted multiline turns; submit with /send or / on its own line",
+    )
     run_parser.add_argument("--speculative-draft-model-dir", default=None,
                             help="Path to a compiled draft model directory for greedy speculative decoding")
     run_parser.add_argument("--speculative-draft-tokens", type=int, default=4,
