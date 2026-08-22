@@ -699,65 +699,69 @@ $(document).ready(function(){initNavTree('gemm__batch__int8_8c_source.html','');
 <div class="line"><a id="l00557" name="l00557"></a><span class="lineno">  557</span>    <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
 <div class="line"><a id="l00558" name="l00558"></a><span class="lineno">  558</span>{</div>
 <div class="line"><a id="l00559" name="l00559"></a><span class="lineno">  559</span>    <span class="comment">/* First compute GEMM */</span></div>
-<div class="line"><a id="l00560" name="l00560"></a><span class="lineno">  560</span><span class="preprocessor">#if defined(__AVX512VNNI__) &amp;&amp; defined(__AVX512VL__)</span></div>
-<div class="line"><a id="l00561" name="l00561"></a><span class="lineno">  561</span>    gemm_nt_q8_0_q8_0_vnni(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><a id="l00562" name="l00562"></a><span class="lineno">  562</span><span class="preprocessor">#elif defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00563" name="l00563"></a><span class="lineno">  563</span>    gemm_nt_q8_0_q8_0_avx512(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><a id="l00564" name="l00564"></a><span class="lineno">  564</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><a id="l00565" name="l00565"></a><span class="lineno">  565</span>    gemm_nt_q8_0_q8_0_avx2(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><a id="l00566" name="l00566"></a><span class="lineno">  566</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><a id="l00567" name="l00567"></a><span class="lineno">  567</span>    gemm_nt_q8_0_q8_0_avx(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><a id="l00568" name="l00568"></a><span class="lineno">  568</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00569" name="l00569"></a><span class="lineno">  569</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a7dd8f3c479f8d9414625ef13f423aa13">gemm_nt_q8_0_q8_0_ref</a>(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><a id="l00570" name="l00570"></a><span class="lineno">  570</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00571" name="l00571"></a><span class="lineno">  571</span> </div>
-<div class="line"><a id="l00572" name="l00572"></a><span class="lineno">  572</span>    <span class="comment">/* Add bias if provided */</span></div>
-<div class="line"><a id="l00573" name="l00573"></a><span class="lineno">  573</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><a id="l00574" name="l00574"></a><span class="lineno">  574</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><a id="l00575" name="l00575"></a><span class="lineno">  575</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><a id="l00576" name="l00576"></a><span class="lineno">  576</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * N + n] += bias[n];</div>
-<div class="line"><a id="l00577" name="l00577"></a><span class="lineno">  577</span>            }</div>
-<div class="line"><a id="l00578" name="l00578"></a><span class="lineno">  578</span>        }</div>
-<div class="line"><a id="l00579" name="l00579"></a><span class="lineno">  579</span>    }</div>
-<div class="line"><a id="l00580" name="l00580"></a><span class="lineno">  580</span>}</div>
+<div class="line"><a id="l00560" name="l00560"></a><span class="lineno">  560</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00561" name="l00561"></a><span class="lineno">  561</span>    <span class="comment">/*</span></div>
+<div class="line"><a id="l00562" name="l00562"></a><span class="lineno">  562</span><span class="comment">     * The production contract is bit-exact with llama.cpp&#39;s eight-lane</span></div>
+<div class="line"><a id="l00563" name="l00563"></a><span class="lineno">  563</span><span class="comment">     * FP32 accumulation tree.  AVX-512/VNNI changes the integer dot, but it</span></div>
+<div class="line"><a id="l00564" name="l00564"></a><span class="lineno">  564</span><span class="comment">     * must not silently replace that FP32 reduction with the scalar-per-block</span></div>
+<div class="line"><a id="l00565" name="l00565"></a><span class="lineno">  565</span><span class="comment">     * candidate above.  The AVX2-named entry point delegates each activation</span></div>
+<div class="line"><a id="l00566" name="l00566"></a><span class="lineno">  566</span><span class="comment">     * row to the certified x4 provider, which also uses VNNI instructions when</span></div>
+<div class="line"><a id="l00567" name="l00567"></a><span class="lineno">  567</span><span class="comment">     * they are available while preserving the declared reduction order.</span></div>
+<div class="line"><a id="l00568" name="l00568"></a><span class="lineno">  568</span><span class="comment">     */</span></div>
+<div class="line"><a id="l00569" name="l00569"></a><span class="lineno">  569</span>    gemm_nt_q8_0_q8_0_avx2(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><a id="l00570" name="l00570"></a><span class="lineno">  570</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a id="l00571" name="l00571"></a><span class="lineno">  571</span>    gemm_nt_q8_0_q8_0_avx(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><a id="l00572" name="l00572"></a><span class="lineno">  572</span><span class="preprocessor">#else</span></div>
+<div class="line"><a id="l00573" name="l00573"></a><span class="lineno">  573</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a7dd8f3c479f8d9414625ef13f423aa13">gemm_nt_q8_0_q8_0_ref</a>(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><a id="l00574" name="l00574"></a><span class="lineno">  574</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00575" name="l00575"></a><span class="lineno">  575</span> </div>
+<div class="line"><a id="l00576" name="l00576"></a><span class="lineno">  576</span>    <span class="comment">/* Add bias if provided */</span></div>
+<div class="line"><a id="l00577" name="l00577"></a><span class="lineno">  577</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><a id="l00578" name="l00578"></a><span class="lineno">  578</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><a id="l00579" name="l00579"></a><span class="lineno">  579</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><a id="l00580" name="l00580"></a><span class="lineno">  580</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * N + n] += bias[n];</div>
+<div class="line"><a id="l00581" name="l00581"></a><span class="lineno">  581</span>            }</div>
+<div class="line"><a id="l00582" name="l00582"></a><span class="lineno">  582</span>        }</div>
+<div class="line"><a id="l00583" name="l00583"></a><span class="lineno">  583</span>    }</div>
+<div class="line"><a id="l00584" name="l00584"></a><span class="lineno">  584</span>}</div>
 </div>
-<div class="line"><a id="l00581" name="l00581"></a><span class="lineno">  581</span> </div>
-<div class="foldopen" id="foldopen00582" data-start="{" data-end="}">
-<div class="line"><a id="l00582" name="l00582"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a6ea32422e3bafdcc69f97b7f442239f0">  582</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__batch__int8_8c.html#aefc30511dccb12849fdf738fbb7b37ad">gemm_nt_q8_0_q8_0_m2n4</a>(</div>
-<div class="line"><a id="l00583" name="l00583"></a><span class="lineno">  583</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *A,</div>
-<div class="line"><a id="l00584" name="l00584"></a><span class="lineno">  584</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *B,</div>
-<div class="line"><a id="l00585" name="l00585"></a><span class="lineno">  585</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
-<div class="line"><a id="l00586" name="l00586"></a><span class="lineno">  586</span>    <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><a id="l00587" name="l00587"></a><span class="lineno">  587</span>    <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
-<div class="line"><a id="l00588" name="l00588"></a><span class="lineno">  588</span>{</div>
-<div class="line"><a id="l00589" name="l00589"></a><span class="lineno">  589</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, B, A, M, N, K);</div>
-<div class="line"><a id="l00590" name="l00590"></a><span class="lineno">  590</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><a id="l00591" name="l00591"></a><span class="lineno">  591</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><a id="l00592" name="l00592"></a><span class="lineno">  592</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><a id="l00593" name="l00593"></a><span class="lineno">  593</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + n] += bias[n];</div>
-<div class="line"><a id="l00594" name="l00594"></a><span class="lineno">  594</span>            }</div>
-<div class="line"><a id="l00595" name="l00595"></a><span class="lineno">  595</span>        }</div>
-<div class="line"><a id="l00596" name="l00596"></a><span class="lineno">  596</span>    }</div>
-<div class="line"><a id="l00597" name="l00597"></a><span class="lineno">  597</span>}</div>
+<div class="line"><a id="l00585" name="l00585"></a><span class="lineno">  585</span> </div>
+<div class="foldopen" id="foldopen00586" data-start="{" data-end="}">
+<div class="line"><a id="l00586" name="l00586"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a6ea32422e3bafdcc69f97b7f442239f0">  586</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__batch__int8_8c.html#aefc30511dccb12849fdf738fbb7b37ad">gemm_nt_q8_0_q8_0_m2n4</a>(</div>
+<div class="line"><a id="l00587" name="l00587"></a><span class="lineno">  587</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *A,</div>
+<div class="line"><a id="l00588" name="l00588"></a><span class="lineno">  588</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *B,</div>
+<div class="line"><a id="l00589" name="l00589"></a><span class="lineno">  589</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
+<div class="line"><a id="l00590" name="l00590"></a><span class="lineno">  590</span>    <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l00591" name="l00591"></a><span class="lineno">  591</span>    <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l00592" name="l00592"></a><span class="lineno">  592</span>{</div>
+<div class="line"><a id="l00593" name="l00593"></a><span class="lineno">  593</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, B, A, M, N, K);</div>
+<div class="line"><a id="l00594" name="l00594"></a><span class="lineno">  594</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><a id="l00595" name="l00595"></a><span class="lineno">  595</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><a id="l00596" name="l00596"></a><span class="lineno">  596</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><a id="l00597" name="l00597"></a><span class="lineno">  597</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + n] += bias[n];</div>
+<div class="line"><a id="l00598" name="l00598"></a><span class="lineno">  598</span>            }</div>
+<div class="line"><a id="l00599" name="l00599"></a><span class="lineno">  599</span>        }</div>
+<div class="line"><a id="l00600" name="l00600"></a><span class="lineno">  600</span>    }</div>
+<div class="line"><a id="l00601" name="l00601"></a><span class="lineno">  601</span>}</div>
 </div>
-<div class="line"><a id="l00598" name="l00598"></a><span class="lineno">  598</span> </div>
-<div class="foldopen" id="foldopen00599" data-start="{" data-end="}">
-<div class="line"><a id="l00599" name="l00599"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a5d18d3033e60f6a561ee729f35aec362">  599</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__batch__int8_8c.html#ad86f12612843b0ab5e4d44ce647c8dca">gemm_nt_q8_0_q8_0_m2n4_tile</a>(</div>
-<div class="line"><a id="l00600" name="l00600"></a><span class="lineno">  600</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *A,</div>
-<div class="line"><a id="l00601" name="l00601"></a><span class="lineno">  601</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *B,</div>
-<div class="line"><a id="l00602" name="l00602"></a><span class="lineno">  602</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
-<div class="line"><a id="l00603" name="l00603"></a><span class="lineno">  603</span>    <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><a id="l00604" name="l00604"></a><span class="lineno">  604</span>    <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K, <span class="keywordtype">int</span> ldc)</div>
-<div class="line"><a id="l00605" name="l00605"></a><span class="lineno">  605</span>{</div>
-<div class="line"><a id="l00606" name="l00606"></a><span class="lineno">  606</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, ldc, B, A, M, N, K);</div>
-<div class="line"><a id="l00607" name="l00607"></a><span class="lineno">  607</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><a id="l00608" name="l00608"></a><span class="lineno">  608</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><a id="l00609" name="l00609"></a><span class="lineno">  609</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><a id="l00610" name="l00610"></a><span class="lineno">  610</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)ldc + n] += bias[n];</div>
-<div class="line"><a id="l00611" name="l00611"></a><span class="lineno">  611</span>            }</div>
-<div class="line"><a id="l00612" name="l00612"></a><span class="lineno">  612</span>        }</div>
-<div class="line"><a id="l00613" name="l00613"></a><span class="lineno">  613</span>    }</div>
-<div class="line"><a id="l00614" name="l00614"></a><span class="lineno">  614</span>}</div>
+<div class="line"><a id="l00602" name="l00602"></a><span class="lineno">  602</span> </div>
+<div class="foldopen" id="foldopen00603" data-start="{" data-end="}">
+<div class="line"><a id="l00603" name="l00603"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a5d18d3033e60f6a561ee729f35aec362">  603</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__batch__int8_8c.html#ad86f12612843b0ab5e4d44ce647c8dca">gemm_nt_q8_0_q8_0_m2n4_tile</a>(</div>
+<div class="line"><a id="l00604" name="l00604"></a><span class="lineno">  604</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *A,</div>
+<div class="line"><a id="l00605" name="l00605"></a><span class="lineno">  605</span>    <span class="keyword">const</span> <span class="keywordtype">void</span> *B,</div>
+<div class="line"><a id="l00606" name="l00606"></a><span class="lineno">  606</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
+<div class="line"><a id="l00607" name="l00607"></a><span class="lineno">  607</span>    <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l00608" name="l00608"></a><span class="lineno">  608</span>    <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K, <span class="keywordtype">int</span> ldc)</div>
+<div class="line"><a id="l00609" name="l00609"></a><span class="lineno">  609</span>{</div>
+<div class="line"><a id="l00610" name="l00610"></a><span class="lineno">  610</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, ldc, B, A, M, N, K);</div>
+<div class="line"><a id="l00611" name="l00611"></a><span class="lineno">  611</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><a id="l00612" name="l00612"></a><span class="lineno">  612</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><a id="l00613" name="l00613"></a><span class="lineno">  613</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><a id="l00614" name="l00614"></a><span class="lineno">  614</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)ldc + n] += bias[n];</div>
+<div class="line"><a id="l00615" name="l00615"></a><span class="lineno">  615</span>            }</div>
+<div class="line"><a id="l00616" name="l00616"></a><span class="lineno">  616</span>        }</div>
+<div class="line"><a id="l00617" name="l00617"></a><span class="lineno">  617</span>    }</div>
+<div class="line"><a id="l00618" name="l00618"></a><span class="lineno">  618</span>}</div>
 </div>
 <div class="ttc" id="ackernel__quant_8h_html"><div class="ttname"><a href="ckernel__quant_8h.html">ckernel_quant.h</a></div><div class="ttdoc">Quantization block structures for weight-only quantization.</div></div>
 <div class="ttc" id="ackernel__quant_8h_html_a7edd411b02255eed928c775b91396c2a"><div class="ttname"><a href="ckernel__quant_8h.html#a7edd411b02255eed928c775b91396c2a">CK_FP16_TO_FP32</a></div><div class="ttdeci">#define CK_FP16_TO_FP32(x)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00392">ckernel_quant.h:392</a></div></div>
@@ -768,9 +772,9 @@ $(document).ready(function(){initNavTree('gemm__batch__int8_8c_source.html','');
 <div class="ttc" id="agemm__batch__int8_8c_html_a928f41fc27c869c5e67f76cb4a721836"><div class="ttname"><a href="gemm__batch__int8_8c.html#a928f41fc27c869c5e67f76cb4a721836">gemm_nt_q8_0_q8_0</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0(const void *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdoc">gemm_nt_q8_0_q8_0 with optional bias (matches header signature)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00552">gemm_batch_int8.c:552</a></div></div>
 <div class="ttc" id="agemm__batch__int8_8c_html_a93f8f68b0da241b2dc1e6c2a70bef457"><div class="ttname"><a href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a></div><div class="ttdeci">void gemm_q8_0_q8_0_m2n4(float *C, const void *W, const void *A_q8, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l01613">gemm_kernels_q8_0.c:1613</a></div></div>
 <div class="ttc" id="agemm__batch__int8_8c_html_acb32be03743b69680e336abcff4b29cb"><div class="ttname"><a href="gemm__batch__int8_8c.html#acb32be03743b69680e336abcff4b29cb">gemm_batch_int8_impl_name</a></div><div class="ttdeci">const char * gemm_batch_int8_impl_name(void)</div><div class="ttdoc">Get the best implementation name for logging/debugging.</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00522">gemm_batch_int8.c:522</a></div></div>
-<div class="ttc" id="agemm__batch__int8_8c_html_ad86f12612843b0ab5e4d44ce647c8dca"><div class="ttname"><a href="gemm__batch__int8_8c.html#ad86f12612843b0ab5e4d44ce647c8dca">gemm_nt_q8_0_q8_0_m2n4_tile</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0_m2n4_tile(const void *A, const void *B, const float *bias, float *C, int M, int N, int K, int ldc)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00599">gemm_batch_int8.c:599</a></div></div>
+<div class="ttc" id="agemm__batch__int8_8c_html_ad86f12612843b0ab5e4d44ce647c8dca"><div class="ttname"><a href="gemm__batch__int8_8c.html#ad86f12612843b0ab5e4d44ce647c8dca">gemm_nt_q8_0_q8_0_m2n4_tile</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0_m2n4_tile(const void *A, const void *B, const float *bias, float *C, int M, int N, int K, int ldc)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00603">gemm_batch_int8.c:603</a></div></div>
 <div class="ttc" id="agemm__batch__int8_8c_html_aeb957672a1aa94abab5a5aac111742d3"><div class="ttname"><a href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a></div><div class="ttdeci">void gemm_q8_0_q8_0_m2n4_strided(float *C, int ldc, const void *W, const void *A_q8, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l01502">gemm_kernels_q8_0.c:1502</a></div></div>
-<div class="ttc" id="agemm__batch__int8_8c_html_aefc30511dccb12849fdf738fbb7b37ad"><div class="ttname"><a href="gemm__batch__int8_8c.html#aefc30511dccb12849fdf738fbb7b37ad">gemm_nt_q8_0_q8_0_m2n4</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0_m2n4(const void *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00582">gemm_batch_int8.c:582</a></div></div>
+<div class="ttc" id="agemm__batch__int8_8c_html_aefc30511dccb12849fdf738fbb7b37ad"><div class="ttname"><a href="gemm__batch__int8_8c.html#aefc30511dccb12849fdf738fbb7b37ad">gemm_nt_q8_0_q8_0_m2n4</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0_m2n4(const void *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00586">gemm_batch_int8.c:586</a></div></div>
 <div class="ttc" id="agemm__batch__int8_8c_html_af13e8b7fd92d0f48c1cfca7161552d4a"><div class="ttname"><a href="gemm__batch__int8_8c.html#af13e8b7fd92d0f48c1cfca7161552d4a">QK8_0</a></div><div class="ttdeci">#define QK8_0</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00059">gemm_batch_int8.c:59</a></div></div>
 <div class="ttc" id="ashow__config_8c_html_a3d5cffd490a70d568b820514b5a0f937"><div class="ttname"><a href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a></div><div class="ttdeci">#define C(color)</div><div class="ttdef"><b>Definition</b> <a href="show__config_8c_source.html#l00039">show_config.c:39</a></div></div>
 <div class="ttc" id="astructblock__q5__0_html"><div class="ttname"><a href="structblock__q5__0.html">block_q5_0</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00070">ckernel_quant.h:70</a></div></div>

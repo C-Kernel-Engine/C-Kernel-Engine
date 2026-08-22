@@ -536,27 +536,31 @@ CK-ENGINE KERNEL RULES:</h1>
 <p class="definition">Definition at line <a class="el" href="gemm__batch__int8_8c_source.html#l00552">552</a> of file <a class="el" href="gemm__batch__int8_8c_source.html">gemm_batch_int8.c</a>.</p>
 <div class="fragment"><div class="line"><span class="lineno">  558</span>{</div>
 <div class="line"><span class="lineno">  559</span>    <span class="comment">/* First compute GEMM */</span></div>
-<div class="line"><span class="lineno">  560</span><span class="preprocessor">#if defined(__AVX512VNNI__) &amp;&amp; defined(__AVX512VL__)</span></div>
-<div class="line"><span class="lineno">  561</span>    gemm_nt_q8_0_q8_0_vnni(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  562</span><span class="preprocessor">#elif defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  563</span>    gemm_nt_q8_0_q8_0_avx512(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  564</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  565</span>    gemm_nt_q8_0_q8_0_avx2(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  566</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  567</span>    gemm_nt_q8_0_q8_0_avx(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  568</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  569</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a7dd8f3c479f8d9414625ef13f423aa13">gemm_nt_q8_0_q8_0_ref</a>(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
-<div class="line"><span class="lineno">  570</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  571</span> </div>
-<div class="line"><span class="lineno">  572</span>    <span class="comment">/* Add bias if provided */</span></div>
-<div class="line"><span class="lineno">  573</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><span class="lineno">  574</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
-<div class="line"><span class="lineno">  575</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
-<div class="line"><span class="lineno">  576</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * N + n] += bias[n];</div>
-<div class="line"><span class="lineno">  577</span>            }</div>
-<div class="line"><span class="lineno">  578</span>        }</div>
-<div class="line"><span class="lineno">  579</span>    }</div>
-<div class="line"><span class="lineno">  580</span>}</div>
+<div class="line"><span class="lineno">  560</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  561</span>    <span class="comment">/*</span></div>
+<div class="line"><span class="lineno">  562</span><span class="comment">     * The production contract is bit-exact with llama.cpp&#39;s eight-lane</span></div>
+<div class="line"><span class="lineno">  563</span><span class="comment">     * FP32 accumulation tree.  AVX-512/VNNI changes the integer dot, but it</span></div>
+<div class="line"><span class="lineno">  564</span><span class="comment">     * must not silently replace that FP32 reduction with the scalar-per-block</span></div>
+<div class="line"><span class="lineno">  565</span><span class="comment">     * candidate above.  The AVX2-named entry point delegates each activation</span></div>
+<div class="line"><span class="lineno">  566</span><span class="comment">     * row to the certified x4 provider, which also uses VNNI instructions when</span></div>
+<div class="line"><span class="lineno">  567</span><span class="comment">     * they are available while preserving the declared reduction order.</span></div>
+<div class="line"><span class="lineno">  568</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  569</span>    gemm_nt_q8_0_q8_0_avx2(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  570</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  571</span>    gemm_nt_q8_0_q8_0_avx(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  572</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  573</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a7dd8f3c479f8d9414625ef13f423aa13">gemm_nt_q8_0_q8_0_ref</a>(A, B, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K);</div>
+<div class="line"><span class="lineno">  574</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  575</span> </div>
+<div class="line"><span class="lineno">  576</span>    <span class="comment">/* Add bias if provided */</span></div>
+<div class="line"><span class="lineno">  577</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><span class="lineno">  578</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; m++) {</div>
+<div class="line"><span class="lineno">  579</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; n++) {</div>
+<div class="line"><span class="lineno">  580</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * N + n] += bias[n];</div>
+<div class="line"><span class="lineno">  581</span>            }</div>
+<div class="line"><span class="lineno">  582</span>        }</div>
+<div class="line"><span class="lineno">  583</span>    }</div>
+<div class="line"><span class="lineno">  584</span>}</div>
 <div class="ttc" id="agemm__batch__int8_8c_html_a7dd8f3c479f8d9414625ef13f423aa13"><div class="ttname"><a href="gemm__batch__int8_8c.html#a7dd8f3c479f8d9414625ef13f423aa13">gemm_nt_q8_0_q8_0_ref</a></div><div class="ttdeci">void gemm_nt_q8_0_q8_0_ref(const void *A, const void *B, float *C, int M, int N, int K)</div><div class="ttdoc">Scalar reference: gemm_nt_q8_0_q8_0.</div><div class="ttdef"><b>Definition</b> <a href="gemm__batch__int8_8c_source.html#l00118">gemm_batch_int8.c:118</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__batch__int8_8c_source.html#l00118">gemm_nt_q8_0_q8_0_ref()</a>.</p>
@@ -621,17 +625,17 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__batch__int8_8c_source.html#l00582">582</a> of file <a class="el" href="gemm__batch__int8_8c_source.html">gemm_batch_int8.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  588</span>{</div>
-<div class="line"><span class="lineno">  589</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, B, A, M, N, K);</div>
-<div class="line"><span class="lineno">  590</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><span class="lineno">  591</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno">  592</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno">  593</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + n] += bias[n];</div>
-<div class="line"><span class="lineno">  594</span>            }</div>
-<div class="line"><span class="lineno">  595</span>        }</div>
-<div class="line"><span class="lineno">  596</span>    }</div>
-<div class="line"><span class="lineno">  597</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__batch__int8_8c_source.html#l00586">586</a> of file <a class="el" href="gemm__batch__int8_8c_source.html">gemm_batch_int8.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  592</span>{</div>
+<div class="line"><span class="lineno">  593</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, B, A, M, N, K);</div>
+<div class="line"><span class="lineno">  594</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><span class="lineno">  595</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno">  596</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno">  597</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)N + n] += bias[n];</div>
+<div class="line"><span class="lineno">  598</span>            }</div>
+<div class="line"><span class="lineno">  599</span>        }</div>
+<div class="line"><span class="lineno">  600</span>    }</div>
+<div class="line"><span class="lineno">  601</span>}</div>
 <div class="ttc" id="agemm__batch__int8_8c_html_a93f8f68b0da241b2dc1e6c2a70bef457"><div class="ttname"><a href="gemm__batch__int8_8c.html#a93f8f68b0da241b2dc1e6c2a70bef457">gemm_q8_0_q8_0_m2n4</a></div><div class="ttdeci">void gemm_q8_0_q8_0_m2n4(float *C, const void *W, const void *A_q8, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l01613">gemm_kernels_q8_0.c:1613</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01613">gemm_q8_0_q8_0_m2n4()</a>.</p>
@@ -700,17 +704,17 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__batch__int8_8c_source.html#l00599">599</a> of file <a class="el" href="gemm__batch__int8_8c_source.html">gemm_batch_int8.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  605</span>{</div>
-<div class="line"><span class="lineno">  606</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, ldc, B, A, M, N, K);</div>
-<div class="line"><span class="lineno">  607</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
-<div class="line"><span class="lineno">  608</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno">  609</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno">  610</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)ldc + n] += bias[n];</div>
-<div class="line"><span class="lineno">  611</span>            }</div>
-<div class="line"><span class="lineno">  612</span>        }</div>
-<div class="line"><span class="lineno">  613</span>    }</div>
-<div class="line"><span class="lineno">  614</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__batch__int8_8c_source.html#l00603">603</a> of file <a class="el" href="gemm__batch__int8_8c_source.html">gemm_batch_int8.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  609</span>{</div>
+<div class="line"><span class="lineno">  610</span>    <a class="code hl_function" href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a>(<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, ldc, B, A, M, N, K);</div>
+<div class="line"><span class="lineno">  611</span>    <span class="keywordflow">if</span> (bias != NULL) {</div>
+<div class="line"><span class="lineno">  612</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno">  613</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno">  614</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)m * (<span class="keywordtype">size_t</span>)ldc + n] += bias[n];</div>
+<div class="line"><span class="lineno">  615</span>            }</div>
+<div class="line"><span class="lineno">  616</span>        }</div>
+<div class="line"><span class="lineno">  617</span>    }</div>
+<div class="line"><span class="lineno">  618</span>}</div>
 <div class="ttc" id="agemm__batch__int8_8c_html_aeb957672a1aa94abab5a5aac111742d3"><div class="ttname"><a href="gemm__batch__int8_8c.html#aeb957672a1aa94abab5a5aac111742d3">gemm_q8_0_q8_0_m2n4_strided</a></div><div class="ttdeci">void gemm_q8_0_q8_0_m2n4_strided(float *C, int ldc, const void *W, const void *A_q8, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0_8c_source.html#l01502">gemm_kernels_q8_0.c:1502</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01502">gemm_q8_0_q8_0_m2n4_strided()</a>.</p>
@@ -877,7 +881,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01502">gemm_q8_0_q8_0_m2n4_strided()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__batch__int8_8c_source.html#l00582">gemm_nt_q8_0_q8_0_m2n4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__batch__int8_8c_source.html#l00586">gemm_nt_q8_0_q8_0_m2n4()</a>.</p>
 
 </div>
 </div>
@@ -1050,7 +1054,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="show__config_8c_source.html#l00039">C</a>, <a class="el" href="ckernel__quant_8h_source.html#l00392">CK_FP16_TO_FP32</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00056">ck_q8_0_q8_0_debug_ref()</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01405">gemv_q8_0_q8_0()</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01428">gemv_q8_0_q8_0_x4()</a>, and <a class="el" href="ckernel__quant_8h_source.html#l00102">QK8_0</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="gemm__batch__int8_8c_source.html#l00599">gemm_nt_q8_0_q8_0_m2n4_tile()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01613">gemm_q8_0_q8_0_m2n4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="gemm__batch__int8_8c_source.html#l00603">gemm_nt_q8_0_q8_0_m2n4_tile()</a>, and <a class="el" href="gemm__kernels__q8__0_8c_source.html#l01613">gemm_q8_0_q8_0_m2n4()</a>.</p>
 
 </div>
 </div>
