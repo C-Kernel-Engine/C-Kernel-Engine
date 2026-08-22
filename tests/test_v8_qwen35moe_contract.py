@@ -448,6 +448,70 @@ class Qwen35MoeContractTests(unittest.TestCase):
         self.assertEqual(report["scratch_contract_count"], 1)
         self.assertEqual(report["scratch"][0]["disjoint_port_count"], 1)
 
+    def test_packed_activation_validation_honors_weight_prefix(self) -> None:
+        layout = {
+            "memory": {
+                "arena": {
+                    "mode": "packed",
+                    "activations_base": 608,
+                    "total_size": 1632,
+                },
+                "activations": {
+                    "size": 1024,
+                    "buffers": [
+                        {"name": "mlp_scratch", "offset": 608, "size": 1024},
+                    ],
+                },
+            },
+        }
+        report = _validate_lowered_activation_memory({"operations": []}, layout)
+        self.assertEqual(report["arena_base"], 608)
+        self.assertEqual(report["arena_bytes"], 1024)
+
+        layout["memory"]["activations"]["buffers"][0]["size"] = 1025
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"interval \[608, 1633\) is outside arena \[608, 1632\)",
+        ):
+            _validate_lowered_activation_memory({"operations": []}, layout)
+
+    def test_runtime_kv_state_is_not_validated_as_activation_scratch(self) -> None:
+        layout = {
+            "memory": {
+                "arena": {
+                    "mode": "packed",
+                    "activations_base": 608,
+                    "total_size": 1632,
+                },
+                "activations": {
+                    "size": 1024,
+                    "buffers": [
+                        {"name": "mlp_scratch", "offset": 608, "size": 1024},
+                    ],
+                },
+            },
+        }
+        lowered = {
+            "operations": [
+                {
+                    "op": "attn",
+                    "layer": 0,
+                    "kernel": "deepseek_mla_attention_decode_f32",
+                    "scratch": [
+                        {
+                            "name": "k_scratch",
+                            "scratch_offset": 0,
+                            "size": 32,
+                            "runtime_expr": "model->kv_cache",
+                        },
+                    ],
+                },
+            ],
+        }
+        report = _validate_lowered_activation_memory(lowered, layout)
+        self.assertEqual(report["scratch_contract_count"], 0)
+        self.assertEqual(report["external_runtime_scratch_count"], 1)
+
     def test_required_scratch_expression_fails_closed(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "unsupported size_bytes"):
             _kernel_scratch_size_bytes(

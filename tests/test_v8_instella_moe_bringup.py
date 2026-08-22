@@ -208,12 +208,12 @@ class InstellaMoEBringupTests(unittest.TestCase):
                     capture_output=True,
                     text=True,
                 )
-                call_ir = json.loads(call_path.read_text(encoding="utf-8"))
                 self.assertEqual(
                     build.returncode,
                     0,
-                    build.stdout + build.stderr + "\n" + json.dumps(call_ir.get("errors"), indent=2),
+                    build.stdout + build.stderr,
                 )
+                call_ir = json.loads(call_path.read_text(encoding="utf-8"))
                 self.assertFalse(call_ir.get("errors"), call_ir.get("errors"))
                 graph_ir = json.loads(
                     (out / f"ir1_{mode}.json").read_text(encoding="utf-8")

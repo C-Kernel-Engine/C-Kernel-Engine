@@ -458,17 +458,26 @@
           {
             "id": "q_proj",
             "op": "q_proj",
-            "graph_slots": {"inputs": {"x": "main_stream"}}
+            "graph_slots": {
+              "inputs": {"A": "main_stream"},
+              "outputs": {"C": "q_scratch"}
+            }
           },
           {
             "id": "k_proj",
             "op": "k_proj",
-            "graph_slots": {"inputs": {"x": "main_stream"}}
+            "graph_slots": {
+              "inputs": {"A": "main_stream"},
+              "outputs": {"C": "k_scratch"}
+            }
           },
           {
             "id": "v_proj",
             "op": "v_proj",
-            "graph_slots": {"inputs": {"x": "main_stream"}}
+            "graph_slots": {
+              "inputs": {"A": "main_stream"},
+              "outputs": {"C": "v_scratch"}
+            }
           },
           {
             "id": "attn",
@@ -492,20 +501,29 @@
           {
             "id": "out_proj",
             "op": "out_proj",
-            "graph_slots": {"inputs": {"x": "attn_scratch"}}
+            "graph_slots": {
+              "inputs": {"A": "attn_scratch"},
+              "outputs": {"C": "main_stream"}
+            }
           },
           {"id": "attn_residual", "op": "residual_add"},
           {"id": "ffn_norm", "op": "layernorm"},
           {
             "id": "mlp_up",
             "op": "mlp_up",
-            "graph_slots": {"inputs": {"x": "main_stream"}}
+            "graph_slots": {
+              "inputs": {"A": "main_stream"},
+              "outputs": {"C": "mlp_scratch"}
+            }
           },
           {"id": "mlp_gelu", "op": "gelu"},
           {
             "id": "mlp_down",
             "op": "mlp_down",
-            "graph_slots": {"inputs": {"x": "mlp_scratch"}}
+            "graph_slots": {
+              "inputs": {"A": "mlp_scratch"},
+              "outputs": {"C": "main_stream"}
+            }
           },
           {"id": "mlp_residual", "op": "residual_add"}
         ]

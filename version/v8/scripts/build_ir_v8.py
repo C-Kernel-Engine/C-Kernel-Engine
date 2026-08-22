@@ -4323,22 +4323,29 @@ def _validate_lowered_activation_memory(
     lowered_ir: Dict[str, Any], layout: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Fail closed when a lowered write can exceed its physical allocation."""
-    activation_memory = layout.get("memory", {}).get("activations", {})
+    memory = layout.get("memory", {})
+    activation_memory = memory.get("activations", {})
+    arena = memory.get("arena", {})
     buffers = activation_memory.get("buffers", [])
-    total_size = int(activation_memory.get("size", 0) or 0)
+    activation_bytes = int(activation_memory.get("size", 0) or 0)
+    packed_layout = str(arena.get("mode", "region")) == "packed"
+    activation_base = (
+        int(arena.get("activations_base", 0) or 0) if packed_layout else 0
+    )
+    activation_limit = activation_base + activation_bytes
     by_name = {str(buf.get("name")): buf for buf in buffers}
 
-    previous_end = 0
+    previous_end = activation_base
     previous_name = "<activation-base>"
     for buf in sorted(buffers, key=lambda item: int(item.get("offset", 0) or 0)):
         name = str(buf.get("name", "<unnamed>"))
         offset = int(buf.get("offset", 0) or 0)
         size = int(buf.get("size", 0) or 0)
         end = offset + size
-        if offset < 0 or size < 0 or end > total_size:
+        if offset < activation_base or size < 0 or end > activation_limit:
             raise RuntimeError(
                 f"HARD ACTIVATION LAYOUT FAULT: {name} interval [{offset}, {end}) "
-                f"is outside arena [0, {total_size})"
+                f"is outside arena [{activation_base}, {activation_limit})"
             )
         if offset < previous_end:
             raise RuntimeError(
@@ -4350,20 +4357,34 @@ def _validate_lowered_activation_memory(
 
     write_contracts: List[Dict[str, Any]] = []
     scratch_contracts: List[Dict[str, Any]] = []
+    external_runtime_scratch: List[Dict[str, Any]] = []
     operations = lowered_ir.get("operations", []) if isinstance(lowered_ir, dict) else []
     for op in operations:
         for scratch in op.get("scratch", []) or []:
             if not isinstance(scratch, dict):
                 continue
+            if scratch.get("runtime_expr"):
+                external_runtime_scratch.append({
+                    "op": str(op.get("op", "")),
+                    "layer": int(op.get("layer", -1) or -1),
+                    "provider": str(op.get("kernel", "")),
+                    "scratch": str(scratch.get("name", "")),
+                    "storage": "external_runtime",
+                })
+                continue
             scratch_offset = int(scratch.get("scratch_offset", 0) or 0)
             scratch_size = int(scratch.get("size", 0) or 0)
             scratch_end = scratch_offset + scratch_size
-            if scratch_offset < 0 or scratch_size < 0 or scratch_end > total_size:
+            if (
+                scratch_offset < activation_base
+                or scratch_size < 0
+                or scratch_end > activation_limit
+            ):
                 raise RuntimeError(
                     "HARD SCRATCH LAYOUT FAULT: "
                     f"{op.get('kernel')}:{scratch.get('name', '<unnamed>')} interval "
                     f"[{scratch_offset}, {scratch_end}) is outside activation arena "
-                    f"[0, {total_size})"
+                    f"[{activation_base}, {activation_limit})"
                 )
             disjoint_from = scratch.get("disjoint_from", []) or []
             for live in disjoint_from:
@@ -4468,9 +4489,12 @@ def _validate_lowered_activation_memory(
         "activation_buffer_count": len(buffers),
         "quantized_write_count": len(write_contracts),
         "scratch_contract_count": len(scratch_contracts),
-        "arena_bytes": total_size,
+        "external_runtime_scratch_count": len(external_runtime_scratch),
+        "arena_bytes": activation_bytes,
+        "arena_base": activation_base,
         "writes": write_contracts,
         "scratch": scratch_contracts,
+        "external_runtime_scratch": external_runtime_scratch,
     }
 
 
@@ -10690,15 +10714,17 @@ def generate_memory_layout(
     provider_scratch_reserve = _required_kernel_call_scratch_bytes(
         ir_lower_1_ops, config, seq_len
     )
-    scratch_size = (
-        max(mlp_size, fused_attn_scratch, geglu_bf16_scratch)
-        + provider_scratch_reserve
+    scratch_size = max(
+        mlp_size,
+        fused_attn_scratch,
+        geglu_bf16_scratch,
+        provider_scratch_reserve,
     )
     add_buffer(
         "mlp_scratch",
         scratch_size,
-        f"[max({seq_len}*{intermediate_size*2}, fused_attn, geglu_bf16) + "
-        f"provider_scratch({provider_scratch_reserve})]",
+        f"[max({seq_len}*{intermediate_size*2}, fused_attn, geglu_bf16, "
+        f"provider_scratch({provider_scratch_reserve}))]",
     )
 
     # Layer output: [seq_len, embed_dim]
@@ -10928,10 +10954,13 @@ def generate_memory_layout_packed(
                 "HARD SCRATCH CONTRACT FAULT: selected providers require workspace "
                 "but the activation plan has no mlp_scratch arena"
             )
-        mlp_spec["size"] = int(mlp_spec.get("size", 0) or 0) + provider_scratch_reserve
+        mlp_spec["size"] = max(
+            int(mlp_spec.get("size", 0) or 0),
+            provider_scratch_reserve,
+        )
         mlp_spec["shape"] = (
-            f"{mlp_spec.get('shape', '[mlp_scratch]')} + "
-            f"provider_scratch({provider_scratch_reserve})"
+            f"max({mlp_spec.get('shape', '[mlp_scratch]')}, "
+            f"provider_scratch({provider_scratch_reserve}))"
         )
 
     weight_offset = 0
@@ -12774,7 +12803,9 @@ def generate_ir_lower_2(
                 config.get("routed_scaling_factor", 1.0) or 1.0
             )
         if op_type in ("cross_k_proj", "cross_v_proj"):
-            params["_m"] = int(config.get("encoder_memory_length", 0) or 0)
+            cross_rows = int(config.get("encoder_memory_length", 0) or 0)
+            params["_m"] = cross_rows
+            params["seq_len"] = cross_rows
         if op_type == "cross_attn":
             params["query_tokens"] = int(params.get("seq_len", 1) or 1)
             params["key_tokens"] = int(config.get("encoder_memory_length", 0) or 0)
@@ -14090,7 +14121,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             if (
                 op_name in ("cross_k_proj", "cross_v_proj")
                 and str(name).lower() == "m"
-                and src == "dim:_m"
+                and src in {"dim:_m", "runtime:seq_len"}
             ):
                 arg_doc["source"] = "dim:encoder_memory_length"
             elif (
