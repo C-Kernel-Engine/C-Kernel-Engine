@@ -281,6 +281,30 @@ class Qwen35MoeContractTests(unittest.TestCase):
                     expected,
                 )
 
+    def test_bucketed_moe_workspace_resolves_at_long_prefill_shapes(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        config = {
+            "embed_dim": HIDDEN,
+            "moe_intermediate_size": EXPERT_DIM,
+            "n_routed_experts": EXPERTS,
+            "experts_per_tok": TOP_K,
+        }
+        for rows, expected in ((512, 5_134_400), (4096, 13_736_000)):
+            with self.subTest(rows=rows):
+                self.assertEqual(
+                    _kernel_scratch_size_bytes(
+                        provider["scratch"][0], {"_m": rows}, config
+                    ),
+                    expected,
+                )
+
     def test_moe_output_extent_resolves_from_physical_port_contract(self) -> None:
         provider_path = (
             REPO_ROOT

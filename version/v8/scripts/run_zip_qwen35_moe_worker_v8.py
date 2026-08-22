@@ -78,7 +78,17 @@ def _bind_kernels(library_path: Path) -> ctypes.CDLL:
         ctypes.c_int,
     ]
     library.moe_swiglu_expert_q4k_q5k_workspace_bytes.restype = ctypes.c_size_t
-    library.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace.argtypes = [
+    library.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    library.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes.restype = (
+        ctypes.c_size_t
+    )
+    library.moe_swiglu_expert_forward_q4k_q5k_auto_workspace.argtypes = [
         ctypes.POINTER(ctypes.c_float),
         ctypes.POINTER(ctypes.c_int),
         ctypes.POINTER(ctypes.c_float),
@@ -94,7 +104,7 @@ def _bind_kernels(library_path: Path) -> ctypes.CDLL:
         ctypes.c_void_p,
         ctypes.c_size_t,
     ]
-    library.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace.restype = ctypes.c_int
+    library.moe_swiglu_expert_forward_q4k_q5k_auto_workspace.restype = ctypes.c_int
     library.moe_swiglu_shared_q8_0_gated_workspace_bytes.argtypes = [
         ctypes.c_int,
         ctypes.c_int,
@@ -239,11 +249,21 @@ def main() -> int:
                 )
             )
             worker_threads = max(1, int(os.environ.get("CK_NUM_THREADS", "1")))
+            row_parallel_bytes = routed_stride * min(remote_rows, worker_threads)
+            bucketed_bytes = int(
+                library.moe_swiglu_expert_q4k_q5k_bucketed_workspace_bytes(
+                    remote_rows,
+                    hidden_dim,
+                    intermediate_dim,
+                    n_experts,
+                    top_k,
+                )
+            )
             routed_workspace = np.empty(
-                routed_stride * min(remote_rows, worker_threads), dtype=np.uint8
+                max(row_parallel_bytes, bucketed_bytes), dtype=np.uint8
             )
             routed_started = time.monotonic_ns()
-            rc = library.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+            rc = library.moe_swiglu_expert_forward_q4k_q5k_auto_workspace(
                 hidden.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                 indices.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
                 routing.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),

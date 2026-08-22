@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,8 +89,12 @@ static ck_zip_state_t ck_zip_state = {
 };
 static pthread_once_t ck_zip_once = PTHREAD_ONCE_INIT;
 static ck_routed_fn ck_real_routed_parallel = NULL;
+static ck_routed_fn ck_real_routed_auto = NULL;
 static ck_routed_fn ck_real_routed_prepared = NULL;
 static ck_shared_fn ck_real_shared = NULL;
+static ck_shared_fn ck_real_shared_parallel = NULL;
+static atomic_int ck_zip_routed_nested = 0;
+static atomic_int ck_zip_shared_nested = 0;
 
 static uint64_t ck_zip_now_ns(void)
 {
@@ -141,13 +146,19 @@ static void ck_zip_initialize(void)
 
     ck_real_routed_parallel = (ck_routed_fn)dlsym(
         RTLD_NEXT, "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace");
+    ck_real_routed_auto = (ck_routed_fn)dlsym(
+        RTLD_NEXT, "moe_swiglu_expert_forward_q4k_q5k_auto_workspace");
     ck_real_routed_prepared = (ck_routed_fn)dlsym(
         RTLD_NEXT,
         "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace");
     ck_real_shared = (ck_shared_fn)dlsym(
         RTLD_NEXT, "moe_swiglu_shared_forward_q8_0_gated_workspace");
-    if ((!ck_real_routed_parallel && !ck_real_routed_prepared) ||
-        !ck_real_shared) {
+    ck_real_shared_parallel = (ck_shared_fn)dlsym(
+        RTLD_NEXT,
+        "moe_swiglu_shared_forward_q8_0_gated_parallel_workspace");
+    if ((!ck_real_routed_parallel && !ck_real_routed_auto &&
+         !ck_real_routed_prepared) ||
+        (!ck_real_shared && !ck_real_shared_parallel)) {
         fprintf(stderr, "ck_zip: failed to resolve production MoE providers: %s\n",
                 dlerror());
         return;
@@ -247,6 +258,11 @@ static void ck_zip_send_request(const float *hidden, const int *indices,
                                 int hidden_dim, int intermediate_dim,
                                 int n_experts, int top_k)
 {
+    if (ck_zip_state.request_pending) {
+        fprintf(stderr, "ck_zip: routed request overlaps an active layer\n");
+        fflush(stderr);
+        _exit(93);
+    }
     ck_zip_open_connection();
     const int remote_begin = ck_zip_local_rows(rows);
     const int remote_rows = rows - remote_begin;
@@ -305,8 +321,18 @@ static void ck_zip_receive_response(float *output, int rows, int hidden_dim)
         header.remote_rows != (uint32_t)remote_rows ||
         header.kind != CK_ZIP_RESPONSE ||
         header.output_bytes != (uint64_t)output_bytes) {
-        fprintf(stderr, "ck_zip: response contract mismatch at layer %u\n",
-                ck_zip_state.sequence);
+        fprintf(
+            stderr,
+            "ck_zip: response contract mismatch at layer %u: "
+            "got{magic=%08x version=%u sequence=%u rows=%u hidden=%u "
+            "remote_begin=%u remote_rows=%u kind=%u output_bytes=%llu} "
+            "expected{rows=%d hidden=%d remote_begin=%d remote_rows=%d "
+            "output_bytes=%zu}\n",
+            ck_zip_state.sequence, header.magic, header.version,
+            header.sequence, header.total_rows, header.hidden_dim,
+            header.remote_begin, header.remote_rows, header.kind,
+            (unsigned long long)header.output_bytes, rows, hidden_dim,
+            remote_begin, remote_rows, output_bytes);
         fflush(stderr);
         _exit(92);
     }
@@ -338,6 +364,12 @@ static int ck_zip_routed_workspace(
             expert_down, output, rows, hidden_dim, intermediate_dim, n_experts,
             top_k, workspace, workspace_bytes);
     }
+    if (atomic_load_explicit(&ck_zip_routed_nested, memory_order_relaxed) > 0) {
+        return (*real_routed)(
+            hidden, indices, routing_weights, expert_gate, expert_up,
+            expert_down, output, rows, hidden_dim, intermediate_dim, n_experts,
+            top_k, workspace, workspace_bytes);
+    }
 
     memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
     const uint64_t send_started = ck_zip_now_ns();
@@ -347,10 +379,14 @@ static int ck_zip_routed_workspace(
 
     const int local_rows = ck_zip_local_rows(rows);
     const uint64_t compute_started = ck_zip_now_ns();
+    atomic_fetch_add_explicit(
+        &ck_zip_routed_nested, 1, memory_order_relaxed);
     const int status = (*real_routed)(
         hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
         output, local_rows, hidden_dim, intermediate_dim, n_experts, top_k,
         workspace, workspace_bytes);
+    atomic_fetch_sub_explicit(
+        &ck_zip_routed_nested, 1, memory_order_relaxed);
     ck_zip_state.routed_ns += ck_zip_now_ns() - compute_started;
     ck_zip_state.routed_calls += 1;
     return status;
@@ -370,6 +406,20 @@ int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
         workspace_bytes);
 }
 
+int moe_swiglu_expert_forward_q4k_q5k_auto_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes)
+{
+    return ck_zip_routed_workspace(
+        &ck_real_routed_auto,
+        "moe_swiglu_expert_forward_q4k_q5k_auto_workspace", hidden,
+        indices, routing_weights, expert_gate, expert_up, expert_down, output,
+        rows, hidden_dim, intermediate_dim, n_experts, top_k, workspace,
+        workspace_bytes);
+}
+
 int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
     const float *hidden, const int *indices, const float *routing_weights,
     const void *expert_gate, const void *expert_up, const void *expert_down,
@@ -384,19 +434,25 @@ int moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace(
         workspace_bytes);
 }
 
-int moe_swiglu_shared_forward_q8_0_gated_workspace(
+static int ck_zip_shared_workspace(
+    ck_shared_fn *real_shared, const char *symbol,
     const float *hidden, const float *routed, const void *shared_gate,
     const void *shared_up, const void *shared_down,
     const float *shared_gate_input, float *output, int rows, int hidden_dim,
     int intermediate_dim, void *workspace, size_t workspace_bytes)
 {
     pthread_once(&ck_zip_once, ck_zip_initialize);
-    if (!ck_zip_state.enabled || rows <= 1) {
-        if (!ck_real_shared) {
-            ck_real_shared = (ck_shared_fn)dlsym(
-                RTLD_NEXT, "moe_swiglu_shared_forward_q8_0_gated_workspace");
-        }
-        return ck_real_shared(
+    if (!*real_shared) {
+        *real_shared = (ck_shared_fn)dlsym(RTLD_NEXT, symbol);
+    }
+    if (!*real_shared) {
+        fprintf(stderr, "ck_zip: failed to resolve shared provider %s: %s\n",
+                symbol, dlerror());
+        return -1;
+    }
+    if (!ck_zip_state.enabled || rows <= 1 ||
+        atomic_load_explicit(&ck_zip_shared_nested, memory_order_relaxed) > 0) {
+        return (*real_shared)(
             hidden, routed, shared_gate, shared_up, shared_down,
             shared_gate_input, output, rows, hidden_dim, intermediate_dim,
             workspace, workspace_bytes);
@@ -404,10 +460,14 @@ int moe_swiglu_shared_forward_q8_0_gated_workspace(
 
     const int local_rows = ck_zip_local_rows(rows);
     const uint64_t compute_started = ck_zip_now_ns();
-    const int status = ck_real_shared(
+    atomic_fetch_add_explicit(
+        &ck_zip_shared_nested, 1, memory_order_relaxed);
+    const int status = (*real_shared)(
         hidden, routed, shared_gate, shared_up, shared_down,
         shared_gate_input, output, local_rows, hidden_dim, intermediate_dim,
         workspace, workspace_bytes);
+    atomic_fetch_sub_explicit(
+        &ck_zip_shared_nested, 1, memory_order_relaxed);
     ck_zip_state.shared_ns += ck_zip_now_ns() - compute_started;
     ck_zip_state.shared_calls += 1;
     if (status != 0) return status;
@@ -416,6 +476,31 @@ int moe_swiglu_shared_forward_q8_0_gated_workspace(
     ck_zip_receive_response(output, rows, hidden_dim);
     ck_zip_state.response_wait_ns += ck_zip_now_ns() - wait_started;
     return 0;
+}
+
+int moe_swiglu_shared_forward_q8_0_gated_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes)
+{
+    return ck_zip_shared_workspace(
+        &ck_real_shared, "moe_swiglu_shared_forward_q8_0_gated_workspace",
+        hidden, routed, shared_gate, shared_up, shared_down, shared_gate_input,
+        output, rows, hidden_dim, intermediate_dim, workspace, workspace_bytes);
+}
+
+int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes)
+{
+    return ck_zip_shared_workspace(
+        &ck_real_shared_parallel,
+        "moe_swiglu_shared_forward_q8_0_gated_parallel_workspace", hidden,
+        routed, shared_gate, shared_up, shared_down, shared_gate_input, output,
+        rows, hidden_dim, intermediate_dim, workspace, workspace_bytes);
 }
 
 static void ck_zip_write_report(void) __attribute__((destructor));

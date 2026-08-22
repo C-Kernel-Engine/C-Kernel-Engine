@@ -96,9 +96,13 @@ def test_zip_preload_compiles_strictly(tmp_path: Path) -> None:
 def test_zip_transport_does_not_enter_numerical_kernel_sources() -> None:
     kernel_source = (ROOT / "src/kernels/axpy_kernels.c").read_text(encoding="utf-8")
     transport_source = PRELOAD_PATH.read_text(encoding="utf-8")
+    worker_source = WORKER_PATH.read_text(encoding="utf-8")
     assert "CK_ZIP_RESEARCH" not in kernel_source
     assert "socket(" not in kernel_source
     assert "CK_ZIP_RESEARCH_ROLE" in transport_source
     assert "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace" in transport_source
+    assert "moe_swiglu_expert_forward_q4k_q5k_auto_workspace" in transport_source
     assert "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace" in transport_source
     assert "moe_swiglu_shared_forward_q8_0_gated_workspace" in transport_source
+    assert "moe_swiglu_shared_forward_q8_0_gated_parallel_workspace" in transport_source
+    assert "library.moe_swiglu_expert_forward_q4k_q5k_auto_workspace(" in worker_source
