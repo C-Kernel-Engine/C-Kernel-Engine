@@ -20,6 +20,26 @@ SPEC.loader.exec_module(XRAY)
 
 
 class TextRecurrentXRayTests(unittest.TestCase):
+    def test_boundary_selection_follows_layer_kind(self) -> None:
+        config = {"layer_kinds": ["recurrent", "full_attention"]}
+        recurrent = XRAY.boundaries_for_layer(config, 0)
+        attention = XRAY.boundaries_for_layer(config, 1)
+
+        self.assertIn("new_state", recurrent)
+        self.assertNotIn("q_proj", recurrent)
+        self.assertIn("q_proj", attention)
+        self.assertNotIn("new_state", attention)
+        self.assertIn("layer_out", recurrent)
+        self.assertIn("layer_out", attention)
+
+    def test_boundary_selection_rejects_unknown_or_missing_layer_kind(self) -> None:
+        with self.assertRaisesRegex(ValueError, "layer_kinds"):
+            XRAY.boundaries_for_layer({}, 0)
+        with self.assertRaisesRegex(ValueError, "outside"):
+            XRAY.boundaries_for_layer({"layer_kinds": ["recurrent"]}, 1)
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            XRAY.boundaries_for_layer({"layer_kinds": ["mystery"]}, 0)
+
     def test_ck_capture_runs_in_short_lived_worker(self) -> None:
         process = mock.Mock()
         process.exitcode = 0
@@ -56,7 +76,8 @@ class TextRecurrentXRayTests(unittest.TestCase):
             model = root / "model"
             model.mkdir()
             (model / "config.json").write_text(
-                '{"ssm_state_size": 4, "num_heads": 2, "num_kv_heads": 1}'
+                '{"ssm_state_size": 4, "num_heads": 2, "num_kv_heads": 1, '
+                '"layer_kinds": ["recurrent"]}'
             )
             parity = root / "parity.json"
             parity.write_text('{"initial_tokens": [1], "final_prefix": [1]}')
@@ -79,6 +100,30 @@ class TextRecurrentXRayTests(unittest.TestCase):
         result = XRAY.compare_arrays("new_state", ck.reshape(-1), oracle.reshape(-1))
         self.assertEqual(result["status"], "exact")
         self.assertIn("head,value,key", result["axis_transform"])
+
+    def test_llama_physical_state_layout_is_compared_without_transpose(self) -> None:
+        values = np.arange(2 * 4 * 4, dtype=np.float32)
+        result = XRAY.compare_arrays(
+            "new_state",
+            values,
+            values.copy(),
+            state_size=4,
+            recurrent_state_physical_layout="head_value_key_contiguous",
+        )
+        self.assertEqual(result["status"], "exact")
+        self.assertEqual(result["axis_transform"], "identity:[head,value,key]")
+
+    def test_unknown_state_layout_fails_closed(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "unsupported recurrent_state_physical_layout"
+        ):
+            XRAY.compare_arrays(
+                "new_state",
+                np.zeros(16, dtype=np.float32),
+                np.zeros(16, dtype=np.float32),
+                state_size=4,
+                recurrent_state_physical_layout="ambiguous",
+            )
 
     def test_exact_input_then_projection_difference_is_provider_mismatch(self) -> None:
         schedules = {"ck": "sequential_decode", "oracle_prefix": "batched", "oracle_decode": "sequential"}

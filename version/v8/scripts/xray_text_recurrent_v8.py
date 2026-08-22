@@ -9,7 +9,7 @@ import multiprocessing
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 import numpy as np
 
@@ -32,6 +32,52 @@ BOUNDARIES = (
     "attn_output",
     "final_output",
     "linear_attn_out",
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "qk_norm_q",
+    "qk_norm_k",
+    "rope_q",
+    "rope_k",
+    "attn_gate",
+    "attn_pregate",
+    "attn_out",
+    "out_proj",
+    "after_attn",
+    "post_attn_norm",
+    "mlp_gate",
+    "mlp_up",
+    "mlp_swiglu",
+    "mlp_down",
+    "layer_out",
+)
+
+RECURRENT_BOUNDARIES = (
+    "attn_norm",
+    "linear_attn_qkv_mixed",
+    "z",
+    "conv_output_raw",
+    "conv_output_silu",
+    "q_conv_predelta",
+    "k_conv_predelta",
+    "alpha",
+    "gate",
+    "beta",
+    "new_state",
+    "attn_output",
+    "final_output",
+    "linear_attn_out",
+    "after_attn",
+    "post_attn_norm",
+    "mlp_gate",
+    "mlp_up",
+    "mlp_swiglu",
+    "mlp_down",
+    "layer_out",
+)
+
+FULL_ATTENTION_BOUNDARIES = (
+    "attn_norm",
     "q_proj",
     "k_proj",
     "v_proj",
@@ -82,6 +128,23 @@ ORACLE_BOUNDARY_OCCURRENCES = {
 }
 
 
+def boundaries_for_layer(config: dict[str, Any], layer: int) -> tuple[str, ...]:
+    layer_kinds = config.get("layer_kinds")
+    if not isinstance(layer_kinds, list) or not layer_kinds:
+        raise ValueError("model config must declare non-empty layer_kinds")
+    if layer < 0 or layer >= len(layer_kinds):
+        raise ValueError(
+            f"X-ray layer {layer} is outside configured layer_kinds extent "
+            f"{len(layer_kinds)}"
+        )
+    kind = str(layer_kinds[layer])
+    if kind == "recurrent":
+        return RECURRENT_BOUNDARIES
+    if kind == "full_attention":
+        return FULL_ATTENTION_BOUNDARIES
+    raise ValueError(f"unsupported X-ray layer kind at layer {layer}: {kind}")
+
+
 @contextmanager
 def _temporary_environment(values: dict[str, str]) -> Iterator[None]:
     previous = {name: os.environ.get(name) for name in values}
@@ -101,20 +164,35 @@ def canonicalize_named_axes(
     ck: np.ndarray,
     oracle: np.ndarray,
     state_size: int,
+    recurrent_state_physical_layout: str = "head_key_value_contiguous",
 ) -> tuple[np.ndarray, np.ndarray, str]:
     if name == "new_state":
         state_elements = state_size * state_size
         if state_size <= 0 or ck.size != oracle.size or ck.size % state_elements != 0:
             raise ValueError("new_state requires matching [head, key, value] extents")
+        if recurrent_state_physical_layout == "head_value_key_contiguous":
+            return ck.reshape(-1), oracle.reshape(-1), "identity:[head,value,key]"
+        if recurrent_state_physical_layout != "head_key_value_contiguous":
+            raise ValueError(
+                "unsupported recurrent_state_physical_layout: "
+                f"{recurrent_state_physical_layout!r}"
+            )
         heads = ck.size // state_elements
-        # CKE stores [head, key, value]; llama.cpp stores [head, value, key].
-        oracle = oracle.reshape(heads, state_size, state_size).transpose(0, 2, 1).reshape(-1)
-        return ck, oracle, "oracle:[head,value,key]->[head,key,value]"
+        ck = ck.reshape(heads, state_size, state_size).transpose(0, 2, 1).reshape(-1)
+        return ck, oracle.reshape(-1), "ck:[head,key,value]->[head,value,key]"
     return ck.reshape(-1), oracle.reshape(-1), "identity"
 
 
-def compare_arrays(name: str, ck: np.ndarray, oracle: np.ndarray, state_size: int = 128) -> dict[str, Any]:
-    ck, oracle, transform = canonicalize_named_axes(name, ck, oracle, state_size)
+def compare_arrays(
+    name: str,
+    ck: np.ndarray,
+    oracle: np.ndarray,
+    state_size: int = 128,
+    recurrent_state_physical_layout: str = "head_key_value_contiguous",
+) -> dict[str, Any]:
+    ck, oracle, transform = canonicalize_named_axes(
+        name, ck, oracle, state_size, recurrent_state_physical_layout
+    )
     if ck.shape != oracle.shape:
         return {
             "status": "shape_mismatch",
@@ -284,10 +362,12 @@ def analyze_capture(
     ck_prefill_mode: str = "sequential",
     attention_heads: int = 0,
     attention_kv_heads: int = 0,
+    boundaries: Sequence[str] = BOUNDARIES,
+    recurrent_state_physical_layout: str = "head_key_value_contiguous",
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for logical_token in range(total_tokens):
-        for boundary in BOUNDARIES:
+        for boundary in boundaries:
             if boundary == "new_state" and logical_token < prompt_tokens - 1:
                 continue
             try:
@@ -318,7 +398,15 @@ def analyze_capture(
                 })
                 continue
             row = {"logical_token": logical_token, "layer": layer, "boundary": boundary}
-            row.update(compare_arrays(boundary, ck, oracle, state_size))
+            row.update(
+                compare_arrays(
+                    boundary,
+                    ck,
+                    oracle,
+                    state_size,
+                    recurrent_state_physical_layout,
+                )
+            )
             rows.append(row)
     schedules = {
         "ck": "batched_then_sequential" if ck_prefill_mode == "hybrid" else "sequential_decode",
@@ -409,6 +497,20 @@ def capture_and_analyze(
     attention_kv_heads = int(config.get("num_key_value_heads", config.get("num_kv_heads", 0)))
     if attention_kv_heads <= 0:
         raise ValueError("model config must declare a positive key/value head count")
+    boundaries = boundaries_for_layer(config, layer)
+    recurrent_state_physical_layout = str(
+        config.get(
+            "recurrent_state_physical_layout", "head_key_value_contiguous"
+        )
+    )
+    if recurrent_state_physical_layout not in {
+        "head_key_value_contiguous",
+        "head_value_key_contiguous",
+    }:
+        raise ValueError(
+            "unsupported recurrent_state_physical_layout: "
+            f"{recurrent_state_physical_layout!r}"
+        )
     prompt = [int(token) for token in source["initial_tokens"]]
     full_prefix = [int(token) for token in source["final_prefix"]]
     if full_prefix[: len(prompt)] != prompt:
@@ -418,7 +520,7 @@ def capture_and_analyze(
     oracle_root = capture_root / "llama"
     ck_root.mkdir(parents=True, exist_ok=True)
     oracle_names = ",".join(
-        f"{ORACLE_BOUNDARY_NAMES.get(name, name)}-{layer}" for name in BOUNDARIES
+        f"{ORACLE_BOUNDARY_NAMES.get(name, name)}-{layer}" for name in boundaries
     )
 
     if reuse_ck_capture:
@@ -436,7 +538,7 @@ def capture_and_analyze(
             {
                 "CK_DEBUG_EXPORT_HIDDEN": str(ck_root),
                 "CK_DEBUG_EXPORT_HIDDEN_LAYER": str(layer),
-                "CK_DEBUG_EXPORT_HIDDEN_NAMES": ",".join(BOUNDARIES),
+                "CK_DEBUG_EXPORT_HIDDEN_NAMES": ",".join(boundaries),
             },
         )
 
@@ -457,7 +559,12 @@ def capture_and_analyze(
         ck_prefill_mode=ck_prefill_mode,
         attention_heads=attention_heads,
         attention_kv_heads=attention_kv_heads,
+        boundaries=boundaries,
+        recurrent_state_physical_layout=recurrent_state_physical_layout,
     )
+    report["layer_kind"] = str(config["layer_kinds"][layer])
+    report["requested_boundaries"] = list(boundaries)
+    report["recurrent_state_physical_layout"] = recurrent_state_physical_layout
     report["source_parity_report"] = str(parity_report)
     report["capture_root"] = str(capture_root)
     report["llama_capture"] = {
