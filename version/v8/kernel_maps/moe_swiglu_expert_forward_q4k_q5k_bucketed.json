@@ -49,8 +49,8 @@
     "isa": ["avx512f", "avx512bw", "avx512_vnni", "fma"],
     "alignment": {"H": 256, "I": 256},
     "shape_classes": {"R": {"min": 1}},
-    "runtime_selection": {"bucketed_min_rows": 512, "fallback": "moe_swiglu_expert_forward_q4k_q5k"},
-    "notes": "Rows at or above 512 are grouped by expert independently for each selected slot. Prepared AVX-VNNI x8 gate/up weights process four gathered rows per worker; unavailable or over-budget preparation falls back to compact rows4. A pool barrier between slots preserves selected-slot accumulation order exactly. Shorter prefill and decode retain the row-parallel provider because measured dispatch and bucketing costs outweigh reuse."
+    "runtime_selection": {"bucketed_min_rows": 512, "single_row": "parallel selected expert routes when worker_count >= top_k", "fallback": "moe_swiglu_expert_forward_q4k_q5k"},
+    "notes": "Rows at or above 512 are grouped by expert independently for each selected slot. Prepared AVX-VNNI x8 gate/up weights process four gathered rows per worker; unavailable or over-budget preparation falls back to compact rows4. A pool barrier between slots preserves selected-slot accumulation order exactly. Single-row decode uses the compact provider's selected-route parallel path; other shorter calls use row parallelism."
   },
   "impl": {
     "function": "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace",

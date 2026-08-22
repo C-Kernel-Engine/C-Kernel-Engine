@@ -251,6 +251,35 @@ class CompactRoutedSwiGLUTests(unittest.TestCase):
         self.assertEqual(parallel_status, 0)
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
 
+    def test_single_row_route_parallel_matches_serial_slot_order(self) -> None:
+        hidden = np.ascontiguousarray(self.x[:1])
+        indices = np.ascontiguousarray(self.indices[:1])
+        routing = np.ascontiguousarray(self.routing[:1])
+        expected = np.empty((1, self.hidden), dtype=np.float32)
+        actual = np.empty_like(expected)
+        row_workspace_bytes = LIB.moe_swiglu_expert_q4k_q5k_workspace_bytes(
+            self.hidden, self.intermediate
+        )
+        serial_workspace = ctypes.create_string_buffer(row_workspace_bytes)
+        parallel_workspace = ctypes.create_string_buffer(
+            row_workspace_bytes * 64
+        )
+        serial_status = LIB.moe_swiglu_expert_forward_q4k_q5k_workspace(
+            _fptr(hidden), _iptr(indices), _fptr(routing),
+            self.gate, self.up, self.down, _fptr(expected),
+            1, self.hidden, self.intermediate, self.experts, self.top_k,
+            serial_workspace, row_workspace_bytes,
+        )
+        parallel_status = LIB.moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
+            _fptr(hidden), _iptr(indices), _fptr(routing),
+            self.gate, self.up, self.down, _fptr(actual),
+            1, self.hidden, self.intermediate, self.experts, self.top_k,
+            parallel_workspace, len(parallel_workspace),
+        )
+        self.assertEqual(serial_status, 0)
+        self.assertEqual(parallel_status, 0)
+        np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
     def test_bucketed_experts_match_serial_provider_bit_exact(self) -> None:
         expected = np.empty((self.rows, self.hidden), dtype=np.float32)
         actual = np.empty_like(expected)

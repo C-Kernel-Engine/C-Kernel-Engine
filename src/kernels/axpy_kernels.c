@@ -686,6 +686,132 @@ static void ck_moe_q4k_q5k_parallel_work(int ith, int nth, void *opaque)
         args->workspace_stride);
 }
 
+typedef struct {
+    const int *indices;
+    const void *expert_gate;
+    const void *expert_up;
+    const void *expert_down;
+    const void *hidden_q8;
+    uint8_t *workspace;
+    size_t workspace_stride;
+    size_t hidden_q8_bytes;
+    int hidden_dim;
+    int intermediate_dim;
+    int n_experts;
+    int top_k;
+    float *expert_output[CK_THREADPOOL_MAX_THREADS];
+    int status[CK_THREADPOOL_MAX_THREADS];
+} ck_moe_q4k_q5k_route_args_t;
+
+static void ck_moe_q4k_q5k_route_work(int ith, int nth, void *opaque)
+{
+    ck_moe_q4k_q5k_route_args_t *args =
+        (ck_moe_q4k_q5k_route_args_t *)opaque;
+    if (ith >= nth || ith >= args->top_k) return;
+
+    const int expert = args->indices[ith];
+    if (expert < 0 || expert >= args->n_experts) {
+        args->status[ith] = -2;
+        return;
+    }
+
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)args->intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)args->intermediate_dim));
+    uint8_t *cursor = args->workspace + (size_t)ith * args->workspace_stride;
+    cursor += args->hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *expert_output = (float *)cursor;
+    args->expert_output[ith] = expert_output;
+
+    const size_t q4_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)args->hidden_dim);
+    const size_t q5_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q5_K, (size_t)args->intermediate_dim);
+    const size_t q4_expert_offset =
+        (size_t)expert * (size_t)args->intermediate_dim * q4_row_bytes;
+    const size_t q5_expert_offset =
+        (size_t)expert * (size_t)args->hidden_dim * q5_row_bytes;
+
+    gemv_q4_k_q8_k(
+        gate_up,
+        (const uint8_t *)args->expert_gate + q4_expert_offset,
+        args->hidden_q8, args->intermediate_dim, args->hidden_dim);
+    gemv_q4_k_q8_k(
+        gate_up + args->intermediate_dim,
+        (const uint8_t *)args->expert_up + q4_expert_offset,
+        args->hidden_q8, args->intermediate_dim, args->hidden_dim);
+    swiglu_forward_ggml(gate_up, gate_up, 1, args->intermediate_dim);
+    quantize_row_q8_k(gate_up, act_q8, args->intermediate_dim);
+    gemv_q5_k_q8_k(
+        expert_output,
+        (const uint8_t *)args->expert_down + q5_expert_offset,
+        act_q8, args->hidden_dim, args->intermediate_dim);
+    args->status[ith] = 0;
+}
+
+static int ck_moe_q4k_q5k_route_parallel(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes,
+    size_t workspace_stride,
+    ck_threadpool_t *pool)
+{
+    if (!pool || top_k <= 1 || top_k > CK_THREADPOOL_MAX_THREADS ||
+        ck_threadpool_n_threads(pool) < top_k ||
+        workspace_bytes < workspace_stride * (size_t)top_k) {
+        return 1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    void *hidden_q8 = workspace;
+    quantize_row_q8_k(hidden, hidden_q8, hidden_dim);
+
+    ck_moe_q4k_q5k_route_args_t args = {
+        .indices = indices,
+        .expert_gate = expert_gate,
+        .expert_up = expert_up,
+        .expert_down = expert_down,
+        .hidden_q8 = hidden_q8,
+        .workspace = (uint8_t *)workspace,
+        .workspace_stride = workspace_stride,
+        .hidden_q8_bytes = hidden_q8_bytes,
+        .hidden_dim = hidden_dim,
+        .intermediate_dim = intermediate_dim,
+        .n_experts = n_experts,
+        .top_k = top_k,
+        .expert_output = {0},
+        .status = {0},
+    };
+    ck_threadpool_dispatch_n(
+        pool, top_k, ck_moe_q4k_q5k_route_work, &args);
+
+    memset(output, 0, (size_t)hidden_dim * sizeof(float));
+    for (int slot = 0; slot < top_k; ++slot) {
+        if (args.status[slot] != 0 || !args.expert_output[slot]) {
+            return args.status[slot] != 0 ? args.status[slot] : -1;
+        }
+        axpy_f32(
+            output, args.expert_output[slot], routing_weights[slot], hidden_dim);
+    }
+    return 0;
+}
+
 int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
     const float *hidden,
     const int *indices,
@@ -711,6 +837,15 @@ int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
     }
 
     ck_threadpool_t *pool = ck_threadpool_global();
+    if (rows == 1) {
+        const int route_status = ck_moe_q4k_q5k_route_parallel(
+            hidden, indices, routing_weights,
+            expert_gate, expert_up, expert_down, output,
+            hidden_dim, intermediate_dim, n_experts, top_k,
+            workspace, workspace_bytes, stride, pool);
+        if (route_status <= 0) return route_status;
+    }
+
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > rows) active = rows;
     if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;

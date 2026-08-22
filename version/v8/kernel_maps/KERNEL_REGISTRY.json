@@ -27653,7 +27653,12 @@
           "H": 256,
           "I": 256
         },
-        "notes": "H and I must be multiples of the QK_K=256 super-block width. Token rows are statically partitioned across the persistent thread pool; every worker owns a disjoint workspace slice."
+        "runtime_selection": {
+          "single_row": "selected expert routes when worker_count >= top_k",
+          "multiple_rows": "independent token rows",
+          "fallback": "serial selected-slot execution"
+        },
+        "notes": "H and I must be multiples of the QK_K=256 super-block width. Single-row decode assigns one selected expert route to each persistent worker and merges route outputs in original slot order. Multi-row calls partition independent token rows. Every worker owns a disjoint planner-provided workspace slice."
       },
       "impl": {
         "function": "moe_swiglu_expert_forward_q4k_q5k_parallel_workspace",
@@ -27670,12 +27675,16 @@
         "threading": {
           "runtime": "ck_threadpool",
           "work_partition": [
-            "independent_rows"
+            "independent_rows",
+            "independent_experts"
           ],
           "dispatch": [
             "ck_threadpool_dispatch_n"
           ],
-          "reduction_order_effect": "none"
+          "barriers": [
+            "selected_expert_routes_complete"
+          ],
+          "reduction_order_effect": "contract_defined"
         }
       },
       "call_abi": {
@@ -27784,12 +27793,13 @@
             "threading": {
               "runtime": "ck_threadpool",
               "work_partition": [
-                "independent_rows"
+                "independent_rows",
+                "independent_experts"
               ],
               "dispatch": [
                 "ck_threadpool_dispatch_n"
               ],
-              "reduction_order_effect": "none"
+              "reduction_order_effect": "contract_defined"
             }
           },
           "arithmetic": {
@@ -27801,7 +27811,7 @@
           }
         }
       ],
-      "notes": "Compact routed SwiGLU candidate for expert-major Q4_K gate/up and Q5_K down weights. It quantizes each hidden row once, never expands all experts, and statically partitions independent rows across planner-owned per-worker workspaces.",
+      "notes": "Compact routed SwiGLU candidate for expert-major Q4_K gate/up and Q5_K down weights. It quantizes each hidden row once and never expands all experts. Single-row decode parallelizes independent selected routes and retains exact selected-slot accumulation order; larger calls partition independent rows across planner-owned per-worker workspaces.",
       "name": "moe_swiglu_expert_forward_q4k_q5k",
       "_source_file": "moe_swiglu_expert_forward_q4k_q5k.json"
     },
@@ -27970,9 +27980,10 @@
         },
         "runtime_selection": {
           "bucketed_min_rows": 512,
+          "single_row": "parallel selected expert routes when worker_count >= top_k",
           "fallback": "moe_swiglu_expert_forward_q4k_q5k"
         },
-        "notes": "Rows at or above 512 are grouped by expert independently for each selected slot. Prepared AVX-VNNI x8 gate/up weights process four gathered rows per worker; unavailable or over-budget preparation falls back to compact rows4. A pool barrier between slots preserves selected-slot accumulation order exactly. Shorter prefill and decode retain the row-parallel provider because measured dispatch and bucketing costs outweigh reuse."
+        "notes": "Rows at or above 512 are grouped by expert independently for each selected slot. Prepared AVX-VNNI x8 gate/up weights process four gathered rows per worker; unavailable or over-budget preparation falls back to compact rows4. A pool barrier between slots preserves selected-slot accumulation order exactly. Single-row decode uses the compact provider's selected-route parallel path; other shorter calls use row parallelism."
       },
       "impl": {
         "function": "moe_swiglu_expert_forward_q4k_q5k_auto_prepared_workspace",
