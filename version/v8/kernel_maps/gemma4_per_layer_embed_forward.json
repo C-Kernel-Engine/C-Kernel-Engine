@@ -1,6 +1,13 @@
 {
   "id": "gemma4_per_layer_embed_forward",
   "op": "gemma4_per_layer_embed",
+  "operation_interface": "per_layer_input.apply.fp32.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "per_layer_input.apply.fp32.v1",
+    "phases": ["prefill", "decode"]
+  },
   "variant": "gemma4_scalar_correctness",
   "modes": {
     "inference": true,
@@ -20,6 +27,10 @@
         "T",
         "E"
       ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
       "desc": "Main hidden stream, updated in-place"
     },
     {
@@ -30,6 +41,10 @@
         "L",
         "P"
       ],
+      "layout": "token_layer_feature_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
       "desc": "Prepared Gemma4 per-layer input stream"
     }
   ],
@@ -41,6 +56,10 @@
         "P",
         "E"
       ],
+      "layout": "row_major",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
       "desc": "Layer input gate projection"
     },
     {
@@ -50,6 +69,10 @@
         "E",
         "P"
       ],
+      "layout": "row_major",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
       "desc": "Layer projection back to model stream"
     },
     {
@@ -58,6 +81,10 @@
       "shape": [
         "E"
       ],
+      "layout": "feature_contiguous",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
       "desc": "Layer post projection RMSNorm scale"
     },
     {
@@ -66,6 +93,10 @@
       "shape": [
         1
       ],
+      "layout": "scalar",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "optional",
       "desc": "Optional Gemma4 layer output scale"
     }
   ],
@@ -77,6 +108,11 @@
         "T",
         "E"
       ],
+      "layout": "token_major_contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alias_of": "input:hidden",
       "desc": "Updated hidden stream"
     }
   ],
@@ -99,6 +135,23 @@
     "c_declaration": "void gemma4_per_layer_embed_forward(float *hidden, const float *per_layer_input, const float *inp_gate, const float *proj, const float *post_norm, const float *out_scale, int tokens, int layer, int num_layers, int embed_dim, int per_layer_dim, float eps);",
     "sources": [
       "src/kernels/gemma4_per_layer_embed.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "hidden", "source": "activation:hidden", "cast": "float*", "ports": ["input:hidden", "output:hidden"]},
+      {"name": "per_layer_input", "source": "activation:per_layer_input", "cast": "const float*", "ports": ["input:per_layer_input"]},
+      {"name": "inp_gate", "source": "weight_f:per_layer_inp_gate", "ports": ["weight:inp_gate"]},
+      {"name": "proj", "source": "weight_f:per_layer_proj", "ports": ["weight:proj"]},
+      {"name": "post_norm", "source": "weight_f:per_layer_post_norm", "ports": ["weight:post_norm"]},
+      {"name": "out_scale", "source": "weight_f:layer_output_scale", "ports": ["weight:out_scale"]},
+      {"name": "tokens", "source": "dim:seq_len"},
+      {"name": "layer", "source": "runtime:layer"},
+      {"name": "num_layers", "source": "dim:num_layers"},
+      {"name": "embed_dim", "source": "dim:embed_dim"},
+      {"name": "per_layer_dim", "source": "dim:per_layer_dim"},
+      {"name": "eps", "source": "dim:rms_eps"}
     ]
   },
   "notes": "First-pass correctness implementation of llama.cpp Gemma4 per-layer embedding branch."

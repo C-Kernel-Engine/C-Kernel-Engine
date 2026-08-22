@@ -973,17 +973,10 @@ def emit_prefill_op(
         lines.append("    }")
     elif (
         op_type in {"attn", "attn_sliding"}
-        and func in {
-            "attention_forward_causal_head_major_gqa_flash_strided",
-            "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
-            "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
-        }
+        and isinstance(physical_execution, dict)
+        and str(physical_execution.get("mixed_visual_chunk_function", "") or "").strip()
     ):
-        mixed_func = (
-            str(physical_execution.get("mixed_visual_chunk_function", "") or "")
-            if isinstance(physical_execution, dict)
-            else ""
-        ) or "attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4"
+        mixed_func = str(physical_execution["mixed_visual_chunk_function"]).strip()
         mixed_args = args[:10]
         lines.append("    if (bridge_noncausal_visual_chunk && bridge_visual_start >= 0 && bridge_visual_tokens > 0) {")
         lines.append(f"        {mixed_func}(")

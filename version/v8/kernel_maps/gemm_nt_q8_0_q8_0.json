@@ -1,6 +1,7 @@
 {
   "id": "gemm_nt_q8_0_q8_0",
   "op": "gemm",
+  "operation_interface": "linear.q8_0_activation.q8_0_weight.fp32_output.v1",
   "selection": {
     "status": "production",
     "priority": 200,
@@ -59,12 +60,14 @@
     "output": "fp32"
   },
   "inputs": [
-    {"name": "A", "dtype": "q8_0", "shape": ["M", "K"], "layout": "token_major_contiguous", "placement": "local", "desc": "Activation matrix [rows, cols] (Q8_0 quantized)"},
-    {"name": "B", "dtype": "q8_0", "shape": ["N", "K"], "layout": "opaque_packed", "placement": "local", "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"},
-    {"name": "bias", "dtype": "fp32", "shape": ["N"], "layout": "token_major_contiguous", "placement": "local", "optional": true, "desc": "Bias [N] (optional)"}
+    {"name": "A", "dtype": "q8_0", "shape": ["M", "K"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Activation matrix [rows, cols] (Q8_0 quantized)"}
+  ],
+  "weights": [
+    {"name": "B", "dtype": "q8_0", "shape": ["N", "K"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required", "desc": "Weight matrix [cols, cols] (Q8_0 quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "optional", "desc": "Bias [N] (optional)"}
   ],
   "outputs": [
-    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "layout": "token_major_contiguous", "placement": "local", "desc": "Result [M, N]"}
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Result [M, N]"}
   ],
   "scratch": [],
   "dims": ["M", "N", "K"],
@@ -116,6 +119,15 @@
     ],
     "variants": [
       {
+        "name": "avx512_vnni_llama_reduction",
+        "function": "gemm_nt_q8_0_q8_0",
+        "priority": 260,
+        "requires": ["avx512f", "avx512_vnni", "avx512vl", "avx2", "fma"],
+        "compile_flags": ["-mavx512f", "-mavx512vnni", "-mavx512vl", "-mavx2", "-mfma"],
+        "numerical_contract": "q8_0_weight_q8_0_input_llama_fp32_output",
+        "notes": "Uses AVX-512/VNNI integer dots while preserving the certified eight-lane FP32 reduction tree."
+      },
+      {
         "name": "avx2_m2n4",
         "function": "gemm_nt_q8_0_q8_0_m2n4",
         "priority": 240,
@@ -124,9 +136,34 @@
         "numerical_contract": "q8_0_weight_q8_0_input_llama_fp32_output"
       },
       {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
-      {"name": "avx_vnni", "requires": ["avx2", "avx_vnni", "fma"], "compile_flags": ["-mavx2", "-mavxvnni", "-mfma"]}
+      {"name": "avx_vnni", "requires": ["avx2", "avx_vnni", "fma"], "compile_flags": ["-mavx2", "-mavxvnni", "-mfma"], "numerical_contract": "q8_0_weight_q8_0_input_llama_fp32_output", "notes": "VNNI changes integer-dot execution only; FP32 reduction remains contract-identical."}
     ]
   },
+  "numerical_capabilities": [
+    {
+      "contract_id": "q8_0_weight_q8_0_input_llama_fp32_output",
+      "status": "validated",
+      "phases": ["prefill"],
+      "function": "gemm_nt_q8_0_q8_0",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows", "output_tiles"],
+          "dispatch": ["inline", "ck_threadpool_dispatch_n", "ck_threadpool_parallel_for_n"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
   "tests": {
     "unit": ["unittest/test_gemm_batch_int8.py", "unittest/test_q8_0_q8_0_x4.py"],
     "bench": ["tests/test_gemm_avx_bench.c", "tests/test_threadpool_parity.c"],
@@ -149,10 +186,10 @@
   "call_abi": {
     "version": 1,
     "params": [
-      {"name": "A", "source": "activation:a", "cast": "const void*"},
-      {"name": "B", "source": "weight:_first_weight"},
-      {"name": "bias", "source": "weight_f:_bias"},
-      {"name": "C", "source": "output:c", "cast": "float*"},
+      {"name": "A", "source": "activation:a", "cast": "const void*", "ports": ["input:A"]},
+      {"name": "B", "source": "weight:_first_weight", "ports": ["weight:B"]},
+      {"name": "bias", "source": "weight_f:_bias", "ports": ["weight:bias"]},
+      {"name": "C", "source": "output:c", "cast": "float*", "ports": ["output:C"]},
       {"name": "M", "source": "dim:_m"},
       {"name": "N", "source": "dim:_output_dim"},
       {"name": "K", "source": "dim:_input_dim"}

@@ -557,11 +557,15 @@ void gemm_nt_q8_0_q8_0(
     int M, int N, int K)
 {
     /* First compute GEMM */
-#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
-    gemm_nt_q8_0_q8_0_vnni(A, B, C, M, N, K);
-#elif defined(__AVX512F__)
-    gemm_nt_q8_0_q8_0_avx512(A, B, C, M, N, K);
-#elif defined(__AVX2__)
+#if defined(__AVX2__)
+    /*
+     * The production contract is bit-exact with llama.cpp's eight-lane
+     * FP32 accumulation tree.  AVX-512/VNNI changes the integer dot, but it
+     * must not silently replace that FP32 reduction with the scalar-per-block
+     * candidate above.  The AVX2-named entry point delegates each activation
+     * row to the certified x4 provider, which also uses VNNI instructions when
+     * they are available while preserving the declared reduction order.
+     */
     gemm_nt_q8_0_q8_0_avx2(A, B, C, M, N, K);
 #elif defined(__AVX__)
     gemm_nt_q8_0_q8_0_avx(A, B, C, M, N, K);

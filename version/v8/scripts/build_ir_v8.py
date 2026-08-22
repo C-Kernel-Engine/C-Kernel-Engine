@@ -4135,7 +4135,7 @@ def _materialize_template_config_params(
             continue
         target_key = str(source_key)[:-len("_from_config")]
         config_key = str(config_key_raw or "").strip()
-        if not target_key or not config_key or target_key in resolved:
+        if not target_key or not config_key:
             continue
         if config_key in config:
             resolved[target_key] = copy.deepcopy(config[config_key])
@@ -7473,9 +7473,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             # was from ckernel_orchestration.c which is not used in v7.
             # Fall through to standard matmul handling below.
 
-            # Gemma4 per-layer prepare is a structured header op, not a
-            # dense projection. It owns BF16/quantized weights internally and
-            # must stay on its dedicated kernel regardless of source dtype.
             if op == "kv_a_layernorm":
                 return ["rmsnorm_forward_kv_lora"]
             if op == "kv_lora_decompress":
@@ -7509,12 +7506,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     "FarSkip reference provider currently requires BF16 shared-expert weights; "
                     f"got gate={gate_dtype}, up={up_dtype}, down={down_dtype}"
                 )
-
-            if op == "gemma4_per_layer_prepare":
-                token_dtype = layer_quant.get("per_layer_token_emb", header_quant.get("per_layer_token_emb", ""))
-                if token_dtype == "bf16":
-                    return ["gemma4_per_layer_prepare_bf16_forward"]
-                return ["gemma4_per_layer_prepare_forward"]
 
             if op == "moe_relu2_expert_mlp":
                 up_dtype = str(layer_quant.get("moe_expert_up", "")).lower()
@@ -12149,17 +12140,6 @@ def generate_ir_lower_2(
                             }
                             continue
 
-                if ir_op.get("op") == "gemma4_per_layer_prepare" and input_name in ("tokens", "token_ids"):
-                    buf = activation_buffers.get("token_ids")
-                    if buf:
-                        lowered_op["activations"][input_name] = {
-                            "buffer": "token_ids",
-                            "activation_offset": buf["offset"],
-                            "dtype": "i32",
-                            "ptr_expr": f"activations + {buf['offset']}",
-                        }
-                        continue
-
                 declared_slot = input_info.get("slot")
                 declared_from = input_info.get("from")
                 if declared_slot == "external:token_ids" or declared_from == "external:token_ids":
@@ -12683,14 +12663,6 @@ def generate_ir_lower_2(
                 "num_branch_slices",
                 _template_int_param(params, "num_branch_slices", config, int(params.get("num_deepstack_layers", 0) or 0)),
             )
-        if op_type == "rope_qk" and ir_op.get("kernel", "") == "rope_forward_qk_gemma4v_vision_xy":
-            params.setdefault("vision_grid_w", int(config.get("vision_grid_w", 0) or config.get("image_grid_w", 0) or 0))
-            if int(params.get("vision_grid_w", 0) or 0) <= 0:
-                params["vision_grid_w"] = int(max(1, round(float(config.get("vision_num_patches", 1) or 1) ** 0.5)))
-            params.setdefault("rotary_dim", int(config.get("rotary_dim", params.get("head_dim", 0)) or params.get("head_dim", 0) or 0))
-            gemma4v_freq_base = float(config.get("vision_rope_theta", 100.0) or 100.0)
-            params["freq_base"] = gemma4v_freq_base
-            params["rope_freq_base"] = gemma4v_freq_base
         if _is_vision_mrope_operation(ir_op):
             sections = config.get("vision_mrope_sections")
             if not isinstance(sections, list) or len(sections) != 4:

@@ -23,6 +23,8 @@ from build_ir_v8 import (  # type: ignore
     apply_layer_attention_dims,
     _validate_lowered_activation_memory,
     build_activation_specs,
+    find_kernel,
+    load_kernel_registry,
 )
 
 
@@ -623,6 +625,32 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             (REPO_ROOT / "version" / "v8" / "kernel_maps" / "gemma4_per_layer_prepare_forward.json").read_text(encoding="utf-8")
         )
         self.assertEqual(prepare_map["op"], "gemma4_per_layer_prepare")
+
+    def test_gemma4_prepare_provider_is_selected_generically_by_storage_dtype(self) -> None:
+        registry = load_kernel_registry()
+        self.assertEqual(
+            find_kernel(
+                registry,
+                op="gemma4_per_layer_prepare",
+                quant={"weight": "q5_k"},
+                mode="prefill",
+            ),
+            "gemma4_per_layer_prepare_forward",
+        )
+        self.assertEqual(
+            find_kernel(
+                registry,
+                op="gemma4_per_layer_prepare",
+                quant={"weight": "bf16"},
+                mode="prefill",
+            ),
+            "gemma4_per_layer_prepare_bf16_forward",
+        )
+
+        source = (
+            REPO_ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn('if op == "gemma4_per_layer_prepare"', source)
 
 
 if __name__ == "__main__":

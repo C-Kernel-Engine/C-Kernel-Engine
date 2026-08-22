@@ -1744,13 +1744,13 @@
     "q8_0_weight_q8_0_input_llama_fp32_output": {
       "operator_family": "gemm",
       "status": "validated",
-      "storage": {"input": "fp32", "weight": "q8_0", "output": "fp32"},
+      "storage": {"input": "q8_0", "weight": "q8_0", "output": "fp32"},
       "compute": {
         "input": "int8",
         "weight": "int8",
         "accumulator": "fp32",
         "contraction": "enabled",
-        "evaluation_order": "q8_0_quantize_then_int32_block_dot_then_fp32_scaled_block_accumulation"
+        "evaluation_order": "prequantized_q8_0_int32_block_dot_then_fp32_scaled_block_accumulation"
       },
       "rounding": {
         "mode": "rne",
@@ -1769,7 +1769,37 @@
         "thread_count_changes_arithmetic_order": false
       },
       "position_transform": null,
-      "description": "llama.cpp-compatible Q8_0 projection with canonical per-block Q8_0 activation quantization and FP32 scaled block accumulation."
+      "description": "llama.cpp-compatible projection from pre-quantized Q8_0 activations with FP32 scaled block accumulation."
+    },
+    "q8_0_weight_fp32_input_internal_q8_0_llama_fp32_output": {
+      "operator_family": "gemm",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "q8_0", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int8",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "fp32_input_quantize_q8_0_then_int32_block_dot_then_fp32_scaled_block_accumulation"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "weighted_product", "reduction_update", "output_store"]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "ascending_k",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "FP32-input wrapper that performs canonical per-block Q8_0 activation quantization before the llama.cpp-compatible Q8_0 projection."
     },
     "bf16_weight_bf16_input_native_pair_dot_bf16_output": {
       "status": "validated",

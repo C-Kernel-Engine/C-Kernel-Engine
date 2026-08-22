@@ -590,14 +590,43 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(gemma["kernels"]["patch_proj"], "gemm_nt_f16")
 
     def test_gemma4_vision_rope_theta_overrides_common_rope_default(self) -> None:
+        circuit = build_ir_v8._load_builtin_template_doc("gemma4_vision")
+        self.assertIsNotNone(circuit)
+        rope_op = next(
+            op for op in circuit["block_types"]["vision_encoder"]["body"]["ops"]
+            if op.get("id") == "rope_qk"
+        )
+        params = build_ir_v8._materialize_template_config_params(
+            rope_op.get("params"),
+            {
+                "vision_grid_w": 21,
+                "rotary_dim": 72,
+                "vision_rope_theta": 100.0,
+            },
+        )
+        self.assertEqual(params["vision_grid_w"], 21)
+        self.assertEqual(params["rotary_dim"], 72)
+        self.assertEqual(params["freq_base"], 100.0)
+
+        configured = build_ir_v8._materialize_template_config_params(
+            rope_op.get("params"),
+            {
+                "vision_grid_w": 21,
+                "rotary_dim": 72,
+                "vision_rope_theta": 1234.0,
+            },
+        )
+        self.assertEqual(configured["freq_base"], 1234.0)
+
+        defaulted = build_ir_v8._materialize_template_config_params(
+            rope_op.get("params"),
+            {"vision_grid_w": 21, "rotary_dim": 72},
+        )
+        self.assertEqual(defaulted["freq_base"], 100.0)
+
         source = V8_BUILD_PATH.read_text(encoding="utf-8")
         marker = 'ir_op.get("kernel", "") == "rope_forward_qk_gemma4v_vision_xy"'
-        self.assertIn(marker, source)
-        block = source[source.index(marker):source.index(marker) + 700]
-        self.assertIn('config.get("vision_rope_theta", 100.0)', block)
-        self.assertIn('params["freq_base"] = gemma4v_freq_base', block)
-        self.assertIn('params["rope_freq_base"] = gemma4v_freq_base', block)
-        self.assertNotIn('params.setdefault("freq_base"', block)
+        self.assertNotIn(marker, source)
 
     def test_gemma4_geometry_override_uses_pooled_projector_tokens(self) -> None:
         with mock.patch.object(bridge_runner_v8, "_image_source_size", return_value=(72, 72)):

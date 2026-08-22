@@ -109,6 +109,35 @@ class Qwen3VLMethodicalParityTests(unittest.TestCase):
         for op in ("qkv_packed_proj", "out_proj", "mlp_up"):
             self.assertIn(op, ops)
 
+    def test_q8_projection_provider_preserves_one_reduction_across_isas(self) -> None:
+        provider = load(KERNEL_MAPS / "gemm_nt_q8_0_q8_0.json")
+        contract_id = "q8_0_weight_q8_0_input_llama_fp32_output"
+        self.assertEqual(
+            provider["operation_interface"],
+            "linear.q8_0_activation.q8_0_weight.fp32_output.v1",
+        )
+        self.assertEqual(provider["numerical_contract"], contract_id)
+        self.assertEqual(
+            {capability["contract_id"] for capability in provider["numerical_capabilities"]},
+            {contract_id},
+        )
+
+        variants = {
+            variant["name"]: variant for variant in provider["impl"]["variants"]
+        }
+        for name in ("avx2_m2n4", "avx_vnni", "avx512_vnni_llama_reduction"):
+            with self.subTest(variant=name):
+                self.assertEqual(variants[name]["numerical_contract"], contract_id)
+
+        source = (ROOT / "src/kernels/gemm_batch_int8.c").read_text(encoding="utf-8")
+        wrapper = source[
+            source.index("void gemm_nt_q8_0_q8_0("):
+            source.index("void gemm_nt_q8_0_q8_0_m2n4(")
+        ]
+        self.assertIn("gemm_nt_q8_0_q8_0_avx2(A, B, C, M, N, K);", wrapper)
+        self.assertNotIn("gemm_nt_q8_0_q8_0_vnni(A, B, C, M, N, K);", wrapper)
+        self.assertNotIn("gemm_nt_q8_0_q8_0_avx512(A, B, C, M, N, K);", wrapper)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

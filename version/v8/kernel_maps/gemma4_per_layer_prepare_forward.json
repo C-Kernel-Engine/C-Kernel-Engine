@@ -1,6 +1,13 @@
 {
   "id": "gemma4_per_layer_prepare_forward",
   "op": "gemma4_per_layer_prepare",
+  "operation_interface": "per_layer_input.prepare.q5_k_token.bf16_projection.fp32.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "per_layer_input.prepare.q5_k_token_bf16_projection.fp32.v1",
+    "phases": ["prefill", "decode"]
+  },
   "variant": "gemma4_scalar_correctness",
   "modes": {
     "inference": true,
@@ -19,14 +26,22 @@
       "shape": [
         "T",
         "E"
-      ]
+      ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
     },
     {
       "name": "tokens",
       "dtype": "i32",
       "shape": [
         "T"
-      ]
+      ],
+      "layout": "token_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
     }
   ],
   "weights": [
@@ -37,7 +52,11 @@
         "V",
         "L",
         "P"
-      ]
+      ],
+      "layout": "opaque_packed",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
     },
     {
       "name": "per_layer_model_proj",
@@ -46,14 +65,22 @@
         "L",
         "P",
         "E"
-      ]
+      ],
+      "layout": "row_major",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
     },
     {
       "name": "per_layer_proj_norm",
       "dtype": "fp32",
       "shape": [
         "P"
-      ]
+      ],
+      "layout": "feature_contiguous",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
     }
   ],
   "outputs": [
@@ -64,7 +91,11 @@
         "T",
         "L",
         "P"
-      ]
+      ],
+      "layout": "token_layer_feature_contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
     }
   ],
   "scratch": [],
@@ -86,6 +117,23 @@
     "c_declaration": "void gemma4_per_layer_prepare_forward(float *per_layer_input, const float *hidden, const int32_t *token_ids, const void *per_layer_token_emb, const uint16_t *per_layer_model_proj, const float *per_layer_proj_norm, int tokens, int num_layers, int embed_dim, int per_layer_dim, int vocab_size, float eps);",
     "sources": [
       "src/kernels/gemma4_per_layer_embed.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "per_layer_input", "source": "output:per_layer_input", "cast": "float*", "ports": ["output:per_layer_input"]},
+      {"name": "hidden", "source": "activation:hidden", "cast": "const float*", "ports": ["input:hidden"]},
+      {"name": "token_ids", "source": "activation:tokens", "cast": "const int32_t*", "ports": ["input:tokens"]},
+      {"name": "per_layer_token_emb", "source": "weight:per_layer_token_emb", "ports": ["weight:per_layer_token_emb"]},
+      {"name": "per_layer_model_proj", "source": "weight:per_layer_model_proj", "cast": "const uint16_t*", "ports": ["weight:per_layer_model_proj"]},
+      {"name": "per_layer_proj_norm", "source": "weight_f:per_layer_proj_norm", "ports": ["weight:per_layer_proj_norm"]},
+      {"name": "tokens", "source": "dim:seq_len"},
+      {"name": "num_layers", "source": "dim:num_layers"},
+      {"name": "embed_dim", "source": "dim:embed_dim"},
+      {"name": "per_layer_dim", "source": "dim:per_layer_dim"},
+      {"name": "vocab_size", "source": "dim:vocab_size"},
+      {"name": "eps", "source": "dim:rms_eps"}
     ]
   },
   "notes": "Prepare Gemma4 per-layer input stream once from original token embedding stream."
