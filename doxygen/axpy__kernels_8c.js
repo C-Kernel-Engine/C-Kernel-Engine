@@ -13,6 +13,8 @@ var axpy__kernels_8c =
     [ "ck_moe_q4k_q5k_bucket_work", "axpy__kernels_8c.html#ab16024251b4cd40e1220004b49795bdb", null ],
     [ "ck_moe_q4k_q5k_parallel_work", "axpy__kernels_8c.html#a19cf8a76d9f3a4dd99221d7ee3025e9b", null ],
     [ "ck_moe_q4k_q5k_quantize_work", "axpy__kernels_8c.html#ac9084e6ddbe1055d51945f1a7bdb9680", null ],
+    [ "ck_moe_q4k_q5k_route_parallel", "axpy__kernels_8c.html#ab480961065b4294dbdf960ff003a5c4d", null ],
+    [ "ck_moe_q4k_q5k_route_work", "axpy__kernels_8c.html#a0736761daf2cc15c3b35b8ce25581717", null ],
     [ "ck_moe_shared_q8_0_parallel_work", "axpy__kernels_8c.html#aad638e6442fefef9e2168345b35c28d4", null ],
     [ "ck_moe_sigmoid_f32", "axpy__kernels_8c.html#acbfeb51b56dcd12f1c77b5e6f307ae6e", null ],
     [ "ck_moe_silu_f32", "axpy__kernels_8c.html#a016bad88c138cb1af2b1bf0b5ec3d39b", null ],
