@@ -165,6 +165,8 @@ Functions</h2></td></tr>
 <tr class="separator:a102617ea5d170076dc9e1d6ac167617c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acb65349d061ea0910dd80602f5f210df" id="r_acb65349d061ea0910dd80602f5f210df"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="swiglu__kernels_8c.html#acb65349d061ea0910dd80602f5f210df">swiglu_forward_ggml</a> (const float *input, float *output, int tokens, int dim)</td></tr>
 <tr class="separator:acb65349d061ea0910dd80602f5f210df"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad0d3e95f8d1c4c192a2d487b4d5ec8cf" id="r_ad0d3e95f8d1c4c192a2d487b4d5ec8cf"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="swiglu__kernels_8c.html#ad0d3e95f8d1c4c192a2d487b4d5ec8cf">swiglu_forward_ggml_split</a> (const float *gate, const float *up, float *output, int tokens, int dim)</td></tr>
+<tr class="separator:ad0d3e95f8d1c4c192a2d487b4d5ec8cf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a18063a61725eeeeb371d7c9f1e0d410d" id="r_a18063a61725eeeeb371d7c9f1e0d410d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="swiglu__kernels_8c.html#a18063a61725eeeeb371d7c9f1e0d410d">swiglu_forward_pytorch_bf16_storage</a> (const float *input, float *output, int tokens, int dim)</td></tr>
 <tr class="separator:a18063a61725eeeeb371d7c9f1e0d410d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9f878d17d42282d00f88d10c0bfd603c" id="r_a9f878d17d42282d00f88d10c0bfd603c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="swiglu__kernels_8c.html#a9f878d17d42282d00f88d10c0bfd603c">swiglu_forward_q8_k</a> (const float *input, void *output_q8, int tokens, int dim)</td></tr>
@@ -231,7 +233,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">   41</span>    <span class="keywordflow">return</span> 1.0f / (1.0f + expf(-x));</div>
 <div class="line"><span class="lineno">   42</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="swiglu__kernels_8c_source.html#l00676">swiglu_backward_exact()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00515">swiglu_forward_exact()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00319">swiglu_forward_q8_k()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="swiglu__kernels_8c_source.html#l00719">swiglu_backward_exact()</a>, <a class="el" href="swiglu__kernels_8c_source.html#l00515">swiglu_forward_exact()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00319">swiglu_forward_q8_k()</a>.</p>
 
 </div>
 </div>
@@ -399,11 +401,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  501</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aaa76ef661048368434b452a237bc3669"><div class="ttname"><a href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a></div><div class="ttdeci">float sigmoid_scalar(float x)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00026">sigmoid_kernels.c:26</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
-<div class="ttc" id="aswiglu__kernels_8c_html_a771ec9e8b054416576cf1788ea8d3747"><div class="ttname"><a href="swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747">swiglu_backward_exact</a></div><div class="ttdeci">void swiglu_backward_exact(const float *input, const float *d_output, float *d_input, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00676">swiglu_kernels.c:676</a></div></div>
+<div class="ttc" id="aswiglu__kernels_8c_html_a771ec9e8b054416576cf1788ea8d3747"><div class="ttname"><a href="swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747">swiglu_backward_exact</a></div><div class="ttdeci">void swiglu_backward_exact(const float *input, const float *d_output, float *d_input, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00719">swiglu_kernels.c:719</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
 <div class="ttc" id="av6_85__simple_8c_html_a49cac1d218fc2817ed1f679a37f25f41"><div class="ttname"><a href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a></div><div class="ttdeci">static void silu(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="v6_85__simple_8c_source.html#l00159">v6.5_simple.c:159</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="sigmoid__kernels_8c_source.html#l00026">sigmoid_scalar()</a>, <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00676">swiglu_backward_exact()</a>.</p>
+<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00043">ck_strict_parity_enabled()</a>, <a class="el" href="sigmoid__kernels_8c_source.html#l00026">sigmoid_scalar()</a>, <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>, and <a class="el" href="swiglu__kernels_8c_source.html#l00719">swiglu_backward_exact()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02713">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
@@ -458,33 +460,33 @@ CK-ENGINE KERNEL RULES:</h1>
 <p>Uses standard library expf for numerical accuracy reference.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00676">676</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  681</span>{</div>
-<div class="line"><span class="lineno">  682</span>    <span class="keywordtype">int</span> T = tokens;</div>
-<div class="line"><span class="lineno">  683</span>    <span class="keywordtype">int</span> D = dim;</div>
-<div class="line"><span class="lineno">  684</span> </div>
-<div class="line"><span class="lineno">  685</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
-<div class="line"><span class="lineno">  686</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (2 * D);</div>
-<div class="line"><span class="lineno">  687</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dy_row = d_output + (size_t)t * D;</div>
-<div class="line"><span class="lineno">  688</span>        <span class="keywordtype">float</span> *dx_row = d_input + (size_t)t * (2 * D);</div>
-<div class="line"><span class="lineno">  689</span> </div>
-<div class="line"><span class="lineno">  690</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
-<div class="line"><span class="lineno">  691</span>            <span class="keywordtype">float</span> a = row[d];       <span class="comment">// gate</span></div>
-<div class="line"><span class="lineno">  692</span>            <span class="keywordtype">float</span> b = row[D + d];   <span class="comment">// value</span></div>
-<div class="line"><span class="lineno">  693</span>            <span class="keywordtype">float</span> dy = dy_row[d];</div>
-<div class="line"><span class="lineno">  694</span> </div>
-<div class="line"><span class="lineno">  695</span>            <span class="keywordtype">float</span> s = <a class="code hl_function" href="swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c">sigmoid_scalar_parity</a>(a); <span class="comment">// sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  696</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = a * s;                 <span class="comment">// silu(a)</span></div>
-<div class="line"><span class="lineno">  697</span>            <span class="keywordtype">float</span> silu_prime = s * (1.0f + a * (1.0f - s)); <span class="comment">// silu&#39;(a), PyTorch form</span></div>
-<div class="line"><span class="lineno">  698</span> </div>
-<div class="line"><span class="lineno">  699</span>            <span class="keywordtype">float</span> dA = dy * b * silu_prime;</div>
-<div class="line"><span class="lineno">  700</span>            <span class="keywordtype">float</span> dB = dy * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
-<div class="line"><span class="lineno">  701</span> </div>
-<div class="line"><span class="lineno">  702</span>            dx_row[d] = dA;</div>
-<div class="line"><span class="lineno">  703</span>            dx_row[D + d] = dB;</div>
-<div class="line"><span class="lineno">  704</span>        }</div>
-<div class="line"><span class="lineno">  705</span>    }</div>
-<div class="line"><span class="lineno">  706</span>}</div>
+<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00719">719</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  724</span>{</div>
+<div class="line"><span class="lineno">  725</span>    <span class="keywordtype">int</span> T = tokens;</div>
+<div class="line"><span class="lineno">  726</span>    <span class="keywordtype">int</span> D = dim;</div>
+<div class="line"><span class="lineno">  727</span> </div>
+<div class="line"><span class="lineno">  728</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
+<div class="line"><span class="lineno">  729</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (2 * D);</div>
+<div class="line"><span class="lineno">  730</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dy_row = d_output + (size_t)t * D;</div>
+<div class="line"><span class="lineno">  731</span>        <span class="keywordtype">float</span> *dx_row = d_input + (size_t)t * (2 * D);</div>
+<div class="line"><span class="lineno">  732</span> </div>
+<div class="line"><span class="lineno">  733</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; D; ++d) {</div>
+<div class="line"><span class="lineno">  734</span>            <span class="keywordtype">float</span> a = row[d];       <span class="comment">// gate</span></div>
+<div class="line"><span class="lineno">  735</span>            <span class="keywordtype">float</span> b = row[D + d];   <span class="comment">// value</span></div>
+<div class="line"><span class="lineno">  736</span>            <span class="keywordtype">float</span> dy = dy_row[d];</div>
+<div class="line"><span class="lineno">  737</span> </div>
+<div class="line"><span class="lineno">  738</span>            <span class="keywordtype">float</span> s = <a class="code hl_function" href="swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c">sigmoid_scalar_parity</a>(a); <span class="comment">// sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  739</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = a * s;                 <span class="comment">// silu(a)</span></div>
+<div class="line"><span class="lineno">  740</span>            <span class="keywordtype">float</span> silu_prime = s * (1.0f + a * (1.0f - s)); <span class="comment">// silu&#39;(a), PyTorch form</span></div>
+<div class="line"><span class="lineno">  741</span> </div>
+<div class="line"><span class="lineno">  742</span>            <span class="keywordtype">float</span> dA = dy * b * silu_prime;</div>
+<div class="line"><span class="lineno">  743</span>            <span class="keywordtype">float</span> dB = dy * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
+<div class="line"><span class="lineno">  744</span> </div>
+<div class="line"><span class="lineno">  745</span>            dx_row[d] = dA;</div>
+<div class="line"><span class="lineno">  746</span>            dx_row[D + d] = dB;</div>
+<div class="line"><span class="lineno">  747</span>        }</div>
+<div class="line"><span class="lineno">  748</span>    }</div>
+<div class="line"><span class="lineno">  749</span>}</div>
 <div class="ttc" id="aswiglu__kernels_8c_html_acb190f66cb5c281730a5137b2c9a729c"><div class="ttname"><a href="swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c">sigmoid_scalar_parity</a></div><div class="ttdeci">static float sigmoid_scalar_parity(float x)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00039">swiglu_kernels.c:39</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="swiglu__kernels_8c_source.html#l00039">sigmoid_scalar_parity()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
@@ -769,6 +771,97 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
+<p class="reference">Referenced by <a class="el" href="axpy__kernels_8c_source.html#l00943">ck_moe_q4k_q5k_bucket_work()</a>, <a class="el" href="axpy__kernels_8c_source.html#l00556">moe_swiglu_expert_forward_q4k_q5k_workspace()</a>, and <a class="el" href="axpy__kernels_8c_source.html#l01301">moe_swiglu_shared_forward_q8_0_gated_workspace()</a>.</p>
+
+</div>
+</div>
+<a id="ad0d3e95f8d1c4c192a2d487b4d5ec8cf" name="ad0d3e95f8d1c4c192a2d487b4d5ec8cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad0d3e95f8d1c4c192a2d487b4d5ec8cf">&#9670;&#160;</a></span>swiglu_forward_ggml_split()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void swiglu_forward_ggml_split </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>up</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dim</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00576">576</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  581</span>{</div>
+<div class="line"><span class="lineno">  582</span>    <span class="keywordflow">if</span> (!gate || !up || !output || tokens &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  583</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  584</span>    }</div>
+<div class="line"><span class="lineno">  585</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  586</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  587</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *up_row = up + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  588</span>        <span class="keywordtype">float</span> *out_row = output + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  589</span>        <span class="keywordtype">int</span> d = 0;</div>
+<div class="line"><span class="lineno">  590</span> </div>
+<div class="line"><span class="lineno">  591</span><span class="preprocessor">#if defined(__AVX512F__) &amp;&amp; defined(__AVX512DQ__)</span></div>
+<div class="line"><span class="lineno">  592</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= dim; d += 16) {</div>
+<div class="line"><span class="lineno">  593</span>            <span class="keyword">const</span> __m512 gate_v = _mm512_loadu_ps(gate_row + d);</div>
+<div class="line"><span class="lineno">  594</span>            <span class="keyword">const</span> __m512 up_v = _mm512_loadu_ps(up_row + d);</div>
+<div class="line"><span class="lineno">  595</span>            <span class="keyword">const</span> __m512 neg_gate = _mm512_sub_ps(_mm512_setzero_ps(), gate_v);</div>
+<div class="line"><span class="lineno">  596</span>            <span class="keyword">const</span> __m512 denom = _mm512_add_ps(</div>
+<div class="line"><span class="lineno">  597</span>                _mm512_set1_ps(1.0f), ck_ggml_expf_avx512(neg_gate));</div>
+<div class="line"><span class="lineno">  598</span>            <span class="keyword">const</span> __m512 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm512_div_ps(gate_v, denom);</div>
+<div class="line"><span class="lineno">  599</span>            _mm512_storeu_ps(out_row + d, _mm512_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, up_v));</div>
+<div class="line"><span class="lineno">  600</span>        }</div>
+<div class="line"><span class="lineno">  601</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
+<div class="line"><span class="lineno">  602</span>        <span class="keywordflow">for</span> (; d + 8 &lt;= dim; d += 8) {</div>
+<div class="line"><span class="lineno">  603</span>            <span class="keyword">const</span> __m256 gate_v = _mm256_loadu_ps(gate_row + d);</div>
+<div class="line"><span class="lineno">  604</span>            <span class="keyword">const</span> __m256 up_v = _mm256_loadu_ps(up_row + d);</div>
+<div class="line"><span class="lineno">  605</span>            <span class="keyword">const</span> __m256 neg_gate = _mm256_sub_ps(_mm256_setzero_ps(), gate_v);</div>
+<div class="line"><span class="lineno">  606</span>            <span class="keyword">const</span> __m256 denom = _mm256_add_ps(</div>
+<div class="line"><span class="lineno">  607</span>                _mm256_set1_ps(1.0f), ck_ggml_expf_avx2(neg_gate));</div>
+<div class="line"><span class="lineno">  608</span>            <span class="keyword">const</span> __m256 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm256_div_ps(gate_v, denom);</div>
+<div class="line"><span class="lineno">  609</span>            _mm256_storeu_ps(out_row + d, _mm256_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, up_v));</div>
+<div class="line"><span class="lineno">  610</span>        }</div>
+<div class="line"><span class="lineno">  611</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  612</span>        <span class="keywordflow">for</span> (; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  613</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gate_v = gate_row[d];</div>
+<div class="line"><span class="lineno">  614</span>            out_row[d] = (gate_v / (1.0f + expf(-gate_v))) * up_row[d];</div>
+<div class="line"><span class="lineno">  615</span>        }</div>
+<div class="line"><span class="lineno">  616</span>    }</div>
+<div class="line"><span class="lineno">  617</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="axpy__kernels_8c_source.html#l00943">ck_moe_q4k_q5k_bucket_work()</a>.</p>
+
 </div>
 </div>
 <a id="a18063a61725eeeeb371d7c9f1e0d410d" name="a18063a61725eeeeb371d7c9f1e0d410d"></a>
@@ -809,54 +902,54 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00615">615</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  619</span>{</div>
-<div class="line"><span class="lineno">  620</span>    <span class="keywordflow">if</span> (!input || !output || tokens &lt; 0 || dim &lt; 0) {</div>
-<div class="line"><span class="lineno">  621</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch BF16 SwiGLU arguments\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  622</span>        abort();</div>
-<div class="line"><span class="lineno">  623</span>    }</div>
-<div class="line"><span class="lineno">  624</span> </div>
-<div class="line"><span class="lineno">  625</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  626</span>    pthread_once(&amp;ck_pytorch_swiglu_once, ck_bind_pytorch_swiglu_sleef);</div>
-<div class="line"><span class="lineno">  627</span>    <span class="keywordflow">if</span> (!ck_pytorch_swiglu_expf16) {</div>
-<div class="line"><span class="lineno">  628</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  629</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16 SwiGLU requires &quot;</span></div>
-<div class="line"><span class="lineno">  630</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  631</span>        abort();</div>
-<div class="line"><span class="lineno">  632</span>    }</div>
-<div class="line"><span class="lineno">  633</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  634</span> </div>
-<div class="line"><span class="lineno">  635</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
-<div class="line"><span class="lineno">  636</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (<span class="keywordtype">size_t</span>)(2 * dim);</div>
-<div class="line"><span class="lineno">  637</span>        <span class="keywordtype">float</span> *out_row = output + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  638</span>        <span class="keywordtype">int</span> d = 0;</div>
-<div class="line"><span class="lineno">  639</span> </div>
-<div class="line"><span class="lineno">  640</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  641</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= dim; d += 16) {</div>
-<div class="line"><span class="lineno">  642</span>            <span class="keyword">const</span> __m512 gate = _mm512_loadu_ps(row + d);</div>
-<div class="line"><span class="lineno">  643</span>            <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
-<div class="line"><span class="lineno">  644</span>                _mm512_set1_ps(1.0f),</div>
-<div class="line"><span class="lineno">  645</span>                ck_pytorch_swiglu_expf16(_mm512_sub_ps(_mm512_setzero_ps(), gate)));</div>
-<div class="line"><span class="lineno">  646</span>            <span class="keyword">const</span> __m512 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm512_div_ps(gate, denominator);</div>
-<div class="line"><span class="lineno">  647</span>            <span class="keywordtype">float</span> silu_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  648</span>            _mm512_store_ps(silu_lanes, <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>);</div>
-<div class="line"><span class="lineno">  649</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  650</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> silu_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_lanes[lane]));</div>
-<div class="line"><span class="lineno">  651</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> up_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[dim + d + lane]));</div>
-<div class="line"><span class="lineno">  652</span>                out_row[d + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(</div>
-<div class="line"><span class="lineno">  653</span>                    <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_bf16 * up_bf16));</div>
-<div class="line"><span class="lineno">  654</span>            }</div>
-<div class="line"><span class="lineno">  655</span>        }</div>
-<div class="line"><span class="lineno">  656</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  657</span>        <span class="keywordflow">for</span> (; d &lt; dim; ++d) {</div>
-<div class="line"><span class="lineno">  658</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gate_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[d]));</div>
-<div class="line"><span class="lineno">  659</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> up_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[dim + d]));</div>
-<div class="line"><span class="lineno">  660</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = gate_bf16 / (1.0f + expf(-gate_bf16));</div>
-<div class="line"><span class="lineno">  661</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> silu_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>));</div>
-<div class="line"><span class="lineno">  662</span>            out_row[d] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_bf16 * up_bf16));</div>
-<div class="line"><span class="lineno">  663</span>        }</div>
-<div class="line"><span class="lineno">  664</span>    }</div>
-<div class="line"><span class="lineno">  665</span>}</div>
+<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00658">658</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  662</span>{</div>
+<div class="line"><span class="lineno">  663</span>    <span class="keywordflow">if</span> (!input || !output || tokens &lt; 0 || dim &lt; 0) {</div>
+<div class="line"><span class="lineno">  664</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch BF16 SwiGLU arguments\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  665</span>        abort();</div>
+<div class="line"><span class="lineno">  666</span>    }</div>
+<div class="line"><span class="lineno">  667</span> </div>
+<div class="line"><span class="lineno">  668</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  669</span>    pthread_once(&amp;ck_pytorch_swiglu_once, ck_bind_pytorch_swiglu_sleef);</div>
+<div class="line"><span class="lineno">  670</span>    <span class="keywordflow">if</span> (!ck_pytorch_swiglu_expf16) {</div>
+<div class="line"><span class="lineno">  671</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  672</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16 SwiGLU requires &quot;</span></div>
+<div class="line"><span class="lineno">  673</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  674</span>        abort();</div>
+<div class="line"><span class="lineno">  675</span>    }</div>
+<div class="line"><span class="lineno">  676</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  677</span> </div>
+<div class="line"><span class="lineno">  678</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; tokens; ++t) {</div>
+<div class="line"><span class="lineno">  679</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (<span class="keywordtype">size_t</span>)(2 * dim);</div>
+<div class="line"><span class="lineno">  680</span>        <span class="keywordtype">float</span> *out_row = output + (size_t)t * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  681</span>        <span class="keywordtype">int</span> d = 0;</div>
+<div class="line"><span class="lineno">  682</span> </div>
+<div class="line"><span class="lineno">  683</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  684</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= dim; d += 16) {</div>
+<div class="line"><span class="lineno">  685</span>            <span class="keyword">const</span> __m512 gate = _mm512_loadu_ps(row + d);</div>
+<div class="line"><span class="lineno">  686</span>            <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
+<div class="line"><span class="lineno">  687</span>                _mm512_set1_ps(1.0f),</div>
+<div class="line"><span class="lineno">  688</span>                ck_pytorch_swiglu_expf16(_mm512_sub_ps(_mm512_setzero_ps(), gate)));</div>
+<div class="line"><span class="lineno">  689</span>            <span class="keyword">const</span> __m512 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm512_div_ps(gate, denominator);</div>
+<div class="line"><span class="lineno">  690</span>            <span class="keywordtype">float</span> silu_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  691</span>            _mm512_store_ps(silu_lanes, <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>);</div>
+<div class="line"><span class="lineno">  692</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  693</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> silu_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_lanes[lane]));</div>
+<div class="line"><span class="lineno">  694</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> up_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[dim + d + lane]));</div>
+<div class="line"><span class="lineno">  695</span>                out_row[d + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(</div>
+<div class="line"><span class="lineno">  696</span>                    <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_bf16 * up_bf16));</div>
+<div class="line"><span class="lineno">  697</span>            }</div>
+<div class="line"><span class="lineno">  698</span>        }</div>
+<div class="line"><span class="lineno">  699</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  700</span>        <span class="keywordflow">for</span> (; d &lt; dim; ++d) {</div>
+<div class="line"><span class="lineno">  701</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> gate_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[d]));</div>
+<div class="line"><span class="lineno">  702</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> up_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(row[dim + d]));</div>
+<div class="line"><span class="lineno">  703</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = gate_bf16 / (1.0f + expf(-gate_bf16));</div>
+<div class="line"><span class="lineno">  704</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> silu_bf16 = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>));</div>
+<div class="line"><span class="lineno">  705</span>            out_row[d] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(silu_bf16 * up_bf16));</div>
+<div class="line"><span class="lineno">  706</span>        }</div>
+<div class="line"><span class="lineno">  707</span>    }</div>
+<div class="line"><span class="lineno">  708</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
 </div><!-- fragment -->

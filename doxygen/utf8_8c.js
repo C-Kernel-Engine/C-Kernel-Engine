@@ -10,7 +10,7 @@ var utf8_8c =
     [ "ck_utf8_next_char", "utf8_8c.html#a2c193f8c69997dc0e0db4742fb457741", null ],
     [ "ck_utf8_offset_to_byte", "utf8_8c.html#a77837f31824e662ea801692c952185fa", null ],
     [ "ck_utf8_validate", "utf8_8c.html#ac9d90a6c7fbe37aed06950f272845139", null ],
-    [ "CK_UTF8_WHITESPACE_RANGES", "utf8_8c.html#a99351866c99dd535b491e8143169f52b", null ],
+    [ "CK_UTF8_WHITESPACE_RANGES", "utf8_8c.html#acf5e3853d518d63a37be8f992d36411e", null ],
     [ "end", "utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667", null ],
     [ "start", "utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b", null ]
 ];

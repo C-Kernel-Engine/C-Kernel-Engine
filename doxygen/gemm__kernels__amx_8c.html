@@ -274,11 +274,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  266</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  267</span>}</div>
 <div class="ttc" id="agemm__kernels__amx_8c_html_a030c98b26ad610ccea6dabf993b60cdf"><div class="ttname"><a href="gemm__kernels__amx_8c.html#a030c98b26ad610ccea6dabf993b60cdf">gemv_q4_k_q8_k_avx2</a></div><div class="ttdeci">void gemv_q4_k_q8_k_avx2(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k__avx2_8c_source.html#l00118">gemm_kernels_q4k_q8k_avx2.c:118</a></div></div>
-<div class="ttc" id="agemm__kernels__amx_8c_html_a53c1355c32a77df5522e2b8eff8fc3f5"><div class="ttname"><a href="gemm__kernels__amx_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5">gemv_q4_k_q8_k_vnni</a></div><div class="ttdeci">void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03374">gemm_kernels_q4k_q8k_vnni.c:3374</a></div></div>
+<div class="ttc" id="agemm__kernels__amx_8c_html_a53c1355c32a77df5522e2b8eff8fc3f5"><div class="ttname"><a href="gemm__kernels__amx_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5">gemv_q4_k_q8_k_vnni</a></div><div class="ttdeci">void gemv_q4_k_q8_k_vnni(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03534">gemm_kernels_q4k_q8k_vnni.c:3534</a></div></div>
 <div class="ttc" id="agemm__kernels__amx_8c_html_ac01f8caf84e100f3c72919c71217010e"><div class="ttname"><a href="gemm__kernels__amx_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00201">gemm_kernels_q4k_q8k.c:201</a></div></div>
 <div class="ttc" id="agemm__kernels__amx_8c_html_ae73d24e96a48e8e4b3af9e658b3360fd"><div class="ttname"><a href="gemm__kernels__amx_8c.html#ae73d24e96a48e8e4b3af9e658b3360fd">gemv_q4_k_q8_k_avx</a></div><div class="ttdeci">void gemv_q4_k_q8_k_avx(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__avx_8c_source.html#l00251">gemm_kernels_q4k_avx.c:251</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels__q4k__avx_8c_source.html#l00251">gemv_q4_k_q8_k_avx()</a>, <a class="el" href="gemm__kernels__q4k__q8k__avx2_8c_source.html#l00118">gemv_q4_k_q8_k_avx2()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00201">gemv_q4_k_q8_k_ref()</a>, and <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03374">gemv_q4_k_q8_k_vnni()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels__q4k__avx_8c_source.html#l00251">gemv_q4_k_q8_k_avx()</a>, <a class="el" href="gemm__kernels__q4k__q8k__avx2_8c_source.html#l00118">gemv_q4_k_q8_k_avx2()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00201">gemv_q4_k_q8_k_ref()</a>, and <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03534">gemv_q4_k_q8_k_vnni()</a>.</p>
 
 </div>
 </div>
@@ -521,39 +521,39 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03374">3374</a> of file <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html">gemm_kernels_q4k_q8k_vnni.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 3378</span>{</div>
-<div class="line"><span class="lineno"> 3379</span><span class="preprocessor">#if defined(__AVX512VNNI__) &amp;&amp; defined(__AVX512VL__)</span></div>
-<div class="line"><span class="lineno"> 3380</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *fast_env = getenv(<span class="stringliteral">&quot;CK_ENABLE_Q4K_Q8K_VNNI_FAST&quot;</span>);</div>
-<div class="line"><span class="lineno"> 3381</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> fast_disabled = fast_env &amp;&amp; fast_env[0] &amp;&amp; fast_env[0] == <span class="charliteral">&#39;0&#39;</span>;</div>
-<div class="line"><span class="lineno"> 3382</span>    <span class="keywordflow">if</span> (!fast_disabled &amp;&amp; !<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
-<div class="line"><span class="lineno"> 3383</span>        <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 3384</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 3385</span>        }</div>
-<div class="line"><span class="lineno"> 3386</span> </div>
-<div class="line"><span class="lineno"> 3387</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
-<div class="line"><span class="lineno"> 3388</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
-<div class="line"><span class="lineno"> 3389</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno"> 3390</span> </div>
-<div class="line"><span class="lineno"> 3391</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
-<div class="line"><span class="lineno"> 3392</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
-<div class="line"><span class="lineno"> 3393</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><span class="lineno"> 3394</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; ++b) {</div>
-<div class="line"><span class="lineno"> 3395</span>                sum += dot_q4_k_q8_k_vnni_block(&amp;w_row[b], &amp;x[b]);</div>
-<div class="line"><span class="lineno"> 3396</span>            }</div>
-<div class="line"><span class="lineno"> 3397</span>            y[row] = sum;</div>
-<div class="line"><span class="lineno"> 3398</span>        }</div>
-<div class="line"><span class="lineno"> 3399</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 3400</span>    }</div>
-<div class="line"><span class="lineno"> 3401</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno"> 3402</span> </div>
-<div class="line"><span class="lineno"> 3403</span>    <span class="comment">/* Strict/debug parity keeps the llama-style scalar accumulation path.</span></div>
-<div class="line"><span class="lineno"> 3404</span><span class="comment">     * Production AVX-512 hosts use VNNI by default; set</span></div>
-<div class="line"><span class="lineno"> 3405</span><span class="comment">     * CK_ENABLE_Q4K_Q8K_VNNI_FAST=0 or CK_DEBUG_Q4K_Q8_REF=1 when attributing</span></div>
-<div class="line"><span class="lineno"> 3406</span><span class="comment">     * borderline logit movement against scalar/reference behavior.</span></div>
-<div class="line"><span class="lineno"> 3407</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno"> 3408</span>    <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
-<div class="line"><span class="lineno"> 3409</span>}</div>
+<p class="definition">Definition at line <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03534">3534</a> of file <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html">gemm_kernels_q4k_q8k_vnni.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 3538</span>{</div>
+<div class="line"><span class="lineno"> 3539</span><span class="preprocessor">#if defined(__AVX512VNNI__) &amp;&amp; defined(__AVX512VL__)</span></div>
+<div class="line"><span class="lineno"> 3540</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *fast_env = getenv(<span class="stringliteral">&quot;CK_ENABLE_Q4K_Q8K_VNNI_FAST&quot;</span>);</div>
+<div class="line"><span class="lineno"> 3541</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> fast_disabled = fast_env &amp;&amp; fast_env[0] &amp;&amp; fast_env[0] == <span class="charliteral">&#39;0&#39;</span>;</div>
+<div class="line"><span class="lineno"> 3542</span>    <span class="keywordflow">if</span> (!fast_disabled &amp;&amp; !<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>()) {</div>
+<div class="line"><span class="lineno"> 3543</span>        <span class="keywordflow">if</span> (!y || !W || !x_q8 || M &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 3544</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 3545</span>        }</div>
+<div class="line"><span class="lineno"> 3546</span> </div>
+<div class="line"><span class="lineno"> 3547</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *blocks = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *)W;</div>
+<div class="line"><span class="lineno"> 3548</span>        <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *x = (<span class="keyword">const</span> <a class="code hl_struct" href="structblock__q8__K.html">block_q8_K</a> *)x_q8;</div>
+<div class="line"><span class="lineno"> 3549</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> blocks_per_row = K / <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno"> 3550</span> </div>
+<div class="line"><span class="lineno"> 3551</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; M; ++row) {</div>
+<div class="line"><span class="lineno"> 3552</span>            <span class="keyword">const</span> <a class="code hl_struct" href="structblock__q4__K.html">block_q4_K</a> *w_row = blocks + (size_t)row * (<span class="keywordtype">size_t</span>)blocks_per_row;</div>
+<div class="line"><span class="lineno"> 3553</span>            <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><span class="lineno"> 3554</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> b = 0; b &lt; blocks_per_row; ++b) {</div>
+<div class="line"><span class="lineno"> 3555</span>                sum += dot_q4_k_q8_k_vnni_block(&amp;w_row[b], &amp;x[b]);</div>
+<div class="line"><span class="lineno"> 3556</span>            }</div>
+<div class="line"><span class="lineno"> 3557</span>            y[row] = sum;</div>
+<div class="line"><span class="lineno"> 3558</span>        }</div>
+<div class="line"><span class="lineno"> 3559</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 3560</span>    }</div>
+<div class="line"><span class="lineno"> 3561</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno"> 3562</span> </div>
+<div class="line"><span class="lineno"> 3563</span>    <span class="comment">/* Strict/debug parity keeps the llama-style scalar accumulation path.</span></div>
+<div class="line"><span class="lineno"> 3564</span><span class="comment">     * Production AVX-512 hosts use VNNI by default; set</span></div>
+<div class="line"><span class="lineno"> 3565</span><span class="comment">     * CK_ENABLE_Q4K_Q8K_VNNI_FAST=0 or CK_DEBUG_Q4K_Q8_REF=1 when attributing</span></div>
+<div class="line"><span class="lineno"> 3566</span><span class="comment">     * borderline logit movement against scalar/reference behavior.</span></div>
+<div class="line"><span class="lineno"> 3567</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno"> 3568</span>    <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a>(y, W, x_q8, M, K);</div>
+<div class="line"><span class="lineno"> 3569</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
 <div class="ttc" id="agemm__kernels__q4k__q8k__vnni_8c_html_ac01f8caf84e100f3c72919c71217010e"><div class="ttname"><a href="gemm__kernels__q4k__q8k__vnni_8c.html#ac01f8caf84e100f3c72919c71217010e">gemv_q4_k_q8_k_ref</a></div><div class="ttdeci">void gemv_q4_k_q8_k_ref(float *y, const void *W, const void *x_q8, int M, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00201">gemm_kernels_q4k_q8k.c:201</a></div></div>
 </div><!-- fragment -->
