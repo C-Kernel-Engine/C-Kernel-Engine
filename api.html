@@ -3518,7 +3518,7 @@
 
 
 <details open>
-    <summary>RMS Normalization (55)</summary>
+    <summary>RMS Normalization (56)</summary>
     <div class="accordion-content">
 
 
@@ -3929,7 +3929,7 @@ test_parity.py::test_rmsnorm_backward_parity</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_pytorch_bf16_storage_impl</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_pytorch_bf16_storage_impl(const float * input, const float * gamma, float * output, float * rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps, int qwen3next_weight_order)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_pytorch_bf16_storage_impl(const float * input, const float * gamma, float * output, float * rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps, int qwen3next_weight_order)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -3965,6 +3965,16 @@ test_rmsnorm.py::TestRMSNormForward::test_fp32_single
 test_rmsnorm.py::TestRMSNormForward::test_perf_rolled 
 test_layernorm.py::TestLayerNormForward::test_rmsnorm_compat 
 test_parity.py::test_rmsnorm_parity</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_strided_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_strided_pytorch_bf16_storage(const float * input, const float * gamma, float * output, float * rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
 
@@ -5940,7 +5950,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_decode_f32_workspace</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_decode_f32_workspace(const float * q, const float * k_cache, const float * v_cache, float * output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float * scores, size_t scores_bytes)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_decode_f32_workspace(const float * q, const float * k_cache, const float * v_cache, float * output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float * scores, size_t scores_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5960,7 +5970,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_attention_f32_workspace</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_f32_workspace(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float * scores, size_t scores_bytes)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_attention_f32_workspace(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float * scores, size_t scores_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -6921,7 +6931,7 @@ test_swiglu.py::TestSwiGLUForward::test_exact_single</p>
 
 
 <details open>
-    <summary>RoPE (Rotary Position Embedding) (77)</summary>
+    <summary>RoPE (Rotary Position Embedding) (78)</summary>
     <div class="accordion-content">
 
 
@@ -7071,6 +7081,16 @@ test_swiglu.py::TestSwiGLUForward::test_exact_single</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_partial_rope_concat_f32(const float * q_nope, const float * q_pe, const float * k_nope, const float * k_pe, const float * cos, const float * sin, float * query, float * key, int tokens, int heads, int qk_nope_dim, int qk_rope_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">deepseek_mla_partial_rope_concat_packed_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void deepseek_mla_partial_rope_concat_packed_bf16_storage(const float * q_packed, const float * k_nope, const float * kv_a_packed, const float * cos, const float * sin, float * query, float * key, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int qk_rope_dim)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -7735,7 +7755,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1273)</summary>
+    <summary>Other Functions (1274)</summary>
     <div class="accordion-content">
 
 
@@ -14216,6 +14236,16 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t ds_mix_idx(int t, int out_s, int in_s, int n_streams)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ds_mla_bf16_round</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float ds_mla_bf16_round(float value)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

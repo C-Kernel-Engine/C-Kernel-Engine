@@ -1,5 +1,10 @@
 var NAVTREEINDEX19 =
 {
+"structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,84,4],
+"structRecommendation.html#ac691a32118bd2279bf9536d183329119":[1,0,84,2],
+"structRecommendation.html#ad4009263d6f5d6e3feeab261f071beaf":[1,0,84,0],
+"structRecommendationList.html":[1,0,85],
+"structRecommendationList.html#a07a86874728786aa76e45da00a7f5af9":[1,0,85,0],
 "structRecommendationList.html#a63246ddf4369acfa638cf19f1de2cf3e":[1,0,85,1],
 "structSystemTopology.html":[1,0,86],
 "structSystemTopology.html#a5987f9ac86ee94f588a8fcfaf85d2cf7":[1,0,86,1],
@@ -244,10 +249,5 @@ var NAVTREEINDEX19 =
 "tokenizer_8h.html#ab046b8725b078826c08dd8bf474e1bd9":[2,0,0,1,3,4],
 "tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91":[2,0,0,1,3,19],
 "tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15":[2,0,0,1,3,46],
-"tokenizer_8h.html#ac113f9561eb6088f8142823cc33f2816":[2,0,0,1,3,15],
-"tokenizer_8h.html#acd0ec47154bf6f8b901e60a7d3cb8d58":[2,0,0,1,3,11],
-"tokenizer_8h.html#acf24f5aad70b6eec0a05064b5f95538d":[2,0,0,1,3,14],
-"tokenizer_8h.html#acf3cafe5474fe8230132d201545dd40a":[2,0,0,1,3,20],
-"tokenizer_8h.html#ad6c5fe6b7a2df85a99504e702348a0bb":[2,0,0,1,3,12],
-"tokenizer_8h.html#ae246055217081d433db25cb6a754f5b9":[2,0,0,1,3,25]
+"tokenizer_8h.html#ac113f9561eb6088f8142823cc33f2816":[2,0,0,1,3,15]
 };

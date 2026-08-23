@@ -322,21 +322,21 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="rmsnorm__kernels_8c_source.html#l00596">596</a> of file <a class="el" href="rmsnorm__kernels_8c_source.html">rmsnorm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  604</span>{</div>
-<div class="line"><span class="lineno">  605</span>    <a class="code hl_function" href="rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76">rmsnorm_forward_strided_f32</a>(</div>
-<div class="line"><span class="lineno">  606</span>        input,</div>
-<div class="line"><span class="lineno">  607</span>        gamma,</div>
-<div class="line"><span class="lineno">  608</span>        output,</div>
-<div class="line"><span class="lineno">  609</span>        rstd_cache,</div>
-<div class="line"><span class="lineno">  610</span>        tokens,</div>
-<div class="line"><span class="lineno">  611</span>        d_model,</div>
-<div class="line"><span class="lineno">  612</span>        aligned_embed_dim,</div>
-<div class="line"><span class="lineno">  613</span>        aligned_embed_dim,</div>
-<div class="line"><span class="lineno">  614</span>        eps</div>
-<div class="line"><span class="lineno">  615</span>    );</div>
-<div class="line"><span class="lineno">  616</span>}</div>
-<div class="ttc" id="armsnorm__kernels_8c_html_aae8ede0a82b914bbd6191d39c29b4e76"><div class="ttname"><a href="rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76">rmsnorm_forward_strided_f32</a></div><div class="ttdeci">void rmsnorm_forward_strided_f32(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00467">rmsnorm_kernels.c:467</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rmsnorm__kernels_8c_source.html#l00621">621</a> of file <a class="el" href="rmsnorm__kernels_8c_source.html">rmsnorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  629</span>{</div>
+<div class="line"><span class="lineno">  630</span>    <a class="code hl_function" href="rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76">rmsnorm_forward_strided_f32</a>(</div>
+<div class="line"><span class="lineno">  631</span>        input,</div>
+<div class="line"><span class="lineno">  632</span>        gamma,</div>
+<div class="line"><span class="lineno">  633</span>        output,</div>
+<div class="line"><span class="lineno">  634</span>        rstd_cache,</div>
+<div class="line"><span class="lineno">  635</span>        tokens,</div>
+<div class="line"><span class="lineno">  636</span>        d_model,</div>
+<div class="line"><span class="lineno">  637</span>        aligned_embed_dim,</div>
+<div class="line"><span class="lineno">  638</span>        aligned_embed_dim,</div>
+<div class="line"><span class="lineno">  639</span>        eps</div>
+<div class="line"><span class="lineno">  640</span>    );</div>
+<div class="line"><span class="lineno">  641</span>}</div>
+<div class="ttc" id="armsnorm__kernels_8c_html_aae8ede0a82b914bbd6191d39c29b4e76"><div class="ttname"><a href="rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76">rmsnorm_forward_strided_f32</a></div><div class="ttdeci">void rmsnorm_forward_strided_f32(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00492">rmsnorm_kernels.c:492</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="rmsnorm__qkv_8c_source.html#l00222">rmsnorm_qkv_q4k_fused()</a>.</p>
 
@@ -1198,10 +1198,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  281</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a9beb124343d26ac4870d92b2f047d643">gemv_q4_k</a>(v_out, wv, normed, kv_dim, embed_dim);</div>
 <div class="line"><span class="lineno">  282</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a9beb124343d26ac4870d92b2f047d643"><div class="ttname"><a href="ckernel__engine_8h.html#a9beb124343d26ac4870d92b2f047d643">gemv_q4_k</a></div><div class="ttdeci">void gemv_q4_k(float *y, const void *W, const float *x, int M, int K)</div><div class="ttdoc">Auto-dispatch GEMV based on available SIMD.</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k_8c_source.html#l00301">gemm_kernels_q4k.c:301</a></div></div>
-<div class="ttc" id="armsnorm__qkv_8c_html_a9a068ed02d809a81a23f09e61b820baf"><div class="ttname"><a href="rmsnorm__qkv_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a></div><div class="ttdeci">void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00596">rmsnorm_kernels.c:596</a></div></div>
+<div class="ttc" id="armsnorm__qkv_8c_html_a9a068ed02d809a81a23f09e61b820baf"><div class="ttname"><a href="rmsnorm__qkv_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a></div><div class="ttdeci">void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00621">rmsnorm_kernels.c:621</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00596">rmsnorm_forward()</a>.</p>
+<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="gemm__kernels__q4k_8c_source.html#l00301">gemv_q4_k()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00621">rmsnorm_forward()</a>.</p>
 
 </div>
 </div>
