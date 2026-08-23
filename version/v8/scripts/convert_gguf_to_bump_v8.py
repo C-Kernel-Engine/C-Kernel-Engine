@@ -184,8 +184,62 @@ def gguf_ck_arch_contract(arch: str) -> Dict[str, Any]:
     return contract if isinstance(contract, dict) else {}
 
 
-def gguf_ck_template_arch(arch: str) -> str:
-    contract = gguf_ck_arch_contract(arch)
+def gguf_ck_artifact_contract(
+    arch: str,
+    metadata: Optional[Dict[str, object]] = None,
+) -> Dict[str, Any]:
+    """Resolve an exact artifact variant without teaching lowering model names."""
+    contract = copy.deepcopy(gguf_ck_arch_contract(arch))
+    variants = contract.pop("artifact_variants", []) or []
+    if not variants or metadata is None:
+        return contract
+
+    matches: list[Dict[str, Any]] = []
+    for variant in variants:
+        if not isinstance(variant, dict):
+            raise GGUFError(f"{arch}: artifact variant must be an object")
+        required = variant.get("match")
+        if not isinstance(required, dict) or not required:
+            raise GGUFError(f"{arch}: artifact variant requires a non-empty match object")
+        if all(metadata.get(str(key)) == value for key, value in required.items()):
+            matches.append(variant)
+
+    if len(matches) > 1:
+        ids = [str(row.get("id") or "<unnamed>") for row in matches]
+        raise GGUFError(f"{arch}: artifact metadata matches multiple variants: {ids}")
+    if not matches:
+        return contract
+
+    selected = matches[0]
+    for key, value in selected.items():
+        if key not in {"id", "match"}:
+            contract[key] = copy.deepcopy(value)
+    contract["artifact_variant"] = str(selected.get("id") or "")
+    return contract
+
+
+def gguf_ck_artifact_match_keys() -> set[str]:
+    """Return metadata keys that the streaming GGUF reader must retain."""
+    keys: set[str] = set()
+    contracts = load_gguf_ck_map().get("architectures") or {}
+    for arch, contract in contracts.items():
+        if not isinstance(contract, dict):
+            continue
+        for variant in contract.get("artifact_variants", []) or []:
+            if not isinstance(variant, dict):
+                raise GGUFError(f"{arch}: artifact variant must be an object")
+            required = variant.get("match")
+            if not isinstance(required, dict) or not required:
+                raise GGUFError(f"{arch}: artifact variant requires a non-empty match object")
+            keys.update(str(key) for key in required)
+    return keys
+
+
+def gguf_ck_template_arch(
+    arch: str,
+    metadata: Optional[Dict[str, object]] = None,
+) -> str:
+    contract = gguf_ck_artifact_contract(arch, metadata)
     template = contract.get("template")
     return str(template).lower() if template else str(arch).lower()
 
@@ -387,11 +441,14 @@ def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
     return config
 
 
-def load_template_for_arch(arch: str) -> dict:
+def load_template_for_arch(
+    arch: str,
+    metadata: Optional[Dict[str, object]] = None,
+) -> dict:
     # Intentional contract: template selection is explicit. Most architectures use
     # circuits/<arch>.json directly; GGUF aliases must be declared in
     # model_maps/gguf_ck_map.json rather than guessed in Python conditionals.
-    template_name = gguf_ck_template_arch(arch)
+    template_name = gguf_ck_template_arch(arch, metadata)
     base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "circuits"))
     template_path = os.path.join(base_dir, f"{template_name}.json")
     if not os.path.exists(template_path):
@@ -403,6 +460,25 @@ def load_template_for_arch(arch: str) -> dict:
         template_data = json.load(f)
     _validate_template_runtime_metadata(template_data, source=template_path)
     return template_data
+
+
+def apply_circuit_runtime_defaults(config: dict, template_data: dict) -> dict:
+    """Merge declarative circuit defaults without branching on model family."""
+    defaults = (template_data.get("contract") or {}).get("runtime_defaults") or {}
+    if not isinstance(defaults, dict):
+        raise GGUFError("circuit contract.runtime_defaults must be an object")
+    for key, value in defaults.items():
+        if key == "activation_preference_by_op":
+            current = config.get(key)
+            merged = dict(current) if isinstance(current, dict) else {}
+            if not isinstance(value, dict):
+                raise GGUFError("activation_preference_by_op runtime default must be an object")
+            for op_name, dtype in value.items():
+                merged.setdefault(str(op_name), str(dtype))
+            config[key] = merged
+        else:
+            config.setdefault(str(key), copy.deepcopy(value))
+    return config
 
 
 def apply_model_contract_overrides(
@@ -2678,6 +2754,7 @@ def main() -> None:
         "mistral3.embedding_weight_tying",
         "deepseek2.embedding_weight_tying",
     }
+    wanted_meta.update(gguf_ck_artifact_match_keys())
 
     if args.extract_vocab:
         import subprocess
@@ -2746,8 +2823,9 @@ def main() -> None:
         r.seek(data_start)
 
         arch = str(meta.get("general.architecture", "llama"))
+        artifact_contract = gguf_ck_artifact_contract(arch, meta)
 
-        template_probe_arch = arch
+        template_probe_arch = str(artifact_contract.get("template") or arch)
         if arch == "clip" and str(meta.get("clip.projector_type") or "").strip().lower() == "qwen3vl_merger":
             template_probe_arch = "qwen3_vl_vision"
         if arch == "clip" and str(meta.get("clip.vision.projector_type") or "").strip().lower() == "gemma4v":
@@ -2788,7 +2866,13 @@ def main() -> None:
                 return f"{n} B"
 
             print(f"[gguf] file={args.gguf}")
-            print(f"[gguf] version={version} arch={arch} tensors={n_tensors} kv={n_kv} alignment={alignment} data_start={data_start}")
+            resolved_template = str(artifact_contract.get("template") or arch)
+            artifact_variant = str(artifact_contract.get("artifact_variant") or "")
+            identity = f" variant={artifact_variant}" if artifact_variant else ""
+            print(
+                f"[gguf] version={version} source_arch={arch} circuit={resolved_template}{identity} "
+                f"tensors={n_tensors} kv={n_kv} alignment={alignment} data_start={data_start}"
+            )
             print("[gguf] tensor types:")
             for tcode, cnt in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
                 b = bytes_by_type.get(tcode)
@@ -4592,12 +4676,18 @@ def main() -> None:
                 layer_quant_summary,
             )
 
-            runtime_arch = "qwen35"
+            runtime_arch = str(artifact_contract.get("runtime_arch") or "qwen35")
             qwen35_config = {
                 "model": runtime_arch,
                 "arch": runtime_arch,
                 "model_type": runtime_arch,
                 "source_arch": arch,
+                "source_artifact_variant": str(
+                    artifact_contract.get("artifact_variant") or ""
+                ),
+                "source_model_name": str(meta.get("general.name") or ""),
+                "source_model_basename": str(meta.get("general.basename") or ""),
+                "source_size_label": str(meta.get("general.size_label") or ""),
                 "embed_dim": int(embed_dim),
                 "attn_out_dim": int(attn_query_dim or (num_heads * head_dim)),
                 "num_heads": int(num_heads),
@@ -4701,7 +4791,8 @@ def main() -> None:
             qwen35_quant_summary.update(layer_quant_summary)
 
             if template_data is None:
-                template_data = load_template_for_arch(arch)
+                template_data = load_template_for_arch(runtime_arch)
+            qwen35_config = apply_circuit_runtime_defaults(qwen35_config, template_data)
             template_data = apply_model_contract_overrides(
                 template_data,
                 tie_word_embeddings=bool(tie_word_embeddings),
@@ -4823,7 +4914,7 @@ def main() -> None:
                 if args.bump_version == BUMP_VERSION_V5:
                     manifest_dict = {
                         "version": 5,
-                        "model": arch,
+                        "model": runtime_arch,
                         "bump_layout": {
                             "header_size": HEADER_SIZE,
                             "ext_metadata_size": EXT_METADATA_SIZE,
@@ -4915,10 +5006,11 @@ def main() -> None:
             print(
                 f"[gguf->bump] version={args.bump_version} arch={arch} layers={num_layers} "
                 f"hidden={embed_dim} heads={num_heads}/{num_kv_heads} ff={intermediate} "
-                f"vocab={vocab_size} ctx={context_len} hybrid={arch} -> {args.output}"
+                f"vocab={vocab_size} ctx={context_len} source_arch={arch} "
+                f"circuit={runtime_arch} -> {args.output}"
             )
             print_generic_conversion_report(
-                arch=arch,
+                arch=runtime_arch,
                 manifest_entries=manifest_entries,
                 coverage_report=source_coverage,
             )
@@ -4928,7 +5020,7 @@ def main() -> None:
                 os.makedirs(os.path.dirname(args.manifest_out) or ".", exist_ok=True)
                 manifest = manifest_dict or {
                     "version": 5,
-                    "model": arch,
+                    "model": runtime_arch,
                     "config": qwen35_config if args.bump_version == BUMP_VERSION_V5 else None,
                     "template": template_data if args.bump_version == BUMP_VERSION_V5 else None,
                     "quant_summary": qwen35_quant_summary if args.bump_version == BUMP_VERSION_V5 else None,

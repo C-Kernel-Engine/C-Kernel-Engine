@@ -2,6 +2,31 @@
   "version": 1,
   "description": "Declarative GGUF-to-CK model contract map. Keep model file tensor names here; keep kernel_maps focused on CK op-to-C-kernel bindings.",
   "architectures": {
+    "qwen35": {
+      "template": "qwen35",
+      "family": "qwen35",
+      "artifact_variants": [
+        {
+          "id": "qwen38-27b-unsloth",
+          "match": {
+            "general.basename": "Qwen3.8-27B"
+          },
+          "template": "qwen38",
+          "family": "qwen38",
+          "runtime_arch": "qwen38"
+        },
+        {
+          "id": "qwen38-27b-standard",
+          "match": {
+            "general.basename": "Qwen3.8",
+            "general.size_label": "27B"
+          },
+          "template": "qwen38",
+          "family": "qwen38",
+          "runtime_arch": "qwen38"
+        }
+      ]
+    },
     "nemotron_h": {
       "template": "nemotron_h",
       "family": "nemotron_h",

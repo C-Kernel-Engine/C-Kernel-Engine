@@ -1,0 +1,1030 @@
+{
+  "version": 2,
+  "name": "qwen38",
+  "family": "qwen38",
+  "flags": {
+    "use_qkv_bias": false,
+    "activation": "swiglu",
+    "rope": "rope",
+    "tokenizer": "bpe",
+    "has_qk_norm": true,
+    "prefill_policy": "sequential_decode",
+    "hybrid_block_pattern": "3x_recurrent_then_1x_full_attention",
+    "mlp_topology": "dense_swiglu"
+  },
+  "kernels": {
+    "rope_qk": "mrope_qk_text"
+  },
+  "contract": {
+    "runtime_defaults": {
+      "prefer_q8_0_contract": true,
+      "prefill_gateup_swiglu_fusion_default": false,
+      "activation_preference_by_op": {
+        "recurrent_gate_proj": "q8_k",
+        "recurrent_alpha_proj": "q8_0",
+        "recurrent_beta_proj": "q8_0"
+      }
+    },
+    "tokenizer_contract": {
+      "tokenizer_type": "bpe",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "chat_contract": {
+      "version": 1,
+      "name": "qwen38",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<|im_start|>{role}\n",
+      "turn_suffix": "<|im_end|>\n",
+      "assistant_generation_prefix": "<|im_start|>assistant\n",
+      "role_labels": {
+        "system": "system",
+        "user": "user",
+        "assistant": "assistant"
+      },
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "force_bos_text_if_tokenizer_add_bos_false": "",
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": ["/no_think", "/nothink", "/think"],
+      "thinking_mode_default": "visible",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|im_start|>assistant\n",
+        "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+      },
+      "last_user_prefix_by_thinking_mode": {
+        "visible": "",
+        "suppressed": "/no_think\n"
+      },
+      "stop_text_markers": ["<|im_end|>"],
+      "token_stop_markers": ["<|im_end|>"],
+      "template_markers": ["<|im_start|>", "<|im_end|>", "<think>", "</think>"],
+      "min_response_tokens": 8
+    },
+    "attention_contract": {
+      "rope_layout": "split",
+      "rope_type": "rope",
+      "qk_norm": "hybrid_full_attention_only",
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "hybrid_recurrent_attention",
+      "layer_policy_config_key": "layer_execution_plan",
+      "layer_kind_config_key": "layer_kinds",
+      "state_policy_config_key": "layer_state_policy",
+      "attention_policy_config_key": "layer_attention_policy",
+      "recurrent_policy_config_key": "layer_recurrent_policy",
+      "kv_policy_config_key": "layer_kv_policy"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> silu_mul -> down",
+      "activation": "swiglu",
+      "qkv_bias": false,
+      "body_type": "hybrid_recurrent_attention"
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "weight_tying",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {}
+    }
+  },
+  "required_contracts": {
+    "decoder.attention": {
+      "op": "attention",
+      "template_ops": ["attn"],
+      "selector": {
+        "config_not_equals": {
+          "decode_kv_cache_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "requires": {"execution.phase": "prefill", "execution.prefill_batching": "batch_append", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp16", "tensor.layout": "head_major", "numerics.attention_reduction": "f16_flash_auto_qtile64"},
+          "validation": "validated",
+          "evidence": "Qwen3.6-27B Q4_K_M production replay is bit-exact against llama.cpp for all 353 rows with the 64x64 tiled prefill schedule; batches shorter than 64 retain the provider's single-range path."
+        },
+        "decode": {
+          "requires": {"execution.phase": "decode", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp16", "tensor.layout": "head_major", "numerics.attention_reduction": "f16_online_fp32_merge"},
+          "validation": "validated",
+          "evidence": "v8 Qwen3.5 E2E regression validates dense-attention decode layers; recurrent layers use a separate state contract."
+        }
+      }
+    },
+    "decoder.attention_bf16_pytorch": {
+      "op": "attention",
+      "template_ops": ["attn"],
+      "selector": {
+        "config_equals": {
+          "decode_kv_cache_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "requires": {
+            "execution.phase": "prefill",
+            "execution.prefill_batching": "unified_mixed",
+            "execution.attention_schedule": "full_matrix_causal",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "bf16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "bf16_pytorch_sdpa"
+          },
+          "validation": "observed",
+          "evidence": "Qwen3Next BF16 full-attention prefill preserves BF16 Q/K/V storage and uses the PyTorch SDPA arithmetic contract."
+        },
+        "decode": {
+          "requires": {
+            "execution.phase": "decode",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "bf16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "bf16_pytorch_sdpa"
+          },
+          "validation": "observed",
+          "evidence": "Qwen3Next DynamicCache preserves BF16 K/V storage during incremental decode."
+        }
+      }
+    }
+  },
+  "required_numerical_contracts": {
+    "decoder.rmsnorm": {
+      "operation_interface": "rmsnorm.fp32.v1",
+      "op": "rmsnorm",
+      "template_ops": ["attn_norm", "post_attention_norm", "final_rmsnorm"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Matched-schedule Qwen3.5 X-ray shows generic SIMD RMSNorm differences crossing recurrent alpha/beta Q8_0 thresholds; the llama.cpp production graph oracle is bit-exact."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "The exact provider preserves the same ascending FP64 row reduction and reciprocal-square-root expression across prefill, decode, and CPU ISA variants."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rmsnorm.output",
+        "producer": "rmsnorm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.rmsnorm_bf16_pytorch": {
+      "operation_interface": "rmsnorm.fp32_bf16_values.v1",
+      "op": "rmsnorm",
+      "template_ops": ["attn_norm", "post_attention_norm", "final_rmsnorm"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
+          "validation": "validated",
+          "evidence": "Qwen3.6 BF16 hidden-state RMSNorm uses PyTorch AVX2 cascade reduction and BF16 storage."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the same BF16 RMSNorm storage contract."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rmsnorm.output",
+        "producer": "rmsnorm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.qk_norm": {
+      "operation_interface": "qk_norm.fp32_inplace.v1",
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "selector": {
+        "config_not_equals": {
+          "decoder_qk_norm_reduction_policy": "pytorch_avx2_cascade_exact"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Matched-schedule Qwen3.5 X-ray finds exact Q/K projections followed by the first value drift at Q RMSNorm in full-attention layers."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "The llama-production provider uses the same ascending FP64 reduction and reciprocal-square-root expression as the reference graph."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.qk_norm_bf16_pytorch": {
+      "operation_interface": "qk_norm.fp32_bf16_values_inplace.v1",
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "selector": {
+        "config_equals": {
+          "decoder_qk_norm_reduction_policy": "pytorch_avx2_cascade_exact"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+          "validation": "validated",
+          "evidence": "Qwen3Next full-attention Q/K normalization uses PyTorch BF16 per-head RMSNorm storage and AVX2 cascade reduction."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the same BF16 per-head Q/K normalization contract."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.recurrent_core.prefill": {
+      "op": "gated_deltanet",
+      "template_ops": ["recurrent_core"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gated_deltanet_llama_fused_prefill_fp32_state",
+          "validation": "validated",
+          "evidence": "The pinned llama.cpp production runtime enables fused Gated DeltaNet prefill. Real Qwen3.6-VL attribution confirms that carrying state in ascending token order through the exact decode arithmetic is bit-exact across all 1,035 prompt rows."
+        },
+        "decode": {
+          "contract_id": "gated_deltanet_llama_avx2_decode_fp32_state",
+          "validation": "validated",
+          "evidence": "The production provider tiles compact Q/K groups over value heads and preserves llama.cpp AVX2 decode state-update and reduction order."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_core.output",
+        "producer": "recurrent_core",
+        "logical_layout": "head_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.recurrent_core_bf16_pytorch": {
+      "op": "gated_deltanet",
+      "template_ops": ["recurrent_core"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen3.6 stores 16 compact Q/K groups for 48 value heads; each Q/K group is repeated across three value heads before the DeltaNet update."
+        },
+        "decode": {
+          "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode uses the same 16-to-48 grouped-head mapping and BF16 output boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_core.output",
+        "producer": "recurrent_core",
+        "logical_layout": "head_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.recurrent_norm_gate": {
+      "op": "recurrent_norm_gate",
+      "operation_interface": "recurrent_norm_gate.fp32.v1",
+      "template_ops": ["recurrent_norm_gate"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_norm_gate_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "After exact DeltaNet state parity, matched-schedule X-ray advances to the separate RMSNorm-SiLU-gate composition."
+        },
+        "decode": {
+          "contract_id": "recurrent_norm_gate_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "The provider preserves llama.cpp operation boundaries and evaluation order instead of algebraically fusing the expression."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_norm_gate.output",
+        "producer": "recurrent_norm_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.recurrent_norm_gate_bf16_pytorch": {
+      "op": "recurrent_norm_gate",
+      "operation_interface": "recurrent_norm_gate.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_norm_gate"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_norm_gate_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Real Qwen3.6 BF16 X-ray at layer 0 matches PyTorch RMSNormGated storage and SiLU boundaries."
+        },
+        "decode": {
+          "contract_id": "recurrent_norm_gate_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Decode uses the same BF16 RMSNormGated operator boundaries."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_norm_gate.output",
+        "producer": "recurrent_norm_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.residual_add_bf16_pytorch": {
+      "op": "residual_add",
+      "template_ops": ["residual_add"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "residual_add_bf16_input_fp32_add_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen3.6 hidden states and projection outputs are BF16 tensors; residual addition stores BF16."
+        },
+        "decode": {
+          "contract_id": "residual_add_bf16_input_fp32_add_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode retains the same BF16 residual storage boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.residual_add.output",
+        "producer": "residual_add",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q5_k.prefill": {
+      "op": "gemm",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q5_k"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "q5_k_weight_q8_k_input_avx2_fma_fp32_output",
+          "validation": "validated",
+          "evidence": "Q5_K adapter is bit-exact against the llama.cpp x86 production graph at the Qwen3.5 recurrent QKV shape."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_gate_scalar_projections_llama": {
+      "op": "gemm",
+      "template_ops": [
+        "recurrent_alpha_proj",
+        "recurrent_beta_proj"
+      ],
+      "selector": {
+        "config_equals": {
+          "ssm_time_step_rank": 48
+        },
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
+          "validation": "validated",
+          "evidence": "Real Qwen3.6-27B Q4_K_M layer-0 X-ray is exact through recurrent Q/K pre-delta and first differs in the raw 48-wide FP32 alpha/beta projections; llama.cpp's llamafile single-vector FMA order is bit-exact."
+        },
+        "decode": {
+          "contract_id": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
+          "validation": "validated",
+          "evidence": "The one-token provider follows llama.cpp's ggml_vec_dot four-accumulator reduction rather than the multi-token llamafile path."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_gate_scalar_projection.output",
+        "producer": "recurrent_alpha_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "head"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q6_k.prefill": {
+      "op": "gemm",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q6_k"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "q6_k_weight_q8_k_input_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Q6_K x Q8_K production GEMM matches the llama.cpp CPU graph contract and the Qwen3.6 Q4_K_M recurrent QKV tensors are uniformly Q6_K."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q5_k.decode": {
+      "op": "gemv",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q5_k"
+        }
+      },
+      "phases": {
+        "decode": {
+          "contract_id": "q5_k_weight_q8_k_input_avx2_fma_fp32_output",
+          "validation": "validated",
+          "evidence": "Q5_K adapter is bit-exact against the llama.cpp x86 production graph at M=1,N=6144,K=1024."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q6_k.decode": {
+      "op": "gemv",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q6_k"
+        }
+      },
+      "phases": {
+        "decode": {
+          "contract_id": "q6_k_weight_q8_k_input_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Q6_K x Q8_K production GEMV is bit-exact against the llama.cpp CPU graph and uses independent output partitioning."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q8_0.prefill": {
+      "op": "gemm",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q8_0"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "q8_0_weight_fp32_input_internal_q8_0_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Canonical Q8_0 activation quantization and Q8_0 dot products pass the production llama.cpp vision and decoder parity corpus."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.projections_bf16_pytorch.prefill": {
+      "op": "gemm",
+      "template_ops": [
+        "recurrent_qkv_proj",
+        "recurrent_gate_proj",
+        "recurrent_alpha_proj",
+        "recurrent_beta_proj",
+        "recurrent_out_proj",
+        "q_gate_proj",
+        "k_proj",
+        "v_proj",
+        "out_proj",
+        "mlp_gate_up",
+        "mlp_down",
+        "logits"
+      ],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Real Qwen3.6-27B layer-0 attribution shows that leaving projection outputs in FP32 diverges immediately; applying the PyTorch BF16 output boundary restores 99.9-100% elementwise equality before reduction-order effects."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qkv_projection.q8_0.decode": {
+      "op": "gemv",
+      "template_ops": ["recurrent_qkv_proj"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "q8_0"
+        }
+      },
+      "phases": {
+        "decode": {
+          "contract_id": "q8_0_weight_fp32_input_internal_q8_0_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Canonical Q8_0 activation quantization and Q8_0 dot products pass the production llama.cpp vision and decoder parity corpus."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.projections_bf16_pytorch.decode": {
+      "op": "gemm",
+      "template_ops": [
+        "recurrent_qkv_proj",
+        "recurrent_gate_proj",
+        "recurrent_alpha_proj",
+        "recurrent_beta_proj",
+        "recurrent_out_proj",
+        "q_gate_proj",
+        "k_proj",
+        "v_proj",
+        "out_proj",
+        "mlp_gate_up",
+        "mlp_down",
+        "logits"
+      ],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "decode": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "The exact oneDNN provider is validated at M=1 as well as batched prefill, preserving the same PyTorch BF16 projection boundary across decode."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qkv_projection.output",
+        "producer": "recurrent_qkv_proj",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qk_l2_norm": {
+      "op": "recurrent_qk_l2_norm",
+      "operation_interface": "recurrent_qk_l2_norm.fp32_inplace.v1",
+      "template_ops": ["recurrent_qk_l2_norm"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_qk_l2_llama_cpu_fp32_output",
+          "validation": "validated",
+          "evidence": "Production ggml graph parity is bit-exact at Qwen3.5 dimensions and eps=1e-6."
+        },
+        "decode": {
+          "contract_id": "recurrent_qk_l2_llama_cpu_fp32_output",
+          "validation": "validated",
+          "evidence": "Production ggml graph parity is bit-exact at Qwen3.5 dimensions and eps=1e-6."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qk_l2_norm.output",
+        "producer": "recurrent_qk_l2_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.recurrent_qk_l2_norm_bf16_pytorch": {
+      "op": "recurrent_qk_l2_norm",
+      "operation_interface": "recurrent_qk_l2_norm.fp32_bf16_values_inplace.v1",
+      "template_ops": ["recurrent_qk_l2_norm"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_qk_l2_pytorch_bf16_vector_tail_bf16_output",
+          "validation": "validated",
+          "evidence": "Byte-exact against PyTorch 2.8 CPU BF16 l2norm at production head width across prompt lengths 1 through 353, including the Vec<BF16> scalar-tail boundary."
+        },
+        "decode": {
+          "contract_id": "recurrent_qk_l2_pytorch_bf16_vector_tail_bf16_output",
+          "validation": "validated",
+          "evidence": "The one-token path explicitly matches PyTorch's BF16 scalar-tail rsqrt behavior."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qk_l2_norm.output",
+        "producer": "recurrent_qk_l2_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.recurrent_ssm_conv": {
+      "op": "ssm_conv1d",
+      "operation_interface": "ssm_conv1d.fp32.v1",
+      "template_ops": ["recurrent_ssm_conv"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16",
+          "recurrent_ssm_arithmetic": "llama_fma"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "ssm_conv1d_llama_scalar_mul_add_fp32_output",
+          "validation": "validated",
+          "evidence": "The separated provider retains the most stable certified Qwen3.6 trajectory while the independently certified FMA candidate exposes a compensating downstream deviation."
+        },
+        "decode": {
+          "contract_id": "ssm_conv1d_llama_scalar_mul_add_fp32_output",
+          "validation": "validated",
+          "evidence": "The separated provider remains production until the FMA candidate's earlier end-to-end trajectory divergence is attributed and resolved."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_ssm_conv.output",
+        "producer": "recurrent_ssm_conv",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_ssm_conv_fma": {
+      "op": "ssm_conv1d",
+      "operation_interface": "ssm_conv1d.fp32.v1",
+      "template_ops": ["recurrent_ssm_conv"],
+      "selector": {
+        "config_equals": {
+          "recurrent_ssm_arithmetic": "llama_fma"
+        },
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "ssm_conv1d_llama_fma_fp32_output",
+          "validation": "validated",
+          "evidence": "The explicit Qwen3.6-VL circuit pairs contracted SSM arithmetic with segment-preserving Q4 projection row groups; together the real OCR prefix is bit-exact through decoder layers 0 and 1."
+        },
+        "decode": {
+          "contract_id": "ssm_conv1d_llama_fma_fp32_output",
+          "validation": "validated",
+          "evidence": "The same contracted scalar chain is deterministic across thread counts and preserves the selected multimodal trajectory contract."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_ssm_conv.output",
+        "producer": "recurrent_ssm_conv",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_ssm_conv_bf16_pytorch": {
+      "op": "ssm_conv1d",
+      "operation_interface": "ssm_conv1d.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_ssm_conv"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "ssm_conv1d_pytorch_fp32_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Real Qwen3.6-27B layer-0 attribution is byte-exact only after storing the raw recurrent convolution output to BF16 before SiLU."
+        },
+        "decode": {
+          "contract_id": "ssm_conv1d_pytorch_fp32_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode preserves the same checkpoint-derived BF16 activation boundary as prefill."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_ssm_conv.output",
+        "producer": "recurrent_ssm_conv",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_silu": {
+      "op": "recurrent_silu",
+      "operation_interface": "recurrent_silu.fp32.v1",
+      "template_ops": ["recurrent_silu"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_silu_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "llama.cpp production callback parity isolates byte-exact convolution input/raw output and requires its AVX2 vector SiLU evaluation."
+        },
+        "decode": {
+          "contract_id": "recurrent_silu_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 step-27 X-ray identifies recurrent SiLU as the first non-exact layer-0 boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_silu.output",
+        "producer": "recurrent_silu",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_silu_bf16_pytorch": {
+      "op": "recurrent_silu",
+      "operation_interface": "recurrent_silu.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_silu"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_silu_pytorch_sleef_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "The real PyTorch BF16 layer consumes the BF16-stored convolution result and stores the SLEEF SiLU result to BF16."
+        },
+        "decode": {
+          "contract_id": "recurrent_silu_pytorch_sleef_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode uses the identical BF16 activation and transcendental boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_silu.output",
+        "producer": "recurrent_silu",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.attention_gate": {
+      "op": "attn_gate_sigmoid_mul",
+      "operation_interface": "attn_gate_sigmoid_mul.fp32.v1",
+      "template_ops": ["attn_gate_sigmoid_mul"],
+      "phases": {
+        "prefill": {
+          "contract_id": "attention_gate_llama_sigmoid_fp32_output",
+          "validation": "validated",
+          "evidence": "Schedule-preserving X-ray finds exact pre-gate attention followed by one-ULP sigmoid drift that crosses a later Q8_K MLP boundary."
+        },
+        "decode": {
+          "contract_id": "attention_gate_llama_sigmoid_fp32_output",
+          "validation": "validated",
+          "evidence": "The same provider is bit-exact against the llama.cpp CPU production formula for negative and positive gates."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.attention_gate.output",
+        "producer": "attn_gate_sigmoid_mul",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.swiglu": {
+      "op": "swiglu",
+      "operation_interface": "swiglu.fp32.v1",
+      "template_ops": ["silu_mul"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 uses the same llama.cpp GGML vector-exp and direct-division SwiGLU arithmetic as the validated decoder provider."
+        },
+        "decode": {
+          "contract_id": "swiglu_fp32_ggml_vector_exp_fp32_output",
+          "validation": "validated",
+          "evidence": "Long-form prompt parity requires exact GGML SwiGLU arithmetic at every recurrent and full-attention decoder layer."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.swiglu.output",
+        "producer": "silu_mul",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.swiglu_bf16_pytorch": {
+      "op": "swiglu",
+      "operation_interface": "swiglu.fp32_bf16_values.v1",
+      "template_ops": ["silu_mul"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "swiglu_pytorch_sleef_bf16_intermediate_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen3.6 BF16 MLP uses PyTorch SLEEF SiLU with BF16 intermediate and output storage."
+        },
+        "decode": {
+          "contract_id": "swiglu_pytorch_sleef_bf16_intermediate_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode retains identical BF16 SwiGLU storage boundaries."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.swiglu.output",
+        "producer": "silu_mul",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.mrope": {
+      "op": "rope",
+      "template_ops": ["rope_qk"],
+      "phases": {
+        "prefill": {
+          "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 regression validates configured partial-width text M-RoPE through call IR and end-to-end inference."
+        },
+        "decode": {
+          "contract_id": "text_mrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen3.5 regression validates configured partial-width text M-RoPE through call IR and end-to-end inference."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mrope.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    }
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "hybrid_recurrent_attention",
+        "kind_config_key": "layer_kinds",
+        "interval_config_key": "full_attention_interval",
+        "periodic_kind": "full_attention",
+        "default_kind": "recurrent",
+        "quant_aliases_common": {
+          "ln1_gamma": "attn_norm",
+          "ln2_gamma": "post_attention_norm",
+          "w1": "ffn_gate",
+          "w3": "ffn_up",
+          "w2": "ffn_down"
+        },
+        "quant_aliases_by_kind": {
+          "full_attention": {
+            "wq": "attn_q_gate",
+            "wk": "attn_k",
+            "wv": "attn_v",
+            "wo": "attn_output",
+            "q_norm": "attn_q_norm",
+            "k_norm": "attn_k_norm"
+          }
+        },
+        "ops_by_kind": {
+          "recurrent": [
+            "attn_norm",
+            "recurrent_qkv_proj",
+            "recurrent_gate_proj",
+            "recurrent_alpha_proj",
+            "recurrent_beta_proj",
+            "recurrent_split_qkv",
+            "recurrent_dt_gate",
+            "recurrent_conv_state_update",
+            "recurrent_ssm_conv",
+            "recurrent_silu",
+            "recurrent_split_conv_qkv",
+            "recurrent_qk_l2_norm",
+            "recurrent_core",
+            "recurrent_norm_gate",
+            "recurrent_out_proj",
+            "residual_add",
+            "post_attention_norm",
+            "mlp_gate_up",
+            "silu_mul",
+            "mlp_down",
+            "residual_add"
+          ],
+          "full_attention": [
+            "attn_norm",
+            "q_gate_proj",
+            "split_q_gate",
+            "k_proj",
+            "v_proj",
+            "qk_norm",
+            "rope_qk",
+            "attn",
+            "attn_gate_sigmoid_mul",
+            "out_proj",
+            "residual_add",
+            "post_attention_norm",
+            "mlp_gate_up",
+            "silu_mul",
+            "mlp_down",
+            "residual_add"
+          ]
+        }
+      },
+      "footer": [
+        "final_rmsnorm",
+        "weight_tying",
+        "logits"
+      ]
+    }
+  }
+}
