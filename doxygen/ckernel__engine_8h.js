@@ -501,6 +501,7 @@ var ckernel__engine_8h =
     [ "vec_dot_q6_k_q8_k", "ckernel__engine_8h.html#a892b783bece286ef3d51dfef42017ac5", null ],
     [ "vision_position_ids_2d_merge", "ckernel__engine_8h.html#af0161c757898c6d0193bcae1415dc1e4", null ],
     [ "weighted_sum_f32", "ckernel__engine_8h.html#a6923864d9edb216c4938436cd74a4823", null ],
+    [ "yarn_rope_cache_contiguous_positions_f32", "ckernel__engine_8h.html#a993ff02bbef882dac5892be3db86e53e", null ],
     [ "yarn_rope_cache_explicit_positions_bf16", "ckernel__engine_8h.html#a3b2a3c0e00fba2964884ae6db444565d", null ],
     [ "yarn_rope_cache_explicit_positions_f32", "ckernel__engine_8h.html#abdc5ff497129c93f5d6db4cffc24897a", null ]
 ];
