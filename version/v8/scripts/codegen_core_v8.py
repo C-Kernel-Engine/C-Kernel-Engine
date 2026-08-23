@@ -1912,6 +1912,15 @@ def emit_op(
         _emit_hidden_export(_hidden_arg("q"), "q_proj", _mul_expr(rows, _hidden_arg("q_dim")))
         _emit_hidden_export(_hidden_arg("k"), "k_proj", _mul_expr(rows, _hidden_arg("k_dim")))
         _emit_hidden_export(_hidden_arg("v"), "v_proj", _mul_expr(rows, _hidden_arg("v_dim")))
+    elif op_name in ("q_proj", "k_proj", "v_proj"):
+        # Quantized providers with specialized emission export their outputs
+        # before returning. Keep the generic fallback observable as well, for
+        # providers such as compact Q5_K GEMV that use the call-ready ABI.
+        _emit_hidden_export(
+            _hidden_arg("y", "output", "out", "c"),
+            op_name,
+            _hidden_arg("M", "N", "out_dim"),
+        )
     elif op_name == "split_q_gate":
         _emit_hidden_export(
             _hidden_arg("gate"),

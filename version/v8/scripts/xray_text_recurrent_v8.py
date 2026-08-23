@@ -128,6 +128,13 @@ ORACLE_BOUNDARY_OCCURRENCES = {
 }
 
 
+def ck_capture_names(boundaries: Sequence[str]) -> tuple[str, ...]:
+    names = list(boundaries)
+    if "mlp_gate" in names or "mlp_up" in names:
+        names.append("mlp_gate_up")
+    return tuple(dict.fromkeys(names))
+
+
 def boundaries_for_layer(config: dict[str, Any], layer: int) -> tuple[str, ...]:
     layer_kinds = config.get("layer_kinds")
     if not isinstance(layer_kinds, list) or not layer_kinds:
@@ -304,6 +311,18 @@ def _load_ck_row(
 ) -> np.ndarray:
     if ck_prefill_mode == "hybrid" and logical_token < prompt_tokens:
         path = root / f"tok_{0:04d}_layer_{layer:03d}_{name}.f32"
+        if not path.is_file() and name in {"mlp_gate", "mlp_up"}:
+            combined_path = root / f"tok_{0:04d}_layer_{layer:03d}_mlp_gate_up.f32"
+            combined = np.fromfile(combined_path, dtype=np.float32)
+            combined_width = 2 * expected_count
+            if combined.size != prompt_tokens * combined_width:
+                raise ValueError(
+                    "batched CK fused gate/up extent mismatch: "
+                    f"{combined.size} != {prompt_tokens}*{combined_width}"
+                )
+            rows = combined.reshape(prompt_tokens, combined_width)
+            offset = 0 if name == "mlp_gate" else expected_count
+            return rows[logical_token, offset : offset + expected_count]
         data = np.fromfile(path, dtype=np.float32)
         if name == "new_state":
             if logical_token != prompt_tokens - 1 or data.size != expected_count:
@@ -498,6 +517,7 @@ def capture_and_analyze(
     if attention_kv_heads <= 0:
         raise ValueError("model config must declare a positive key/value head count")
     boundaries = boundaries_for_layer(config, layer)
+    physical_ck_boundaries = ck_capture_names(boundaries)
     recurrent_state_physical_layout = str(
         config.get(
             "recurrent_state_physical_layout", "head_key_value_contiguous"
@@ -538,7 +558,7 @@ def capture_and_analyze(
             {
                 "CK_DEBUG_EXPORT_HIDDEN": str(ck_root),
                 "CK_DEBUG_EXPORT_HIDDEN_LAYER": str(layer),
-                "CK_DEBUG_EXPORT_HIDDEN_NAMES": ",".join(boundaries),
+                "CK_DEBUG_EXPORT_HIDDEN_NAMES": ",".join(physical_ck_boundaries),
             },
         )
 
@@ -564,6 +584,7 @@ def capture_and_analyze(
     )
     report["layer_kind"] = str(config["layer_kinds"][layer])
     report["requested_boundaries"] = list(boundaries)
+    report["ck_capture_boundaries"] = list(physical_ck_boundaries)
     report["recurrent_state_physical_layout"] = recurrent_state_physical_layout
     report["source_parity_report"] = str(parity_report)
     report["capture_root"] = str(capture_root)

@@ -40,6 +40,13 @@ class TextRecurrentXRayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             XRAY.boundaries_for_layer({"layer_kinds": ["mystery"]}, 0)
 
+    def test_capture_plan_includes_physical_fused_gate_up_dependency(self) -> None:
+        names = XRAY.ck_capture_names(("attn_norm", "mlp_gate", "mlp_up"))
+        self.assertEqual(
+            names,
+            ("attn_norm", "mlp_gate", "mlp_up", "mlp_gate_up"),
+        )
+
     def test_ck_capture_runs_in_short_lived_worker(self) -> None:
         process = mock.Mock()
         process.exitcode = 0
@@ -190,6 +197,27 @@ class TextRecurrentXRayTests(unittest.TestCase):
             values.tofile(root / "tok_0000_layer_000_z.f32")
             row = XRAY._load_ck_row(root, "z", 0, 2, 3, 4, "hybrid")
             np.testing.assert_array_equal(row, values[2])
+
+    def test_hybrid_ck_gate_and_up_rows_are_reconstructed_from_fused_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            values = np.arange(24, dtype=np.float32).reshape(3, 8)
+            values.tofile(root / "tok_0000_layer_000_mlp_gate_up.f32")
+
+            gate = XRAY._load_ck_row(root, "mlp_gate", 0, 1, 3, 4, "hybrid")
+            up = XRAY._load_ck_row(root, "mlp_up", 0, 1, 3, 4, "hybrid")
+
+            np.testing.assert_array_equal(gate, values[1, :4])
+            np.testing.assert_array_equal(up, values[1, 4:])
+
+    def test_hybrid_ck_fused_gate_up_extent_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            np.arange(23, dtype=np.float32).tofile(
+                root / "tok_0000_layer_000_mlp_gate_up.f32"
+            )
+            with self.assertRaisesRegex(ValueError, "fused gate/up extent mismatch"):
+                XRAY._load_ck_row(root, "mlp_gate", 0, 1, 3, 4, "hybrid")
 
     def test_hybrid_ck_attention_rows_are_canonicalized_from_head_major(self) -> None:
         with tempfile.TemporaryDirectory() as td:
