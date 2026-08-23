@@ -179,4 +179,14 @@ def validate_graph_slots(
         "operation_interface": interface_id,
         "inputs": dict(input_slots),
         "outputs": dict(output_slots),
+        "port_dtypes": {
+            "inputs": {
+                name: str(canonical["inputs"][name]["dtype"])
+                for name in input_slots
+            },
+            "outputs": {
+                name: str(canonical["outputs"][name]["dtype"])
+                for name in output_slots
+            },
+        },
     }

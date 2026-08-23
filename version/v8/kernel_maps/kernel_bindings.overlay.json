@@ -582,76 +582,6 @@
         }
       ]
     },
-    "gemm_naive_parallel": {
-      "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
-      "params": [
-        {
-          "cast": "const float*",
-          "name": "A",
-          "source": "activation:a"
-        },
-        {
-          "name": "B",
-          "source": "weight:_first_weight"
-        },
-        {
-          "name": "bias",
-          "source": "weight_f:_bias"
-        },
-        {
-          "cast": "float*",
-          "name": "C",
-          "source": "output:c"
-        },
-        {
-          "name": "M",
-          "source": "dim:_m"
-        },
-        {
-          "name": "N",
-          "source": "dim:_output_dim"
-        },
-        {
-          "name": "K",
-          "source": "dim:_input_dim"
-        }
-      ]
-    },
-    "gemm_nt_fp32_exact": {
-      "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
-      "params": [
-        {
-          "cast": "const float*",
-          "name": "A",
-          "source": "activation:a"
-        },
-        {
-          "name": "B",
-          "source": "weight:_first_weight"
-        },
-        {
-          "name": "bias",
-          "source": "weight_f:_bias"
-        },
-        {
-          "cast": "float*",
-          "name": "C",
-          "source": "output:c"
-        },
-        {
-          "name": "M",
-          "source": "dim:_m"
-        },
-        {
-          "name": "N",
-          "source": "dim:_output_dim"
-        },
-        {
-          "name": "K",
-          "source": "dim:_input_dim"
-        }
-      ]
-    },
     "gemma4_final_logit_softcap_forward": {
       "note": "Apply Gemma4 final logit softcapping in-place: tanh(logit / cap) * cap.",
       "params": [
@@ -2275,50 +2205,6 @@
         {
           "name": "intermediate_dim",
           "source": "dim:moe_shared_expert_intermediate_size"
-        }
-      ]
-    },
-    "deepseek_mla_kv_decompress_bf16": {
-      "params": [
-        {
-          "name": "compressed_kv",
-          "source": "activation:compressed_kv",
-          "cast": "const float*"
-        },
-        {
-          "name": "kv_b_proj",
-          "source": "weight:mla_kv_b_proj",
-          "cast": "const uint16_t*"
-        },
-        {
-          "name": "k_nope",
-          "source": "output:k_nope",
-          "cast": "float*"
-        },
-        {
-          "name": "value",
-          "source": "output:value",
-          "cast": "float*"
-        },
-        {
-          "name": "tokens",
-          "source": "dim:_m"
-        },
-        {
-          "name": "heads",
-          "source": "dim:num_heads"
-        },
-        {
-          "name": "kv_lora_rank",
-          "source": "dim:kv_lora_rank"
-        },
-        {
-          "name": "qk_nope_dim",
-          "source": "dim:qk_nope_head_dim"
-        },
-        {
-          "name": "v_dim",
-          "source": "dim:v_head_dim"
         }
       ]
     },

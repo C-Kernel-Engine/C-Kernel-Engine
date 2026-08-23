@@ -34,6 +34,77 @@ class _FakeCFunc:
 
 
 class TestCKChatRuntimeContract(unittest.TestCase):
+    def test_manifest_template_contract_is_authoritative(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_manifest_contract_") as td:
+            run_dir = Path(td)
+            (run_dir / "weights_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "template": {
+                            "name": "fixture",
+                            "contract": {
+                                "chat_contract": {
+                                    "name": "fixture",
+                                    "raw_prompt_allowed": False,
+                                    "conversation_prefix": "<bos>",
+                                    "turn_prefix_by_role": {"user": "<user>"},
+                                    "assistant_generation_prefix": "<assistant>",
+                                }
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+
+            self.assertTrue(model.use_chat_template)
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<bos><user>Hello<assistant>",
+            )
+
+    def test_role_specific_turn_contract_matches_deepseek_style_template(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_role_contract_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps(
+                    {
+                        "chat_contract": {
+                            "name": "role_specific",
+                            "raw_prompt_allowed": False,
+                            "conversation_prefix": "<bos>",
+                            "turn_prefix_by_role": {
+                                "system": "",
+                                "user": "<user>",
+                                "assistant": "<assistant>",
+                            },
+                            "turn_suffix_by_role": {
+                                "assistant": "<eos>",
+                            },
+                            "assistant_generation_prefix": "<assistant>",
+                            "system_prompt_mode": "dedicated_turn",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<bos><user>Hello<assistant>",
+            )
+            self.assertEqual(
+                model.format_chat_conversation(
+                    [("user", "Hello"), ("assistant", "Hi"), ("user", "Next")],
+                    system_prompt="System",
+                ),
+                "<bos>System<user>Hello<assistant>Hi<eos><user>Next<assistant>",
+            )
+
     def test_glm4_contract_matches_gguf_generation_prompt_exactly(self) -> None:
         model = ck_chat.CKModel("/tmp/nonexistent")
         model._configure_chat_template("glm4")

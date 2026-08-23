@@ -405,6 +405,13 @@ class MemoryPlanner:
         if isinstance(input_info.get("from"), str) and input_info["from"].startswith("external:"):
             slot = input_info["from"]
 
+        # An explicit graph slot is the circuit-owned semantic edge. Kernel
+        # dtype lowering has already selected any required physical view (for
+        # example main_stream_q8), so legacy op-name defaults must not replace
+        # a declared normalized or auxiliary stream here.
+        if isinstance(slot, str) and slot:
+            return self.state.get_buffer_for_slot(slot), dtype
+
         # Special cases based on op type and input name
         if op_type == "residual_add":
             if input_name == "a":
@@ -494,9 +501,6 @@ class MemoryPlanner:
             # logits reads quantized final hidden state
             return self.state.main_stream_q8_buffer, dtype
 
-        if isinstance(slot, str) and slot:
-            return self.state.get_buffer_for_slot(slot), dtype
-
         # Default: use main stream
         return self.state.main_stream_buffer, dtype
 
@@ -506,6 +510,14 @@ class MemoryPlanner:
 
         dtype = output_info.get("dtype", "fp32")
         slot = output_info.get("slot")
+
+        # Explicit circuit graph slots own output placement just as they own
+        # input placement. Legacy operation defaults apply only when the
+        # circuit did not declare a semantic output edge.
+        if isinstance(slot, str) and slot:
+            buffer = self.state.get_buffer_for_slot(slot)
+            self.state.record_write(buffer, op_id, dtype)
+            return buffer, dtype
 
         # Special cases based on op type
         if op_type == "dense_embedding_lookup":
@@ -614,11 +626,6 @@ class MemoryPlanner:
             buffer = "A_RESIDUAL"
             self.state.record_write(buffer, op_id, "fp32")
             return buffer, "fp32"
-
-        if isinstance(slot, str) and slot:
-            buffer = self.state.get_buffer_for_slot(slot)
-            self.state.record_write(buffer, op_id, dtype)
-            return buffer, dtype
 
         # Default: use main stream
         buffer = self.state.main_stream_buffer

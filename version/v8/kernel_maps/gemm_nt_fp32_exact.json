@@ -1,6 +1,7 @@
 {
   "id": "gemm_nt_fp32_exact",
   "op": "gemm",
+  "operation_interface": "gemm.fp32_activation.fp32_weight.fp32_output.v1",
   "variant": "fp32_nt_exact",
   "quant": {
     "weight": "fp32",
@@ -12,12 +13,24 @@
       "name": "A",
       "dtype": "fp32",
       "shape": ["M", "K"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
       "desc": "Activation matrix [M, K] (row-major)"
-    },
+    }
+  ],
+  "weights": [
     {
       "name": "B",
       "dtype": "fp32",
       "shape": ["N", "K"],
+      "layout": "output_feature_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
       "desc": "Weight matrix [N, K] (row-major, transposed logical layout)"
     },
     {
@@ -25,6 +38,11 @@
       "dtype": "fp32",
       "shape": ["N"],
       "optional": true,
+      "layout": "feature_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "optional",
       "desc": "Bias vector [N] (or NULL)"
     }
   ],
@@ -33,6 +51,11 @@
       "name": "C",
       "dtype": "fp32",
       "shape": ["M", "N"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
       "desc": "Output matrix [M, N] = A @ B^T + bias"
     }
   ],
@@ -45,6 +68,19 @@
     "function": "gemm_naive_parallel",
     "c_declaration": "void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels.c"]
+  },
+  "call_abi": {
+    "version": 1,
+    "last_token_dispatch": "preserve_provider",
+    "params": [
+      {"name": "A", "source": "activation:a", "cast": "const float*", "ports": ["input:A"]},
+      {"name": "B", "source": "weight:_first_weight", "cast": "const float*", "ports": ["weight:B"]},
+      {"name": "bias", "source": "weight_f:_bias", "ports": ["weight:bias"]},
+      {"name": "C", "source": "output:c", "cast": "float*", "ports": ["output:C"]},
+      {"name": "M", "source": "runtime:seq_len"},
+      {"name": "N", "source": "dim:_output_dim"},
+      {"name": "K", "source": "dim:_input_dim"}
+    ]
   },
   "tests": {
     "unit": ["unittest/test_gemm.py", "tests/test_v8_qwen3vl_template.py"]

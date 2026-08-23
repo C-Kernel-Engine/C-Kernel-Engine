@@ -1251,6 +1251,15 @@ def emit_prefill_op(
             _hidden_mul(_hidden_arg("m", "rows", "num_tokens") or "num_tokens", v_width),
         )
         _emit_hidden_last(_hidden_arg("output", "out", "c", "y"), "v_proj", v_width)
+    elif op_type == "attention_gate_projection":
+        _emit_hidden_full(
+            _hidden_arg("output", "out", "c", "y"),
+            "attn_gate",
+            _hidden_mul(
+                _hidden_arg("rows", "num_tokens") or "num_tokens",
+                _hidden_arg("N", "n", "gate_dim"),
+            ),
+        )
     elif op_type == "split_q_gate":
         _emit_hidden_full(
             _hidden_arg("gate"),
@@ -1327,6 +1336,13 @@ def emit_prefill_op(
             _emit_hidden_last(_hidden_arg("output", "out", "x", "y"), "rmsnorm", "EMBED_DIM")
     elif op_type == "block_rmsnorm":
         label = "block_rmsnorm" if op_instance_idx == 0 else "ffn_norm"
+        if op_instance_idx == 1:
+            _emit_hidden_full(
+                _hidden_arg("input", "x"),
+                "ffn_input",
+                _hidden_mul(_hidden_arg("rows", "num_tokens") or "num_tokens", "EMBED_DIM"),
+            )
+            _emit_hidden_last(_hidden_arg("input", "x"), "ffn_input", "EMBED_DIM")
         _emit_hidden_full(
             _hidden_arg("output", "out", "x", "y"),
             label,
@@ -1362,6 +1378,13 @@ def emit_prefill_op(
         output = _hidden_arg("output", "out")
         _emit_hidden_full(output, "moe_combined_output", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(output, "moe_combined_output", "EMBED_DIM")
+    elif op_type == "farskip_routed_shared_combine":
+        main_output = _hidden_arg("main_output")
+        routed_free_output = _hidden_arg("routed_free_output")
+        _emit_hidden_full(main_output, "layer_out", _hidden_mul("num_tokens", "EMBED_DIM"))
+        _emit_hidden_last(main_output, "layer_out", "EMBED_DIM")
+        _emit_hidden_full(routed_free_output, "routed_free_out", _hidden_mul("num_tokens", "EMBED_DIM"))
+        _emit_hidden_last(routed_free_output, "routed_free_out", "EMBED_DIM")
     elif op_type == "residual_add":
         if op_instance_idx == 0:
             _emit_hidden_full(_hidden_arg("output", "out", "c", "y"), "after_attn", _hidden_mul("num_tokens", "EMBED_DIM"))

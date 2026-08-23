@@ -123,8 +123,11 @@ def normalize_chat_contract(contract: Any) -> Optional[dict[str, Any]]:
     out.setdefault("version", 1)
     out.setdefault("name", "")
     out.setdefault("raw_prompt_allowed", False)
+    out.setdefault("conversation_prefix", "")
     out.setdefault("turn_prefix", "")
     out.setdefault("turn_suffix", "")
+    out.setdefault("turn_prefix_by_role", {})
+    out.setdefault("turn_suffix_by_role", {})
     out.setdefault("assistant_generation_prefix", "")
     out.setdefault("system_prompt_mode", "disabled")
     out.setdefault("system_prompt_separator", "\n\n")
@@ -146,6 +149,8 @@ def normalize_chat_contract(contract: Any) -> Optional[dict[str, Any]]:
     for dict_key in (
         "assistant_generation_prefix_by_thinking_mode",
         "last_user_prefix_by_thinking_mode",
+        "turn_prefix_by_role",
+        "turn_suffix_by_role",
     ):
         value = out.get(dict_key)
         if not isinstance(value, dict):

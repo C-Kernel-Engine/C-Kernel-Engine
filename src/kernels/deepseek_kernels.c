@@ -244,7 +244,8 @@ void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
                     acc += bf16_to_float(kv_b_proj[(size_t)out_col * (size_t)kv_lora_rank + (size_t)r]) *
                            compressed_kv[ds_mla_tok_idx(t, r, kv_lora_rank)];
                 }
-                k_nope[ds_mla_thd_idx(t, h, d, heads, qk_nope_dim)] = acc;
+                k_nope[ds_mla_thd_idx(t, h, d, heads, qk_nope_dim)] =
+                    bf16_to_float(float_to_bf16(acc));
             }
             for (int d = 0; d < v_dim; ++d) {
                 const int out_col = h * out_per_head + qk_nope_dim + d;
@@ -253,7 +254,8 @@ void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
                     acc += bf16_to_float(kv_b_proj[(size_t)out_col * (size_t)kv_lora_rank + (size_t)r]) *
                            compressed_kv[ds_mla_tok_idx(t, r, kv_lora_rank)];
                 }
-                value[ds_mla_thd_idx(t, h, d, heads, v_dim)] = acc;
+                value[ds_mla_thd_idx(t, h, d, heads, v_dim)] =
+                    bf16_to_float(float_to_bf16(acc));
             }
         }
     }
@@ -333,13 +335,16 @@ void deepseek_mla_partial_rope_concat_packed_f32(const float *q_packed,
 {
     if (!q_packed || !k_nope || !kv_a_packed || !cos || !sin || !query || !key ||
         tokens <= 0 || heads <= 0 || kv_lora_rank <= 0 || qk_nope_dim <= 0 ||
-        qk_rope_dim <= 0 || (qk_rope_dim % 2) != 0) {
+        qk_rope_dim <= 0 || qk_rope_dim > 256 || (qk_rope_dim % 2) != 0) {
         return;
     }
 
     const int q_head_dim = qk_nope_dim + qk_rope_dim;
     const int kv_a_dim = kv_lora_rank + qk_rope_dim;
     const int half = qk_rope_dim / 2;
+    if (qk_rope_dim > 256) {
+        return;
+    }
     for (int t = 0; t < tokens; ++t) {
         const float *cos_row = cos + (size_t)t * (size_t)half;
         const float *sin_row = sin + (size_t)t * (size_t)half;
@@ -372,6 +377,79 @@ void deepseek_mla_partial_rope_concat_packed_f32(const float *q_packed,
                 q_out[qk_nope_dim + half + i] = q_second * c + q_first * ss;
                 k_out[qk_nope_dim + i] = k_first * c - k_second * ss;
                 k_out[qk_nope_dim + half + i] = k_second * c + k_first * ss;
+            }
+        }
+    }
+}
+
+static inline float ds_mla_bf16_round(float value)
+{
+    return bf16_to_float(float_to_bf16(value));
+}
+
+void deepseek_mla_partial_rope_concat_packed_bf16_storage(
+    const float *q_packed,
+    const float *k_nope,
+    const float *kv_a_packed,
+    const float *cos,
+    const float *sin,
+    float *query,
+    float *key,
+    int tokens,
+    int heads,
+    int kv_lora_rank,
+    int qk_nope_dim,
+    int qk_rope_dim)
+{
+    if (!q_packed || !k_nope || !kv_a_packed || !cos || !sin || !query || !key ||
+        tokens <= 0 || heads <= 0 || kv_lora_rank <= 0 || qk_nope_dim <= 0 ||
+        qk_rope_dim <= 0 || (qk_rope_dim % 2) != 0) {
+        return;
+    }
+
+    const int q_head_dim = qk_nope_dim + qk_rope_dim;
+    const int kv_a_dim = kv_lora_rank + qk_rope_dim;
+    const int half = qk_rope_dim / 2;
+    for (int t = 0; t < tokens; ++t) {
+        const float *cos_row = cos + (size_t)t * (size_t)half;
+        const float *sin_row = sin + (size_t)t * (size_t)half;
+        const float *kp = kv_a_packed + (size_t)t * (size_t)kv_a_dim + (size_t)kv_lora_rank;
+        for (int h = 0; h < heads; ++h) {
+            const float *q_in = q_packed + ds_mla_thd_idx(t, h, 0, heads, q_head_dim);
+            const float *kn = k_nope + ds_mla_thd_idx(t, h, 0, heads, qk_nope_dim);
+            float *q_out = query + ds_mla_thd_idx(t, h, 0, heads, q_head_dim);
+            float *k_out = key + ds_mla_thd_idx(t, h, 0, heads, q_head_dim);
+
+            for (int d = 0; d < qk_nope_dim; ++d) {
+                q_out[d] = ds_mla_bf16_round(q_in[d]);
+                k_out[d] = ds_mla_bf16_round(kn[d]);
+            }
+
+            float q_pe_tmp[256];
+            for (int i = 0; i < qk_rope_dim; ++i) {
+                q_pe_tmp[i] = ds_mla_bf16_round(q_in[qk_nope_dim + i]);
+            }
+            for (int i = 0; i < half; ++i) {
+                const float q_first = q_pe_tmp[2 * i];
+                const float q_second = q_pe_tmp[2 * i + 1];
+                const float k_first = ds_mla_bf16_round(kp[2 * i]);
+                const float k_second = ds_mla_bf16_round(kp[2 * i + 1]);
+                const float c = ds_mla_bf16_round(cos_row[i]);
+                const float s = ds_mla_bf16_round(sin_row[i]);
+
+                const float q_first_cos = ds_mla_bf16_round(q_first * c);
+                const float q_second_sin = ds_mla_bf16_round(q_second * s);
+                const float q_second_cos = ds_mla_bf16_round(q_second * c);
+                const float q_first_sin = ds_mla_bf16_round(q_first * s);
+                const float k_first_cos = ds_mla_bf16_round(k_first * c);
+                const float k_second_sin = ds_mla_bf16_round(k_second * s);
+                const float k_second_cos = ds_mla_bf16_round(k_second * c);
+                const float k_first_sin = ds_mla_bf16_round(k_first * s);
+
+                q_out[qk_nope_dim + i] = ds_mla_bf16_round(q_first_cos - q_second_sin);
+                q_out[qk_nope_dim + half + i] = ds_mla_bf16_round(q_second_cos + q_first_sin);
+                k_out[qk_nope_dim + i] = ds_mla_bf16_round(k_first_cos - k_second_sin);
+                k_out[qk_nope_dim + half + i] = ds_mla_bf16_round(k_second_cos + k_first_sin);
             }
         }
     }
@@ -561,11 +639,13 @@ void deepseek_mla_attention_f32_workspace(const float *q,
                                           int num_tokens,
                                           int qk_head_dim,
                                           int v_head_dim,
+                                          float scale,
                                           float *scores,
                                           size_t scores_bytes)
 {
     if (!q || !k || !v || !output || num_heads <= 0 || num_kv_heads <= 0 ||
-        num_tokens <= 0 || qk_head_dim <= 0 || v_head_dim <= 0) {
+        num_tokens <= 0 || qk_head_dim <= 0 || v_head_dim <= 0 ||
+        !isfinite(scale) || scale <= 0.0f) {
         return;
     }
     if ((size_t)num_tokens > SIZE_MAX / sizeof(float) || !scores ||
@@ -573,7 +653,6 @@ void deepseek_mla_attention_f32_workspace(const float *q,
         return;
     }
 
-    const float scale = 1.0f / sqrtf((float)qk_head_dim);
     for (int t = 0; t < num_tokens; ++t) {
         for (int h = 0; h < num_heads; ++h) {
             const int kv_h = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
@@ -628,7 +707,8 @@ void deepseek_mla_attention_f32(const float *q,
     if (!scores) return;
     deepseek_mla_attention_f32_workspace(
         q, k, v, output, num_heads, num_kv_heads, num_tokens,
-        qk_head_dim, v_head_dim, scores, scores_bytes);
+        qk_head_dim, v_head_dim, 1.0f / sqrtf((float)qk_head_dim),
+        scores, scores_bytes);
     free(scores);
 }
 
@@ -721,12 +801,14 @@ void deepseek_mla_attention_decode_f32_workspace(const float *q,
                                                  int v_head_dim,
                                                  int max_seq_len,
                                                  int cache_stride,
+                                                 float scale,
                                                  float *scores,
                                                  size_t scores_bytes)
 {
     if (!q || !k_cache || !v_cache || !output || num_heads <= 0 ||
         num_kv_heads <= 0 || cache_len <= 0 || qk_head_dim <= 0 ||
-        v_head_dim <= 0 || max_seq_len <= 0 || cache_stride <= 0) {
+        v_head_dim <= 0 || max_seq_len <= 0 || cache_stride <= 0 ||
+        !isfinite(scale) || scale <= 0.0f) {
         return;
     }
     if (qk_head_dim > cache_stride || v_head_dim > cache_stride) {
@@ -737,7 +819,6 @@ void deepseek_mla_attention_decode_f32_workspace(const float *q,
         return;
     }
 
-    const float scale = 1.0f / sqrtf((float)qk_head_dim);
     for (int h = 0; h < num_heads; ++h) {
         const int kv_h = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
         const float *q_vec = q + (size_t)h * (size_t)qk_head_dim;
@@ -794,6 +875,6 @@ void deepseek_mla_attention_decode_f32(const float *q,
     deepseek_mla_attention_decode_f32_workspace(
         q, k_cache, v_cache, output, num_heads, num_kv_heads, cache_len,
         qk_head_dim, v_head_dim, max_seq_len, cache_stride,
-        scores, scores_bytes);
+        1.0f / sqrtf((float)qk_head_dim), scores, scores_bytes);
     free(scores);
 }

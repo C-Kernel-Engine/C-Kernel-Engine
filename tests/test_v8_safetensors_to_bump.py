@@ -1707,6 +1707,7 @@ def test_kimi_vl_safetensors_to_bump_dry_run_maps_text_decoder(tmp_path: Path) -
     assert entries["layer.1.moe_expert_gate"]["shape"] == [2, 4, 8]
     assert entries["layer.1.moe_expert_up"]["shape"] == [2, 4, 8]
     assert entries["layer.1.moe_expert_down"]["shape"] == [2, 8, 4]
+    assert entries["layer.0.mla_kv_b_proj"]["dtype"] == "bf16"
     assert {
         "token_emb",
         "layer.0.mla_q_proj",

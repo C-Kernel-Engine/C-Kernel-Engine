@@ -11,7 +11,7 @@
   },
   "inputs": [
     {"name": "a", "dtype": "fp32", "shape": ["T", "AE"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Residual input A [tokens, aligned_embed_dim]"},
-    {"name": "b", "dtype": "fp32", "shape": ["T", "AE"], "layout": "token_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required", "desc": "Residual input B [tokens, aligned_embed_dim] (saved residual scratch)"}
+    {"name": "b", "dtype": "fp32", "shape": ["T", "AE"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Residual input B [tokens, aligned_embed_dim]"}
   ],
   "weights": [],
   "activations": [],
@@ -47,8 +47,8 @@
     ]
   },
   "call_abi": {"version": 1, "params": [
-    {"name": "a", "source": "activation:input", "cast": "float*", "ports": ["input:a"]},
-    {"name": "b", "source": "scratch:residual", "cast": "float*", "ports": ["input:b"]},
+    {"name": "a", "source": "activation:a", "cast": "float*", "ports": ["input:a"]},
+    {"name": "b", "source": "activation:b", "cast": "float*", "ports": ["input:b"]},
     {"name": "out", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
     {"name": "tokens", "source": "dim:seq_len"},
     {"name": "aligned_embed_dim", "source": "dim:embed_dim"}

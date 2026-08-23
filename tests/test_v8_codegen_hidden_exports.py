@@ -277,6 +277,18 @@ class HiddenExportExtentTests(unittest.TestCase):
         self.assertIn('"attn_out", (const float*)ATTN, (8) * (18) * (256)', gated)
 
     def test_mla_exports_each_semantic_attention_boundary(self) -> None:
+        gate = codegen.emit_op(
+            {
+                "op": "attention_gate_projection",
+                "function": "gemm_nt_bf16",
+                "layer": 0,
+                "args": [
+                    _arg("output", "GATE"),
+                    _arg("rows", "30"),
+                    _arg("N", "2048"),
+                ],
+            }
+        )
         kv_a = codegen.emit_op(
             {
                 "op": "kv_a_proj",
@@ -345,6 +357,7 @@ class HiddenExportExtentTests(unittest.TestCase):
             }
         )
 
+        self.assertIn('"attn_gate", (const float*)GATE, (30) * (2048)', gate)
         self.assertIn('"mla_kv_a", (const float*)KV_A, (30) * (576)', kv_a)
         self.assertIn('"mla_kv_norm", (const float*)KV_NORM, (30) * (512)', kv_norm)
         self.assertIn('"mla_k_nope", (const float*)K_NOPE, (30) * (16) * (128)', decompress)
@@ -360,6 +373,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "function": "rmsnorm_forward",
                 "layer": 0,
                 "args": [
+                    _arg("input", "ATTN_INPUT"),
                     _arg("output", "ATTN_NORM"),
                     _arg("rows", "30"),
                 ],
@@ -372,6 +386,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "function": "rmsnorm_forward",
                 "layer": 0,
                 "args": [
+                    _arg("input", "FFN_INPUT"),
                     _arg("output", "FFN_NORM"),
                     _arg("rows", "30"),
                 ],
@@ -380,7 +395,9 @@ class HiddenExportExtentTests(unittest.TestCase):
         )
 
         self.assertIn('"block_rmsnorm", (const float*)ATTN_NORM', first)
+        self.assertNotIn('"ffn_input"', first)
         self.assertNotIn('"ffn_norm"', first)
+        self.assertIn('"ffn_input", (const float*)FFN_INPUT', second)
         self.assertIn('"ffn_norm", (const float*)FFN_NORM', second)
         self.assertNotIn('"block_rmsnorm"', second)
 
@@ -437,6 +454,27 @@ class HiddenExportExtentTests(unittest.TestCase):
         self.assertIn('"moe_routing_weights", (const float*)ROUTING, (30) * (6)', selection)
         self.assertIn('"moe_routed_output", (const float*)ROUTED, (30) * (2048)', routed)
         self.assertIn('"moe_combined_output", (const float*)COMBINED, (30) * (2048)', combined)
+
+    def test_farskip_combine_exports_both_persistent_streams(self) -> None:
+        emitted = codegen.emit_op(
+            {
+                "op": "farskip_routed_shared_combine",
+                "function": "farskip_swiglu_shared_combine_bf16",
+                "layer": 1,
+                "args": [
+                    _arg("main_output", "MAIN"),
+                    _arg("routed_free_output", "ROUTED_FREE"),
+                    _arg("rows", "30"),
+                    _arg("hidden_dim", "2048"),
+                ],
+            }
+        )
+
+        self.assertIn('"layer_out", (const float*)MAIN, (30) * (2048)', emitted)
+        self.assertIn(
+            '"routed_free_out", (const float*)ROUTED_FREE, (30) * (2048)',
+            emitted,
+        )
 
     def test_attention_checkpoint_name_comes_from_call_ir_contract(self) -> None:
         emitted = codegen.emit_op(

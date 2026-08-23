@@ -538,8 +538,14 @@ class CKModel:
                     template_data = data
 
             template = data.get("template")
-            if template_data is None and isinstance(template, dict):
-                template_data = template
+            if isinstance(template, dict):
+                template_contract = template.get("contract")
+                if isinstance(template_contract, dict):
+                    explicit_contract = template_contract.get("chat_contract")
+                    if explicit_contract is not None:
+                        break
+                if template_data is None:
+                    template_data = template
 
         if explicit_contract is None:
             meta = self._load_model_meta()
@@ -1701,8 +1707,19 @@ class CKModel:
 
         contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract() or {}
         role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
+        conversation_prefix = str(contract.get("conversation_prefix") or "")
         turn_prefix = str(contract.get("turn_prefix") or "")
         turn_suffix = str(contract.get("turn_suffix") or "")
+        turn_prefix_by_role = (
+            contract.get("turn_prefix_by_role")
+            if isinstance(contract.get("turn_prefix_by_role"), dict)
+            else {}
+        )
+        turn_suffix_by_role = (
+            contract.get("turn_suffix_by_role")
+            if isinstance(contract.get("turn_suffix_by_role"), dict)
+            else {}
+        )
         assistant_generation_prefix, last_user_prefix = self._resolve_contract_thinking_overrides(contract)
         system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
         system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
@@ -1767,10 +1784,11 @@ class CKModel:
 
         def _render_turn(role: str, content: str) -> str:
             label = str(role_labels.get(role) or role)
-            prefix = turn_prefix.replace("{role}", label)
-            return f"{prefix}{content}{turn_suffix}"
+            prefix = str(turn_prefix_by_role.get(role, turn_prefix)).replace("{role}", label)
+            suffix = str(turn_suffix_by_role.get(role, turn_suffix))
+            return f"{prefix}{content}{suffix}"
 
-        prompt = ""
+        prompt = conversation_prefix
         if bos_prefix:
             special = self._load_tokenizer_contract()
             if not bool(special.get("add_bos_token", False)):

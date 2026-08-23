@@ -1,6 +1,16 @@
 {
   "id": "farskip_swiglu_shared_combine_bf16",
   "op": "farskip_routed_shared_combine",
+  "operation_interface": "farskip.shared_swiglu.bf16_weights.fp32_two_stream.v1",
+  "selection": {
+    "status": "candidate",
+    "priority": 200,
+    "equivalence_group": "instella_farskip_bf16_shared_swiglu_fp32_two_stream",
+    "phases": ["prefill", "decode"]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "instella_farskip_bf16_shared_swiglu_fp32_two_stream",
   "variant": "bf16_shared_weight_fp32_two_stream",
   "modes": {
     "inference": true,
@@ -13,20 +23,30 @@
     "output": "fp32"
   },
   "inputs": [
-    {"name": "hidden", "dtype": "fp32", "shape": ["R", "H"]},
-    {"name": "routed", "dtype": "fp32", "shape": ["R", "H"]},
-    {"name": "post_attn_residual", "dtype": "fp32", "shape": ["R", "H"]}
+    {"name": "hidden", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "routed", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "post_attn_residual", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}
   ],
   "weights": [
-    {"name": "shared_gate", "dtype": "bf16", "shape": ["I", "H"]},
-    {"name": "shared_up", "dtype": "bf16", "shape": ["I", "H"]},
-    {"name": "shared_down", "dtype": "bf16", "shape": ["H", "I"]}
+    {"name": "moe_shared_gate", "dtype": "bf16", "shape": ["I", "H"], "layout": "feature_major_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_shared_up", "dtype": "bf16", "shape": ["I", "H"], "layout": "feature_major_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "moe_shared_down", "dtype": "bf16", "shape": ["H", "I"], "layout": "feature_major_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
   ],
   "outputs": [
-    {"name": "main_output", "dtype": "fp32", "shape": ["R", "H"]},
-    {"name": "routed_free_output", "dtype": "fp32", "shape": ["R", "H"]}
+    {"name": "main_output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required", "may_alias": ["input:post_attn_residual"]},
+    {"name": "routed_free_output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
   "dims": ["R", "H", "I"],
+  "scratch": [],
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["independent_rows"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
+    }
+  },
   "impl": {
     "function": "farskip_swiglu_shared_combine_bf16",
     "c_declaration": "void farskip_swiglu_shared_combine_bf16(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
@@ -60,14 +80,14 @@
   "call_abi": {
     "version": 1,
     "params": [
-      {"name": "hidden", "source": "activation:hidden", "cast": "const float*"},
-      {"name": "routed", "source": "activation:routed", "cast": "const float*"},
-      {"name": "post_attn_residual", "source": "activation:post_attn_residual", "cast": "const float*"},
-      {"name": "shared_gate", "source": "weight:moe_shared_gate", "cast": "const uint16_t*"},
-      {"name": "shared_up", "source": "weight:moe_shared_up", "cast": "const uint16_t*"},
-      {"name": "shared_down", "source": "weight:moe_shared_down", "cast": "const uint16_t*"},
-      {"name": "main_output", "source": "output:main_output", "cast": "float*"},
-      {"name": "routed_free_output", "source": "output:routed_free_output", "cast": "float*"},
+      {"name": "hidden", "source": "activation:hidden", "cast": "const float*", "ports": ["input:hidden"]},
+      {"name": "routed", "source": "activation:routed", "cast": "const float*", "ports": ["input:routed"]},
+      {"name": "post_attn_residual", "source": "activation:post_attn_residual", "cast": "const float*", "ports": ["input:post_attn_residual"]},
+      {"name": "shared_gate", "source": "weight:moe_shared_gate", "cast": "const uint16_t*", "ports": ["weight:moe_shared_gate"]},
+      {"name": "shared_up", "source": "weight:moe_shared_up", "cast": "const uint16_t*", "ports": ["weight:moe_shared_up"]},
+      {"name": "shared_down", "source": "weight:moe_shared_down", "cast": "const uint16_t*", "ports": ["weight:moe_shared_down"]},
+      {"name": "main_output", "source": "output:main_output", "cast": "float*", "ports": ["output:main_output"]},
+      {"name": "routed_free_output", "source": "output:routed_free_output", "cast": "float*", "ports": ["output:routed_free_output"]},
       {"name": "rows", "source": "runtime:seq_len"},
       {"name": "hidden_dim", "source": "dim:embed_dim"},
       {"name": "intermediate_dim", "source": "dim:moe_shared_expert_intermediate_size"}

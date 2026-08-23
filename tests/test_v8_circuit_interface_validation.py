@@ -64,6 +64,10 @@ class CircuitInterfaceValidationTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "validated")
         self.assertEqual(result["operation_interface"], "synthetic.fp32.v1")
+        self.assertEqual(
+            result["port_dtypes"],
+            {"inputs": {"x": "fp32"}, "outputs": {"y": "fp32"}},
+        )
 
     def test_implicit_dataflow_remains_visible_migration_debt(self) -> None:
         result = validate(None, interface(port("input", "x"), port("output", "y")))

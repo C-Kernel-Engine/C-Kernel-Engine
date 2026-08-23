@@ -1020,6 +1020,15 @@ void rmsnorm_forward_pytorch_bf16_storage(const float *input,
                                           int d_model,
                                           int aligned_embed_dim,
                                           float eps);
+void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input,
+                                                   const float *gamma,
+                                                   float *output,
+                                                   float *rstd_cache,
+                                                   int tokens,
+                                                   int d_model,
+                                                   int input_stride,
+                                                   int output_stride,
+                                                   float eps);
 void rmsnorm_forward_qwen3next_pytorch_bf16_storage(const float *input,
                                                      const float *gamma,
                                                      float *output,
@@ -1504,6 +1513,7 @@ void deepseek_mla_attention_f32_workspace(const float *q,
                                           int num_tokens,
                                           int qk_head_dim,
                                           int v_head_dim,
+                                          float scale,
                                           float *scores,
                                           size_t scores_bytes);
 
@@ -1551,6 +1561,7 @@ void deepseek_mla_attention_decode_f32_workspace(const float *q,
                                                  int v_head_dim,
                                                  int max_seq_len,
                                                  int cache_stride,
+                                                 float scale,
                                                  float *scores,
                                                  size_t scores_bytes);
 
@@ -3544,6 +3555,20 @@ void deepseek_mla_partial_rope_concat_packed_f32(const float *q_packed,
                                              int kv_lora_rank,
                                              int qk_nope_dim,
                                              int qk_rope_dim);
+
+void deepseek_mla_partial_rope_concat_packed_bf16_storage(
+    const float *q_packed,
+    const float *k_nope,
+    const float *kv_a_packed,
+    const float *cos,
+    const float *sin,
+    float *query,
+    float *key,
+    int tokens,
+    int heads,
+    int kv_lora_rank,
+    int qk_nope_dim,
+    int qk_rope_dim);
 
 // Attention backward (GQA-aware): computes d_q, d_k, d_v.
 void attention_backward_causal_head_major_gqa(

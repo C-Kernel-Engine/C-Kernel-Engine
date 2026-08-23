@@ -65,7 +65,8 @@
     "T",
     "QK",
     "V",
-    "S"
+    "S",
+    "attention_scale"
   ],
   "params": [
     {
@@ -99,7 +100,7 @@
   ],
   "impl": {
     "function": "deepseek_mla_attention_decode_f32_workspace",
-    "c_declaration": "void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float *scores, size_t scores_bytes);",
+    "c_declaration": "void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes);",
     "sources": [
       "src/kernels/deepseek_kernels.c"
     ]
@@ -118,10 +119,11 @@
       {"name": "v_head_dim", "source": "dim:v_head_dim"},
       {"name": "max_seq_len", "source": "dim:max_seq_len"},
       {"name": "cache_stride", "source": "dim:kv_cache_head_dim"},
+      {"name": "scale", "source": "dim:attention_scale"},
       {"name": "scores", "source": "scratch:scores", "cast": "float*"},
       {"name": "scores_bytes", "source": "scratch_size:scores"}
     ]
   },
-  "notes": "Reference MLA decode attention over persistent K/V cache. K uses qk_head_dim; V uses v_head_dim; both use cache_stride.",
+  "notes": "Reference MLA decode attention over persistent K/V cache. K uses qk_head_dim; V uses v_head_dim; both use cache_stride. The model-derived softmax scale is explicit.",
   "name": "deepseek_mla_attention_decode_f32"
 }

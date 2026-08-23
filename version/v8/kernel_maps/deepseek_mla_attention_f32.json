@@ -25,10 +25,10 @@
       "desc": "Reusable causal score row sized for the complete prefill sequence."
     }
   ],
-  "dims": ["T", "H", "KV", "QK", "V"],
+  "dims": ["T", "H", "KV", "QK", "V", "attention_scale"],
   "impl": {
     "function": "deepseek_mla_attention_f32_workspace",
-    "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float *scores, size_t scores_bytes);",
+    "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
     "sources": ["src/kernels/deepseek_kernels.c"]
   },
   "call_abi": {
@@ -43,9 +43,10 @@
       {"name": "num_tokens", "source": "dim:seq_len"},
       {"name": "qk_head_dim", "source": "dim:head_dim"},
       {"name": "v_head_dim", "source": "dim:v_head_dim"},
+      {"name": "scale", "source": "dim:attention_scale"},
       {"name": "scores", "source": "scratch:scores", "cast": "float*"},
       {"name": "scores_bytes", "source": "scratch_size:scores"}
     ]
   },
-  "notes": "Reference causal MLA prefill attention over the current token sequence."
+  "notes": "Reference causal MLA prefill attention over the current token sequence. The model-derived softmax scale is an explicit ABI dimension, including any YaRN mscale multiplier."
 }

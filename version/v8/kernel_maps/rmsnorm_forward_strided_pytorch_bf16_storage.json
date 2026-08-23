@@ -1,0 +1,109 @@
+{
+  "id": "rmsnorm_forward_strided_pytorch_bf16_storage",
+  "op": "rmsnorm",
+  "operation_interface": "rmsnorm.fp32_bf16_values.strided.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+    "phases": ["prefill", "decode"]
+  },
+  "variant": "pytorch_avx2_cascade_bf16_storage_independent_row_strides",
+  "quant": {"weight": "bf16", "activation": "bf16", "output": "bf16"},
+  "inputs": [{
+    "name": "input",
+    "dtype": "fp32",
+    "shape": ["T", "INPUT_STRIDE"],
+    "layout": "row_major_strided",
+    "placement": "local",
+    "access": "read",
+    "storage_class": "activation",
+    "consumption": "required",
+    "desc": "BF16-RNE values carried in FP32 storage; the first D values of each physical input row are normalized."
+  }],
+  "weights": [{
+    "name": "gamma",
+    "dtype": "fp32",
+    "shape": ["D"],
+    "layout": "feature_contiguous",
+    "placement": "local",
+    "access": "read",
+    "storage_class": "weight",
+    "consumption": "required",
+    "desc": "BF16-RNE gamma values carried in FP32 BUMP storage."
+  }],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["T", "OUTPUT_STRIDE"],
+      "layout": "row_major_strided",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE RMSNorm values carried in FP32 storage; padding is zeroed."
+    },
+    {
+      "name": "rstd",
+      "dtype": "fp32",
+      "shape": ["T"],
+      "layout": "token_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "scratch",
+      "consumption": "optional"
+    }
+  ],
+  "dims": ["T", "D", "INPUT_STRIDE", "OUTPUT_STRIDE"],
+  "params": [{"name": "eps", "dtype": "float32"}],
+  "impl": {
+    "function": "rmsnorm_forward_strided_pytorch_bf16_storage",
+    "c_declaration": "void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps);",
+    "sources": ["src/kernels/rmsnorm_kernels.c"],
+    "variants": [{"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "rmsnorm_forward_strided_pytorch_bf16_storage",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {
+        "runtime": "serial",
+        "work_partition": ["independent_rows"],
+        "dispatch": ["inline"],
+        "reduction_order_effect": "none"
+      }
+    },
+    "arithmetic": {
+      "partial_accumulator": "fp32",
+      "merge_order": "hierarchical_cascade",
+      "deterministic": true,
+      "thread_count_changes_arithmetic_order": false,
+      "split_strategy": "independent_outputs"
+    }
+  }],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+      {"name": "gamma", "source": "weight_f:mla_kv_a_norm", "cast": "const float*", "ports": ["weight:gamma"]},
+      {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+      {"name": "rstd_cache", "source": "null", "ports": ["output:rstd"]},
+      {"name": "tokens", "source": "dim:seq_len"},
+      {"name": "d_model", "source": "dim:kv_lora_rank"},
+      {"name": "input_stride", "source": "dim:kv_lora_input_dim"},
+      {"name": "output_stride", "source": "dim:kv_lora_rank"},
+      {"name": "eps", "source": "dim:rms_eps"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py"],
+    "production_shapes": ["T=1,D=512,INPUT_STRIDE=544,OUTPUT_STRIDE=512", "T=16,D=512,INPUT_STRIDE=544,OUTPUT_STRIDE=520"],
+    "oracle": "PyTorch BF16 RMSNorm CPU reduction and storage with independent physical row strides"
+  },
+  "notes": "Strided form of the PyTorch AVX2-cascade BF16 RMSNorm storage contract. Instella MLA normalizes the first 512 values of a 544-value compressed-KV row; model identity is not part of the ABI."
+}

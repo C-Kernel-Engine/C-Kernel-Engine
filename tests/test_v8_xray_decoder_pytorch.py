@@ -17,6 +17,114 @@ SPEC.loader.exec_module(MODULE)
 
 
 class DecoderPyTorchXRayTests(unittest.TestCase):
+    def test_structured_module_output_uses_primary_tensor(self) -> None:
+        primary = np.asarray([1.0, 2.0], dtype=np.float32)
+        auxiliary = np.asarray([3.0, 4.0], dtype=np.float32)
+
+        self.assertIs(MODULE._tensor_from_output((primary, auxiliary)), primary)
+
+    def test_last_feature_row_handles_latent_kv_projection_shape(self) -> None:
+        values = np.arange(1 * 1 * 16 * 8, dtype=np.float32).reshape(1, 1, 16, 8)
+
+        np.testing.assert_array_equal(
+            MODULE._last_feature_row(values),
+            values[0, 0, -1],
+        )
+
+    def test_split_mla_kv_projection_matches_flat_ck_exports(self) -> None:
+        import torch
+
+        values = torch.arange(1 * 1 * 3 * 16, dtype=torch.float32).reshape(
+            1, 1, 3, 16
+        )
+        k_nope, value = MODULE._split_mla_kv_projection(
+            values, heads=2, k_width=5, v_width=3
+        )
+        expanded = values[0, 0, -1].reshape(2, 8)
+
+        np.testing.assert_array_equal(k_nope.numpy(), expanded[:, :5].reshape(-1))
+        np.testing.assert_array_equal(value.numpy(), expanded[:, 5:].reshape(-1))
+
+    def test_split_full_mla_kv_projection_preserves_token_order(self) -> None:
+        import torch
+
+        values = torch.arange(1 * 1 * 3 * 16, dtype=torch.float32).reshape(
+            1, 1, 3, 16
+        )
+        k_nope, value = MODULE._split_mla_kv_projection_full(
+            values, heads=2, k_width=5, v_width=3
+        )
+        expanded = values.reshape(3, 2, 8)
+
+        np.testing.assert_array_equal(k_nope.numpy(), expanded[:, :, :5].numpy())
+        np.testing.assert_array_equal(value.numpy(), expanded[:, :, 5:].numpy())
+
+    def test_explicit_last_row_capture_is_not_reshaped_as_a_full_trajectory(self) -> None:
+        values = np.arange(12, dtype=np.float32)
+
+        boundary, logical = MODULE._logical_ck_capture(
+            values, "mlp_gate_last", token_count=4
+        )
+
+        self.assertEqual(boundary, "mlp_gate")
+        np.testing.assert_array_equal(logical, values)
+
+    def test_instrumented_attention_resolver_captures_semantic_mla_edges(self) -> None:
+        import torch
+
+        captured = {3: {}}
+
+        def resolver(_config):
+            def interface(_module, query, _key, _value, *_args, **_kwargs):
+                return query.transpose(1, 2), None
+
+            return interface
+
+        interface = MODULE._instrument_attention_resolver(
+            resolver, captured, frozenset({3})
+        )(object())
+        query = torch.arange(1 * 2 * 3 * 4, dtype=torch.float32).reshape(1, 2, 3, 4)
+        result = interface(SimpleNamespace(layer_idx=3), query, query + 1, query + 2)
+
+        expected_query = query[0, :, -1, :].reshape(-1)
+        np.testing.assert_array_equal(captured[3]["mla_query"].numpy(), expected_query)
+        np.testing.assert_array_equal(
+            captured[3]["mla_key"].numpy(), expected_query + 1
+        )
+        np.testing.assert_array_equal(
+            captured[3]["mla_context"].numpy(),
+            result[0][0, -1].reshape(-1),
+        )
+        np.testing.assert_array_equal(
+            captured[3]["mla_query_full"].numpy(),
+            query[0].transpose(0, 1).numpy(),
+        )
+        np.testing.assert_array_equal(
+            captured[3]["mla_key_full"].numpy(),
+            (query[0] + 1).transpose(0, 1).numpy(),
+        )
+        np.testing.assert_array_equal(
+            captured[3]["mla_value_full"].numpy(),
+            (query[0] + 2).transpose(0, 1).numpy(),
+        )
+        np.testing.assert_array_equal(
+            captured[3]["mla_context_full"].numpy(),
+            result[0][0].numpy(),
+        )
+
+    def test_mla_operation_requires_one_numeric_explicit_contract(self) -> None:
+        operation = {
+            "op": "mla_attention",
+            "layer": 2,
+            "args": [{"name": "scale", "expr": "0.125"}],
+        }
+        call_ir = {"operations": [operation]}
+
+        self.assertIs(MODULE._mla_operation(call_ir, 2), operation)
+        self.assertEqual(MODULE._literal_call_arg(operation, "scale"), 0.125)
+        with self.assertRaisesRegex(RuntimeError, "missing"):
+            MODULE._literal_call_arg(operation, "num_heads")
+
     def test_parse_token_ids_accepts_explicit_csv(self) -> None:
         self.assertEqual(MODULE.parse_token_ids("1, 2,3"), [1, 2, 3])
 
@@ -158,6 +266,23 @@ class DecoderPyTorchXRayTests(unittest.TestCase):
             self.assertEqual(checkpoint["kernel_id"], "residual_add_f32")
             self.assertEqual(checkpoint["function"], "residual_add_f32")
             self.assertEqual(checkpoint["resolved_contract_id"], "residual.fp32")
+
+    def test_mla_boundary_metadata_tracks_the_actual_producer(self) -> None:
+        call_ir = {
+            "operations": [
+                {
+                    "op": "attention_gate_projection",
+                    "layer": 0,
+                    "kernel_id": "gemm_nt_bf16",
+                    "resolved_contract_id": "bf16.gate",
+                }
+            ]
+        }
+
+        result = MODULE.operation_metadata(call_ir, 0, "attn_gate")
+
+        self.assertEqual(result["producer"], "attention_gate_projection")
+        self.assertEqual(result["kernel_id"], "gemm_nt_bf16")
 
 
 if __name__ == "__main__":

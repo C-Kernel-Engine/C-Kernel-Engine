@@ -1,0 +1,162 @@
+{
+  "id": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+  "op": "partial_rope_concat",
+  "operation_interface": "mla.partial_rope_concat.packed_interleaved.pytorch_bf16_storage.v1",
+  "selection": {
+    "status": "production",
+    "priority": 200,
+    "equivalence_group": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+    "phases": ["prefill", "decode"]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+  "variant": "packed_pairwise_interleaved_bf16_values_fp32_carrier",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {
+      "name": "q_packed",
+      "dtype": "fp32",
+      "shape": ["T", "H", "Dk+Dr"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE packed query values carried in FP32 storage."
+    },
+    {
+      "name": "k_nope",
+      "dtype": "fp32",
+      "shape": ["T", "H", "Dk"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE non-rotary key values carried in FP32 storage."
+    },
+    {
+      "name": "kv_a_packed",
+      "dtype": "fp32",
+      "shape": ["T", "R+Dr"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE compressed KV and shared rotary key values carried in FP32 storage."
+    },
+    {
+      "name": "cos",
+      "dtype": "fp32",
+      "shape": ["T", "Dr/2"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "persistent_state",
+      "consumption": "required"
+    },
+    {
+      "name": "sin",
+      "dtype": "fp32",
+      "shape": ["T", "Dr/2"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "persistent_state",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "query",
+      "dtype": "fp32",
+      "shape": ["T", "H", "Dk+Dr"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "may_alias": ["input:q_packed"],
+      "desc": "BF16-RNE assembled query values carried in FP32 storage."
+    },
+    {
+      "name": "key",
+      "dtype": "fp32",
+      "shape": ["T", "H", "Dk+Dr"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE assembled key values carried in FP32 storage."
+    }
+  ],
+  "scratch": [],
+  "dims": ["T", "H", "R", "Dk", "Dr"],
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
+    }
+  },
+  "impl": {
+    "function": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+    "c_declaration": "void deepseek_mla_partial_rope_concat_packed_bf16_storage(const float *q_packed, const float *k_nope, const float *kv_a_packed, const float *cos, const float *sin, float *query, float *key, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int qk_rope_dim);",
+    "sources": ["src/kernels/deepseek_kernels.c"],
+    "variants": [{"name": "scalar_ref", "requires": [], "compile_flags": []}]
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+      "status": "validated",
+      "phases": ["prefill", "decode"],
+      "function": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": ["serial"],
+          "dispatch": ["inline"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "bf16",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q_packed", "source": "activation:q_packed", "cast": "const float*", "ports": ["input:q_packed"]},
+      {"name": "k_nope", "source": "activation:k_nope", "cast": "const float*", "ports": ["input:k_nope"]},
+      {"name": "kv_a_packed", "source": "activation:kv_a_packed", "cast": "const float*", "ports": ["input:kv_a_packed"]},
+      {"name": "cos", "source": "runtime:rope_cos_mla_positioned", "cast": "const float*", "ports": ["input:cos"]},
+      {"name": "sin", "source": "runtime:rope_sin_mla_positioned", "cast": "const float*", "ports": ["input:sin"]},
+      {"name": "query", "source": "output:query", "cast": "float*", "ports": ["output:query"]},
+      {"name": "key", "source": "output:key", "cast": "float*", "ports": ["output:key"]},
+      {"name": "tokens", "source": "dim:_m"},
+      {"name": "heads", "source": "dim:num_heads"},
+      {"name": "kv_lora_rank", "source": "dim:kv_lora_rank"},
+      {"name": "qk_nope_dim", "source": "dim:qk_nope_head_dim"},
+      {"name": "qk_rope_dim", "source": "dim:qk_rope_head_dim"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_deepseek_reference_kernels.py"],
+    "parity": [{"kind": "pytorch", "command": ".venv/bin/python unittest/test_deepseek_reference_kernels.py", "tolerance": "0"}]
+  },
+  "notes": "Model-agnostic packed MLA partial-RoPE assembly with PyTorch BF16 storage after each multiply and add/subtract. The provider consumes and produces BF16 values in FP32 activation carriers."
+}

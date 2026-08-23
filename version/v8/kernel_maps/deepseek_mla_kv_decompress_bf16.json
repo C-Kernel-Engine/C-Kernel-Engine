@@ -1,89 +1,135 @@
 {
   "id": "deepseek_mla_kv_decompress_bf16",
   "op": "kv_lora_decompress",
-  "variant": "bf16_weight_fp32_activation",
-  "modes": {
-    "inference": true,
-    "training": true,
-    "backward": false
+  "operation_interface": "mla.kv_lora_decompress.bf16_weight.bf16_storage.v1",
+  "selection": {
+    "status": "production",
+    "priority": 200,
+    "equivalence_group": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+    "phases": ["prefill", "decode"]
   },
-  "quant": {
-    "weight": "bf16",
-    "activation": "fp32",
-    "output": "fp32"
-  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+  "variant": "bf16_weight_bf16_values_fp32_carrier",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "bf16", "activation": "fp32", "output": "fp32"},
   "inputs": [
     {
       "name": "compressed_kv",
       "dtype": "fp32",
-      "shape": [
-        "T",
-        "R"
-      ]
+      "shape": ["T", "R"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE latent values carried in FP32 storage."
     }
   ],
   "weights": [
     {
       "name": "kv_b_proj",
       "dtype": "bf16",
-      "shape": [
-        "H*(Dk+Dv)",
-        "R"
-      ]
+      "shape": ["H*(Dk+Dv)", "R"],
+      "layout": "feature_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
     }
   ],
   "outputs": [
     {
       "name": "k_nope",
       "dtype": "fp32",
-      "shape": [
-        "T",
-        "H",
-        "Dk"
-      ]
+      "shape": ["T", "H", "Dk"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE non-rotary key values carried in FP32 storage."
     },
     {
       "name": "value",
       "dtype": "fp32",
-      "shape": [
-        "T",
-        "H",
-        "Dv"
-      ]
+      "shape": ["T", "H", "Dv"],
+      "layout": "token_head_feature_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-RNE value-head values carried in FP32 storage."
     }
   ],
-  "dims": [
-    "T",
-    "H",
-    "R",
-    "Dk",
-    "Dv"
-  ],
+  "scratch": [],
+  "dims": ["T", "H", "R", "Dk", "Dv"],
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
+    }
+  },
   "impl": {
-    "sources": [
-      "src/kernels/deepseek_kernels.c"
-    ],
-    "variants": [
-      {
-        "name": "scalar_ref",
-        "requires": [],
-        "compile_flags": []
-      }
-    ],
     "function": "deepseek_mla_kv_decompress_bf16",
-    "c_declaration": "void deepseek_mla_kv_decompress_bf16(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);"
+    "c_declaration": "void deepseek_mla_kv_decompress_bf16(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);",
+    "sources": ["src/kernels/deepseek_kernels.c"],
+    "variants": [
+      {"name": "scalar_ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+      "status": "validated",
+      "phases": ["prefill", "decode"],
+      "function": "deepseek_mla_kv_decompress_bf16",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": ["serial"],
+          "dispatch": ["inline"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "compressed_kv", "source": "activation:compressed_kv", "cast": "const float*", "ports": ["input:compressed_kv"]},
+      {"name": "kv_b_proj", "source": "weight:mla_kv_b_proj", "cast": "const uint16_t*", "ports": ["weight:kv_b_proj"]},
+      {"name": "k_nope", "source": "output:k_nope", "cast": "float*", "ports": ["output:k_nope"]},
+      {"name": "value", "source": "output:value", "cast": "float*", "ports": ["output:value"]},
+      {"name": "tokens", "source": "dim:_m"},
+      {"name": "heads", "source": "dim:num_heads"},
+      {"name": "kv_lora_rank", "source": "dim:kv_lora_rank"},
+      {"name": "qk_nope_dim", "source": "dim:qk_nope_head_dim"},
+      {"name": "v_dim", "source": "dim:v_head_dim"}
+    ]
   },
   "tests": {
-    "unit": [
-      "unittest/test_deepseek_reference_kernels.py"
-    ],
+    "unit": ["unittest/test_deepseek_reference_kernels.py"],
     "parity": [
       {
         "kind": "pytorch",
         "command": ".venv/bin/python unittest/test_deepseek_reference_kernels.py",
-        "tolerance": "1e-5"
+        "tolerance": "0"
       }
     ]
   },
-  "notes": "DeepSeek/Kimi MLA KV LoRA decompression with BF16 projection weights and FP32 activations/output."
+  "notes": "Model-agnostic MLA KV-B projection for BF16 checkpoints. Input and outputs use BF16-RNE values in FP32 activation carriers; the provider owns the BF16 weight ABI and output-storage boundary."
 }

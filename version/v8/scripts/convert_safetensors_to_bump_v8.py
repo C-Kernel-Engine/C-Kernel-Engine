@@ -53,6 +53,23 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     write_bumpv5_footer,
 )
 
+
+def _effective_attention_scale(
+    head_dim: int,
+    rope_scaling: dict[str, Any] | None = None,
+) -> float:
+    if head_dim <= 0:
+        raise ValueError("attention head_dim must be positive")
+    scale = 1.0 / math.sqrt(float(head_dim))
+    rope = rope_scaling if isinstance(rope_scaling, dict) else {}
+    rope_type = str(rope.get("rope_type") or rope.get("type") or "default").lower()
+    mscale_all_dim = float(rope.get("mscale_all_dim") or 0.0)
+    factor = float(rope.get("factor") or 1.0)
+    if rope_type not in {"default", "none"} and mscale_all_dim and factor > 1.0:
+        mscale = 0.1 * mscale_all_dim * math.log(factor) + 1.0
+        scale *= mscale * mscale
+    return scale
+
 DTYPE_TO_CK = {
     "F32": ("fp32", CK_DT_FP32, 4),
     "BF16": ("bf16", CK_DT_BF16, 2),
@@ -652,7 +669,7 @@ def _kimi_vl_text_refs(
             TensorRef(f"layer.{layer}.mla_q_proj", (_require_existing(headers, (f"{pfx}.self_attn.q_proj.weight",), f"layer {layer} MLA q_proj"),)),
             TensorRef(f"layer.{layer}.mla_kv_a_proj", (_require_existing(headers, (f"{pfx}.self_attn.kv_a_proj_with_mqa.weight",), f"layer {layer} MLA kv_a_proj_with_mqa"),)),
             TensorRef(f"layer.{layer}.mla_kv_a_norm", (_require_existing(headers, (f"{pfx}.self_attn.kv_a_layernorm.weight",), f"layer {layer} MLA kv_a_layernorm"),), dtype="fp32"),
-            TensorRef(f"layer.{layer}.mla_kv_b_proj", (_require_existing(headers, (f"{pfx}.self_attn.kv_b_proj.weight",), f"layer {layer} MLA kv_b_proj"),), dtype="fp32"),
+            TensorRef(f"layer.{layer}.mla_kv_b_proj", (_require_existing(headers, (f"{pfx}.self_attn.kv_b_proj.weight",), f"layer {layer} MLA kv_b_proj"),)),
             TensorRef(f"layer.{layer}.mla_out_proj", (_require_existing(headers, (f"{pfx}.self_attn.o_proj.weight",), f"layer {layer} MLA o_proj"),)),
         ])
         if include_attention_gate:
@@ -1427,9 +1444,13 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             )
             first_farskip = True
             for layer, kind in enumerate(layer_kinds):
-                if kind != "mla_moe" or not bool(text.get("farskip", False)):
+                if not bool(text.get("farskip", False)):
                     continue
-                if farskip_start <= layer <= farskip_end:
+                if not farskip_start <= layer <= farskip_end:
+                    continue
+                if kind == "mla_dense_mlp":
+                    layer_kinds[layer] = "mla_gated_farskip_dense_mlp"
+                elif kind == "mla_moe":
                     layer_kinds[layer] = (
                         "mla_gated_farskip_moe_first"
                         if first_farskip
@@ -1473,6 +1494,9 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "qk_rope_head_dim": qk_rope,
             "v_head_dim": v_head,
             "head_dim": qk_nope + qk_rope,
+            "attention_scale": _effective_attention_scale(
+                qk_nope + qk_rope, rope_scaling
+            ),
             "rotary_dim": qk_rope,
             "mla_q_head_dim": qk_nope + qk_rope,
             "mla_k_head_dim": qk_nope + qk_rope,

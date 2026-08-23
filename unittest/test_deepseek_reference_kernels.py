@@ -15,6 +15,7 @@ lib = load_lib("libckernel_engine.so")
 
 fptr = ctypes.POINTER(ctypes.c_float)
 iptr = ctypes.POINTER(ctypes.c_int)
+u16ptr = ctypes.POINTER(ctypes.c_uint16)
 
 lib.deepseek_mhc_mix_f32.argtypes = [fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mhc_mix_f32.restype = None
@@ -34,21 +35,35 @@ lib.deepseek_hybrid_attention_f32.argtypes = [fptr, fptr, fptr, iptr, fptr, fptr
 lib.deepseek_hybrid_attention_f32.restype = None
 lib.deepseek_mla_kv_decompress_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_kv_decompress_f32.restype = None
+lib.deepseek_mla_kv_decompress_bf16.argtypes = [fptr, u16ptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+lib.deepseek_mla_kv_decompress_bf16.restype = None
 lib.deepseek_mla_partial_rope_concat_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_partial_rope_concat_f32.restype = None
 lib.deepseek_mla_partial_rope_concat_packed_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_partial_rope_concat_packed_f32.restype = None
+lib.deepseek_mla_partial_rope_concat_packed_bf16_storage.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+lib.deepseek_mla_partial_rope_concat_packed_bf16_storage.restype = None
 lib.deepseek_mla_kv_cache_batch_store_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_kv_cache_batch_store_f32.restype = None
 lib.deepseek_mla_kv_cache_store_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_kv_cache_store_f32.restype = None
 lib.deepseek_mla_attention_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_attention_f32.restype = None
-lib.deepseek_mla_attention_f32_workspace.argtypes = [*lib.deepseek_mla_attention_f32.argtypes, fptr, ctypes.c_size_t]
+lib.deepseek_mla_attention_f32_workspace.argtypes = [
+    *lib.deepseek_mla_attention_f32.argtypes,
+    ctypes.c_float,
+    fptr,
+    ctypes.c_size_t,
+]
 lib.deepseek_mla_attention_f32_workspace.restype = None
 lib.deepseek_mla_attention_decode_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_attention_decode_f32.restype = None
-lib.deepseek_mla_attention_decode_f32_workspace.argtypes = [*lib.deepseek_mla_attention_decode_f32.argtypes, fptr, ctypes.c_size_t]
+lib.deepseek_mla_attention_decode_f32_workspace.argtypes = [
+    *lib.deepseek_mla_attention_decode_f32.argtypes,
+    ctypes.c_float,
+    fptr,
+    ctypes.c_size_t,
+]
 lib.deepseek_mla_attention_decode_f32_workspace.restype = None
 
 
@@ -84,6 +99,7 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         lib.deepseek_mla_attention_f32_workspace(
             ptr(q), ptr(k), ptr(v), ptr(actual),
             heads, kv_heads, tokens, qk_dim, v_dim,
+            1.0 / math.sqrt(qk_dim),
             ptr(scores), scores.nbytes,
         )
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
@@ -92,9 +108,34 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         lib.deepseek_mla_attention_f32_workspace(
             ptr(q), ptr(k), ptr(v), ptr(sentinel),
             heads, kv_heads, tokens, qk_dim, v_dim,
+            1.0 / math.sqrt(qk_dim),
             ptr(scores), scores.nbytes - ctypes.sizeof(ctypes.c_float),
         )
         np.testing.assert_array_equal(sentinel, -19.0)
+
+        custom_scale = np.float32(0.25)
+        scaled = np.empty_like(actual)
+        lib.deepseek_mla_attention_f32_workspace(
+            ptr(q), ptr(k), ptr(v), ptr(scaled),
+            heads, kv_heads, tokens, qk_dim, v_dim,
+            custom_scale, ptr(scores), scores.nbytes,
+        )
+        reference = np.zeros_like(scaled)
+        for token in range(tokens):
+            for head in range(heads):
+                kv_head = head * kv_heads // heads
+                logits = np.asarray(
+                    [
+                        np.dot(q[token, head], k[key, kv_head]) * custom_scale
+                        for key in range(token + 1)
+                    ],
+                    dtype=np.float32,
+                )
+                weights = np.exp(logits - np.max(logits), dtype=np.float32)
+                weights /= np.sum(weights, dtype=np.float32)
+                reference[token, head] = weights @ v[: token + 1, kv_head]
+        np.testing.assert_allclose(scaled, reference, rtol=1e-6, atol=1e-6)
+        self.assertFalse(np.array_equal(scaled.view(np.uint32), expected.view(np.uint32)))
 
     def test_mhc_mix_forward_backward(self):
         torch.manual_seed(7)
@@ -181,6 +222,37 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         lib.deepseek_mla_kv_decompress_f32(ptr(compressed_np), ptr(kv_b_np), ptr(k_np), ptr(v_np), tokens, heads, rank, nope_dim, v_dim)
         np.testing.assert_allclose(k_np, ref_k.numpy(), rtol=1e-6, atol=1e-6)
         np.testing.assert_allclose(v_np, ref_v.numpy(), rtol=1e-6, atol=1e-6)
+
+    def test_mla_kv_decompress_bf16_preserves_pytorch_storage_boundary(self):
+        torch.manual_seed(191)
+        tokens, heads, rank, nope_dim, v_dim = 2, 3, 8, 4, 5
+        compressed = torch.randn(tokens, rank, dtype=torch.bfloat16)
+        kv_b = torch.randn(
+            heads * (nope_dim + v_dim), rank, dtype=torch.bfloat16
+        )
+        projected = torch.nn.functional.linear(compressed, kv_b).view(
+            tokens, heads, nope_dim + v_dim
+        )
+        ref_k = projected[:, :, :nope_dim].float().contiguous().numpy()
+        ref_v = projected[:, :, nope_dim:].float().contiguous().numpy()
+
+        compressed_np = np.ascontiguousarray(compressed.float().numpy())
+        kv_b_np = np.ascontiguousarray(kv_b.view(torch.uint16).numpy())
+        k_np = np.empty((tokens, heads, nope_dim), dtype=np.float32)
+        v_np = np.empty((tokens, heads, v_dim), dtype=np.float32)
+        lib.deepseek_mla_kv_decompress_bf16(
+            ptr(compressed_np),
+            kv_b_np.ctypes.data_as(u16ptr),
+            ptr(k_np),
+            ptr(v_np),
+            tokens,
+            heads,
+            rank,
+            nope_dim,
+            v_dim,
+        )
+        np.testing.assert_array_equal(k_np, ref_k)
+        np.testing.assert_array_equal(v_np, ref_v)
 
     def test_mla_partial_rope_concat_matches_kimi_layout(self):
         torch.manual_seed(23)
@@ -271,6 +343,76 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         )
         np.testing.assert_allclose(query, q_ref.numpy(), rtol=1e-6, atol=1e-6)
         np.testing.assert_allclose(key, k_ref.numpy(), rtol=1e-6, atol=1e-6)
+
+    def test_mla_partial_rope_concat_packed_preserves_pytorch_bf16_stages(self):
+        torch.manual_seed(193)
+        tokens, heads, rank, nope_dim, rope_dim = 4, 3, 8, 6, 8
+        q_packed = torch.randn(
+            tokens, heads, nope_dim + rope_dim, dtype=torch.bfloat16
+        )
+        k_nope = torch.randn(tokens, heads, nope_dim, dtype=torch.bfloat16)
+        kv_a_packed = torch.randn(tokens, rank + rope_dim, dtype=torch.bfloat16)
+        base = torch.randn(tokens, rope_dim // 2, dtype=torch.float32)
+        cos_half = base.cos().to(torch.bfloat16)
+        sin_half = base.sin().to(torch.bfloat16)
+
+        q_pass, q_rot = torch.split(q_packed, [nope_dim, rope_dim], dim=-1)
+        k_rot = kv_a_packed[:, rank:].view(tokens, 1, rope_dim)
+        cos_broadcast = cos_half.view(tokens, 1, rope_dim // 2)
+        sin_broadcast = sin_half.view(tokens, 1, rope_dim // 2)
+
+        def apply_interleaved(x):
+            first, second = x[..., 0::2], x[..., 1::2]
+            return torch.cat(
+                [
+                    first * cos_broadcast - second * sin_broadcast,
+                    second * cos_broadcast + first * sin_broadcast,
+                ],
+                dim=-1,
+            )
+
+        q_ref = torch.cat([q_pass, apply_interleaved(q_rot)], dim=-1)
+        k_ref = torch.cat(
+            [k_nope, apply_interleaved(k_rot).expand(-1, heads, -1)], dim=-1
+        )
+
+        query = np.empty((tokens, heads, nope_dim + rope_dim), dtype=np.float32)
+        key = np.empty_like(query)
+        lib.deepseek_mla_partial_rope_concat_packed_bf16_storage(
+            ptr(np.ascontiguousarray(q_packed.float().numpy())),
+            ptr(np.ascontiguousarray(k_nope.float().numpy())),
+            ptr(np.ascontiguousarray(kv_a_packed.float().numpy())),
+            ptr(np.ascontiguousarray(cos_half.float().numpy())),
+            ptr(np.ascontiguousarray(sin_half.float().numpy())),
+            ptr(query),
+            ptr(key),
+            tokens,
+            heads,
+            rank,
+            nope_dim,
+            rope_dim,
+        )
+        np.testing.assert_array_equal(query, q_ref.float().numpy())
+        np.testing.assert_array_equal(key, k_ref.float().numpy())
+
+        query_inplace = np.ascontiguousarray(q_packed.float().numpy())
+        key_inplace = np.empty_like(query_inplace)
+        lib.deepseek_mla_partial_rope_concat_packed_bf16_storage(
+            ptr(query_inplace),
+            ptr(np.ascontiguousarray(k_nope.float().numpy())),
+            ptr(np.ascontiguousarray(kv_a_packed.float().numpy())),
+            ptr(np.ascontiguousarray(cos_half.float().numpy())),
+            ptr(np.ascontiguousarray(sin_half.float().numpy())),
+            ptr(query_inplace),
+            ptr(key_inplace),
+            tokens,
+            heads,
+            rank,
+            nope_dim,
+            rope_dim,
+        )
+        np.testing.assert_array_equal(query_inplace, q_ref.float().numpy())
+        np.testing.assert_array_equal(key_inplace, k_ref.float().numpy())
 
     def test_mla_kv_cache_batch_store_uses_head_major_padded_layout(self):
         rng = np.random.default_rng(31)
@@ -373,7 +515,7 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         lib.deepseek_mla_attention_decode_f32(*args)
         workspace_args = (*args[:3], ptr(actual), *args[4:])
         lib.deepseek_mla_attention_decode_f32_workspace(
-            *workspace_args, ptr(scores), scores.nbytes
+            *workspace_args, 1.0 / math.sqrt(qk_dim), ptr(scores), scores.nbytes
         )
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
 
@@ -381,6 +523,7 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         undersized_args = (*args[:3], ptr(sentinel), *args[4:])
         lib.deepseek_mla_attention_decode_f32_workspace(
             *undersized_args,
+            1.0 / math.sqrt(qk_dim),
             ptr(scores), cache_len * ctypes.sizeof(ctypes.c_float) - 1,
         )
         np.testing.assert_array_equal(sentinel, -23.0)

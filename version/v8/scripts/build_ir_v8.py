@@ -1649,6 +1649,10 @@ OP_DATAFLOW = {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "attn_q_gate_packed", "dtype": "fp32"}},
     },
+    "attention_gate_projection": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "attn_gate", "dtype": "fp32"}},
+    },
     "k_proj": {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "k_scratch", "dtype": "fp32"}},
@@ -2879,7 +2883,8 @@ class DataflowTracker:
 
     def record_op(self, op_id: int, op_type: str, layer: int, instance: int,
                   input_slot_override: Optional[Dict[str, str]] = None,
-                  output_slot_override: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+                  output_slot_override: Optional[Dict[str, str]] = None,
+                  interface_validation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Record an op's dataflow and return the dataflow info to embed in IR1.
 
@@ -2889,7 +2894,33 @@ class DataflowTracker:
                 "outputs": {output_name: {"dtype": "Z", "slot": "..."}}
             }
         """
-        dataflow_def = OP_DATAFLOW.get(op_type, {})
+        dataflow_def = copy.deepcopy(OP_DATAFLOW.get(op_type, {}))
+        input_dtypes: Dict[str, str] = {}
+        output_dtypes: Dict[str, str] = {}
+        if (
+            isinstance(interface_validation, dict)
+            and interface_validation.get("status") == "validated"
+        ):
+            port_dtypes = interface_validation.get("port_dtypes", {})
+            input_dtypes = (
+                port_dtypes.get("inputs", {})
+                if isinstance(port_dtypes.get("inputs"), dict)
+                else {}
+            )
+            output_dtypes = (
+                port_dtypes.get("outputs", {})
+                if isinstance(port_dtypes.get("outputs"), dict)
+                else {}
+            )
+            canonical_inputs = dataflow_def.setdefault("inputs", {})
+            for name, slot in interface_validation.get("inputs", {}).items():
+                canonical_inputs.setdefault(name, slot)
+            canonical_outputs = dataflow_def.setdefault("outputs", {})
+            for name, slot in interface_validation.get("outputs", {}).items():
+                canonical_outputs.setdefault(
+                    name,
+                    {"slot": slot, "dtype": output_dtypes.get(name, "unknown")},
+                )
 
         # ═══════════════════════════════════════════════════════════
         # NOTE: Residual saving is now handled by explicit residual_save ops
@@ -2906,7 +2937,10 @@ class DataflowTracker:
                 # External input (token_ids, etc.)
                 inputs[input_name] = {
                     "from": slot_name,
-                    "dtype": "i32" if "token" in slot_name else "fp32",
+                    "dtype": input_dtypes.get(
+                        input_name,
+                        "i32" if "token" in slot_name else "fp32",
+                    ),
                     "slot": slot_name,
                 }
             elif slot_name in self.slots:
@@ -2922,7 +2956,7 @@ class DataflowTracker:
                 # Slot not yet written - this is a bug or first use
                 inputs[input_name] = {
                     "from": f"uninitialized:{slot_name}",
-                    "dtype": "unknown",
+                    "dtype": input_dtypes.get(input_name, "unknown"),
                     "slot": slot_name,
                 }
 
@@ -3827,7 +3861,11 @@ RESIDUAL_SOURCE_BRANCH_STARTERS = {
 PRE_NORM_Q8_DIRECT_CONSUMERS = RESIDUAL_SOURCE_BRANCH_STARTERS
 
 
-def should_insert_residual_save(layer_ops: List[str], op_idx: int) -> bool:
+def should_insert_residual_save(
+    layer_ops: List[str],
+    op_idx: int,
+    op_item: Optional[Dict[str, Any]] = None,
+) -> bool:
     """
     Insert residual_save only when the current norm starts a branch whose later
     residual_add must still see the branch input.
@@ -3838,6 +3876,8 @@ def should_insert_residual_save(layer_ops: List[str], op_idx: int) -> bool:
     - post_attention_norm must NOT overwrite the saved residual, because the
       following residual_add still needs the original layer input
     """
+    if isinstance(op_item, dict) and op_item.get("auto_residual_save") is False:
+        return False
     if op_idx < 0 or op_idx >= len(layer_ops):
         return False
     if layer_ops[op_idx] not in PRE_NORM_OP_NAMES:
@@ -7447,16 +7487,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if op == "attn" and mode == "prefill" and not _attention_contract_is_causal(template, config):
                 return ["attention_forward_full_head_major_gqa_flash_strided"]
 
-        # Kimi/DeepSeek MLA decompression has the same semantic template op for
-        # FP32 and BF16 weights, but the C ABI differs for kv_b_proj.  Resolve it
-        # from the manifest-derived layer_quant before honoring a generic template
-        # default, otherwise BF16 weights can be cast as float*.
-        if op == "kv_lora_decompress":
-            kv_b_dtype = str(layer_quant.get("mla_kv_b_proj", "") or "").strip().lower()
-            if kv_b_dtype == "bf16":
-                return ["deepseek_mla_kv_decompress_bf16"]
-            return ["deepseek_mla_kv_decompress_f32"]
-
         explicit_kernel = str(template_kernels.get(op, "") or "").strip()
         if explicit_kernel:
             explicit_weight_info = OP_TO_WEIGHT_KEYS.get(op)
@@ -7958,7 +7988,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 pass  # Flag is set, handled below
 
                         # Insert residual_save BEFORE pre-norm to save input for skip connection
-                        if should_insert_residual_save(layer_ops, op_idx):
+                        if should_insert_residual_save(layer_ops, op_idx, op_item):
                             residual_save_op_name = f"residual_save"
                             residual_save_info = get_op_info(residual_save_op_name, "body", layer_idx)
                             arranged_kernels.append({
@@ -8372,6 +8402,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             instance,
             merged_input_override or None,
             explicit_output_override or None,
+            ir_op.get("interface_validation"),
         )
         ir_op["dataflow"] = dataflow_info
 

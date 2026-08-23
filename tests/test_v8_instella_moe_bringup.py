@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version" / "v8" / "scripts" / "convert_safetensors_to_bump_v8.py"
+CIRCUIT = ROOT / "version" / "v8" / "circuits" / "instella_moe.json"
 
 
 def _load_converter():
@@ -110,6 +112,29 @@ def _headers() -> dict:
 
 
 class InstellaMoEBringupTests(unittest.TestCase):
+    def test_chat_contract_matches_checkpoint_role_markers(self) -> None:
+        circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
+        contract = circuit["contract"]["chat_contract"]
+
+        self.assertEqual(contract["conversation_prefix"], "<｜begin▁of▁sentence｜>")
+        self.assertEqual(contract["turn_prefix_by_role"]["user"], "<｜User｜>")
+        self.assertEqual(
+            contract["turn_prefix_by_role"]["assistant"],
+            "<｜Assistant｜>",
+        )
+        self.assertEqual(
+            contract["turn_suffix_by_role"]["assistant"],
+            "<｜end▁of▁sentence｜>",
+        )
+        self.assertFalse(contract["raw_prompt_allowed"])
+
+    def test_mla_latent_norm_selects_strided_bf16_storage_provider(self) -> None:
+        circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
+        self.assertEqual(
+            circuit["kernels"]["kv_a_layernorm"],
+            "rmsnorm_forward_strided_pytorch_bf16_storage",
+        )
+
     def test_architecture_class_overrides_deepseek_model_type(self) -> None:
         self.assertEqual(converter._infer_arch(_tiny_config()), "instella_moe")
 
@@ -121,6 +146,10 @@ class InstellaMoEBringupTests(unittest.TestCase):
         by_name = {ref.ck_name: ref for ref in refs}
         self.assertIn("layer.0.mla_gate_proj", by_name)
         self.assertIn("layer.1.mla_gate_proj", by_name)
+        self.assertIsNone(
+            by_name["layer.0.mla_kv_b_proj"].dtype,
+            "the converter must preserve the checkpoint's BF16 KV-B projection",
+        )
         self.assertEqual(by_name["layer.1.moe_expert_gate"].shape, (2, 4, 8))
         self.assertEqual(by_name["layer.1.moe_shared_gate"].source_names, (
             "model.layers.1.mlp.shared_experts.gate_proj.weight",
@@ -136,7 +165,7 @@ class InstellaMoEBringupTests(unittest.TestCase):
         self.assertEqual(config["model"], "instella_moe")
         self.assertEqual(
             config["layer_kinds"],
-            ["mla_gated_dense_mlp", "mla_gated_farskip_moe_first"],
+            ["mla_gated_farskip_dense_mlp", "mla_gated_farskip_moe_first"],
         )
         self.assertTrue(config["gated_attention"])
         self.assertTrue(config["farskip"])
@@ -149,6 +178,11 @@ class InstellaMoEBringupTests(unittest.TestCase):
         self.assertEqual(config["rope_beta_slow"], 1.0)
         self.assertEqual(config["rope_mscale"], 1.0)
         self.assertEqual(config["rope_mscale_all_dim"], 1.0)
+        expected_mscale = 0.1 * math.log(40.0) + 1.0
+        self.assertAlmostEqual(
+            config["attention_scale"],
+            (1.0 / math.sqrt(4.0)) * expected_mscale * expected_mscale,
+        )
         self.assertEqual(config["moe_shared_intermediate_size"], 8)
 
     def test_synthetic_model_reaches_call_ready_ir_in_prefill_and_decode(self) -> None:
@@ -246,9 +280,132 @@ class InstellaMoEBringupTests(unittest.TestCase):
                 )
                 self.assertTrue(any(op.get("op") == "residual_add" for op in joined))
                 ops = call_ir.get("operations", call_ir.get("ops", []))
+                final_norm = next(op for op in ops if op.get("op") == "final_rmsnorm")
+                self.assertEqual(
+                    final_norm.get("call_abi", {}).get("kernel_id"),
+                    "rmsnorm_forward_pytorch_bf16_storage",
+                )
+                kv_decompress = next(
+                    op for op in ops
+                    if op.get("layer") == 0 and op.get("op") == "kv_lora_decompress"
+                )
+                self.assertEqual(
+                    kv_decompress.get("call_abi", {}).get("kernel_id"),
+                    "deepseek_mla_kv_decompress_bf16",
+                )
+                self.assertEqual(
+                    kv_decompress.get("call_abi", {}).get("owner"),
+                    "kernel_map",
+                )
+                layer_zero = [op for op in ops if op.get("layer") == 0]
+                self.assertEqual(
+                    [op.get("op") for op in layer_zero].count("residual_save"),
+                    1,
+                    "explicit FarSkip dataflow must not be overwritten by a legacy residual copy",
+                )
+                layer_zero_norms = [
+                    op for op in layer_zero if op.get("op") == "block_rmsnorm"
+                ]
+                self.assertEqual(len(layer_zero_norms), 2)
+                ffn_input = next(
+                    arg for arg in layer_zero_norms[1].get("args", [])
+                    if arg.get("source") in {"activation:input", "activation:x"}
+                )
+                self.assertEqual(ffn_input.get("buffer_ref"), "residual")
+                residual_adds = [
+                    op for op in layer_zero if op.get("op") == "residual_add"
+                ]
+                self.assertEqual(len(residual_adds), 2)
+                final_inputs = {
+                    arg.get("name"): arg.get("buffer_ref")
+                    for arg in residual_adds[1].get("args", [])
+                    if arg.get("name") in {"a", "b"}
+                }
+                self.assertEqual(
+                    final_inputs,
+                    {"a": "embedded_input", "b": "layer_output"},
+                )
+                normalized_projection_ops = {
+                    "q_proj",
+                    "attention_gate_projection",
+                    "mlp_gate_up",
+                }
+                bf16_storage_projections = {
+                    "q_proj",
+                    "kv_a_proj",
+                    "attention_gate_projection",
+                    "out_proj",
+                    "mlp_gate_up",
+                    "mlp_down",
+                }
+                for op in ops:
+                    if op.get("op") not in bf16_storage_projections:
+                        continue
+                    self.assertEqual(
+                        op.get("call_abi", {}).get("kernel_id"),
+                        "gemm_nt_bf16_bf16_storage",
+                        op,
+                    )
+                for op in ops:
+                    if op.get("layer") != 0 or op.get("op") not in normalized_projection_ops:
+                        continue
+                    activation_args = [
+                        arg for arg in op.get("args", [])
+                        if arg.get("source") in {"activation:a", "activation:x"}
+                    ]
+                    self.assertEqual(len(activation_args), 1, op)
+                    self.assertEqual(
+                        activation_args[0].get("buffer_ref"),
+                        "layer_input",
+                        op,
+                    )
+                gate = next(
+                    op for op in ops
+                    if op.get("layer") == 0
+                    and op.get("op") == "attention_gate_projection"
+                )
+                gate_outputs = [
+                    arg for arg in gate.get("args", [])
+                    if arg.get("source") in {"output:c", "output:y"}
+                ]
+                self.assertEqual(len(gate_outputs), 1, gate)
+                self.assertEqual(gate_outputs[0].get("buffer_ref"), "attn_gate")
+                router = next(
+                    op for op in ops
+                    if op.get("layer") == 1 and op.get("op") == "moe_router"
+                )
+                self.assertEqual(router.get("call_abi", {}).get("owner"), "kernel_map")
+                router_buffers = {
+                    arg.get("name"): arg.get("buffer_ref")
+                    for arg in router.get("args", [])
+                    if arg.get("name") in {"A", "C"}
+                }
+                self.assertEqual(
+                    router_buffers,
+                    {"A": "layer_input", "C": "mlp_scratch"},
+                    "router logits must not overwrite their normalized activation input",
+                )
                 farskip = [op for op in ops if op.get("op") == "farskip_routed_shared_combine"]
                 self.assertEqual(len(farskip), 1)
                 self.assertEqual(farskip[0].get("call_abi", {}).get("owner"), "kernel_map")
+                farskip_buffers = {
+                    arg.get("name"): arg.get("buffer_ref")
+                    for arg in farskip[0].get("args", [])
+                    if arg.get("name") in {
+                        "hidden", "routed", "post_attn_residual",
+                        "main_output", "routed_free_output",
+                    }
+                }
+                self.assertEqual(
+                    farskip_buffers,
+                    {
+                        "hidden": "layer_input",
+                        "routed": "mlp_scratch",
+                        "post_attn_residual": "embedded_input",
+                        "main_output": "embedded_input",
+                        "routed_free_output": "layer_output",
+                    },
+                )
 
             init_call = json.loads((out / "init_call.json").read_text(encoding="utf-8"))
             yarn = next(

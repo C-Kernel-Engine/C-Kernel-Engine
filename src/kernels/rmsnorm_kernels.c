@@ -52,6 +52,15 @@ static inline __m256 rmsnorm_add_avx2_ordered(__m256 left, __m256 right)
     return _mm256_load_ps((const float *)materialized);
 #endif
 }
+
+static inline __m256 rmsnorm_load_bf16_values_avx2(const float *values)
+{
+    _Alignas(32) float rounded[8];
+    for (int lane = 0; lane < 8; ++lane) {
+        rounded[lane] = bf16_to_float(float_to_bf16(values[lane]));
+    }
+    return _mm256_load_ps(rounded);
+}
 #endif
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -248,13 +257,14 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
                                                        float *rstd_cache,
                                                        int tokens,
                                                        int d_model,
-                                                       int aligned_embed_dim,
+                                                       int input_stride,
+                                                       int output_stride,
                                                        float eps,
                                                        int qwen3next_weight_order)
 {
     for (int t = 0; t < tokens; ++t) {
-        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
-        float *y = output + (size_t)t * (size_t)aligned_embed_dim;
+        const float *x = input + (size_t)t * (size_t)input_stride;
+        float *y = output + (size_t)t * (size_t)output_stride;
         float sum_sq = 0.0f;
 
 #if defined(__AVX2__)
@@ -293,7 +303,7 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
             for (int block = 0; block < level_step; ++block, ++item) {
                 for (int stream = 0; stream < 4; ++stream) {
                     const int offset = (item * 4 + stream) * 8;
-                    const __m256 values = _mm256_loadu_ps(x + offset);
+                    const __m256 values = rmsnorm_load_bf16_values_avx2(x + offset);
                     const __m256 squared = rmsnorm_square_avx2_no_contract(values);
                     level[0][stream] = rmsnorm_add_avx2_ordered(
                         level[0][stream], squared
@@ -314,7 +324,7 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
         for (; item < cascade_items; ++item) {
             for (int stream = 0; stream < 4; ++stream) {
                 const int offset = (item * 4 + stream) * 8;
-                const __m256 values = _mm256_loadu_ps(x + offset);
+                const __m256 values = rmsnorm_load_bf16_values_avx2(x + offset);
                 const __m256 squared = rmsnorm_square_avx2_no_contract(values);
                 level[0][stream] = rmsnorm_add_avx2_ordered(
                     level[0][stream], squared
@@ -334,7 +344,7 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
         }
         d = cascade_items * 4 * 8;
         for (; d + 8 <= d_model; d += 8) {
-            const __m256 values = _mm256_loadu_ps(x + d);
+            const __m256 values = rmsnorm_load_bf16_values_avx2(x + d);
             const __m256 squared = rmsnorm_square_avx2_no_contract(values);
             reduced = rmsnorm_add_avx2_ordered(reduced, squared);
         }
@@ -378,7 +388,7 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
                 y[d] = bf16_to_float(float_to_bf16(normalized * weight));
             }
         }
-        for (int d = d_model; d < aligned_embed_dim; ++d) y[d] = 0.0f;
+        for (int d = d_model; d < output_stride; ++d) y[d] = 0.0f;
     }
 }
 
@@ -393,7 +403,22 @@ void rmsnorm_forward_pytorch_bf16_storage(const float *input,
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, gamma, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, eps, 0);
+        aligned_embed_dim, aligned_embed_dim, eps, 0);
+}
+
+void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input,
+                                                   const float *gamma,
+                                                   float *output,
+                                                   float *rstd_cache,
+                                                   int tokens,
+                                                   int d_model,
+                                                   int input_stride,
+                                                   int output_stride,
+                                                   float eps)
+{
+    rmsnorm_forward_pytorch_bf16_storage_impl(
+        input, gamma, output, rstd_cache, tokens, d_model,
+        input_stride, output_stride, eps, 0);
 }
 
 void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
@@ -408,7 +433,7 @@ void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, gamma, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, eps, 1);
+        aligned_embed_dim, aligned_embed_dim, eps, 1);
 }
 
 static void rmsnorm_backward_strict_scalar(const float *d_output,

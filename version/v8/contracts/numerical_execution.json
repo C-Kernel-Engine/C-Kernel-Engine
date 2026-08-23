@@ -2400,6 +2400,86 @@
       "description": "Segmented BF16 prefill provider: aligned M/N/K uses the AMX tile32 contract; short or unaligned text segments use the native paired-dot contract. Both paths round input and output at the same BF16 storage boundaries.",
       "operator_family": "gemm"
     },
+    "mla_kv_decompress_bf16_weight_bf16_input_bf16_output": {
+      "operator_family": "mla_kv_decompress",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "bf16_rne",
+        "weight": "bf16",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "ascending_latent_dimension_per_independent_head_output"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "output_store"]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "left_to_right",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Expands a BF16-valued MLA latent through the checkpoint's BF16 KV-B projection, splits non-rotary key and value heads, and stores BF16-RNE values in FP32 activation carriers."
+    },
+    "mla_partial_rope_interleaved_pytorch_bf16_storage": {
+      "operator_family": "partial_rope_concat",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "bf16_rne",
+        "weight": "none",
+        "accumulator": "bf16",
+        "contraction": "disabled",
+        "evaluation_order": "bf16_input_and_trig_load_then_separate_bf16_products_then_bf16_add_or_subtract"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "weighted_product", "reduction_update", "output_store"]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "stage_ordered",
+        "partial_accumulator": "bf16",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": {
+        "position_source": "contiguous_zero_based_positions",
+        "pairing": "pairwise_interleaved",
+        "rotary_width": "Dr",
+        "head_width": "Dk+Dr",
+        "position_rank": 3,
+        "axis_order": ["token", "head", "rotary_pair"],
+        "section_interpretation": "not_applicable",
+        "frequency_compute": "fp32",
+        "intermediate_compute": "bf16",
+        "rounding_points": ["input", "trigonometric_cache", "product", "sum_or_difference", "output"],
+        "threading": "serial"
+      },
+      "description": "Assembles packed MLA Q/K heads and applies pairwise-interleaved RoPE with the staged BF16-RNE arithmetic used by PyTorch CPU. Inputs and outputs are BF16 values carried in FP32 buffers."
+    },
     "instella_farskip_bf16_shared_swiglu_fp32_two_stream": {
       "operator_family": "farskip_shared_swiglu",
       "status": "observed",

@@ -14,6 +14,7 @@
     "normalized_stream": "layer_input",
     "attention_residual": "residual",
     "post_attention_stream": "embedded_input",
+    "dense_mlp_output": "layer_output",
     "routed_stream": "mlp_scratch",
     "routed_free_stream": "layer_output"
   },
@@ -27,18 +28,34 @@
     "chat_contract": {
       "version": 1,
       "name": "instella_moe",
-      "raw_prompt_allowed": true,
+      "raw_prompt_allowed": false,
+      "conversation_prefix": "<｜begin▁of▁sentence｜>",
       "turn_prefix": "",
       "turn_suffix": "",
-      "assistant_generation_prefix": "",
-      "role_labels": {"system": "system", "user": "user", "assistant": "assistant"},
+      "turn_prefix_by_role": {
+        "system": "",
+        "user": "<｜User｜>",
+        "assistant": "<｜Assistant｜>"
+      },
+      "turn_suffix_by_role": {
+        "system": "",
+        "user": "",
+        "assistant": "<｜end▁of▁sentence｜>"
+      },
+      "assistant_generation_prefix": "<｜Assistant｜>",
+      "role_labels": {"system": "system", "user": "User", "assistant": "Assistant"},
       "system_prompt_mode": "dedicated_turn",
       "system_prompt_separator": "\n\n",
       "default_system_prompt": "",
       "inject_default_system_prompt": false,
-      "stop_text_markers": [],
-      "token_stop_markers": [],
-      "template_markers": [],
+      "stop_text_markers": ["<｜end▁of▁sentence｜>"],
+      "token_stop_markers": ["<｜end▁of▁sentence｜>"],
+      "template_markers": [
+        "<｜begin▁of▁sentence｜>",
+        "<｜User｜>",
+        "<｜Assistant｜>",
+        "<｜end▁of▁sentence｜>"
+      ],
       "min_response_tokens": 1
     },
     "attention_contract": {
@@ -93,12 +110,89 @@
     },
     "runtime_invariants": {"required_call_args": {}}
   },
+  "required_numerical_contracts": {
+    "decoder.mla_partial_rope_bf16_storage": {
+      "op": "partial_rope_concat",
+      "template_ops": ["partial_rope_concat"],
+      "phases": {
+        "prefill": {
+          "contract_id": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Instella applies interleaved partial RoPE with PyTorch BF16 multiply and add/subtract storage boundaries."
+        },
+        "decode": {
+          "contract_id": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Incremental decode preserves the same BF16 staged interleaved rotation."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mla_partial_rope.output",
+        "producer": "partial_rope_concat",
+        "logical_layout": "token_head_feature",
+        "axis_names": ["token", "head", "feature"]
+      }
+    },
+    "decoder.mla_kv_decompress_bf16_storage": {
+      "op": "kv_lora_decompress",
+      "template_ops": ["kv_lora_decompress"],
+      "phases": {
+        "prefill": {
+          "contract_id": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "Instella retains the checkpoint BF16 KV-B projection and stores the decompressed key/value heads at the PyTorch BF16 boundary."
+        },
+        "decode": {
+          "contract_id": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "Incremental decode uses the same KV-B projection arithmetic and BF16 output-storage boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mla_kv_decompress.output",
+        "producer": "kv_lora_decompress",
+        "logical_layout": "token_head_feature",
+        "axis_names": ["token", "head", "feature"]
+      }
+    },
+    "decoder.projections_bf16_storage": {
+      "op": "gemm",
+      "template_ops": [
+        "q_proj",
+        "kv_a_proj",
+        "attention_gate_projection",
+        "out_proj",
+        "mlp_gate_up",
+        "mlp_down"
+      ],
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
+          "validation": "validated",
+          "evidence": "Instella stores BF16 projection outputs before MLA, gated attention, dense SwiGLU, and logits consumers."
+        },
+        "decode": {
+          "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the same BF16 linear-output storage boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.bf16_projection.output",
+        "producer": "gemm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    }
+  },
   "kernels": {
     "rope_init": "yarn_rope_cache_contiguous_positions_f32",
     "block_rmsnorm": "rmsnorm_forward_pytorch_bf16_storage",
-    "kv_a_layernorm": "rmsnorm_forward_strided_f32",
+    "final_rmsnorm": "rmsnorm_forward_pytorch_bf16_storage",
+    "residual_add": "ck_residual_add_token_major_bf16_storage",
+    "kv_a_layernorm": "rmsnorm_forward_strided_pytorch_bf16_storage",
     "kv_lora_decompress": "deepseek_mla_kv_decompress_bf16",
-    "partial_rope_concat": "deepseek_mla_partial_rope_concat_packed_f32",
+    "partial_rope_concat": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
     "mla_attention_prefill": "deepseek_mla_attention_f32",
     "mla_attention_decode": "deepseek_mla_attention_decode_f32",
     "moe_router": "gemm_nt_fp32_exact",
@@ -115,6 +209,25 @@
         "type": "gated_mla_farskip_moe",
         "kind_config_key": "layer_kinds",
         "ops_by_kind": {
+          "mla_gated_farskip_dense_mlp": [
+            {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
+            {"op":"block_rmsnorm","graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"q_proj","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"q_scratch"}}},
+            {"op":"kv_a_proj","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"compressed_kv"}}},
+            {"op":"kv_a_layernorm","graph_slots":{"inputs":{"input":"compressed_kv"},"outputs":{"output":"compressed_kv_normed"}}},
+            {"op":"kv_lora_decompress","graph_slots":{"inputs":{"compressed_kv":"compressed_kv_normed"},"outputs":{"k_nope":"k_nope","value":"v_scratch"}}},
+            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","kv_a_packed":"compressed_kv","cos":"rope_cos_mla_positioned","sin":"rope_sin_mla_positioned"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
+            {"op":"mla_attention","graph_slots":{"inputs":{"q":"q_scratch","k":"k_scratch","v":"v_scratch"},"outputs":{"out":"attn_scratch"}}},
+            {"op":"attention_gate_projection","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"attn_gate"}}},
+            {"op":"attn_gate_sigmoid_mul","graph_slots":{"inputs":{"x":"attn_scratch","gate":"attn_gate"},"outputs":{"out":"attn_scratch"}}},
+            {"op":"out_proj","graph_slots":{"inputs":{"x":"attn_scratch"},"outputs":{"y":"post_attention_stream"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"post_attention_stream","b":"attention_residual"},"outputs":{"out":"main_stream"}}},
+            {"op":"block_rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"attention_residual"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"mlp_gate_up","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"mlp_scratch"}}},
+            {"op":"silu_mul","graph_slots":{"inputs":{"gate":"mlp_scratch"},"outputs":{"out":"mlp_scratch"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"x":"mlp_scratch"},"outputs":{"y":"dense_mlp_output"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"dense_mlp_output"},"outputs":{"out":"main_stream"}}}
+          ],
           "mla_gated_dense_mlp": [
             {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
             {"op":"block_rmsnorm","graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
@@ -122,7 +235,7 @@
             {"op":"kv_a_proj","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"compressed_kv"}}},
             {"op":"kv_a_layernorm","graph_slots":{"inputs":{"input":"compressed_kv"},"outputs":{"output":"compressed_kv_normed"}}},
             {"op":"kv_lora_decompress","graph_slots":{"inputs":{"compressed_kv":"compressed_kv_normed"},"outputs":{"k_nope":"k_nope","value":"v_scratch"}}},
-            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","k_pe":"compressed_kv"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
+            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","kv_a_packed":"compressed_kv","cos":"rope_cos_mla_positioned","sin":"rope_sin_mla_positioned"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
             {"op":"mla_attention","graph_slots":{"inputs":{"q":"q_scratch","k":"k_scratch","v":"v_scratch"},"outputs":{"out":"attn_scratch"}}},
             {"op":"attention_gate_projection","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"attn_gate"}}},
             {"op":"attn_gate_sigmoid_mul","graph_slots":{"inputs":{"x":"attn_scratch","gate":"attn_gate"},"outputs":{"out":"attn_scratch"}}},
@@ -142,15 +255,15 @@
             {"op":"kv_a_proj","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"compressed_kv"}}},
             {"op":"kv_a_layernorm","graph_slots":{"inputs":{"input":"compressed_kv"},"outputs":{"output":"compressed_kv_normed"}}},
             {"op":"kv_lora_decompress","graph_slots":{"inputs":{"compressed_kv":"compressed_kv_normed"},"outputs":{"k_nope":"k_nope","value":"v_scratch"}}},
-            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","k_pe":"compressed_kv"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
+            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","kv_a_packed":"compressed_kv","cos":"rope_cos_mla_positioned","sin":"rope_sin_mla_positioned"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
             {"op":"mla_attention","graph_slots":{"inputs":{"q":"q_scratch","k":"k_scratch","v":"v_scratch"},"outputs":{"out":"attn_scratch"}}},
             {"op":"attention_gate_projection","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"attn_gate"}}},
             {"op":"attn_gate_sigmoid_mul","graph_slots":{"inputs":{"x":"attn_scratch","gate":"attn_gate"},"outputs":{"out":"attn_scratch"}}},
             {"op":"out_proj","graph_slots":{"inputs":{"x":"attn_scratch"},"outputs":{"y":"post_attention_stream"}}},
             {"op":"residual_add","graph_slots":{"inputs":{"a":"post_attention_stream","b":"attention_residual"},"outputs":{"out":"post_attention_stream"}}},
-            {"op":"block_rmsnorm","graph_slots":{"inputs":{"input":"attention_residual"},"outputs":{"output":"normalized_stream"}}},
-            {"op":"moe_router","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"router_scores"}}},
-            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"router_scores"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"block_rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"attention_residual"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
+            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
             {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"routed_stream"}}},
             {"op":"farskip_routed_shared_combine","graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"routed_stream","post_attn_residual":"post_attention_stream"},"outputs":{"main_output":"main_stream","routed_free_output":"routed_free_stream"}}}
           ],
@@ -161,15 +274,15 @@
             {"op":"kv_a_proj","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"compressed_kv"}}},
             {"op":"kv_a_layernorm","graph_slots":{"inputs":{"input":"compressed_kv"},"outputs":{"output":"compressed_kv_normed"}}},
             {"op":"kv_lora_decompress","graph_slots":{"inputs":{"compressed_kv":"compressed_kv_normed"},"outputs":{"k_nope":"k_nope","value":"v_scratch"}}},
-            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","k_pe":"compressed_kv"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
+            {"op":"partial_rope_concat","graph_slots":{"inputs":{"q_packed":"q_scratch","k_nope":"k_nope","kv_a_packed":"compressed_kv","cos":"rope_cos_mla_positioned","sin":"rope_sin_mla_positioned"},"outputs":{"query":"q_scratch","key":"k_scratch"}}},
             {"op":"mla_attention","graph_slots":{"inputs":{"q":"q_scratch","k":"k_scratch","v":"v_scratch"},"outputs":{"out":"attn_scratch"}}},
             {"op":"attention_gate_projection","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"attn_gate"}}},
             {"op":"attn_gate_sigmoid_mul","graph_slots":{"inputs":{"x":"attn_scratch","gate":"attn_gate"},"outputs":{"out":"attn_scratch"}}},
             {"op":"out_proj","graph_slots":{"inputs":{"x":"attn_scratch"},"outputs":{"y":"post_attention_stream"}}},
             {"op":"residual_add","graph_slots":{"inputs":{"a":"post_attention_stream","b":"attention_residual"},"outputs":{"out":"post_attention_stream"}}},
-            {"op":"block_rmsnorm","graph_slots":{"inputs":{"input":"attention_residual"},"outputs":{"output":"normalized_stream"}}},
-            {"op":"moe_router","graph_slots":{"inputs":{"x":"normalized_stream"},"outputs":{"y":"router_scores"}}},
-            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"router_scores"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"block_rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"attention_residual"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
+            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
             {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"routed_stream"}}},
             {"op":"farskip_routed_shared_combine","graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"routed_stream","post_attn_residual":"post_attention_stream"},"outputs":{"main_output":"main_stream","routed_free_output":"routed_free_stream"}}}
           ]

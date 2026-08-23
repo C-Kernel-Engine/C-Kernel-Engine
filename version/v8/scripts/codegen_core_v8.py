@@ -1921,6 +1921,15 @@ def emit_op(
             op_name,
             _hidden_arg("M", "N", "out_dim"),
         )
+    elif op_name == "attention_gate_projection":
+        _emit_hidden_export(
+            _hidden_arg("output", "out", "c", "y"),
+            "attn_gate",
+            _mul_expr(
+                _hidden_arg("rows", "num_tokens", "tokens"),
+                _hidden_arg("N", "n", "gate_dim"),
+            ),
+        )
     elif op_name == "split_q_gate":
         _emit_hidden_export(
             _hidden_arg("gate"),
@@ -2024,11 +2033,15 @@ def emit_op(
         )
     elif op_name == "block_rmsnorm":
         out_expr = _hidden_arg("output", "out", "x", "y")
+        input_expr = _hidden_arg("input", "x")
         count_expr = _mul_expr(
             _hidden_arg("tokens", "num_tokens", "rows"),
             _hidden_arg("d_model", "aligned_embed_dim", "embed_dim", "dim"),
         ) or "EMBED_DIM"
         label = "block_rmsnorm" if op_instance_idx == 0 else "ffn_norm"
+        if op_instance_idx == 1:
+            _emit_hidden_export(input_expr, "ffn_input", count_expr)
+            _emit_hidden_export_last_row(input_expr, "ffn_input", "EMBED_DIM")
         _emit_hidden_export(out_expr, label, count_expr)
         _emit_hidden_export_last_row(out_expr, label, "EMBED_DIM")
     elif op_name in {"rmsnorm", "attn_norm"}:
@@ -2092,6 +2105,15 @@ def emit_op(
         width = _hidden_arg("hidden_dim", "embed_dim") or "EMBED_DIM"
         _emit_hidden_export(output, "moe_combined_output", _mul_expr(rows, width))
         _emit_hidden_export_last_row(output, "moe_combined_output", width)
+    elif op_name == "farskip_routed_shared_combine":
+        rows = _hidden_arg("rows", "M", "m", "tokens")
+        width = _hidden_arg("hidden_dim", "embed_dim") or "EMBED_DIM"
+        main_output = _hidden_arg("main_output")
+        routed_free_output = _hidden_arg("routed_free_output")
+        _emit_hidden_export(main_output, "layer_out", _mul_expr(rows, width))
+        _emit_hidden_export_last_row(main_output, "layer_out", width)
+        _emit_hidden_export(routed_free_output, "routed_free_out", _mul_expr(rows, width))
+        _emit_hidden_export_last_row(routed_free_output, "routed_free_out", width)
     elif op_name == "mlp_gate_up":
         out_expr = _hidden_arg("output", "out", "c", "y")
         rows_expr = _hidden_arg("m", "M", "rows", "tokens")

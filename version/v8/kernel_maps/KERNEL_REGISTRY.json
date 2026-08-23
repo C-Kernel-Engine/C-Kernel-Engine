@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 287,
+      "total": 289,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -69,7 +69,7 @@
         "multimodal_position_builder": 1,
         "multimodal_prefix_insert": 1,
         "optimizer": 4,
-        "partial_rope_concat": 2,
+        "partial_rope_concat": 3,
         "patch_projection": 1,
         "position_embeddings": 6,
         "position_ids": 1,
@@ -92,7 +92,7 @@
         "relu2": 2,
         "residual_add": 2,
         "residual_save": 1,
-        "rmsnorm": 8,
+        "rmsnorm": 9,
         "rope": 17,
         "rope_backward": 2,
         "rope_init": 3,
@@ -9796,9 +9796,9 @@
           ],
           "layout": "token_major_contiguous",
           "access": "read",
-          "storage_class": "scratch",
+          "storage_class": "activation",
           "consumption": "required",
-          "desc": "Residual input B [tokens, aligned_embed_dim] (saved residual scratch)"
+          "desc": "Residual input B [tokens, aligned_embed_dim]"
         }
       ],
       "weights": [],
@@ -9879,7 +9879,7 @@
         "params": [
           {
             "name": "a",
-            "source": "activation:input",
+            "source": "activation:a",
             "cast": "float*",
             "ports": [
               "input:a"
@@ -9887,7 +9887,7 @@
           },
           {
             "name": "b",
-            "source": "scratch:residual",
+            "source": "activation:b",
             "cast": "float*",
             "ports": [
               "input:b"
@@ -9973,7 +9973,7 @@
           ],
           "layout": "token_major_contiguous",
           "access": "read",
-          "storage_class": "scratch",
+          "storage_class": "activation",
           "consumption": "required",
           "desc": "Residual input B [tokens, aligned_embed_dim] (saved residual scratch)"
         }
@@ -9992,6 +9992,9 @@
           "access": "write",
           "storage_class": "activation",
           "consumption": "required",
+          "may_alias": [
+            "input:a"
+          ],
           "desc": "Output [tokens, aligned_embed_dim]"
         }
       ],
@@ -10091,7 +10094,7 @@
         "params": [
           {
             "name": "a",
-            "source": "activation:input",
+            "source": "activation:a",
             "cast": "float*",
             "ports": [
               "input:a"
@@ -10099,7 +10102,7 @@
           },
           {
             "name": "b",
-            "source": "scratch:residual",
+            "source": "activation:b",
             "cast": "float*",
             "ports": [
               "input:b"
@@ -10195,7 +10198,8 @@
         "T",
         "QK",
         "V",
-        "S"
+        "S",
+        "attention_scale"
       ],
       "params": [
         {
@@ -10229,7 +10233,7 @@
       ],
       "impl": {
         "function": "deepseek_mla_attention_decode_f32_workspace",
-        "c_declaration": "void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float *scores, size_t scores_bytes);",
+        "c_declaration": "void deepseek_mla_attention_decode_f32_workspace(const float *q, const float *k_cache, const float *v_cache, float *output, int num_heads, int num_kv_heads, int cache_len, int qk_head_dim, int v_head_dim, int max_seq_len, int cache_stride, float scale, float *scores, size_t scores_bytes);",
         "sources": [
           "src/kernels/deepseek_kernels.c"
         ]
@@ -10286,6 +10290,10 @@
             "source": "dim:kv_cache_head_dim"
           },
           {
+            "name": "scale",
+            "source": "dim:attention_scale"
+          },
+          {
             "name": "scores",
             "source": "scratch:scores",
             "cast": "float*"
@@ -10296,7 +10304,7 @@
           }
         ]
       },
-      "notes": "Reference MLA decode attention over persistent K/V cache. K uses qk_head_dim; V uses v_head_dim; both use cache_stride.",
+      "notes": "Reference MLA decode attention over persistent K/V cache. K uses qk_head_dim; V uses v_head_dim; both use cache_stride. The model-derived softmax scale is explicit.",
       "name": "deepseek_mla_attention_decode_f32",
       "_source_file": "deepseek_mla_attention_decode_f32.json"
     },
@@ -10366,11 +10374,12 @@
         "H",
         "KV",
         "QK",
-        "V"
+        "V",
+        "attention_scale"
       ],
       "impl": {
         "function": "deepseek_mla_attention_f32_workspace",
-        "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float *scores, size_t scores_bytes);",
+        "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
         "sources": [
           "src/kernels/deepseek_kernels.c"
         ]
@@ -10419,6 +10428,10 @@
             "source": "dim:v_head_dim"
           },
           {
+            "name": "scale",
+            "source": "dim:attention_scale"
+          },
+          {
             "name": "scores",
             "source": "scratch:scores",
             "cast": "float*"
@@ -10429,7 +10442,7 @@
           }
         ]
       },
-      "notes": "Reference causal MLA prefill attention over the current token sequence.",
+      "notes": "Reference causal MLA prefill attention over the current token sequence. The model-derived softmax scale is an explicit ABI dimension, including any YaRN mscale multiplier.",
       "name": "deepseek_mla_attention_f32",
       "_source_file": "deepseek_mla_attention_f32.json"
     },
@@ -10625,10 +10638,23 @@
     {
       "id": "deepseek_mla_kv_decompress_bf16",
       "op": "kv_lora_decompress",
-      "variant": "bf16_weight_fp32_activation",
+      "operation_interface": "mla.kv_lora_decompress.bf16_weight.bf16_storage.v1",
+      "selection": {
+        "status": "production",
+        "priority": 200,
+        "equivalence_group": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+      "variant": "bf16_weight_bf16_values_fp32_carrier",
       "modes": {
         "inference": true,
-        "training": true,
+        "training": false,
         "backward": false
       },
       "quant": {
@@ -10643,7 +10669,13 @@
           "shape": [
             "T",
             "R"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE latent values carried in FP32 storage."
         }
       ],
       "weights": [
@@ -10653,7 +10685,12 @@
           "shape": [
             "H*(Dk+Dv)",
             "R"
-          ]
+          ],
+          "layout": "feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
         }
       ],
       "outputs": [
@@ -10664,7 +10701,13 @@
             "T",
             "H",
             "Dk"
-          ]
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE non-rotary key values carried in FP32 storage."
         },
         {
           "name": "value",
@@ -10673,9 +10716,16 @@
             "T",
             "H",
             "Dv"
-          ]
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE value-head values carried in FP32 storage."
         }
       ],
+      "scratch": [],
       "dims": [
         "T",
         "H",
@@ -10683,7 +10733,22 @@
         "Dk",
         "Dv"
       ],
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
       "impl": {
+        "function": "deepseek_mla_kv_decompress_bf16",
+        "c_declaration": "void deepseek_mla_kv_decompress_bf16(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);",
         "sources": [
           "src/kernels/deepseek_kernels.c"
         ],
@@ -10693,9 +10758,96 @@
             "requires": [],
             "compile_flags": []
           }
-        ],
-        "function": "deepseek_mla_kv_decompress_bf16",
-        "c_declaration": "void deepseek_mla_kv_decompress_bf16(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "mla_kv_decompress_bf16_weight_bf16_input_bf16_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "deepseek_mla_kv_decompress_bf16",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "compressed_kv",
+            "source": "activation:compressed_kv",
+            "cast": "const float*",
+            "ports": [
+              "input:compressed_kv"
+            ]
+          },
+          {
+            "name": "kv_b_proj",
+            "source": "weight:mla_kv_b_proj",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:kv_b_proj"
+            ]
+          },
+          {
+            "name": "k_nope",
+            "source": "output:k_nope",
+            "cast": "float*",
+            "ports": [
+              "output:k_nope"
+            ]
+          },
+          {
+            "name": "value",
+            "source": "output:value",
+            "cast": "float*",
+            "ports": [
+              "output:value"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:_m"
+          },
+          {
+            "name": "heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "kv_lora_rank",
+            "source": "dim:kv_lora_rank"
+          },
+          {
+            "name": "qk_nope_dim",
+            "source": "dim:qk_nope_head_dim"
+          },
+          {
+            "name": "v_dim",
+            "source": "dim:v_head_dim"
+          }
+        ]
       },
       "tests": {
         "unit": [
@@ -10705,11 +10857,11 @@
           {
             "kind": "pytorch",
             "command": ".venv/bin/python unittest/test_deepseek_reference_kernels.py",
-            "tolerance": "1e-5"
+            "tolerance": "0"
           }
         ]
       },
-      "notes": "DeepSeek/Kimi MLA KV LoRA decompression with BF16 projection weights and FP32 activations/output.",
+      "notes": "Model-agnostic MLA KV-B projection for BF16 checkpoints. Input and outputs use BF16-RNE values in FP32 activation carriers; the provider owns the BF16 weight ABI and output-storage boundary.",
       "name": "deepseek_mla_kv_decompress_bf16",
       "_source_file": "deepseek_mla_kv_decompress_bf16.json"
     },
@@ -10926,6 +11078,305 @@
       "notes": "Reusable scalar reference for interleaved DeepSeek-V3-style MLA partial RoPE assembly: copy q/k no-PE slices, rotate raw adjacent q_pe/shared-k_pe pairs into split-half output order, then concatenate. The function name records its origin; the generic partial_rope_concat op is reused by Kimi and Instella when their numerical contract matches.",
       "name": "deepseek_mla_partial_rope_concat_f32",
       "_source_file": "deepseek_mla_partial_rope_concat_f32.json"
+    },
+    {
+      "id": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+      "op": "partial_rope_concat",
+      "operation_interface": "mla.partial_rope_concat.packed_interleaved.pytorch_bf16_storage.v1",
+      "selection": {
+        "status": "production",
+        "priority": 200,
+        "equivalence_group": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+      "variant": "packed_pairwise_interleaved_bf16_values_fp32_carrier",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q_packed",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "Dk+Dr"
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE packed query values carried in FP32 storage."
+        },
+        {
+          "name": "k_nope",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "Dk"
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE non-rotary key values carried in FP32 storage."
+        },
+        {
+          "name": "kv_a_packed",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "R+Dr"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE compressed KV and shared rotary key values carried in FP32 storage."
+        },
+        {
+          "name": "cos",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "Dr/2"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "persistent_state",
+          "consumption": "required"
+        },
+        {
+          "name": "sin",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "Dr/2"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "persistent_state",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "Dk+Dr"
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "may_alias": [
+            "input:q_packed"
+          ],
+          "desc": "BF16-RNE assembled query values carried in FP32 storage."
+        },
+        {
+          "name": "key",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "Dk+Dr"
+          ],
+          "layout": "token_head_feature_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE assembled key values carried in FP32 storage."
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "H",
+        "R",
+        "Dk",
+        "Dr"
+      ],
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "impl": {
+        "function": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+        "c_declaration": "void deepseek_mla_partial_rope_concat_packed_bf16_storage(const float *q_packed, const float *k_nope, const float *kv_a_packed, const float *cos, const float *sin, float *query, float *key, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int qk_rope_dim);",
+        "sources": [
+          "src/kernels/deepseek_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "scalar_ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "mla_partial_rope_interleaved_pytorch_bf16_storage",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "bf16",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q_packed",
+            "source": "activation:q_packed",
+            "cast": "const float*",
+            "ports": [
+              "input:q_packed"
+            ]
+          },
+          {
+            "name": "k_nope",
+            "source": "activation:k_nope",
+            "cast": "const float*",
+            "ports": [
+              "input:k_nope"
+            ]
+          },
+          {
+            "name": "kv_a_packed",
+            "source": "activation:kv_a_packed",
+            "cast": "const float*",
+            "ports": [
+              "input:kv_a_packed"
+            ]
+          },
+          {
+            "name": "cos",
+            "source": "runtime:rope_cos_mla_positioned",
+            "cast": "const float*",
+            "ports": [
+              "input:cos"
+            ]
+          },
+          {
+            "name": "sin",
+            "source": "runtime:rope_sin_mla_positioned",
+            "cast": "const float*",
+            "ports": [
+              "input:sin"
+            ]
+          },
+          {
+            "name": "query",
+            "source": "output:query",
+            "cast": "float*",
+            "ports": [
+              "output:query"
+            ]
+          },
+          {
+            "name": "key",
+            "source": "output:key",
+            "cast": "float*",
+            "ports": [
+              "output:key"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:_m"
+          },
+          {
+            "name": "heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "kv_lora_rank",
+            "source": "dim:kv_lora_rank"
+          },
+          {
+            "name": "qk_nope_dim",
+            "source": "dim:qk_nope_head_dim"
+          },
+          {
+            "name": "qk_rope_dim",
+            "source": "dim:qk_rope_head_dim"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_deepseek_reference_kernels.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_deepseek_reference_kernels.py",
+            "tolerance": "0"
+          }
+        ]
+      },
+      "notes": "Model-agnostic packed MLA partial-RoPE assembly with PyTorch BF16 storage after each multiply and add/subtract. The provider consumes and produces BF16 values in FP32 activation carriers.",
+      "name": "deepseek_mla_partial_rope_concat_packed_bf16_storage",
+      "_source_file": "deepseek_mla_partial_rope_concat_packed_bf16_storage.json"
     },
     {
       "id": "deepseek_mla_partial_rope_concat_packed_f32",
@@ -12380,6 +12831,19 @@
     {
       "id": "farskip_swiglu_shared_combine_bf16",
       "op": "farskip_routed_shared_combine",
+      "operation_interface": "farskip.shared_swiglu.bf16_weights.fp32_two_stream.v1",
+      "selection": {
+        "status": "candidate",
+        "priority": 200,
+        "equivalence_group": "instella_farskip_bf16_shared_swiglu_fp32_two_stream",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "instella_farskip_bf16_shared_swiglu_fp32_two_stream",
       "variant": "bf16_shared_weight_fp32_two_stream",
       "modes": {
         "inference": true,
@@ -12398,7 +12862,12 @@
           "shape": [
             "R",
             "H"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
         },
         {
           "name": "routed",
@@ -12406,7 +12875,12 @@
           "shape": [
             "R",
             "H"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
         },
         {
           "name": "post_attn_residual",
@@ -12414,33 +12888,53 @@
           "shape": [
             "R",
             "H"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "weights": [
         {
-          "name": "shared_gate",
+          "name": "moe_shared_gate",
           "dtype": "bf16",
           "shape": [
             "I",
             "H"
-          ]
+          ],
+          "layout": "feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
         },
         {
-          "name": "shared_up",
+          "name": "moe_shared_up",
           "dtype": "bf16",
           "shape": [
             "I",
             "H"
-          ]
+          ],
+          "layout": "feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
         },
         {
-          "name": "shared_down",
+          "name": "moe_shared_down",
           "dtype": "bf16",
           "shape": [
             "H",
             "I"
-          ]
+          ],
+          "layout": "feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
         }
       ],
       "outputs": [
@@ -12450,6 +12944,14 @@
           "shape": [
             "R",
             "H"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "may_alias": [
+            "input:post_attn_residual"
           ]
         },
         {
@@ -12458,7 +12960,12 @@
           "shape": [
             "R",
             "H"
-          ]
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "dims": [
@@ -12466,6 +12973,20 @@
         "H",
         "I"
       ],
+      "scratch": [],
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
       "impl": {
         "function": "farskip_swiglu_shared_combine_bf16",
         "c_declaration": "void farskip_swiglu_shared_combine_bf16(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
@@ -12511,42 +13032,66 @@
           {
             "name": "hidden",
             "source": "activation:hidden",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
           },
           {
             "name": "routed",
             "source": "activation:routed",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:routed"
+            ]
           },
           {
             "name": "post_attn_residual",
             "source": "activation:post_attn_residual",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:post_attn_residual"
+            ]
           },
           {
             "name": "shared_gate",
             "source": "weight:moe_shared_gate",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:moe_shared_gate"
+            ]
           },
           {
             "name": "shared_up",
             "source": "weight:moe_shared_up",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:moe_shared_up"
+            ]
           },
           {
             "name": "shared_down",
             "source": "weight:moe_shared_down",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:moe_shared_down"
+            ]
           },
           {
             "name": "main_output",
             "source": "output:main_output",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:main_output"
+            ]
           },
           {
             "name": "routed_free_output",
             "source": "output:routed_free_output",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:routed_free_output"
+            ]
           },
           {
             "name": "rows",
@@ -16096,7 +16641,8 @@
           "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
           "status": "validated",
           "phases": [
-            "prefill"
+            "prefill",
+            "decode"
           ],
           "function": "gemm_nt_bf16_bf16_storage",
           "explicit_selector": true,
@@ -17197,6 +17743,7 @@
     {
       "id": "gemm_nt_fp32_exact",
       "op": "gemm",
+      "operation_interface": "gemm.fp32_activation.fp32_weight.fp32_output.v1",
       "variant": "fp32_nt_exact",
       "quant": {
         "weight": "fp32",
@@ -17211,8 +17758,15 @@
             "M",
             "K"
           ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
           "desc": "Activation matrix [M, K] (row-major)"
-        },
+        }
+      ],
+      "weights": [
         {
           "name": "B",
           "dtype": "fp32",
@@ -17220,6 +17774,11 @@
             "N",
             "K"
           ],
+          "layout": "output_feature_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required",
           "desc": "Weight matrix [N, K] (row-major, transposed logical layout)"
         },
         {
@@ -17229,6 +17788,11 @@
             "N"
           ],
           "optional": true,
+          "layout": "feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
           "desc": "Bias vector [N] (or NULL)"
         }
       ],
@@ -17240,6 +17804,11 @@
             "M",
             "N"
           ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
           "desc": "Output matrix [M, N] = A @ B^T + bias"
         }
       ],
@@ -17257,6 +17826,55 @@
         "c_declaration": "void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
         "sources": [
           "src/kernels/gemm_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "last_token_dispatch": "preserve_provider",
+        "params": [
+          {
+            "name": "A",
+            "source": "activation:a",
+            "cast": "const float*",
+            "ports": [
+              "input:A"
+            ]
+          },
+          {
+            "name": "B",
+            "source": "weight:_first_weight",
+            "cast": "const float*",
+            "ports": [
+              "weight:B"
+            ]
+          },
+          {
+            "name": "bias",
+            "source": "weight_f:_bias",
+            "ports": [
+              "weight:bias"
+            ]
+          },
+          {
+            "name": "C",
+            "source": "output:c",
+            "cast": "float*",
+            "ports": [
+              "output:C"
+            ]
+          },
+          {
+            "name": "M",
+            "source": "runtime:seq_len"
+          },
+          {
+            "name": "N",
+            "source": "dim:_output_dim"
+          },
+          {
+            "name": "K",
+            "source": "dim:_input_dim"
+          }
         ]
       },
       "tests": {
@@ -39188,6 +39806,216 @@
       "notes": "RMSNorm over D logical values with independent physical input and output row strides.",
       "name": "rmsnorm_forward_strided_f32",
       "_source_file": "rmsnorm_forward_strided_f32.json"
+    },
+    {
+      "id": "rmsnorm_forward_strided_pytorch_bf16_storage",
+      "op": "rmsnorm",
+      "operation_interface": "rmsnorm.fp32_bf16_values.strided.v1",
+      "selection": {
+        "status": "production",
+        "priority": 100,
+        "equivalence_group": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "variant": "pytorch_avx2_cascade_bf16_storage_independent_row_strides",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "INPUT_STRIDE"
+          ],
+          "layout": "row_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE values carried in FP32 storage; the first D values of each physical input row are normalized."
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "layout": "feature_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required",
+          "desc": "BF16-RNE gamma values carried in FP32 BUMP storage."
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "OUTPUT_STRIDE"
+          ],
+          "layout": "row_major_strided",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "BF16-RNE RMSNorm values carried in FP32 storage; padding is zeroed."
+        },
+        {
+          "name": "rstd",
+          "dtype": "fp32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "scratch",
+          "consumption": "optional"
+        }
+      ],
+      "dims": [
+        "T",
+        "D",
+        "INPUT_STRIDE",
+        "OUTPUT_STRIDE"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "rmsnorm_forward_strided_pytorch_bf16_storage",
+        "c_declaration": "void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps);",
+        "sources": [
+          "src/kernels/rmsnorm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2"
+            ],
+            "compile_flags": [
+              "-mavx2"
+            ]
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_pytorch_avx2_cascade_bf16_storage",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "rmsnorm_forward_strided_pytorch_bf16_storage",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "hierarchical_cascade",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "weight_f:mla_kv_a_norm",
+            "cast": "const float*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null",
+            "ports": [
+              "output:rstd"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "d_model",
+            "source": "dim:kv_lora_rank"
+          },
+          {
+            "name": "input_stride",
+            "source": "dim:kv_lora_input_dim"
+          },
+          {
+            "name": "output_stride",
+            "source": "dim:kv_lora_rank"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py"
+        ],
+        "production_shapes": [
+          "T=1,D=512,INPUT_STRIDE=544,OUTPUT_STRIDE=512",
+          "T=16,D=512,INPUT_STRIDE=544,OUTPUT_STRIDE=520"
+        ],
+        "oracle": "PyTorch BF16 RMSNorm CPU reduction and storage with independent physical row strides"
+      },
+      "notes": "Strided form of the PyTorch AVX2-cascade BF16 RMSNorm storage contract. Instella MLA normalizes the first 512 values of a 544-value compressed-KV row; model identity is not part of the ABI.",
+      "name": "rmsnorm_forward_strided_pytorch_bf16_storage",
+      "_source_file": "rmsnorm_forward_strided_pytorch_bf16_storage.json"
     },
     {
       "id": "v_norm",

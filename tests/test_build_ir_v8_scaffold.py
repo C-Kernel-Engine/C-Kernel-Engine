@@ -147,6 +147,22 @@ class BuildIrV8ScaffoldTests(unittest.TestCase):
         self.assertEqual(assignments["inputs"]["aux"]["buffer"], "layer_output")
         self.assertEqual(assignments["outputs"]["next_aux"]["buffer"], "layer_output")
 
+    def test_explicit_projection_input_slot_overrides_legacy_stream_default(self) -> None:
+        graph = {
+            "inputs": {
+                "x": {"slot": "normalized_stream", "dtype": "fp32"},
+            },
+            "outputs": {
+                "y": {"slot": "q_scratch", "dtype": "fp32"},
+            },
+        }
+        assignment = build_ir_v8.plan_memory(
+            [{"idx": 0, "op": "q_proj", "layer": 0, "dataflow": graph}],
+            slot_bindings={"normalized_stream": "layer_input"},
+        )[0]
+
+        self.assertEqual(assignment["inputs"]["x"]["buffer"], "layer_input")
+
     def test_activation_binding_contract_rejects_empty_names(self) -> None:
         self.assertEqual(
             build_ir_v8._template_activation_bindings(

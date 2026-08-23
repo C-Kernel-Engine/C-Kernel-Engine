@@ -40,7 +40,7 @@
       ],
       "layout": "token_major_contiguous",
       "access": "read",
-      "storage_class": "scratch",
+      "storage_class": "activation",
       "consumption": "required",
       "desc": "Residual input B [tokens, aligned_embed_dim] (saved residual scratch)"
     }
@@ -59,6 +59,7 @@
       "access": "write",
       "storage_class": "activation",
       "consumption": "required",
+      "may_alias": ["input:a"],
       "desc": "Output [tokens, aligned_embed_dim]"
     }
   ],
@@ -159,7 +160,7 @@
     "params": [
       {
         "name": "a",
-        "source": "activation:input",
+        "source": "activation:a",
         "cast": "float*",
         "ports": [
           "input:a"
@@ -167,7 +168,7 @@
       },
       {
         "name": "b",
-        "source": "scratch:residual",
+        "source": "activation:b",
         "cast": "float*",
         "ports": [
           "input:b"
