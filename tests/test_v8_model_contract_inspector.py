@@ -286,7 +286,7 @@ class ModelContractInspectorTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
         report = json.loads(proc.stdout)
         self.assertEqual(report["arch"], "instella_moe")
         self.assertEqual(report["model_type"], "deepseek_v3")
@@ -295,10 +295,10 @@ class ModelContractInspectorTests(unittest.TestCase):
             {"mla_gated_dense_mlp": 1, "mla_gated_farskip_moe": 26},
         )
         self.assertIn("attention_gate_sigmoid_mul", report["required_ops"])
-        self.assertEqual(report["status"], "bringup_required")
+        self.assertEqual(report["status"], "supported")
         self.assertNotIn("farskip_two_stream_residual", report["required_ops"])
         self.assertNotIn("farskip_routed_shared_combine", report["missing_ops"])
-        self.assertIn("mla_interleaved_yarn_contract", report["missing_ops"])
+        self.assertNotIn("mla_interleaved_yarn_contract", report["missing_ops"])
         self.assertNotIn("safetensors_to_bump_mapping", report["missing_ops"])
         self.assertNotIn("v8_template_contract", report["missing_ops"])
 

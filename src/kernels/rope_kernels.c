@@ -453,7 +453,7 @@ static void yarn_rope_cache_explicit_positions_impl(float *cos_f32,
                                           float mscale,
                                           float mscale_all_dim)
 {
-    if ((!cos_f32 && !cos_bf16) || (!sin_f32 && !sin_bf16) || !positions ||
+    if ((!cos_f32 && !cos_bf16) || (!sin_f32 && !sin_bf16) ||
         num_tokens <= 0 || rotary_dim <= 0 || (rotary_dim & 1) != 0 ||
         freq_base <= 0.0f || factor <= 0.0f || original_context <= 0 ||
         beta_fast <= 0.0f || beta_slow <= 0.0f) {
@@ -474,7 +474,7 @@ static void yarn_rope_cache_explicit_positions_impl(float *cos_f32,
         yarn_mscale(factor, mscale_all_dim);
 
     for (int token = 0; token < num_tokens; ++token) {
-        const float position = (float)positions[token];
+        const float position = (float)(positions ? positions[token] : token);
         for (int pair = 0; pair < pairs; ++pair) {
             const float exponent = (2.0f * (float)pair) / (float)rotary_dim;
             const float pos_freq = ck_rope_reference_powf(freq_base, exponent);
@@ -510,6 +510,24 @@ void yarn_rope_cache_explicit_positions_f32(float *cos_cache,
 {
     yarn_rope_cache_explicit_positions_impl(
         cos_cache, sin_cache, NULL, NULL, positions, num_tokens, rotary_dim,
+        freq_base, factor, original_context, beta_fast, beta_slow, mscale,
+        mscale_all_dim);
+}
+
+void yarn_rope_cache_contiguous_positions_f32(float *cos_cache,
+                                  float *sin_cache,
+                                  int num_tokens,
+                                  int rotary_dim,
+                                  float freq_base,
+                                  float factor,
+                                  int original_context,
+                                  float beta_fast,
+                                  float beta_slow,
+                                  float mscale,
+                                  float mscale_all_dim)
+{
+    yarn_rope_cache_explicit_positions_impl(
+        cos_cache, sin_cache, NULL, NULL, NULL, num_tokens, rotary_dim,
         freq_base, factor, original_context, beta_fast, beta_slow, mscale,
         mscale_all_dim);
 }

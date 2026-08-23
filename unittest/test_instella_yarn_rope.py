@@ -22,6 +22,10 @@ COMMON = [I32PTR, ctypes.c_int, ctypes.c_int, ctypes.c_float, ctypes.c_float,
           ctypes.c_int, ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_float]
 LIB.yarn_rope_cache_explicit_positions_f32.argtypes = [FPTR, FPTR] + COMMON
 LIB.yarn_rope_cache_explicit_positions_bf16.argtypes = [U16PTR, U16PTR] + COMMON
+LIB.yarn_rope_cache_contiguous_positions_f32.argtypes = [
+    FPTR, FPTR, ctypes.c_int, ctypes.c_int, ctypes.c_float, ctypes.c_float,
+    ctypes.c_int, ctypes.c_float, ctypes.c_float, ctypes.c_float, ctypes.c_float,
+]
 
 
 def reference(positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -72,6 +76,32 @@ def test_instella_yarn_cache_fp32_and_bf16() -> None:
     np.testing.assert_array_equal(sin_b, expected_sin_b)
 
 
+def test_contiguous_cache_matches_explicit_positions_bit_exactly() -> None:
+    positions = np.arange(257, dtype=np.int32)
+    shape = (len(positions), 16)
+    explicit_cos = np.empty(shape, dtype=np.float32)
+    explicit_sin = np.empty(shape, dtype=np.float32)
+    contiguous_cos = np.empty(shape, dtype=np.float32)
+    contiguous_sin = np.empty(shape, dtype=np.float32)
+    params = (len(positions), 32, 8_000_000.0, 40.0, 4096, 32.0, 1.0, 1.0, 1.0)
+
+    LIB.yarn_rope_cache_explicit_positions_f32(
+        explicit_cos.ctypes.data_as(FPTR),
+        explicit_sin.ctypes.data_as(FPTR),
+        positions.ctypes.data_as(I32PTR),
+        *params,
+    )
+    LIB.yarn_rope_cache_contiguous_positions_f32(
+        contiguous_cos.ctypes.data_as(FPTR),
+        contiguous_sin.ctypes.data_as(FPTR),
+        *params,
+    )
+
+    np.testing.assert_array_equal(contiguous_cos, explicit_cos)
+    np.testing.assert_array_equal(contiguous_sin, explicit_sin)
+
+
 if __name__ == "__main__":
     test_instella_yarn_cache_fp32_and_bf16()
-    print("Instella YaRN cache: FP32 tolerance and BF16 exact parity passed")
+    test_contiguous_cache_matches_explicit_positions_bit_exactly()
+    print("Instella YaRN cache: explicit and contiguous position parity passed")

@@ -249,12 +249,6 @@ def _missing_ops(arch: str, required_ops: list[str]) -> list[str]:
             "tiktoken_tokenizer_contract",
             "moonvit_bridge_contract",
         ])
-    if arch == "instella_moe":
-        # The circuit and exact YaRN leaf providers exist, but generated
-        # initialization does not yet bind positions and YaRN parameters to
-        # yarn_rope_init. Keep model support fail-closed until that call is
-        # present in call-ready IR.
-        missing.append("mla_interleaved_yarn_contract")
     if arch not in SUPPORTED_DENSE_ARCHES | SUPPORTED_HYBRID_ARCHES:
         missing.append("v8_template_contract")
         missing.append("safetensors_to_bump_mapping")
@@ -536,7 +530,7 @@ def _notes(arch: str, config: dict[str, Any], layer_kinds: list[str], missing_op
             f"top_k={text.get('num_experts_per_tok')} shared_experts={text.get('n_shared_experts')} "
             f"router={text.get('scoring_func')}/{text.get('topk_method')} scale={text.get('routed_scaling_factor')}."
         )
-        notes.append("The executable circuit now owns gated-MLA wiring and FarSkip main/routed-free lifetimes, and the BF16 FarSkip provider covers the new residual boundary. Exact YaRN leaf providers exist, but generated initialization does not yet bind the explicit positions and scaling parameters; support remains fail-closed on that contract and real-weight PyTorch X-ray parity.")
+        notes.append("The executable circuit owns gated-MLA wiring, FarSkip main/routed-free lifetimes, and contiguous-position YaRN cache initialization. Real-weight PyTorch X-ray parity remains the promotion gate beyond config-level support.")
     if not missing_ops:
         notes.append("Config-level contract has no known missing op, but weight-name audit and hidden parity are still required.")
     return notes

@@ -1409,6 +1409,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         })
 
     if arch in {"kimi_vl", "instella_moe"}:
+        rope_scaling = text.get("rope_scaling") if isinstance(text.get("rope_scaling"), dict) else {}
         first_dense = int(text.get("first_k_dense_replace") or 0)
         moe_freq = int(text.get("moe_layer_freq") or 1)
         num_layers = int(cfg.get("num_layers") or 0)
@@ -1483,6 +1484,18 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             ),
             "rope_theta": float(text.get("rope_theta") or 10000.0),
             "rope_freq_base": float(text.get("rope_theta") or 10000.0),
+            "rope_scaling_type": str(rope_scaling.get("type") or "none"),
+            "rope_scaling_factor": float(rope_scaling.get("factor") or 1.0),
+            "rope_original_context_length": int(
+                rope_scaling.get("original_max_position_embeddings")
+                or text.get("max_position_embeddings")
+                or cfg.get("context_length")
+                or 0
+            ),
+            "rope_beta_fast": float(rope_scaling.get("beta_fast") or 0.0),
+            "rope_beta_slow": float(rope_scaling.get("beta_slow") or 0.0),
+            "rope_mscale": float(rope_scaling.get("mscale") or 1.0),
+            "rope_mscale_all_dim": float(rope_scaling.get("mscale_all_dim") or 1.0),
             "has_attention_biases": False,
             "has_qk_norm": bool(text.get("qk_layernorm", False)) if arch == "instella_moe" else False,
             "gated_attention": bool(text.get("gated_attention", False)),
@@ -1492,7 +1505,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "attn_only_farskip": bool(text.get("attn_only_farskip", False)),
             "mlp_only_farskip": bool(text.get("mlp_only_farskip", False)),
             "rope_interleave": bool(text.get("rope_interleave", False)),
-            "rope_scaling": text.get("rope_scaling"),
+            "rope_scaling": rope_scaling or None,
             "moe_shared_intermediate_size": int(text.get("moe_intermediate_size") or 0) * int(text.get("n_shared_experts") or 0),
             "prefill_policy": "batched",
         })

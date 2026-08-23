@@ -953,6 +953,35 @@
       "position_transform": null,
       "description": "Qwen3.6 BF16 Gated DeltaNet provider: expand compact Q/K groups across adjacent value heads using group = head / (H / G), retain FP32 recurrent state, and store the attention output to BF16."
     },
+    "yarn_rope_cache_contiguous_positions_fp32": {
+      "operator_family": "yarn_rope_init",
+      "status": "validated",
+      "storage": {"input": "none", "weight": "none", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "correction_bounds_then_pair_ascending_frequency_mix_then_contiguous_position_angle_then_cos_sin_then_attention_scale"
+      },
+      "rounding": {"mode": "rne", "points": ["weighted_product", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": {
+        "position_source": "contiguous_zero_based_positions",
+        "pairing": "pairwise_interleaved",
+        "rotary_width": "configured_rotary_dim",
+        "head_width": "configured_rotary_dim",
+        "position_rank": 1,
+        "axis_order": ["position"],
+        "section_interpretation": "not_applicable",
+        "frequency_compute": "fp32",
+        "intermediate_compute": "fp32",
+        "rounding_points": ["frequency", "angle", "cosine", "sine", "output_store"],
+        "threading": "serial"
+      },
+      "description": "Parameterized YaRN cache for contiguous positions 0 through T-1, using configured correction bounds, interpolation factor, and mscale ratio with FP32 cache storage."
+    },
     "yarn_rope_cache_explicit_positions_fp32": {
       "operator_family": "yarn_rope_init",
       "status": "validated",

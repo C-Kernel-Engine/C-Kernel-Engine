@@ -57,7 +57,15 @@ def _tiny_config() -> dict:
         "gated_attention": True,
         "farskip": True,
         "rope_interleave": True,
-        "rope_scaling": {"type": "yarn", "factor": 40},
+        "rope_scaling": {
+            "type": "yarn",
+            "factor": 40,
+            "original_max_position_embeddings": 4096,
+            "beta_fast": 32,
+            "beta_slow": 1,
+            "mscale": 1.0,
+            "mscale_all_dim": 1.0,
+        },
         "rope_theta": 8000000,
         "vocab_size": 32,
         "max_position_embeddings": 128,
@@ -134,6 +142,13 @@ class InstellaMoEBringupTests(unittest.TestCase):
         self.assertTrue(config["farskip"])
         self.assertTrue(config["rope_interleave"])
         self.assertEqual(config["rope_layout"], "partial_interleaved_yarn")
+        self.assertEqual(config["rope_scaling_type"], "yarn")
+        self.assertEqual(config["rope_scaling_factor"], 40.0)
+        self.assertEqual(config["rope_original_context_length"], 4096)
+        self.assertEqual(config["rope_beta_fast"], 32.0)
+        self.assertEqual(config["rope_beta_slow"], 1.0)
+        self.assertEqual(config["rope_mscale"], 1.0)
+        self.assertEqual(config["rope_mscale_all_dim"], 1.0)
         self.assertEqual(config["moe_shared_intermediate_size"], 8)
 
     def test_synthetic_model_reaches_call_ready_ir_in_prefill_and_decode(self) -> None:
@@ -180,7 +195,6 @@ class InstellaMoEBringupTests(unittest.TestCase):
                     "--config-out", str(out / "config.json"),
                     "--manifest-out", str(out / "weights_manifest.json"),
                     "--arch", "auto",
-                    "--dry-run",
                 ],
                 cwd=ROOT,
                 check=True,
@@ -190,19 +204,22 @@ class InstellaMoEBringupTests(unittest.TestCase):
             builder = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
             for mode in ("prefill", "decode"):
                 call_path = out / f"call_{mode}.json"
+                builder_args = [
+                    sys.executable,
+                    str(builder),
+                    "--manifest", str(out / "weights_manifest.json"),
+                    "--mode", mode,
+                    "--context-len", "8",
+                    "--layout-mode", "packed",
+                    "--output", str(out / f"ir1_{mode}.json"),
+                    "--layout-output", str(out / f"layout_{mode}.json"),
+                    "--lowered-output", str(out / f"lowered_{mode}.json"),
+                    "--call-output", str(call_path),
+                ]
+                if mode == "decode":
+                    builder_args.extend(["--init-output", str(out / "init.json")])
                 build = subprocess.run(
-                    [
-                        sys.executable,
-                        str(builder),
-                        "--manifest", str(out / "weights_manifest.json"),
-                        "--mode", mode,
-                        "--context-len", "8",
-                        "--layout-mode", "packed",
-                        "--output", str(out / f"ir1_{mode}.json"),
-                        "--layout-output", str(out / f"layout_{mode}.json"),
-                        "--lowered-output", str(out / f"lowered_{mode}.json"),
-                        "--call-output", str(call_path),
-                    ],
+                    builder_args,
                     cwd=ROOT,
                     check=False,
                     capture_output=True,
@@ -233,6 +250,38 @@ class InstellaMoEBringupTests(unittest.TestCase):
                 self.assertEqual(len(farskip), 1)
                 self.assertEqual(farskip[0].get("call_abi", {}).get("owner"), "kernel_map")
 
+            init_call = json.loads((out / "init_call.json").read_text(encoding="utf-8"))
+            yarn = next(
+                op for op in init_call["operations"] if op["op"] == "yarn_rope_init"
+            )
+            self.assertEqual(
+                yarn["function"], "yarn_rope_cache_contiguous_positions_f32"
+            )
+            self.assertEqual(yarn["errors"], [])
+            self.assertEqual(
+                [arg["source"] for arg in yarn["args"]],
+                [
+                    "output:cos_cache",
+                    "output:sin_cache",
+                    "dim:T",
+                    "dim:Dr",
+                    "param:freq_base",
+                    "param:factor",
+                    "param:original_context",
+                    "param:beta_fast",
+                    "param:beta_slow",
+                    "param:mscale",
+                    "param:mscale_all_dim",
+                ],
+            )
+            # This minimal fixture does not materialize production vocabulary
+            # weight macros; keep generated-C coverage focused on the map-owned
+            # arithmetic init call certified by this test.
+            init_call["operations"] = [yarn]
+            (out / "init_call.json").write_text(
+                json.dumps(init_call, indent=2), encoding="utf-8"
+            )
+
             generated_c = out / "model_v8.c"
             codegen = subprocess.run(
                 [
@@ -253,6 +302,7 @@ class InstellaMoEBringupTests(unittest.TestCase):
             self.assertEqual(codegen.returncode, 0, codegen.stdout + codegen.stderr)
             source = generated_c.read_text(encoding="utf-8")
             self.assertIn("farskip_swiglu_shared_combine_bf16", source)
+            self.assertIn("yarn_rope_cache_contiguous_positions_f32(", source)
             syntax = subprocess.run(
                 [
                     "cc", "-std=c11", "-fopenmp", "-fsyntax-only",
@@ -264,6 +314,33 @@ class InstellaMoEBringupTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(syntax.returncode, 0, syntax.stdout + syntax.stderr)
+
+    def test_codegen_fails_closed_without_resolved_yarn_init(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "codegen_v8",
+            ROOT / "version" / "v8" / "scripts" / "codegen_v8.py",
+        )
+        assert spec is not None and spec.loader is not None
+        codegen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(codegen)
+        layout = {
+            "config": {
+                "_template_uses_rope": True,
+                "rope_theta": 8_000_000.0,
+                "rotary_dim": 32,
+                "rope_scaling_type": "yarn",
+                "rope_layout": "partial_interleaved_yarn",
+            },
+            "memory": {
+                "activations": {"buffers": [{"name": "rope_cache"}]},
+            },
+        }
+        with self.assertRaisesRegex(RuntimeError, "resolved init_call.json provider"):
+            codegen._inject_missing_rope_init(
+                "static int do_init(void) {\n    /* No pre-weights init ops */\n}\n",
+                layout,
+                None,
+            )
 
 
 if __name__ == "__main__":

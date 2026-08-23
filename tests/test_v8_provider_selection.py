@@ -143,7 +143,7 @@ class ProviderSelectionTests(unittest.TestCase):
             selected.append(document["id"])
             errors = sorted(validator.iter_errors(document["selection"]), key=str)
             self.assertEqual(errors, [], path.name)
-        self.assertEqual(len(selected), 60)
+        self.assertEqual(len(selected), 61)
 
     def test_gemma_q5_prefill_providers_are_production_selected(self):
         maps = ROOT / "version" / "v8" / "kernel_maps"

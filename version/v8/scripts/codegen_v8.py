@@ -693,6 +693,14 @@ def _inject_missing_rope_init(
     if not bool(cfg.get("_template_uses_rope")) and "rope_theta" not in cfg:
         return code
 
+    rope_scaling_type_value = str(cfg.get("rope_scaling_type", "none")).strip().lower()
+    rope_layout = str(cfg.get("rope_layout", "")).strip().lower()
+    if rope_scaling_type_value == "yarn" or "yarn" in rope_layout:
+        raise RuntimeError(
+            "YaRN RoPE initialization requires a resolved init_call.json provider; "
+            "the standard RoPE fallback is not numerically compatible"
+        )
+
     rope_theta = float(cfg.get("rope_theta", 0.0) or 0.0)
     rotary_dim = int(cfg.get("rotary_dim", cfg.get("head_dim", 0)) or 0)
     rope_scaling_type = json.dumps(str(cfg.get("rope_scaling_type", "none")))

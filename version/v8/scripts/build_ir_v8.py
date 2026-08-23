@@ -2636,6 +2636,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     template = manifest.get("template", {})
     flags = template.get("flags", {})
     template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
+    kernel_call_abis = load_kernel_call_abis(legacy_bindings={})
 
     # ═══════════════════════════════════════════════════════════
     # ROPE INIT: Precompute cos/sin tables if model uses RoPE
@@ -2658,10 +2659,28 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
         rope_attn_factor = config.get("rope_attn_factor", 1.0)
 
         rope_init_kernel = template_kernels.get("rope_init", "rope_precompute_cache")
+        rope_init_abi = kernel_call_abis.get(rope_init_kernel, {})
+        rope_init_op = str(rope_init_abi.get("op") or "rope_init")
         rope_init_params = {
             "max_seq_len": {"source": "dim:max_seq_len", "value": max_seq_len},
             "head_dim": {"source": "dim:head_dim", "value": head_dim},
             "base": {"source": "config:rope_theta", "value": rope_theta},
+            "freq_base": {"source": "config:rope_theta", "value": rope_theta},
+            "factor": {"source": "config:rope_scaling_factor", "value": rope_scaling_factor},
+            "original_context": {
+                "source": "config:rope_original_context_length",
+                "value": rope_original_context_length,
+            },
+            "beta_fast": {"source": "config:rope_beta_fast", "value": rope_beta_fast},
+            "beta_slow": {"source": "config:rope_beta_slow", "value": rope_beta_slow},
+            "mscale": {
+                "source": "config:rope_mscale",
+                "value": float(config.get("rope_mscale", 1.0)),
+            },
+            "mscale_all_dim": {
+                "source": "config:rope_mscale_all_dim",
+                "value": float(config.get("rope_mscale_all_dim", 1.0)),
+            },
         }
         if rope_init_kernel != "rope_precompute_cache_split":
             rope_init_params["rotary_dim"] = {"source": "dim:rotary_dim", "value": rotary_dim}
@@ -2671,7 +2690,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
         init_ops.append({
             "op_id": op_id,
             "kernel": rope_init_kernel,
-            "op": "rope_init",
+            "op": rope_init_op,
             "section": "init",
             "layer": -1,
             "instance": 0,
@@ -2832,7 +2851,9 @@ def generate_init_ir(manifest: Dict, config: Dict) -> Dict:
         "ops": init_ops,
         "stats": {
             "total_ops": len(init_ops),
-            "has_rope_init": any(op["op"] == "rope_init" for op in init_ops),
+            "has_rope_init": any(
+                op["op"] in {"rope_init", "yarn_rope_init"} for op in init_ops
+            ),
         }
     }
 
@@ -5469,8 +5490,13 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     out["rope_theta"] = float(_pick("rope_theta", "rope_base", "theta", default=10000.0))
     out["rms_eps"] = float(_pick("rms_eps", "rms_norm_eps", default=1e-6))
     out["rotary_dim"] = int(_pick("rotary_dim", default=out.get("head_dim", 64)))
-    out["rope_scaling_type"] = str(_pick("rope_scaling_type", default="none"))
-    out["rope_scaling_factor"] = float(_pick("rope_scaling_factor", default=1.0))
+    rope_scaling = out.get("rope_scaling") if isinstance(out.get("rope_scaling"), dict) else {}
+    out["rope_scaling_type"] = str(
+        _pick("rope_scaling_type", default=rope_scaling.get("type", "none"))
+    )
+    out["rope_scaling_factor"] = float(
+        _pick("rope_scaling_factor", default=rope_scaling.get("factor", 1.0))
+    )
     rope_layout_value = _pick("rope_layout")
     if rope_layout_value is not None and str(rope_layout_value).strip():
         out["rope_layout"] = str(rope_layout_value)
@@ -5478,11 +5504,26 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     if rope_param_mode_value is not None and str(rope_param_mode_value).strip():
         out["rope_param_mode"] = str(rope_param_mode_value)
     out["rope_original_context_length"] = int(
-        _pick("rope_original_context_length", default=out.get("context_length", 0))
+        _pick(
+            "rope_original_context_length",
+            default=rope_scaling.get(
+                "original_max_position_embeddings", out.get("context_length", 0)
+            ),
+        )
     )
-    out["rope_beta_fast"] = float(_pick("rope_beta_fast", default=0.0))
-    out["rope_beta_slow"] = float(_pick("rope_beta_slow", default=0.0))
+    out["rope_beta_fast"] = float(
+        _pick("rope_beta_fast", default=rope_scaling.get("beta_fast", 0.0))
+    )
+    out["rope_beta_slow"] = float(
+        _pick("rope_beta_slow", default=rope_scaling.get("beta_slow", 0.0))
+    )
     out["rope_attn_factor"] = float(_pick("rope_attn_factor", default=1.0))
+    out["rope_mscale"] = float(
+        _pick("rope_mscale", default=rope_scaling.get("mscale", 1.0))
+    )
+    out["rope_mscale_all_dim"] = float(
+        _pick("rope_mscale_all_dim", default=rope_scaling.get("mscale_all_dim", 1.0))
+    )
 
     # Clamp rotary_dim to head_dim for safety
     if out.get("head_dim") is not None:
@@ -13436,6 +13477,7 @@ def load_kernel_call_abis(
             )
         result[kernel_id] = {
             "function": function,
+            "op": str(doc.get("op", "") or ""),
             "call_abi": copy.deepcopy(call_abi),
             "source_file": path.name,
         }
@@ -14286,6 +14328,8 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
         op_config = op.get("config", {})
         op_errors = []
         call_abi_entry = kernel_call_abis.get(func)
+        if call_abi_entry:
+            func = str(call_abi_entry.get("function") or func)
 
         args = []
 
@@ -14419,6 +14463,75 @@ def generate_init_ir_lower_3(init_ir: Dict, layout: Dict) -> Dict:
                 "source": "config:rope_theta",
                 "expr": f"{rope_theta}f",
             })
+
+        elif call_abi_entry:
+            # Generic map-owned init ABI lowering. Init providers may bind only
+            # declared output buffers, dimensions, parameters, configuration,
+            # constants, and null values; runtime/model inference is forbidden.
+            rope_cache_buf = act_buffers.get(
+                "rope_cache", act_buffers.get("rope_cos_cache", {})
+            )
+            rope_cache_define = rope_cache_buf.get("define", "A_ROPE_CACHE")
+
+            def init_literal(value: Any) -> str:
+                if isinstance(value, bool):
+                    return "1" if value else "0"
+                if isinstance(value, float):
+                    return f"{repr(value)}f"
+                if isinstance(value, str):
+                    return json.dumps(value)
+                return str(value)
+
+            for abi_param in call_abi_entry.get("call_abi", {}).get("params", []):
+                name = str(abi_param.get("name", "") or "")
+                source = str(abi_param.get("source", "") or "")
+                cast = str(abi_param.get("cast", "") or "")
+                expr = "0"
+
+                if source in {"output:cos_cache", "output:sin_cache"}:
+                    pointer_cast = cast or "float*"
+                    expr = f"({pointer_cast})(g_model->bump + {rope_cache_define})"
+                    if source == "output:sin_cache":
+                        expr += " + MAX_SEQ_LEN * ROTARY_DIM / 2"
+                elif source.startswith("dim:"):
+                    key = source.split(":", 1)[1]
+                    dim_exprs = {
+                        "T": "MAX_SEQ_LEN",
+                        "max_seq_len": "MAX_SEQ_LEN",
+                        "Dr": "ROTARY_DIM",
+                        "rotary_dim": "ROTARY_DIM",
+                        "head_dim": "HEAD_DIM",
+                    }
+                    if key not in dim_exprs:
+                        op_errors.append(f"{func}.{name}: unsupported init dim '{key}'")
+                    else:
+                        expr = dim_exprs[key]
+                elif source.startswith("param:"):
+                    key = source.split(":", 1)[1]
+                    value = params.get(key)
+                    if isinstance(value, dict):
+                        value = value.get("value")
+                    if value is None:
+                        op_errors.append(f"{func}.{name}: missing init param '{key}'")
+                    else:
+                        expr = init_literal(value)
+                elif source.startswith("config:"):
+                    key = source.split(":", 1)[1]
+                    value = op_config.get(key, config.get(key))
+                    if value is None:
+                        op_errors.append(f"{func}.{name}: missing init config '{key}'")
+                    else:
+                        expr = init_literal(value)
+                elif source.startswith("const:"):
+                    expr = source.split(":", 1)[1]
+                elif source == "null":
+                    expr = "NULL"
+                else:
+                    op_errors.append(
+                        f"{func}.{name}: unsupported init source '{source}'"
+                    )
+
+                args.append({"name": name, "source": source, "expr": expr})
 
         elif op_type == "tokenizer_init":
             # Tokenizer init has explicit c_code - pass it through directly

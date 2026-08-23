@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 286,
+      "total": 287,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -112,7 +112,7 @@
         "tokenizer": 1,
         "v_norm": 1,
         "vision_patchify": 1,
-        "yarn_rope_init": 2
+        "yarn_rope_init": 3
       }
     }
   },
@@ -44445,6 +44445,193 @@
       "notes": "Build merged vision position IDs for 2D M-RoPE style encoders.",
       "name": "vision_position_ids_2d_merge",
       "_source_file": "vision_position_ids_2d_merge.json"
+    },
+    {
+      "id": "yarn_rope_cache_contiguous_positions_f32",
+      "op": "yarn_rope_init",
+      "operation_interface": "yarn_rope_init.contiguous_positions.fp32.v1",
+      "selection": {
+        "status": "production",
+        "priority": 100,
+        "equivalence_group": "yarn_rope_init.contiguous_positions.fp32.v1",
+        "phases": [
+          "init"
+        ]
+      },
+      "variant": "yarn_contiguous_positions_fp32",
+      "mode": "init",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "Dr/2"
+          ],
+          "layout": "row_major",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "Precomputed YaRN cos cache for positions 0 through T-1"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "Dr/2"
+          ],
+          "layout": "row_major",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "Precomputed YaRN sin cache for positions 0 through T-1"
+        }
+      ],
+      "dims": [
+        "T",
+        "Dr"
+      ],
+      "params": [
+        {
+          "name": "freq_base",
+          "dtype": "fp32"
+        },
+        {
+          "name": "factor",
+          "dtype": "fp32"
+        },
+        {
+          "name": "original_context",
+          "dtype": "i32"
+        },
+        {
+          "name": "beta_fast",
+          "dtype": "fp32"
+        },
+        {
+          "name": "beta_slow",
+          "dtype": "fp32"
+        },
+        {
+          "name": "mscale",
+          "dtype": "fp32"
+        },
+        {
+          "name": "mscale_all_dim",
+          "dtype": "fp32"
+        }
+      ],
+      "impl": {
+        "function": "yarn_rope_cache_contiguous_positions_f32",
+        "c_declaration": "void yarn_rope_cache_contiguous_positions_f32(float *cos_cache, float *sin_cache, int num_tokens, int rotary_dim, float freq_base, float factor, int original_context, float beta_fast, float beta_slow, float mscale, float mscale_all_dim);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "yarn_rope_cache_contiguous_positions_fp32",
+          "status": "validated",
+          "phases": [
+            "init"
+          ],
+          "function": "yarn_rope_cache_contiguous_positions_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "cos_cache",
+            "source": "output:cos_cache",
+            "cast": "float*",
+            "ports": [
+              "output:cos_cache"
+            ]
+          },
+          {
+            "name": "sin_cache",
+            "source": "output:sin_cache",
+            "cast": "float*",
+            "ports": [
+              "output:sin_cache"
+            ]
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:T"
+          },
+          {
+            "name": "rotary_dim",
+            "source": "dim:Dr"
+          },
+          {
+            "name": "freq_base",
+            "source": "param:freq_base"
+          },
+          {
+            "name": "factor",
+            "source": "param:factor"
+          },
+          {
+            "name": "original_context",
+            "source": "param:original_context"
+          },
+          {
+            "name": "beta_fast",
+            "source": "param:beta_fast"
+          },
+          {
+            "name": "beta_slow",
+            "source": "param:beta_slow"
+          },
+          {
+            "name": "mscale",
+            "source": "param:mscale"
+          },
+          {
+            "name": "mscale_all_dim",
+            "source": "param:mscale_all_dim"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_instella_yarn_rope.py"
+        ]
+      },
+      "notes": "Reusable contiguous-position YaRN cache provider for model initialization. It is bit-exact with the explicit-position provider when positions are 0 through T-1; no model identity is required by the ABI.",
+      "name": "yarn_rope_cache_contiguous_positions_f32",
+      "_source_file": "yarn_rope_cache_contiguous_positions_f32.json"
     },
     {
       "id": "yarn_rope_cache_explicit_positions_bf16",
