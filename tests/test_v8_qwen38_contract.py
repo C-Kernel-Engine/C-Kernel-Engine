@@ -12,6 +12,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import convert_gguf_to_bump_v8 as converter  # type: ignore
+import codegen_core_v8  # type: ignore
 
 
 class Qwen38ContractTests(unittest.TestCase):
@@ -98,6 +99,27 @@ class Qwen38ContractTests(unittest.TestCase):
         self.assertEqual(
             config["activation_preference_by_op"]["recurrent_gate_proj"],
             "q8_k",
+        )
+
+    def test_generic_q5_k_projection_remains_visible_to_xray(self) -> None:
+        emitted = codegen_core_v8.emit_op({
+            "idx": 1,
+            "layer": 3,
+            "section": "body",
+            "op": "k_proj",
+            "function": "gemv_q5_k",
+            "args": [
+                {"name": "y", "expr": "k_output"},
+                {"name": "W", "expr": "k_weight"},
+                {"name": "x", "expr": "hidden"},
+                {"name": "M", "expr": "1024"},
+                {"name": "K", "expr": "5120"},
+            ],
+        })
+        self.assertIn(
+            'ck_debug_export_hidden(model, 3, "k_proj", '
+            '(const float*)k_output, 1024);',
+            emitted,
         )
 
 

@@ -4008,6 +4008,19 @@ certify-qwen35-text-parity:
 		--ctx-len "$${QWEN35_CTX_LEN:-1034}" \
 		--threads "$${CK_NUM_THREADS:-20}"
 
+.PHONY: certify-qwen38-svg-parity
+certify-qwen38-svg-parity:
+	@test -n "$${QWEN38_MODEL_DIR:-}" || { echo "QWEN38_MODEL_DIR is required"; exit 2; }
+	@test -n "$${QWEN38_GGUF:-}" || { echo "QWEN38_GGUF is required"; exit 2; }
+	@test -n "$${CK_LLAMA_CPP_ROOT:-}" || { echo "CK_LLAMA_CPP_ROOT is required"; exit 2; }
+	@$(PYTHON) version/v8/scripts/certify_text_prompt_parity_v8.py \
+		--model-dir "$${QWEN38_MODEL_DIR}" \
+		--gguf "$${QWEN38_GGUF}" \
+		--prompt-set version/v8/test_assets/qwen38_svg_parity_prompt.json \
+		--output-dir "$${QWEN38_CERT_OUTPUT:-build/qwen38-svg-certification}" \
+		--ctx-len "$${QWEN38_CTX_LEN:-4096}" \
+		--threads "$${CK_NUM_THREADS:-16}"
+
 .PHONY: test-xray-validator-selftest test-bf16-xray xray-vision-parity test-v8-dsl-policy test-v8-dsl
 test-xray-validator-selftest:
 	@echo "Running X-ray injected-fault validator self-test..."

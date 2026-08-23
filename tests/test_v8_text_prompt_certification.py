@@ -53,6 +53,16 @@ class TextPromptCertificationTests(unittest.TestCase):
         report = {"pass": True, "matched_stop_token": None, "steps": [{}] * 63}
         self.assertFalse(certifier.report_satisfies_stage(report, 64))
 
+    def test_quality_failure_does_not_discard_complete_trajectory(self) -> None:
+        report = {
+            "pass": False,
+            "first_divergence": None,
+            "matched_stop_token": None,
+            "steps": [{}] * 64,
+            "quality": {"pass": False},
+        }
+        self.assertTrue(certifier.report_satisfies_stage(report, 64))
+
     def test_utf8_corruption_markers_are_rejected(self) -> None:
         self.assertTrue(certifier.decoded_text_is_clean("Hello \u2014 \u4f60\u597d \U0001f60a"))
         for text in ("bad \\uFFFD", "bad \ufffd", "bad \u00c3\u00a9", "bad \ufffd\u0141"):
@@ -77,6 +87,133 @@ class TextPromptCertificationTests(unittest.TestCase):
         self.assertIn("xray_text_recurrent_v8.py", command)
         self.assertIn("--parity-report /out/fail.json", command)
         self.assertIn("--ck-prefill-mode hybrid", command)
+
+    def test_standalone_svg_quality_contract_is_fail_closed(self) -> None:
+        contract = {
+            "kind": "standalone_svg.v1",
+            "min_graphic_elements": 3,
+            "required_labels": ["decode"],
+        }
+        valid = certifier.evaluate_quality_contract(
+            '<svg viewBox="0 0 100 100"><title>Pipeline</title>'
+            '<desc>Four stages</desc><rect width="10" height="10"/>'
+            '<line x1="0" y1="0" x2="10" y2="10"/><text>decode</text></svg>',
+            contract,
+        )
+        self.assertTrue(valid["pass"])
+        self.assertEqual(valid["graphic_element_count"], 3)
+
+        scripted = certifier.evaluate_quality_contract(
+            '<svg viewBox="0 0 1 1"><title>T</title><desc>D</desc>'
+            '<script>alert(1)</script><rect/></svg>',
+            contract,
+        )
+        self.assertFalse(scripted["pass"])
+        self.assertTrue(scripted["has_script"])
+
+    def test_svg_quality_requires_requested_labels_and_used_arrow_marker(self) -> None:
+        contract = {
+            "kind": "standalone_svg.v1",
+            "required_labels": ["tokenize", "prefill", "decode", "detokenize"],
+            "require_arrow_marker": True,
+        }
+        valid = certifier.evaluate_quality_contract(
+            '<svg viewBox="0 0 100 20"><title>T</title><desc>D</desc>'
+            '<defs><marker id="arrow"><path d="M0 0L5 2L0 4Z"/></marker></defs>'
+            '<text>Tokenize Prefill Decode Detokenize</text>'
+            '<line marker-end="url(#arrow)"/></svg>',
+            contract,
+        )
+        self.assertTrue(valid["pass"])
+        self.assertTrue(valid["has_arrow_marker"])
+
+        missing = certifier.evaluate_quality_contract(
+            '<svg viewBox="0 0 100 20"><title>T</title><desc>D</desc><circle/></svg>',
+            contract,
+        )
+        self.assertFalse(missing["pass"])
+        self.assertIn("tokenize", missing["missing_labels"])
+
+    def test_svg_quality_rejects_wrappers_and_external_assets(self) -> None:
+        contract = {"kind": "standalone_svg.v1"}
+        result = certifier.evaluate_quality_contract(
+            '```svg\n<svg viewBox="0 0 1 1"><title>T</title><desc>D</desc>'
+            '<image href="https://example.com/a.png"/></svg>\n```',
+            contract,
+        )
+        self.assertFalse(result["pass"])
+        self.assertFalse(result["output_only"])
+        self.assertTrue(result["has_external_reference"])
+
+    def test_svg_quality_preserves_complete_visible_reasoning(self) -> None:
+        result = certifier.evaluate_quality_contract(
+            '<think>Plan the accessible diagram.</think>\n'
+            '<svg viewBox="0 0 10 10"><title>T</title><desc>D</desc><rect/></svg>',
+            {"kind": "standalone_svg.v1"},
+        )
+        self.assertTrue(result["pass"])
+        self.assertTrue(result["reasoning_present"])
+        self.assertTrue(result["reasoning_complete"])
+        self.assertGreater(result["reasoning_characters"], 0)
+
+    def test_svg_quality_rejects_incomplete_visible_reasoning(self) -> None:
+        result = certifier.evaluate_quality_contract(
+            '<think>Still planning the diagram',
+            {"kind": "standalone_svg.v1"},
+        )
+        self.assertFalse(result["pass"])
+        self.assertFalse(result["reasoning_complete"])
+        self.assertEqual(result["answer_characters"], 0)
+
+    def test_xray_completion_rejects_missing_boundaries(self) -> None:
+        self.assertTrue(certifier.xray_report_is_complete({
+            "first_divergence": None,
+            "rows": [{"status": "exact"}, {"status": "exact"}],
+        }))
+        self.assertFalse(certifier.xray_report_is_complete({
+            "first_divergence": None,
+            "rows": [{"status": "exact"}, {"status": "missing_or_incompatible"}],
+        }))
+
+    def test_trajectory_numerical_contract_requires_every_exact_row(self) -> None:
+        report = {
+            "first_divergence": None,
+            "steps": [
+                {"top1_match": True, "bit_exact": True},
+                {"top1_match": True, "bit_exact": False},
+            ],
+        }
+        self.assertTrue(certifier.trajectory_numerical_contract(report, False)["pass"])
+        strict = certifier.trajectory_numerical_contract(report, True)
+        self.assertFalse(strict["pass"])
+        self.assertEqual(strict["bit_exact_rows"], 1)
+
+    def test_large_vocabulary_trajectory_uses_streaming(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config.json").write_text(
+                json.dumps({"vocab_size": 248320}), encoding="utf-8"
+            )
+            self.assertFalse(certifier.trajectory_uses_streaming(root, 64))
+            self.assertTrue(certifier.trajectory_uses_streaming(root, 512))
+
+    def test_runtime_context_capacity_reads_generated_abi(self) -> None:
+        class Getter:
+            argtypes = None
+            restype = None
+
+            def __call__(self) -> int:
+                return 2048
+
+        class Runtime:
+            ck_model_get_context_window = Getter()
+
+        original = certifier.ctypes.CDLL
+        certifier.ctypes.CDLL = lambda _path: Runtime()
+        try:
+            self.assertEqual(certifier.runtime_context_capacity(Path("/model")), 2048)
+        finally:
+            certifier.ctypes.CDLL = original
 
 
 if __name__ == "__main__":
