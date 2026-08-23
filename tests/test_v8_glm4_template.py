@@ -260,7 +260,8 @@ class V8GLM4TemplateTests(unittest.TestCase):
         self.assertEqual(by_op["qkv_proj"]["graph_slots"]["inputs"]["x"], "main_stream")
         self.assertEqual(by_op["out_proj"]["graph_slots"]["inputs"]["x"], "attn_scratch")
         self.assertEqual(by_op["mlp_gate_up"]["graph_slots"]["inputs"]["x"], "main_stream")
-        self.assertEqual(by_op["mlp_down"]["graph_slots"]["inputs"]["x"], "mlp_scratch")
+        self.assertEqual(by_op["mlp_down"]["graph_slots"]["inputs"]["A"], "mlp_scratch")
+        self.assertEqual(by_op["mlp_down"]["graph_slots"]["outputs"]["C"], "main_stream")
         footer_items = build_ir_v8._normalize_template_op_items(doc["block_types"]["decoder"]["footer"])
         footer_by_op = {item["op"]: item for item in footer_items if isinstance(item.get("graph_slots"), dict)}
         self.assertEqual(footer_by_op["logits"]["graph_slots"]["inputs"]["x"], "main_stream")

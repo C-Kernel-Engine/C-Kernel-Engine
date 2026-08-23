@@ -65,6 +65,27 @@ CRITICAL_TEMPLATE_INPUTS: dict[str, tuple[str, ...]] = {
     "logits": ("x",),
 }
 
+LINEAR_ACTIVATION_INPUTS = {
+    "qkv_proj",
+    "q_proj",
+    "q_gate_proj",
+    "k_proj",
+    "v_proj",
+    "kv_a_proj",
+    "mlp_gate_up",
+    "mlp_up",
+    "mamba_in_proj",
+    "recurrent_qkv_proj",
+    "recurrent_gate_proj",
+    "recurrent_alpha_proj",
+    "recurrent_beta_proj",
+    "out_proj",
+    "mlp_down",
+    "mamba_out_proj",
+    "recurrent_out_proj",
+    "logits",
+}
+
 
 def audit_template_explicit_edges(template: dict[str, Any]) -> dict[str, Any]:
     missing: list[str] = []
@@ -95,8 +116,16 @@ def audit_template_explicit_edges(template: dict[str, Any]) -> dict[str, Any]:
                 inputs = graph_slots.get("inputs") if isinstance(graph_slots.get("inputs"), dict) else {}
                 for input_name in required:
                     label = f"{block_name}.{section_name}[{index}].{op}.{input_name}"
-                    if input_name in inputs:
-                        explicit.append(f"{label}={inputs[input_name]}")
+                    candidates = (
+                        ("x", "A")
+                        if input_name == "x" and op in LINEAR_ACTIVATION_INPUTS
+                        else (input_name,)
+                    )
+                    declared = next((name for name in candidates if name in inputs), None)
+                    if declared is not None:
+                        explicit.append(
+                            f"{block_name}.{section_name}[{index}].{op}.{declared}={inputs[declared]}"
+                        )
                     else:
                         missing.append(label)
     return {
