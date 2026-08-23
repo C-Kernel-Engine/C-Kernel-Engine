@@ -39,6 +39,23 @@
     "weight_storage": {"format": "q6_k", "block_elements": 256, "block_bytes": 210},
     "activation_storage": {"format": "q8_k", "block_elements": 256},
     "diagnostic_providers": {"fp32_activation": "gemm_nt_q6_k", "row_quantized": "gemv_q6_k_q8_k"},
+    "runtime_dispatch": {
+      "schema_version": 1,
+      "policies": {
+        "prefill_schedule": {
+          "status": "production",
+          "requires_fallback": true,
+          "routes": [
+            {"min_m": 4, "max_m": 63, "n": 10240, "k": 5120, "tile_m": 16, "tile_n": 64, "flags": ["output_tiles", "compact_m4"]},
+            {"min_m": 4, "max_m": 63, "min_n": 4096, "min_k": 8192, "tile_m": 8, "tile_n": 128, "flags": ["output_tiles", "compact_m4"]},
+            {"min_m": 2, "max_m": 3, "min_n": 4096, "min_k": 8192, "tile_m": 8, "tile_n": 128, "flags": ["output_tiles"]},
+            {"min_m": 2, "min_n": 2048, "min_k": 8192, "tile_m": 16, "tile_n": 256, "flags": ["output_tiles"]},
+            {"min_m": 1, "tile_m": 16, "tile_n": 256}
+          ],
+          "notes": "Ordered shape classes select output tiling and compact four-row reuse. The first matching route wins."
+        }
+      }
+    },
     "segmented_row_provider": {
       "function": "gemm_nt_q6_k_q8_k_segmented_parallel_dispatch",
       "segment_lengths_dtype": "i32",
@@ -52,33 +69,10 @@
       "reduction_order_effect": "none"
     },
     "work_partition_routing": {
-      "selection": "shape_threshold",
+      "selection": "generated_runtime_dispatch",
       "numerical_effect": "none",
       "dispatch_function": "gemm_nt_q6_k_q8_k_parallel_dispatch",
-      "routes": [
-        {
-          "id": "wide_output_tiles",
-          "work_partition": "output_tiles",
-          "predicate": {"min_m": 2, "min_n": 2048, "min_k": 8192}
-        },
-        {
-          "id": "qwen36_recurrent_qkv_output_tiles",
-          "work_partition": "output_tiles",
-          "predicate": {
-            "min_m": 4,
-            "max_m": 63,
-            "min_n": 10240,
-            "max_n": 10240,
-            "min_k": 5120,
-            "max_k": 5120
-          }
-        },
-        {
-          "id": "independent_rows_fallback",
-          "work_partition": "independent_rows",
-          "predicate": {"fallback": true}
-        }
-      ]
+      "policy": "prefill_schedule"
     }
   },
   "quant": {

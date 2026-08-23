@@ -550,56 +550,30 @@ class AttentionContractV8Tests(unittest.TestCase):
     def test_q6_prefill_declares_map_owned_work_partition_routes(self) -> None:
         kernel = resolver.load_json(V8_ROOT / "kernel_maps" / "gemm_nt_q6_k_q8_k.json")
         routing = kernel["implementation"]["work_partition_routing"]
-        self.assertEqual(routing["selection"], "shape_threshold")
+        self.assertEqual(routing["selection"], "generated_runtime_dispatch")
         self.assertEqual(routing["numerical_effect"], "none")
         self.assertEqual(
             routing["dispatch_function"],
             kernel["production"]["threaded_function"],
         )
-        self.assertEqual(
-            routing["routes"],
-            [
-                {
-                    "id": "wide_output_tiles",
-                    "work_partition": "output_tiles",
-                    "predicate": {"min_m": 2, "min_n": 2048, "min_k": 8192},
-                },
-                {
-                    "id": "qwen36_recurrent_qkv_output_tiles",
-                    "work_partition": "output_tiles",
-                    "predicate": {
-                        "min_m": 4,
-                        "max_m": 63,
-                        "min_n": 10240,
-                        "max_n": 10240,
-                        "min_k": 5120,
-                        "max_k": 5120,
-                    },
-                },
-                {
-                    "id": "independent_rows_fallback",
-                    "work_partition": "independent_rows",
-                    "predicate": {"fallback": True},
-                },
-            ],
-        )
+        self.assertEqual(routing["policy"], "prefill_schedule")
         resolver.validate_quantized_linear_kernel_capability(kernel, self.linear_contracts)
 
     def test_q6_prefill_runtime_implements_map_owned_shape_route(self) -> None:
-        kernel = resolver.load_json(V8_ROOT / "kernel_maps" / "gemm_nt_q6_k_q8_k.json")
-        predicate = kernel["implementation"]["work_partition_routing"]["routes"][0]["predicate"]
+        generated = (V8_ROOT / "src" / "ck_kernel_dispatch_policy_v8.inc").read_text(encoding="utf-8")
         source = (V8_ROOT / "src" / "ck_parallel_prefill_v8.c").read_text(encoding="utf-8")
-        self.assertIn(f'N < {predicate["min_n"]} || K < {predicate["min_k"]}', source)
-        self.assertIn("N == 10240 && K == 5120", source)
-        self.assertIn("M <= 1", source)
+        self.assertIn("{4, 63, 10240, 10240, 5120, 5120, 16, 64", generated)
+        self.assertIn("ck_policy_gemm_nt_q6_k_q8_k_prefill_schedule", source)
+        self.assertNotIn("qwen36_recurrent_qkv", source)
         self.assertNotIn("CK_ENABLE_Q6K_Q8K_2D_PREFILL", source)
 
     def test_q6_short_wide_prefill_uses_measured_m4_provider(self) -> None:
+        generated = (V8_ROOT / "src" / "ck_kernel_dispatch_policy_v8.inc").read_text(encoding="utf-8")
         source = (V8_ROOT / "src" / "ck_parallel_prefill_v8.c").read_text(encoding="utf-8")
-        self.assertIn("short_mlp_down || qwen36_recurrent_qkv", source)
-        self.assertIn("N == 10240 && K == 5120", source)
-        self.assertIn("short_wide_q6 ? 8 : 16", source)
-        self.assertIn("qwen36_recurrent_qkv ? 64", source)
+        self.assertIn("CK_GEMM_ROUTE_OUTPUT_TILES | CK_GEMM_ROUTE_COMPACT_M4", generated)
+        self.assertIn("route->flags & CK_GEMM_ROUTE_COMPACT_M4", source)
+        self.assertIn("schedule->tile_m", source)
+        self.assertIn("schedule->tile_n", source)
         self.assertIn("gemm_nt_q6_k_q8_k_m4_tile", source)
 
     def test_q6_benchmark_defaults_to_gcc_provenance(self) -> None:
@@ -615,16 +589,15 @@ class AttentionContractV8Tests(unittest.TestCase):
 
     def test_q6_prefill_missing_fallback_is_a_hard_fault(self) -> None:
         kernel = resolver.load_json(V8_ROOT / "kernel_maps" / "gemm_nt_q6_k_q8_k.json")
-        kernel["implementation"]["work_partition_routing"]["routes"].pop()
-        with self.assertRaisesRegex(resolver.ContractError, "exactly one final fallback"):
+        kernel["implementation"]["runtime_dispatch"]["policies"]["prefill_schedule"]["routes"].pop()
+        with self.assertRaisesRegex(resolver.ContractError, "no final fallback"):
             resolver.validate_quantized_linear_kernel_capability(kernel, self.linear_contracts)
 
-    def test_q6_prefill_ambiguous_shape_routes_are_a_hard_fault(self) -> None:
+    def test_q6_prefill_mixed_exact_and_range_bounds_are_a_hard_fault(self) -> None:
         kernel = resolver.load_json(V8_ROOT / "kernel_maps" / "gemm_nt_q6_k_q8_k.json")
-        routes = kernel["implementation"]["work_partition_routing"]["routes"]
-        routes.insert(1, copy.deepcopy(routes[0]))
-        routes[1]["id"] = "overlapping_output_tiles"
-        with self.assertRaisesRegex(resolver.ContractError, "ambiguous work-partition shape routes"):
+        route = kernel["implementation"]["runtime_dispatch"]["policies"]["prefill_schedule"]["routes"][0]
+        route["min_n"] = route["n"]
+        with self.assertRaisesRegex(resolver.ContractError, "mixes exact and ranged N bounds"):
             resolver.validate_quantized_linear_kernel_capability(kernel, self.linear_contracts)
 
 

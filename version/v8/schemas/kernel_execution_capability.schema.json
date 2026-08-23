@@ -58,11 +58,12 @@
         "work_partition_routing": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selection", "numerical_effect", "dispatch_function", "routes"],
+          "required": ["selection", "numerical_effect", "dispatch_function"],
           "properties": {
-            "selection": {"const": "shape_threshold"},
+            "selection": {"enum": ["shape_threshold", "generated_runtime_dispatch"]},
             "numerical_effect": {"const": "none"},
             "dispatch_function": {"type": "string", "minLength": 1},
+            "policy": {"type": "string", "minLength": 1},
             "routes": {
               "type": "array",
               "minItems": 2,
@@ -86,6 +87,60 @@
                       "fallback": {"const": true}
                     },
                     "minProperties": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "runtime_dispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "policies"],
+          "properties": {
+            "schema_version": {"const": 1},
+            "policies": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "routes"],
+                "properties": {
+                  "status": {"enum": ["production", "candidate", "production_when_prepared"]},
+                  "requires": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "minLength": 1}
+                  },
+                  "requires_fallback": {"type": "boolean"},
+                  "notes": {"type": "string", "minLength": 1},
+                  "routes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "m": {"type": "integer", "minimum": 1},
+                        "min_m": {"type": "integer", "minimum": 1},
+                        "max_m": {"type": "integer", "minimum": 1},
+                        "n": {"type": "integer", "minimum": 1},
+                        "min_n": {"type": "integer", "minimum": 1},
+                        "max_n": {"type": "integer", "minimum": 1},
+                        "k": {"type": "integer", "minimum": 1},
+                        "min_k": {"type": "integer", "minimum": 1},
+                        "max_k": {"type": "integer", "minimum": 1},
+                        "tile_m": {"type": "integer", "minimum": 1},
+                        "tile_n": {"type": "integer", "minimum": 1},
+                        "max_threads": {"type": "integer", "minimum": 1},
+                        "flags": {
+                          "type": "array",
+                          "uniqueItems": true,
+                          "items": {"enum": ["output_tiles", "compact_m4", "batched_tail"]}
+                        }
+                      }
+                    }
                   }
                 }
               }

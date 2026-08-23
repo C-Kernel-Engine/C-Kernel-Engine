@@ -343,7 +343,70 @@ def validate_quantized_linear_kernel_capability(
             "The kernel map and numerical contract disagree about reduction-order effects.",
             "correct the map or define a distinct numerical contract.",
         )
+    runtime_dispatch = kernel["implementation"].get("runtime_dispatch")
+    runtime_policies = {}
+    if runtime_dispatch is not None:
+        runtime_policies = runtime_dispatch["policies"]
+        supported = set(threading["work_partition"])
+        for policy_id, policy in runtime_policies.items():
+            routes = policy["routes"]
+            for index, route in enumerate(routes):
+                for axis in ("m", "n", "k"):
+                    exact = route.get(axis)
+                    lo = route.get(f"min_{axis}", 1)
+                    hi = route.get(f"max_{axis}")
+                    if exact is not None and (
+                        f"min_{axis}" in route or f"max_{axis}" in route
+                    ):
+                        raise hard_contract_fault(
+                            f"kernel {kernel_id!r} runtime policy {policy_id!r} mixes exact and ranged {axis.upper()} bounds",
+                            f"route_index={index}, route={route}",
+                            "declare either the exact dimension or its min/max interval.",
+                        )
+                    if hi is not None and hi < lo:
+                        raise hard_contract_fault(
+                            f"kernel {kernel_id!r} runtime policy {policy_id!r} has an invalid {axis.upper()} range",
+                            f"route_index={index}, min={lo}, max={hi}",
+                            "make every runtime dispatch interval non-empty.",
+                        )
+            if policy.get("requires_fallback"):
+                fallback = routes[-1]
+                covers_all_shapes = all(
+                    axis not in fallback
+                    and f"max_{axis}" not in fallback
+                    and int(fallback.get(f"min_{axis}", 1)) == 1
+                    for axis in ("m", "n", "k")
+                )
+                if not covers_all_shapes:
+                    raise hard_contract_fault(
+                        f"kernel {kernel_id!r} runtime policy {policy_id!r} has no final fallback",
+                        f"final_route={fallback}",
+                        "end a total runtime schedule with a route covering every positive M/N/K shape.",
+                    )
+            for route in routes:
+                if "output_tiles" in route.get("flags", []) and "output_tiles" not in supported:
+                    raise hard_contract_fault(
+                        f"kernel {kernel_id!r} runtime policy {policy_id!r} selects unsupported output tiles",
+                        f"supported={sorted(supported)}",
+                        "advertise and certify output-tile partitioning before selecting it.",
+                    )
+
     routing = kernel["implementation"].get("work_partition_routing")
+    if routing is not None and routing["selection"] == "generated_runtime_dispatch":
+        if routing["dispatch_function"] != production["threaded_function"]:
+            raise hard_contract_fault(
+                f"kernel {kernel_id!r} work-partition router names the wrong dispatch function",
+                f"routing={routing['dispatch_function']!r}, production={production['threaded_function']!r}",
+                "route every performance partition through the exact resolved threaded provider.",
+            )
+        policy_id = routing.get("policy")
+        if policy_id not in runtime_policies:
+            raise hard_contract_fault(
+                f"kernel {kernel_id!r} work-partition router references an unknown generated policy",
+                f"policy={policy_id!r}, available={sorted(runtime_policies)}",
+                "bind work-partition routing to one implementation.runtime_dispatch policy.",
+            )
+        routing = None
     if routing is not None:
         if routing["dispatch_function"] != production["threaded_function"]:
             raise hard_contract_fault(

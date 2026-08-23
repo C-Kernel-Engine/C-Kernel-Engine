@@ -3217,8 +3217,9 @@ QWEN3VL_ENCODER_ATTN_BIN := $(BUILD_DIR)/bench_qwen3vl_encoder_attention
 Q80_FP32_GEMM_BIN := $(BUILD_DIR)/bench_q8_0_fp32_gemm
 V66_SRC_DIR    := version/v6.6/src
 V8_SRC_DIR     := version/v8/src
+V8_KERNEL_DISPATCH_POLICY := $(V8_SRC_DIR)/ck_kernel_dispatch_policy_v8.inc
 
-$(THREADPOOL_BIN): $(LIB) tests/test_threadpool_parity.c $(V8_SRC_DIR)/ck_parallel_decode_v8.c $(V8_SRC_DIR)/ck_parallel_prefill_v8.c
+$(THREADPOOL_BIN): $(LIB) tests/test_threadpool_parity.c $(V8_SRC_DIR)/ck_parallel_decode_v8.c $(V8_SRC_DIR)/ck_parallel_prefill_v8.c $(V8_KERNEL_DISPATCH_POLICY)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 -march=native -Iinclude -I$(V66_SRC_DIR) -I$(V8_SRC_DIR) \
 		tests/test_threadpool_parity.c \
@@ -3240,7 +3241,7 @@ test-threadpool-parity-verbose: $(THREADPOOL_BIN)
 	@echo "Running Thread Pool GEMV parity + speed test (verbose)..."
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(THREADPOOL_BIN) --verbose
 
-$(Q4K_Q8K_LLAMA_PACKED_PREFILL_OBJ): $(V8_SRC_DIR)/ck_parallel_prefill_v8.c
+$(Q4K_Q8K_LLAMA_PACKED_PREFILL_OBJ): $(V8_SRC_DIR)/ck_parallel_prefill_v8.c $(V8_KERNEL_DISPATCH_POLICY)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 $(AVX_FLAGS) -Iinclude -I$(V8_SRC_DIR) -c $< -o $@
 
@@ -3350,7 +3351,7 @@ $(DELTANET_PARALLEL_DECODE_OBJ): $(V8_SRC_DIR)/ck_parallel_decode_v8.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 $(AVX_FLAGS) -Iinclude -I$(V8_SRC_DIR) -c $< -o $@
 
-$(DELTANET_PARALLEL_PREFILL_OBJ): $(V8_SRC_DIR)/ck_parallel_prefill_v8.c
+$(DELTANET_PARALLEL_PREFILL_OBJ): $(V8_SRC_DIR)/ck_parallel_prefill_v8.c $(V8_KERNEL_DISPATCH_POLICY)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 $(AVX_FLAGS) -Iinclude -I$(V8_SRC_DIR) -c $< -o $@
 
@@ -3606,7 +3607,7 @@ test-q4q6-llama-production-forced-avx2:
 			build_quant_avx2/test_q6k_q8k_llama_production --quick; \
 	done
 
-$(Q4K_DISPATCH_MATRIX_BIN): $(LIB) benchmarks/bench_q4k_dispatch_matrix.c $(V8_SRC_DIR)/ck_parallel_decode_v8.c $(V8_SRC_DIR)/ck_parallel_prefill_v8.c
+$(Q4K_DISPATCH_MATRIX_BIN): $(LIB) benchmarks/bench_q4k_dispatch_matrix.c $(V8_SRC_DIR)/ck_parallel_decode_v8.c $(V8_SRC_DIR)/ck_parallel_prefill_v8.c $(V8_KERNEL_DISPATCH_POLICY)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) -O3 -march=native -Iinclude -I$(V8_SRC_DIR) \
 		benchmarks/bench_q4k_dispatch_matrix.c \
@@ -6344,6 +6345,7 @@ test-kernel-maps:
 	@$(MAKE) --no-print-directory test-v8-kernel-allocations
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q \
 		tests/test_v8_circuit_interface_validation.py \
+		tests/test_v8_kernel_dispatch_policy.py \
 		tests/test_v8_kernel_allocation_audit.py \
 		tests/test_v8_quantized_write_bounds.py \
 		tests/test_v8_provider_selection.py \
@@ -6360,8 +6362,13 @@ test-v8-kernel-allocations:
 
 v8-kernel-registry-freshness:
 	@$(PYTHON) -c "import sys; sys.path.insert(0, 'version/v8/scripts'); import ck_run_v8; ck_run_v8.step_regenerate_kernel_registry(force=True)"
+	@$(PYTHON) version/v8/scripts/generate_kernel_dispatch_policy_v8.py
 	@git diff --exit-code -- version/v8/kernel_maps/KERNEL_REGISTRY.json || { \
 		echo "FAIL: KERNEL_REGISTRY.json is stale; regenerate via ck_run_v8.step_regenerate_kernel_registry"; \
+		exit 1; \
+	}
+	@git diff --exit-code -- version/v8/src/ck_kernel_dispatch_policy_v8.inc || { \
+		echo "FAIL: ck_kernel_dispatch_policy_v8.inc is stale; regenerate via generate_kernel_dispatch_policy_v8.py"; \
 		exit 1; \
 	}
 

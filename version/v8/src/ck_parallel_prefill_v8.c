@@ -47,6 +47,43 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+enum {
+    CK_GEMM_ROUTE_OUTPUT_TILES = 1 << 0,
+    CK_GEMM_ROUTE_COMPACT_M4 = 1 << 1,
+    CK_GEMM_ROUTE_BATCHED_TAIL = 1 << 2,
+};
+
+typedef struct {
+    int min_m;
+    int max_m;
+    int min_n;
+    int max_n;
+    int min_k;
+    int max_k;
+    int tile_m;
+    int tile_n;
+    int max_threads;
+    unsigned int flags;
+} ck_gemm_route_v8;
+
+#include "ck_kernel_dispatch_policy_v8.inc"
+
+static const ck_gemm_route_v8 *ck_find_gemm_route_v8(
+        const ck_gemm_route_v8 *routes, size_t route_count,
+        int M, int N, int K)
+{
+    if (!routes || M <= 0 || N <= 0 || K <= 0) return NULL;
+    for (size_t index = 0; index < route_count; ++index) {
+        const ck_gemm_route_v8 *route = &routes[index];
+        if (M >= route->min_m && M <= route->max_m &&
+            N >= route->min_n && N <= route->max_n &&
+            K >= route->min_k && K <= route->max_k) {
+            return route;
+        }
+    }
+    return NULL;
+}
+
 /* Serial GEMM kernels (defined in src/kernels/) */
 extern void gemm_nt_q5_0_q8_0(const void *A, const void *B, const float *bias,
                                 float *C, int M, int N, int K);
@@ -1188,13 +1225,9 @@ static void *ck_get_q4k_packed_vnni_x16_cached(const void *B, int N, int K)
 }
 
 /* Return a view into an x16 weight that model initialization already packed.
- *
- * Qwen3.6 stores MLP gate/up as one N=34816 tensor, while decode invokes the
- * two N=17408 halves independently.  The x16 layout groups 16 output rows, so
- * a row-aligned subrange can reuse the combined allocation without repacking
- * or changing its arithmetic.  Do not create a cache entry here: the presence
- * of a prepared entry is the capability signal that scopes this dispatch to a
- * generated model/provider combination that selected x16 during load.
+ * A row-aligned projection subrange can reuse a combined x16 allocation
+ * without repacking or changing arithmetic. Do not create a cache entry here:
+ * the prepared entry is the capability signal for this dispatch.
  */
 static void *ck_find_prepared_q4k_packed_vnni_x16(
         const void *B, int N, int K)
@@ -1451,14 +1484,11 @@ static int ck_should_use_q6k_q8k_2d_prefill(const ck_threadpool_t *pool,
 
     if (jobs < active * 2) return 0;
 
-    /* Keep this predicate synchronized with implementation.work_partition_routing
-     * in gemm_nt_q6_k_q8_k.json. The map owns the public capability; this
-     * dispatch function implements that resolved shape contract. */
-    const int qwen36_recurrent_qkv =
-        M >= 4 && M <= 63 && N == 10240 && K == 5120;
-    if (!qwen36_recurrent_qkv && (N < 2048 || K < 8192)) return 0;
-
-    return 1;
+    const ck_gemm_route_v8 *route = ck_find_gemm_route_v8(
+        ck_policy_gemm_nt_q6_k_q8_k_prefill_schedule,
+        CK_POLICY_GEMM_NT_Q6_K_Q8_K_PREFILL_SCHEDULE_COUNT,
+        M, N, K);
+    return route && (route->flags & CK_GEMM_ROUTE_OUTPUT_TILES) != 0;
 }
 
 static int ck_should_use_q6k_q8k_m4_prefill(int M, int N, int K)
@@ -1466,17 +1496,11 @@ static int ck_should_use_q6k_q8k_m4_prefill(int M, int N, int K)
     if (ck_env_enabled("CK_DISABLE_Q6K_Q8K_M4_PREFILL")) return 0;
     if (ck_env_enabled("CK_ENABLE_Q6K_Q8K_M4_PREFILL")) return 1;
 
-    /*
-     * Measured Qwen3.6 Q4_K_M MLP-down and recurrent-QKV scopes.  The provider
-     * is bit-exact with the independent-row and llama.cpp AVX2 reductions.
-     * Keep other Q6 model shapes on the established provider until their own
-     * sweep records a win.
-     */
-    const int short_mlp_down =
-        M >= 4 && M <= 63 && N >= 4096 && K >= 8192;
-    const int qwen36_recurrent_qkv =
-        M >= 4 && M <= 63 && N == 10240 && K == 5120;
-    return short_mlp_down || qwen36_recurrent_qkv;
+    const ck_gemm_route_v8 *route = ck_find_gemm_route_v8(
+        ck_policy_gemm_nt_q6_k_q8_k_prefill_schedule,
+        CK_POLICY_GEMM_NT_Q6_K_Q8_K_PREFILL_SCHEDULE_COUNT,
+        M, N, K);
+    return route && (route->flags & CK_GEMM_ROUTE_COMPACT_M4) != 0;
 }
 
 static int ck_shape_aware_enabled(const ck_threadpool_t *pool)
@@ -1518,36 +1542,24 @@ static int ck_select_q4k_vnni_active_threads(
     return capacity;
 }
 
-static int ck_should_use_qwen36_q4k_avx512_x16(
+static const ck_gemm_route_v8 *ck_q4k_avx512_x16_prefill_route(
         int M, int N, int K)
 {
     /*
      * Keep the AVX-512 provider sweep-only until a real generated graph shows
-     * a stable end-to-end win.  The isolated and live batched GEMMs win, but
-     * Qwen3.6's certified chat policy currently uses sequential decode because
-     * the complete hybrid batched graph has a different numerical trajectory.
+     * a stable end-to-end win. The isolated and live batched GEMMs win, but a
+     * complete hybrid graph can have a different numerical trajectory.
      */
     if (!ck_env_enabled("CK_ENABLE_Q4K_AVX512_X16_EXPERIMENTAL") &&
         !ck_env_enabled("CK_V8_FORCE_BATCHED_PREFILL")) {
-        return 0;
+        return NULL;
     }
-    if (ck_env_enabled("CK_DISABLE_Q4K_AVX512_X16_PREFILL")) return 0;
-    if (!ck_q4k_packed_vnni_x16_available() || M < 16) return 0;
-
-    /*
-     * Measured Qwen3.6 Q4_K_M prefill hot set.  This includes gate/up,
-     * recurrent projections, full-attention gates, and both recurrent/MLP
-     * output projections.  In the real 29-token graph the x16 provider is
-     * 20-69% faster than x8 at these shapes while retaining the same
-     * pairwise split-min arithmetic.
-     *
-     * Keep other models on their certified providers until their own sweep
-     * rows demonstrate a win for this packing and thread schedule.
-     */
-    if (K == 5120) {
-        return N == 1024 || N == 6144 || N == 12288 || N == 34816;
-    }
-    return N == 5120 && (K == 6144 || K == 17408);
+    if (ck_env_enabled("CK_DISABLE_Q4K_AVX512_X16_PREFILL")) return NULL;
+    if (!ck_q4k_packed_vnni_x16_available()) return NULL;
+    return ck_find_gemm_route_v8(
+        ck_policy_gemm_nt_q4_k_q8_k_avx512_vnni_x16_prefill,
+        CK_POLICY_GEMM_NT_Q4_K_Q8_K_AVX512_VNNI_X16_PREFILL_COUNT,
+        M, N, K);
 }
 
 int ck_q4k_prepare_vnni_x16_weight(const void *B, int N, int K)
@@ -1556,16 +1568,17 @@ int ck_q4k_prepare_vnni_x16_weight(const void *B, int N, int K)
      * Reuse production eligibility so initialization cannot create a second,
      * subtly different provider-selection policy.
      */
-    if (!ck_should_use_qwen36_q4k_avx512_x16(16, N, K)) return 0;
+    if (!ck_q4k_avx512_x16_prefill_route(16, N, K)) return 0;
     return ck_get_q4k_packed_vnni_x16_cached(B, N, K) != NULL;
 }
 
-static int ck_select_qwen36_q4k_avx512_x16_threads(
-        const ck_threadpool_t *pool, int M, int N, int K)
+static int ck_select_q4k_avx512_x16_threads(
+        const ck_threadpool_t *pool, int M, int N, int K,
+        const ck_gemm_route_v8 *route)
 {
     int active = ck_select_gemm_active_threads(pool, M, N, K);
-    if (N == 34816 && active > 20) {
-        active = 20;
+    if (route && route->max_threads > 0 && active > route->max_threads) {
+        active = route->max_threads;
     }
     return active;
 }
@@ -2437,9 +2450,11 @@ void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
     const int serial = packed_rows > 0 &&
             (!pool || ck_threadpool_n_threads(pool) <= 1 ||
              ck_should_run_gemm_serial(pool, packed_rows, N, K));
+    const ck_gemm_route_v8 *x16_route = !serial
+        ? ck_q4k_avx512_x16_prefill_route(packed_rows, N, K)
+        : NULL;
     void *packed_vnni_x16 = NULL;
-    if (!serial &&
-        ck_should_use_qwen36_q4k_avx512_x16(packed_rows, N, K)) {
+    if (x16_route) {
         packed_vnni_x16 =
                 ck_get_q4k_packed_vnni_x16_cached(B, N, K);
     }
@@ -2471,14 +2486,11 @@ void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
         }
     } else if (packed_rows > 0) {
         int active = ck_select_gemm_active_threads(pool, packed_rows, N, K);
-        /*
-         * The AVX-512 x16 provider is promoted only for the measured Qwen3.6
-         * hot shapes. It preserves the same pairwise split-min arithmetic as
-         * the x8 provider while doubling the output lanes per dot product.
-         */
+        /* The map-selected x16 route preserves the same pairwise split-min
+         * arithmetic as x8 while doubling output lanes per dot product. */
         if (packed_vnni_x16) {
-            active = ck_select_qwen36_q4k_avx512_x16_threads(
-                    pool, packed_rows, N, K);
+            active = ck_select_q4k_avx512_x16_threads(
+                    pool, packed_rows, N, K, x16_route);
             ck_q4k_prefill_debug_dispatch(
                     "avx512_vnni_x16_16m", M, N, K, active);
             gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m(
@@ -2515,20 +2527,15 @@ void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
      * GEMV order. The two reduction boundaries are numerically distinct. */
     if (packed_rows < M) {
         const int tail_rows = M - packed_rows;
-        const int tail_thread_cap = N == 34816 ? 20 : 0;
+        const int tail_thread_cap = x16_route ? x16_route->max_threads : 0;
         ck_q4k_prefill_debug_dispatch(
                 "pairwise_residual_gemv_parallel",
                 tail_rows, N, K,
                 pool ? ck_threadpool_n_threads(pool) : 1);
-        /*
-         * Qwen3.6 recurrent-gate prefill has three residual rows at the
-         * common M=23 shape.  Keep the exact GEMV reduction order for every
-         * output, but amortize the thread-pool dispatch and retain each
-         * worker's packed-weight range across those rows.  The much wider
-         * N=34816 gate/up projection does not benefit from this cache
-         * schedule, so it deliberately retains one dispatch per row.
-         */
-        if (packed_vnni_x16 && N == 6144 &&
+        /* The route metadata enables batched residual rows only where the
+         * measured cache schedule wins; all paths retain exact GEMV order. */
+        if (packed_vnni_x16 && x16_route &&
+            (x16_route->flags & CK_GEMM_ROUTE_BATCHED_TAIL) != 0 &&
             !ck_env_enabled("CK_DISABLE_Q4K_X16_BATCHED_TAIL")) {
             run_gemv_q4_k_q8_k_repacked_x16_parallel(
                     pool,
@@ -2609,16 +2616,13 @@ void gemv_q4_k_q8_k_repacked_parallel_dispatch(
 {
     if (!y || !W || !x_q8 || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
 
-    /* Qwen3.6 model initialization already prepares this exact x16 VNNI
-     * layout for its wide prefill projections.  Reuse it for decode only when
-     * a prepared view exists; otherwise retain the certified x8 provider.
-     * This makes model/load-time provider selection the capability signal and
-     * requires no user-facing dispatch flag. */
-    const int qwen36_decode_shape =
-            (K == 5120 &&
-             (N == 6144 || N == 12288 || N == 17408)) ||
-            (N == 5120 && (K == 6144 || K == 17408));
-    if (qwen36_decode_shape &&
+    /* Reuse x16 weights only for a map-owned decode route and when model
+     * initialization prepared the exact view. */
+    const ck_gemm_route_v8 *decode_route = ck_find_gemm_route_v8(
+        ck_policy_gemm_nt_q4_k_q8_k_avx512_vnni_x16_decode_prepared,
+        CK_POLICY_GEMM_NT_Q4_K_Q8_K_AVX512_VNNI_X16_DECODE_PREPARED_COUNT,
+        1, N, K);
+    if (decode_route &&
         ck_q4k_packed_vnni_x16_available()) {
         void *packed_x16 =
                 ck_find_prepared_q4k_packed_vnni_x16(W, N, K);
@@ -2660,18 +2664,20 @@ void gemm_nt_q6_k_q8_k_parallel_dispatch(
     /* A is Q8_K: row_bytes = (K / QK_K) * sizeof(block_q8_K) */
     size_t A_row_bytes = (size_t)(K / QK_K) * sizeof(block_q8_K);
 
-    const int qwen36_recurrent_qkv =
-        M >= 4 && M <= 63 && N == 10240 && K == 5120;
-    const int short_wide_q6 =
-        M <= 63 && N >= 4096 && K >= 8192;
+    const ck_gemm_route_v8 *schedule = ck_find_gemm_route_v8(
+        ck_policy_gemm_nt_q6_k_q8_k_prefill_schedule,
+        CK_POLICY_GEMM_NT_Q6_K_Q8_K_PREFILL_SCHEDULE_COUNT,
+        M, N, K);
+    const int default_tile_m = schedule && schedule->tile_m > 0
+        ? schedule->tile_m : 16;
+    const int default_tile_n = schedule && schedule->tile_n > 0
+        ? schedule->tile_n : 256;
     gemm_args_t args = {
         .A = A, .B = prepared ? prepared : B, .bias = bias, .C = C,
         .M = M, .N = N, .K = K,
         .A_row_bytes = A_row_bytes,
-        .tile_m = ck_env_int_or2("CK_PREFILL_TILE_M", NULL, short_wide_q6 ? 8 : 16),
-        .tile_n = ck_env_int_or2(
-            "CK_PREFILL_TILE_N", NULL,
-            qwen36_recurrent_qkv ? 64 : (short_wide_q6 ? 128 : 256)),
+        .tile_m = ck_env_int_or2("CK_PREFILL_TILE_M", NULL, default_tile_m),
+        .tile_n = ck_env_int_or2("CK_PREFILL_TILE_N", NULL, default_tile_n),
         .use_q6_m4 = !prepared && ck_should_use_q6k_q8k_m4_prefill(M, N, K),
         .use_q6_prepared = prepared != NULL
     };

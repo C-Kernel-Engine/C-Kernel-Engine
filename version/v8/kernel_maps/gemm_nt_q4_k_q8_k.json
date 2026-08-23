@@ -45,6 +45,36 @@
       "boundary_semantics": "restart_row_group_at_each_segment",
       "fallback": "gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch"
     },
+    "runtime_dispatch": {
+      "schema_version": 1,
+      "policies": {
+        "avx512_vnni_x16_prefill": {
+          "status": "candidate",
+          "requires": ["avx512_vnni", "avx512_bw", "prepared_weight_layout"],
+          "routes": [
+            {"min_m": 16, "n": 1024, "k": 5120},
+            {"min_m": 16, "n": 6144, "k": 5120, "flags": ["batched_tail"]},
+            {"min_m": 16, "n": 12288, "k": 5120},
+            {"min_m": 16, "n": 34816, "k": 5120, "max_threads": 20},
+            {"min_m": 16, "n": 5120, "k": 6144},
+            {"min_m": 16, "n": 5120, "k": 17408}
+          ],
+          "notes": "Candidate shape regions measured for the x16 AVX-512/VNNI provider. Promotion remains opt-in until the complete hybrid graph retains its certified trajectory."
+        },
+        "avx512_vnni_x16_decode_prepared": {
+          "status": "production_when_prepared",
+          "requires": ["avx512_vnni", "avx512_bw", "prepared_weight_layout"],
+          "routes": [
+            {"m": 1, "n": 6144, "k": 5120},
+            {"m": 1, "n": 12288, "k": 5120},
+            {"m": 1, "n": 17408, "k": 5120},
+            {"m": 1, "n": 5120, "k": 6144},
+            {"m": 1, "n": 5120, "k": 17408}
+          ],
+          "notes": "Decode may reuse x16 weights only when model initialization prepared the exact view."
+        }
+      }
+    },
     "threading": {
       "runtime": "ck_threadpool",
       "work_partition": ["serial", "independent_rows", "independent_columns", "output_tiles"],
