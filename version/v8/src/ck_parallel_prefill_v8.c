@@ -270,6 +270,14 @@ extern void gemm_nt_q5_k_prepared_m4(const float *A, const void *B_prepared,
                                      const float *bias, float *C,
                                      int M, int N, int K);
 extern void quantize_row_q8_k(const float *x, void *y, int k);
+extern void quantize_batch_q8_k_4row_nearest_even(
+    const float *x, void *y, int num_rows, int k);
+extern void rmsnorm_forward_llama_production(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
+extern void recurrent_norm_gate_llama_avx2_forward(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps);
 extern void gemm_nt_q5_k_prepared_q8_m4_nrange(
     const void *A_q8, const void *B_prepared, const float *bias, float *C,
     int M, int N, int K, int n_begin, int n_end);
@@ -361,8 +369,160 @@ typedef struct {
     int dim;
 } geglu_args_t;
 
+typedef struct {
+    const float *input;
+    void *output;
+    int rows;
+    int k;
+} q8_k_quantize_args_t;
+
+typedef struct {
+    const float *input;
+    const float *gamma;
+    float *output;
+    float *rstd_cache;
+    int tokens;
+    int d_model;
+    int aligned_embed_dim;
+    float eps;
+} rmsnorm_exact_args_t;
+
+typedef struct {
+    const float *x;
+    const float *gate;
+    const float *weight;
+    float *out;
+    int rows;
+    int num_heads;
+    int head_dim;
+    float eps;
+} recurrent_norm_gate_args_t;
+
 static int ck_min_int(int a, int b) { return a < b ? a : b; }
 static int ck_env_enabled(const char *name);
+
+static int ck_independent_row_active_threads(
+        ck_threadpool_t *pool, int rows, int grain_size)
+{
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    const int jobs = (rows + grain_size - 1) / grain_size;
+    if (active > jobs) active = jobs;
+    return active > 0 ? active : 1;
+}
+
+static void work_quantize_q8_k_rows(int begin, int end, void *userdata)
+{
+    q8_k_quantize_args_t *args = (q8_k_quantize_args_t *)userdata;
+    const size_t input_row_elems = (size_t)args->k;
+    const size_t output_row_bytes =
+        (size_t)(args->k / QK_K) * sizeof(block_q8_K);
+    quantize_batch_q8_k_4row_nearest_even(
+        args->input + (size_t)begin * input_row_elems,
+        (unsigned char *)args->output + (size_t)begin * output_row_bytes,
+        end - begin, args->k);
+}
+
+static void work_rmsnorm_exact_rows(int begin, int end, void *userdata)
+{
+    rmsnorm_exact_args_t *args = (rmsnorm_exact_args_t *)userdata;
+    const size_t offset = (size_t)begin * (size_t)args->aligned_embed_dim;
+    rmsnorm_forward_llama_production(
+        args->input + offset, args->gamma, args->output + offset,
+        args->rstd_cache ? args->rstd_cache + begin : NULL,
+        end - begin, args->d_model, args->aligned_embed_dim, args->eps);
+}
+
+static void work_recurrent_norm_gate_rows(int begin, int end, void *userdata)
+{
+    recurrent_norm_gate_args_t *args =
+        (recurrent_norm_gate_args_t *)userdata;
+    const size_t row_elems =
+        (size_t)args->num_heads * (size_t)args->head_dim;
+    const size_t offset = (size_t)begin * row_elems;
+    recurrent_norm_gate_llama_avx2_forward(
+        args->x + offset, args->gate + offset, args->weight,
+        args->out + offset, end - begin, args->num_heads,
+        args->head_dim, args->eps);
+}
+
+void quantize_batch_q8_k_4row_nearest_even_parallel_dispatch(
+    const float *x, void *y, int num_rows, int k)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 16;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || num_rows < grain * 2 ||
+        k <= 0 || (k % QK_K) != 0) {
+        quantize_batch_q8_k_4row_nearest_even(x, y, num_rows, k);
+        return;
+    }
+
+    q8_k_quantize_args_t args = {
+        .input = x,
+        .output = y,
+        .rows = num_rows,
+        .k = k,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, num_rows, grain),
+        0, num_rows, grain, work_quantize_q8_k_rows, &args);
+}
+
+void rmsnorm_forward_llama_production_parallel_dispatch(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 8;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || tokens < grain * 2 ||
+        d_model <= 0 || aligned_embed_dim < d_model) {
+        rmsnorm_forward_llama_production(
+            input, gamma, output, rstd_cache,
+            tokens, d_model, aligned_embed_dim, eps);
+        return;
+    }
+
+    rmsnorm_exact_args_t args = {
+        .input = input,
+        .gamma = gamma,
+        .output = output,
+        .rstd_cache = rstd_cache,
+        .tokens = tokens,
+        .d_model = d_model,
+        .aligned_embed_dim = aligned_embed_dim,
+        .eps = eps,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, tokens, grain),
+        0, tokens, grain, work_rmsnorm_exact_rows, &args);
+}
+
+void recurrent_norm_gate_llama_avx2_parallel_dispatch(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 4;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || rows < grain * 2 ||
+        num_heads <= 0 || head_dim <= 0) {
+        recurrent_norm_gate_llama_avx2_forward(
+            x, gate, weight, out, rows, num_heads, head_dim, eps);
+        return;
+    }
+
+    recurrent_norm_gate_args_t args = {
+        .x = x,
+        .gate = gate,
+        .weight = weight,
+        .out = out,
+        .rows = rows,
+        .num_heads = num_heads,
+        .head_dim = head_dim,
+        .eps = eps,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, rows, grain),
+        0, rows, grain, work_recurrent_norm_gate_rows, &args);
+}
 
 static int ck_deltanet_chunk64_available(void)
 {

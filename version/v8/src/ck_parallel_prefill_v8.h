@@ -40,6 +40,17 @@ void ck_parallel_prefill_shutdown(void);
 /** Release provider caches owned by a completed prefill phase before decode. */
 void ck_parallel_prefill_release_transient_caches(void);
 
+/* Exact row-parallel providers for prefill operations whose canonical
+ * arithmetic is serial within each independent row. */
+void quantize_batch_q8_k_4row_nearest_even_parallel_dispatch(
+    const float *x, void *y, int num_rows, int k);
+void rmsnorm_forward_llama_production_parallel_dispatch(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
+void recurrent_norm_gate_llama_avx2_parallel_dispatch(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps);
+
 /** Release lazily repacked Q4_K weights at model/test teardown. */
 void ck_q4k_packed_weight_cache_clear(void);
 

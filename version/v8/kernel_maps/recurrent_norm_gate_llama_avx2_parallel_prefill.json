@@ -1,8 +1,8 @@
 {
-  "id": "recurrent_norm_gate_llama_avx2_forward",
+  "id": "recurrent_norm_gate_llama_avx2_parallel_prefill",
   "op": "recurrent_norm_gate",
   "operation_interface": "recurrent_norm_gate.fp32.v1",
-  "variant": "llama_avx2_fp32",
+  "variant": "llama_avx2_fp32_parallel_prefill",
   "modes": {"inference": true, "training": false, "backward": false},
   "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
   "inputs": [
@@ -15,21 +15,32 @@
   "dims": ["R", "H", "D"],
   "params": [{"name": "eps", "dtype": "float32"}],
   "impl": {
-    "function": "recurrent_norm_gate_llama_avx2_forward",
-    "c_declaration": "void recurrent_norm_gate_llama_avx2_forward(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
-    "sources": ["src/kernels/recurrent_norm_kernels.c", "src/kernels/rmsnorm_kernels.c", "src/kernels/recurrent_gate_kernels.c"],
-    "variants": [{"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}]
+    "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch",
+    "c_declaration": "void recurrent_norm_gate_llama_avx2_parallel_dispatch(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
+    "sources": ["src/kernels/recurrent_norm_kernels.c", "src/kernels/rmsnorm_kernels.c", "src/kernels/recurrent_gate_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"],
+    "variants": [{"name": "avx2_independent_rows", "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch", "priority": 210, "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"], "shape_constraints": {"R_min": 8}, "work_partition": "independent_rows"}]
   },
   "numerical_capabilities": [{
     "contract_id": "recurrent_norm_gate_llama_avx2_fp32_output",
     "status": "validated",
-    "phases": ["decode"],
-    "function": "recurrent_norm_gate_llama_avx2_forward",
+    "phases": ["prefill"],
+    "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch",
     "explicit_selector": true,
-    "implementation": {"isa_dispatch": "compile_time", "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {
+        "runtime": "ck_threadpool",
+        "work_partition": ["independent_rows"],
+        "dispatch": ["inline", "ck_threadpool_parallel_for_n"],
+        "reduction_order_effect": "none"
+      }
+    },
     "arithmetic": {"partial_accumulator": "fp64", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
   }],
-  "tests": {"unit": ["unittest/test_recurrent_norm_gate.py"], "parity": [{"kind": "llama.cpp_production_graph", "command": "make test-deltanet-llamacpp-production", "tolerance": "0"}]},
+  "tests": {
+    "unit": ["tests/test_v8_prefill_independent_row_parallel.py", "unittest/test_recurrent_norm_gate.py"],
+    "parity": [{"kind": "llama.cpp_production_graph", "command": "make test-deltanet-llamacpp-production", "tolerance": "0"}]
+  },
   "call_abi": {"version": 1, "params": [
     {"name": "x", "source": "activation:x", "cast": "const float*", "ports": ["input:x"]},
     {"name": "gate", "source": "activation:gate", "cast": "const float*", "ports": ["input:gate"]},
@@ -39,5 +50,6 @@
     {"name": "num_heads", "source": "dim:recurrent_num_heads"},
     {"name": "head_dim", "source": "dim:recurrent_head_dim"},
     {"name": "eps", "source": "dim:rms_eps"}
-  ]}
+  ]},
+  "notes": "Partitions independent recurrent rows through the persistent pool without changing per-head RMSNorm or SiLU arithmetic."
 }

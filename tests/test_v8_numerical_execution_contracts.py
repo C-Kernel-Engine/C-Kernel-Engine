@@ -157,7 +157,12 @@ class NumericalExecutionContractTests(unittest.TestCase):
                         mode="production",
                     )
                     self.assertEqual(plan["operation_interface"], interface_id)
-                    self.assertEqual(plan["kernel"]["id"], kernel_id)
+                    expected_kernel = (
+                        "rmsnorm_forward_llama_production_parallel_prefill"
+                        if operation == "decoder.rmsnorm" and phase == "prefill"
+                        else kernel_id
+                    )
+                    self.assertEqual(plan["kernel"]["id"], expected_kernel)
                     self.assertEqual(
                         plan["kernel"]["interface_call_abi"], "validated"
                     )
@@ -264,7 +269,12 @@ class NumericalExecutionContractTests(unittest.TestCase):
                         mode="production",
                     )
                     self.assertEqual(plan["operation_interface"], interface_id)
-                    self.assertEqual(plan["kernel"]["id"], kernel_id)
+                    expected_kernel = (
+                        "rmsnorm_forward_llama_production_parallel_prefill"
+                        if operation == "decoder.rmsnorm" and phase == "prefill"
+                        else kernel_id
+                    )
+                    self.assertEqual(plan["kernel"]["id"], expected_kernel)
 
     def test_audio_and_vision_gelu_resolve_from_hardened_interfaces(self):
         cases = (
@@ -561,15 +571,15 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 289)
+        self.assertEqual(report["counts"]["kernel_maps"], 291)
         self.assertEqual(report["counts"]["physical_layout_maps"], 4)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 97)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 46)
+        self.assertEqual(report["counts"]["resolver_governed_maps"], 99)
+        self.assertEqual(report["counts"]["interface_hardened_maps"], 48)
         self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 46
+            report["counts"]["interface_abi_crossvalidated_maps"], 48
         )
         self.assertEqual(report["counts"]["contract_pending_maps"], 51)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 153)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 155)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 34)
         self.assertEqual(report["counts"]["selection_managed_maps"], 65)
         self.assertEqual(report["selection"]["legacy_selection_if_statements"], 69)
@@ -766,10 +776,28 @@ class NumericalExecutionContractTests(unittest.TestCase):
             ROOT / "version" / "v8" / "circuits" / "qwen3vl.json"
         )
         expected = {
-            "decoder.rmsnorm": "rmsnorm_forward_llama_production",
-            "decoder.qk_norm": "qk_norm_forward_llama_production",
+            "decoder.rmsnorm": {
+                "prefill": (
+                    "rmsnorm_forward_llama_production_parallel_prefill",
+                    "rmsnorm_forward_llama_production_parallel_dispatch",
+                ),
+                "decode": (
+                    "rmsnorm_forward_llama_production",
+                    "rmsnorm_forward_llama_production",
+                ),
+            },
+            "decoder.qk_norm": {
+                "prefill": (
+                    "qk_norm_forward_llama_production",
+                    "qk_norm_forward_llama_production",
+                ),
+                "decode": (
+                    "qk_norm_forward_llama_production",
+                    "qk_norm_forward_llama_production",
+                ),
+            },
         }
-        for operation, function in expected.items():
+        for operation, functions in expected.items():
             for phase in ("prefill", "decode"):
                 with self.subTest(operation=operation, phase=phase):
                     plan = resolver.resolve_contract(
@@ -780,7 +808,8 @@ class NumericalExecutionContractTests(unittest.TestCase):
                         phase,
                         mode="production",
                     )
-                    self.assertEqual(plan["kernel"]["id"], function)
+                    kernel_id, function = functions[phase]
+                    self.assertEqual(plan["kernel"]["id"], kernel_id)
                     self.assertEqual(plan["kernel"]["function"], function)
                     semantics = plan["contract"]["semantics"]
                     self.assertEqual(semantics["compute"]["accumulator"], "fp64")
@@ -807,10 +836,12 @@ class NumericalExecutionContractTests(unittest.TestCase):
                     plan["contract"]["id"],
                     "rmsnorm_llama_cpu_production_fp32_output",
                 )
-                self.assertEqual(
-                    plan["kernel"]["function"],
-                    "rmsnorm_forward_llama_production",
+                expected_function = (
+                    "rmsnorm_forward_llama_production_parallel_dispatch"
+                    if phase == "prefill"
+                    else "rmsnorm_forward_llama_production"
                 )
+                self.assertEqual(plan["kernel"]["function"], expected_function)
 
     def test_qwen35_recurrent_core_resolves_exact_llama_avx2_provider(self):
         circuit_doc = resolver.load_json(
@@ -939,10 +970,12 @@ class NumericalExecutionContractTests(unittest.TestCase):
                     plan["contract"]["id"],
                     "recurrent_norm_gate_llama_avx2_fp32_output",
                 )
-                self.assertEqual(
-                    plan["kernel"]["function"],
-                    "recurrent_norm_gate_llama_avx2_forward",
+                expected_function = (
+                    "recurrent_norm_gate_llama_avx2_parallel_dispatch"
+                    if phase == "prefill"
+                    else "recurrent_norm_gate_llama_avx2_forward"
                 )
+                self.assertEqual(plan["kernel"]["function"], expected_function)
 
     def test_qwen35_attention_gate_resolves_exact_llama_sigmoid_provider(self):
         circuit_doc = resolver.load_json(

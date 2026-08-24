@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 289,
+      "total": 291,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -83,7 +83,7 @@
         "recurrent_conv_state_update": 2,
         "recurrent_dt_gate": 1,
         "recurrent_dt_gate_backward": 1,
-        "recurrent_norm_gate": 4,
+        "recurrent_norm_gate": 5,
         "recurrent_qk_l2_norm": 3,
         "recurrent_silu": 4,
         "recurrent_split_conv_qkv": 2,
@@ -92,7 +92,7 @@
         "relu2": 2,
         "residual_add": 2,
         "residual_save": 1,
-        "rmsnorm": 9,
+        "rmsnorm": 10,
         "rope": 17,
         "rope_backward": 2,
         "rope_init": 3,
@@ -35502,7 +35502,8 @@
         "function": "quantize_row_q8_k",
         "sources": [
           "src/kernels/gemm_kernels_q4k_q8k.c",
-          "src/kernels/quantize_row_q8_k_sse.c"
+          "src/kernels/quantize_row_q8_k_sse.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
@@ -35525,7 +35526,7 @@
           "c_block_type": "block_q8_K"
         },
         "prefill_batch": {
-          "function": "quantize_batch_q8_k_4row_nearest_even",
+          "function": "quantize_batch_q8_k_4row_nearest_even_parallel_dispatch",
           "row_group": 4,
           "tail_function": "quantize_row_q8_k",
           "rounding_contract": "llama_repack_q8_k_4row_nearest_even"
@@ -36559,7 +36560,6 @@
           "contract_id": "recurrent_norm_gate_llama_avx2_fp32_output",
           "status": "validated",
           "phases": [
-            "prefill",
             "decode"
           ],
           "function": "recurrent_norm_gate_llama_avx2_forward",
@@ -36653,6 +36653,220 @@
       },
       "name": "recurrent_norm_gate_llama_avx2_forward",
       "_source_file": "recurrent_norm_gate_llama_avx2_forward.json"
+    },
+    {
+      "id": "recurrent_norm_gate_llama_avx2_parallel_prefill",
+      "op": "recurrent_norm_gate",
+      "operation_interface": "recurrent_norm_gate.fp32.v1",
+      "variant": "llama_avx2_fp32_parallel_prefill",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "layout": "feature_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "H",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch",
+        "c_declaration": "void recurrent_norm_gate_llama_avx2_parallel_dispatch(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/recurrent_norm_kernels.c",
+          "src/kernels/rmsnorm_kernels.c",
+          "src/kernels/recurrent_gate_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ],
+        "variants": [
+          {
+            "name": "avx2_independent_rows",
+            "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch",
+            "priority": 210,
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ],
+            "shape_constraints": {
+              "R_min": 8
+            },
+            "work_partition": "independent_rows"
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "recurrent_norm_gate_llama_avx2_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "recurrent_norm_gate_llama_avx2_parallel_dispatch",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline",
+                "ck_threadpool_parallel_for_n"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "tests": {
+        "unit": [
+          "tests/test_v8_prefill_independent_row_parallel.py",
+          "unittest/test_recurrent_norm_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "llama.cpp_production_graph",
+            "command": "make test-deltanet-llamacpp-production",
+            "tolerance": "0"
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "x",
+            "source": "activation:x",
+            "cast": "const float*",
+            "ports": [
+              "input:x"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const float*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "weight",
+            "source": "weight:ssm_norm",
+            "cast": "const float*",
+            "ports": [
+              "weight:weight"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "runtime:seq_len"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:recurrent_num_heads"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:recurrent_head_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "notes": "Partitions independent recurrent rows through the persistent pool without changing per-head RMSNorm or SiLU arithmetic.",
+      "name": "recurrent_norm_gate_llama_avx2_parallel_prefill",
+      "_source_file": "recurrent_norm_gate_llama_avx2_parallel_prefill.json"
     },
     {
       "id": "recurrent_norm_gate_pytorch_bf16_storage",
@@ -39374,7 +39588,6 @@
           "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
           "status": "validated",
           "phases": [
-            "prefill",
             "decode"
           ],
           "function": "rmsnorm_forward_llama_production",
@@ -39472,6 +39685,190 @@
       "notes": "FP32 RMSNorm matching llama.cpp CPU production with ordered FP32 square, FP64 scalar accumulation, scalar sqrt then scalar divide, and fused left-associative scale multiplication. The explicit sqrt/divide boundary prevents ICX from substituting vrsqrt14ss plus Newton refinement.",
       "name": "rmsnorm_forward_llama_production",
       "_source_file": "rmsnorm_forward_llama_production.json"
+    },
+    {
+      "id": "rmsnorm_forward_llama_production_parallel_prefill",
+      "op": "rmsnorm",
+      "operation_interface": "rmsnorm.fp32.v1",
+      "variant": "llama_cpu_production_fp32_output_parallel_prefill",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "layout": "feature_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "rstd",
+          "dtype": "fp32",
+          "shape": [
+            "T"
+          ],
+          "layout": "token_contiguous",
+          "access": "write",
+          "storage_class": "scratch",
+          "consumption": "optional"
+        }
+      ],
+      "dims": [
+        "T",
+        "E"
+      ],
+      "params": [
+        {
+          "name": "eps",
+          "dtype": "float32"
+        }
+      ],
+      "impl": {
+        "function": "rmsnorm_forward_llama_production_parallel_dispatch",
+        "c_declaration": "void rmsnorm_forward_llama_production_parallel_dispatch(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+        "sources": [
+          "src/kernels/rmsnorm_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "rmsnorm_forward_llama_production_parallel_dispatch",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "compile_time",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline",
+                "ck_threadpool_parallel_for_n"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "alt": [
+              "ln1_gamma",
+              "ln2_gamma",
+              "final_ln_weight"
+            ],
+            "cast": "const float*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null",
+            "ports": [
+              "output:rstd"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "d_model",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "aligned_embed_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_prefill_independent_row_parallel.py",
+          "unittest/test_rmsnorm_llama_production.cpp"
+        ],
+        "parity": [
+          {
+            "criteria": "bit exact across serial and parallel prefill providers"
+          }
+        ]
+      },
+      "notes": "Partitions independent token rows through the persistent pool while retaining the canonical llama.cpp-compatible reduction within every row.",
+      "name": "rmsnorm_forward_llama_production_parallel_prefill",
+      "_source_file": "rmsnorm_forward_llama_production_parallel_prefill.json"
     },
     {
       "id": "rmsnorm_forward_pytorch_bf16_storage",
