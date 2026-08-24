@@ -5,7 +5,8 @@ var ckernel__engine_8h =
       [ "CK_ATTN_PREFILL_SCHEDULE_KV_HEADS", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33", null ],
       [ "CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1", null ],
       [ "CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef", null ],
-      [ "CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851", null ]
+      [ "CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851", null ],
+      [ "CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ab2b762c82a789d6b6eecc727a35c42b4", null ]
     ] ],
     [ "ck_attention_reduction_t", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e", [
       [ "CK_ATTN_REDUCTION_FP32_ONLINE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8", null ],
@@ -17,7 +18,8 @@ var ckernel__engine_8h =
     [ "ck_attention_status_t", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67", [
       [ "CK_ATTENTION_STATUS_OK", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67abea27a79c4c94ac03dfe2ab71fb2cdf1", null ],
       [ "CK_ATTENTION_STATUS_INVALID_ARGUMENT", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad2afe3d323b8a120f969ba979c34a8df", null ],
-      [ "CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614", null ]
+      [ "CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67a1f3f246a2db6a868a9e1a5835d06e614", null ],
+      [ "CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE", "ckernel__engine_8h.html#adcb33ce8a8fd7acd821411605a3baf67ad762a0a2ebaaa15ce18a2bfbe86349c7", null ]
     ] ],
     [ "adamw_clip_update_multi_f32", "ckernel__engine_8h.html#ab5a989d66800118a460f2229f856aa3d", null ],
     [ "adamw_update_f32", "ckernel__engine_8h.html#ac1a9ed01c15286fc6e3be73f96371d76", null ],
@@ -52,8 +54,11 @@ var ckernel__engine_8h =
     [ "attention_forward_causal_head_major_gqa_flash_strided_token_output", "ckernel__engine_8h.html#aed9165e0811ee2f38c38aa7d6ad5048a", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract", "ckernel__engine_8h.html#a1760eea773e5956fd3ae977e5029ab86", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace", "ckernel__engine_8h.html#a49061a12eedcf16aa601f8dc8d777992", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace", "ckernel__engine_8h.html#a348daf796bede58ae3c83d797ba2ba56", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract", "ckernel__engine_8h.html#a669b5ad8474b002ce52839ec5694a237", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace", "ckernel__engine_8h.html#ad1a72792cdc40d8fc00a3221a86e82cb", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config", "ckernel__engine_8h.html#a799abd849ac31acee3371df4d78c81e5", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes", "ckernel__engine_8h.html#a89f38a290cc9573e693a7dda9f695979", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule", "ckernel__engine_8h.html#a07878d5ab2649929b52802d5dc6cb353", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract", "ckernel__engine_8h.html#a6fadecb99c59f6d83845510bd60f862a", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace", "ckernel__engine_8h.html#add5e8b95245fbfa279c6828d4a91bb7c", null ],
