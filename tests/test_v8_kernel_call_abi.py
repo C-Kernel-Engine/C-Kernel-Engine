@@ -163,6 +163,24 @@ class V8KernelCallABITests(unittest.TestCase):
         self.assertEqual(q6_k["max_total_bytes"], 8589934592)
         self.assertEqual(q6_k["min_remaining_memory_bytes"], 17179869184)
         self.assertEqual(registry["gemm_nt_q6_k_q8_k"]["weight_preparation"], q6_k)
+        q6_variants = {
+            variant["name"]: variant
+            for variant in registry["gemm_nt_q6_k_q8_k"]["impl"]["variants"]
+        }
+        q6_avx512 = q6_variants["avx512_vnni_prepared_integer_metadata"]
+        self.assertEqual(
+            q6_avx512["function"],
+            "gemm_nt_q6_k_q8_k_prepared_avx512_vnni",
+        )
+        self.assertEqual(q6_avx512["priority"], 300)
+        self.assertEqual(
+            q6_avx512["requires_prepared_format"],
+            "q6_k_expanded_integer_metadata_v1",
+        )
+        self.assertEqual(
+            q6_avx512["equivalence_group"],
+            "q6_k_x_q8_k_fp32_block_order",
+        )
         moe = preparations["moe_swiglu_expert_forward_q4k_q5k_bucketed"]
         self.assertEqual(
             moe["function"], "ck_moe_prepare_q4k_gate_up_vnni_x8"

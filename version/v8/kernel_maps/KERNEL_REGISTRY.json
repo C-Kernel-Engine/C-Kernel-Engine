@@ -19899,6 +19899,25 @@
         ],
         "variants": [
           {
+            "name": "avx512_vnni_prepared_integer_metadata",
+            "function": "gemm_nt_q6_k_q8_k_prepared_avx512_vnni",
+            "priority": 300,
+            "requires": [
+              "avx512_vnni",
+              "avx512_bw"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mavx512bw",
+              "-mavx512vnni",
+              "-mavx2",
+              "-mfma"
+            ],
+            "requires_prepared_format": "q6_k_expanded_integer_metadata_v1",
+            "equivalence_group": "q6_k_x_q8_k_fp32_block_order",
+            "work_partition": "output_tiles"
+          },
+          {
             "name": "avx2_prepared_integer_metadata",
             "function": "gemm_nt_q6_k_q8_k_prepared",
             "priority": 260,
@@ -19911,6 +19930,7 @@
               "-mfma"
             ],
             "requires_prepared_format": "q6_k_expanded_integer_metadata_v1",
+            "equivalence_group": "q6_k_x_q8_k_fp32_block_order",
             "work_partition": "output_tiles"
           },
           {

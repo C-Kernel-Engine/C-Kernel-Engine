@@ -25,7 +25,10 @@ size_t ck_q6_k_prepared_block_size(void);
 void ck_q6_k_prepare_weight(const void *, void *, int, int);
 void gemm_nt_q6_k_q8_k_prepared(
         const void *, const void *, const float *, float *, int, int, int);
+void gemm_nt_q6_k_q8_k_prepared_avx512_vnni(
+        const void *, const void *, const float *, float *, int, int, int);
 const char *ck_q6_k_q8_k_provider_name(void);
+const char *ck_q6_k_prepared_provider_name(void);
 void ck_threadpool_global_destroy(void);
 void ggml_vec_dot_q6_K_q8_K(
         int, float *, size_t, const void *, size_t, const void *, size_t, int);
@@ -184,6 +187,7 @@ static bool run_case(const case_spec &spec, bool prepared_only = false) {
     bool pass = compare_bytes("Q8_K activation quantizer", ck_q8.data(), llama_q8.data(), ck_q8.size());
     std::vector<float> ck(static_cast<size_t>(spec.m) * spec.n);
     std::vector<float> prepared(ck.size());
+    std::vector<float> prepared_avx512(ck.size());
     std::vector<float> m4(ck.size()), leaf(ck.size()), canonical(ck.size()), repack(ck.size());
     for (int r = 0; r < spec.m; ++r) for (int c = 0; c < spec.n; ++c) {
         ggml_vec_dot_q6_K_q8_K(spec.k, &leaf[static_cast<size_t>(r) * spec.n + c], 0,
@@ -211,6 +215,12 @@ static bool run_case(const case_spec &spec, bool prepared_only = false) {
     gemm_nt_q6_k_q8_k_prepared(
         ck_q8.data(), prepared_weights.data(), nullptr,
         prepared.data(), spec.m, spec.n, spec.k);
+    gemm_nt_q6_k_q8_k_prepared_avx512_vnni(
+        ck_q8.data(), prepared_weights.data(), nullptr,
+        prepared_avx512.data(), spec.m, spec.n, spec.k);
+    pass &= compare_f32(
+            "CK prepared AVX512/VNNI",
+            prepared_avx512.data(), prepared.data(), prepared.size());
     if (prepared_only) {
         return compare_f32(
                 "CK prepared vs established",
@@ -295,10 +305,11 @@ int main(int argc, char **argv) {
         return 2;
     }
     std::printf("llama ISA: avx2=%d avx_vnni=%d avx512=%d avx512_vnni=%d; "
-                "CK Q6 provider=%s\n",
+                "CK Q6 provider=%s prepared=%s\n",
             ggml_cpu_has_avx2(), ggml_cpu_has_avx_vnni(),
             ggml_cpu_has_avx512(), ggml_cpu_has_avx512_vnni(),
-            ck_q6_k_q8_k_provider_name());
+            ck_q6_k_q8_k_provider_name(),
+            ck_q6_k_prepared_provider_name());
     if (!std::getenv("CK_NUM_THREADS")) setenv("CK_NUM_THREADS", "1", 1);
     const bool prepared_only =
         argc > 1 && std::strcmp(argv[1], "--prepared-only") == 0;

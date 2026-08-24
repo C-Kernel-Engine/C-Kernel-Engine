@@ -455,6 +455,7 @@ void gemv_q6_k_q8_k(float *y,
                     const void *x_q8,
                     int M, int K);
 const char *ck_q6_k_q8_k_provider_name(void);
+const char *ck_q6_k_prepared_provider_name(void);
 
 /* Parallel Q6_K versions - caller provides ith/nth from OpenMP region */
 void gemv_q6_k_q8_k_parallel(float *y, const void *W, const void *x_q8,

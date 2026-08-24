@@ -59,6 +59,18 @@ size_t ck_q6_k_prepared_block_size(void)
     return sizeof(block_q6_K_prepared);
 }
 
+const char *ck_q6_k_prepared_provider_name(void)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && \
+    defined(__AVX512VNNI__)
+    return "q6_k_prepared_avx512_vnni_exact";
+#elif defined(__AVX2__)
+    return "q6_k_prepared_avx2_exact";
+#else
+    return "q6_k_prepared_unavailable";
+#endif
+}
+
 void ck_q6_k_prepare_weight(const void *src, void *dst, int N, int K)
 {
     if (!src || !dst || N <= 0 || K <= 0 || (K % QK_K) != 0) return;
@@ -923,6 +935,63 @@ static float dot_q6_k_prepared_q8_k_avx2(
     return ck_q6k_hsum_float_8(acc);
 }
 
+#if defined(__AVX512F__) && defined(__AVX512BW__) && \
+    defined(__AVX512VNNI__)
+/*
+ * Prepared Q6 stores unsigned 6-bit values as bytes, which maps directly to
+ * VPDPBUSD. Fold each pair of 32-byte groups into the same eight integer lanes
+ * used by the certified AVX2 provider. The correction, FP32 block FMA, and
+ * horizontal reduction therefore retain the established arithmetic contract.
+ */
+static float dot_q6_k_prepared_q8_k_avx512_vnni(
+        const block_q6_K_prepared *w, const block_q8_K *x, int K)
+{
+    const int nb = K / QK_K;
+    const __m512i scale_indices = _mm512_setr_epi32(
+        0, 0, 0, 0, 1, 1, 1, 1,
+        2, 2, 2, 2, 3, 3, 3, 3);
+    __m256 acc = _mm256_setzero_ps();
+
+    for (int i = 0; i < nb; ++i) {
+        const __m128i scales =
+            _mm_loadu_si128((const __m128i *)(const void *)w[i].scales);
+        const __m512i scales_32 = _mm512_cvtepi8_epi32(scales);
+        const __m256i scales_16 = _mm256_cvtepi8_epi16(scales);
+        const __m256i q8sums =
+            _mm256_loadu_si256((const __m256i *)(const void *)x[i].bsums);
+        const __m256i q8sclsub = _mm256_slli_epi32(
+            _mm256_madd_epi16(q8sums, scales_16), 5);
+        __m256i sumi = _mm256_setzero_si256();
+
+        for (int chunk = 0; chunk < 4; ++chunk) {
+            const __m512i q6 = _mm512_loadu_si512(
+                (const void *)(w[i].qs + chunk * 64));
+            const __m512i q8 = _mm512_loadu_si512(
+                (const void *)(x[i].qs + chunk * 64));
+            const __m512i products = _mm512_dpbusd_epi32(
+                _mm512_setzero_si512(), q6, q8);
+            const __m512i indices = _mm512_add_epi32(
+                scale_indices, _mm512_set1_epi32(chunk * 4));
+            const __m512i scaled = _mm512_mullo_epi32(
+                products, _mm512_permutexvar_epi32(indices, scales_32));
+            const __m512i upper_half = _mm512_shuffle_i32x4(
+                scaled, scaled, _MM_SHUFFLE(3, 2, 3, 2));
+            const __m256i pair_sum = _mm256_add_epi32(
+                _mm512_castsi512_si256(scaled),
+                _mm512_castsi512_si256(upper_half));
+            sumi = _mm256_add_epi32(sumi, pair_sum);
+        }
+
+        sumi = _mm256_sub_epi32(sumi, q8sclsub);
+        const float d = GGML_FP16_TO_FP32(w[i].d) * x[i].d;
+        acc = _mm256_fmadd_ps(
+            _mm256_broadcast_ss(&d), _mm256_cvtepi32_ps(sumi), acc);
+    }
+
+    return ck_q6k_hsum_float_8(acc);
+}
+#endif
+
 void gemv_q6_k_q8_k_avx2(float *y,
                           const void *W,
                           const void *x_q8,
@@ -1476,18 +1545,25 @@ void gemm_nt_q6_k_q8_k(const void *A_q8,
     }
 }
 
-void gemm_nt_q6_k_q8_k_prepared_tile(const void *A_q8,
+static void gemm_nt_q6_k_q8_k_prepared_tile_impl(
+                                      const void *A_q8,
                                       const void *B_prepared,
                                       const float *bias,
                                       float *C,
                                       int M, int N, int K,
                                       int m0, int m1,
-                                      int n0, int n1)
+                                      int n0, int n1,
+                                      int use_avx512_vnni)
 {
 #if !defined(__AVX2__)
     (void)A_q8; (void)B_prepared; (void)bias; (void)C;
     (void)M; (void)N; (void)K; (void)m0; (void)m1; (void)n0; (void)n1;
+    (void)use_avx512_vnni;
 #else
+#if !defined(__AVX512F__) || !defined(__AVX512BW__) || \
+    !defined(__AVX512VNNI__)
+    (void)use_avx512_vnni;
+#endif
     if (!A_q8 || !B_prepared || !C || M <= 0 || N <= 0 || K <= 0 ||
         (K % QK_K) != 0) return;
     if (m0 < 0) m0 = 0;
@@ -1507,11 +1583,49 @@ void gemm_nt_q6_k_q8_k_prepared_tile(const void *A_q8,
         for (int m = m0; m < m1; ++m) {
             const block_q8_K *a_row =
                 A + (size_t)m * (size_t)blocks_per_row;
+#if defined(__AVX512F__) && defined(__AVX512BW__) && \
+    defined(__AVX512VNNI__)
+            const float dot = use_avx512_vnni
+                ? dot_q6_k_prepared_q8_k_avx512_vnni(w_row, a_row, K)
+                : dot_q6_k_prepared_q8_k_avx2(w_row, a_row, K);
+#else
+            const float dot = dot_q6_k_prepared_q8_k_avx2(w_row, a_row, K);
+#endif
             C[(size_t)m * (size_t)N + (size_t)n] =
-                dot_q6_k_prepared_q8_k_avx2(w_row, a_row, K) + b;
+                dot + b;
         }
     }
 #endif
+}
+
+void gemm_nt_q6_k_q8_k_prepared_tile(const void *A_q8,
+                                      const void *B_prepared,
+                                      const float *bias,
+                                      float *C,
+                                      int M, int N, int K,
+                                      int m0, int m1,
+                                      int n0, int n1)
+{
+    int use_avx512_vnni = 0;
+#if defined(__AVX512F__) && defined(__AVX512BW__) && \
+    defined(__AVX512VNNI__)
+    use_avx512_vnni = 1;
+#endif
+    gemm_nt_q6_k_q8_k_prepared_tile_impl(
+        A_q8, B_prepared, bias, C, M, N, K,
+        m0, m1, n0, n1, use_avx512_vnni);
+}
+
+void gemm_nt_q6_k_q8_k_prepared_avx512_vnni(
+                                 const void *A_q8,
+                                 const void *B_prepared,
+                                 const float *bias,
+                                 float *C,
+                                 int M, int N, int K)
+{
+    gemm_nt_q6_k_q8_k_prepared_tile_impl(
+        A_q8, B_prepared, bias, C, M, N, K,
+        0, M, 0, N, 1);
 }
 
 void gemm_nt_q6_k_q8_k_prepared(const void *A_q8,
