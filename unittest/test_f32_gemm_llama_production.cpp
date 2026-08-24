@@ -14,6 +14,9 @@ extern "C" {
 void gemm_nt_f32_llama_production(
         const float * A, const float * B, const float * bias, float * C,
         int M, int N, int K);
+void gemm_nt_f32_llama_production_output_range(
+        const float * A, const float * B, const float * bias, float * C,
+        int M, int N, int K, int output_begin, int output_end);
 }
 
 namespace {
@@ -78,6 +81,7 @@ static bool run_case(const case_spec & spec) {
             static_cast<size_t>(spec.outputs) * spec.width);
     std::vector<float> ck(
             static_cast<size_t>(spec.rows) * spec.outputs, 0.0f);
+    std::vector<float> ck_ranges(ck.size(), 0.0f);
     std::vector<float> llama(ck.size(), 0.0f);
     for (int row = 0; row < spec.rows; ++row) {
         for (int col = 0; col < spec.width; ++col) {
@@ -94,6 +98,14 @@ static bool run_case(const case_spec & spec) {
     gemm_nt_f32_llama_production(
             input.data(), weight.data(), nullptr, ck.data(),
             spec.rows, spec.outputs, spec.width);
+    const int total = spec.rows * spec.outputs;
+    const int chunk = std::max(1, (total + 6) / 7);
+    for (int begin = 0; begin < total; begin += chunk) {
+        gemm_nt_f32_llama_production_output_range(
+                input.data(), weight.data(), nullptr, ck_ranges.data(),
+                spec.rows, spec.outputs, spec.width,
+                begin, std::min(begin + chunk, total));
+    }
     if (!llama_matmul(input, weight, llama, spec)) {
         std::fprintf(stderr, "%s: llama.cpp graph execution failed\n", spec.name);
         return false;
@@ -102,6 +114,10 @@ static bool run_case(const case_spec & spec) {
     float max_abs = 0.0f;
     for (size_t i = 0; i < ck.size(); ++i) {
         different += std::memcmp(&ck[i], &llama[i], sizeof(float)) != 0;
+        if (std::memcmp(&ck[i], &ck_ranges[i], sizeof(float)) != 0) {
+            std::fprintf(stderr, "%s: output-range mismatch at %zu\n", spec.name, i);
+            return false;
+        }
         max_abs = std::max(max_abs, std::fabs(ck[i] - llama[i]));
     }
     std::printf("%-24s different=%zu/%zu max_abs=%.9g [%s]\n",

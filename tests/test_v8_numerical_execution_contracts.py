@@ -1589,7 +1589,8 @@ class NumericalExecutionContractTests(unittest.TestCase):
                     plan["kernel"]["id"], "gemm_nt_f32_llama_production"
                 )
                 self.assertEqual(
-                    plan["kernel"]["function"], "gemm_nt_f32_llama_production"
+                    plan["kernel"]["function"],
+                    "gemm_nt_f32_llama_production_parallel_dispatch",
                 )
                 semantics = plan["contract"]["semantics"]
                 self.assertEqual(

@@ -101,6 +101,12 @@ extern void gemm_nt_q5_0_q8_0_m4n2_tile(const void *A, const void *B,
                                          int M, int N, int K, int ldc);
 extern void gemm_nt_q8_0_q8_0(const void *A, const void *B, const float *bias,
                                 float *C, int M, int N, int K);
+extern void gemm_nt_f32_llama_production(const float *A, const float *B,
+                                          const float *bias, float *C,
+                                          int M, int N, int K);
+extern void gemm_nt_f32_llama_production_output_range(
+    const float *A, const float *B, const float *bias, float *C,
+    int M, int N, int K, int output_begin, int output_end);
 extern void gemm_nt_q8_0_q8_0_m2n4(const void *A, const void *B,
                                      const float *bias, float *C,
                                      int M, int N, int K);
@@ -2310,6 +2316,19 @@ static void work_gemm_nt_q5_k_prepared_nrange(
     }
 }
 
+static void work_gemm_nt_f32_llama_production(int ith, int nth, void *args)
+{
+    const gemm_args_t *a = (const gemm_args_t *)args;
+    const int total = a->M * a->N;
+    const int chunk = (total + nth - 1) / nth;
+    const int begin = chunk * ith;
+    const int end = ck_min_int(begin + chunk, total);
+    if (begin >= end) return;
+    gemm_nt_f32_llama_production_output_range(
+        (const float *)a->A, (const float *)a->B, a->bias, a->C,
+        a->M, a->N, a->K, begin, end);
+}
+
 /* ============================================================================
  * Parallel Dispatch Wrappers
  *
@@ -2358,6 +2377,27 @@ void gemm_nt_q5_0_q8_0_parallel_dispatch(
     }
 #endif
     ck_threadpool_dispatch_n(pool, active, work_gemm_nt_q5_0_q8_0, &args);
+}
+
+void gemm_nt_f32_llama_production_parallel_dispatch(
+    const float *A, const float *B, const float *bias, float *C,
+    int M, int N, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int total = M > 0 && N > 0 ? M * N : 0;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M <= 1 || total < 96) {
+        gemm_nt_f32_llama_production(A, B, bias, C, M, N, K);
+        return;
+    }
+
+    gemm_args_t args = {
+        .A = A, .B = B, .bias = bias, .C = C,
+        .M = M, .N = N, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > total) active = total;
+    ck_threadpool_dispatch_n(
+        pool, active, work_gemm_nt_f32_llama_production, &args);
 }
 
 void gemm_nt_q8_0_q8_0_parallel_dispatch(

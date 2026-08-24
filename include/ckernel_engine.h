@@ -103,6 +103,14 @@ void gemm_fine_grained_parallel(const float *A,
 	                                  float *C,
 	                                  int M, int N, int K);
 
+	void gemm_nt_f32_llama_production_output_range(const float *A,
+	                                               const float *B,
+	                                               const float *bias,
+	                                               float *C,
+	                                               int M, int N, int K,
+	                                               int output_begin,
+	                                               int output_end);
+
 	/* Training dispatch wrapper: same contract as gemm_blocked_serial.
 	 * Uses CK threadpool for row/column partitioning and falls back to serial. */
 	void gemm_blocked_serial_train_parallel_dispatch(const float *A,

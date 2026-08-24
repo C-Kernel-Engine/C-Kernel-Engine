@@ -902,6 +902,103 @@ static inline float ck_hsum256_llamafile(__m256 value)
 }
 #endif
 
+static inline void ck_gemm_nt_f32_llama_production_output(
+        const float *A, const float *B, const float *bias, float *C,
+        int M, int N, int K, int index)
+{
+    const int row = index / N;
+    const int col = index - row * N;
+    const float *a = A + (size_t)row * (size_t)K;
+    const float *b = B + (size_t)col * (size_t)K;
+    float sum = 0.0f;
+    int k = 0;
+
+#if defined(__AVX512F__)
+    if (M > 1) {
+        __m512 acc = _mm512_setzero_ps();
+        for (; k + 16 <= K; k += 16) {
+            acc = _mm512_fmadd_ps(
+                _mm512_loadu_ps(a + k), _mm512_loadu_ps(b + k), acc);
+        }
+        sum = _mm512_reduce_add_ps(acc);
+    } else {
+        __m512 acc[4] = {
+            _mm512_setzero_ps(), _mm512_setzero_ps(),
+            _mm512_setzero_ps(), _mm512_setzero_ps()
+        };
+        for (; k + 64 <= K; k += 64) {
+            for (int lane = 0; lane < 4; ++lane) {
+                acc[lane] = _mm512_fmadd_ps(
+                    _mm512_loadu_ps(a + k + lane * 16),
+                    _mm512_loadu_ps(b + k + lane * 16),
+                    acc[lane]);
+            }
+        }
+        acc[0] = _mm512_add_ps(acc[0], acc[2]);
+        acc[1] = _mm512_add_ps(acc[1], acc[3]);
+        acc[0] = _mm512_add_ps(acc[0], acc[1]);
+        sum = _mm512_reduce_add_ps(acc[0]);
+    }
+#elif defined(__AVX__)
+    if (M > 1) {
+        __m256 acc = _mm256_setzero_ps();
+        for (; k + 8 <= K; k += 8) {
+#if defined(__FMA__)
+            acc = _mm256_fmadd_ps(
+                _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k), acc);
+#else
+            acc = _mm256_add_ps(
+                acc, _mm256_mul_ps(
+                    _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k)));
+#endif
+        }
+        sum = ck_hsum256_llamafile(acc);
+    } else {
+        __m256 acc[4] = {
+            _mm256_setzero_ps(), _mm256_setzero_ps(),
+            _mm256_setzero_ps(), _mm256_setzero_ps()
+        };
+        for (; k + 32 <= K; k += 32) {
+            for (int lane = 0; lane < 4; ++lane) {
+#if defined(__FMA__)
+                acc[lane] = _mm256_fmadd_ps(
+                    _mm256_loadu_ps(a + k + lane * 8),
+                    _mm256_loadu_ps(b + k + lane * 8),
+                    acc[lane]);
+#else
+                acc[lane] = _mm256_add_ps(
+                    acc[lane], _mm256_mul_ps(
+                        _mm256_loadu_ps(a + k + lane * 8),
+                        _mm256_loadu_ps(b + k + lane * 8)));
+#endif
+            }
+        }
+        acc[0] = _mm256_add_ps(acc[0], acc[2]);
+        acc[1] = _mm256_add_ps(acc[1], acc[3]);
+        acc[0] = _mm256_add_ps(acc[0], acc[1]);
+        sum = hsum256_ps(acc[0]);
+    }
+#endif
+    for (; k < K; ++k) {
+        sum += a[k] * b[k];
+    }
+    C[(size_t)row * (size_t)N + (size_t)col] =
+        bias ? sum + bias[col] : sum;
+}
+
+void gemm_nt_f32_llama_production_output_range(
+        const float *A, const float *B, const float *bias, float *C,
+        int M, int N, int K, int output_begin, int output_end)
+{
+    if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0) return;
+    const int total = M * N;
+    if (output_begin < 0) output_begin = 0;
+    if (output_end > total) output_end = total;
+    for (int index = output_begin; index < output_end; ++index) {
+        ck_gemm_nt_f32_llama_production_output(A, B, bias, C, M, N, K, index);
+    }
+}
+
 void gemm_nt_f32_llama_production(const float *A,
                                   const float *B,
                                   const float *bias,
@@ -914,83 +1011,6 @@ void gemm_nt_f32_llama_production(const float *A,
 
 #pragma omp parallel for schedule(static) if ((size_t)M * (size_t)N >= 96)
     for (int index = 0; index < M * N; ++index) {
-        const int row = index / N;
-        const int col = index - row * N;
-        const float *a = A + (size_t)row * (size_t)K;
-        const float *b = B + (size_t)col * (size_t)K;
-        float sum = 0.0f;
-        int k = 0;
-
-#if defined(__AVX512F__)
-        if (M > 1) {
-            __m512 acc = _mm512_setzero_ps();
-            for (; k + 16 <= K; k += 16) {
-                acc = _mm512_fmadd_ps(
-                    _mm512_loadu_ps(a + k), _mm512_loadu_ps(b + k), acc);
-            }
-            sum = _mm512_reduce_add_ps(acc);
-        } else {
-            __m512 acc[4] = {
-                _mm512_setzero_ps(), _mm512_setzero_ps(),
-                _mm512_setzero_ps(), _mm512_setzero_ps()
-            };
-            for (; k + 64 <= K; k += 64) {
-                for (int lane = 0; lane < 4; ++lane) {
-                    acc[lane] = _mm512_fmadd_ps(
-                        _mm512_loadu_ps(a + k + lane * 16),
-                        _mm512_loadu_ps(b + k + lane * 16),
-                        acc[lane]);
-                }
-            }
-            acc[0] = _mm512_add_ps(acc[0], acc[2]);
-            acc[1] = _mm512_add_ps(acc[1], acc[3]);
-            acc[0] = _mm512_add_ps(acc[0], acc[1]);
-            sum = _mm512_reduce_add_ps(acc[0]);
-        }
-#elif defined(__AVX__)
-        if (M > 1) {
-            __m256 acc = _mm256_setzero_ps();
-            for (; k + 8 <= K; k += 8) {
-#if defined(__FMA__)
-                acc = _mm256_fmadd_ps(
-                    _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k), acc);
-#else
-                acc = _mm256_add_ps(
-                    acc, _mm256_mul_ps(
-                        _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k)));
-#endif
-            }
-            sum = ck_hsum256_llamafile(acc);
-        } else {
-            __m256 acc[4] = {
-                _mm256_setzero_ps(), _mm256_setzero_ps(),
-                _mm256_setzero_ps(), _mm256_setzero_ps()
-            };
-            for (; k + 32 <= K; k += 32) {
-                for (int lane = 0; lane < 4; ++lane) {
-#if defined(__FMA__)
-                    acc[lane] = _mm256_fmadd_ps(
-                        _mm256_loadu_ps(a + k + lane * 8),
-                        _mm256_loadu_ps(b + k + lane * 8),
-                        acc[lane]);
-#else
-                    acc[lane] = _mm256_add_ps(
-                        acc[lane], _mm256_mul_ps(
-                            _mm256_loadu_ps(a + k + lane * 8),
-                            _mm256_loadu_ps(b + k + lane * 8)));
-#endif
-                }
-            }
-            acc[0] = _mm256_add_ps(acc[0], acc[2]);
-            acc[1] = _mm256_add_ps(acc[1], acc[3]);
-            acc[0] = _mm256_add_ps(acc[0], acc[1]);
-            sum = hsum256_ps(acc[0]);
-        }
-#endif
-        for (; k < K; ++k) {
-            sum += a[k] * b[k];
-        }
-        C[(size_t)row * (size_t)N + (size_t)col] =
-            bias ? sum + bias[col] : sum;
+        ck_gemm_nt_f32_llama_production_output(A, B, bias, C, M, N, K, index);
     }
 }

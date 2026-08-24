@@ -32,9 +32,12 @@
     "notes": "Independent output dots permit deterministic parallel ownership. The provider uses native-width arithmetic selected at compile time."
   },
   "impl": {
-    "function": "gemm_nt_f32_llama_production",
-    "c_declaration": "void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
-    "sources": ["src/kernels/gemm_kernels.c"]
+    "function": "gemm_nt_f32_llama_production_parallel_dispatch",
+    "c_declaration": "void gemm_nt_f32_llama_production_parallel_dispatch(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": [
+      "src/kernels/gemm_kernels.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
+    ]
   },
   "implementation": {
     "isa_dispatch": "compile_time",
@@ -45,9 +48,9 @@
       "row_quantized": "gemm_nt_f32_llama_production"
     },
     "threading": {
-      "runtime": "openmp",
+      "runtime": "ck_threadpool",
       "work_partition": ["output_tiles"],
-      "dispatch": ["openmp_parallel_for"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
       "schedule": "static_partition",
       "barriers": ["provider_complete"],
       "reduction_order_effect": "none"
@@ -57,14 +60,14 @@
     "contract_id": "fp32_weight_fp32_input_llamafile_x86_native_fp32_output",
     "status": "validated",
     "phases": ["prefill", "decode"],
-    "function": "gemm_nt_f32_llama_production",
+    "function": "gemm_nt_f32_llama_production_parallel_dispatch",
     "explicit_selector": true,
     "implementation": {
       "isa_dispatch": "compile_time",
       "threading": {
-        "runtime": "openmp",
+        "runtime": "ck_threadpool",
         "work_partition": ["output_tiles"],
-        "dispatch": ["openmp_parallel_for"],
+        "dispatch": ["ck_threadpool_dispatch_n"],
         "reduction_order_effect": "none"
       }
     },
@@ -90,8 +93,8 @@
     ]
   },
   "production": {
-    "function": "gemm_nt_f32_llama_production",
-    "threaded_function": "gemm_nt_f32_llama_production",
+    "function": "gemm_nt_f32_llama_production_parallel_dispatch",
+    "threaded_function": "gemm_nt_f32_llama_production_parallel_dispatch",
     "reference_comparison": {
       "requirement": "bit_exact",
       "absolute_tolerance": 0.0,
@@ -122,6 +125,6 @@
       "criteria": "bit exact for M=1,4,65, N=48, K=5120 and M=65, N=256, K=2048 across 1,16,20,24,32 threads"
     }]
   },
-  "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths.",
+  "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths. Independent prefill outputs are assigned to CKE's persistent thread pool; decode and small shapes retain the serial leaf.",
   "name": "gemm_nt_f32_llama_production"
 }

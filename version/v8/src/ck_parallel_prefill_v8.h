@@ -162,6 +162,10 @@ void gemm_nt_q5_k_parallel_dispatch(
     const float *A, const void *B, const float *bias, float *C,
     int M, int N, int K);
 
+void gemm_nt_f32_llama_production_parallel_dispatch(
+    const float *A, const float *B, const float *bias, float *C,
+    int M, int N, int K);
+
 void gemm_nt_q5_k_parallel_dispatch_with_scratch(
     const float *A, const void *B, const float *bias, float *C,
     int M, int N, int K, void *scratch, size_t scratch_bytes);
