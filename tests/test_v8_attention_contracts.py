@@ -117,6 +117,31 @@ class AttentionContractV8Tests(unittest.TestCase):
         with self.assertRaisesRegex(resolver.ContractError, "kernel map names"):
             resolver.validate_kernel_overlay(kernels)
 
+    def test_topology_route_rejects_call_abi_drift(self) -> None:
+        kernel_id = (
+            "attention_forward_causal_head_major_gqa_prefill_append_"
+            "f16cache_flash_auto_qtile64"
+        )
+        kernels = copy.deepcopy(self.kernels)
+        kernel_map = resolver.load_json(
+            V8_ROOT / "kernel_maps" / f"{kernel_id}.json"
+        )
+        route_workers = next(
+            param
+            for param in kernel_map["call_abi"]["params"]
+            if param["name"] == "route_workers"
+        )
+        route_workers["source"] = "const:8"
+        with tempfile.TemporaryDirectory(prefix="cke-v8-attention-route-") as tmp:
+            map_path = Path(tmp) / f"{kernel_id}.json"
+            map_path.write_text(json.dumps(kernel_map), encoding="utf-8")
+            kernels["kernels"][kernel_id]["base_kernel_map"] = str(map_path)
+            with self.assertRaisesRegex(
+                resolver.ContractError,
+                "runtime route is not ABI-owned by its map",
+            ):
+                resolver.validate_kernel_overlay(kernels)
+
     def test_decode_bringup_resolves_requested_contract(self) -> None:
         result = self.resolve("decode")
         self.assertEqual(result["reduction"]["id"], "f16_online_fp32_merge")
@@ -219,7 +244,27 @@ class AttentionContractV8Tests(unittest.TestCase):
         ]["threading"]
         self.assertEqual(threading["runtime"], "ck_threadpool")
         self.assertEqual(
-            threading["work_partition"], ["independent_query_blocks"]
+            threading["work_partition"],
+            ["independent_query_blocks", "cooperative_kv_groups"],
+        )
+        routing = self.kernels["kernels"][result["kernel"]["id"]][
+            "implementation"
+        ]["work_partition_routing"]
+        self.assertEqual(routing["selection"], "runtime_shape_topology")
+        self.assertEqual(
+            routing["routes"][0]["predicate"],
+            {
+                "num_heads": 24,
+                "num_kv_heads": 4,
+                "head_dim": 256,
+                "query_tokens": 4096,
+                "min_kv_tokens": 8192,
+                "workers": 16,
+            },
+        )
+        self.assertEqual(
+            routing["routes"][0]["configuration"],
+            {"query_tile_size": 128, "concurrent_query_tiles": 4},
         )
         self.assertEqual(threading["dispatch"], ["ck_threadpool_dispatch_n"])
 

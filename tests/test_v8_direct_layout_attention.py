@@ -65,6 +65,29 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             qtile_schedule_signature
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule.restype = ctypes.c_int
+        reuse_signature = qtile_schedule_signature[:-1] + [
+            ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
+        ]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config.argtypes = (
+            reuse_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config.restype = ctypes.c_int
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes.argtypes = [
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int,
+        ]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes.restype = ctypes.c_size_t
+        auto_signature = qtile_schedule_signature[:-1] + [
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float), ctypes.c_size_t,
+            ctypes.c_void_p, ctypes.c_size_t,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace.argtypes = (
+            auto_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace.restype = ctypes.c_int
         cls._lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace.argtypes = (
             prefill_workspace_signature
             + [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
@@ -173,6 +196,90 @@ class DirectLayoutAttentionTests(unittest.TestCase):
                 dst = (token * heads + head) * dim
                 expected[dst:dst + dim] = head_output[src:src + dim]
         self.assertEqual(expected.tobytes(), token_output.tobytes())
+
+    def test_gqa_reuse_workspace_is_exact_and_fails_closed(self):
+        heads, kv_heads, query_tokens, past_tokens, dim = 4, 2, 128, 64, 16
+        capacity = query_tokens + past_tokens
+        q = array("f", (
+            math.sin(index * 0.007 + 0.1)
+            for index in range(heads * query_tokens * dim)
+        ))
+
+        def fp16_bits(value):
+            import struct
+            return int.from_bytes(struct.pack("<e", value), "little")
+
+        k = array("H", (
+            fp16_bits(math.cos(index * 0.011))
+            for index in range(kv_heads * capacity * dim)
+        ))
+        v = array("H", (
+            fp16_bits(math.sin(index * 0.013 + 0.2))
+            for index in range(kv_heads * capacity * dim)
+        ))
+        baseline = array("f", [0.0]) * (heads * query_tokens * dim)
+        reused = array("f", [7.0]) * (heads * query_tokens * dim)
+        fallback = array("f", [0.0]) * (heads * query_tokens * dim)
+        token_workspace = array("f", [0.0]) * (2 * heads * dim)
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        old_threads = os.environ.get("CK_NUM_THREADS")
+        os.environ["CK_NUM_THREADS"] = "4"
+        try:
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(baseline), heads, kv_heads, query_tokens,
+                past_tokens, capacity, dim, dim, 2,
+            )
+            self.assertEqual(status, 0)
+
+            required = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes(
+                heads, kv_heads, dim, 4, 64, 2,
+            )
+            self.assertGreater(required, 0)
+            raw_workspace = bytearray(required + 63)
+            raw_view = (ctypes.c_ubyte * len(raw_workspace)).from_buffer(raw_workspace)
+            workspace = ctypes.c_void_p((ctypes.addressof(raw_view) + 63) & ~63)
+
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(reused), heads, kv_heads, query_tokens,
+                past_tokens, capacity, dim, dim, 64, 2,
+                workspace, required - 1,
+            )
+            self.assertEqual(status, -3)
+            self.assertEqual(reused.tobytes(), (array("f", [7.0]) * len(reused)).tobytes())
+
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(reused), heads, kv_heads, query_tokens,
+                past_tokens, capacity, dim, dim, 64, 2,
+                workspace, required,
+            )
+            self.assertEqual(status, 0)
+            self.assertEqual(reused.tobytes(), baseline.tobytes())
+
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(fallback), heads, kv_heads, query_tokens,
+                past_tokens, capacity, dim, dim, 3,
+                float_pointer(token_workspace),
+                len(token_workspace) * ctypes.sizeof(ctypes.c_float),
+                workspace, required,
+                24, 4, 256, 4096, 8192, 16, 128, 4,
+            )
+            self.assertEqual(status, 0)
+            self.assertEqual(fallback.tobytes(), baseline.tobytes())
+        finally:
+            if old_threads is None:
+                os.environ.pop("CK_NUM_THREADS", None)
+            else:
+                os.environ["CK_NUM_THREADS"] = old_threads
 
     def test_segmented_prefill_matches_independent_segment_calls_bit_exactly(self):
         heads, kv_heads, tokens, dim = 4, 2, 75, 16

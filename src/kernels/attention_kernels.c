@@ -6367,6 +6367,110 @@ typedef struct {
     size_t output_head_stride;
 } ck_attention_f16_prefill_qtile64_args_t;
 
+typedef struct {
+    _Alignas(64) int arrived;
+    _Alignas(64) int phase;
+    int lanes;
+} ck_attention_gqa_team_barrier_t;
+
+typedef struct {
+    ck_attention_f16_prefill_qtile64_args_t base;
+    float *shared_k_tiles;
+    float *shared_v_tiles;
+    ck_attention_gqa_team_barrier_t *barriers;
+    unsigned char *worker_workspace;
+    size_t worker_workspace_stride;
+    int query_tile_size;
+    int concurrent_query_tiles;
+} ck_attention_f16_prefill_gqa_reuse_args_t;
+
+static inline size_t ck_attention_align64_size(size_t value)
+{
+    return (value + 63u) & ~(size_t) 63u;
+}
+
+static size_t ck_attention_f16_prefill_gqa_reuse_worker_bytes(
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int workers,
+    int query_tile_size,
+    int concurrent_query_tiles)
+{
+    if (num_heads <= 0 || num_kv_heads <= 0 ||
+        num_heads % num_kv_heads != 0 || workers < num_kv_heads ||
+        workers % num_kv_heads != 0 || head_dim <= 0 ||
+        query_tile_size <= 0 || concurrent_query_tiles <= 0) {
+        return 0;
+    }
+    const int lanes = workers / num_kv_heads;
+    const int group_jobs =
+        (num_heads / num_kv_heads) * concurrent_query_tiles;
+    const size_t local_capacity =
+        (size_t) (group_jobs + lanes - 1) / (size_t) lanes;
+    size_t bytes = 0;
+    bytes = ck_attention_align64_size(bytes) +
+        3u * local_capacity * sizeof(int);
+    bytes = ck_attention_align64_size(bytes) +
+        local_capacity * (size_t) query_tile_size * (size_t) head_dim *
+        sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        local_capacity * (size_t) query_tile_size * CK_GGML_FA_TILE_KV *
+        sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        local_capacity * (size_t) query_tile_size * (size_t) head_dim *
+        sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        local_capacity * (size_t) query_tile_size * sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        local_capacity * (size_t) query_tile_size * sizeof(float);
+    return ck_attention_align64_size(bytes);
+}
+
+size_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes(
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int workers,
+    int query_tile_size,
+    int concurrent_query_tiles)
+{
+    const size_t worker_bytes =
+        ck_attention_f16_prefill_gqa_reuse_worker_bytes(
+            num_heads, num_kv_heads, head_dim, workers,
+            query_tile_size, concurrent_query_tiles);
+    if (worker_bytes == 0) return 0;
+    size_t bytes = 63u;
+    bytes = ck_attention_align64_size(bytes) +
+        (size_t) num_kv_heads * (size_t) head_dim * CK_GGML_FA_TILE_KV *
+        sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        (size_t) num_kv_heads * CK_GGML_FA_TILE_KV * (size_t) head_dim *
+        sizeof(float);
+    bytes = ck_attention_align64_size(bytes) +
+        (size_t) num_kv_heads * sizeof(ck_attention_gqa_team_barrier_t);
+    bytes = ck_attention_align64_size(bytes) +
+        (size_t) workers * worker_bytes;
+    return bytes;
+}
+
+static inline void ck_attention_gqa_team_barrier_wait(
+    ck_attention_gqa_team_barrier_t *barrier)
+{
+    const int phase = __atomic_load_n(&barrier->phase, __ATOMIC_RELAXED);
+    if (__atomic_fetch_add(&barrier->arrived, 1, __ATOMIC_ACQ_REL) ==
+        barrier->lanes - 1) {
+        __atomic_store_n(&barrier->arrived, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&barrier->phase, phase + 1, __ATOMIC_RELEASE);
+        return;
+    }
+    while (__atomic_load_n(&barrier->phase, __ATOMIC_ACQUIRE) == phase) {
+#if defined(__i386__) || defined(__x86_64__)
+        _mm_pause();
+#endif
+    }
+}
+
 static inline float ck_attention_u16_cache_to_f32(uint16_t value, int cache_is_bf16)
 {
     return cache_is_bf16 ? bf16_to_float(value) : CK_FP16_TO_FP32(value);
@@ -6550,6 +6654,238 @@ static void ck_attention_f16_prefill_qtile64_work(int ith, int nth, void *opaque
     }
 }
 
+static void ck_attention_f16_prefill_gqa_reuse_work(int ith, int nth, void *opaque)
+{
+    const ck_attention_f16_prefill_gqa_reuse_args_t *args =
+        (const ck_attention_f16_prefill_gqa_reuse_args_t *) opaque;
+    const ck_attention_f16_prefill_qtile64_args_t *base = &args->base;
+    const int lanes = nth / base->num_kv_heads;
+    const int kv_group = ith / lanes;
+    const int lane = ith % lanes;
+    const int heads_per_group = base->num_heads / base->num_kv_heads;
+    const int head_begin = kv_group * heads_per_group;
+    const int query_tiles =
+        (base->q_tokens + args->query_tile_size - 1) / args->query_tile_size;
+    const int kv_tokens = base->past_tokens + base->q_tokens;
+    const float scale = ck_attention_strict_scale_f32(base->head_dim);
+    const size_t kv_head_stride =
+        (size_t) base->cache_capacity * (size_t) base->aligned_head_dim;
+    const uint16_t *k_head =
+        base->k_cache + (size_t) kv_group * kv_head_stride;
+    const uint16_t *v_head =
+        base->v_cache + (size_t) kv_group * kv_head_stride;
+    float *shared_k = args->shared_k_tiles +
+        (size_t) kv_group * (size_t) base->head_dim * CK_GGML_FA_TILE_KV;
+    float *shared_v = args->shared_v_tiles +
+        (size_t) kv_group * CK_GGML_FA_TILE_KV * (size_t) base->head_dim;
+    ck_attention_gqa_team_barrier_t *barrier = &args->barriers[kv_group];
+    const int max_group_jobs =
+        heads_per_group * args->concurrent_query_tiles;
+    const int local_capacity = (max_group_jobs + lanes - 1) / lanes;
+    unsigned char *worker = args->worker_workspace +
+        (size_t) ith * args->worker_workspace_stride;
+    size_t cursor = 0;
+    cursor = ck_attention_align64_size(cursor);
+    int *local_heads = (int *) (worker + cursor);
+    cursor += (size_t) local_capacity * sizeof(int);
+    int *local_iq = (int *) (worker + cursor);
+    cursor += (size_t) local_capacity * sizeof(int);
+    int *local_rows = (int *) (worker + cursor);
+    cursor += (size_t) local_capacity * sizeof(int);
+    cursor = ck_attention_align64_size(cursor);
+    float *q_tiles = (float *) (worker + cursor);
+    cursor += (size_t) local_capacity * (size_t) args->query_tile_size *
+        (size_t) base->head_dim * sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    float *kq_tiles = (float *) (worker + cursor);
+    cursor += (size_t) local_capacity * (size_t) args->query_tile_size *
+        CK_GGML_FA_TILE_KV * sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    float *vkq_tiles = (float *) (worker + cursor);
+    cursor += (size_t) local_capacity * (size_t) args->query_tile_size *
+        (size_t) base->head_dim * sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    float *sum_rows = (float *) (worker + cursor);
+    cursor += (size_t) local_capacity * (size_t) args->query_tile_size *
+        sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    float *max_rows = (float *) (worker + cursor);
+
+    for (int query_tile_begin = 0; query_tile_begin < query_tiles;
+         query_tile_begin += args->concurrent_query_tiles) {
+        int batch_tiles = query_tiles - query_tile_begin;
+        if (batch_tiles > args->concurrent_query_tiles) {
+            batch_tiles = args->concurrent_query_tiles;
+        }
+        const int group_jobs = heads_per_group * batch_tiles;
+        int local_jobs = 0;
+
+        for (int group_job = lane; group_job < group_jobs; group_job += lanes) {
+            const int local = local_jobs++;
+            const int group_head = group_job / batch_tiles;
+            const int batch_tile = group_job % batch_tiles;
+            const int h = head_begin + group_head;
+            const int iq =
+                (query_tile_begin + batch_tile) * args->query_tile_size;
+            int tile_rows = base->q_tokens - iq;
+            if (tile_rows > args->query_tile_size) {
+                tile_rows = args->query_tile_size;
+            }
+            local_heads[local] = h;
+            local_iq[local] = iq;
+            local_rows[local] = tile_rows;
+
+            float *q_tile = q_tiles +
+                (size_t) local * (size_t) args->query_tile_size *
+                (size_t) base->head_dim;
+            float *vkq = vkq_tiles +
+                (size_t) local * (size_t) args->query_tile_size *
+                (size_t) base->head_dim;
+            float *sum_row = sum_rows +
+                (size_t) local * (size_t) args->query_tile_size;
+            float *max_row = max_rows +
+                (size_t) local * (size_t) args->query_tile_size;
+            memset(q_tile, 0,
+                   (size_t) args->query_tile_size * (size_t) base->head_dim *
+                       sizeof(float));
+            memset(vkq, 0,
+                   (size_t) args->query_tile_size * (size_t) base->head_dim *
+                       sizeof(float));
+            for (int tq = 0; tq < args->query_tile_size; ++tq) {
+                sum_row[tq] = 0.0f;
+                max_row[tq] = -INFINITY;
+            }
+            for (int tq = 0; tq < tile_rows; ++tq) {
+                const float *q_vec = base->q +
+                    (size_t) h * base->q_head_stride +
+                    (size_t) (iq + tq) * (size_t) base->aligned_head_dim;
+                memcpy(q_tile + (size_t) tq * (size_t) base->head_dim,
+                       q_vec, (size_t) base->head_dim * sizeof(float));
+            }
+        }
+
+        int kv_limit = base->past_tokens +
+            (query_tile_begin + batch_tiles) * args->query_tile_size;
+        if (kv_limit > kv_tokens) kv_limit = kv_tokens;
+
+        for (int ik = 0; ik < kv_limit; ik += CK_GGML_FA_TILE_KV) {
+            int kv_tile = kv_limit - ik;
+            if (kv_tile > CK_GGML_FA_TILE_KV) kv_tile = CK_GGML_FA_TILE_KV;
+            const int packed_elems = CK_GGML_FA_TILE_KV * base->head_dim;
+            for (int flat = lane; flat < packed_elems; flat += lanes) {
+                const int tk = flat / base->head_dim;
+                const int d = flat % base->head_dim;
+                float k_value = 0.0f;
+                float v_value = 0.0f;
+                if (tk < kv_tile) {
+                    const uint16_t *k_vec = k_head +
+                        (size_t) (ik + tk) * (size_t) base->aligned_head_dim;
+                    const uint16_t *v_vec = v_head +
+                        (size_t) (ik + tk) * (size_t) base->aligned_head_dim;
+                    k_value = ck_attention_u16_cache_to_f32(
+                        k_vec[d], base->cache_is_bf16);
+                    v_value = ck_attention_u16_cache_to_f32(
+                        v_vec[d], base->cache_is_bf16);
+                }
+                shared_k[(size_t) d * CK_GGML_FA_TILE_KV + (size_t) tk] =
+                    k_value;
+                shared_v[(size_t) tk * (size_t) base->head_dim + (size_t) d] =
+                    v_value;
+            }
+            ck_attention_gqa_team_barrier_wait(barrier);
+
+            for (int local = 0; local < local_jobs; ++local) {
+                const int iq = local_iq[local];
+                const int tile_rows = local_rows[local];
+                float *q_tile = q_tiles +
+                    (size_t) local * (size_t) args->query_tile_size *
+                    (size_t) base->head_dim;
+                float *kq = kq_tiles +
+                    (size_t) local * (size_t) args->query_tile_size *
+                    CK_GGML_FA_TILE_KV;
+                float *vkq = vkq_tiles +
+                    (size_t) local * (size_t) args->query_tile_size *
+                    (size_t) base->head_dim;
+                float *sum_row = sum_rows +
+                    (size_t) local * (size_t) args->query_tile_size;
+                float *max_row = max_rows +
+                    (size_t) local * (size_t) args->query_tile_size;
+                memset(kq, 0,
+                       (size_t) args->query_tile_size * CK_GGML_FA_TILE_KV *
+                           sizeof(float));
+                ck_attention_matmul_f32_accum(
+                    kq, q_tile, shared_k, args->query_tile_size,
+                    base->head_dim, CK_GGML_FA_TILE_KV);
+                ck_vec_scale_f32_inplace(
+                    kq, args->query_tile_size * CK_GGML_FA_TILE_KV, scale);
+
+                for (int tq = 0; tq < args->query_tile_size; ++tq) {
+                    float *kq_row = kq + (size_t) tq * CK_GGML_FA_TILE_KV;
+                    const int last_valid_key = base->past_tokens + iq + tq;
+                    for (int tk = 0; tk < CK_GGML_FA_TILE_KV; ++tk) {
+                        const int key = ik + tk;
+                        if (tk >= kv_tile || tq >= tile_rows || key > last_valid_key) {
+                            kq_row[tk] = -INFINITY;
+                        }
+                    }
+                    const float tile_max =
+                        ck_vec_max_f32_contig(kq_row, CK_GGML_FA_TILE_KV);
+                    if (tile_max == -INFINITY) {
+                        memset(kq_row, 0,
+                               CK_GGML_FA_TILE_KV * sizeof(float));
+                        continue;
+                    }
+                    const float old_max = max_row[tq];
+                    const float new_max = old_max > tile_max ? old_max : tile_max;
+                    if (new_max > old_max) {
+                        const float ms =
+                            ck_attention_reference_expf(old_max - new_max);
+                        ck_vec_scale_f32_inplace(
+                            vkq + (size_t) tq * (size_t) base->head_dim,
+                            base->head_dim, ms);
+                        sum_row[tq] *= ms;
+                    }
+                    max_row[tq] = new_max;
+                    sum_row[tq] = (float) (
+                        (double) sum_row[tq] +
+                        ck_ggml_vec_soft_max_row(
+                            CK_GGML_FA_TILE_KV, kq_row, kq_row, new_max));
+                }
+                ck_attention_matmul_f32_accum(
+                    vkq, kq, shared_v, args->query_tile_size,
+                    CK_GGML_FA_TILE_KV, base->head_dim);
+            }
+            ck_attention_gqa_team_barrier_wait(barrier);
+        }
+
+        for (int local = 0; local < local_jobs; ++local) {
+            const int h = local_heads[local];
+            const int iq = local_iq[local];
+            const int tile_rows = local_rows[local];
+            float *vkq = vkq_tiles +
+                (size_t) local * (size_t) args->query_tile_size *
+                (size_t) base->head_dim;
+            float *sum_row = sum_rows +
+                (size_t) local * (size_t) args->query_tile_size;
+            for (int tq = 0; tq < tile_rows; ++tq) {
+                float *out_vec = base->output +
+                    (size_t) h * base->output_head_stride +
+                    (size_t) (iq + tq) * (size_t) base->aligned_head_dim;
+                const float inv_sum =
+                    sum_row[tq] == 0.0f ? 0.0f : 1.0f / sum_row[tq];
+                for (int d = 0; d < base->head_dim; ++d) {
+                    out_vec[d] = vkq[
+                        (size_t) tq * (size_t) base->head_dim + (size_t) d] *
+                        inv_sum;
+                }
+                for (int d = base->head_dim; d < base->aligned_head_dim; ++d) {
+                    out_vec[d] = 0.0f;
+                }
+            }
+        }
+    }
+}
+
 static ck_attention_status_t ck_attention_f16_prefill_qtile64_dispatch(
     const float *q,
     const uint16_t *k_cache,
@@ -6607,6 +6943,164 @@ static ck_attention_status_t ck_attention_f16_prefill_qtile64_dispatch(
         ck_attention_f16_prefill_qtile64_work(0, 1, &args);
     }
     return CK_ATTENTION_STATUS_OK;
+}
+
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    int query_tile_size,
+    int concurrent_query_tiles,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    if (!q || !k_cache || !v_cache || !output || !workspace || num_heads <= 0 ||
+        num_kv_heads <= 0 || num_heads % num_kv_heads != 0 ||
+        query_tile_size <= 0 || q_tokens < query_tile_size || past_tokens < 0 ||
+        past_tokens + q_tokens > cache_capacity || head_dim <= 0 ||
+        aligned_head_dim < head_dim || query_tile_size < 16 ||
+        query_tile_size > 128 || query_tile_size % 16 != 0 ||
+        concurrent_query_tiles <= 0 || concurrent_query_tiles > 4) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || active < num_kv_heads || active % num_kv_heads != 0 ||
+        ck_threadpool_thread_id(pool) > 0) {
+        return CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT;
+    }
+    const size_t required_workspace =
+        attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes(
+            num_heads, num_kv_heads, head_dim, active,
+            query_tile_size, concurrent_query_tiles);
+    if (required_workspace == 0 || workspace_bytes < required_workspace) {
+        return CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE;
+    }
+    const int lanes = active / num_kv_heads;
+    const size_t tile_elems =
+        (size_t) num_kv_heads * (size_t) head_dim * CK_GGML_FA_TILE_KV;
+    uintptr_t workspace_address = (uintptr_t) workspace;
+    workspace_address = (workspace_address + 63u) & ~(uintptr_t) 63u;
+    unsigned char *workspace_base = (unsigned char *) workspace_address;
+    size_t cursor = 0;
+    float *shared_k_tiles = (float *) (workspace_base + cursor);
+    cursor += tile_elems * sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    float *shared_v_tiles = (float *) (workspace_base + cursor);
+    cursor += tile_elems * sizeof(float);
+    cursor = ck_attention_align64_size(cursor);
+    ck_attention_gqa_team_barrier_t *barriers =
+        (ck_attention_gqa_team_barrier_t *) (workspace_base + cursor);
+    cursor += (size_t) num_kv_heads * sizeof(*barriers);
+    cursor = ck_attention_align64_size(cursor);
+    unsigned char *worker_workspace = workspace_base + cursor;
+    const size_t worker_workspace_stride =
+        ck_attention_f16_prefill_gqa_reuse_worker_bytes(
+            num_heads, num_kv_heads, head_dim, active,
+            query_tile_size, concurrent_query_tiles);
+    for (int group = 0; group < num_kv_heads; ++group) {
+        __atomic_store_n(&barriers[group].arrived, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&barriers[group].phase, 0, __ATOMIC_RELAXED);
+        barriers[group].lanes = lanes;
+    }
+
+    ck_attention_f16_prefill_gqa_reuse_args_t args = {
+        .base = {
+            .q = q,
+            .k_cache = k_cache,
+            .v_cache = v_cache,
+            .output = output,
+            .num_heads = num_heads,
+            .num_kv_heads = num_kv_heads,
+            .q_tokens = q_tokens,
+            .past_tokens = past_tokens,
+            .cache_capacity = cache_capacity,
+            .head_dim = head_dim,
+            .aligned_head_dim = aligned_head_dim,
+            .cache_is_bf16 = 0,
+            .schedule = CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES,
+            .q_head_stride =
+                (size_t) q_tokens * (size_t) aligned_head_dim,
+            .output_head_stride =
+                (size_t) q_tokens * (size_t) aligned_head_dim,
+        },
+        .shared_k_tiles = shared_k_tiles,
+        .shared_v_tiles = shared_v_tiles,
+        .barriers = barriers,
+        .worker_workspace = worker_workspace,
+        .worker_workspace_stride = worker_workspace_stride,
+        .query_tile_size = query_tile_size,
+        .concurrent_query_tiles = concurrent_query_tiles,
+    };
+    ck_threadpool_dispatch_n(
+        pool, active, ck_attention_f16_prefill_gqa_reuse_work, &args);
+    return CK_ATTENTION_STATUS_OK;
+}
+
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    ck_attention_reduction_t reduction,
+    float *token_workspace,
+    size_t token_workspace_bytes,
+    void *gqa_workspace,
+    size_t gqa_workspace_bytes,
+    int route_num_heads,
+    int route_num_kv_heads,
+    int route_head_dim,
+    int route_query_tokens,
+    int route_min_kv_tokens,
+    int route_workers,
+    int route_query_tile_size,
+    int route_concurrent_query_tiles)
+{
+    if (route_num_heads <= 0 || route_num_kv_heads <= 0 ||
+        route_num_heads % route_num_kv_heads != 0 || route_head_dim <= 0 ||
+        route_query_tokens <= 0 || route_min_kv_tokens < route_query_tokens ||
+        route_workers < route_num_kv_heads ||
+        route_workers % route_num_kv_heads != 0 ||
+        route_query_tile_size < 16 || route_query_tile_size > 128 ||
+        route_query_tile_size % 16 != 0 ||
+        route_concurrent_query_tiles <= 0 ||
+        route_concurrent_query_tiles > 4) {
+        return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+    }
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    const int kv_tokens = past_tokens + q_tokens;
+    if (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64 &&
+        num_heads == route_num_heads && num_kv_heads == route_num_kv_heads &&
+        head_dim == route_head_dim && aligned_head_dim == route_head_dim &&
+        q_tokens == route_query_tokens && kv_tokens >= route_min_kv_tokens &&
+        active == route_workers) {
+        return attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(
+            q, k_cache, v_cache, output, num_heads, num_kv_heads,
+            q_tokens, past_tokens, cache_capacity, head_dim, aligned_head_dim,
+            route_query_tile_size, route_concurrent_query_tiles,
+            gqa_workspace, gqa_workspace_bytes);
+    }
+    return attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(
+        q, k_cache, v_cache, output, num_heads, num_kv_heads,
+        q_tokens, past_tokens, cache_capacity, head_dim, aligned_head_dim,
+        reduction, token_workspace, token_workspace_bytes);
 }
 
 ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule(

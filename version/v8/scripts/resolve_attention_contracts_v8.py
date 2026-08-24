@@ -565,6 +565,79 @@ def validate_kernel_overlay(doc: Dict[str, Any]) -> None:
                     "the final query-tile route has a finite max_tokens",
                     "end the final validated route with max_tokens=null.",
                 )
+        routing = kernel.get("implementation", {}).get("work_partition_routing")
+        if routing is not None and routing.get("selection") == "runtime_shape_topology":
+            base_routing = (base_map.get("implementation") or {}).get(
+                "work_partition_routing"
+            )
+            if routing != base_routing:
+                raise hard_contract_fault(
+                    f"kernel {kernel_id!r} runtime route drifts from its kernel map",
+                    "The registry overlay and generator-owned map must be identical.",
+                    "regenerate the registry from the kernel maps.",
+                )
+            if routing["dispatch_function"] != base_function:
+                raise hard_contract_fault(
+                    f"kernel {kernel_id!r} runtime route names the wrong ABI",
+                    f"routing={routing['dispatch_function']!r}, impl={base_function!r}",
+                    "route through the exact function emitted by codegen.",
+                )
+            bounded_routes = [
+                route
+                for route in routing["routes"]
+                if route["predicate"].get("fallback") is not True
+            ]
+            if len(bounded_routes) != 1:
+                raise hard_contract_fault(
+                    f"kernel {kernel_id!r} has an ambiguous topology ABI",
+                    f"bounded_routes={len(bounded_routes)}",
+                    "use one bounded route per explicit map-owned ABI.",
+                )
+            route = bounded_routes[0]
+            predicate_fields = (
+                "num_heads", "num_kv_heads", "head_dim", "query_tokens",
+                "min_kv_tokens", "workers",
+            )
+            configuration_fields = (
+                "query_tile_size", "concurrent_query_tiles",
+            )
+            missing = [
+                name for name in predicate_fields if name not in route["predicate"]
+            ] + [
+                name
+                for name in configuration_fields
+                if name not in route.get("configuration", {})
+            ]
+            if missing:
+                raise hard_contract_fault(
+                    f"kernel {kernel_id!r} has an incomplete topology route",
+                    f"missing={missing}",
+                    "declare the complete shape, worker, and tile configuration.",
+                )
+            expected_sources = {
+                "route_num_heads": route["predicate"]["num_heads"],
+                "route_num_kv_heads": route["predicate"]["num_kv_heads"],
+                "route_head_dim": route["predicate"]["head_dim"],
+                "route_query_tokens": route["predicate"]["query_tokens"],
+                "route_min_kv_tokens": route["predicate"]["min_kv_tokens"],
+                "route_workers": route["predicate"]["workers"],
+                "route_query_tile_size": route["configuration"]["query_tile_size"],
+                "route_concurrent_query_tiles": route["configuration"][
+                    "concurrent_query_tiles"
+                ],
+            }
+            call_sources = {
+                param["name"]: param["source"]
+                for param in (base_map.get("call_abi") or {}).get("params", [])
+            }
+            for name, value in expected_sources.items():
+                expected = f"const:{value}"
+                if call_sources.get(name) != expected:
+                    raise hard_contract_fault(
+                        f"kernel {kernel_id!r} runtime route is not ABI-owned by its map",
+                        f"{name}: expected {expected!r}, got {call_sources.get(name)!r}",
+                        "emit every topology predicate and tile choice as an exact map constant.",
+                    )
         provides = kernel["provides"]
         if not isinstance(provides, dict) or not provides:
             raise ContractError(f"Kernel capability {kernel_id}.provides must be a non-empty object")

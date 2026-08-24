@@ -70,6 +70,53 @@
             }
           }
         },
+        "work_partition_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selection", "numerical_effect", "dispatch_function", "routes"],
+          "properties": {
+            "selection": {"const": "runtime_shape_topology"},
+            "numerical_effect": {"const": "none"},
+            "dispatch_function": {"type": "string", "minLength": 1},
+            "policy": {"type": "string", "minLength": 1},
+            "routes": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "work_partition", "predicate"],
+                "properties": {
+                  "id": {"type": "string", "minLength": 1},
+                  "work_partition": {"enum": ["independent_query_blocks", "cooperative_kv_groups"]},
+                  "predicate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "num_heads": {"type": "integer", "minimum": 1},
+                      "num_kv_heads": {"type": "integer", "minimum": 1},
+                      "head_dim": {"type": "integer", "minimum": 1},
+                      "query_tokens": {"type": "integer", "minimum": 1},
+                      "min_kv_tokens": {"type": "integer", "minimum": 1},
+                      "workers": {"type": "integer", "minimum": 1},
+                      "fallback": {"const": true}
+                    },
+                    "minProperties": 1
+                  },
+                  "configuration": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["query_tile_size", "concurrent_query_tiles"],
+                    "properties": {
+                      "query_tile_size": {"type": "integer", "minimum": 16},
+                      "concurrent_query_tiles": {"type": "integer", "minimum": 1}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "segmented_query_provider": {
           "type": "object",
           "additionalProperties": false,
@@ -87,7 +134,7 @@
           "required": ["runtime", "work_partition", "dispatch", "reduction_order_effect"],
           "properties": {
             "runtime": {"enum": ["serial", "ck_threadpool", "external_blas"]},
-            "work_partition": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["serial", "independent_heads", "independent_query_blocks", "kv_chunks_by_workers"]}},
+            "work_partition": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["serial", "independent_heads", "independent_query_blocks", "cooperative_kv_groups", "kv_chunks_by_workers"]}},
             "dispatch": {
               "type": "array",
               "minItems": 1,
@@ -99,6 +146,12 @@
                   "internal_threaded"
                 ]
               }
+            },
+            "barriers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
             },
             "reduction_order_effect": {"enum": ["none", "contract_defined", "implementation_defined"]}
           }

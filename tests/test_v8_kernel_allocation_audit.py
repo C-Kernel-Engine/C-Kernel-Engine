@@ -215,9 +215,13 @@ class TestKernelAllocationAudit(unittest.TestCase):
             "attention_forward_causal_head_major_gqa_prefill_append_f16cache_single_range.json",
             "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json",
         ]
-        function = (
+        contract_function = (
             "attention_forward_causal_head_major_gqa_prefill_append_"
             "f16cache_contract_workspace"
+        )
+        auto_function = (
+            "attention_forward_causal_head_major_gqa_prefill_append_"
+            "f16cache_auto_workspace"
         )
         allocating = {
             row["function"] for row in AUDIT.build_report()["mapped_allocating_providers"]
@@ -229,17 +233,21 @@ class TestKernelAllocationAudit(unittest.TestCase):
                         encoding="utf-8"
                     )
                 )
-                self.assertEqual(kernel_map["impl"]["function"], function)
+                function = kernel_map["impl"]["function"]
+                expected_function = (
+                    auto_function if "qtile64" in filename else contract_function
+                )
+                self.assertEqual(function, expected_function)
                 self.assertEqual(
-                    kernel_map["scratch"],
-                    [{
+                    kernel_map["scratch"][0],
+                    {
                         "name": "token_workspace",
                         "dtype": "fp32",
                         "shape": [2, "H", "D"],
                         "size_resolution": "required",
                         "lifetime": "kernel_call",
                         "desc": kernel_map["scratch"][0]["desc"],
-                    }],
+                    },
                 )
                 sources = {
                     param["name"]: param["source"]
@@ -250,6 +258,33 @@ class TestKernelAllocationAudit(unittest.TestCase):
                     sources["token_workspace_bytes"],
                     "scratch_size:token_workspace",
                 )
+                if function == auto_function:
+                    self.assertEqual(kernel_map["scratch"][1]["name"], "gqa_workspace")
+                    self.assertEqual(kernel_map["scratch"][1]["size_bytes"], 33554432)
+                    self.assertEqual(sources["gqa_workspace"], "scratch:gqa_workspace")
+                    self.assertEqual(
+                        sources["gqa_workspace_bytes"],
+                        "scratch_size:gqa_workspace",
+                    )
+                    self.assertEqual(
+                        {name: sources[name] for name in (
+                            "route_num_heads", "route_num_kv_heads",
+                            "route_head_dim", "route_query_tokens",
+                            "route_min_kv_tokens", "route_workers",
+                            "route_query_tile_size",
+                            "route_concurrent_query_tiles",
+                        )},
+                        {
+                            "route_num_heads": "const:24",
+                            "route_num_kv_heads": "const:4",
+                            "route_head_dim": "const:256",
+                            "route_query_tokens": "const:4096",
+                            "route_min_kv_tokens": "const:8192",
+                            "route_workers": "const:16",
+                            "route_query_tile_size": "const:128",
+                            "route_concurrent_query_tiles": "const:4",
+                        },
+                    )
                 self.assertNotIn(function, allocating)
 
     def test_segmented_f16_attention_workspace_resolves_exact_bytes(self):

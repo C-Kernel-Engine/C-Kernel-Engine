@@ -2878,10 +2878,10 @@
       "supported_reductions": {
         "f16_flash_auto_qtile64": {
           "status": "validated",
-          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
+          "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
-          "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic with independent query-block scheduling."
+          "notes": "Q<64 uses FP16 online single-range arithmetic. Q>=64 uses 64x64 tiled FP32 arithmetic. The measured 24Q/4KV/D256, Q=4096, 16-worker long-context region reuses each converted K/V tile across four concurrent query tiles without changing key reduction order."
         }
       },
       "implementation": {
@@ -2892,13 +2892,49 @@
           "boundary_semantics": "restart_query_tile_policy_at_each_segment",
           "fallback": "reject_invalid_plan"
         },
+        "work_partition_routing": {
+          "selection": "runtime_shape_topology",
+          "numerical_effect": "none",
+          "dispatch_function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+          "policy": "Reuse each converted K/V tile across four concurrent query tiles only in the measured long-prefill topology.",
+          "routes": [
+            {
+              "id": "gqa_shared_kv_q128_c4",
+              "work_partition": "cooperative_kv_groups",
+              "predicate": {
+                "num_heads": 24,
+                "num_kv_heads": 4,
+                "head_dim": 256,
+                "query_tokens": 4096,
+                "min_kv_tokens": 8192,
+                "workers": 16
+              },
+              "configuration": {
+                "query_tile_size": 128,
+                "concurrent_query_tiles": 4
+              }
+            },
+            {
+              "id": "independent_query_tiles",
+              "work_partition": "independent_query_blocks",
+              "predicate": {
+                "fallback": true
+              }
+            }
+          ]
+        },
         "threading": {
           "runtime": "ck_threadpool",
           "work_partition": [
-            "independent_query_blocks"
+            "independent_query_blocks",
+            "cooperative_kv_groups"
           ],
           "dispatch": [
             "ck_threadpool_dispatch_n"
+          ],
+          "barriers": [
+            "kv_tile_ready",
+            "kv_tile_consumed"
           ],
           "reduction_order_effect": "contract_defined"
         }
@@ -2978,6 +3014,15 @@
           "size_resolution": "required",
           "lifetime": "kernel_call",
           "desc": "Planner-owned query/output token workspace used by short-segment fallback."
+        },
+        {
+          "name": "gqa_workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "size_bytes": 33554432,
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "desc": "Planner-owned 32 MiB cooperative GQA workspace for shared K/V tiles, four team barriers, and sixteen worker-local Q/KQ/PV accumulators. Runtime guards keep other shapes on the independent-query provider."
         }
       ],
       "dims": [
@@ -2994,8 +3039,8 @@
         }
       ],
       "impl": {
-        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
-        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes);",
+        "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+        "c_declaration": "ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(const float *q, const uint16_t *k_cache, const uint16_t *v_cache, float *output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float *token_workspace, size_t token_workspace_bytes, void *gqa_workspace, size_t gqa_workspace_bytes, int route_num_heads, int route_num_kv_heads, int route_head_dim, int route_query_tokens, int route_min_kv_tokens, int route_workers, int route_query_tile_size, int route_concurrent_query_tiles);",
         "sources": [
           "src/kernels/attention_kernels.c"
         ]
@@ -3075,6 +3120,47 @@
           {
             "name": "token_workspace_bytes",
             "source": "scratch_size:token_workspace"
+          },
+          {
+            "name": "gqa_workspace",
+            "source": "scratch:gqa_workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "gqa_workspace_bytes",
+            "source": "scratch_size:gqa_workspace"
+          },
+          {
+            "name": "route_num_heads",
+            "source": "const:24"
+          },
+          {
+            "name": "route_num_kv_heads",
+            "source": "const:4"
+          },
+          {
+            "name": "route_head_dim",
+            "source": "const:256"
+          },
+          {
+            "name": "route_query_tokens",
+            "source": "const:4096"
+          },
+          {
+            "name": "route_min_kv_tokens",
+            "source": "const:8192"
+          },
+          {
+            "name": "route_workers",
+            "source": "const:16"
+          },
+          {
+            "name": "route_query_tile_size",
+            "source": "const:128"
+          },
+          {
+            "name": "route_concurrent_query_tiles",
+            "source": "const:4"
           }
         ]
       },

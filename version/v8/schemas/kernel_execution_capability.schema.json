@@ -60,7 +60,7 @@
           "additionalProperties": false,
           "required": ["selection", "numerical_effect", "dispatch_function"],
           "properties": {
-            "selection": {"enum": ["shape_threshold", "generated_runtime_dispatch"]},
+            "selection": {"enum": ["shape_threshold", "generated_runtime_dispatch", "runtime_shape_topology"]},
             "numerical_effect": {"const": "none"},
             "dispatch_function": {"type": "string", "minLength": 1},
             "policy": {"type": "string", "minLength": 1},
@@ -73,7 +73,7 @@
                 "required": ["id", "work_partition", "predicate"],
                 "properties": {
                   "id": {"type": "string", "minLength": 1},
-                  "work_partition": {"enum": ["independent_rows", "independent_columns", "output_tiles"]},
+                  "work_partition": {"enum": ["independent_rows", "independent_columns", "independent_query_blocks", "cooperative_kv_groups", "output_tiles"]},
                   "predicate": {
                     "type": "object",
                     "additionalProperties": false,
@@ -84,9 +84,24 @@
                       "max_n": {"type": "integer", "minimum": 1},
                       "min_k": {"type": "integer", "minimum": 1},
                       "max_k": {"type": "integer", "minimum": 1},
+                      "num_heads": {"type": "integer", "minimum": 1},
+                      "num_kv_heads": {"type": "integer", "minimum": 1},
+                      "head_dim": {"type": "integer", "minimum": 1},
+                      "query_tokens": {"type": "integer", "minimum": 1},
+                      "min_kv_tokens": {"type": "integer", "minimum": 1},
+                      "workers": {"type": "integer", "minimum": 1},
                       "fallback": {"const": true}
                     },
                     "minProperties": 1
+                  },
+                  "configuration": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["query_tile_size", "concurrent_query_tiles"],
+                    "properties": {
+                      "query_tile_size": {"type": "integer", "minimum": 16},
+                      "concurrent_query_tiles": {"type": "integer", "minimum": 1}
+                    }
                   }
                 }
               }
@@ -216,6 +231,7 @@
                 "independent_experts",
                 "independent_heads",
                 "independent_query_blocks",
+                "cooperative_kv_groups",
                 "kv_chunks_by_workers",
                 "output_tiles",
                 "split_k"

@@ -1833,12 +1833,14 @@ typedef enum {
     CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS = 1,
     CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES = 2,
     CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES = 3,
+    CK_ATTN_PREFILL_SCHEDULE_GQA_SHARED_KV_TILES = 4,
 } ck_attention_prefill_schedule_t;
 
 typedef enum {
     CK_ATTENTION_STATUS_OK = 0,
     CK_ATTENTION_STATUS_INVALID_ARGUMENT = -1,
     CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT = -2,
+    CK_ATTENTION_STATUS_INSUFFICIENT_WORKSPACE = -3,
 } ck_attention_status_t;
 
 // v8.5 explicit numerical-contract entry point. Unlike the legacy wrapper,
@@ -1901,6 +1903,31 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     ck_attention_reduction_t reduction,
     float *token_workspace,
     size_t token_workspace_bytes);
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    ck_attention_reduction_t reduction,
+    float *token_workspace,
+    size_t token_workspace_bytes,
+    void *gqa_workspace,
+    size_t gqa_workspace_bytes,
+    int route_num_heads,
+    int route_num_kv_heads,
+    int route_head_dim,
+    int route_query_tokens,
+    int route_min_kv_tokens,
+    int route_workers,
+    int route_query_tile_size,
+    int route_concurrent_query_tiles);
 
 // Isolated scheduling research entry point for the qtile64 numerical contract.
 // Production circuits continue to use the contract entry point above.
@@ -1917,6 +1944,33 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     int head_dim,
     int aligned_head_dim,
     ck_attention_prefill_schedule_t schedule);
+
+// Configurable GQA data-reuse entry point. A fixed 64-key block preserves the
+// qtile64 numerical contract while the kernel map controls query-row tiling and
+// concurrent query tiles without changing any output row's key reduction order.
+size_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_workspace_bytes(
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int workers,
+    int query_tile_size,
+    int concurrent_query_tiles);
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    int query_tile_size,
+    int concurrent_query_tiles,
+    void *workspace,
+    size_t workspace_bytes);
 
 ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace(
     const float *q, const uint16_t *k_cache, const uint16_t *v_cache,
