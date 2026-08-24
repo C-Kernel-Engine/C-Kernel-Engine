@@ -1,6 +1,12 @@
 var ckernel__engine_8h =
 [
     [ "CKMathBackend", "structCKMathBackend.html", "structCKMathBackend" ],
+    [ "ck_attention_prefill_schedule_t", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36", [
+      [ "CK_ATTN_PREFILL_SCHEDULE_KV_HEADS", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a1ea78a01558752ab59bdf4355fd4fe33", null ],
+      [ "CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a2c30b4152a1d3817a2e5a75bdf9f40e1", null ],
+      [ "CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36a14c0b15894aa11e4c64d8f05e6510fef", null ],
+      [ "CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES", "ckernel__engine_8h.html#a01c1b88e0a25e9f1a05b22122c11ff36ae18681cb01afb607335d062840e36851", null ]
+    ] ],
     [ "ck_attention_reduction_t", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010e", [
       [ "CK_ATTN_REDUCTION_FP32_ONLINE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010eadbc9e39a1c54b34cb182196445e795b8", null ],
       [ "CK_ATTN_REDUCTION_F16_ONLINE_FP32_MERGE", "ckernel__engine_8h.html#ac4e937f6afb8a4807301eda5aa8b010ea85e68fd51ad8a3b0ddaff562ab9080f7", null ],
@@ -48,6 +54,7 @@ var ckernel__engine_8h =
     [ "attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace", "ckernel__engine_8h.html#a49061a12eedcf16aa601f8dc8d777992", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract", "ckernel__engine_8h.html#a669b5ad8474b002ce52839ec5694a237", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace", "ckernel__engine_8h.html#ad1a72792cdc40d8fc00a3221a86e82cb", null ],
+    [ "attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule", "ckernel__engine_8h.html#a07878d5ab2649929b52802d5dc6cb353", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_full_bf16cache_pytorch_contract", "ckernel__engine_8h.html#a6fadecb99c59f6d83845510bd60f862a", null ],
     [ "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace", "ckernel__engine_8h.html#add5e8b95245fbfa279c6828d4a91bb7c", null ],
     [ "attention_forward_causal_head_major_shared_kv_gemma4", "ckernel__engine_8h.html#a658a1295a31fdb0f9e6bf87dd8a941cf", null ],

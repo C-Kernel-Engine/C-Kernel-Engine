@@ -4573,7 +4573,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (152)</summary>
+    <summary>Attention (155)</summary>
     <div class="accordion-content">
 
 
@@ -4868,6 +4868,16 @@ test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(const float * q, const uint16_t * k_cache, const uint16_t * v_cache, float * output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float * token_workspace, size_t token_workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule(const float * q, const uint16_t * k_cache, const uint16_t * v_cache, float * output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_prefill_schedule_t schedule)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -5277,6 +5287,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_f16_prefill_qtile64_dispatch</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_attention_status_t ck_attention_f16_prefill_qtile64_dispatch(const float * q, const uint16_t * k_cache, const uint16_t * v_cache, float * output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int cache_is_bf16, size_t q_head_stride, size_t output_head_stride, ck_attention_prefill_schedule_t schedule)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_f16_prefill_qtile64_work</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -5322,6 +5342,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_attention_flash_query_auto(const float * q_vec, const float * k_head, const float * v_head, int kv_tokens, int head_dim, int aligned_head_dim, float scale, float * out_vec)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">ck_attention_status_t ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace(const float * q, const uint16_t * k_cache, const uint16_t * v_cache, float * output, int num_heads, int num_kv_heads, int q_tokens, int past_tokens, int cache_capacity, int head_dim, int aligned_head_dim, ck_attention_reduction_t reduction, float * token_workspace, size_t token_workspace_bytes, const int * segment_lengths, int num_segments, ck_attention_prefill_schedule_t schedule)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
 
@@ -20758,7 +20788,7 @@ rmsnorm_backward(d_norm_out, input, gamma, rstd_cache, d_input, d_gamma, tokens,
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-24</p>
             </div>
         </div>
     </footer>

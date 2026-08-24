@@ -1,5 +1,14 @@
 var NAVTREEINDEX12 =
 {
+"gemm__microkernel_8c.html#a1eaf653ddeb5638bd73838e59f35f065":[2,0,1,1,45,0],
+"gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5":[2,0,1,1,45,5],
+"gemm__microkernel_8c.html#a2b8e598e4d209aa77c0e6a6c681bb1be":[2,0,1,1,45,16],
+"gemm__microkernel_8c.html#a2ecba71250e316cfb6a7415be7346f1c":[2,0,1,1,45,10],
+"gemm__microkernel_8c.html#a3885c3bae663fe1ffb421179b9edce82":[2,0,1,1,45,9],
+"gemm__microkernel_8c.html#a594a440cd88e67b89068125123f52c9e":[2,0,1,1,45,11],
+"gemm__microkernel_8c.html#a5e9ddc655a21cd03b71493f6e819f85c":[2,0,1,1,45,18],
+"gemm__microkernel_8c.html#a6d69e1aaf7b6e0de9b1a7900c0e22a5a":[2,0,1,1,45,4],
+"gemm__microkernel_8c.html#a71d9e511e7e302cd831e83581219e70d":[2,0,1,1,45,2],
 "gemm__microkernel_8c.html#a73764abcca0b8bbf6bf355d9f1bab0b9":[2,0,1,1,45,1],
 "gemm__microkernel_8c.html#a757a5b148b758bc38cbc87a99d33de9f":[2,0,1,1,45,8],
 "gemm__microkernel_8c.html#a901f57b4416f1abe2f441bfdfe444e74":[2,0,1,1,45,17],
@@ -67,8 +76,8 @@ var NAVTREEINDEX12 =
 "ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6":[2,0,1,1,49,3],
 "ggml__runtime__compat_8h.html#af96c7de149a9dab3bc48b7d9b70c4ad8":[2,0,1,1,49,10],
 "ggml__runtime__compat_8h_source.html":[2,0,1,1,49],
-"globals.html":[2,1,0],
 "globals.html":[2,1,0,0],
+"globals.html":[2,1,0],
 "globals_a.html":[2,1,0,1],
 "globals_b.html":[2,1,0,2],
 "globals_c.html":[2,1,0,3],
@@ -240,14 +249,5 @@ var NAVTREEINDEX12 =
 "layernorm__kernels_8c.html#a46261ef8f841555efe9a18a242bca28c":[2,0,1,1,52,8],
 "layernorm__kernels_8c.html#a5911e69518ae480120fd122d94764a0a":[2,0,1,1,52,6],
 "layernorm__kernels_8c.html#a70f6e1d9794261350ce1a16212a4e0bb":[2,0,1,1,52,9],
-"layernorm__kernels_8c.html#a72f2038f01b5790f7235b5371d1f4d72":[2,0,1,1,52,5],
-"layernorm__kernels_8c.html#a8d349f047d6654b3a351fb62e0b20e87":[2,0,1,1,52,0],
-"layernorm__kernels_8c.html#aabe13737d121479113ffd94b43e58087":[2,0,1,1,52,4],
-"layernorm__kernels_8c.html#ace47573bf5278260d2652f4fb069bb9e":[2,0,1,1,52,2],
-"layernorm__kernels_8c.html#afd2e784d7b2b3ac7eb93e6f87c091fae":[2,0,1,1,52,3],
-"layernorm__kernels_8c_source.html":[2,0,1,1,52],
-"layernorm__kernels__bf16_8c.html":[2,0,1,1,53],
-"layernorm__kernels__bf16_8c.html#aa7733a43d00131cdc95692c34076b02e":[2,0,1,1,53,0],
-"layernorm__kernels__bf16_8c.html#ad8b1ba75e043f61ad20c8be7064a0de0":[2,0,1,1,53,2],
-"layernorm__kernels__bf16_8c.html#af62acc8f81d07c3913e0036ce21e6b76":[2,0,1,1,53,1]
+"layernorm__kernels_8c.html#a72f2038f01b5790f7235b5371d1f4d72":[2,0,1,1,52,5]
 };

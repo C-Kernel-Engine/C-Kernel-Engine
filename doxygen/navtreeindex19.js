@@ -1,5 +1,14 @@
 var NAVTREEINDEX19 =
 {
+"structQWEN2__0__5B__DECODELayerOffsets.html#aec3c1fdb6f46df1440b88a7182693a1d":[1,0,82,10],
+"structQWEN2__0__5B__DECODELayerOffsets.html#af75fc7708796bc7dde15c0129cab826f":[1,0,82,16],
+"structQWEN2__0__5B__DECODELayerOffsets.html#af82d2dc27972b986ee4caf6f54dd16d9":[1,0,82,1],
+"structQWEN2__0__5B__DECODEModel.html":[1,0,83],
+"structQWEN2__0__5B__DECODEModel.html#a07e198cd09baeda89471f687bf5ac3b7":[1,0,83,0],
+"structQWEN2__0__5B__DECODEModel.html#a60fe84f331aa220d10a5335f16d02fe5":[1,0,83,1],
+"structRecommendation.html":[1,0,84],
+"structRecommendation.html#a2dea715a398d739605559094647c11eb":[1,0,84,3],
+"structRecommendation.html#aa8cbf25679d19f8407ac276b25c1b1bf":[1,0,84,1],
 "structRecommendation.html#ab10fd7bc5c1c6eee44e39a537f53cc51":[1,0,84,4],
 "structRecommendation.html#ac691a32118bd2279bf9536d183329119":[1,0,84,2],
 "structRecommendation.html#ad4009263d6f5d6e3feeab261f071beaf":[1,0,84,0],
@@ -240,14 +249,5 @@ var NAVTREEINDEX19 =
 "tokenizer_8h.html#a7b861b5a4ce2546abb39e12cedd14cb2":[2,0,0,1,3,6],
 "tokenizer_8h.html#a7cc51ec584feb41327c453e546740e7c":[2,0,0,1,3,28],
 "tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6":[2,0,0,1,3,44],
-"tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741":[2,0,0,1,3,40],
-"tokenizer_8h.html#a8a61458f294240972a499c24a5a47488":[2,0,0,1,3,8],
-"tokenizer_8h.html#a8a61458f294240972a499c24a5a47488a94f29df13784ecd1dbb820f1e9671497":[2,0,0,1,3,8,0],
-"tokenizer_8h.html#a8a61458f294240972a499c24a5a47488a996472bd3b2654c56c58777a3a8d2ad5":[2,0,0,1,3,8,1],
-"tokenizer_8h.html#a9b857f7ce4dd3bca5a537e67f77a2b44":[2,0,0,1,3,45],
-"tokenizer_8h.html#aad7d008ac73952c45a288cbb69806835":[2,0,0,1,3,18],
-"tokenizer_8h.html#ab046b8725b078826c08dd8bf474e1bd9":[2,0,0,1,3,4],
-"tokenizer_8h.html#ab3c4ccc15a8a6a14e785265d58ca3a91":[2,0,0,1,3,19],
-"tokenizer_8h.html#abba2eff6b3bd59ba528a2828b636dc15":[2,0,0,1,3,46],
-"tokenizer_8h.html#ac113f9561eb6088f8142823cc33f2816":[2,0,0,1,3,15]
+"tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741":[2,0,0,1,3,40]
 };

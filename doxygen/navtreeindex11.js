@@ -1,5 +1,14 @@
 var NAVTREEINDEX11 =
 {
+"gemm__kernels__q4k__q8k__vnni_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5":[2,0,1,1,32,67],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a59a992525f5d17df769f5c0e52e1402f":[2,0,1,1,32,74],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a5c4e0dcbc1e9733deb44031b4e08c503":[2,0,1,1,32,30],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a6116389f2ccff10f9bc640673d000391":[2,0,1,1,32,18],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a62f93d10701cc1e6b42e568f224b7473":[2,0,1,1,32,0],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a64251c6521b989ba693a28da1c174857":[2,0,1,1,32,47],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4":[2,0,1,1,32,77],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a6ad55ef4d1dbde3f507e20d83ed6c8de":[2,0,1,1,32,14],
+"gemm__kernels__q4k__q8k__vnni_8c.html#a6cf7992511d1c498f6742af5c6e09387":[2,0,1,1,32,28],
 "gemm__kernels__q4k__q8k__vnni_8c.html#a6e367d96cfdab0db97772adb1738b1ba":[2,0,1,1,32,57],
 "gemm__kernels__q4k__q8k__vnni_8c.html#a70d282b9f3aa110ba4d779246e3ad9a4":[2,0,1,1,32,72],
 "gemm__kernels__q4k__q8k__vnni_8c.html#a7181c43aa87e8a27378773586c8f9fd5":[2,0,1,1,32,53],
@@ -240,14 +249,5 @@ var NAVTREEINDEX11 =
 "gemm__kernels__q8__0__q8__0__contract_8c.html#afe79cceed7908ec8029cd6db5ea1238d":[2,0,1,1,44,28],
 "gemm__kernels__q8__0__q8__0__contract_8c_source.html":[2,0,1,1,44],
 "gemm__microkernel_8c.html":[2,0,1,1,45],
-"gemm__microkernel_8c.html#a18bfcedb9d45538774be02d4b68f0b67":[2,0,1,1,45,14],
-"gemm__microkernel_8c.html#a1eaf653ddeb5638bd73838e59f35f065":[2,0,1,1,45,0],
-"gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5":[2,0,1,1,45,5],
-"gemm__microkernel_8c.html#a2b8e598e4d209aa77c0e6a6c681bb1be":[2,0,1,1,45,16],
-"gemm__microkernel_8c.html#a2ecba71250e316cfb6a7415be7346f1c":[2,0,1,1,45,10],
-"gemm__microkernel_8c.html#a3885c3bae663fe1ffb421179b9edce82":[2,0,1,1,45,9],
-"gemm__microkernel_8c.html#a594a440cd88e67b89068125123f52c9e":[2,0,1,1,45,11],
-"gemm__microkernel_8c.html#a5e9ddc655a21cd03b71493f6e819f85c":[2,0,1,1,45,18],
-"gemm__microkernel_8c.html#a6d69e1aaf7b6e0de9b1a7900c0e22a5a":[2,0,1,1,45,4],
-"gemm__microkernel_8c.html#a71d9e511e7e302cd831e83581219e70d":[2,0,1,1,45,2]
+"gemm__microkernel_8c.html#a18bfcedb9d45538774be02d4b68f0b67":[2,0,1,1,45,14]
 };
