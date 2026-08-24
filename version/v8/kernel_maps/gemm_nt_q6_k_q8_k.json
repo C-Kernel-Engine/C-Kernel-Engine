@@ -49,6 +49,7 @@
             {"min_m": 4, "max_m": 63, "n": 10240, "k": 5120, "tile_m": 16, "tile_n": 64, "flags": ["output_tiles", "compact_m4"]},
             {"min_m": 4, "max_m": 63, "min_n": 4096, "min_k": 8192, "tile_m": 8, "tile_n": 128, "flags": ["output_tiles", "compact_m4"]},
             {"min_m": 2, "max_m": 3, "min_n": 4096, "min_k": 8192, "tile_m": 8, "tile_n": 128, "flags": ["output_tiles"]},
+            {"min_m": 64, "min_n": 1024, "min_k": 5120, "tile_m": 16, "tile_n": 256, "flags": ["output_tiles", "compact_m4"]},
             {"min_m": 2, "min_n": 2048, "min_k": 8192, "tile_m": 16, "tile_n": 256, "flags": ["output_tiles"]},
             {"min_m": 1, "tile_m": 16, "tile_n": 256}
           ],
@@ -142,9 +143,10 @@
     "arguments": {"B": "B", "N": "N", "K": "K"},
     "prepared_format": "q6_k_expanded_integer_metadata_v1",
     "prepared_bytes": "N * (K / 256) * 274",
-    "max_total_bytes": 1073741824,
+    "max_total_bytes": 8589934592,
+    "min_remaining_memory_bytes": 17179869184,
     "fallback": "gemm_nt_q6_k_q8_k_parallel_dispatch",
-    "notes": "Expand Q6_K integer codes once at model load while retaining FP16 super-block scales and the established Q8_K/FP32 reduction tree. Resolved AVX2 prefill weights are prepared deterministically until the 1 GiB aggregate budget is exhausted; remaining weights retain the established compact fallback."
+    "notes": "Expand Q6_K integer codes once at model load while retaining FP16 super-block scales and the established Q8_K/FP32 reduction tree. Resolved prefill weights may use up to 8 GiB while preserving at least 16 GiB of detected host/cgroup memory; remaining weights retain the exact compact M4 fallback."
   },
   "numerical_capabilities": [
     {

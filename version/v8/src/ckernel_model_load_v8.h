@@ -92,6 +92,10 @@ void ck_unload_manifest_map(ck_manifest_map_t *manifest);
  */
 ck_weight_info_t *ck_get_weight_info(ck_manifest_map_t *manifest, const char *name);
 
+/* Bound optional prepared-weight memory by current host/cgroup headroom. */
+size_t ck_model_preparation_budget(size_t map_max_bytes,
+                                   size_t min_remaining_memory_bytes);
+
 /*
  * ck_load_weights() - Load all weights from BUMP file using manifest
  *

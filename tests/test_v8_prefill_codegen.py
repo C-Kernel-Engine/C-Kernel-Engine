@@ -763,6 +763,7 @@ class TestV8PrefillCodegen(unittest.TestCase):
             "arguments": {"B": "B", "N": "N", "K": "K"},
             "prepared_bytes": "N * (K / 32) * 34",
             "max_total_bytes": 1024,
+            "min_remaining_memory_bytes": 256,
         }
         args = [
             {"name": "A", "expr": "input_q8"},
@@ -779,13 +780,26 @@ class TestV8PrefillCodegen(unittest.TestCase):
         emitted = codegen_prefill_v8.emit_prefill_weight_prepare_function([op, op])
 
         self.assertEqual(emitted.count("ck_q5_0_prepare_q8_0_weight("), 1)
-        self.assertIn("mapped_prepared_item_0_0 <= (size_t)1024", emitted)
         self.assertIn(
-            "mapped_prepared_bytes_0 <= (size_t)1024 - mapped_prepared_item_0_0",
+            "ck_model_preparation_budget((size_t)1024, (size_t)256)", emitted
+        )
+        self.assertIn("mapped_prepared_item_0_0 <= mapped_prepared_budget_0", emitted)
+        self.assertIn(
+            "mapped_prepared_bytes_0 <= mapped_prepared_budget_0 - mapped_prepared_item_0_0",
             emitted,
         )
         self.assertIn("mapped_prepared_skipped_0 += 1", emitted)
-        self.assertIn("prepared %zu bytes within budget 1024; skipped %d weight(s)", emitted)
+        self.assertIn("const int mapped_prepared_result_0_0", emitted)
+        self.assertIn("if (mapped_prepared_result_0_0 > 0)", emitted)
+        self.assertIn(
+            "if (mapped_prepared_bytes_0 > 0 || mapped_prepared_skipped_0 > 0)",
+            emitted,
+        )
+        self.assertIn(
+            "prepared %zu bytes within runtime budget %zu (map max 1024, reserve 256); "
+            "skipped %d weight(s)",
+            emitted,
+        )
         self.assertIn("model->weight_q5, 64, 128", emitted)
 
     def test_map_owned_weight_preparation_skips_only_items_beyond_budget(self) -> None:
@@ -811,9 +825,9 @@ class TestV8PrefillCodegen(unittest.TestCase):
             [op("model->small", 8, 8), op("model->large", 64, 64)]
         )
 
-        self.assertIn("prepared += prepare_weight(model->small, 8, 8)", emitted)
-        self.assertIn("prepared += prepare_weight(model->large, 64, 64)", emitted)
-        self.assertEqual(emitted.count("mapped_prepared_skipped_0 += 1"), 2)
+        self.assertIn("prepare_weight(model->small, 8, 8)", emitted)
+        self.assertIn("prepare_weight(model->large, 64, 64)", emitted)
+        self.assertEqual(emitted.count("mapped_prepared_skipped_0 += 1"), 4)
         self.assertNotIn("if (mapped_prepared_bytes_0 <=", emitted)
 
 

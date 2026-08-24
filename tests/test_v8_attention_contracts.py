@@ -621,6 +621,21 @@ class AttentionContractV8Tests(unittest.TestCase):
         self.assertIn("schedule->tile_n", source)
         self.assertIn("gemm_nt_q6_k_q8_k_m4_tile", source)
 
+    def test_q6_long_prefill_uses_measured_m4_provider(self) -> None:
+        kernel = resolver.load_json(V8_ROOT / "kernel_maps" / "gemm_nt_q6_k_q8_k.json")
+        routes = kernel["implementation"]["runtime_dispatch"]["policies"]["prefill_schedule"]["routes"]
+        long_route = next(route for route in routes if route.get("min_m") == 64)
+        self.assertEqual(long_route["min_n"], 1024)
+        self.assertEqual(long_route["min_k"], 5120)
+        self.assertIn("compact_m4", long_route["flags"])
+
+        generated = (V8_ROOT / "src" / "ck_kernel_dispatch_policy_v8.inc").read_text(encoding="utf-8")
+        self.assertIn(
+            "{64, 2147483647, 1024, 2147483647, 5120, 2147483647, 16, 256, 0, "
+            "CK_GEMM_ROUTE_OUTPUT_TILES | CK_GEMM_ROUTE_COMPACT_M4}",
+            generated,
+        )
+
     def test_q6_benchmark_defaults_to_gcc_provenance(self) -> None:
         bench_path = REPO_ROOT / "benchmarks" / "bench_q6k_prefill_tile.py"
         spec = importlib.util.spec_from_file_location("bench_q6k_prefill_tile", bench_path)

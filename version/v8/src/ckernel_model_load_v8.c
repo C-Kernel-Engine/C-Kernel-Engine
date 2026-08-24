@@ -43,9 +43,11 @@
 #include "ckernel_model_load_v8.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /*
  * CONSTANTS
@@ -55,6 +57,88 @@
  */
 #define MANIFEST_LINE_MAX 4096
 #define COPY_CHUNK (1 << 20)
+
+static uint64_t ck_read_memory_counter(const char *path, int *valid)
+{
+    FILE *file;
+    char value[64];
+    char *end = NULL;
+    unsigned long long parsed;
+
+    if (valid) *valid = 0;
+    file = fopen(path, "r");
+    if (!file) return 0;
+    if (!fgets(value, sizeof(value), file)) {
+        fclose(file);
+        return 0;
+    }
+    fclose(file);
+    if (strncmp(value, "max", 3) == 0) {
+        if (valid) *valid = 1;
+        return UINT64_MAX;
+    }
+    errno = 0;
+    parsed = strtoull(value, &end, 10);
+    if (errno != 0 || end == value) return 0;
+    if (valid) *valid = 1;
+    return (uint64_t)parsed;
+}
+
+static uint64_t ck_host_available_memory(void)
+{
+    FILE *file = fopen("/proc/meminfo", "r");
+    char line[256];
+    uint64_t available = 0;
+
+    if (file) {
+        while (fgets(line, sizeof(line), file)) {
+            unsigned long long kib = 0;
+            if (sscanf(line, "MemAvailable: %llu kB", &kib) == 1) {
+                available = (uint64_t)kib * UINT64_C(1024);
+                break;
+            }
+        }
+        fclose(file);
+    }
+    if (available == 0) {
+        long pages = sysconf(_SC_AVPHYS_PAGES);
+        long page_size = sysconf(_SC_PAGESIZE);
+        if (pages > 0 && page_size > 0 &&
+            (uint64_t)pages <= UINT64_MAX / (uint64_t)page_size) {
+            available = (uint64_t)pages * (uint64_t)page_size;
+        }
+    }
+    return available;
+}
+
+size_t ck_model_preparation_budget(size_t map_max_bytes,
+                                   size_t min_remaining_memory_bytes)
+{
+    uint64_t available = ck_host_available_memory();
+    int limit_valid = 0;
+    int current_valid = 0;
+    uint64_t limit = ck_read_memory_counter("/sys/fs/cgroup/memory.max", &limit_valid);
+    uint64_t current = ck_read_memory_counter("/sys/fs/cgroup/memory.current", &current_valid);
+
+    if (!(limit_valid && current_valid)) {
+        limit = ck_read_memory_counter(
+            "/sys/fs/cgroup/memory/memory.limit_in_bytes", &limit_valid);
+        current = ck_read_memory_counter(
+            "/sys/fs/cgroup/memory/memory.usage_in_bytes", &current_valid);
+    }
+    if (limit_valid && current_valid && limit != UINT64_MAX) {
+        uint64_t cgroup_available = limit > current ? limit - current : 0;
+        if (available == 0 || cgroup_available < available) available = cgroup_available;
+    }
+    if (available == 0 || available <= (uint64_t)min_remaining_memory_bytes) return 0;
+
+    available -= (uint64_t)min_remaining_memory_bytes;
+    if (available > (uint64_t)SIZE_MAX) available = (uint64_t)SIZE_MAX;
+    if (map_max_bytes == 0 || available < (uint64_t)map_max_bytes) {
+        return (size_t)available;
+    }
+    return map_max_bytes;
+}
 
 /*
  * Helper: Check if string 's' starts with 'prefix'

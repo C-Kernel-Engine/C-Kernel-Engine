@@ -13696,6 +13696,7 @@ def _validate_kernel_weight_preparation(kernel_id: str, preparation: Any) -> Dic
     arguments = preparation.get("arguments")
     bytes_expr = str(preparation.get("prepared_bytes", "") or "").strip()
     max_bytes = preparation.get("max_total_bytes")
+    min_remaining_bytes = preparation.get("min_remaining_memory_bytes", 0)
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", function):
         raise RuntimeError(
             f"HARD WEIGHT PREPARATION FAULT: {kernel_id} has invalid function {function!r}."
@@ -13728,6 +13729,15 @@ def _validate_kernel_weight_preparation(kernel_id: str, preparation: Any) -> Dic
     if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
         raise RuntimeError(
             f"HARD WEIGHT PREPARATION FAULT: {kernel_id} has invalid max_total_bytes."
+        )
+    if (
+        not isinstance(min_remaining_bytes, int)
+        or isinstance(min_remaining_bytes, bool)
+        or min_remaining_bytes < 0
+    ):
+        raise RuntimeError(
+            f"HARD WEIGHT PREPARATION FAULT: {kernel_id} has invalid "
+            "min_remaining_memory_bytes."
         )
     return copy.deepcopy(preparation)
 

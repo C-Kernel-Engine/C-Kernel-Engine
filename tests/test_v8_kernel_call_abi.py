@@ -160,7 +160,8 @@ class V8KernelCallABITests(unittest.TestCase):
         q6_k = preparations["gemm_nt_q6_k_q8_k"]
         self.assertEqual(q6_k["function"], "ck_q6_k_prepare_expanded_weight")
         self.assertEqual(q6_k["prepared_format"], "q6_k_expanded_integer_metadata_v1")
-        self.assertEqual(q6_k["max_total_bytes"], 1073741824)
+        self.assertEqual(q6_k["max_total_bytes"], 8589934592)
+        self.assertEqual(q6_k["min_remaining_memory_bytes"], 17179869184)
         self.assertEqual(registry["gemm_nt_q6_k_q8_k"]["weight_preparation"], q6_k)
         moe = preparations["moe_swiglu_expert_forward_q4k_q5k_bucketed"]
         self.assertEqual(
@@ -265,6 +266,27 @@ class V8KernelCallABITests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(RuntimeError, "unknown symbols"):
+                build_ir_v8.load_kernel_weight_preparations(root)
+
+    def test_weight_preparation_rejects_invalid_memory_reserve(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cke_weight_preparation_") as td:
+            root = Path(td)
+            (root / "invalid.json").write_text(
+                json.dumps(
+                    {
+                        "id": "invalid_prepare",
+                        "weight_preparation": {
+                            "function": "prepare_weight",
+                            "arguments": {"B": "B", "N": "N", "K": "K"},
+                            "prepared_bytes": "N * K",
+                            "max_total_bytes": 1024,
+                            "min_remaining_memory_bytes": -1,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "min_remaining_memory_bytes"):
                 build_ir_v8.load_kernel_weight_preparations(root)
 
     def test_duplicate_map_and_legacy_ownership_is_a_hard_failure(self) -> None:
