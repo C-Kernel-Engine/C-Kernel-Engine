@@ -3103,6 +3103,42 @@ CK_EXPORT void ck_model_profile_dump(void) {
         debug_kv_pointer = "g_model->kv_cache"
         debug_kv_ctype = "float"
         debug_kv_dtype = 0
+    layer_k_offsets = config.get("layer_k_cache_offset")
+    layer_v_offsets = config.get("layer_v_cache_offset")
+    compact_kv_debug = (
+        isinstance(layer_k_offsets, list)
+        and isinstance(layer_v_offsets, list)
+        and len(layer_k_offsets) == int(config.get("num_layers", 0) or 0)
+        and len(layer_v_offsets) == int(config.get("num_layers", 0) or 0)
+    )
+    if compact_kv_debug:
+        debug_kv_offset_decls = (
+            "static const int64_t g_layer_k_cache_offset[NUM_LAYERS] = {"
+            + ", ".join(str(int(value)) for value in layer_k_offsets)
+            + "};\n"
+            "static const int64_t g_layer_v_cache_offset[NUM_LAYERS] = {"
+            + ", ".join(str(int(value)) for value in layer_v_offsets)
+            + "};"
+        )
+        debug_kv_layer_guard = (
+            "    if (g_layer_k_cache_offset[layer] < 0 || "
+            "g_layer_v_cache_offset[layer] < 0) return -8;\n"
+        )
+        debug_kv_k_base = (
+            "(size_t)g_layer_k_cache_offset[layer] * (size_t)MAX_SEQ_LEN"
+        )
+        debug_kv_v_base = (
+            "(size_t)g_layer_v_cache_offset[layer] * (size_t)MAX_SEQ_LEN"
+        )
+    else:
+        debug_kv_offset_decls = ""
+        debug_kv_layer_guard = ""
+        debug_kv_k_base = (
+            "(size_t)(layer * 2) * (size_t)NUM_KV_HEADS * head_stride"
+        )
+        debug_kv_v_base = (
+            "(size_t)(layer * 2 + 1) * (size_t)NUM_KV_HEADS * head_stride"
+        )
     encoder_memory_api = ""
     uses_persistent_cross_kv_cache = bool(
         config.get("_template_uses_persistent_cross_kv_cache", False)
@@ -3206,6 +3242,7 @@ typedef struct {{
 static CKModel *g_model = NULL;
 static ck_manifest_map_t *g_manifest = NULL;
 static int g_ck_skip_decode_logits = 0;
+{debug_kv_offset_decls}
 
 /* Weight pointer macros */
 #define W_PTR(off) ((void*)(g_model->bump_weights + (off)))
@@ -3500,6 +3537,7 @@ CK_EXPORT int ck_model_kv_cache_enable(int capacity) {{
 CK_EXPORT int ck_model_debug_export_kv(const char *path, int layer) {{
     if (!g_model || !path || !path[0] || !{debug_kv_pointer}) return -1;
     if (layer < 0 || layer >= NUM_LAYERS || g_model->pos < 0 || g_model->pos > MAX_SEQ_LEN) return -2;
+{debug_kv_layer_guard}
     FILE *f = fopen(path, "wb");
     if (!f) return -3;
     const uint32_t header[8] = {{
@@ -3509,10 +3547,8 @@ CK_EXPORT int ck_model_debug_export_kv(const char *path, int layer) {{
     if (fwrite(header, sizeof(header), 1, f) != 1) {{ fclose(f); return -4; }}
     const size_t head_stride = (size_t)MAX_SEQ_LEN * (size_t)HEAD_DIM;
     const size_t valid_bytes = (size_t)g_model->pos * (size_t)HEAD_DIM * sizeof({debug_kv_ctype});
-    const {debug_kv_ctype} *layer_k = {debug_kv_pointer} +
-        (size_t)(layer * 2) * (size_t)NUM_KV_HEADS * head_stride;
-    const {debug_kv_ctype} *layer_v = {debug_kv_pointer} +
-        (size_t)(layer * 2 + 1) * (size_t)NUM_KV_HEADS * head_stride;
+    const {debug_kv_ctype} *layer_k = {debug_kv_pointer} + {debug_kv_k_base};
+    const {debug_kv_ctype} *layer_v = {debug_kv_pointer} + {debug_kv_v_base};
     for (int h = 0; h < NUM_KV_HEADS; ++h) {{
         if (fwrite(layer_k + (size_t)h * head_stride, valid_bytes, 1, f) != 1) {{ fclose(f); return -5; }}
     }}

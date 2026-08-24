@@ -1224,6 +1224,7 @@ def step_build_ir(
     *,
     force: bool = False,
     context_len: int | None = None,
+    prefill_chunk_len: int | None = None,
     logits_layout: str | None = None,
     prefill_policy: str = "auto",
 ) -> dict[str, Path]:
@@ -1252,6 +1253,7 @@ def step_build_ir(
         "schema": "ck-v8-ir-bundle-v1",
         "manifest": _file_identity(manifest_path),
         "context_len": int(context_len) if context_len is not None else None,
+        "prefill_chunk_len": int(prefill_chunk_len) if prefill_chunk_len is not None else None,
         "logits_layout": logits_layout,
         "prefill_policy": str(prefill_policy),
         "planner_sources": _tree_identity(
@@ -1300,6 +1302,8 @@ def step_build_ir(
             cmd.extend(["--init-output", str(outputs["init_ir"])])
         if context_len is not None:
             cmd.extend(["--context-len", str(int(context_len))])
+        if prefill_chunk_len is not None:
+            cmd.extend(["--prefill-chunk-len", str(int(prefill_chunk_len))])
         if logits_layout:
             cmd.extend(["--logits-layout", logits_layout])
         cmd.extend(["--prefill-policy-override", str(prefill_policy)])
@@ -1919,6 +1923,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
         work_dir,
         force=args.force_compile,
         context_len=args.context_len,
+        prefill_chunk_len=getattr(args, "prefill_chunk_len", None),
         logits_layout=args.logits_layout,
         prefill_policy=getattr(args, "prefill_policy", "auto"),
     )
@@ -2261,6 +2266,12 @@ Examples:
     run_parser.add_argument("model", help="GGUF source: hf://repo/file.gguf, local GGUF, or local runtime dir")
     run_parser.add_argument("--run", dest="run_dir", default=None, help="Optional explicit run directory")
     run_parser.add_argument("--context-len", type=int, default=None, help="Context length override")
+    run_parser.add_argument(
+        "--prefill-chunk-len",
+        type=int,
+        default=None,
+        help="Maximum transient token rows per prefill call (default: circuit policy or context length)",
+    )
     run_parser.add_argument("--logits-layout", choices=["auto", "last", "full"], default="auto")
     run_parser.add_argument(
         "--prefill-policy",

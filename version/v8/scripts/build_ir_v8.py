@@ -3248,6 +3248,173 @@ def _template_activation_buffer_specs(
     return result
 
 
+def _resolve_prefill_extent(config: Dict[str, Any], context_capacity: int) -> int:
+    """Return the maximum number of token rows resident for one prefill call."""
+    raw = config.get("prefill_chunk_length", context_capacity)
+    try:
+        extent = int(raw or context_capacity)
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            f"HARD MEMORY PLAN FAULT: prefill_chunk_length must be an integer, got {raw!r}"
+        )
+    if extent <= 0:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: prefill_chunk_length must be positive"
+        )
+    return min(extent, int(context_capacity))
+
+
+def _resolve_kv_cache_dtype(config: Dict[str, Any]) -> str:
+    """Resolve the persistent KV storage contract shared by prefill and decode."""
+    dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+    if dtype in {"bf16", "bfloat16"}:
+        return "bf16"
+    if dtype in {"fp16", "f16"}:
+        return "fp16"
+    if dtype == "fp32":
+        return "fp32"
+    raise RuntimeError(
+        f"HARD MEMORY PLAN FAULT: unsupported persistent KV dtype {dtype!r}"
+    )
+
+
+def _materialize_compact_kv_layout(config: Dict[str, Any]) -> None:
+    """Derive per-layer KV offsets from the circuit-owned cache policy.
+
+    Offsets are measured in elements per token. Layers with ``none`` policy own
+    no cache, while ``reuse`` aliases the explicitly declared source layer.
+    Existing explicit layouts are retained after validation.
+    """
+    policies = config.get("layer_kv_policy")
+    if not isinstance(policies, list) or not policies:
+        return
+
+    normalized_policies = {
+        str(policy or "none").strip().lower() for policy in policies
+    }
+    if normalized_policies == {"compressed_mla_kv"}:
+        # MLA owns a distinct compressed-cache plan and ABI; it must not be
+        # expanded into the standard per-head K/V layout handled here.
+        return
+
+    num_layers = int(config.get("num_layers", len(policies)) or len(policies))
+    if len(policies) != num_layers:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: layer_kv_policy length does not match num_layers "
+            f"({len(policies)} != {num_layers})"
+        )
+    num_kv_heads = int(config.get("num_kv_heads", 0) or 0)
+    default_dim = int(config.get("kv_cache_head_dim", config.get("head_dim", 0)) or 0)
+    if num_kv_heads <= 0 or default_dim <= 0:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: compact KV planning requires positive "
+            "num_kv_heads and kv_cache_head_dim/head_dim"
+        )
+
+    layer_k_dims = config.get("layer_k_head_dim")
+    layer_v_dims = config.get("layer_v_head_dim")
+    if not isinstance(layer_k_dims, list):
+        layer_k_dims = [default_dim] * num_layers
+    if not isinstance(layer_v_dims, list):
+        layer_v_dims = [default_dim] * num_layers
+    if len(layer_k_dims) != num_layers or len(layer_v_dims) != num_layers:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: per-layer KV dimensions must match num_layers"
+        )
+
+    explicit_k = config.get("layer_k_cache_offset")
+    explicit_v = config.get("layer_v_cache_offset")
+    explicit_stride = int(config.get("kv_cache_token_stride_total", 0) or 0)
+    if isinstance(explicit_k, list) or isinstance(explicit_v, list) or explicit_stride:
+        if (
+            not isinstance(explicit_k, list)
+            or not isinstance(explicit_v, list)
+            or len(explicit_k) != num_layers
+            or len(explicit_v) != num_layers
+            or explicit_stride <= 0
+        ):
+            raise RuntimeError(
+                "HARD MEMORY PLAN FAULT: explicit compact KV layout requires complete "
+                "per-layer K/V offsets and a positive token stride"
+            )
+        for layer, (raw_k, raw_v) in enumerate(zip(explicit_k, explicit_v)):
+            k_offset = int(raw_k)
+            v_offset = int(raw_v)
+            if (k_offset < 0) != (v_offset < 0):
+                raise RuntimeError(
+                    "HARD MEMORY PLAN FAULT: K/V cache ownership must be paired; "
+                    f"layer={layer} k_offset={k_offset} v_offset={v_offset}"
+                )
+            if k_offset < 0:
+                continue
+            k_dim = int(layer_k_dims[layer] or default_dim)
+            v_dim = int(layer_v_dims[layer] or default_dim)
+            if (
+                k_offset + num_kv_heads * k_dim > explicit_stride
+                or v_offset + num_kv_heads * v_dim > explicit_stride
+            ):
+                raise RuntimeError(
+                    "HARD MEMORY PLAN FAULT: compact KV interval exceeds token stride; "
+                    f"layer={layer} stride={explicit_stride}"
+                )
+        return
+
+    sources = config.get("layer_kv_source")
+    if not isinstance(sources, list):
+        sources = list(range(num_layers))
+    if len(sources) != num_layers:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: layer_kv_source length does not match num_layers"
+        )
+
+    k_offsets = [-1] * num_layers
+    v_offsets = [-1] * num_layers
+    stride = 0
+    producing = {
+        "produce",
+        "attention_kv_cache",
+        "kv_cache",
+        "q_equals_k_equals_v",
+    }
+    for layer, raw_policy in enumerate(policies):
+        policy = str(raw_policy or "none").strip().lower()
+        if policy in {"none", "disabled"}:
+            continue
+        if policy == "reuse":
+            source = int(sources[layer])
+            if source < 0 or source >= layer or k_offsets[source] < 0 or v_offsets[source] < 0:
+                raise RuntimeError(
+                    "HARD MEMORY PLAN FAULT: KV reuse must reference an earlier "
+                    f"cache-producing layer; layer={layer} source={source}"
+                )
+            k_offsets[layer] = k_offsets[source]
+            v_offsets[layer] = v_offsets[source]
+            continue
+        if policy not in producing:
+            raise RuntimeError(
+                f"HARD MEMORY PLAN FAULT: unsupported layer_kv_policy {policy!r} at layer {layer}"
+            )
+        k_dim = int(layer_k_dims[layer] or default_dim)
+        v_dim = int(layer_v_dims[layer] or default_dim)
+        if k_dim <= 0 or v_dim <= 0:
+            raise RuntimeError(
+                f"HARD MEMORY PLAN FAULT: invalid KV dimensions at layer {layer}"
+            )
+        k_offsets[layer] = stride
+        stride += num_kv_heads * k_dim
+        v_offsets[layer] = stride
+        stride += num_kv_heads * v_dim
+
+    if stride <= 0:
+        raise RuntimeError(
+            "HARD MEMORY PLAN FAULT: circuit declares KV-cache use but no layer owns storage"
+        )
+    config["layer_k_cache_offset"] = k_offsets
+    config["layer_v_cache_offset"] = v_offsets
+    config["kv_cache_token_stride_total"] = stride
+    config["kv_cache_layer_stride_variable"] = True
+
+
 def build_activation_specs(
     config: Dict[str, Any],
     mode: str,
@@ -3278,13 +3445,8 @@ def build_activation_specs(
     uses_kv_cache = bool(config.get("_template_uses_kv_cache", True))
     uses_rope = bool(config.get("_template_uses_rope", True))
     has_logits = bool(config.get("_template_has_logits", True))
-    decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
-    if mode == "decode" and decode_kv_cache_dtype in {"bf16", "bfloat16"}:
-        kv_cache_dtype = "bf16"
-    elif mode == "decode" and decode_kv_cache_dtype in {"fp16", "f16"}:
-        kv_cache_dtype = "fp16"
-    else:
-        kv_cache_dtype = "fp32"
+    _materialize_compact_kv_layout(config)
+    kv_cache_dtype = _resolve_kv_cache_dtype(config)
     kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype)
 
     def _positive_int_config(name: str, default: int) -> int:
@@ -3311,7 +3473,7 @@ def build_activation_specs(
     else:
         context_len = min(context_len, max_context)
 
-    seq_len = 1 if mode == "decode" else context_len
+    seq_len = 1 if mode == "decode" else _resolve_prefill_extent(config, context_len)
     image_height = int(config.get("image_height", config.get("image_size", 0)) or 0)
     image_width = int(config.get("image_width", config.get("image_size", 0)) or 0)
     patch_size = int(config.get("patch_size", 0) or 0)
@@ -10584,13 +10746,8 @@ def generate_memory_layout(
     uses_kv_cache = bool(config.get("_template_uses_kv_cache", True))
     uses_rope = bool(config.get("_template_uses_rope", True))
     has_logits = bool(config.get("_template_has_logits", True))
-    decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
-    if mode == "decode" and decode_kv_cache_dtype in {"bf16", "bfloat16"}:
-        kv_cache_dtype = "bf16"
-    elif mode == "decode" and decode_kv_cache_dtype in {"fp16", "f16"}:
-        kv_cache_dtype = "fp16"
-    else:
-        kv_cache_dtype = "fp32"
+    _materialize_compact_kv_layout(config)
+    kv_cache_dtype = _resolve_kv_cache_dtype(config)
     kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype)
 
     head_dim = int(head_dim)
@@ -10621,16 +10778,18 @@ def generate_memory_layout(
     else:
         context_len = min(context_len, max_context)
 
-    # For decode mode, we process 1 token but need full KV cache
+    # Persistent state uses the full context capacity. Transient prefill rows
+    # are bounded independently so long-context runtimes do not allocate every
+    # activation as [context_capacity, ...].
     if mode == "decode":
-        seq_len = 1  # tokens per forward pass
+        seq_len = 1
     else:
-        seq_len = context_len  # prefill processes all tokens
+        seq_len = _resolve_prefill_extent(config, int(context_len))
 
     print(f"\n📊 Activation memory planning:")
     print(f"  Mode: {mode}")
-    print(f"  Context length: {context_len}")
-    print(f"  Sequence length (per pass): {seq_len}")
+    print(f"  Context capacity: {context_len}")
+    print(f"  Execution extent (per pass): {seq_len}")
 
     # Calculate buffer sizes
     activation_buffers = []
@@ -11375,10 +11534,17 @@ def generate_ir_lower_2(
         kv_buf = activation_buffers.get("kv_cache")
         if not kv_buf or not context_len or not num_kv_heads or not head_dim:
             return None
-        if 0 <= int(layer) < len(layer_k_cache_offset) and 0 <= int(layer) < len(layer_v_cache_offset):
-            k_base = kv_buf["offset"] + int(layer_k_cache_offset[int(layer)]) * int(context_len) * kv_elem_bytes
-            v_base = kv_buf["offset"] + int(layer_v_cache_offset[int(layer)]) * int(context_len) * kv_elem_bytes
-            return k_base, v_base
+        if layer_k_cache_offset or layer_v_cache_offset:
+            if (
+                0 <= int(layer) < len(layer_k_cache_offset)
+                and 0 <= int(layer) < len(layer_v_cache_offset)
+                and int(layer_k_cache_offset[int(layer)]) >= 0
+                and int(layer_v_cache_offset[int(layer)]) >= 0
+            ):
+                k_base = kv_buf["offset"] + int(layer_k_cache_offset[int(layer)]) * int(context_len) * kv_elem_bytes
+                v_base = kv_buf["offset"] + int(layer_v_cache_offset[int(layer)]) * int(context_len) * kv_elem_bytes
+                return k_base, v_base
+            return None
         kv_per_layer = num_kv_heads * context_len * head_dim * kv_elem_bytes
         base = kv_buf["offset"] + layer * 2 * kv_per_layer
         return base, base + kv_per_layer
@@ -12797,10 +12963,12 @@ def generate_ir_lower_2(
         if mode == "decode":
             effective_seq_len = 1
         else:
-            # Prefill must follow the effective runtime context length (e.g. --context-len),
-            # not the model's training max_seq_len (often 32768+), otherwise kernels
-            # run with massively inflated token counts and diverge/slow down.
-            effective_seq_len = int(config.get("context_length", config.get("max_seq_len", 2048)))
+            # Capacity controls persistent state bounds. Kernel row counts must use
+            # the transient execution extent selected by the prefill chunk policy.
+            effective_seq_len = _resolve_prefill_extent(
+                config,
+                int(config.get("context_length", config.get("max_seq_len", 2048))),
+            )
         # Override stale seq_len injected earlier in the pipeline (IR1 may still carry
         # model max_seq_len). Lowered IR must always reflect runtime-effective length.
         params["seq_len"] = effective_seq_len
@@ -12960,6 +13128,10 @@ def generate_ir_lower_2(
                     if not mlp_buf or scratch_cursor > scratch_limit:
                         raise RuntimeError(
                             "HARD MEMORY PLAN FAULT: kernel scratch exceeds mlp_scratch arena: "
+                            f"provider={ir_op.get('kernel')} "
+                            f"scratch={scratch.get('name', i)} "
+                            f"scratch_bytes={int(scratch_size)} "
+                            f"live_bytes={scratch_offset - (int(mlp_buf['offset']) if mlp_buf else 0)} "
                             f"required={scratch_cursor - (int(mlp_buf['offset']) if mlp_buf else 0)} "
                             f"available={int(mlp_buf.get('size', 0)) if mlp_buf else 0}"
                         )
@@ -14033,16 +14205,28 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     kv_cache_head_dim = 1
                 layer_k_offsets = config.get("layer_k_cache_offset") if isinstance(config.get("layer_k_cache_offset"), list) else []
                 layer_v_offsets = config.get("layer_v_cache_offset") if isinstance(config.get("layer_v_cache_offset"), list) else []
-                if 0 <= kv_layer < len(layer_k_offsets) and 0 <= kv_layer < len(layer_v_offsets):
+                compact_kv_layout = bool(layer_k_offsets or layer_v_offsets)
+                valid_compact_kv_layer = (
+                    0 <= kv_layer < len(layer_k_offsets)
+                    and 0 <= kv_layer < len(layer_v_offsets)
+                    and int(layer_k_offsets[kv_layer]) >= 0
+                    and int(layer_v_offsets[kv_layer]) >= 0
+                )
+                if (
+                    compact_kv_layout
+                    and valid_compact_kv_layer
+                ):
                     k_expr = f"(model->kv_cache + {int(layer_k_offsets[kv_layer])}ULL*MAX_SEQ_LEN)"
                     v_expr = f"(model->kv_cache + {int(layer_v_offsets[kv_layer])}ULL*MAX_SEQ_LEN)"
                     k_expr_f16 = f"(model->kv_cache_f16 + {int(layer_k_offsets[kv_layer])}ULL*MAX_SEQ_LEN)"
                     v_expr_f16 = f"(model->kv_cache_f16 + {int(layer_v_offsets[kv_layer])}ULL*MAX_SEQ_LEN)"
-                else:
+                elif not compact_kv_layout:
                     k_expr = f"(model->kv_cache + ({kv_layer}*2)*NUM_KV_HEADS*MAX_SEQ_LEN*{kv_cache_head_dim})"
                     v_expr = f"(model->kv_cache + ({kv_layer}*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*{kv_cache_head_dim})"
                     k_expr_f16 = f"(model->kv_cache_f16 + ({kv_layer}*2)*NUM_KV_HEADS*MAX_SEQ_LEN*{kv_cache_head_dim})"
                     v_expr_f16 = f"(model->kv_cache_f16 + ({kv_layer}*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*{kv_cache_head_dim})"
+                else:
+                    k_expr = v_expr = k_expr_f16 = v_expr_f16 = "0"
                 audio_runtime_exprs = {
                     "audio_wav_bytes": "audio_wav_bytes",
                     "audio_wav_byte_count": "audio_wav_byte_count",
@@ -14058,8 +14242,16 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 if key in audio_runtime_exprs:
                     expr = audio_runtime_exprs[key]
                 elif key in ("kv_cache_k_layer", "kv_k"):
+                    if compact_kv_layout and not valid_compact_kv_layer:
+                        op_errors.append(
+                            f"{func}.{name}: layer {kv_layer} does not own compact KV storage"
+                        )
                     expr = k_expr
                 elif key in ("kv_cache_v_layer", "kv_v"):
+                    if compact_kv_layout and not valid_compact_kv_layer:
+                        op_errors.append(
+                            f"{func}.{name}: layer {kv_layer} does not own compact KV storage"
+                        )
                     expr = v_expr
                 elif key == "kv_cache_k_layer_f16":
                     expr = k_expr_f16
@@ -14682,6 +14874,15 @@ def main(args: List[str]) -> int:
         help="Context length for buffer allocation (default: from model config)"
     )
     parser.add_argument(
+        "--prefill-chunk-len",
+        type=int,
+        default=None,
+        help=(
+            "Maximum transient token rows allocated for one prefill call. "
+            "Persistent KV/RoPE capacity remains --context-len."
+        ),
+    )
+    parser.add_argument(
         "--logits-layout",
         choices=["auto", "last", "full"],
         default="auto",
@@ -14763,8 +14964,14 @@ def main(args: List[str]) -> int:
     _apply_prefill_policy_override(manifest, parsed_args.prefill_policy_override)
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True
-    # Override logits layout if requested (propagates into layout + codegen config)
-    manifest.setdefault("config", {})["logits_layout"] = parsed_args.logits_layout
+    if parsed_args.prefill_chunk_len is not None:
+        if parsed_args.prefill_chunk_len <= 0:
+            raise RuntimeError("--prefill-chunk-len must be positive")
+        manifest.setdefault("config", {})["prefill_chunk_length"] = int(parsed_args.prefill_chunk_len)
+        manifest["config"]["prefill_chunk_length_source"] = "cli_override"
+    # "auto" preserves a circuit/runtime default when one exists.
+    if parsed_args.logits_layout != "auto":
+        manifest.setdefault("config", {})["logits_layout"] = parsed_args.logits_layout
 
     template = manifest.get("template", {})
     sequence = _template_sequence(template) if isinstance(template, dict) else []

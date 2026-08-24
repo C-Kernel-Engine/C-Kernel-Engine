@@ -32,6 +32,7 @@ OPTIONAL_MODELS = (
     ("qwen36", "Qwen3.6", "V8_QWEN36_MODEL"),
     ("instella", "Instella-MoE", "V8_INSTELLA_MODEL"),
     ("qwen35_moe", "Qwen3.5 MoE", "V8_QWEN35_MOE_MODEL"),
+    ("qwen38", "Qwen3.8", "V8_QWEN38_MODEL"),
 )
 
 
@@ -49,15 +50,21 @@ def _load_models(path: Path) -> list[dict[str, Any]]:
     ]
     for model_id, label, env_name in OPTIONAL_MODELS:
         model = os.environ.get(env_name, "").strip()
-        rows.append(
-            {
-                "id": model_id,
-                "label": label,
-                "model": model,
-                "required": False,
-                "model_env": env_name,
-            }
-        )
+        row = {
+            "id": model_id,
+            "label": label,
+            "model": model,
+            "required": False,
+            "model_env": env_name,
+        }
+        if model_id == "qwen38":
+            raw_contexts = os.environ.get(
+                "V8_QWEN38_MEMORY_PLAN_CONTEXTS", "262144"
+            )
+            row["contexts"] = sorted(
+                {int(value) for value in raw_contexts.split(",") if value.strip()}
+            )
+        rows.append(row)
     return rows
 
 
@@ -230,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     rows = [
         _certify(model, context_len)
         for model in _load_models(args.families)
-        for context_len in contexts
+        for context_len in model.get("contexts", contexts)
     ]
     _apply_baseline(rows, args.baseline)
     summary = {

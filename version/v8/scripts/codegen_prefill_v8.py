@@ -337,13 +337,32 @@ def emit_prefill_op(
         decode_uses_fp16_kv = decode_kv_cache_dtype in {"fp16", "f16"}
         k_offsets = config.get("layer_k_cache_offset") or []
         v_offsets = config.get("layer_v_cache_offset") or []
-        if isinstance(k_offsets, list) and layer < len(k_offsets) and k_offsets[layer] is not None:
+        compact_kv_layout = bool(k_offsets or v_offsets)
+        if (
+            isinstance(k_offsets, list)
+            and layer < len(k_offsets)
+            and k_offsets[layer] is not None
+            and int(k_offsets[layer]) >= 0
+        ):
             k_base_expr = f"kv_cache + ({int(k_offsets[layer])}ULL*cache_stride)"
         else:
+            if compact_kv_layout:
+                raise RuntimeError(
+                    f"kv_cache_batch_copy layer {layer} does not own compact K storage"
+                )
             k_base_expr = f"kv_cache + (1ULL*({layer}*2)*Hkv*cache_stride*D)"
-        if isinstance(v_offsets, list) and layer < len(v_offsets) and v_offsets[layer] is not None:
+        if (
+            isinstance(v_offsets, list)
+            and layer < len(v_offsets)
+            and v_offsets[layer] is not None
+            and int(v_offsets[layer]) >= 0
+        ):
             v_base_expr = f"kv_cache + ({int(v_offsets[layer])}ULL*cache_stride)"
         else:
+            if compact_kv_layout:
+                raise RuntimeError(
+                    f"kv_cache_batch_copy layer {layer} does not own compact V storage"
+                )
             v_base_expr = f"kv_cache + (1ULL*({layer}*2+1)*Hkv*cache_stride*D)"
         if decode_uses_fp16_kv:
             return f"""    /* Op {seq_idx}: kv_cache_batch_copy layer={layer} */
@@ -562,8 +581,17 @@ def emit_prefill_op(
     def _prefill_kv_cache_expr(which: str, source_layer: int) -> str:
         offsets_key = "layer_k_cache_offset" if which == "k" else "layer_v_cache_offset"
         offsets = config.get(offsets_key)
-        if isinstance(offsets, list) and 0 <= int(source_layer) < len(offsets):
+        if (
+            isinstance(offsets, list)
+            and 0 <= int(source_layer) < len(offsets)
+            and int(offsets[int(source_layer)]) >= 0
+        ):
             return f"(model->kv_cache + {int(offsets[int(source_layer)])}ULL*MAX_SEQ_LEN)"
+        if isinstance(offsets, list) and offsets:
+            raise RuntimeError(
+                f"prefill {which.upper()} cache source layer {source_layer} "
+                "does not own compact KV storage"
+            )
         try:
             kv_cache_head_dim = int(config.get("kv_cache_head_dim", config.get("head_dim", 1)) or config.get("head_dim", 1) or 1)
         except Exception:
@@ -1580,6 +1608,13 @@ def emit_prefill_op(
 def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False, dump: bool = False) -> str:
     """Emit the prefill function with all ops unrolled."""
     lines = []
+    context_capacity = int(config.get("context_length", config.get("context_len", 0)) or 0)
+    prefill_chunk_length = int(config.get("prefill_chunk_length", context_capacity) or context_capacity)
+    if context_capacity <= 0 or prefill_chunk_length <= 0:
+        raise RuntimeError(
+            "prefill codegen requires positive context_length and prefill_chunk_length"
+        )
+    prefill_chunk_length = min(prefill_chunk_length, context_capacity)
     scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
     outproj_policy = str(config.get("out_proj_input_policy") or "").strip().lower()
     debug_outproj_default = 1 if outproj_policy in {"fp32", "fp32_input", "force_fp32"} else 0
@@ -1593,12 +1628,14 @@ def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False, 
 /* ============================================================================
  * PREFILL - Batched processing from IR Lower (prefill mode)
  * ============================================================================ */
-static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
+static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_tokens, int prefill_start_pos) {
     if (!model || !tokens || num_tokens <= 0) return;
-    const int prefill_start_pos = 0;
+    if (prefill_start_pos < 0 || prefill_start_pos >= MAX_SEQ_LEN) return;
 
-    /* Clamp to max context */
-    if (num_tokens > MAX_SEQ_LEN) num_tokens = MAX_SEQ_LEN;
+    /* Clamp this chunk to the persistent context capacity. */
+    if (num_tokens > MAX_SEQ_LEN - prefill_start_pos) {
+        num_tokens = MAX_SEQ_LEN - prefill_start_pos;
+    }
 
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
@@ -1769,10 +1806,27 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
             embed_scale_emitted = True
         lines.append("")
 
-    lines.append("    model->pos = num_tokens;")
-    lines.append("    model->rope_pos = num_tokens;")
+    lines.append("    model->pos = prefill_start_pos + num_tokens;")
+    lines.append("    model->rope_pos = prefill_start_pos + num_tokens;")
     if bool(config.get("_template_uses_persistent_cross_kv_cache", False)):
         lines.append("    model->encoder_kv_ready = 1;")
+    lines.append("}")
+    lines.append("")
+    lines.append("static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {")
+    lines.append("    if (!model || !tokens || num_tokens <= 0) return;")
+    lines.append("    int consumed = 0;")
+    lines.append("    int start_pos = model->pos;")
+    lines.append("    if (start_pos < 0 || start_pos >= MAX_SEQ_LEN) return;")
+    lines.append("    if (num_tokens > MAX_SEQ_LEN - start_pos) num_tokens = MAX_SEQ_LEN - start_pos;")
+    lines.append("    while (consumed < num_tokens) {")
+    lines.append(f"        int chunk = num_tokens - consumed > {prefill_chunk_length} ? {prefill_chunk_length} : num_tokens - consumed;")
+    lines.append("        if (chunk == 1 && consumed > 0) {")
+    lines.append("            ck_decode(model, tokens[consumed]);")
+    lines.append("        } else {")
+    lines.append("            ck_prefill_range(model, tokens + consumed, chunk, start_pos + consumed);")
+    lines.append("        }")
+    lines.append("        consumed += chunk;")
+    lines.append("    }")
     lines.append("}")
     return "\n".join(lines)
 

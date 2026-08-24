@@ -111,3 +111,24 @@ def test_nightly_registers_planner_only_model_matrix() -> None:
     assert '"v8-model-memory-plans-nightly": ROOT' in source
     assert "v8-model-memory-plans-nightly:" in makefile
     assert "certify_model_memory_plans_v8.py" in makefile
+
+
+def test_qwen38_optional_model_uses_full_context_capacity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    monkeypatch.setenv("V8_QWEN38_MODEL", "/models/qwen38.bump")
+    monkeypatch.delenv("V8_QWEN38_MEMORY_PLAN_CONTEXTS", raising=False)
+
+    rows = module._load_models(ROOT / "version" / "v8" / "regression" / "families.json")
+    qwen38 = next(row for row in rows if row["id"] == "qwen38")
+
+    assert qwen38["model"] == "/models/qwen38.bump"
+    assert qwen38["contexts"] == [262144]
+
+    baseline = json.loads(
+        (ROOT / "version" / "v8" / "contracts" / "model_memory_plan_baseline.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert baseline["models"]["qwen38"] == {"prefill": 265, "decode": 217}
