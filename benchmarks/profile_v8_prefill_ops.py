@@ -173,6 +173,7 @@ def _load_profile_rows(csv_path: Path) -> list[dict[str, Any]]:
         for row in reader:
             row["layer"] = int(row.get("layer") or -1)
             row["time_us"] = float(row.get("time_us") or 0.0)
+            row["cpu_time_us"] = float(row.get("cpu_time_us") or 0.0)
             row["token_id"] = int(row.get("token_id") or 0)
             rows.append(row)
         return rows
@@ -182,16 +183,24 @@ def _group(rows: list[dict[str, Any]], keys: tuple[str, ...], *, limit: int) -> 
     agg: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:
         key = tuple(row.get(k, "") for k in keys)
-        bucket = agg.setdefault(key, {k: row.get(k, "") for k in keys} | {"time_us": 0.0, "count": 0})
+        bucket = agg.setdefault(
+            key,
+            {k: row.get(k, "") for k in keys}
+            | {"time_us": 0.0, "cpu_time_us": 0.0, "count": 0},
+        )
         bucket["time_us"] += float(row["time_us"])
+        bucket["cpu_time_us"] += float(row["cpu_time_us"])
         bucket["count"] += 1
     ranked = sorted(agg.values(), key=lambda x: float(x["time_us"]), reverse=True)
     return ranked[:limit]
 
 
-def _summarize(rows: list[dict[str, Any]], *, limit: int) -> dict[str, Any]:
+def _summarize(
+    rows: list[dict[str, Any]], *, limit: int, threads: int
+) -> dict[str, Any]:
     prefill = [r for r in rows if r.get("mode") == "prefill"]
     total_us = sum(float(r["time_us"]) for r in prefill)
+    total_cpu_us = sum(float(r["cpu_time_us"]) for r in prefill)
     by_op = _group(prefill, ("op",), limit=limit)
     by_kernel = _group(prefill, ("kernel", "op"), limit=limit)
     by_layer = _group(prefill, ("layer",), limit=limit)
@@ -199,10 +208,25 @@ def _summarize(rows: list[dict[str, Any]], *, limit: int) -> dict[str, Any]:
     for table in (by_op, by_kernel, by_layer, by_layer_op):
         for row in table:
             row["time_ms"] = row["time_us"] / 1000.0
+            row["cpu_time_ms"] = row["cpu_time_us"] / 1000.0
+            row["core_equivalents"] = (
+                row["cpu_time_us"] / row["time_us"] if row["time_us"] > 0 else 0.0
+            )
+            row["worker_utilization_pct"] = (
+                100.0 * row["core_equivalents"] / threads if threads > 0 else 0.0
+            )
             row["pct"] = (100.0 * row["time_us"] / total_us) if total_us > 0 else 0.0
     return {
         "prefill_total_us": total_us,
         "prefill_total_ms": total_us / 1000.0,
+        "prefill_cpu_time_us": total_cpu_us,
+        "prefill_cpu_time_ms": total_cpu_us / 1000.0,
+        "prefill_core_equivalents": total_cpu_us / total_us if total_us > 0 else 0.0,
+        "prefill_worker_utilization_pct": (
+            100.0 * total_cpu_us / (total_us * threads)
+            if total_us > 0 and threads > 0
+            else 0.0
+        ),
         "prefill_entries": len(prefill),
         "by_op": by_op,
         "by_kernel_op": by_kernel,
@@ -216,14 +240,22 @@ def _fmt_table(title: str, rows: list[dict[str, Any]], cols: tuple[str, ...]) ->
     if not rows:
         print("  no rows")
         return
-    header = "  " + "  ".join(f"{c:>16}" for c in (*cols, "ms", "%", "count"))
+    header = "  " + "  ".join(
+        f"{c:>16}"
+        for c in (*cols, "wall ms", "CPU ms", "cores", "util %", "%", "count")
+    )
     print(header)
     for row in rows:
         values = [str(row.get(c, "")) for c in cols]
         print(
             "  "
             + "  ".join(f"{v:>16}" for v in values)
-            + f"  {row['time_ms']:16.3f}  {row['pct']:15.1f}  {row['count']:16d}"
+            + f"  {row['time_ms']:16.3f}"
+            + f"  {row['cpu_time_ms']:16.3f}"
+            + f"  {row['core_equivalents']:16.2f}"
+            + f"  {row['worker_utilization_pct']:16.1f}"
+            + f"  {row['pct']:16.1f}"
+            + f"  {row['count']:16d}"
         )
 
 
@@ -311,7 +343,7 @@ def main() -> int:
             continue
 
         rows = _load_profile_rows(csv_path)
-        summary = _summarize(rows, limit=args.limit)
+        summary = _summarize(rows, limit=args.limit, threads=args.threads)
         prompt_ms = float(run_row.get("prompt_ms") or 0.0)
         profile_ms = float(summary["prefill_total_ms"])
         uncovered_ms = max(0.0, prompt_ms - profile_ms)
@@ -322,10 +354,14 @@ def main() -> int:
 
         print(
             f"prompt={prompt_ms:.2f} ms ({run_row.get('prompt_tok_s', 0):.1f} tok/s), "
-            f"profiled prefill ops={profile_ms:.2f} ms, coverage={summary['profile_coverage_pct']:.1f}%"
+            f"profiled prefill ops={profile_ms:.2f} ms, "
+            f"occupancy={summary['prefill_core_equivalents']:.2f}/{args.threads} cores "
+            f"({summary['prefill_worker_utilization_pct']:.1f}%), "
+            f"coverage={summary['profile_coverage_pct']:.1f}%"
         )
         _fmt_table("Top prefill ops", summary["by_op"], ("op",))
         _fmt_table("Top prefill kernel/op sites", summary["by_kernel_op"], ("kernel", "op"))
+        _fmt_table("Prefill layers", summary["by_layer"], ("layer",))
         _fmt_table("Top prefill layer/op sites", summary["by_layer_op"], ("layer", "op"))
 
         results.append(

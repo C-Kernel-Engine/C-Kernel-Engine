@@ -3859,6 +3859,7 @@ typedef struct {
     const char *op;         /* e.g. "q_proj", "mlp_gate_up" */
     int layer;
     double time_us;
+    double cpu_time_us;
 } CKProfileEntry;
 
 #define CK_PROFILE_MAX_ENTRIES 16384
@@ -3868,11 +3869,14 @@ static int _ck_profile_token_id = 0;
 
 static inline void _ck_profile_log(const char *mode, const char *kernel,
                                     const char *op, int layer,
-                                    struct timespec t0, struct timespec t1) {
+                                    struct timespec t0, struct timespec t1,
+                                    struct timespec cpu_t0, struct timespec cpu_t1) {
     if (_ck_profile_count >= CK_PROFILE_MAX_ENTRIES) return;
     double us = (t1.tv_sec - t0.tv_sec) * 1e6 + (t1.tv_nsec - t0.tv_nsec) / 1e3;
+    double cpu_us = (cpu_t1.tv_sec - cpu_t0.tv_sec) * 1e6
+                  + (cpu_t1.tv_nsec - cpu_t0.tv_nsec) / 1e3;
     _ck_profile_entries[_ck_profile_count++] = (CKProfileEntry){
-        mode, kernel, op, layer, us
+        mode, kernel, op, layer, us, cpu_us
     };
 }
 
@@ -3881,8 +3885,9 @@ static void _ck_profile_dump_json(FILE *f) {
     for (int i = 0; i < _ck_profile_count; i++) {
         CKProfileEntry *e = &_ck_profile_entries[i];
         fprintf(f, "    {\\"mode\\":\\"%s\\",\\"kernel\\":\\"%s\\",\\"op\\":\\"%s\\","
-                "\\"layer\\":%d,\\"time_us\\":%.1f,\\"token_id\\":%d}%s\\n",
-                e->mode, e->kernel, e->op, e->layer, e->time_us,
+                "\\"layer\\":%d,\\"time_us\\":%.1f,\\"cpu_time_us\\":%.1f,"
+                "\\"token_id\\":%d}%s\\n",
+                e->mode, e->kernel, e->op, e->layer, e->time_us, e->cpu_time_us,
                 _ck_profile_token_id,
                 i < _ck_profile_count - 1 ? "," : "");
     }
@@ -3897,12 +3902,13 @@ static void _ck_profile_dump(void) {
         FILE *f = fopen(csv_path, _ck_profile_token_id == 0 ? "w" : "a");
         if (f) {
             if (_ck_profile_token_id == 0) {
-                fprintf(f, "mode,kernel,op,layer,time_us,token_id\\n");
+                fprintf(f, "mode,kernel,op,layer,time_us,cpu_time_us,token_id\\n");
             }
             for (int i = 0; i < _ck_profile_count; i++) {
                 CKProfileEntry *e = &_ck_profile_entries[i];
-                fprintf(f, "%s,%s,%s,%d,%.1f,%d\\n",
-                        e->mode, e->kernel, e->op, e->layer, e->time_us,
+                fprintf(f, "%s,%s,%s,%d,%.1f,%.1f,%d\\n",
+                        e->mode, e->kernel, e->op, e->layer,
+                        e->time_us, e->cpu_time_us,
                         _ck_profile_token_id);
             }
             fclose(f);
@@ -3913,11 +3919,12 @@ static void _ck_profile_dump(void) {
         if (f) { _ck_profile_dump_json(f); fclose(f); }
     }
     if (!csv_path && !json_path) {
-        fprintf(stderr, "mode,kernel,op,layer,time_us,token_id\\n");
+        fprintf(stderr, "mode,kernel,op,layer,time_us,cpu_time_us,token_id\\n");
         for (int i = 0; i < _ck_profile_count; i++) {
             CKProfileEntry *e = &_ck_profile_entries[i];
-            fprintf(stderr, "%s,%s,%s,%d,%.1f,%d\\n",
-                    e->mode, e->kernel, e->op, e->layer, e->time_us,
+            fprintf(stderr, "%s,%s,%s,%d,%.1f,%.1f,%d\\n",
+                    e->mode, e->kernel, e->op, e->layer,
+                    e->time_us, e->cpu_time_us,
                     _ck_profile_token_id);
         }
     }
@@ -3925,11 +3932,14 @@ static void _ck_profile_dump(void) {
     _ck_profile_token_id++;
 }
 
-#define CK_PROFILE_VARS() struct timespec _pt0, _pt1;
-#define CK_PROFILE_BEGIN() clock_gettime(CLOCK_MONOTONIC, &_pt0);
+#define CK_PROFILE_VARS() struct timespec _pt0, _pt1, _pct0, _pct1;
+#define CK_PROFILE_BEGIN() \\
+    clock_gettime(CLOCK_MONOTONIC, &_pt0); \\
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &_pct0);
 #define CK_PROFILE_END(mode, kernel, op, layer) \\
     clock_gettime(CLOCK_MONOTONIC, &_pt1); \\
-    _ck_profile_log(mode, kernel, op, layer, _pt0, _pt1);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &_pct1); \\
+    _ck_profile_log(mode, kernel, op, layer, _pt0, _pt1, _pct0, _pct1);
 #else
 #define CK_PROFILE_VARS()
 #define CK_PROFILE_BEGIN()
