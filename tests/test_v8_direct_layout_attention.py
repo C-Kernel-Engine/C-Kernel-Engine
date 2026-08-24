@@ -53,6 +53,18 @@ class DirectLayoutAttentionTests(unittest.TestCase):
             prefill_workspace_signature
         )
         cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace.restype = ctypes.c_int
+        qtile_schedule_signature = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_uint16),
+            ctypes.POINTER(ctypes.c_uint16),
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ]
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule.argtypes = (
+            qtile_schedule_signature
+        )
+        cls._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule.restype = ctypes.c_int
         cls._lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace.argtypes = (
             prefill_workspace_signature
             + [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
@@ -227,6 +239,48 @@ class DirectLayoutAttentionTests(unittest.TestCase):
         )
         self.assertEqual(status, 0)
         self.assertEqual(expected.tobytes(), actual.tobytes())
+
+    def test_qtile64_parallel_schedules_are_bit_exact(self):
+        heads, kv_heads, query_tokens, past_tokens, dim = 24, 4, 130, 17, 16
+        capacity = query_tokens + past_tokens
+        q = array("f", (
+            math.sin(index * 0.007 + 0.1)
+            for index in range(heads * query_tokens * dim)
+        ))
+
+        def fp16_bits(value):
+            import struct
+            return int.from_bytes(struct.pack("<e", value), "little")
+
+        k = array("H", (
+            fp16_bits(math.cos(index * 0.011))
+            for index in range(kv_heads * capacity * dim)
+        ))
+        v = array("H", (
+            fp16_bits(math.sin(index * 0.013 + 0.2))
+            for index in range(kv_heads * capacity * dim)
+        ))
+
+        def float_pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def half_pointer(values):
+            return (ctypes.c_uint16 * len(values)).from_buffer(values)
+
+        outputs = []
+        for schedule in range(4):
+            output = array("f", [0.0]) * (heads * query_tokens * dim)
+            status = self._lib.attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule(
+                float_pointer(q), half_pointer(k), half_pointer(v),
+                float_pointer(output), heads, kv_heads, query_tokens,
+                past_tokens, capacity, dim, dim, schedule,
+            )
+            self.assertEqual(status, 0)
+            outputs.append(output.tobytes())
+
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertEqual(outputs[0], outputs[2])
+        self.assertEqual(outputs[0], outputs[3])
 
 
 if __name__ == "__main__":

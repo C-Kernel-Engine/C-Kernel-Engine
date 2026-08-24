@@ -1,6 +1,7 @@
 {
   "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
   "op": "attention",
+  "operation_interface": "attention.causal_gqa.fp32_f16_cache.fp32_output.v1",
   "selection": {
     "status": "production",
     "priority": 200,
@@ -25,7 +26,7 @@
       "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
       "explicit_selector": true,
       "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
-      "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic."
+      "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic with independent query-block scheduling."
     }
   },
   "implementation": {
@@ -38,23 +39,26 @@
     },
     "threading": {
       "runtime": "ck_threadpool",
-      "work_partition": ["independent_heads"],
+      "work_partition": ["independent_query_blocks"],
       "dispatch": ["ck_threadpool_dispatch_n"],
       "reduction_order_effect": "contract_defined"
     }
   },
   "inputs": [
-    {"name": "q", "dtype": "fp32", "shape": ["num_heads", "q_tokens", "head_dim"], "layout": "head_major_contiguous", "placement": "local"},
-    {"name": "k_cache", "dtype": "fp16", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "layout": "head_major_contiguous", "placement": "local"},
-    {"name": "v_cache", "dtype": "fp16", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "layout": "head_major_contiguous", "placement": "local"}
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k_cache", "dtype": "fp16", "shape": ["KV", "S", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "runtime", "consumption": "required"},
+    {"name": "v_cache", "dtype": "fp16", "shape": ["KV", "S", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "runtime", "consumption": "required"}
   ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [],
   "outputs": [
-    {"name": "output", "dtype": "fp32", "shape": ["num_heads", "q_tokens", "head_dim"], "layout": "head_major_contiguous", "placement": "local"}
+    {"name": "output", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
   "scratch": [
     {"name": "token_workspace", "dtype": "fp32", "shape": [2, "H", "D"], "size_resolution": "required", "lifetime": "kernel_call", "desc": "Planner-owned query/output token workspace used by short-segment fallback."}
   ],
-  "dims": ["num_heads", "num_kv_heads", "q_tokens", "past_tokens", "cache_capacity", "head_dim", "aligned_head_dim"],
+  "dims": ["H", "KV", "T", "S", "D"],
   "params": [
     {"name": "reduction", "dtype": "ck_attention_reduction_t"}
   ],
@@ -66,10 +70,10 @@
   "call_abi": {
     "version": 1,
     "params": [
-      {"name": "q", "source": "scratch:q_scratch", "cast": "const float*"},
-      {"name": "k_cache", "source": "runtime:kv_cache_k_layer_f16", "cast": "const uint16_t*"},
-      {"name": "v_cache", "source": "runtime:kv_cache_v_layer_f16", "cast": "const uint16_t*"},
-      {"name": "output", "source": "output:out", "cast": "float*"},
+      {"name": "q", "source": "scratch:q_scratch", "cast": "const float*", "ports": ["input:q"]},
+      {"name": "k_cache", "source": "runtime:kv_cache_k_layer_f16", "cast": "const uint16_t*", "ports": ["input:k_cache"]},
+      {"name": "v_cache", "source": "runtime:kv_cache_v_layer_f16", "cast": "const uint16_t*", "ports": ["input:v_cache"]},
+      {"name": "output", "source": "output:out", "cast": "float*", "ports": ["output:output"]},
       {"name": "num_heads", "source": "dim:num_heads"},
       {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
       {"name": "q_tokens", "source": "dim:seq_len"},
@@ -81,5 +85,6 @@
       {"name": "token_workspace", "source": "scratch:token_workspace", "cast": "float*"},
       {"name": "token_workspace_bytes", "source": "scratch_size:token_workspace"}
     ]
-  }
+  },
+  "bench": ["benchmarks/bench_qwen38_long_attention.py"]
 }

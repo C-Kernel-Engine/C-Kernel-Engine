@@ -1826,6 +1826,15 @@ typedef enum {
     CK_ATTN_REDUCTION_BF16_PYTORCH_SDPA = 4,
 } ck_attention_reduction_t;
 
+// Research selectors for partitioning independent prefill attention outputs.
+// They do not alter the numerical reduction performed for any output row.
+typedef enum {
+    CK_ATTN_PREFILL_SCHEDULE_KV_HEADS = 0,
+    CK_ATTN_PREFILL_SCHEDULE_QUERY_HEADS = 1,
+    CK_ATTN_PREFILL_SCHEDULE_QUERY_TILES = 2,
+    CK_ATTN_PREFILL_SCHEDULE_KV_GROUP_QUERY_TILES = 3,
+} ck_attention_prefill_schedule_t;
+
 typedef enum {
     CK_ATTENTION_STATUS_OK = 0,
     CK_ATTENTION_STATUS_INVALID_ARGUMENT = -1,
@@ -1892,6 +1901,22 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     ck_attention_reduction_t reduction,
     float *token_workspace,
     size_t token_workspace_bytes);
+
+// Isolated scheduling research entry point for the qtile64 numerical contract.
+// Production circuits continue to use the contract entry point above.
+ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16cache_qtile64_schedule(
+    const float *q,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int q_tokens,
+    int past_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim,
+    ck_attention_prefill_schedule_t schedule);
 
 ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace(
     const float *q, const uint16_t *k_cache, const uint16_t *v_cache,

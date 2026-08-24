@@ -219,7 +219,7 @@ class AttentionContractV8Tests(unittest.TestCase):
         ]["threading"]
         self.assertEqual(threading["runtime"], "ck_threadpool")
         self.assertEqual(
-            threading["work_partition"], ["independent_heads"]
+            threading["work_partition"], ["independent_query_blocks"]
         )
         self.assertEqual(threading["dispatch"], ["ck_threadpool_dispatch_n"])
 

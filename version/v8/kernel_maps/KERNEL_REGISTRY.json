@@ -2841,6 +2841,7 @@
     {
       "id": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
       "op": "attention",
+      "operation_interface": "attention.causal_gqa.fp32_f16_cache.fp32_output.v1",
       "selection": {
         "status": "production",
         "priority": 200,
@@ -2880,7 +2881,7 @@
           "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
           "explicit_selector": true,
           "selector": "CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64",
-          "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic."
+          "notes": "Matches llama.cpp CPU flash dispatch: Q<64 uses FP16 online single-range arithmetic; Q>=64 uses 64x64 tiled FP32 arithmetic with independent query-block scheduling."
         }
       },
       "implementation": {
@@ -2894,7 +2895,7 @@
         "threading": {
           "runtime": "ck_threadpool",
           "work_partition": [
-            "independent_heads"
+            "independent_query_blocks"
           ],
           "dispatch": [
             "ck_threadpool_dispatch_n"
@@ -2907,47 +2908,62 @@
           "name": "q",
           "dtype": "fp32",
           "shape": [
-            "num_heads",
-            "q_tokens",
-            "head_dim"
+            "H",
+            "T",
+            "D"
           ],
           "layout": "head_major_contiguous",
-          "placement": "local"
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
         },
         {
           "name": "k_cache",
           "dtype": "fp16",
           "shape": [
-            "num_kv_heads",
-            "cache_capacity",
-            "head_dim"
+            "KV",
+            "S",
+            "D"
           ],
           "layout": "head_major_contiguous",
-          "placement": "local"
+          "placement": "local",
+          "access": "read",
+          "storage_class": "runtime",
+          "consumption": "required"
         },
         {
           "name": "v_cache",
           "dtype": "fp16",
           "shape": [
-            "num_kv_heads",
-            "cache_capacity",
-            "head_dim"
+            "KV",
+            "S",
+            "D"
           ],
           "layout": "head_major_contiguous",
-          "placement": "local"
+          "placement": "local",
+          "access": "read",
+          "storage_class": "runtime",
+          "consumption": "required"
         }
       ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
       "outputs": [
         {
           "name": "output",
           "dtype": "fp32",
           "shape": [
-            "num_heads",
-            "q_tokens",
-            "head_dim"
+            "H",
+            "T",
+            "D"
           ],
           "layout": "head_major_contiguous",
-          "placement": "local"
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
         }
       ],
       "scratch": [
@@ -2965,13 +2981,11 @@
         }
       ],
       "dims": [
-        "num_heads",
-        "num_kv_heads",
-        "q_tokens",
-        "past_tokens",
-        "cache_capacity",
-        "head_dim",
-        "aligned_head_dim"
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
       ],
       "params": [
         {
@@ -2992,22 +3006,34 @@
           {
             "name": "q",
             "source": "scratch:q_scratch",
-            "cast": "const float*"
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
           },
           {
             "name": "k_cache",
             "source": "runtime:kv_cache_k_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:k_cache"
+            ]
           },
           {
             "name": "v_cache",
             "source": "runtime:kv_cache_v_layer_f16",
-            "cast": "const uint16_t*"
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:v_cache"
+            ]
           },
           {
             "name": "output",
             "source": "output:out",
-            "cast": "float*"
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
           },
           {
             "name": "num_heads",
@@ -3052,6 +3078,9 @@
           }
         ]
       },
+      "bench": [
+        "benchmarks/bench_qwen38_long_attention.py"
+      ],
       "name": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
       "_source_file": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64.json"
     },
