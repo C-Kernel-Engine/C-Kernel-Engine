@@ -2389,6 +2389,15 @@ Examples:
     clean_parser.add_argument("model", nargs="?", help="Model cache dir to remove (or all)")
 
     args = parser.parse_args(argv)
+    if args.command in {"run", "audio"} and os.environ.get("CK_SOURCE_INTEGRITY_CHECKED") != "1":
+        integrity_script = ROOT_SCRIPTS_DIR / "check_source_integrity.py"
+        result = subprocess.run(
+            [sys.executable, str(integrity_script)],
+            cwd=PROJECT_ROOT,
+            check=False,
+        )
+        if result.returncode != 0:
+            return result.returncode
     _ensure_v8_python_requirements(args.command)
 
     try:

@@ -7,6 +7,17 @@ SYSTEM_PY="${PYTHON3:-python3}"
 REQS="$PROJECT_ROOT/requirements-v8.txt"
 SELECTED_PY=""
 
+requires_source_integrity() {
+  case "${1:-}" in
+    run|audio|serve)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 print_run_quickstart() {
   cat <<EOF
 [v8] model argument required for 'run'
@@ -154,6 +165,11 @@ needs_bootstrap() {
       ;;
   esac
 }
+
+if requires_source_integrity "$@"; then
+  "$SYSTEM_PY" "$PROJECT_ROOT/scripts/check_source_integrity.py"
+  export CK_SOURCE_INTEGRITY_CHECKED=1
+fi
 
 if needs_bootstrap "$@"; then
   ensure_bootstrap

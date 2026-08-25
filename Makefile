@@ -4021,7 +4021,7 @@ certify-qwen38-svg-parity:
 		--ctx-len "$${QWEN38_CTX_LEN:-4096}" \
 		--threads "$${CK_NUM_THREADS:-16}"
 
-.PHONY: test-xray-validator-selftest test-bf16-xray xray-vision-parity test-v8-dsl-policy test-v8-dsl
+.PHONY: test-xray-validator-selftest test-bf16-xray xray-vision-parity test-source-integrity test-v8-dsl-policy test-v8-dsl
 test-xray-validator-selftest:
 	@echo "Running X-ray injected-fault validator self-test..."
 	@mkdir -p build/xray
@@ -4085,7 +4085,12 @@ xray-vision-parity:
 			--output-dir "$${XRAY_OUTPUT_DIR:-build/xray/qwen3vl_bf16}"; \
 	fi
 
-test-v8-dsl-policy:
+test-source-integrity:
+	@echo "Checking tracked production sources for unresolved merges..."
+	@$(PYTHON) scripts/check_source_integrity.py --json-out build/source_integrity_report.json
+	@$(PYTHON) -m unittest tests.test_source_integrity -v
+
+test-v8-dsl-policy: test-source-integrity
 	@echo "Running v8 zero-hardcoding DSL policy tests..."
 	@$(PYTHON) version/v8/scripts/audit_dsl_policy_v8.py --json-out build/v8/dsl_policy_report.json
 	@$(PYTHON) -m unittest tests.test_v8_dsl_policy -v

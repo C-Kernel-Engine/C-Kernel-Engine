@@ -38,6 +38,12 @@ fi
 
 cd "$ROOT_DIR"
 
+echo -e "${YELLOW}Checking repository source integrity...${NC}"
+if ! python3 scripts/check_source_integrity.py; then
+    echo -e "${RED}✗ Resolve every merge marker and unmerged index entry before pushing${NC}" >&2
+    exit 1
+fi
+
 PREPUSH_LOCK_PATH="${CK_PREPUSH_LOCK_PATH:-${HOME_DIR}/.cache/ck-engine/model-regression.lock}"
 PREPUSH_MIN_AVAILABLE_GB="${CK_PREPUSH_MIN_AVAILABLE_GB:-16}"
 PREPUSH_MIN_SWAP_FREE_GB="${CK_PREPUSH_MIN_SWAP_FREE_GB:-2}"

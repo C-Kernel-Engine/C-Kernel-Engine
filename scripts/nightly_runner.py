@@ -867,6 +867,12 @@ MAKE_TARGETS = {
         "target": "test-v8-dsl-policy",
         "timeout_sec": 300,
     },
+    "source_integrity": {
+        "name": "Repository Source Integrity",
+        "category": "inference",
+        "target": "test-source-integrity",
+        "timeout_sec": 120,
+    },
     "v8_template_circuit_audit": {
         "name": "v8 Template Circuit/Dataflow Audit",
         "category": "inference",
