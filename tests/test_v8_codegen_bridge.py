@@ -671,7 +671,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
                 i
                 for i, op in enumerate(prefill_ops)
                 if op.get("function")
-                == "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace"
+                == "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace"
             )
             self.assertLess(cache_copy_idx, append_attn_idx)
             cache_args = prefill_ops[cache_copy_idx].get("args", [])
@@ -690,6 +690,14 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertEqual(
                 append_arg_by_name["token_workspace_bytes"].get("source"),
                 "scratch_size:token_workspace",
+            )
+            self.assertEqual(
+                append_arg_by_name["gqa_workspace"].get("source"),
+                "scratch:gqa_workspace",
+            )
+            self.assertEqual(
+                append_arg_by_name["gqa_workspace_bytes"].get("source"),
+                "scratch_size:gqa_workspace",
             )
             self.assertTrue(
                 any(

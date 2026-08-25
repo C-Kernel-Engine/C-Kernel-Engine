@@ -146,20 +146,27 @@ class TestV8PrefillCodegen(unittest.TestCase):
         self.assertIn("gemm_nt_q6_k_q8_k(", emitted)
 
     def test_attention_uses_map_owned_segmented_query_provider(self) -> None:
-        arg_names = [
+        base_arg_names = [
             "q", "k_cache", "v_cache", "output", "num_heads", "num_kv_heads",
             "q_tokens", "past_tokens", "cache_capacity", "head_dim",
             "aligned_head_dim", "reduction", "token_workspace",
             "token_workspace_bytes",
         ]
+        route_arg_names = [
+            "gqa_workspace", "gqa_workspace_bytes", "route_num_heads",
+            "route_num_kv_heads", "route_head_dim", "route_query_tokens",
+            "route_min_kv_tokens", "route_workers", "route_query_tile_size",
+            "route_concurrent_query_tiles",
+        ]
         op = {
-            "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
+            "function": "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
             "op": "attn",
             "layer": 3,
             "resolved_execution": {
                 "implementation": {
                     "segmented_query_provider": {
                         "function": "attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_contract_workspace",
+                        "base_args": base_arg_names,
                         "segment_lengths_dtype": "i32",
                         "boundary_semantics": "restart_query_tile_policy_at_each_segment",
                         "fallback": "reject_invalid_plan",
@@ -168,7 +175,7 @@ class TestV8PrefillCodegen(unittest.TestCase):
             },
             "args": [
                 {"name": name, "source": f"test:{name}", "expr": name}
-                for name in arg_names
+                for name in base_arg_names + route_arg_names
             ],
         }
         emitted = codegen_prefill_v8.emit_prefill_op(
@@ -181,9 +188,12 @@ class TestV8PrefillCodegen(unittest.TestCase):
         self.assertIn("g_multimodal_prefill_segment_lengths", emitted)
         self.assertIn("g_multimodal_prefill_num_segments", emitted)
         self.assertIn(
-            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace(",
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace(",
             emitted,
         )
+        segmented_call = emitted.split("} else {", 1)[0]
+        self.assertNotIn("gqa_workspace,", segmented_call)
+        self.assertNotIn("route_num_heads,", segmented_call)
 
     def test_kv_transpose_exports_attention_consumed_layout(self) -> None:
         config = {"num_kv_heads": 8, "head_dim": 128, "context_len": 1034}

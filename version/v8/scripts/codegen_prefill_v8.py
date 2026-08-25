@@ -200,8 +200,13 @@ def emit_prefill_op(
     segmented_row_function = (
         _segmented_row_provider(op, config) if segment_plan_available else ""
     )
+    segmented_attention_provider = (
+        _segmented_attention_provider(op) if segment_plan_available else {}
+    )
     segmented_attention_function = (
-        _segmented_attention_provider(op) if segment_plan_available else ""
+        str(segmented_attention_provider.get("function", ""))
+        if isinstance(segmented_attention_provider, dict)
+        else ""
     )
     quantization_emission = resolved_activation_quantization_emission(op)
     if op_type.startswith("quantize_") and quantization_emission is None:
@@ -970,9 +975,17 @@ def emit_prefill_op(
                 lines.append("        }")
             lines.append("    }")
     elif segmented_attention_function:
+        segmented_args = []
+        for arg_name in segmented_attention_provider["base_args"]:
+            arg = arg_expr_by_name.get(str(arg_name).lower())
+            if arg is None:
+                raise RuntimeError(
+                    f"segmented-query provider requires missing base argument {arg_name!r}"
+                )
+            segmented_args.append(arg)
         lines.append("    if (ck_multimodal_prefill_has_segment_plan(num_tokens)) {")
         lines.append(f"        {segmented_attention_function}(")
-        for arg in args:
+        for arg in segmented_args:
             lines.append(f"            {arg},")
         lines.append("            g_multimodal_prefill_segment_lengths,")
         lines.append("            g_multimodal_prefill_num_segments")
@@ -1952,9 +1965,9 @@ def _segmented_row_provider(op: Dict, config: Dict) -> str:
     return str(provider["function"])
 
 
-def _segmented_attention_provider(op: Dict) -> str:
+def _segmented_attention_provider(op: Dict) -> Dict:
     if str(op.get("op", "")) not in {"attn", "attn_sliding"}:
-        return ""
+        return {}
     execution = op.get("resolved_execution")
     implementation = execution.get("implementation") if isinstance(execution, dict) else None
     provider = (
@@ -1963,17 +1976,28 @@ def _segmented_attention_provider(op: Dict) -> str:
         else None
     )
     if provider is None:
-        return ""
+        return {}
     if not isinstance(provider, dict):
         raise RuntimeError("segmented-query attention provider metadata must be an object")
-    required = {"function", "segment_lengths_dtype", "boundary_semantics", "fallback"}
+    required = {
+        "function",
+        "base_args",
+        "segment_lengths_dtype",
+        "boundary_semantics",
+        "fallback",
+    }
     if set(provider) != required:
         raise RuntimeError("segmented-query provider must define the exact ABI contract")
     if provider["segment_lengths_dtype"] != "i32":
         raise RuntimeError("segmented-query provider requires i32 segment lengths")
     if provider["boundary_semantics"] != "restart_query_tile_policy_at_each_segment":
         raise RuntimeError("segmented-query provider has incompatible boundary semantics")
-    return str(provider["function"])
+    base_args = provider["base_args"]
+    if not isinstance(base_args, list) or not base_args or not all(
+        isinstance(name, str) and name for name in base_args
+    ):
+        raise RuntimeError("segmented-query provider requires exact base argument names")
+    return provider
 
 
 def _emit_multimodal_prefill_bridge_helpers(config: Dict, text_mrope_function: str) -> str:

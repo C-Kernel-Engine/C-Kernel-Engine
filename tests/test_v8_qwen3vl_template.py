@@ -792,7 +792,11 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         self.assertEqual(len(fp16_attention), 1)
         self.assertEqual(
             fp16_attention[0]["kernel"]["function"],
-            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract_workspace",
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace",
+        )
+        self.assertEqual(
+            fp16_attention[0]["kernel"]["id"],
+            "attention_forward_causal_head_major_gqa_prefill_append_f16cache_flash_auto_qtile64",
         )
         self.assertNotIn(
             "execution.attention_schedule",
