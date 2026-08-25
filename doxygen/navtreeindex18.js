@@ -1,5 +1,8 @@
 var NAVTREEINDEX18 =
 {
+"structCKSessionGenerateResultV8.html":[1,0,57],
+"structCKSessionGenerateResultV8.html#a3dcccdadb8ba40dfffc7037d76927a12":[1,0,57,2],
+"structCKSessionGenerateResultV8.html#a4b9e80b1e1a1f2ce5d2cffe64033f58e":[1,0,57,0],
 "structCKSessionGenerateResultV8.html#a569248e5a07f451c2940189a8d4b67ae":[1,0,57,7],
 "structCKSessionGenerateResultV8.html#a79e9f14728cb1bd52f788517ca9058f5":[1,0,57,4],
 "structCKSessionGenerateResultV8.html#a93a392f99ea05b97800f6f0c19ddf12f":[1,0,57,1],
@@ -246,8 +249,5 @@ var NAVTREEINDEX18 =
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24":[1,0,81,4],
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a7c4211b4f3a7c74aec65281818a81693":[1,0,81,3],
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a92c86736f04c96df7c5d506b32f1336a":[1,0,81,0],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#af69dcfddc1e9cf638b4ff5bd8399c865":[1,0,81,2],
-"structQWEN2__0__5B__DECODELayerOffsets.html":[1,0,82],
-"structQWEN2__0__5B__DECODELayerOffsets.html#a1740d677a1cb121cb0f7b9a48a69662e":[1,0,82,12],
-"structQWEN2__0__5B__DECODELayerOffsets.html#a1f43dcc0be32c72eec901965b81dcbb2":[1,0,82,6]
+"structQWEN2__0__5B__DECODEHeaderOffsets.html#af69dcfddc1e9cf638b4ff5bd8399c865":[1,0,81,2]
 };

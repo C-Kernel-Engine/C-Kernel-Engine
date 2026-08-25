@@ -1076,98 +1076,122 @@ $(document).ready(function(){initNavTree('gemm__kernels_8c_source.html',''); ini
 <div class="line"><a id="l00903" name="l00903"></a><span class="lineno">  903</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00904" name="l00904"></a><span class="lineno">  904</span> </div>
 <div class="foldopen" id="foldopen00905" data-start="{" data-end="}">
-<div class="line"><a id="l00905" name="l00905"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ae808c1ad88909d53227862259add3b52">  905</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *A,</div>
-<div class="line"><a id="l00906" name="l00906"></a><span class="lineno">  906</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *B,</div>
-<div class="line"><a id="l00907" name="l00907"></a><span class="lineno">  907</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
-<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span>                                  <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><a id="l00909" name="l00909"></a><span class="lineno">  909</span>                                  <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
-<div class="line"><a id="l00910" name="l00910"></a><span class="lineno">  910</span>{</div>
-<div class="line"><a id="l00911" name="l00911"></a><span class="lineno">  911</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
-<div class="line"><a id="l00912" name="l00912"></a><span class="lineno">  912</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00913" name="l00913"></a><span class="lineno">  913</span>    }</div>
-<div class="line"><a id="l00914" name="l00914"></a><span class="lineno">  914</span> </div>
-<div class="line"><a id="l00915" name="l00915"></a><span class="lineno">  915</span><span class="preprocessor">#pragma omp parallel for schedule(static) if ((size_t)M * (size_t)N &gt;= 96)</span></div>
-<div class="line"><a id="l00916" name="l00916"></a><span class="lineno">  916</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> index = 0; index &lt; M * N; ++index) {</div>
-<div class="line"><a id="l00917" name="l00917"></a><span class="lineno">  917</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> row = index / N;</div>
-<div class="line"><a id="l00918" name="l00918"></a><span class="lineno">  918</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> col = index - row * N;</div>
-<div class="line"><a id="l00919" name="l00919"></a><span class="lineno">  919</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *a = A + (size_t)row * (<span class="keywordtype">size_t</span>)K;</div>
-<div class="line"><a id="l00920" name="l00920"></a><span class="lineno">  920</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *b = B + (size_t)col * (<span class="keywordtype">size_t</span>)K;</div>
-<div class="line"><a id="l00921" name="l00921"></a><span class="lineno">  921</span>        <span class="keywordtype">float</span> sum = 0.0f;</div>
-<div class="line"><a id="l00922" name="l00922"></a><span class="lineno">  922</span>        <span class="keywordtype">int</span> k = 0;</div>
-<div class="line"><a id="l00923" name="l00923"></a><span class="lineno">  923</span> </div>
-<div class="line"><a id="l00924" name="l00924"></a><span class="lineno">  924</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><a id="l00925" name="l00925"></a><span class="lineno">  925</span>        <span class="keywordflow">if</span> (M &gt; 1) {</div>
-<div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span>            __m512 acc = _mm512_setzero_ps();</div>
-<div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span>            <span class="keywordflow">for</span> (; k + 16 &lt;= K; k += 16) {</div>
-<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span>                acc = _mm512_fmadd_ps(</div>
-<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>                    _mm512_loadu_ps(a + k), _mm512_loadu_ps(b + k), acc);</div>
-<div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span>            }</div>
-<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>            sum = _mm512_reduce_add_ps(acc);</div>
-<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>            __m512 acc[4] = {</div>
-<div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span>                _mm512_setzero_ps(), _mm512_setzero_ps(),</div>
-<div class="line"><a id="l00935" name="l00935"></a><span class="lineno">  935</span>                _mm512_setzero_ps(), _mm512_setzero_ps()</div>
-<div class="line"><a id="l00936" name="l00936"></a><span class="lineno">  936</span>            };</div>
-<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>            <span class="keywordflow">for</span> (; k + 64 &lt;= K; k += 64) {</div>
-<div class="line"><a id="l00938" name="l00938"></a><span class="lineno">  938</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 4; ++lane) {</div>
-<div class="line"><a id="l00939" name="l00939"></a><span class="lineno">  939</span>                    acc[lane] = _mm512_fmadd_ps(</div>
-<div class="line"><a id="l00940" name="l00940"></a><span class="lineno">  940</span>                        _mm512_loadu_ps(a + k + lane * 16),</div>
-<div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>                        _mm512_loadu_ps(b + k + lane * 16),</div>
-<div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span>                        acc[lane]);</div>
-<div class="line"><a id="l00943" name="l00943"></a><span class="lineno">  943</span>                }</div>
-<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span>            }</div>
-<div class="line"><a id="l00945" name="l00945"></a><span class="lineno">  945</span>            acc[0] = _mm512_add_ps(acc[0], acc[2]);</div>
-<div class="line"><a id="l00946" name="l00946"></a><span class="lineno">  946</span>            acc[1] = _mm512_add_ps(acc[1], acc[3]);</div>
-<div class="line"><a id="l00947" name="l00947"></a><span class="lineno">  947</span>            acc[0] = _mm512_add_ps(acc[0], acc[1]);</div>
-<div class="line"><a id="l00948" name="l00948"></a><span class="lineno">  948</span>            sum = _mm512_reduce_add_ps(acc[0]);</div>
-<div class="line"><a id="l00949" name="l00949"></a><span class="lineno">  949</span>        }</div>
-<div class="line"><a id="l00950" name="l00950"></a><span class="lineno">  950</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><a id="l00951" name="l00951"></a><span class="lineno">  951</span>        <span class="keywordflow">if</span> (M &gt; 1) {</div>
-<div class="line"><a id="l00952" name="l00952"></a><span class="lineno">  952</span>            __m256 acc = _mm256_setzero_ps();</div>
-<div class="line"><a id="l00953" name="l00953"></a><span class="lineno">  953</span>            <span class="keywordflow">for</span> (; k + 8 &lt;= K; k += 8) {</div>
-<div class="line"><a id="l00954" name="l00954"></a><span class="lineno">  954</span><span class="preprocessor">#if defined(__FMA__)</span></div>
-<div class="line"><a id="l00955" name="l00955"></a><span class="lineno">  955</span>                acc = _mm256_fmadd_ps(</div>
-<div class="line"><a id="l00956" name="l00956"></a><span class="lineno">  956</span>                    _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k), acc);</div>
-<div class="line"><a id="l00957" name="l00957"></a><span class="lineno">  957</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00958" name="l00958"></a><span class="lineno">  958</span>                acc = _mm256_add_ps(</div>
-<div class="line"><a id="l00959" name="l00959"></a><span class="lineno">  959</span>                    acc, _mm256_mul_ps(</div>
-<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>                        _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k)));</div>
-<div class="line"><a id="l00961" name="l00961"></a><span class="lineno">  961</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span>            }</div>
-<div class="line"><a id="l00963" name="l00963"></a><span class="lineno">  963</span>            sum = ck_hsum256_llamafile(acc);</div>
-<div class="line"><a id="l00964" name="l00964"></a><span class="lineno">  964</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><a id="l00965" name="l00965"></a><span class="lineno">  965</span>            __m256 acc[4] = {</div>
-<div class="line"><a id="l00966" name="l00966"></a><span class="lineno">  966</span>                _mm256_setzero_ps(), _mm256_setzero_ps(),</div>
-<div class="line"><a id="l00967" name="l00967"></a><span class="lineno">  967</span>                _mm256_setzero_ps(), _mm256_setzero_ps()</div>
-<div class="line"><a id="l00968" name="l00968"></a><span class="lineno">  968</span>            };</div>
-<div class="line"><a id="l00969" name="l00969"></a><span class="lineno">  969</span>            <span class="keywordflow">for</span> (; k + 32 &lt;= K; k += 32) {</div>
-<div class="line"><a id="l00970" name="l00970"></a><span class="lineno">  970</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 4; ++lane) {</div>
-<div class="line"><a id="l00971" name="l00971"></a><span class="lineno">  971</span><span class="preprocessor">#if defined(__FMA__)</span></div>
-<div class="line"><a id="l00972" name="l00972"></a><span class="lineno">  972</span>                    acc[lane] = _mm256_fmadd_ps(</div>
-<div class="line"><a id="l00973" name="l00973"></a><span class="lineno">  973</span>                        _mm256_loadu_ps(a + k + lane * 8),</div>
-<div class="line"><a id="l00974" name="l00974"></a><span class="lineno">  974</span>                        _mm256_loadu_ps(b + k + lane * 8),</div>
-<div class="line"><a id="l00975" name="l00975"></a><span class="lineno">  975</span>                        acc[lane]);</div>
-<div class="line"><a id="l00976" name="l00976"></a><span class="lineno">  976</span><span class="preprocessor">#else</span></div>
-<div class="line"><a id="l00977" name="l00977"></a><span class="lineno">  977</span>                    acc[lane] = _mm256_add_ps(</div>
-<div class="line"><a id="l00978" name="l00978"></a><span class="lineno">  978</span>                        acc[lane], _mm256_mul_ps(</div>
-<div class="line"><a id="l00979" name="l00979"></a><span class="lineno">  979</span>                            _mm256_loadu_ps(a + k + lane * 8),</div>
-<div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span>                            _mm256_loadu_ps(b + k + lane * 8)));</div>
+<div class="line"><a id="l00905" name="l00905"></a><span class="lineno"><a class="line" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">  905</a></span><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(</div>
+<div class="line"><a id="l00906" name="l00906"></a><span class="lineno">  906</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *A, <span class="keyword">const</span> <span class="keywordtype">float</span> *B, <span class="keyword">const</span> <span class="keywordtype">float</span> *bias, <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l00907" name="l00907"></a><span class="lineno">  907</span>        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K, <span class="keywordtype">int</span> index)</div>
+<div class="line"><a id="l00908" name="l00908"></a><span class="lineno">  908</span>{</div>
+<div class="line"><a id="l00909" name="l00909"></a><span class="lineno">  909</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> row = index / N;</div>
+<div class="line"><a id="l00910" name="l00910"></a><span class="lineno">  910</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> col = index - row * N;</div>
+<div class="line"><a id="l00911" name="l00911"></a><span class="lineno">  911</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *a = A + (size_t)row * (<span class="keywordtype">size_t</span>)K;</div>
+<div class="line"><a id="l00912" name="l00912"></a><span class="lineno">  912</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *b = B + (size_t)col * (<span class="keywordtype">size_t</span>)K;</div>
+<div class="line"><a id="l00913" name="l00913"></a><span class="lineno">  913</span>    <span class="keywordtype">float</span> sum = 0.0f;</div>
+<div class="line"><a id="l00914" name="l00914"></a><span class="lineno">  914</span>    <span class="keywordtype">int</span> k = 0;</div>
+<div class="line"><a id="l00915" name="l00915"></a><span class="lineno">  915</span> </div>
+<div class="line"><a id="l00916" name="l00916"></a><span class="lineno">  916</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><a id="l00917" name="l00917"></a><span class="lineno">  917</span>    <span class="keywordflow">if</span> (M &gt; 1) {</div>
+<div class="line"><a id="l00918" name="l00918"></a><span class="lineno">  918</span>        __m512 acc = _mm512_setzero_ps();</div>
+<div class="line"><a id="l00919" name="l00919"></a><span class="lineno">  919</span>        <span class="keywordflow">for</span> (; k + 16 &lt;= K; k += 16) {</div>
+<div class="line"><a id="l00920" name="l00920"></a><span class="lineno">  920</span>            acc = _mm512_fmadd_ps(</div>
+<div class="line"><a id="l00921" name="l00921"></a><span class="lineno">  921</span>                _mm512_loadu_ps(a + k), _mm512_loadu_ps(b + k), acc);</div>
+<div class="line"><a id="l00922" name="l00922"></a><span class="lineno">  922</span>        }</div>
+<div class="line"><a id="l00923" name="l00923"></a><span class="lineno">  923</span>        sum = _mm512_reduce_add_ps(acc);</div>
+<div class="line"><a id="l00924" name="l00924"></a><span class="lineno">  924</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><a id="l00925" name="l00925"></a><span class="lineno">  925</span>        __m512 acc[4] = {</div>
+<div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span>            _mm512_setzero_ps(), _mm512_setzero_ps(),</div>
+<div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span>            _mm512_setzero_ps(), _mm512_setzero_ps()</div>
+<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span>        };</div>
+<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span>        <span class="keywordflow">for</span> (; k + 64 &lt;= K; k += 64) {</div>
+<div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 4; ++lane) {</div>
+<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span>                acc[lane] = _mm512_fmadd_ps(</div>
+<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span>                    _mm512_loadu_ps(a + k + lane * 16),</div>
+<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>                    _mm512_loadu_ps(b + k + lane * 16),</div>
+<div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span>                    acc[lane]);</div>
+<div class="line"><a id="l00935" name="l00935"></a><span class="lineno">  935</span>            }</div>
+<div class="line"><a id="l00936" name="l00936"></a><span class="lineno">  936</span>        }</div>
+<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>        acc[0] = _mm512_add_ps(acc[0], acc[2]);</div>
+<div class="line"><a id="l00938" name="l00938"></a><span class="lineno">  938</span>        acc[1] = _mm512_add_ps(acc[1], acc[3]);</div>
+<div class="line"><a id="l00939" name="l00939"></a><span class="lineno">  939</span>        acc[0] = _mm512_add_ps(acc[0], acc[1]);</div>
+<div class="line"><a id="l00940" name="l00940"></a><span class="lineno">  940</span>        sum = _mm512_reduce_add_ps(acc[0]);</div>
+<div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>    }</div>
+<div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><a id="l00943" name="l00943"></a><span class="lineno">  943</span>    <span class="keywordflow">if</span> (M &gt; 1) {</div>
+<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span>        __m256 acc = _mm256_setzero_ps();</div>
+<div class="line"><a id="l00945" name="l00945"></a><span class="lineno">  945</span>        <span class="keywordflow">for</span> (; k + 8 &lt;= K; k += 8) {</div>
+<div class="line"><a id="l00946" name="l00946"></a><span class="lineno">  946</span><span class="preprocessor">#if defined(__FMA__)</span></div>
+<div class="line"><a id="l00947" name="l00947"></a><span class="lineno">  947</span>            acc = _mm256_fmadd_ps(</div>
+<div class="line"><a id="l00948" name="l00948"></a><span class="lineno">  948</span>                _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k), acc);</div>
+<div class="line"><a id="l00949" name="l00949"></a><span class="lineno">  949</span><span class="preprocessor">#else</span></div>
+<div class="line"><a id="l00950" name="l00950"></a><span class="lineno">  950</span>            acc = _mm256_add_ps(</div>
+<div class="line"><a id="l00951" name="l00951"></a><span class="lineno">  951</span>                acc, _mm256_mul_ps(</div>
+<div class="line"><a id="l00952" name="l00952"></a><span class="lineno">  952</span>                    _mm256_loadu_ps(a + k), _mm256_loadu_ps(b + k)));</div>
+<div class="line"><a id="l00953" name="l00953"></a><span class="lineno">  953</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00954" name="l00954"></a><span class="lineno">  954</span>        }</div>
+<div class="line"><a id="l00955" name="l00955"></a><span class="lineno">  955</span>        sum = ck_hsum256_llamafile(acc);</div>
+<div class="line"><a id="l00956" name="l00956"></a><span class="lineno">  956</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><a id="l00957" name="l00957"></a><span class="lineno">  957</span>        __m256 acc[4] = {</div>
+<div class="line"><a id="l00958" name="l00958"></a><span class="lineno">  958</span>            _mm256_setzero_ps(), _mm256_setzero_ps(),</div>
+<div class="line"><a id="l00959" name="l00959"></a><span class="lineno">  959</span>            _mm256_setzero_ps(), _mm256_setzero_ps()</div>
+<div class="line"><a id="l00960" name="l00960"></a><span class="lineno">  960</span>        };</div>
+<div class="line"><a id="l00961" name="l00961"></a><span class="lineno">  961</span>        <span class="keywordflow">for</span> (; k + 32 &lt;= K; k += 32) {</div>
+<div class="line"><a id="l00962" name="l00962"></a><span class="lineno">  962</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 4; ++lane) {</div>
+<div class="line"><a id="l00963" name="l00963"></a><span class="lineno">  963</span><span class="preprocessor">#if defined(__FMA__)</span></div>
+<div class="line"><a id="l00964" name="l00964"></a><span class="lineno">  964</span>                acc[lane] = _mm256_fmadd_ps(</div>
+<div class="line"><a id="l00965" name="l00965"></a><span class="lineno">  965</span>                    _mm256_loadu_ps(a + k + lane * 8),</div>
+<div class="line"><a id="l00966" name="l00966"></a><span class="lineno">  966</span>                    _mm256_loadu_ps(b + k + lane * 8),</div>
+<div class="line"><a id="l00967" name="l00967"></a><span class="lineno">  967</span>                    acc[lane]);</div>
+<div class="line"><a id="l00968" name="l00968"></a><span class="lineno">  968</span><span class="preprocessor">#else</span></div>
+<div class="line"><a id="l00969" name="l00969"></a><span class="lineno">  969</span>                acc[lane] = _mm256_add_ps(</div>
+<div class="line"><a id="l00970" name="l00970"></a><span class="lineno">  970</span>                    acc[lane], _mm256_mul_ps(</div>
+<div class="line"><a id="l00971" name="l00971"></a><span class="lineno">  971</span>                        _mm256_loadu_ps(a + k + lane * 8),</div>
+<div class="line"><a id="l00972" name="l00972"></a><span class="lineno">  972</span>                        _mm256_loadu_ps(b + k + lane * 8)));</div>
+<div class="line"><a id="l00973" name="l00973"></a><span class="lineno">  973</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00974" name="l00974"></a><span class="lineno">  974</span>            }</div>
+<div class="line"><a id="l00975" name="l00975"></a><span class="lineno">  975</span>        }</div>
+<div class="line"><a id="l00976" name="l00976"></a><span class="lineno">  976</span>        acc[0] = _mm256_add_ps(acc[0], acc[2]);</div>
+<div class="line"><a id="l00977" name="l00977"></a><span class="lineno">  977</span>        acc[1] = _mm256_add_ps(acc[1], acc[3]);</div>
+<div class="line"><a id="l00978" name="l00978"></a><span class="lineno">  978</span>        acc[0] = _mm256_add_ps(acc[0], acc[1]);</div>
+<div class="line"><a id="l00979" name="l00979"></a><span class="lineno">  979</span>        sum = hsum256_ps(acc[0]);</div>
+<div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span>    }</div>
 <div class="line"><a id="l00981" name="l00981"></a><span class="lineno">  981</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00982" name="l00982"></a><span class="lineno">  982</span>                }</div>
-<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span>            }</div>
-<div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span>            acc[0] = _mm256_add_ps(acc[0], acc[2]);</div>
-<div class="line"><a id="l00985" name="l00985"></a><span class="lineno">  985</span>            acc[1] = _mm256_add_ps(acc[1], acc[3]);</div>
-<div class="line"><a id="l00986" name="l00986"></a><span class="lineno">  986</span>            acc[0] = _mm256_add_ps(acc[0], acc[1]);</div>
-<div class="line"><a id="l00987" name="l00987"></a><span class="lineno">  987</span>            sum = hsum256_ps(acc[0]);</div>
-<div class="line"><a id="l00988" name="l00988"></a><span class="lineno">  988</span>        }</div>
-<div class="line"><a id="l00989" name="l00989"></a><span class="lineno">  989</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l00990" name="l00990"></a><span class="lineno">  990</span>        <span class="keywordflow">for</span> (; k &lt; K; ++k) {</div>
-<div class="line"><a id="l00991" name="l00991"></a><span class="lineno">  991</span>            sum += a[k] * b[k];</div>
-<div class="line"><a id="l00992" name="l00992"></a><span class="lineno">  992</span>        }</div>
-<div class="line"><a id="l00993" name="l00993"></a><span class="lineno">  993</span>        <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)row * (<span class="keywordtype">size_t</span>)N + (size_t)col] =</div>
-<div class="line"><a id="l00994" name="l00994"></a><span class="lineno">  994</span>            bias ? sum + bias[col] : sum;</div>
-<div class="line"><a id="l00995" name="l00995"></a><span class="lineno">  995</span>    }</div>
-<div class="line"><a id="l00996" name="l00996"></a><span class="lineno">  996</span>}</div>
+<div class="line"><a id="l00982" name="l00982"></a><span class="lineno">  982</span>    <span class="keywordflow">for</span> (; k &lt; K; ++k) {</div>
+<div class="line"><a id="l00983" name="l00983"></a><span class="lineno">  983</span>        sum += a[k] * b[k];</div>
+<div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span>    }</div>
+<div class="line"><a id="l00985" name="l00985"></a><span class="lineno">  985</span>    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[(size_t)row * (<span class="keywordtype">size_t</span>)N + (size_t)col] =</div>
+<div class="line"><a id="l00986" name="l00986"></a><span class="lineno">  986</span>        bias ? sum + bias[col] : sum;</div>
+<div class="line"><a id="l00987" name="l00987"></a><span class="lineno">  987</span>}</div>
+</div>
+<div class="line"><a id="l00988" name="l00988"></a><span class="lineno">  988</span> </div>
+<div class="foldopen" id="foldopen00989" data-start="{" data-end="}">
+<div class="line"><a id="l00989" name="l00989"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#a21bf1789acc5556879531b42b0bd40cd">  989</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#a21bf1789acc5556879531b42b0bd40cd">gemm_nt_f32_llama_production_output_range</a>(</div>
+<div class="line"><a id="l00990" name="l00990"></a><span class="lineno">  990</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *A, <span class="keyword">const</span> <span class="keywordtype">float</span> *B, <span class="keyword">const</span> <span class="keywordtype">float</span> *bias, <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l00991" name="l00991"></a><span class="lineno">  991</span>        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K, <span class="keywordtype">int</span> output_begin, <span class="keywordtype">int</span> output_end)</div>
+<div class="line"><a id="l00992" name="l00992"></a><span class="lineno">  992</span>{</div>
+<div class="line"><a id="l00993" name="l00993"></a><span class="lineno">  993</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00994" name="l00994"></a><span class="lineno">  994</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total = M * N;</div>
+<div class="line"><a id="l00995" name="l00995"></a><span class="lineno">  995</span>    <span class="keywordflow">if</span> (output_begin &lt; 0) output_begin = 0;</div>
+<div class="line"><a id="l00996" name="l00996"></a><span class="lineno">  996</span>    <span class="keywordflow">if</span> (output_end &gt; total) output_end = total;</div>
+<div class="line"><a id="l00997" name="l00997"></a><span class="lineno">  997</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> index = output_begin; index &lt; output_end; ++index) {</div>
+<div class="line"><a id="l00998" name="l00998"></a><span class="lineno">  998</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
+<div class="line"><a id="l00999" name="l00999"></a><span class="lineno">  999</span>    }</div>
+<div class="line"><a id="l01000" name="l01000"></a><span class="lineno"> 1000</span>}</div>
+</div>
+<div class="line"><a id="l01001" name="l01001"></a><span class="lineno"> 1001</span> </div>
+<div class="foldopen" id="foldopen01002" data-start="{" data-end="}">
+<div class="line"><a id="l01002" name="l01002"></a><span class="lineno"><a class="line" href="ckernel__engine_8h.html#ae808c1ad88909d53227862259add3b52"> 1002</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a>(<span class="keyword">const</span> <span class="keywordtype">float</span> *A,</div>
+<div class="line"><a id="l01003" name="l01003"></a><span class="lineno"> 1003</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *B,</div>
+<div class="line"><a id="l01004" name="l01004"></a><span class="lineno"> 1004</span>                                  <span class="keyword">const</span> <span class="keywordtype">float</span> *bias,</div>
+<div class="line"><a id="l01005" name="l01005"></a><span class="lineno"> 1005</span>                                  <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l01006" name="l01006"></a><span class="lineno"> 1006</span>                                  <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l01007" name="l01007"></a><span class="lineno"> 1007</span>{</div>
+<div class="line"><a id="l01008" name="l01008"></a><span class="lineno"> 1008</span>    <span class="keywordflow">if</span> (!A || !B || !<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a> || M &lt;= 0 || N &lt;= 0 || K &lt;= 0) {</div>
+<div class="line"><a id="l01009" name="l01009"></a><span class="lineno"> 1009</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l01010" name="l01010"></a><span class="lineno"> 1010</span>    }</div>
+<div class="line"><a id="l01011" name="l01011"></a><span class="lineno"> 1011</span> </div>
+<div class="line"><a id="l01012" name="l01012"></a><span class="lineno"> 1012</span><span class="preprocessor">#pragma omp parallel for schedule(static) if ((size_t)M * (size_t)N &gt;= 96)</span></div>
+<div class="line"><a id="l01013" name="l01013"></a><span class="lineno"> 1013</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> index = 0; index &lt; M * N; ++index) {</div>
+<div class="line"><a id="l01014" name="l01014"></a><span class="lineno"> 1014</span>        <a class="code hl_function" href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a>(A, B, bias, <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>, M, N, K, index);</div>
+<div class="line"><a id="l01015" name="l01015"></a><span class="lineno"> 1015</span>    }</div>
+<div class="line"><a id="l01016" name="l01016"></a><span class="lineno"> 1016</span>}</div>
 </div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a594a440cd88e67b89068125123f52c9e"><div class="ttname"><a href="ckernel__engine_8h.html#a594a440cd88e67b89068125123f52c9e">gemm_microkernel</a></div><div class="ttdeci">void gemm_microkernel(const float *A, const float *B, float *C, int M, int N, int K, int B_transposed)</div><div class="ttdef"><b>Definition</b> <a href="gemm__microkernel_8c_source.html#l01134">gemm_microkernel.c:1134</a></div></div>
@@ -1176,12 +1200,14 @@ $(document).ready(function(){initNavTree('gemm__kernels_8c_source.html',''); ini
 <div class="ttc" id="agemm__kernels_8c_html_a155ee359c94e8d25746f5a2828c6c448"><div class="ttname"><a href="gemm__kernels_8c.html#a155ee359c94e8d25746f5a2828c6c448">gemm_naive_serial_double</a></div><div class="ttdeci">static void gemm_naive_serial_double(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00111">gemm_kernels.c:111</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a19bd64cbde3f643580eb69b050c8e61d"><div class="ttname"><a href="gemm__kernels_8c.html#a19bd64cbde3f643580eb69b050c8e61d">ck_min</a></div><div class="ttdeci">static int ck_min(int a, int b)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00030">gemm_kernels.c:30</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a1cd1848bd75a4fb5874fe0feaa8716e4"><div class="ttname"><a href="gemm__kernels_8c.html#a1cd1848bd75a4fb5874fe0feaa8716e4">gemm_naive_parallel</a></div><div class="ttdeci">void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00146">gemm_kernels.c:146</a></div></div>
+<div class="ttc" id="agemm__kernels_8c_html_a21bf1789acc5556879531b42b0bd40cd"><div class="ttname"><a href="gemm__kernels_8c.html#a21bf1789acc5556879531b42b0bd40cd">gemm_nt_f32_llama_production_output_range</a></div><div class="ttdeci">void gemm_nt_f32_llama_production_output_range(const float *A, const float *B, const float *bias, float *C, int M, int N, int K, int output_begin, int output_end)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00989">gemm_kernels.c:989</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a22a37a53d15e04ad075a326967437567"><div class="ttname"><a href="gemm__kernels_8c.html#a22a37a53d15e04ad075a326967437567">ck_gemm_nn_impl_probe_enabled</a></div><div class="ttdeci">static int ck_gemm_nn_impl_probe_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00496">gemm_kernels.c:496</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a24330b2f3614491ceed30ccb6d1acb3d"><div class="ttname"><a href="gemm__kernels_8c.html#a24330b2f3614491ceed30ccb6d1acb3d">gemm_naive_serial_float</a></div><div class="ttdeci">static void gemm_naive_serial_float(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00128">gemm_kernels.c:128</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a2731fd00008f7e887e94ec03af77325d"><div class="ttname"><a href="gemm__kernels_8c.html#a2731fd00008f7e887e94ec03af77325d">gemm_nn_serial_double</a></div><div class="ttdeci">static void gemm_nn_serial_double(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00321">gemm_kernels.c:321</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a2ede2afc7813b9fa4fc663f93fa2e54d"><div class="ttname"><a href="gemm__kernels_8c.html#a2ede2afc7813b9fa4fc663f93fa2e54d">gemm_nn_avx512_probe</a></div><div class="ttdeci">void gemm_nn_avx512_probe(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00433">gemm_kernels.c:433</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a3549b849a914ea46c5d51c7d485fecec"><div class="ttname"><a href="gemm__kernels_8c.html#a3549b849a914ea46c5d51c7d485fecec">gemm_nn_parallel</a></div><div class="ttdeci">void gemm_nn_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00338">gemm_kernels.c:338</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a44c450ce25774bb9d5fab4e5fd172e98"><div class="ttname"><a href="gemm__kernels_8c.html#a44c450ce25774bb9d5fab4e5fd172e98">gemm_nt_matvec_parallel</a></div><div class="ttdeci">static void gemm_nt_matvec_parallel(const float *A, const float *B, const float *bias, float *C, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00065">gemm_kernels.c:65</a></div></div>
+<div class="ttc" id="agemm__kernels_8c_html_a5b6e336e88f6e42a743eaea511bb59f3"><div class="ttname"><a href="gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3">ck_gemm_nt_f32_llama_production_output</a></div><div class="ttdeci">static void ck_gemm_nt_f32_llama_production_output(const float *A, const float *B, const float *bias, float *C, int M, int N, int K, int index)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00905">gemm_kernels.c:905</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a84ce00fad7103b550ea75b52a21a98f7"><div class="ttname"><a href="gemm__kernels_8c.html#a84ce00fad7103b550ea75b52a21a98f7">gemm_tn_parallel</a></div><div class="ttdeci">void gemm_tn_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00627">gemm_kernels.c:627</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a91c10e18555ecb27791d5405c8dc3ae4"><div class="ttname"><a href="gemm__kernels_8c.html#a91c10e18555ecb27791d5405c8dc3ae4">gemm_nn_avx512</a></div><div class="ttdeci">void gemm_nn_avx512(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00360">gemm_kernels.c:360</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_a991079eceb2424fbabb6bb9e23a7c86e"><div class="ttname"><a href="gemm__kernels_8c.html#a991079eceb2424fbabb6bb9e23a7c86e">gemm_tn_serial_double</a></div><div class="ttdeci">static void gemm_tn_serial_double(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00609">gemm_kernels.c:609</a></div></div>
@@ -1190,7 +1216,7 @@ $(document).ready(function(){initNavTree('gemm__kernels_8c_source.html',''); ini
 <div class="ttc" id="agemm__kernels_8c_html_abab2d2aaed47f4c682c019bd77fab1ed"><div class="ttname"><a href="gemm__kernels_8c.html#abab2d2aaed47f4c682c019bd77fab1ed">gemm_fine_grained_parallel</a></div><div class="ttdeci">void gemm_fine_grained_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00226">gemm_kernels.c:226</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_ad7789976472e68f59b1604811f4648f2"><div class="ttname"><a href="gemm__kernels_8c.html#ad7789976472e68f59b1604811f4648f2">ck_gemm_add_bias</a></div><div class="ttdeci">static void ck_gemm_add_bias(float *C, const float *bias, int M, int N)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00032">gemm_kernels.c:32</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_ae3bc36ea7b8562f9121e527f0f408b43"><div class="ttname"><a href="gemm__kernels_8c.html#ae3bc36ea7b8562f9121e527f0f408b43">gemm_tn_blocked</a></div><div class="ttdeci">void gemm_tn_blocked(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00709">gemm_kernels.c:709</a></div></div>
-<div class="ttc" id="agemm__kernels_8c_html_ae808c1ad88909d53227862259add3b52"><div class="ttname"><a href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a></div><div class="ttdeci">void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00905">gemm_kernels.c:905</a></div></div>
+<div class="ttc" id="agemm__kernels_8c_html_ae808c1ad88909d53227862259add3b52"><div class="ttname"><a href="gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52">gemm_nt_f32_llama_production</a></div><div class="ttdeci">void gemm_nt_f32_llama_production(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l01002">gemm_kernels.c:1002</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_af4f0e756d3ac00b45ce2c7a296b61ae3"><div class="ttname"><a href="gemm__kernels_8c.html#af4f0e756d3ac00b45ce2c7a296b61ae3">gemm_blocked_serial</a></div><div class="ttdeci">void gemm_blocked_serial(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00789">gemm_kernels.c:789</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_afd447dc190bd77241a42d8972f9c5fba"><div class="ttname"><a href="gemm__kernels_8c.html#afd447dc190bd77241a42d8972f9c5fba">gemm_nn_blocked</a></div><div class="ttdeci">void gemm_nn_blocked(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00530">gemm_kernels.c:530</a></div></div>
 <div class="ttc" id="agemm__kernels_8c_html_afe5bf17f909def227c3e25b0c4338f93"><div class="ttname"><a href="gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93">gemm_tn_avx512</a></div><div class="ttdeci">void gemm_tn_avx512(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00649">gemm_kernels.c:649</a></div></div>

@@ -246,6 +246,7 @@ var ckernel__engine_8h =
     [ "gemm_nt_f16", "ckernel__engine_8h.html#a35c4d014ba8d4c8b63cc30114bd1ccf9", null ],
     [ "gemm_nt_f16_clipped", "ckernel__engine_8h.html#a9388bc1e31c430befcde26ec5a572100", null ],
     [ "gemm_nt_f32_llama_production", "ckernel__engine_8h.html#ae808c1ad88909d53227862259add3b52", null ],
+    [ "gemm_nt_f32_llama_production_output_range", "ckernel__engine_8h.html#a21bf1789acc5556879531b42b0bd40cd", null ],
     [ "gemm_nt_q4_0", "ckernel__engine_8h.html#a001c2346f83b345676e8c54a27cf7bb1", null ],
     [ "gemm_nt_q4_1", "ckernel__engine_8h.html#a4aa220bcd9def8d49e5965fc1e63fcc7", null ],
     [ "gemm_nt_q4_k", "ckernel__engine_8h.html#a3175d33b3e513cf585a31f96db726e39", null ],

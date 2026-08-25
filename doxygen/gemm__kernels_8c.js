@@ -2,6 +2,7 @@ var gemm__kernels_8c =
 [
     [ "ck_gemm_add_bias", "gemm__kernels_8c.html#ad7789976472e68f59b1604811f4648f2", null ],
     [ "ck_gemm_nn_impl_probe_enabled", "gemm__kernels_8c.html#a22a37a53d15e04ad075a326967437567", null ],
+    [ "ck_gemm_nt_f32_llama_production_output", "gemm__kernels_8c.html#a5b6e336e88f6e42a743eaea511bb59f3", null ],
     [ "ck_min", "gemm__kernels_8c.html#a19bd64cbde3f643580eb69b050c8e61d", null ],
     [ "gemm_avx512_parallel", "gemm__kernels_8c.html#a9af477f77eb64b2cdd2ccddae9c84e72", null ],
     [ "gemm_blocked_serial", "gemm__kernels_8c.html#af4f0e756d3ac00b45ce2c7a296b61ae3", null ],
@@ -16,6 +17,7 @@ var gemm__kernels_8c =
     [ "gemm_nn_serial_double", "gemm__kernels_8c.html#a2731fd00008f7e887e94ec03af77325d", null ],
     [ "gemm_nn_simd", "gemm__kernels_8c.html#aa2ce07d3575e9c3e87bc8e0f28d43762", null ],
     [ "gemm_nt_f32_llama_production", "gemm__kernels_8c.html#ae808c1ad88909d53227862259add3b52", null ],
+    [ "gemm_nt_f32_llama_production_output_range", "gemm__kernels_8c.html#a21bf1789acc5556879531b42b0bd40cd", null ],
     [ "gemm_nt_matvec_parallel", "gemm__kernels_8c.html#a44c450ce25774bb9d5fab4e5fd172e98", null ],
     [ "gemm_tn_avx512", "gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93", null ],
     [ "gemm_tn_blocked", "gemm__kernels_8c.html#ae3bc36ea7b8562f9121e527f0f408b43", null ],
