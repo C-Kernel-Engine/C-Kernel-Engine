@@ -5403,6 +5403,11 @@ nightly-quick:
 nightly-json:
 	@$(PYTHON) scripts/nightly_runner.py --json $(BUILD_DIR)/nightly_report.json
 
+nightly-demo-readiness:
+	@$(PYTHON) scripts/nightly_runner.py --profile demo-readiness \
+		--json $(BUILD_DIR)/demo-readiness/nightly-latest.json \
+		--markdown $(BUILD_DIR)/demo-readiness/nightly-latest.md
+
 nightly-baseline:
 	@$(PYTHON) scripts/nightly_runner.py --save-baseline
 
@@ -5433,7 +5438,7 @@ nightly-archive:
 nightly-list:
 	@$(PYTHON) scripts/nightly_runner.py --list
 
-.PHONY: nightly nightly-quick nightly-json nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
+.PHONY: nightly nightly-quick nightly-json nightly-demo-readiness nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
 .PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto libckernel_audio.so
 
 # ============================================================================

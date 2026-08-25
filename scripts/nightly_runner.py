@@ -11,6 +11,7 @@ Usage:
     python3 scripts/nightly_runner.py --json report.json # Output JSON report
     python3 scripts/nightly_runner.py --save-baseline    # Save current perf as baseline
     python3 scripts/nightly_runner.py --category quant   # Run specific category
+    python3 scripts/nightly_runner.py --profile demo-readiness --json report.json --markdown report.md
 
 Categories:
     - kernels:  Core kernel tests (gemm, relu, softmax, etc.)
@@ -1060,6 +1061,32 @@ QUICK_TESTS = [
 ]
 
 NIGHTLY_PROFILES = {
+    "demo-readiness": [
+        "v8_validate_contracts",
+        "v8_kernel_map_contracts",
+        "v8_model_memory_plans",
+        "v8_numerical_contracts",
+        "v8_dsl_policy",
+        "v8_template_circuit_audit",
+        "v8_architecture_contracts",
+        "llamacpp_parity",
+        "q4q6_production_graph_parity",
+        "threadpool_parity",
+        "v8_regression_fast",
+        "v8_audio_contracts",
+        "v8_xeon_family_contracts",
+        "qwen3vl_template_contracts",
+        "qwen3vl_methodical_layer_parity",
+        "v8_qwen3vl_vision_smoke",
+        "v8_gemma4_vision_smoke",
+        "qwen3vl_private_corpus_parity",
+        "qwen36vl_private_corpus_parity",
+        "v8_gemma4_highmem",
+        "v8_nemotron9_highmem",
+        "v8_glm4_highmem",
+        "v8_kimi_highmem",
+        "v8_qwen36_highmem",
+    ],
     "xeon-e2e": [
         "v8_xeon_family_contracts",
         "v8_qwen36_highmem",
@@ -1074,6 +1101,13 @@ NIGHTLY_PROFILES = {
     ],
     "gemma4-e2e": [
         "v8_gemma4_highmem",
+    ],
+}
+
+NIGHTLY_PROFILE_TESTS = {
+    "demo-readiness": [
+        "v8_instella_moe_circuit_contracts",
+        "qwen3vl_private_corpus_contract",
     ],
 }
 
@@ -1703,8 +1737,61 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
     )
     if vision_encoder_accuracy is not None:
         report["vision_encoder_accuracy"] = vision_encoder_accuracy
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     filepath.write_text(json.dumps(report, indent=2))
     print(f"\nJSON report saved to: {filepath}")
+
+
+def _markdown_cell(value: object) -> str:
+    return str(value or "").replace("|", "\\|").replace("\n", "<br>")
+
+
+def save_markdown_report(results: list[TestResult], filepath: Path, start_time: datetime):
+    """Write an operator-readable morning report alongside the JSON evidence."""
+    finished = datetime.now()
+    counts = {
+        status: sum(1 for result in results if result.status == status)
+        for status in ("pass", "fail", "skip", "timeout")
+    }
+    overall = "PASS" if counts["fail"] == 0 and counts["timeout"] == 0 else "FAIL"
+    lines = [
+        "# CKE Demo Readiness Report",
+        "",
+        f"**Overall:** {overall}",
+        "",
+        f"- Started: `{start_time.isoformat(timespec='seconds')}`",
+        f"- Finished: `{finished.isoformat(timespec='seconds')}`",
+        f"- Duration: `{sum(result.duration_sec for result in results):.1f}s`",
+        (
+            f"- Results: `{counts['pass']} passed`, `{counts['fail']} failed`, "
+            f"`{counts['skip']} skipped`, `{counts['timeout']} timed out`"
+        ),
+        "",
+        "| Status | Test | Category | Duration | Detail |",
+        "|---|---|---:|---:|---|",
+    ]
+    labels = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP", "timeout": "TIMEOUT"}
+    for result in results:
+        detail = result.error_msg if result.status != "pass" else ""
+        lines.append(
+            "| {status} | {name} | {category} | {duration:.1f}s | {detail} |".format(
+                status=labels[result.status],
+                name=_markdown_cell(result.name),
+                category=_markdown_cell(result.category),
+                duration=result.duration_sec,
+                detail=_markdown_cell(detail),
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "Configured artifact lanes fail when broken. Unconfigured optional model and private-corpus lanes report SKIP.",
+            "",
+        ]
+    )
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    filepath.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Markdown report saved to: {filepath}")
 
 
 def update_nightly_index(results_dir=None):
@@ -1769,6 +1856,7 @@ def main():
     parser.add_argument("--ci", action="store_true", help="CI mode: skip tests requiring full shared library")
     parser.add_argument("--category", type=str, help="Run specific category (kernels, bf16, quant, inference, training, parity, archive, bench)")
     parser.add_argument("--json", type=str, metavar="FILE", help="Save JSON report to file")
+    parser.add_argument("--markdown", type=str, metavar="FILE", help="Save Markdown summary to file")
     parser.add_argument("--save-baseline", action="store_true", help="Save current perf as baseline")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--list", action="store_true", help="List all tests")
@@ -1802,6 +1890,7 @@ def main():
     bench_targets_to_run = []
 
     if args.profile:
+        tests_to_run = list(NIGHTLY_PROFILE_TESTS.get(args.profile, []))
         make_targets_to_run = list(NIGHTLY_PROFILES[args.profile])
     elif args.quick:
         tests_to_run = [k for k in QUICK_TESTS if k in TEST_SUITES]
@@ -1942,6 +2031,8 @@ def main():
     # Save JSON if requested
     if args.json:
         save_json_report(results, Path(args.json), start_time)
+    if args.markdown:
+        save_markdown_report(results, Path(args.markdown), start_time)
 
     # --no-fail: always return 0 for CI warning mode
     if args.no_fail:

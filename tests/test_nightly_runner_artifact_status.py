@@ -5,6 +5,7 @@ import importlib.util
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -119,6 +120,51 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         self.assertEqual(qwen36vl["timeout_sec"], 21600)
         sweep = runner.MAKE_TARGETS["v8_xeon_decoder_family_sweep"]
         self.assertEqual(sweep["profile_only"], "xeon-e2e")
+
+    def test_demo_readiness_profile_covers_models_and_private_ocr(self) -> None:
+        runner = _load_runner()
+        profile = runner.NIGHTLY_PROFILES["demo-readiness"]
+        expected = {
+            "v8_regression_fast",
+            "v8_audio_contracts",
+            "v8_qwen3vl_vision_smoke",
+            "v8_gemma4_vision_smoke",
+            "qwen3vl_private_corpus_parity",
+            "qwen36vl_private_corpus_parity",
+            "v8_gemma4_highmem",
+            "v8_nemotron9_highmem",
+            "v8_glm4_highmem",
+            "v8_kimi_highmem",
+            "v8_qwen36_highmem",
+        }
+        self.assertTrue(expected.issubset(profile))
+        self.assertTrue(all(key in runner.MAKE_TARGETS for key in profile))
+        self.assertIn(
+            "v8_instella_moe_circuit_contracts",
+            runner.NIGHTLY_PROFILE_TESTS["demo-readiness"],
+        )
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        runbook = (ROOT / "docs" / "site" / "_pages" / "v8-runbook.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("nightly-demo-readiness:", makefile)
+        self.assertIn("--profile demo-readiness", makefile)
+        self.assertIn("make nightly-demo-readiness", runbook)
+
+    def test_markdown_report_preserves_fail_and_skip_reasons(self) -> None:
+        runner = _load_runner()
+        results = [
+            runner.TestResult("decoder", "inference", "pass", 1.25),
+            runner.TestResult("private OCR", "parity", "skip", 0.1, error_msg="not configured"),
+            runner.TestResult("vision", "inference", "fail", 2.0, error_msg="hash mismatch"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "nested" / "report.md"
+            runner.save_markdown_report(results, report, datetime(2026, 8, 25, 1, 2, 3))
+            text = report.read_text(encoding="utf-8")
+        self.assertIn("**Overall:** FAIL", text)
+        self.assertIn("| SKIP | private OCR | parity | 0.1s | not configured |", text)
+        self.assertIn("| FAIL | vision | inference | 2.0s | hash mismatch |", text)
 
     def test_profile_only_sweep_is_not_part_of_default_or_category_nightly(self) -> None:
         runner = _load_runner()
