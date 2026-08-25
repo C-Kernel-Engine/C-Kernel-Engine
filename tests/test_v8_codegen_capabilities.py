@@ -329,6 +329,48 @@ class V8CodegenCapabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "advertises function"):
             build_ir._validated_kernel_codegen_capability(document["id"], document)
 
+    def test_canonical_q8_k_map_owns_parallel_prefill_batching(self) -> None:
+        path = ROOT / "version" / "v8" / "kernel_maps" / "quantize_row_q8_k.json"
+        document = json.loads(path.read_text(encoding="utf-8"))
+        capability = document["codegen_capability"]
+        prefill_batch = capability["prefill_batch"]
+
+        self.assertEqual(
+            prefill_batch["function"],
+            "quantize_batch_q8_k_4row_nearest_even_parallel_dispatch",
+        )
+        self.assertEqual(prefill_batch["row_group"], 4)
+        self.assertEqual(prefill_batch["tail_function"], "quantize_row_q8_k")
+        self.assertEqual(
+            prefill_batch["rounding_contract"],
+            capability["rounding_contract"],
+        )
+        self.assertIn(
+            "version/v8/src/ck_parallel_prefill_v8.c",
+            document["impl"]["sources"],
+        )
+
+        op = _quantize_op("quantize_mlp_down_input", "q8_k")
+        op["function"] = document["impl"]["function"]
+        op["resolved_codegen_capability"] = {
+            **capability,
+            "kernel_id": document["id"],
+        }
+        prefill_code = prefill.emit_prefill_op(op, 2, {})
+        self.assertIn(
+            "quantize_batch_q8_k_4row_nearest_even_parallel_dispatch("
+            "_x_base, (void*)_y_base, num_tokens, _k);",
+            prefill_code,
+        )
+        self.assertNotIn("for (int _t = 0; _t < num_tokens; ++_t)", prefill_code)
+
+        decode_code = core.emit_op(op)
+        self.assertIn("quantize_row_q8_k(", decode_code)
+        self.assertNotIn(
+            "quantize_batch_q8_k_4row_nearest_even_parallel_dispatch(",
+            decode_code,
+        )
+
     def test_decode_quantization_uses_storage_capability_not_symbol(self) -> None:
         for storage, symbol, block_type in (
             ("q8_0", "QK8_0", "block_q8_0"),
