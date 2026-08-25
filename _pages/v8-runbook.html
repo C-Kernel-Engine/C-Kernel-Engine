@@ -154,6 +154,25 @@
     </div>
 </div>
 
+<h2 id="demo-readiness-nightly">Overnight Demo Readiness</h2>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">One command before a demo</h3>
+    <p>
+        Run the capacity-aware compatibility sweep before leaving the machine overnight. It exercises the promoted decoder families, compiler and memory-plan contracts, llama.cpp numerical gates, Instella, audio, vision, configured high-memory models, and both Qwen private OCR corpora.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make nightly-demo-readiness</pre>
+    </div>
+    <p>
+        In the morning, open <code>build/demo-readiness/nightly-latest.md</code>. The machine-readable evidence is written to <code>build/demo-readiness/nightly-latest.json</code>. A configured lane that breaks is a failure; an optional model or private corpus that is not configured is shown explicitly as <code>SKIP</code>.
+    </p>
+    <p class="v8-note" style="margin-bottom: 0;">
+        Private OCR output is redacted from the aggregate report. Configure Qwen3-VL with <code>CK_QWEN3VL_OCR_MANIFEST</code>, configure Qwen3.6-VL with <code>CK_QWEN36VL_OCR_MANIFEST</code>, <code>CK_QWEN36VL_DECODER_GGUF</code>, and <code>CK_QWEN36VL_ENCODER_RUNTIME</code>, and point <code>CK_LLAMA_CPP_ROOT</code> at the pinned llama.cpp oracle. Existing completed corpus cases resume instead of being repeated.
+    </p>
+</div>
+
 <div class="card card-blue">
     <h3 style="margin-top: 0;">How The Vision Side Works</h3>
     <p style="margin-bottom: 0.35rem;">
