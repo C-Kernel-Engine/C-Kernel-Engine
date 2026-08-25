@@ -224,7 +224,7 @@ class V8KimiTemplateTests(unittest.TestCase):
 
         q_source = by_layer_op[(0, "q_proj", 0)]["dataflow"]["inputs"]["x"]
         kv_source = by_layer_op[(0, "kv_a_proj", 0)]["dataflow"]["inputs"]["x"]
-        router_source = by_layer_op[(1, "moe_router", 0)]["dataflow"]["inputs"]["x"]
+        router_source = by_layer_op[(1, "moe_router", 0)]["dataflow"]["inputs"]["A"]
         self.assertEqual(q_source["slot"], "layer_input")
         self.assertEqual(q_source["from_op"], by_layer_op[(0, "block_rmsnorm", 0)]["op_id"])
         self.assertEqual(kv_source["slot"], "layer_input")

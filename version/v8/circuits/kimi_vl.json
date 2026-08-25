@@ -125,7 +125,7 @@
   "kernels": {
     "block_rmsnorm": "rmsnorm_forward_pytorch_bf16_storage",
     "kv_a_layernorm": "rmsnorm_forward_strided_f32",
-    "kv_lora_decompress": "deepseek_mla_kv_decompress_f32",
+    "kv_lora_decompress": "deepseek_mla_kv_decompress_bf16",
     "partial_rope_concat": "deepseek_mla_partial_rope_concat_packed_f32",
     "mla_attention_prefill": "deepseek_mla_attention_f32",
     "mla_attention_decode": "deepseek_mla_attention_decode_f32",
@@ -344,7 +344,10 @@
               "op": "moe_router",
               "graph_slots": {
                 "inputs": {
-                  "x": "layer_input"
+                  "A": "layer_input"
+                },
+                "outputs": {
+                  "C": "mlp_scratch"
                 }
               }
             },
