@@ -1118,11 +1118,13 @@
       <div class="ka-card"><strong>Selection status.</strong>
         <span class="pill prod">production &times;64</span>
         <span class="pill cand">candidate &times;5</span>
-        <span class="pill none">unmarked &times;228</span><br>
+        <span class="pill none">legacy (unmarked) &times;228</span><br>
         The schema also defines <code>diagnostic</code> and <code>deprecated</code>; no current map uses them.
-        Only <code>production</code> providers may auto-select. Candidates resolve only behind explicit opt-in
-        routes (for example <code>production_when_prepared</code> weight layouts), and equal-priority production
-        ambiguity fails closed instead of guessing.
+        Explicit <code>candidate</code> providers resolve only behind explicit opt-in routes (for example
+        <code>production_when_prepared</code> weight layouts), and equal-priority production ambiguity fails
+        closed instead of guessing. The 228 unmarked maps are implicit <code>legacy</code> providers: they
+        remain eligible as compatibility fallbacks and rank below production &mdash; migration debt, not
+        unreachable providers.
       </div>
       <div class="ka-card"><strong>The five candidates today.</strong><br>
         <code>moe_softmax_topk_router_llama_f32</code>, <code>moe_swiglu_expert_forward_q4k_q5k</code>,
@@ -1150,7 +1152,7 @@
     </p>
     <div class="svg-expand">
     <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Provider selection filter chain"
-         aria-label="Provider selection filter chain: all 297 providers enter; compatibility filters remove wrong dtype, layout, phase, ISA, shape and ABI matches; status filter removes candidates and unmarked providers from automatic selection; equivalence grouping keeps only providers with the same numerical contract; priority ranks what remains; ties fail closed."
+         aria-label="Provider selection filter chain: all 297 providers enter; compatibility filters remove wrong dtype, layout, phase, ISA, shape and ABI matches; the status filter removes explicit candidate, diagnostic and deprecated providers from automatic selection while unmarked maps stay eligible as legacy fallbacks ranked below production; equivalence grouping keeps only providers with the same numerical contract; priority ranks what remains; ties fail closed."
          style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <style>
         .fs-stage{fill:#323232;stroke:#454545;stroke-width:1.4;}
@@ -1200,7 +1202,7 @@
       <text x="264" y="190" class="fs-drop">&#10007; decode provider in prefill phase</text>
       <text x="264" y="210" class="fs-drop">&#10007; AVX-512 kernel on an SSE host</text>
       <text x="514" y="170" class="fs-drop">&#10007; candidate / diagnostic / deprecated</text>
-      <text x="514" y="190" class="fs-drop">&#10007; unmarked (228 maps never auto-select)</text>
+      <text x="514" y="190" class="fs-drop">&#183; unmarked &rarr; legacy fallback below production (228)</text>
       <text x="764" y="170" class="fs-drop">&#10007; online-softmax flash vs exact full-score</text>
       <text x="764" y="190" class="fs-drop">&#10007; grouped vs serial reduction order</text>
       <text x="1014" y="170" class="fs-drop">&#10007; equal priority, same group</text>

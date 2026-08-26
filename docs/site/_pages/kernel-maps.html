@@ -129,9 +129,9 @@ main code{overflow-wrap:anywhere}
 
 <table class="km-table">
   <tr><th>Field</th><th>Type</th><th>Rule</th></tr>
-  <tr><td>status</td><td><code>production | candidate | diagnostic | deprecated</code></td><td>Lifecycle rank. Only <code>production</code> providers auto-select; candidate, diagnostic, and deprecated never do.</td></tr>
+  <tr><td>status</td><td><code>production | candidate | diagnostic | deprecated</code></td><td>Lifecycle rank. Explicit candidate, diagnostic, and deprecated providers never auto-select. A map <em>without</em> a selection block is an implicit <code>legacy</code> provider: it stays eligible as a compatibility fallback and ranks below production &mdash; migration debt, not an unreachable provider.</td></tr>
   <tr><td>priority</td><td>integer</td><td>Ranks providers <strong>within one equivalence group only</strong>. It cannot compare across groups.</td></tr>
-  <tr><td>equivalence_group</td><td>non-empty string</td><td>Mandatory. A provider that omits it is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
+  <tr><td>equivalence_group</td><td>non-empty string</td><td>Mandatory once a <code>selection</code> block exists. An explicit provider that omits it is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
   <tr><td>phases</td><td>non-empty unique list of <code>init | prefill | decode | training | backward</code></td><td>Declares which execution phases the provider supports.</td></tr>
 </table>
 
@@ -478,8 +478,8 @@ migration ratchet tracks.</p>
 <h2 id="resolution">The Resolution Algorithm</h2>
 
 <p>
-    Provider selection lives in <code>_provider_selection_metadata</code> and <code>_rank_provider_matches</code>
-    (<code>build_ir_v8.py:5666-5770</code>). The pipeline:
+    Provider selection lives in <code>_provider_selection_metadata</code>, <code>_rank_provider_matches</code>,
+    and <code>find_kernel</code> in <code>version/v8/scripts/build_ir_v8.py</code>. The pipeline:
 </p>
 
 <div class="img-container svg-viewer km-flow" data-title="Resolver flow: compatibility filters before priority ranking, fail closed on tie or empty result, X-Ray evidence">
@@ -487,7 +487,7 @@ migration ratchet tracks.</p>
 </div>
 
 <ol>
-  <li><strong>Validate selection metadata.</strong> Every provider must declare an <code>equivalence_group</code>; a missing or malformed <code>selection</code> block is a <code>HARD KERNEL SELECTION FAULT</code>. Providers with no <code>selection</code> block at all are treated as legacy.</li>
+  <li><strong>Validate selection metadata.</strong> Every explicit provider must declare an <code>equivalence_group</code>; a malformed <code>selection</code> block (bad status, non-integer priority, empty group) is a <code>HARD KERNEL SELECTION FAULT</code>. Providers with no <code>selection</code> block at all are implicit legacy: they stay eligible and rank below production. Explicit candidate, diagnostic, and deprecated providers are rejected here with a recorded reason.</li>
   <li><strong>Filter by compatibility.</strong> Contract identity, phase, dtype, shape, layout, ISA, and alias safety — any mismatch rejects the provider with a recorded reason.</li>
   <li><strong>Rank the survivors.</strong> The ranking tuple is direction (inference vs backward) &rarr; activation preference &rarr; lifecycle rank (<code>production</code> first) &rarr; priority (higher wins, within the group).</li>
   <li><strong>Fail closed on ambiguity.</strong> A tie among explicit production providers raises <code>"equal-priority production providers are ambiguous"</code> when they share a group, or <code>"priority cannot choose between different equivalence groups"</code> when they do not. Zero compatible providers is also a compile-time failure — the build never silently substitutes different numerics.</li>
