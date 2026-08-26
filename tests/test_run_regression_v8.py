@@ -42,6 +42,17 @@ class RegressionHarnessV8Tests(unittest.TestCase):
         )
         self.assertEqual(cleaned, "Hello!")
 
+    def test_normalize_assistant_output_handles_prompt_owned_think_prefix(self) -> None:
+        text = "internal reasoning\n</think>\n\nHello! How can I help?"
+        cleaned = regression.normalize_assistant_output(
+            text,
+            {
+                "strip_think_blocks": True,
+                "trim_whitespace": True,
+            },
+        )
+        self.assertEqual(cleaned, "Hello! How can I help?")
+
     def test_greeting_coherence_passes(self) -> None:
         heuristics = {
             "min_chars": 8,

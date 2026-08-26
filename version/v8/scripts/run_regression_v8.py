@@ -241,6 +241,8 @@ def _extract_assistant_output(stdout: str) -> str:
 
 def _strip_think_blocks(text: str) -> str:
     out = re.sub(r"<think>\s*.*?\s*</think>\s*", "", text, flags=re.S | re.I)
+    if not re.search(r"<think>", out, flags=re.I):
+        out = re.sub(r"\A.*?</think>\s*", "", out, count=1, flags=re.S | re.I)
     return re.sub(r"<think>\s*.*\Z", "", out, flags=re.S | re.I)
 
 

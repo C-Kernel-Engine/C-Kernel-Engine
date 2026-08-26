@@ -105,6 +105,31 @@ class TestCKChatRuntimeContract(unittest.TestCase):
                 "<bos>System<user>Hello<assistant>Hi<eos><user>Next<assistant>",
             )
 
+    def test_text_bos_precedes_conversation_prefix(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_bos_conversation_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps(
+                    {
+                        "special_tokens": {"add_bos_token": False},
+                        "chat_contract": {
+                            "name": "ordered_prefixes",
+                            "conversation_prefix": "<conversation>",
+                            "turn_prefix_by_role": {"user": "<user>"},
+                            "assistant_generation_prefix": "<assistant>",
+                            "force_bos_text_if_tokenizer_add_bos_false": "<bos>",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<bos><conversation><user>Hello<assistant>",
+            )
+
     def test_glm4_contract_matches_gguf_generation_prompt_exactly(self) -> None:
         model = ck_chat.CKModel("/tmp/nonexistent")
         model._configure_chat_template("glm4")
@@ -385,6 +410,38 @@ class TestCKChatRuntimeContract(unittest.TestCase):
             prompt = model.format_chat_prompt("Hello")
             self.assertNotIn("/no_think\nHello", prompt)
             self.assertTrue(prompt.endswith("<|im_start|>assistant\n"))
+
+    def test_nemotron_contract_matches_embedded_generation_prompt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_nemotron_") as td:
+            run_dir = Path(td)
+            circuit = json.loads(
+                (ROOT / "version/v8/circuits/nemotron_h.json").read_text(encoding="utf-8")
+            )
+            (run_dir / "config.json").write_text(
+                json.dumps({"chat_contract": circuit["contract"]["chat_contract"]}),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<SPECIAL_10>System\n\n<SPECIAL_11>User\nHello\n"
+                "<SPECIAL_11>Assistant\n<think>\n",
+            )
+
+            self.assertEqual(
+                model.format_chat_prompt("Hello", system_prompt="Be concise."),
+                "<SPECIAL_10>System\nBe concise.\n<SPECIAL_11>User\nHello\n"
+                "<SPECIAL_11>Assistant\n<think>\n",
+            )
+
+            model.thinking_mode = "suppressed"
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<SPECIAL_10>System\n\n<SPECIAL_11>User\nHello\n"
+                "<SPECIAL_11>Assistant\n<think></think>",
+            )
 
     def test_qwen3_auto_mode_uses_visible_think_generation_prompt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_qwen3_") as td:

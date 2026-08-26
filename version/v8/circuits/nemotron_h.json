@@ -27,22 +27,41 @@
     "chat_contract": {
       "version": 1,
       "name": "nemotron_h",
-      "raw_prompt_allowed": true,
-      "turn_prefix": "{role}: ",
+      "raw_prompt_allowed": false,
+      "conversation_prefix": "<SPECIAL_10>System\n",
+      "turn_prefix": "<SPECIAL_11>{role}\n",
+      "turn_prefix_by_role": {
+        "system": ""
+      },
       "turn_suffix": "\n",
-      "assistant_generation_prefix": "assistant: ",
+      "turn_suffix_by_role": {
+        "assistant": "\n<SPECIAL_12>\n"
+      },
+      "assistant_generation_prefix": "<SPECIAL_11>Assistant\n<think>\n",
       "role_labels": {
-        "system": "system",
-        "user": "user",
-        "assistant": "assistant"
+        "system": "System",
+        "user": "User",
+        "assistant": "Assistant"
       },
       "system_prompt_mode": "dedicated_turn",
       "system_prompt_separator": "\n\n",
       "default_system_prompt": "",
       "inject_default_system_prompt": false,
-      "stop_text_markers": [],
-      "token_stop_markers": [],
-      "template_markers": [],
+      "render_empty_system_turn": true,
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": ["/no_think", "/think"],
+      "thinking_mode_default": "visible",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<SPECIAL_11>Assistant\n<think>\n",
+        "suppressed": "<SPECIAL_11>Assistant\n<think></think>"
+      },
+      "last_user_prefix_by_thinking_mode": {
+        "visible": "",
+        "suppressed": ""
+      },
+      "stop_text_markers": ["<SPECIAL_12>"],
+      "token_stop_markers": ["<SPECIAL_12>"],
+      "template_markers": ["<SPECIAL_10>", "<SPECIAL_11>", "<SPECIAL_12>"],
       "min_response_tokens": 8
     },
     "attention_contract": {

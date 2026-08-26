@@ -1468,10 +1468,22 @@ def _format_prompt_with_chat_contract(
     role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
     turn_prefix = str(contract.get("turn_prefix") or "")
     turn_suffix = str(contract.get("turn_suffix") or "")
+    conversation_prefix = str(contract.get("conversation_prefix") or "")
+    turn_prefix_by_role = (
+        contract.get("turn_prefix_by_role")
+        if isinstance(contract.get("turn_prefix_by_role"), dict)
+        else {}
+    )
+    turn_suffix_by_role = (
+        contract.get("turn_suffix_by_role")
+        if isinstance(contract.get("turn_suffix_by_role"), dict)
+        else {}
+    )
     system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
     system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
     default_system_prompt = str(contract.get("default_system_prompt") or "")
     inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
+    render_empty_system_turn = bool(contract.get("render_empty_system_turn"))
     bos_prefix = str(contract.get("force_bos_text_if_tokenizer_add_bos_false") or "")
     suppression_markers = [
         str(marker).lower()
@@ -1496,13 +1508,15 @@ def _format_prompt_with_chat_contract(
 
     def _render_turn(role: str, content: str) -> str:
         label = str(role_labels.get(role) or role)
-        prefix = turn_prefix.replace("{role}", label)
-        return f"{prefix}{content}{turn_suffix}"
+        prefix = str(turn_prefix_by_role.get(role, turn_prefix)).replace("{role}", label)
+        suffix = str(turn_suffix_by_role.get(role, turn_suffix))
+        return f"{prefix}{content}{suffix}"
 
     formatted = ""
     if bos_prefix:
         formatted += bos_prefix
-    if system_text and system_prompt_mode == "dedicated_turn":
+    formatted += conversation_prefix
+    if (system_text or render_empty_system_turn) and system_prompt_mode == "dedicated_turn":
         formatted += _render_turn("system", system_text)
     formatted += _render_turn("user", user_text)
     formatted += assistant_generation_prefix

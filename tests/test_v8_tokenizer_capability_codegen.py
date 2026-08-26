@@ -224,6 +224,29 @@ class TestV8TokenizerCapabilityCodegen(unittest.TestCase):
             c_code,
         )
 
+    def test_generated_formatter_preserves_declarative_role_affixes(self) -> None:
+        generated = build_ir_v8._generate_tokenizer_c_code(
+            "bpe",
+            vocab_size=256,
+            num_merges=0,
+            special_tokens={"bos_token_id": 1, "eos_token_id": 12, "add_bos_token": True},
+            chat_contract={
+                "conversation_prefix": "<SPECIAL_10>System\n",
+                "turn_prefix": "<SPECIAL_11>{role}\n",
+                "turn_prefix_by_role": {"system": ""},
+                "turn_suffix": "\n",
+                "assistant_generation_prefix": "<SPECIAL_11>Assistant\n<think>\n",
+                "role_labels": {"system": "System", "user": "User"},
+                "system_prompt_mode": "dedicated_turn",
+                "render_empty_system_turn": True,
+            },
+        )
+        self.assertIsNotNone(generated)
+        c_code = str(generated["api_functions"])
+        self.assertIn('position, "<SPECIAL_10>System\\n")', c_code)
+        self.assertIn('position, "<SPECIAL_11>User\\n")', c_code)
+        self.assertIn("system_value[0] || 1", c_code)
+
     def test_generated_formatter_keeps_text_bos_when_tokenizer_does_not_add_bos(self) -> None:
         generated = build_ir_v8._generate_tokenizer_c_code(
             "bpe",

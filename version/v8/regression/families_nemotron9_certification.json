@@ -1,0 +1,68 @@
+{
+  "families": [
+    {
+      "id": "nemotron9",
+      "label": "Nemotron Nano 9B v2 Certification",
+      "enabled": true,
+      "model_env": "V8_NEMOTRON9_MODEL",
+      "model": "hf://bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF/nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf",
+      "context_len": 2048,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--thinking-mode",
+        "auto",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "coherence_gate": true,
+      "repeatability": {
+        "prompt": "hello",
+        "runs": 3,
+        "require_nonempty": true
+      },
+      "response_contract": {
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital",
+        "code_bundle"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer"
+        ],
+        "config": {
+          "model": "nemotron_h",
+          "tokenizer_contract.tokenizer_type": "bpe"
+        },
+        "manifest": {
+          "config.model": "nemotron_h",
+          "config.tokenizer_contract.tokenizer_type": "bpe"
+        },
+        "lowered_ops": [
+          {
+            "op": "mamba_selective_scan",
+            "function_prefix": "mamba2_selective_scan",
+            "min_matches": 1
+          },
+          {
+            "op": "relu2",
+            "function_prefix": "relu2_forward",
+            "min_matches": 1
+          }
+        ]
+      }
+    }
+  ]
+}

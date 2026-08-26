@@ -133,6 +133,7 @@ def normalize_chat_contract(contract: Any) -> Optional[dict[str, Any]]:
     out.setdefault("system_prompt_separator", "\n\n")
     out.setdefault("default_system_prompt", "")
     out.setdefault("inject_default_system_prompt", False)
+    out.setdefault("render_empty_system_turn", False)
     out.setdefault("force_bos_text_if_tokenizer_add_bos_false", "")
     out.setdefault("last_user_prefix", "")
     out.setdefault("last_user_prefix_suppression_markers", [])

@@ -679,6 +679,7 @@ def _generate_chat_contract_c_api(
 
     turn_prefix = str(chat_contract.get("turn_prefix") or "")
     turn_suffix = str(chat_contract.get("turn_suffix") or "")
+    conversation_prefix = str(chat_contract.get("conversation_prefix") or "")
     assistant_prefix = str(chat_contract.get("assistant_generation_prefix") or "")
     if not turn_prefix or not assistant_prefix:
         return ""
@@ -690,6 +691,20 @@ def _generate_chat_contract_c_api(
     user_label = str(role_labels.get("user") or "user")
     system_prefix = turn_prefix.replace("{role}", system_label)
     user_prefix = turn_prefix.replace("{role}", user_label)
+    turn_prefix_by_role = chat_contract.get("turn_prefix_by_role")
+    if isinstance(turn_prefix_by_role, dict):
+        system_prefix = str(turn_prefix_by_role.get("system", system_prefix)).replace(
+            "{role}", system_label
+        )
+        user_prefix = str(turn_prefix_by_role.get("user", user_prefix)).replace(
+            "{role}", user_label
+        )
+    turn_suffix_by_role = chat_contract.get("turn_suffix_by_role")
+    system_suffix = turn_suffix
+    user_suffix = turn_suffix
+    if isinstance(turn_suffix_by_role, dict):
+        system_suffix = str(turn_suffix_by_role.get("system", system_suffix))
+        user_suffix = str(turn_suffix_by_role.get("user", user_suffix))
 
     thinking_default = str(chat_contract.get("thinking_mode_default") or "").strip()
     assistant_by_mode = chat_contract.get("assistant_generation_prefix_by_thinking_mode")
@@ -711,6 +726,7 @@ def _generate_chat_contract_c_api(
     system_separator = str(chat_contract.get("system_prompt_separator") or "\n\n")
     default_system = str(chat_contract.get("default_system_prompt") or "")
     inject_default_system = bool(chat_contract.get("inject_default_system_prompt"))
+    render_empty_system_turn = bool(chat_contract.get("render_empty_system_turn"))
     bos_prefix = str(chat_contract.get("force_bos_text_if_tokenizer_add_bos_false") or "")
     if bool((special_tokens or {}).get("add_bos_token", False)):
         bos_prefix = ""
@@ -752,10 +768,12 @@ CK_EXPORT int ck_model_format_chat(const char *system_text,
     int position = 0;
     if (output && output_capacity > 0) output[0] = '\\0';
     position = ck_model_chat_append(output, output_capacity, position, {lit(bos_prefix)});
-    if (system_value[0] && !strcmp({lit(system_mode)}, "dedicated_turn")) {{
+    position = ck_model_chat_append(output, output_capacity, position, {lit(conversation_prefix)});
+    if ((system_value[0] || {1 if render_empty_system_turn else 0}) &&
+        !strcmp({lit(system_mode)}, "dedicated_turn")) {{
         position = ck_model_chat_append(output, output_capacity, position, {lit(system_prefix)});
         position = ck_model_chat_append(output, output_capacity, position, system_value);
-        position = ck_model_chat_append(output, output_capacity, position, {lit(turn_suffix)});
+        position = ck_model_chat_append(output, output_capacity, position, {lit(system_suffix)});
     }}
     position = ck_model_chat_append(output, output_capacity, position, {lit(user_prefix)});
     if (system_value[0] && !strcmp({lit(system_mode)}, "prepend_first_user")) {{
@@ -766,7 +784,7 @@ CK_EXPORT int ck_model_format_chat(const char *system_text,
     }}
     position = ck_model_chat_append(output, output_capacity, position, {lit(last_user_prefix)});
     position = ck_model_chat_append(output, output_capacity, position, user_value);
-    position = ck_model_chat_append(output, output_capacity, position, {lit(turn_suffix)});
+    position = ck_model_chat_append(output, output_capacity, position, {lit(user_suffix)});
     position = ck_model_chat_append(output, output_capacity, position, {lit(assistant_prefix)});
     if (!output || output_capacity <= 0) return position;
     if (position >= output_capacity) return position > 0 ? -position : -1;

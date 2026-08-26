@@ -297,10 +297,12 @@ V8_GEMMA4_VISION_MAX_TOKENS ?= 8
 V8_GEMMA4_VISION_IMAGE ?= version/v8/test_assets/v8_vision_doc_card_72.ppm
 V8_GEMMA4_VISION_PROMPT ?= Explain this image.
 V8_NEMOTRON9_MODEL ?= hf://bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF/nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf
-V8_NEMOTRON9_MIN_MEM_GB ?= 70
+V8_NEMOTRON9_MIN_MEM_GB ?= 16
 V8_NEMOTRON9_CONTEXT ?= 2048
 V8_NEMOTRON9_MAX_TOKENS ?= 64
 V8_NEMOTRON9_PROMPT ?= Give me a concise example of C code.
+V8_NEMOTRON9_CERT_WORK_ROOT ?= $(HOME)/.cache/ck-engine-v8/nightly/nemotron9-certification
+V8_NEMOTRON9_CERT_REPORT_ROOT ?= build/v8_nemotron9_certification
 V8_GLM4_MODEL ?= hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf
 V8_GLM4_MIN_MEM_GB ?= 70
 V8_GLM4_CONTEXT ?= 1024
@@ -4136,17 +4138,19 @@ test-v8-nemotron9-highmem:
 	threshold_kb=$$(( $(V8_NEMOTRON9_MIN_MEM_GB) * 1024 * 1024 )); \
 	if [ "$$avail_kb" -lt "$$threshold_kb" ]; then \
 		avail_gb=$$(( $$avail_kb / 1024 / 1024 )); \
-		echo "SKIP: Nemotron Nano 9B v2 v8 smoke needs >=$(V8_NEMOTRON9_MIN_MEM_GB) GiB MemAvailable; found $${avail_gb} GiB"; \
+		echo "SKIP: Nemotron Nano 9B v2 v8 certification needs >=$(V8_NEMOTRON9_MIN_MEM_GB) GiB MemAvailable; found $${avail_gb} GiB"; \
 	else \
-		echo "Running v8 Nemotron Nano 9B v2 high-memory smoke..."; \
-		CK_NUM_THREADS=$${CK_NUM_THREADS:-24} OMP_NUM_THREADS=$${OMP_NUM_THREADS:-1} \
-			$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/ck_run_v8.py run "$(V8_NEMOTRON9_MODEL)" \
-			--context-len $(V8_NEMOTRON9_CONTEXT) \
-			--force-convert --force-compile \
-			--prompt "$(V8_NEMOTRON9_PROMPT)" \
-			--chat-template auto \
-			--max-tokens $(V8_NEMOTRON9_MAX_TOKENS) \
-			--temperature 0.0; \
+		echo "Running v8 Nemotron Nano 9B v2 high-memory certification..."; \
+		V8_NEMOTRON9_MODEL="$(V8_NEMOTRON9_MODEL)" \
+		CK_NUM_THREADS=$${CK_NUM_THREADS:-16} OMP_NUM_THREADS=$${OMP_NUM_THREADS:-1} \
+			$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_regression_v8.py \
+			--mode full \
+			--family nemotron9 \
+			--families-manifest version/v8/regression/families_nemotron9_certification.json \
+			--prompts-manifest version/v8/regression/prompts_nemotron9_certification.json \
+			--run-root "$(V8_NEMOTRON9_CERT_WORK_ROOT)" \
+			--report-root "$(V8_NEMOTRON9_CERT_REPORT_ROOT)" \
+			--force-rebuild; \
 	fi
 
 test-v8-glm4-highmem:

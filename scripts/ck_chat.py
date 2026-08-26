@@ -1725,6 +1725,7 @@ class CKModel:
         system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
         default_system_prompt = str(contract.get("default_system_prompt") or "")
         inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
+        render_empty_system_turn = bool(contract.get("render_empty_system_turn"))
         suppression_markers = [
             str(marker).lower()
             for marker in list(contract.get("last_user_prefix_suppression_markers") or [])
@@ -1788,13 +1789,14 @@ class CKModel:
             suffix = str(turn_suffix_by_role.get(role, turn_suffix))
             return f"{prefix}{content}{suffix}"
 
-        prompt = conversation_prefix
+        prompt = ""
         if bos_prefix:
             special = self._load_tokenizer_contract()
             if not bool(special.get("add_bos_token", False)):
                 prompt += bos_prefix
+        prompt += conversation_prefix
 
-        if system_prompt and system_prompt_mode == "dedicated_turn":
+        if (system_prompt or render_empty_system_turn) and system_prompt_mode == "dedicated_turn":
             prompt += _render_turn("system", system_prompt)
 
         for role, content in clean_messages:
