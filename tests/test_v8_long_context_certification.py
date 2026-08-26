@@ -57,6 +57,18 @@ def test_native_timing_and_peak_rss_are_parsed() -> None:
     assert runner.parse_peak_rss("Maximum resident set size (kbytes): 123456") == 123456
 
 
+def test_time_binary_resolution_is_path_driven_and_optional() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        executable = Path(directory) / "time"
+        executable.write_text("#!/bin/sh\n", encoding="utf-8")
+        executable.chmod(0o755)
+        assert runner.resolve_time_binary({"PATH": directory}) == str(executable)
+        assert runner.resolve_time_binary({"PATH": ""}) is None
+        assert runner.resolve_time_binary({"CK_TIME_BIN": str(executable)}) == str(executable)
+        executable.chmod(0o644)
+        assert runner.resolve_time_binary({"CK_TIME_BIN": str(executable)}) is None
+
+
 def test_build_failures_distinguish_capacity_from_contract_faults() -> None:
     assert runner.classify_build_failure({
         "returncode": 137,

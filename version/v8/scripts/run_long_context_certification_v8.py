@@ -11,6 +11,7 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import statistics
 import subprocess
 import sys
@@ -109,6 +110,14 @@ def parse_peak_rss(stderr: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def resolve_time_binary(env: dict[str, str]) -> str | None:
+    configured = env.get("CK_TIME_BIN", "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+        return str(path) if path.is_file() and os.access(path, os.X_OK) else None
+    return shutil.which("time", path=env.get("PATH"))
+
+
 def run_command(
     command: list[str],
     *,
@@ -119,7 +128,8 @@ def run_command(
     timed: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    executed = ["/usr/bin/time", "-v", *command] if timed else command
+    time_binary = resolve_time_binary(env) if timed else None
+    executed = [time_binary, "-v", *command] if time_binary else command
     started = dt.datetime.now(dt.timezone.utc)
     try:
         completed = subprocess.run(
@@ -154,7 +164,8 @@ def run_command(
         "error": error,
         "started_at": started.isoformat(),
         "elapsed_seconds": (dt.datetime.now(dt.timezone.utc) - started).total_seconds(),
-        "peak_rss_kib": parse_peak_rss(stderr) if timed else None,
+        "peak_rss_kib": parse_peak_rss(stderr) if time_binary else None,
+        "peak_rss_source": "gnu_time" if time_binary else "unavailable",
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
         "stdout": stdout,
