@@ -1621,6 +1621,10 @@ OP_DATAFLOW = {
         "inputs": {"logits": "logits"},
         "outputs": {"logits": {"slot": "logits", "dtype": "fp32"}},
     },
+    "final_logit_scale": {
+        "inputs": {"logits": "logits"},
+        "outputs": {"logits": {"slot": "logits", "dtype": "fp32"}},
+    },
     "quantize_input_0": {
         "inputs": {"input": "main_stream"},
         "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
@@ -3648,7 +3652,11 @@ def build_activation_specs(
         logits_size = logits_seq * vocab_size * 4
         add("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
 
-    for spec in _template_activation_buffer_specs(template or {}, config).values():
+    activation_config = dict(config)
+    activation_config["execution_extent"] = seq_len
+    for spec in _template_activation_buffer_specs(
+        template or {}, activation_config
+    ).values():
         if spec["name"] in specs:
             raise RuntimeError(
                 f"HARD CIRCUIT BUFFER FAULT: activation buffer {spec['name']!r} duplicates a built-in region"
@@ -3740,6 +3748,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "gemma4_per_layer_prepare": "gemma4_per_layer_prepare",
     "gemma4_per_layer_embed": "gemma4_per_layer_embed",
     "final_logit_softcap": "final_logit_softcap",
+    "final_logit_scale": "final_logit_scale",
     "v_norm": "v_norm",
     "qkv_proj": "qkv_projection",  # Or fallback to 3x matmul
     "qkv_packed_proj": "matmul",
@@ -7480,6 +7489,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         ],
         "assistant_layer_scale": None,
         "final_logit_softcap": None,
+        "final_logit_scale": None,
         "v_norm": [],
         "final_rmsnorm": None,
         "qk_norm": None,  # Per-head RMSNorm gamma is always fp32
@@ -8124,6 +8134,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     active_pre_norm_quant_contract: Optional[str] = None
                     active_pre_norm_quant_op_name: Optional[str] = None
                     active_pre_norm_quant_instance = 0
+                    active_pre_norm_quant_graph_slots: Optional[Dict[str, object]] = None
+                    active_pre_norm_quant_live = False
 
                     for op_idx, op_item in enumerate(layer_items):
                         op = op_item["op"]
@@ -8195,6 +8207,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                 "layer": layer_idx,
                                                 "instance": 0,
                                             })
+                                            # Projection-input quantizers share the
+                                            # planner-owned Q8 workspace. Writing a
+                                            # transformed stream there invalidates
+                                            # the earlier pre-norm value.
+                                            active_pre_norm_quant_live = False
                                             print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: 0) [AUTO-INSERTED]")
                                         break
 
@@ -8219,7 +8236,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                         registry, kernel_id, mode
                                     )
                                 )
-                                if required_contract != active_pre_norm_quant_contract:
+                                if (
+                                    required_contract != active_pre_norm_quant_contract
+                                    or not active_pre_norm_quant_live
+                                ):
                                     if not active_pre_norm_quant_op_name:
                                         raise RuntimeError(
                                             "HARD NUMERICAL CONTRACT FAULT: Q8 consumer "
@@ -8231,7 +8251,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                     quant_op_info = get_op_info(
                                         active_pre_norm_quant_op_name, "body", layer_idx
                                     )
-                                    arranged_kernels.append({
+                                    quant_arranged = {
                                         "op_id": quant_op_info["op_id"],
                                         "kernel": quantize_kernel,
                                         "op": active_pre_norm_quant_op_name,
@@ -8240,7 +8260,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                         "layer": layer_idx,
                                         "instance": active_pre_norm_quant_instance,
                                         "_auto_inserted": True,
-                                    })
+                                    }
+                                    if active_pre_norm_quant_graph_slots:
+                                        quant_arranged["graph_slots"] = copy.deepcopy(
+                                            active_pre_norm_quant_graph_slots
+                                        )
+                                    arranged_kernels.append(quant_arranged)
                                     print(
                                         f"      [{quant_op_info['op_id']:3d}] "
                                         f"{active_pre_norm_quant_op_name:20s} → "
@@ -8249,6 +8274,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                         f"[AUTO-INSERTED contract switch]"
                                     )
                                     active_pre_norm_quant_contract = required_contract
+                                    active_pre_norm_quant_live = True
 
                             # Get op_id and instance (data flow is handled in IR Lower)
                             op_info = get_op_info(split_op, "body", layer_idx)
@@ -8329,12 +8355,34 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                     "layer": layer_idx,
                                                     "instance": norm_instance,
                                                 }
-                                                if op == "block_rmsnorm":
-                                                    quant_arranged["graph_slots"] = {"inputs": {"input": "layer_input"}}
+                                                norm_graph_slots = (
+                                                    op_item.get("graph_slots")
+                                                    if isinstance(op_item, dict)
+                                                    else None
+                                                )
+                                                norm_outputs = (
+                                                    norm_graph_slots.get("outputs")
+                                                    if isinstance(norm_graph_slots, dict)
+                                                    else None
+                                                )
+                                                if isinstance(norm_outputs, dict):
+                                                    normalized_slot = norm_outputs.get("output")
+                                                    if isinstance(normalized_slot, str) and normalized_slot:
+                                                        quant_arranged["graph_slots"] = {
+                                                            "inputs": {"input": normalized_slot}
+                                                        }
+                                                elif op == "block_rmsnorm":
+                                                    quant_arranged["graph_slots"] = {
+                                                        "inputs": {"input": "layer_input"}
+                                                    }
                                                 arranged_kernels.append(quant_arranged)
                                                 active_pre_norm_quant_contract = quant_contract
                                                 active_pre_norm_quant_op_name = quant_op_name
                                                 active_pre_norm_quant_instance = norm_instance
+                                                active_pre_norm_quant_graph_slots = copy.deepcopy(
+                                                    quant_arranged.get("graph_slots")
+                                                )
+                                                active_pre_norm_quant_live = True
                                                 print(f"      [{quant_op_info['op_id']:3d}] {quant_op_name:20s} → {quantize_kernel}  (inst: {norm_instance}) [AUTO-INSERTED]")
                                             break
                                     break
@@ -10306,6 +10354,7 @@ TEMPLATE_OP_WEIGHTS = {
     ],
     "assistant_layer_scale": ["layer_output_scale"],
     "final_logit_softcap": [],
+    "final_logit_scale": [],
     "v_norm": [],
     "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
     "qkv_proj": ["wq", "wk", "wv", "bq", "bk", "bv"],  # QKV + optional biases (for fused kernel)
@@ -10622,7 +10671,9 @@ def generate_memory_layout(
 
     ignored_weight_reasons = _ignored_manifest_weights(template, config, model_weights)
     if ignored_weight_reasons:
-        model_weights -= set(ignored_weight_reasons)
+        ignored_weights = set(ignored_weight_reasons)
+        model_weights -= ignored_weights
+        expected_weights -= ignored_weights
         reason_counts: Dict[str, int] = {}
         for reason in ignored_weight_reasons.values():
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
@@ -11012,7 +11063,9 @@ def generate_memory_layout(
         logits_size = logits_seq * vocab_size * 4
         add_buffer("logits", logits_size, f"[{logits_seq}, {vocab_size}]")
 
-    declared_buffers = _template_activation_buffer_specs(template, config)
+    activation_config = dict(config)
+    activation_config["execution_extent"] = seq_len
+    declared_buffers = _template_activation_buffer_specs(template, activation_config)
     allocated_names = {buf["name"] for buf in activation_buffers}
     for spec in declared_buffers.values():
         if spec["name"] in allocated_names:

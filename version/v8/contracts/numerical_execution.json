@@ -2009,6 +2009,40 @@
       "description": "Elementwise residual addition of BF16-valued float buffers with BF16 RNE output storage.",
       "operator_family": "residual_add"
     },
+    "logits_fp32_scalar_scale_fp32_output": {
+      "operator_family": "final_logit_scale",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "independent_fp32_logit_times_model_scale"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "weighted_product", "output_store"]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Each FP32 output logit is multiplied once by the model-declared FP32 scale."
+    },
     "attention_gate_llama_sigmoid_fp32_output": {
       "operator_family": "attention_gate",
       "status": "validated",

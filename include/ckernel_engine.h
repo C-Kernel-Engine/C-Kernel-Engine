@@ -1197,6 +1197,10 @@ void gemma4_final_logit_softcap_forward(float *logits,
                                         int tokens,
                                         int vocab_size,
                                         float cap);
+void final_logit_scale_f32(float *logits,
+                           int tokens,
+                           int vocab_size,
+                           float scale);
 void qk_norm_backward(const float *d_q_out,
                       const float *d_k_out,
                       const float *q_in,

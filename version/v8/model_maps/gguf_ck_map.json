@@ -2,6 +2,37 @@
   "version": 1,
   "description": "Declarative GGUF-to-CK model contract map. Keep model file tensor names here; keep kernel_maps focused on CK op-to-C-kernel bindings.",
   "architectures": {
+    "cohere2": {
+      "template": "cohere2",
+      "family": "cohere2",
+      "metadata_map": {
+        "block_count": "cohere2.block_count",
+        "context_length": "cohere2.context_length",
+        "embedding_length": "cohere2.embedding_length",
+        "feed_forward_length": "cohere2.feed_forward_length",
+        "attention_head_count": "cohere2.attention.head_count",
+        "attention_head_count_kv": "cohere2.attention.head_count_kv",
+        "attention_key_length": "cohere2.attention.key_length",
+        "attention_value_length": "cohere2.attention.value_length",
+        "attention_layer_norm_epsilon": "cohere2.attention.layer_norm_epsilon",
+        "attention_sliding_window": "cohere2.attention.sliding_window",
+        "attention_sliding_window_pattern": "cohere2.attention.sliding_window_pattern",
+        "rope_freq_base": "cohere2.rope.freq_base",
+        "rope_dimension_count": "cohere2.rope.dimension_count",
+        "logit_scale": "cohere2.logit_scale",
+        "tie_word_embeddings": "cohere2.tie_word_embeddings"
+      },
+      "layer_kind_pattern": [
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention"
+      ],
+      "source_tensor_aliases": {
+        "ffn_norm.weight": "attn_norm.weight"
+      },
+      "synthesize_layernorm_beta": true
+    },
     "qwen35": {
       "template": "qwen35",
       "family": "qwen35",

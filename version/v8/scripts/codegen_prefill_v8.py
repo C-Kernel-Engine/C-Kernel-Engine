@@ -223,7 +223,18 @@ def emit_prefill_op(
         (float*)(model->bump + A_LOGITS),
         1,
         {vocab_size},
-        {cap}
+    {cap}
+    );"""
+
+    if op_type == "final_logit_scale" and str(config.get("logits_layout", "auto")).lower() == "last":
+        vocab_size = int(config.get("vocab_size", 151936))
+        scale = float(config.get("logit_scale", 1.0) or 1.0)
+        return f"""    /* Op {seq_idx}: {func} ({op_type}) layer={layer} */
+    {func}(
+        (float*)(model->bump + A_LOGITS),
+        1,
+        {vocab_size},
+        {scale}
     );"""
 
     if op_type == "copy_last_logits":

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 291,
+      "total": 292,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -31,6 +31,7 @@
         "farskip_routed_shared_combine": 1,
         "feature_concat": 1,
         "feature_slice_copy": 1,
+        "final_logit_scale": 1,
         "final_logit_softcap": 1,
         "full_softmax_topk_router": 1,
         "fused_attention_block": 3,
@@ -13371,6 +13372,134 @@
       "notes": "Generic row-wise feature slice copy used for branch collect/stitch lowering.",
       "name": "feature_slice_copy",
       "_source_file": "feature_slice_copy.json"
+    },
+    {
+      "id": "final_logit_scale_f32",
+      "op": "final_logit_scale",
+      "operation_interface": "logits.scale.fp32_inplace.v1",
+      "variant": "fp32_inplace",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "logits",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "V"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "Logits buffer updated in-place"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "logits",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "V"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "alias_of": "input:logits",
+          "desc": "Scaled logits"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "seq_len",
+        "vocab_size"
+      ],
+      "params": [
+        {
+          "name": "scale",
+          "dtype": "float32",
+          "desc": "Model-declared output-logit scale"
+        }
+      ],
+      "impl": {
+        "function": "final_logit_scale_f32",
+        "c_declaration": "void final_logit_scale_f32(float *logits, int tokens, int vocab_size, float scale);",
+        "sources": [
+          "src/kernels/logit_kernels.c"
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "logits_fp32_scalar_scale_fp32_output",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "final_logit_scale_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "logits",
+            "source": "activation:logits",
+            "cast": "float*",
+            "ports": [
+              "input:logits",
+              "output:logits"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "vocab_size",
+            "source": "dim:vocab_size"
+          },
+          {
+            "name": "scale",
+            "source": "dim:logit_scale"
+          }
+        ]
+      },
+      "notes": "Generic model-declared in-place FP32 output-logit scaling.",
+      "name": "final_logit_scale_f32",
+      "_source_file": "final_logit_scale_f32.json"
     },
     {
       "id": "fused_rmsnorm_qkv_prefill_head_major_quant",

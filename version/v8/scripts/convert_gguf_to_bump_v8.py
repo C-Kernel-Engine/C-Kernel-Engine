@@ -235,6 +235,57 @@ def gguf_ck_artifact_match_keys() -> set[str]:
     return keys
 
 
+def gguf_ck_declared_metadata_keys() -> set[str]:
+    """Return every GGUF metadata key declared by an architecture contract."""
+    keys: set[str] = set()
+    contracts = load_gguf_ck_map().get("architectures") or {}
+    for arch, contract in contracts.items():
+        if not isinstance(contract, dict):
+            continue
+        metadata_map = contract.get("metadata_map") or {}
+        if not isinstance(metadata_map, dict):
+            raise GGUFError(f"{arch}: metadata_map must be an object")
+        keys.update(str(value) for value in metadata_map.values() if value)
+    return keys
+
+
+def gguf_ck_metadata_key(arch: str, logical_name: str) -> str:
+    """Resolve a logical model property to its GGUF metadata key."""
+    metadata_map = gguf_ck_arch_contract(arch).get("metadata_map") or {}
+    if not isinstance(metadata_map, dict):
+        raise GGUFError(f"{arch}: metadata_map must be an object")
+    value = metadata_map.get(str(logical_name))
+    return str(value) if value else ""
+
+
+def gguf_ck_layer_kinds_from_map(arch: str, num_layers: int) -> list[str]:
+    """Expand a declarative repeating layer-kind pattern to the model depth."""
+    pattern = gguf_ck_arch_contract(arch).get("layer_kind_pattern") or []
+    if not pattern:
+        return []
+    if not isinstance(pattern, list) or not all(
+        isinstance(item, str) and item.strip() for item in pattern
+    ):
+        raise GGUFError(f"{arch}: layer_kind_pattern must be a non-empty string list")
+    if int(num_layers) <= 0:
+        raise GGUFError(f"{arch}: cannot expand layer_kind_pattern for {num_layers} layers")
+    return [str(pattern[layer % len(pattern)]) for layer in range(int(num_layers))]
+
+
+def gguf_ck_source_tensor_alias(arch: str, suffix: str) -> str:
+    """Resolve a missing standard tensor suffix through model-map provenance."""
+    aliases = gguf_ck_arch_contract(arch).get("source_tensor_aliases") or {}
+    if not isinstance(aliases, dict):
+        raise GGUFError(f"{arch}: source_tensor_aliases must be an object")
+    value = aliases.get(str(suffix))
+    return str(value) if value else ""
+
+
+def gguf_ck_synthesizes_layernorm_beta(arch: str) -> bool:
+    """Return whether the model contract requires zero LayerNorm bias tensors."""
+    return bool(gguf_ck_arch_contract(arch).get("synthesize_layernorm_beta", False))
+
+
 def gguf_ck_template_arch(
     arch: str,
     metadata: Optional[Dict[str, object]] = None,
@@ -2755,6 +2806,7 @@ def main() -> None:
         "deepseek2.embedding_weight_tying",
     }
     wanted_meta.update(gguf_ck_artifact_match_keys())
+    wanted_meta.update(gguf_ck_declared_metadata_keys())
 
     if args.extract_vocab:
         import subprocess
@@ -3080,6 +3132,9 @@ def main() -> None:
                     if s in {"0", "false", "no", "n", "off"}:
                         return False
             return None
+
+        def contract_key(logical_name: str) -> str:
+            return gguf_ck_metadata_key(arch, logical_name)
 
         def meta_float_list(*keys: str) -> Optional[List[float]]:
             """Get float-list metadata, trying multiple keys in order."""
@@ -4008,6 +4063,7 @@ def main() -> None:
         if len(tok.dims) != 2:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
         embed_dim = meta_int(
+            contract_key("embedding_length"),
             "deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length",
             "llama.embedding_length", "qwen35moe.embedding_length", "nemotron_h.embedding_length", "nemotron_h_moe.embedding_length", "qwen3vl.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length",
             "gemma3.embedding_length", "gemma4.embedding_length", "glm4.embedding_length"
@@ -4063,6 +4119,7 @@ def main() -> None:
                 print(f"[tokenizer] extracted {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from GGUF metadata")
 
         num_layers = meta_int(
+            contract_key("block_count"),
             "deepseek2.block_count", "mistral3.block_count", "mistral.block_count",
             "llama.block_count", "qwen35.block_count", "qwen35moe.block_count", "nemotron_h.block_count", "nemotron_h_moe.block_count", "qwen3vl.block_count", "qwen3.block_count", "qwen2.block_count",
             "gemma3.block_count", "gemma4.block_count", "glm4.block_count"
@@ -4090,6 +4147,7 @@ def main() -> None:
             )
 
         intermediate = meta_int_or_list(
+            contract_key("feed_forward_length"),
             "deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length",
             "llama.feed_forward_length", "qwen35.feed_forward_length", "qwen35moe.expert_feed_forward_length", "nemotron_h.feed_forward_length", "nemotron_h_moe.feed_forward_length", "qwen3vl.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length",
             "gemma3.feed_forward_length", "gemma4.feed_forward_length", "glm4.feed_forward_length"
@@ -4105,6 +4163,7 @@ def main() -> None:
             raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
         num_heads = meta_int(
+            contract_key("attention_head_count"),
             "deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count",
             "llama.attention.head_count", "qwen35.attention.head_count", "qwen35moe.attention.head_count", "nemotron_h.attention.head_count", "nemotron_h_moe.attention.head_count", "qwen3vl.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
             "gemma3.attention.head_count", "gemma4.attention.head_count", "glm4.attention.head_count"
@@ -4112,6 +4171,7 @@ def main() -> None:
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
         num_kv_heads_meta = meta_int_or_list(
+            contract_key("attention_head_count_kv"),
             "deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv",
             "llama.attention.head_count_kv", "qwen35.attention.head_count_kv", "qwen35moe.attention.head_count_kv", "nemotron_h.attention.head_count_kv", "nemotron_h_moe.attention.head_count_kv", "qwen3vl.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv",
             "gemma3.attention.head_count_kv", "gemma4.attention.head_count_kv", "glm4.attention.head_count_kv"
@@ -4122,6 +4182,7 @@ def main() -> None:
         num_kv_heads = num_kv_heads_meta if num_kv_heads_meta and num_kv_heads_meta > 0 else 0
 
         context_len = meta_int(
+            contract_key("context_length"),
             "deepseek2.context_length", "mistral3.context_length", "mistral.context_length",
             "llama.context_length", "qwen35.context_length", "qwen35moe.context_length", "nemotron_h.context_length", "nemotron_h_moe.context_length", "qwen3vl.context_length", "qwen3.context_length", "qwen2.context_length",
             "gemma3.context_length", "gemma4.context_length", "glm4.context_length"
@@ -4132,6 +4193,7 @@ def main() -> None:
             raise GGUFError("Could not determine context length (use --context to override)")
 
         sliding_window = meta_int(
+            contract_key("attention_sliding_window"),
             "attention.sliding_window",
             "llama.attention.sliding_window",
             "gemma.attention.sliding_window",
@@ -4142,6 +4204,7 @@ def main() -> None:
         # The value is stored in config and passed to attention_sliding ops
 
         rope_theta = meta_float(
+            contract_key("rope_freq_base"),
             "deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base",
             "llama.rope.freq_base", "qwen35.rope.freq_base", "qwen35moe.rope.freq_base", "nemotron_h.rope.freq_base", "nemotron_h_moe.rope.freq_base", "qwen3vl.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
             "gemma3.rope.freq_base", "gemma4.rope.freq_base", "glm4.rope.freq_base"
@@ -4149,6 +4212,7 @@ def main() -> None:
 
         # Q/K/V head dimensions (some models report explicit key/value lengths)
         key_length_meta = meta_int(
+            contract_key("attention_key_length"),
             "qwen35.attention.key_length",
             "qwen35moe.attention.key_length",
             "nemotron_h.attention.key_length",
@@ -4161,6 +4225,7 @@ def main() -> None:
             "llama.attention.key_length",
         )
         value_length_meta = meta_int(
+            contract_key("attention_value_length"),
             "qwen35.attention.value_length",
             "qwen35moe.attention.value_length",
             "nemotron_h.attention.value_length",
@@ -4176,6 +4241,7 @@ def main() -> None:
         # RoPE rotary dimensions (subset of head_dim that gets rotated).
         # Resolve after head_dim is known.
         rotary_dim_meta = meta_int(
+            contract_key("rope_dimension_count"),
             "qwen35.rope.dimension_count",
             "qwen35moe.rope.dimension_count",
             "nemotron_h.rope.dimension_count",
@@ -4274,6 +4340,7 @@ def main() -> None:
         )
 
         rms_eps = meta_float(
+            contract_key("attention_layer_norm_epsilon"),
             "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
             "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
             "nemotron_h.attention.layer_norm_rms_epsilon", "nemotron_h_moe.attention.layer_norm_rms_epsilon",
@@ -4417,6 +4484,7 @@ def main() -> None:
         # for untied-LM-head models (e.g., Nanbeige), which causes gibberish generation.
         out_weight = tensors.get("output.weight")
         tie_word_embeddings_meta = meta_bool(
+            contract_key("tie_word_embeddings"),
             "llama.tie_word_embeddings",
             "qwen2.tie_word_embeddings",
             "qwen3.tie_word_embeddings",
@@ -5591,8 +5659,15 @@ def main() -> None:
                 layer_q_dim = int(num_heads) * int(head_dim)
                 layer_k_dim = int(embed_kv)
                 layer_v_dim = int(embed_kv)
-            attn_norm = tensors.get(f"blk.{layer}.attn_norm.weight")
-            ffn_norm = tensors.get(f"blk.{layer}.ffn_norm.weight")
+            def layer_tensor(suffix: str) -> Optional[TensorInfo]:
+                info = tensors.get(f"blk.{layer}.{suffix}")
+                if info is not None:
+                    return info
+                alias = gguf_ck_source_tensor_alias(arch, suffix)
+                return tensors.get(f"blk.{layer}.{alias}") if alias else None
+
+            attn_norm = layer_tensor("attn_norm.weight")
+            ffn_norm = layer_tensor("ffn_norm.weight")
             post_attention_norm = tensors.get(f"blk.{layer}.post_attention_norm.weight")
             post_ffn_norm = tensors.get(f"blk.{layer}.post_ffn_norm.weight") or tensors.get(f"blk.{layer}.post_ffw_norm.weight")
             if not attn_norm or not ffn_norm:
@@ -5732,10 +5807,12 @@ def main() -> None:
                 for dt in (wq_dt, wk_dt, wv_dt, wo_dt, gate_dt, up_dt, down_dt)
             )
 
-            layer_dtypes = [
-                CK_DT_FP32,  # ln1_gamma
-                CK_DT_FP32,  # ln2_gamma
-            ]
+            layer_dtypes = [CK_DT_FP32]  # ln1_gamma
+            if gguf_ck_synthesizes_layernorm_beta(arch):
+                layer_dtypes.append(CK_DT_FP32)  # ln1_beta
+            layer_dtypes.append(CK_DT_FP32)  # ln2_gamma
+            if gguf_ck_synthesizes_layernorm_beta(arch):
+                layer_dtypes.append(CK_DT_FP32)  # ln2_beta
             if post_attention_norm is not None:
                 layer_dtypes.append(CK_DT_FP32)  # post_attention_norm
             if post_ffn_norm is not None:
@@ -5939,8 +6016,14 @@ def main() -> None:
                 ln_size = aligned_embed_dim * 4
                 record_entry(f"layer.{layer}.ln1_gamma", "fp32", ln_size)
                 write_f32_padded(w, ln1, aligned_embed_dim)
+                if gguf_ck_synthesizes_layernorm_beta(arch):
+                    record_entry(f"layer.{layer}.ln1_beta", "fp32", ln_size)
+                    write_f32_zeros(w, aligned_embed_dim)
                 record_entry(f"layer.{layer}.ln2_gamma", "fp32", ln_size)
                 write_f32_padded(w, ln2, aligned_embed_dim)
+                if gguf_ck_synthesizes_layernorm_beta(arch):
+                    record_entry(f"layer.{layer}.ln2_beta", "fp32", ln_size)
+                    write_f32_zeros(w, aligned_embed_dim)
 
                 # Optional post-attention / post-FFN norms (Gemma3-style)
                 if info.get("post_attention_norm") is not None:
@@ -6132,6 +6215,14 @@ def main() -> None:
                     "rms_eps": float(rms_eps) if rms_eps else 1e-5,
                     "tie_word_embeddings": bool(tie_word_embeddings),
                 }, arch)
+                layer_kinds = gguf_ck_layer_kinds_from_map(arch, num_layers)
+                if layer_kinds:
+                    config["layer_kinds"] = layer_kinds
+                if sliding_window and sliding_window > 0:
+                    config["sliding_window"] = int(sliding_window)
+                logit_scale = meta_float(contract_key("logit_scale"))
+                if logit_scale is not None:
+                    config["logit_scale"] = float(logit_scale)
                 if arch == "qwen3vl":
                     num_deepstack_layers = int(meta_int("qwen3vl.n_deepstack_layers") or 0)
                     if num_deepstack_layers > 0:
@@ -6350,6 +6441,12 @@ def main() -> None:
         cfg["tie_word_embeddings"] = bool(tie_word_embeddings)
         cfg["num_merges"] = num_merges
         cfg["total_vocab_bytes"] = total_vocab_bytes
+        layer_kinds = gguf_ck_layer_kinds_from_map(arch, num_layers)
+        if layer_kinds:
+            cfg["layer_kinds"] = layer_kinds
+        logit_scale = meta_float(contract_key("logit_scale"))
+        if logit_scale is not None:
+            cfg["logit_scale"] = float(logit_scale)
         if arch == "qwen3vl":
             num_deepstack_layers = int(meta_int("qwen3vl.n_deepstack_layers") or 0)
             if num_deepstack_layers > 0:
