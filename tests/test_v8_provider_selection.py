@@ -143,7 +143,7 @@ class ProviderSelectionTests(unittest.TestCase):
             selected.append(document["id"])
             errors = sorted(validator.iter_errors(document["selection"]), key=str)
             self.assertEqual(errors, [], path.name)
-        self.assertEqual(len(selected), 65)
+        self.assertEqual(len(selected), 69)
 
     def test_gemma_q5_prefill_providers_are_production_selected(self):
         maps = ROOT / "version" / "v8" / "kernel_maps"
@@ -198,6 +198,38 @@ class ProviderSelectionTests(unittest.TestCase):
                     ),
                     kernel_id,
                 )
+
+    def test_composite_weight_roles_must_all_match(self):
+        providers = []
+        for down_dtype in ("q4_k", "q6_k"):
+            value = provider(
+                f"moe_q4_q4_{down_dtype}",
+                status="production",
+                priority=200,
+                group=f"moe.q4_q4_{down_dtype}.v1",
+            )
+            value["op"] = "moe_swiglu_expert_mlp"
+            value["quant"] = {
+                "gate_weight": "q4_k",
+                "up_weight": "q4_k",
+                "down_weight": down_dtype,
+                "activation": "fp32_to_q8_k",
+            }
+            providers.append(value)
+
+        self.assertEqual(
+            build_ir.find_kernel(
+                {"kernels": providers},
+                op="moe_swiglu_expert_mlp",
+                quant={
+                    "gate_weight": "q4_k",
+                    "up_weight": "q4_k",
+                    "down_weight": "q4_k",
+                },
+                mode="prefill",
+            ),
+            "moe_q4_q4_q4_k",
+        )
 
 
 if __name__ == "__main__":

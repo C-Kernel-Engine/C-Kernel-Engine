@@ -2651,6 +2651,94 @@
       "position_transform": null,
       "description": "Observed compact routed SwiGLU composition for Q4_K gate/up and Q5_K down experts. Constituent primitives are certified; complete llama.cpp mul_mat_id and expert-merge parity remains required before promotion."
     },
+    "attention_gate_softplus_head_scalar_fp32_output": {
+      "operator_family": "attention_gate",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "softplus_gate_then_head_channel_multiply"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "vector_exponential", "logarithm", "weighted_product", "output_store"]
+      },
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed Laguna attention gating applies FP32 softplus to one scalar per query head and broadcasts the result over that head before output projection."
+    },
+    "q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32": {
+      "operator_family": "moe_swiglu_expert",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "q4_k_q6_k", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int4_int6",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_k_then_q4_k_gate_up_then_ggml_swiglu_then_quantize_activation_q8_k_then_q6_k_down_then_selected_slot_order_weighted_sum"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "selected_slot_order"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed compact routed SwiGLU composition for Laguna Q4_K gate/up and Q6_K down experts. Complete oracle parity remains required before promotion."
+    },
+    "q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32": {
+      "operator_family": "moe_swiglu_expert",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "q4_k", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int4",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_k_then_q4_k_gate_up_then_ggml_swiglu_then_quantize_activation_q8_k_then_q4_k_down_then_selected_slot_order_weighted_sum"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "selected_slot_order"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed compact routed SwiGLU composition for Q4_K gate/up and Q4_K down experts. Complete oracle parity remains required before promotion."
+    },
+    "q4_k_q8_k_shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32": {
+      "operator_family": "moe_shared_swiglu",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "q4_k_q6_k", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int4_int6",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_k_then_q4_k_gate_up_then_ggml_swiglu_then_quantize_activation_q8_k_then_q6_k_down_then_routed_add"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed compact shared SwiGLU composition for Laguna Q4_K gate/up and Q6_K down weights, followed by an FP32 routed-result addition."
+    },
+    "q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32": {
+      "operator_family": "moe_shared_swiglu",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "q4_k", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "int4",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_k_then_q4_k_gate_up_then_ggml_swiglu_then_quantize_activation_q8_k_then_q4_k_down_then_routed_add"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed compact shared SwiGLU composition for Q4_K gate/up and Q4_K down weights, followed by an FP32 routed-result addition."
+    },
     "bf16_weight_bf16_input_pytorch_onednn_brgemm_bf16_output": {
       "status": "validated",
       "storage": {

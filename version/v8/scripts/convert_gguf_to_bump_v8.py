@@ -295,7 +295,11 @@ def gguf_ck_template_arch(
     return str(template).lower() if template else str(arch).lower()
 
 
-def gguf_ck_layer_kind_from_map(arch: Optional[str], suffixes: set[str]) -> Optional[str]:
+def gguf_ck_layer_kind_from_map(
+    arch: Optional[str],
+    suffixes: set[str],
+    layer_tensors: Optional[Dict[str, "TensorInfo"]] = None,
+) -> Optional[str]:
     if not arch:
         return None
     layer_kinds = gguf_ck_arch_contract(arch).get("layer_kinds") or {}
@@ -305,7 +309,21 @@ def gguf_ck_layer_kind_from_map(arch: Optional[str], suffixes: set[str]) -> Opti
         if not isinstance(spec, dict):
             continue
         required = spec.get("required_suffixes") or []
-        if required and set(str(s) for s in required).issubset(suffixes):
+        if not required or not set(str(s) for s in required).issubset(suffixes):
+            continue
+        tensor_dims = spec.get("tensor_dims") or {}
+        if not isinstance(tensor_dims, dict):
+            raise GGUFError(f"{arch}: layer_kinds.{kind}.tensor_dims must be an object")
+        dimensions_match = True
+        for suffix, expected in tensor_dims.items():
+            info = (layer_tensors or {}).get(str(suffix))
+            if info is None or not isinstance(expected, list):
+                dimensions_match = False
+                break
+            if [int(value) for value in info.dims] != [int(value) for value in expected]:
+                dimensions_match = False
+                break
+        if dimensions_match:
             return str(kind)
     return None
 
@@ -1119,7 +1137,13 @@ def classify_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
     if not names:
         return "missing"
 
-    mapped_kind = gguf_ck_layer_kind_from_map(arch, names)
+    prefix = f"blk.{layer}."
+    layer_tensors = {
+        name[len(prefix):]: info
+        for name, info in tensors.items()
+        if name.startswith(prefix)
+    }
+    mapped_kind = gguf_ck_layer_kind_from_map(arch, names, layer_tensors)
     if mapped_kind:
         return f"mapped_{mapped_kind}"
 
@@ -4162,7 +4186,7 @@ def main() -> None:
         if intermediate is None:
             raise GGUFError("Could not determine intermediate_size (missing feed_forward_length)")
 
-        num_heads = meta_int(
+        num_heads = meta_int_or_list(
             contract_key("attention_head_count"),
             "deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count",
             "llama.attention.head_count", "qwen35.attention.head_count", "qwen35moe.attention.head_count", "nemotron_h.attention.head_count", "nemotron_h_moe.attention.head_count", "qwen3vl.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
@@ -4170,6 +4194,12 @@ def main() -> None:
         )
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
+        layer_num_heads = [int(value) for value in num_heads] if isinstance(num_heads, list) else None
+        if layer_num_heads:
+            positive_heads = [value for value in layer_num_heads if value > 0]
+            if not positive_heads:
+                raise GGUFError("attention.head_count contains no positive layer values")
+            num_heads = max(positive_heads)
         num_kv_heads_meta = meta_int_or_list(
             contract_key("attention_head_count_kv"),
             "deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv",
@@ -5253,7 +5283,7 @@ def main() -> None:
                 f"extra_projection_tensors={extra_tensors}."
             )
 
-        if arch in {"nemotron_h", "nemotron_h_moe"}:
+        if arch in {"nemotron_h", "nemotron_h_moe", "laguna"}:
             nemotron_meta_prefix = "nemotron_h_moe" if arch == "nemotron_h_moe" else "nemotron_h"
             def nmeta(key: str) -> str:
                 return f"{nemotron_meta_prefix}.{key}"
@@ -5372,7 +5402,7 @@ def main() -> None:
             unconsumed_sources = sorted(set(tensors.keys()) - consumed_sources)
             if unconsumed_sources:
                 raise GGUFError(
-                    f"nemotron_h conversion plan left {len(unconsumed_sources)} source tensors unconsumed: "
+                    f"{arch} conversion plan left {len(unconsumed_sources)} source tensors unconsumed: "
                     f"{unconsumed_sources[:16]}"
                 )
             source_coverage = {
@@ -5456,13 +5486,116 @@ def main() -> None:
                 "has_qk_norm": False,
                 "has_attention_biases": False,
             }, "nemotron_h")
+            runtime_arch = "nemotron_h"
+            if arch == "laguna":
+                laguna_layer_num_heads: list[int] = []
+                laguna_layer_rotary_dim: list[int] = []
+                laguna_layer_sliding_window: list[int] = []
+                laguna_layer_rope_kind: list[str] = []
+                laguna_layer_q_dim: list[int] = []
+                laguna_layer_attention_output_dim: list[int] = []
+                for layer, layer_kind in enumerate(layer_kinds):
+                    q_info = tensors.get(f"blk.{layer}.attn_q.weight")
+                    o_info = tensors.get(f"blk.{layer}.attn_output.weight")
+                    if q_info is None or o_info is None or int(head_dim) <= 0:
+                        raise GGUFError(f"Layer {layer}: Laguna attention dimensions are incomplete")
+                    q_dim = int(q_info.ne1)
+                    if q_dim % int(head_dim) != 0:
+                        raise GGUFError(
+                            f"Layer {layer}: query width {q_dim} is not divisible by head_dim {head_dim}"
+                        )
+                    heads = q_dim // int(head_dim)
+                    sliding = "sliding" in layer_kind
+                    laguna_layer_num_heads.append(heads)
+                    laguna_layer_q_dim.append(q_dim)
+                    laguna_layer_attention_output_dim.append(int(o_info.ne0))
+                    laguna_layer_rotary_dim.append(
+                        int(meta_int("laguna.rope.dimension_count_swa") or head_dim)
+                        if sliding
+                        else int(meta_int("laguna.rope.dimension_count") or rotary_dim)
+                    )
+                    laguna_layer_sliding_window.append(int(sliding_window or 0) if sliding else 0)
+                    laguna_layer_rope_kind.append("swa" if sliding else "full")
+
+                runtime_arch = "laguna"
+                moe_intermediate_size = int(meta_int("laguna.expert_feed_forward_length") or 0)
+                shared_intermediate_size = int(meta_int("laguna.expert_shared_feed_forward_length") or 0)
+                n_routed_experts = int(meta_int("laguna.expert_count") or 0)
+                experts_per_tok = int(meta_int("laguna.expert_used_count") or 0)
+                nemotron_config = _inject_runtime_config_defaults({
+                    "model": "laguna",
+                    "arch": "laguna",
+                    "source_arch": "laguna",
+                    "model_type": "laguna",
+                    "embed_dim": int(embed_dim),
+                    "attn_out_dim": max(laguna_layer_attention_output_dim),
+                    "attn_gate_dim": max(laguna_layer_num_heads),
+                    "num_layers": int(num_layers),
+                    "num_heads": max(laguna_layer_num_heads),
+                    "num_kv_heads": int(num_kv_heads),
+                    "head_dim": int(head_dim),
+                    "v_head_dim": int(value_length_meta or head_dim),
+                    "intermediate_dim": int(intermediate),
+                    "intermediate_size": int(intermediate),
+                    "moe_intermediate_size": moe_intermediate_size,
+                    "moe_shared_expert_intermediate_size": shared_intermediate_size,
+                    "n_routed_experts": n_routed_experts,
+                    "experts_per_tok": experts_per_tok,
+                    "num_experts_per_tok": experts_per_tok,
+                    "router_num_groups": 1,
+                    "router_topk_group": 1,
+                    "router_norm_topk_prob": bool(meta.get("laguna.expert_weights_norm", True)),
+                    "routed_scaling_factor": float(meta_float("laguna.expert_weights_scale") or 1.0),
+                    "vocab_size": int(vocab_size),
+                    "max_seq_len": int(context_len),
+                    "context_length": int(context_len),
+                    "rope_theta": float(rope_theta),
+                    "rope_theta_swa": float(meta_float("laguna.rope.freq_base_swa") or 10000.0),
+                    "rotary_dim": int(rotary_dim),
+                    "rope_scaling_type": str(meta.get("laguna.rope.scaling.type") or "yarn"),
+                    "rope_scaling_factor": float(meta_float("laguna.rope.scaling.factor") or 1.0),
+                    "rope_original_context_length": int(meta_int("laguna.rope.scaling.original_context_length") or context_len),
+                    "rope_beta_fast": float(meta_float("laguna.rope.scaling.yarn_beta_fast") or 0.0),
+                    "rope_beta_slow": float(meta_float("laguna.rope.scaling.yarn_beta_slow") or 0.0),
+                    "rope_attn_factor": float(meta_float("laguna.rope.scaling.yarn_attn_factor") or 1.0),
+                    # ggml applies YaRN's logarithmic magnitude adjustment to
+                    # the artifact attention factor. The cache kernel expresses
+                    # that contract as mscale / mscale_all_dim.
+                    "rope_mscale": float(meta_float("laguna.rope.scaling.yarn_attn_factor") or 1.0),
+                    "rope_mscale_all_dim": 0.0,
+                    "rms_eps": float(rms_eps),
+                    "rms_norm_eps": float(rms_eps),
+                    "tie_word_embeddings": bool(tie_word_embeddings),
+                    "layer_kinds": layer_kinds,
+                    "hybrid_block_pattern": layer_kinds[:],
+                    "layer_num_heads": laguna_layer_num_heads,
+                    "layer_q_dim": laguna_layer_q_dim,
+                    "layer_attention_output_dim": laguna_layer_attention_output_dim,
+                    "layer_q_head_dim": [int(head_dim)] * int(num_layers),
+                    "layer_k_head_dim": [int(head_dim)] * int(num_layers),
+                    "layer_v_head_dim": [int(value_length_meta or head_dim)] * int(num_layers),
+                    "layer_rotary_dim": laguna_layer_rotary_dim,
+                    "layer_sliding_window": laguna_layer_sliding_window,
+                    "layer_rope_kind": laguna_layer_rope_kind,
+                    "layer_kv_policy": ["attention_kv_cache"] * int(num_layers),
+                    "layer_attention_policy": [
+                        "sliding_attention" if "sliding" in kind else "full_attention"
+                        for kind in layer_kinds
+                    ],
+                    "layer_moe_policy": [
+                        "none" if kind.startswith("dense_") else "routed_swiglu"
+                        for kind in layer_kinds
+                    ],
+                    "has_qk_norm": True,
+                    "has_attention_biases": False,
+                }, "laguna")
             if tokenizer_contract:
                 nemotron_config["tokenizer_contract"] = tokenizer_contract
             chat_template = meta.get("tokenizer.chat_template")
             if isinstance(chat_template, str) and chat_template.strip():
                 nemotron_config["chat_template"] = chat_template
             if template_data is None:
-                template_data = load_template_for_arch(arch)
+                template_data = load_template_for_arch(runtime_arch)
             template_data = apply_model_contract_overrides(template_data, tie_word_embeddings=bool(tie_word_embeddings), has_untied_output_weight=out_weight is not None)
             if tokenizer_contract:
                 template_data = _apply_tokenizer_contract_overrides(template_data, str(tokenizer_contract.get("tokenizer_type") or "").strip().lower())
@@ -5576,7 +5709,7 @@ def main() -> None:
 
                 manifest_dict = {
                     "version": 5,
-                    "model": "nemotron_h",
+                    "model": runtime_arch,
                     "source_arch": arch,
                     "source_format": "gguf",
                     "bump_layout": {"header_size": HEADER_SIZE, "ext_metadata_size": EXT_METADATA_SIZE, "data_start": DATA_START},
@@ -5589,14 +5722,14 @@ def main() -> None:
                     "source_tensor_coverage": source_coverage,
                     "num_layers": num_layers,
                     "embed_dim": embed_dim,
-                    "num_heads": num_heads,
+                    "num_heads": int(nemotron_config.get("num_heads", num_heads)),
                     "num_kv_heads": num_kv_heads,
                     "head_dim": head_dim,
                     "intermediate_size": intermediate,
                     "vocab_size": vocab_size,
                     "context_length": context_len,
-                    "has_attention_biases": False,
-                    "has_qk_norm": False,
+                    "has_attention_biases": bool(nemotron_config.get("has_attention_biases", False)),
+                    "has_qk_norm": bool(nemotron_config.get("has_qk_norm", False)),
                     "num_merges": num_merges,
                     "total_vocab_bytes": total_vocab_bytes,
                     "entries": manifest_entries,
@@ -5611,7 +5744,7 @@ def main() -> None:
                 out_f.write(metadata_bytes)
                 write_bumpv5_footer(out_f, len(metadata_bytes), meta_hash)
                 print(f"[bumpv5] Metadata: {len(metadata_bytes)} bytes @ offset {meta_offset}")
-                print(f"[bumpv5] Template: {template_data.get('name', 'nemotron_h')}, mapped entries: {len(manifest_entries)}")
+                print(f"[bumpv5] Template: {template_data.get('name', runtime_arch)}, mapped entries: {len(manifest_entries)}")
 
             if args.config_out:
                 os.makedirs(os.path.dirname(args.config_out) or ".", exist_ok=True)
@@ -5626,11 +5759,11 @@ def main() -> None:
                 print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
 
             print(
-                f"[gguf->bump] version={args.bump_version} arch={arch}->nemotron_h layers={num_layers} "
+                f"[gguf->bump] version={args.bump_version} arch={arch}->{runtime_arch} layers={num_layers} "
                 f"hidden={embed_dim} heads={num_heads}/{num_kv_heads} ff={intermediate} "
                 f"mamba_proj={mamba_projection_size} entries={len(manifest_entries)} -> {args.output}"
             )
-            print_generic_conversion_report(arch="nemotron_h", manifest_entries=manifest_entries, coverage_report=source_coverage)
+            print_generic_conversion_report(arch=runtime_arch, manifest_entries=manifest_entries, coverage_report=source_coverage)
             return
 
         layer_infos = []

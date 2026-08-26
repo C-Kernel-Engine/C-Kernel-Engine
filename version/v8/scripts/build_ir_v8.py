@@ -1854,6 +1854,10 @@ OP_DATAFLOW = {
         "inputs": {"x": "attn_scratch", "gate": "attn_gate"},
         "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
     },
+    "attn_gate_softplus_mul": {
+        "inputs": {"x": "attn_scratch", "gate": "attn_gate"},
+        "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
+    },
     "quantize_recurrent_out_proj_input": {
         "inputs": {"input": "recurrent_normed"},
         "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
@@ -2671,8 +2675,20 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     if rope_type in ("rope", "rope_qk", "partial_rope_concat", "partial_pairwise_concat", True):
         # Get config values
         rope_theta = config["rope_theta"]
-        head_dim = max(int(config["head_dim"]), int(config.get("max_rotary_dim", config["rotary_dim"]) or config["rotary_dim"]))
-        rotary_dim = int(config.get("max_rotary_dim", config["rotary_dim"]) or config["rotary_dim"])
+        rotary_dim_key = str(flags.get("rope_cache_rotary_dim_config_key") or "").strip()
+        if rotary_dim_key:
+            if rotary_dim_key not in config:
+                raise RuntimeError(
+                    "rope cache rotary-dimension config key is missing: "
+                    f"{rotary_dim_key!r}"
+                )
+            rotary_dim = int(config.get(rotary_dim_key) or config["rotary_dim"])
+        else:
+            rotary_dim = int(
+                config.get("max_rotary_dim", config["rotary_dim"])
+                or config["rotary_dim"]
+            )
+        head_dim = max(int(config["head_dim"]), rotary_dim)
         max_seq_len = config["context_length"]
 
         # RoPE scaling (for extended context models like Llama 3.1)
@@ -3797,6 +3813,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "recurrent_core": "gated_deltanet",
     "recurrent_norm_gate": "recurrent_norm_gate",
     "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul",
+    "attn_gate_softplus_mul": "attn_gate_softplus_mul",
     "recurrent_out_proj": "matmul",
     "mamba_in_proj": "matmul",
     "mamba_in_proj_split": "mamba_in_proj_split",
@@ -5455,7 +5472,12 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
     if layer < 0:
         return
     embed_dim = int(config.get("embed_dim", 0) or 0)
-    num_heads = int(config.get("num_heads", config.get("num_attention_heads", 1)) or 1)
+    num_heads = _config_layer_int(
+        config,
+        "layer_num_heads",
+        layer,
+        int(config.get("num_heads", config.get("num_attention_heads", 1)) or 1),
+    )
     num_kv_heads = int(config.get("num_kv_heads", config.get("num_key_value_heads", num_heads)) or num_heads)
     q_head_dim = _config_layer_int(config, "layer_q_head_dim", layer, int(config.get("head_dim", 0) or 0))
     k_head_dim = _config_layer_int(config, "layer_k_head_dim", layer, q_head_dim)
@@ -5489,12 +5511,43 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
     else:
         rope_freq_base = float(config.get("rope_theta", 1000000.0) or 1000000.0)
 
+    attention_dimension_ops = {
+        "q_gate_proj",
+        "attention_gate_projection",
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "qk_norm",
+        "q_norm",
+        "v_norm",
+        "rope_qk",
+        "rope_q",
+        "kv_cache_store",
+        "attn",
+        "attn_sliding",
+        "attn_shared_kv",
+        "attn_sliding_shared_kv",
+        "attn_gate_softplus_mul",
+        "out_proj",
+        "quantize_out_proj_input",
+    }
+    if op_name in attention_dimension_ops:
+        params["num_heads"] = num_heads
+        params["num_kv_heads"] = num_kv_heads
+
     if op_name == "q_gate_proj":
         params["_output_dim"] = int(
             config.get("q_gate_proj_dim", config.get("attn_q_gate_proj_dim", q_dim * 2))
             or (q_dim * 2)
         )
         params["_input_dim"] = embed_dim
+    elif op_name == "attention_gate_projection":
+        params["_output_dim"] = num_heads
+        params["_input_dim"] = embed_dim
+        params["output_dim"] = num_heads
+    elif op_name == "attn_gate_softplus_mul":
+        params["head_dim"] = v_head_dim
+        params["state_dim"] = v_head_dim
     elif op_name == "q_proj":
         params["_output_dim"] = q_dim
         params["_input_dim"] = embed_dim
@@ -6718,17 +6771,24 @@ def find_kernel(
                 )
                 continue
 
-        # Match weight quantization
-        if "weight" in quant:
-            weight_quant = k_quant.get("weight", "none")
-            # Support multi-quant kernels (e.g., "q5_0|q8_0|q4_k")
-            allowed_quants = weight_quant.split("|")
-            # Skip kernels without a specific weight quant when we need one
-            # This prevents meta-kernels like "dense_embedding_lookup" from being selected
-            # when we need an actual implementation like "embedding_forward_q8_0"
-            if quant["weight"] not in allowed_quants:
-                trace_rejected(candidate, selection, "dtype_compatibility", "weight_dtype_mismatch")
-                continue
+        # Match every requested storage role. Composite providers may carry
+        # different formats for gate/up/down weights, so collapsing them into a
+        # single generic weight dtype can select an ABI that misreads packed data.
+        quant_mismatch = False
+        for quant_role, requested_dtype in quant.items():
+            provider_dtype = str(k_quant.get(quant_role, "none"))
+            allowed_dtypes = provider_dtype.split("|")
+            if str(requested_dtype) not in allowed_dtypes:
+                trace_rejected(
+                    candidate,
+                    selection,
+                    "dtype_compatibility",
+                    f"{quant_role}_dtype_mismatch",
+                )
+                quant_mismatch = True
+                break
+        if quant_mismatch:
+            continue
 
         # Match explicit inference/training/backward mode contract.
         # If modes is absent, treat kernel as inference-eligible.
@@ -6819,6 +6879,42 @@ def find_kernel(
             )
 
     return matches[0]["id"]
+
+
+def resolve_swiglu_moe_provider(
+    registry: Dict,
+    *,
+    kernel_op: str,
+    layer_quant: Dict[str, Any],
+    weight_prefix: str,
+    mode: str,
+    prefer_q8_activation: bool,
+) -> str:
+    """Resolve one composite SwiGLU provider from all three weight formats."""
+    gate_dtype = str(layer_quant.get(f"{weight_prefix}_gate", "")).lower()
+    up_dtype = str(layer_quant.get(f"{weight_prefix}_up", "")).lower()
+    down_dtype = str(layer_quant.get(f"{weight_prefix}_down", "")).lower()
+    if gate_dtype == up_dtype == down_dtype and gate_dtype in {"fp32", "bf16"}:
+        quant = {"weight": gate_dtype}
+    else:
+        quant = {
+            "gate_weight": gate_dtype,
+            "up_weight": up_dtype,
+            "down_weight": down_dtype,
+        }
+    kernel_id = find_kernel(
+        registry,
+        op=kernel_op,
+        quant=quant,
+        mode=mode,
+        prefer_q8_activation=prefer_q8_activation,
+    )
+    if kernel_id:
+        return kernel_id
+    raise RuntimeError(
+        "HARD KERNEL RESOLUTION FAULT: no composite SwiGLU provider "
+        f"for gate={gate_dtype}, up={up_dtype}, down={down_dtype}."
+    )
 
 
 def kernel_needs_q8_activation(registry: Dict, kernel_id: str) -> bool:
@@ -7540,6 +7636,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "recurrent_core": None,
         "recurrent_norm_gate": None,
         "attn_gate_sigmoid_mul": None,
+        "attn_gate_softplus_mul": None,
         "residual_add": None,
         "add_stream": None,
         "silu_mul": None,
@@ -7744,19 +7841,23 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     return ["deepseek_mla_kv_decompress_bf16"]
                 return ["deepseek_mla_kv_decompress_f32"]
             if op == "moe_swiglu_expert_mlp":
-                gate_dtype = str(layer_quant.get("moe_expert_gate", "")).lower()
-                up_dtype = str(layer_quant.get("moe_expert_up", "")).lower()
-                down_dtype = str(layer_quant.get("moe_expert_down", "")).lower()
-                if gate_dtype == "bf16" and up_dtype == "bf16" and down_dtype == "bf16":
-                    return ["moe_swiglu_expert_forward_bf16"]
-                return ["moe_swiglu_expert_forward_f32"]
+                return [resolve_swiglu_moe_provider(
+                    registry,
+                    kernel_op=kernel_op,
+                    layer_quant=layer_quant,
+                    weight_prefix="moe_expert",
+                    mode=mode,
+                    prefer_q8_activation=prefer_q8_activation,
+                )]
             if op == "shared_swiglu_expert_mlp":
-                gate_dtype = str(layer_quant.get("moe_shared_gate", "")).lower()
-                up_dtype = str(layer_quant.get("moe_shared_up", "")).lower()
-                down_dtype = str(layer_quant.get("moe_shared_down", "")).lower()
-                if gate_dtype == "bf16" and up_dtype == "bf16" and down_dtype == "bf16":
-                    return ["moe_swiglu_shared_forward_bf16"]
-                return ["moe_swiglu_shared_forward_f32"]
+                return [resolve_swiglu_moe_provider(
+                    registry,
+                    kernel_op=kernel_op,
+                    layer_quant=layer_quant,
+                    weight_prefix="moe_shared",
+                    mode=mode,
+                    prefer_q8_activation=prefer_q8_activation,
+                )]
             if op == "farskip_routed_shared_combine":
                 gate_dtype = str(layer_quant.get("moe_shared_gate", "")).lower()
                 up_dtype = str(layer_quant.get("moe_shared_up", "")).lower()
@@ -7946,6 +8047,49 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         )
         return [kernel_id] if kernel_id else []
 
+    def map_template_op_to_kernel(
+        op: str,
+        layer_quant: Dict,
+        mode: str,
+        header_quant: Dict,
+        explicit_kernel: Optional[str] = None,
+    ) -> List[str]:
+        """Apply a validated circuit provider override around generic resolution."""
+        resolved = map_op_to_kernel(op, layer_quant, mode, header_quant)
+        explicit_kernel = str(explicit_kernel or "").strip()
+        if not explicit_kernel:
+            return resolved
+
+        provider = registry_by_id.get(explicit_kernel)
+        if provider is None:
+            raise RuntimeError(
+                "HARD CIRCUIT KERNEL FAULT: explicit provider is absent from "
+                f"the kernel registry: op={op!r}, provider={explicit_kernel!r}."
+            )
+        expected_op = TEMPLATE_TO_KERNEL_OP.get(op)
+        provider_op = str(provider.get("op", "") or "").strip()
+        if expected_op is None or provider_op != expected_op:
+            raise RuntimeError(
+                "HARD CIRCUIT KERNEL FAULT: explicit provider implements the "
+                f"wrong operation class: op={op!r}, expected={expected_op!r}, "
+                f"provider={explicit_kernel!r}, actual={provider_op!r}."
+            )
+        selection = provider.get("selection")
+        phases = selection.get("phases") if isinstance(selection, dict) else None
+        if isinstance(phases, list) and mode not in phases:
+            raise RuntimeError(
+                "HARD CIRCUIT KERNEL FAULT: explicit provider does not support "
+                f"the active phase: op={op!r}, provider={explicit_kernel!r}, "
+                f"phase={mode!r}, supported={phases!r}."
+            )
+        if numerical_contract_by_template_op.get(op) is not None and resolved != [explicit_kernel]:
+            raise RuntimeError(
+                "HARD CIRCUIT KERNEL FAULT: explicit provider conflicts with "
+                f"the resolved numerical contract for {op!r}: "
+                f"circuit={explicit_kernel!r}, contract={resolved!r}."
+            )
+        return [explicit_kernel]
+
     # ═══════════════════════════════════════════════════════════
     # Parse template → Generate IR1
     # The builder walks the declared template graph and lowers explicit ops into
@@ -8029,7 +8173,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     entry = weight_index.get(resolved)
                     if isinstance(entry, dict):
                         branch_quant["branch_fc2_w"] = str(entry.get("dtype", "fp32") or "fp32")
-                kernels = map_op_to_kernel(lowered_op, branch_quant, mode, header_quant)
+                kernels = map_template_op_to_kernel(
+                    lowered_op,
+                    branch_quant,
+                    mode,
+                    header_quant,
+                    producer_item.get("kernel"),
+                )
 
                 params: Dict[str, Any] = _materialize_template_config_params(
                     producer_item.get("params"), config
@@ -8163,9 +8313,16 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         # v7 compatibility: quantize activation before Q8_0 activation kernels
                         if op in PRE_NORM_OP_NAMES and op_idx + 1 < len(layer_ops):
                             next_op = layer_ops[op_idx + 1]
+                            next_item = layer_items[op_idx + 1]
                             next_kernels = []
                             next_kernels.extend(
-                                map_op_to_kernel(next_op, layer_quant, mode, header_quant)
+                                map_template_op_to_kernel(
+                                    next_op,
+                                    layer_quant,
+                                    mode,
+                                    header_quant,
+                                    next_item.get("kernel"),
+                                )
                             )
                             needs_quantize = False
 
@@ -8195,7 +8352,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             })
                             print(f"      [{residual_save_info['op_id']:3d}] {residual_save_op_name:20s} → memcpy  (inst: {norm_instance}) [AUTO-INSERTED before {op}]")
 
-                        kernels = map_op_to_kernel(op, layer_quant, mode, header_quant)
+                        kernels = map_template_op_to_kernel(
+                            op,
+                            layer_quant,
+                            mode,
+                            header_quant,
+                            op_item.get("kernel"),
+                        )
 
                         # Check if we need to insert quantize op BEFORE out_proj or mlp_down
                         # v7 compatibility: quantize activation output before these projections
@@ -8328,12 +8491,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         # immediate next op misses the required quantize.
                         if op in PRE_NORM_OP_NAMES and op_idx + 1 < len(layer_ops):
                             section_kernels = []
-                            for future_op_item in layer_ops[op_idx + 1:]:
-                                future_op = (
-                                    future_op_item["op"]
-                                    if isinstance(future_op_item, dict)
-                                    else str(future_op_item)
-                                )
+                            for future_op_item in layer_items[op_idx + 1:]:
+                                future_op = future_op_item["op"]
                                 if future_op in PRE_NORM_OP_NAMES:
                                     break
                                 # Only projections that directly consume the
@@ -8344,7 +8503,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 if future_op not in PRE_NORM_Q8_DIRECT_CONSUMERS:
                                     break
                                 section_kernels.extend(
-                                    map_op_to_kernel(future_op, layer_quant, mode, header_quant)
+                                    map_template_op_to_kernel(
+                                        future_op,
+                                        layer_quant,
+                                        mode,
+                                        header_quant,
+                                        future_op_item.get("kernel"),
+                                    )
                                 )
 
                             for nk in section_kernels:
@@ -8439,7 +8604,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 print(f"            {patch_op:20s} → (no kernel)")
                         annotate_branch_taps(emitted_start, section_name, -1, op_item)
                         continue
-                    kernels = map_op_to_kernel(op, {}, mode, header_quant)
+                    kernels = map_template_op_to_kernel(
+                        op,
+                        {},
+                        mode,
+                        header_quant,
+                        op_item.get("kernel"),
+                    )
 
                     # Footer: Insert quantize op BEFORE any op that needs Q8 activation
                     # (after rmsnorm outputs FP32, before logits needs Q8_0)
@@ -10436,6 +10607,7 @@ TEMPLATE_OP_WEIGHTS = {
     "mla_kv_cache_store": [],
     "kv_cache_store_shared_q": [],  # No model weights; writes q_scratch to K/V cache
     "attn_gate_sigmoid_mul": [],  # No model weights
+    "attn_gate_softplus_mul": [],  # No model weights
     "out_proj": ["wo", "bo", "wo_input_min", "wo_input_max", "wo_output_min", "wo_output_max"],  # Output projection + optional bias
     "cross_out_proj": ["cross_wo", "cross_bo"],
     "residual_add": [],  # No model weights
@@ -11403,7 +11575,7 @@ def generate_memory_layout_packed(
             alloc_act("k_scratch")
             alloc_act("v_scratch")
             alloc_act("attn_scratch")
-        if op_type == "attn_gate_sigmoid_mul":
+        if op_type in ("attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
             alloc_act("attn_gate")
             alloc_act("attn_scratch")
 
@@ -11418,7 +11590,7 @@ def generate_memory_layout_packed(
         if "embedding" in kernel_type.lower():
             current_input_buffer = "embedded_input"
             current_output_buffer = "layer_input"
-        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk", "vision_position_ids", "position_ids_2d", "bias_add") or \
+        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "attn_gate_softplus_mul", "k_proj", "v_proj", "qkv_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk", "vision_position_ids", "position_ids_2d", "bias_add") or \
                 (mode == "prefill" and op_type in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv")):
             pass
         else:
@@ -13067,6 +13239,7 @@ def generate_ir_lower_2(
         if op_type in {
             "full_softmax_topk_router",
             "moe_swiglu_expert_mlp",
+            "shared_swiglu_expert_mlp",
             "gated_shared_swiglu_expert_mlp",
         }:
             params.update({
@@ -13076,7 +13249,10 @@ def generate_ir_lower_2(
                 "E": int(config.get("n_routed_experts", config.get("num_experts", 0)) or 0),
                 "K": int(config.get("experts_per_tok", config.get("num_experts_per_tok", 0)) or 0),
             })
-            if op_type == "gated_shared_swiglu_expert_mlp":
+            if op_type in {
+                "shared_swiglu_expert_mlp",
+                "gated_shared_swiglu_expert_mlp",
+            }:
                 params["I"] = int(
                     config.get("moe_shared_expert_intermediate_size", params["I"])
                     or params["I"]
@@ -13242,7 +13418,7 @@ def generate_ir_lower_2(
         elif op_type in ("q_proj", "cross_q_proj", "cross_k_proj", "cross_v_proj", "cross_attn",
                          "transpose_cross_q_to_head_major", "transpose_cross_kv_to_head_major",
                          "transpose_cross_attn_out_to_token_major",
-                         "q_gate_proj", "split_q_gate", "split_qkv_packed", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "qkv_packed_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk",
+                         "q_gate_proj", "split_q_gate", "split_qkv_packed", "attn_gate_sigmoid_mul", "attn_gate_softplus_mul", "k_proj", "v_proj", "qkv_proj", "qkv_packed_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk",
                          "recurrent_qk_l2_norm",
                          "mlp_gate_up", "mlp_up", "silu_mul", "geglu", "gelu", "mlp_down", "projector_fc1", "projector_gelu", "projector_prep", "projector_fc2", "branch_fc1", "branch_gelu", "branch_fc2", "branch_concat", "spatial_merge", "bias_add") or \
                 (ir_op.get("section", "") == "branch" and op_type == "layernorm") or \
@@ -13485,7 +13661,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                     )
 
         # ===== Q/K/V PROJECTIONS =====
-        elif op_name in ("q_proj", "q_gate_proj", "k_proj", "v_proj", "qkv_proj", "split_q_gate", "attn_gate_sigmoid_mul"):
+        elif op_name in ("q_proj", "q_gate_proj", "k_proj", "v_proj", "qkv_proj", "split_q_gate", "attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
             outputs = op.get("outputs", {})
             outputs_to_check = {
                 "q_proj": ["q", "q_out"],
@@ -13494,6 +13670,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                 "v_proj": ["v", "v_out"],
                 "split_q_gate": ["q", "gate"],
                 "attn_gate_sigmoid_mul": ["out"],
+                "attn_gate_softplus_mul": ["out"],
             }
             expected_buffers = {
                 "q_proj": "q_scratch",
@@ -13504,6 +13681,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
             expected_by_output = {
                 "split_q_gate": {"q": "q_scratch", "gate": "attn_gate"},
                 "attn_gate_sigmoid_mul": {"out": "attn_scratch"},
+                "attn_gate_softplus_mul": {"out": "attn_scratch"},
             }
             expected = expected_buffers.get(op_name, "scratch")
             for out_name in outputs_to_check.get(op_name, []):
@@ -13864,6 +14042,13 @@ def _template_activation_bindings(template: Dict[str, Any]) -> Dict[str, str]:
     return result
 
 
+def _c_scalar_expr(value: Any) -> str:
+    """Render a lowered scalar value as a valid C expression."""
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    return str(value)
+
+
 def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
     """
     IR Lower 3: Emit call-ready ops with ordered args (function + expr list).
@@ -14220,7 +14405,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             elif src.startswith("dim:"):
                 key = src.split(":", 1)[1]
                 if key in params:
-                    expr = str(params[key])
+                    expr = _c_scalar_expr(params[key])
                 elif key == "max_seq_len":
                     # Prefer context_length override when present (e.g., --context-len)
                     if "context_length" in config:
@@ -14245,7 +14430,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     else:
                         expr = str(int(config.get("moe_intermediate_size", 0) or 0) * max(1, int(config.get("n_shared_experts", 1) or 1)))
                 elif key in config:
-                    expr = str(config[key])
+                    expr = _c_scalar_expr(config[key])
                 elif key == "intermediate_size" and "intermediate_dim" in config:
                     expr = str(config["intermediate_dim"])
                 else:
@@ -14255,7 +14440,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             elif src.startswith("param:"):
                 key = src.split(":", 1)[1]
                 if key in params:
-                    expr = str(params[key])
+                    expr = _c_scalar_expr(params[key])
                 else:
                     op_errors.append(f"{func}.{name}: missing param '{key}'")
                     expr = "0"

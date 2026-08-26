@@ -274,6 +274,12 @@ def emit_prefill_op(
                 == "preserve_provider"
             )
             if preserve_provider and gemm_a_expr and gemm_b_expr and gemm_c_expr:
+                dump_code = ""
+                if dump:
+                    raw_output = gemm_c_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                    dump_code = f'''\n    #ifdef CK_PARITY_DUMP
+    ck_dump_tensor((float*){raw_output}, -1, "logits", {vocab_size});
+    #endif'''
                 return f"""    /* Op {seq_idx}: logits (last-only exact GEMM contract) */
     {func}(
         (const float*)({gemm_a_expr}) + (size_t)(num_tokens - 1) * {embed_dim},
@@ -284,7 +290,7 @@ def emit_prefill_op(
         {vocab_size},
         {embed_dim}
     );
-    ck_debug_export_hidden(model, -1, "logits", (const float*){gemm_c_expr}, VOCAB_SIZE);"""
+    ck_debug_export_hidden(model, -1, "logits", (const float*){gemm_c_expr}, VOCAB_SIZE);{dump_code}"""
             if linear_emission is None:
                 call_abi = op.get("call_abi") or {}
                 if call_abi.get("owner") != "legacy_compatibility":
@@ -331,6 +337,12 @@ def emit_prefill_op(
                 raise RuntimeError(
                     f"prefill logits(last): unable to derive row stride for func={gemv_func} embed_dim={embed_dim}"
                 )
+            dump_code = ""
+            if dump:
+                raw_output = output_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                dump_code = f'''\n    #ifdef CK_PARITY_DUMP
+    ck_dump_tensor((float*){raw_output}, -1, "logits", {vocab_size});
+    #endif'''
             return f"""    /* Op {seq_idx}: logits (last-only) */
     {gemv_func}(
         {output_expr},
@@ -339,7 +351,7 @@ def emit_prefill_op(
         {vocab_size},
         {embed_dim}
     );
-    ck_debug_export_hidden(model, -1, "logits", (const float*){output_expr}, VOCAB_SIZE);"""
+    ck_debug_export_hidden(model, -1, "logits", (const float*){output_expr}, VOCAB_SIZE);{dump_code}"""
 
     if op_type == "kv_cache_batch_copy":
         # Copy K/V from scratch (head-major after transpose) to KV cache
@@ -1350,7 +1362,7 @@ def emit_prefill_op(
                 _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM",
             ),
         )
-    elif op_type == "attn_gate_sigmoid_mul":
+    elif op_type in ("attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
         _emit_hidden_full(
             _hidden_arg("output", "out", "y"),
             "attn_out",
@@ -1419,7 +1431,13 @@ def emit_prefill_op(
         _emit_hidden_last(output, "moe_router_logits", width)
     elif op_type in ("group_limited_topk_router", "full_softmax_topk_router"):
         width = _hidden_arg("top_k") or "NUM_EXPERTS_PER_TOK"
+        indices = _hidden_raw(_hidden_arg("indices"))
         weights = _hidden_arg("weights")
+        if indices:
+            lines.append(
+                f'    ck_debug_export_hidden_i32(model, {layer}, "moe_selected_experts", '
+                f'(const int32_t*){indices}, {_hidden_mul("num_tokens", width)});'
+            )
         _emit_hidden_full(weights, "moe_routing_weights", _hidden_mul("num_tokens", width))
         _emit_hidden_last(weights, "moe_routing_weights", width)
     elif op_type == "moe_swiglu_expert_mlp":
@@ -1593,6 +1611,12 @@ def emit_prefill_op(
             k_expr = _get_arg("k")
             _emit_head_major_dump(q_expr, "Qcur_rope", num_heads, tokens, head_dim)
             _emit_head_major_dump(k_expr, "Kcur_rope", num_kv_heads, tokens, head_dim)
+        elif op_type == "final_rmsnorm":
+            _emit_dump(
+                _get_arg("output", "out", "x", "y"),
+                "final_norm",
+                _mul_expr(tokens, embed_dim_expr),
+            )
         elif op_type in ("rmsnorm", "layernorm"):
             dump_label = None
             if str(section or "") == "footer":

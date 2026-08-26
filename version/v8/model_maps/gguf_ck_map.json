@@ -314,6 +314,137 @@
         "blk.{L}.attn_v.weight": "layer.{L}.attn_v",
         "blk.{L}.attn_output.weight": "layer.{L}.attn_o"
       }
+    },
+    "laguna": {
+      "template": "laguna",
+      "family": "laguna",
+      "layer_kind_config_key": "layer_kinds",
+      "metadata_map": {
+        "block_count": "laguna.block_count",
+        "context_length": "laguna.context_length",
+        "embedding_length": "laguna.embedding_length",
+        "feed_forward_length": "laguna.feed_forward_length",
+        "vocab_size": "laguna.vocab_size",
+        "attention_head_count": "laguna.attention.head_count",
+        "attention_head_count_kv": "laguna.attention.head_count_kv",
+        "attention_key_length": "laguna.attention.key_length",
+        "attention_value_length": "laguna.attention.value_length",
+        "attention_sliding_window": "laguna.attention.sliding_window",
+        "attention_layer_norm_epsilon": "laguna.attention.layer_norm_rms_epsilon",
+        "rope_freq_base": "laguna.rope.freq_base",
+        "rope_freq_base_swa": "laguna.rope.freq_base_swa",
+        "rope_dimension_count": "laguna.rope.dimension_count",
+        "rope_dimension_count_swa": "laguna.rope.dimension_count_swa",
+        "rope_scaling_type": "laguna.rope.scaling.type",
+        "rope_scaling_factor": "laguna.rope.scaling.factor",
+        "rope_original_context_length": "laguna.rope.scaling.original_context_length",
+        "rope_attn_factor": "laguna.rope.scaling.yarn_attn_factor",
+        "rope_beta_fast": "laguna.rope.scaling.yarn_beta_fast",
+        "rope_beta_slow": "laguna.rope.scaling.yarn_beta_slow",
+        "expert_count": "laguna.expert_count",
+        "expert_used_count": "laguna.expert_used_count",
+        "expert_feed_forward_length": "laguna.expert_feed_forward_length",
+        "expert_shared_feed_forward_length": "laguna.expert_shared_feed_forward_length",
+        "expert_weights_norm": "laguna.expert_weights_norm",
+        "routed_scaling_factor": "laguna.expert_weights_scale",
+        "expert_gating_func": "laguna.expert_gating_func",
+        "leading_dense_block_count": "laguna.leading_dense_block_count"
+      },
+      "layer_kinds": {
+        "dense_global_attention": {
+          "required_suffixes": [
+            "attn_norm.weight",
+            "attn_q.weight",
+            "attn_k.weight",
+            "attn_v.weight",
+            "attn_gate.weight",
+            "attn_output.weight",
+            "ffn_norm.weight",
+            "ffn_gate.weight",
+            "ffn_up.weight",
+            "ffn_down.weight"
+          ],
+          "tensor_dims": {
+            "attn_q.weight": [
+              2048,
+              6144
+            ]
+          }
+        },
+        "moe_global_attention": {
+          "required_suffixes": [
+            "attn_norm.weight",
+            "attn_q.weight",
+            "attn_k.weight",
+            "attn_v.weight",
+            "attn_gate.weight",
+            "attn_output.weight",
+            "ffn_norm.weight",
+            "ffn_gate_inp.weight",
+            "ffn_gate_exps.weight",
+            "ffn_up_exps.weight",
+            "ffn_down_exps.weight",
+            "ffn_gate_shexp.weight",
+            "ffn_up_shexp.weight",
+            "ffn_down_shexp.weight"
+          ],
+          "tensor_dims": {
+            "attn_q.weight": [
+              2048,
+              6144
+            ]
+          }
+        },
+        "moe_sliding_attention": {
+          "required_suffixes": [
+            "attn_norm.weight",
+            "attn_q.weight",
+            "attn_k.weight",
+            "attn_v.weight",
+            "attn_gate.weight",
+            "attn_output.weight",
+            "ffn_norm.weight",
+            "ffn_gate_inp.weight",
+            "ffn_gate_exps.weight",
+            "ffn_up_exps.weight",
+            "ffn_down_exps.weight",
+            "ffn_gate_shexp.weight",
+            "ffn_up_shexp.weight",
+            "ffn_down_shexp.weight"
+          ],
+          "tensor_dims": {
+            "attn_q.weight": [
+              2048,
+              8192
+            ]
+          }
+        }
+      },
+      "tensor_map": {
+        "token_embd.weight": "token_emb",
+        "output_norm.weight": "final_ln_weight",
+        "output.weight": "output.weight",
+        "blk.{L}.attn_norm.weight": "layer.{L}.ln1_gamma",
+        "blk.{L}.ffn_norm.weight": "layer.{L}.ln2_gamma",
+        "blk.{L}.attn_q.weight": "layer.{L}.wq",
+        "blk.{L}.attn_k.weight": "layer.{L}.wk",
+        "blk.{L}.attn_v.weight": "layer.{L}.wv",
+        "blk.{L}.attn_gate.weight": "layer.{L}.mla_gate_proj",
+        "blk.{L}.attn_output.weight": "layer.{L}.wo",
+        "blk.{L}.attn_q_norm.weight": "layer.{L}.q_norm",
+        "blk.{L}.attn_k_norm.weight": "layer.{L}.k_norm",
+        "blk.{L}.ffn_gate.weight": "layer.{L}.w1",
+        "blk.{L}.ffn_up.weight": "layer.{L}.w3",
+        "blk.{L}.ffn_down.weight": "layer.{L}.w2",
+        "blk.{L}.ffn_gate_inp.weight": "layer.{L}.moe_router",
+        "blk.{L}.exp_probs_b.bias": "layer.{L}.moe_router_bias",
+        "blk.{L}.ffn_gate_exps.weight": "layer.{L}.moe_expert_gate",
+        "blk.{L}.ffn_up_exps.weight": "layer.{L}.moe_expert_up",
+        "blk.{L}.ffn_down_exps.weight": "layer.{L}.moe_expert_down",
+        "blk.{L}.ffn_gate_shexp.weight": "layer.{L}.moe_shared_gate",
+        "blk.{L}.ffn_up_shexp.weight": "layer.{L}.moe_shared_up",
+        "blk.{L}.ffn_down_shexp.weight": "layer.{L}.moe_shared_down"
+      }
     }
   }
 }

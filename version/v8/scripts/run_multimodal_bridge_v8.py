@@ -2468,6 +2468,8 @@ def _prepare_decoder_runtime(
     decode_layout = output_dir / "layout_decode.json"
     decode_lowered = output_dir / "lowered_decode.json"
     decode_call = output_dir / "call_decode.json"
+    init_ir = output_dir / "init.json"
+    init_call = output_dir / "init_call.json"
     manifest_map = output_dir / "weights_manifest.map"
     suffix = "_parity_dump" if parity_dump else ""
     prefill_c_path = output_dir / f"decoder_v8_prefill{suffix}.c"
@@ -2494,6 +2496,8 @@ def _prepare_decoder_runtime(
         decode_layout,
         decode_lowered,
         decode_call,
+        init_ir,
+        init_call,
         manifest_map,
         prefill_c_path,
         c_path,
@@ -2578,6 +2582,8 @@ def _prepare_decoder_runtime(
         str(decode_call),
         "--manifest-map-output",
         str(manifest_map),
+        "--init-output",
+        str(init_ir),
     ]
     if context_override is not None:
         decode_args.extend(["--context-len", str(int(context_override))])
@@ -2602,6 +2608,8 @@ def _prepare_decoder_runtime(
             str(prefill_layout),
             "--output",
             str(c_path),
+            "--init",
+            str(init_call),
         ]
         if parity_dump:
             sys.argv.append("--parity-dump")
@@ -2624,6 +2632,8 @@ def _prepare_decoder_runtime(
             str(prefill_layout),
             "--output",
             str(prefill_c_path),
+            "--init",
+            str(init_call),
         ]
         if parity_dump:
             sys.argv.append("--parity-dump")

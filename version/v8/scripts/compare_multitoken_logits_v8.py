@@ -40,6 +40,17 @@ from compare_first_token_logits_v8 import (  # type: ignore
 
 
 _AUTO_STREAM_LOGITS_BYTES = 256 * 1024 * 1024
+_HIDDEN_CAPTURE_SUFFIXES = {".f32", ".i32"}
+
+
+def _hidden_capture_paths(dump_dir: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in dump_dir.resolve().glob("tok_*_layer_*_*")
+        if path.suffix in _HIDDEN_CAPTURE_SUFFIXES
+        and path.is_file()
+        and path.stat().st_size > 0
+    )
 
 
 def _trajectory_logits_bytes(model_dir: Path, max_new_tokens: int) -> int | None:
@@ -363,11 +374,7 @@ def load_ck_greedy_trajectory(
         dump_paths: list[Path] = []
         if capture_step is not None:
             if dump_format == "hidden":
-                dump_paths = sorted(
-                    path
-                    for path in dump_dir.resolve().glob("tok_*_layer_*_*.f32")
-                    if path.is_file() and path.stat().st_size > 0
-                )
+                dump_paths = _hidden_capture_paths(dump_dir)
                 if kv_dump_path is not None and kv_dump_path.is_file():
                     dump_paths.append(kv_dump_path)
             else:

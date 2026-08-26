@@ -15,8 +15,8 @@ SCHEMA = ROOT / "version" / "v8" / "schemas" / "kernel_call_abi.schema.json"
 REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
-EXPECTED_GOVERNED_MAP_COUNT = 118
-EXPECTED_MAP_OWNED_ABI_COUNT = 156
+EXPECTED_GOVERNED_MAP_COUNT = 123
+EXPECTED_MAP_OWNED_ABI_COUNT = 161
 GLM4_PARITY_PROVIDERS = {
     "rope_forward_qk_pairwise_llama_cpu",
     "rope_precompute_cache_llama_cpu",
@@ -62,6 +62,11 @@ def load_json(path: Path) -> dict:
 
 
 class V8KernelCallABITests(unittest.TestCase):
+    def test_lowered_scalar_booleans_are_valid_c_expressions(self) -> None:
+        self.assertEqual(build_ir_v8._c_scalar_expr(True), "1")
+        self.assertEqual(build_ir_v8._c_scalar_expr(False), "0")
+        self.assertEqual(build_ir_v8._c_scalar_expr(8), "8")
+
     def test_kernel_maps_reject_duplicate_json_keys(self) -> None:
         for path in sorted(MAPS.glob("*.json")):
             if path.name in EXCLUDED:

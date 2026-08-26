@@ -184,6 +184,11 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             decoder_parity_v8._ck_dump_filter_names("layer_input-3,after_attn-3"),
             "layer_out-2,after_attn-3,attn_residual-3,ffn_inp-3",
         )
+        self.assertEqual(
+            decoder_parity_v8._ck_dump_filter_names("result_norm,result_output"),
+            "result_norm,final_norm,final_hidden,final_hidden_last,"
+            "result_output,logits",
+        )
 
     def test_resolve_llama_dump_names_expands_semantic_boundaries(self) -> None:
         self.assertEqual(

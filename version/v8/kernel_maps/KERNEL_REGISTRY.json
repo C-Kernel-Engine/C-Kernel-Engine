@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 292,
+      "total": 297,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -15,6 +15,7 @@
         "attention_sliding": 6,
         "attn_gate_sigmoid_mul": 1,
         "attn_gate_sigmoid_mul_backward": 1,
+        "attn_gate_softplus_mul": 1,
         "audio_conv1d": 1,
         "audio_feature_window": 1,
         "audio_log_mel": 2,
@@ -66,7 +67,7 @@
         "mla_kv_cache_batch_store": 1,
         "mla_kv_cache_store": 1,
         "moe_relu2_expert_mlp": 4,
-        "moe_swiglu_expert_mlp": 5,
+        "moe_swiglu_expert_mlp": 7,
         "multimodal_position_builder": 1,
         "multimodal_prefix_insert": 1,
         "optimizer": 4,
@@ -99,7 +100,7 @@
         "rope_init": 3,
         "rowwise_bias_add": 1,
         "shared_relu2_expert_mlp": 1,
-        "shared_swiglu_expert_mlp": 3,
+        "shared_swiglu_expert_mlp": 5,
         "softmax": 1,
         "spatial_merge": 3,
         "speculative_commit_or_reject": 1,
@@ -7643,6 +7644,186 @@
       "notes": "Applies a llama.cpp-compatible FP32 sigmoid gate after attention and before the output projection.",
       "name": "attn_gate_sigmoid_mul_forward",
       "_source_file": "attn_gate_sigmoid_mul_forward.json"
+    },
+    {
+      "id": "attn_gate_softplus_mul_forward",
+      "op": "attn_gate_softplus_mul",
+      "operation_interface": "attn_gate_softplus_mul.fp32.v1",
+      "contract_schema_version": 1,
+      "variant": "head_scalar_fp32",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "token_head_channel",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_head",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H",
+            "D"
+          ],
+          "layout": "token_head_channel",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "may_alias": [
+            "input:x"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "H",
+        "D"
+      ],
+      "constraints": {
+        "notes": "One softplus scalar is computed per query head and broadcast over that head's value channels."
+      },
+      "impl": {
+        "function": "attn_gate_softplus_mul_forward",
+        "c_declaration": "void attn_gate_softplus_mul_forward(const float *x, const float *gate, float *out, int rows, int num_heads, int state_dim);",
+        "sources": [
+          "src/kernels/hybrid_attention_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_gate_softplus_head_scalar_fp32_output",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "attn_gate_softplus_mul_forward",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "x",
+            "source": "activation:x",
+            "cast": "const float*",
+            "ports": [
+              "input:x"
+            ]
+          },
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const float*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "runtime:seq_len"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "state_dim",
+            "source": "dim:head_dim"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attn_gate_softplus_mul.py"
+        ]
+      },
+      "notes": "Laguna-style attention gate: softplus(head_gate) is broadcast over each head before output projection.",
+      "name": "attn_gate_softplus_mul_forward",
+      "_source_file": "attn_gate_softplus_mul_forward.json"
     },
     {
       "id": "audio_conv1d_channel_major_f32",
@@ -28948,6 +29129,297 @@
       "_source_file": "moe_swiglu_expert_forward_f32.json"
     },
     {
+      "id": "moe_swiglu_expert_forward_q4k_q4k",
+      "op": "moe_swiglu_expert_mlp",
+      "operation_interface": "moe_swiglu_expert.q4_k_gate_up.q4_k_down.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 205,
+        "equivalence_group": "q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32",
+      "variant": "compact_q4_k_gate_up_q4_k_down",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "gate_weight": "q4_k",
+        "up_weight": "q4_k",
+        "down_weight": "q4_k",
+        "activation": "fp32_to_q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "routing_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "moe_expert_gate",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_up",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_down",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "H",
+            "I"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4)",
+          "desc": "Planner-owned hidden quantization, gate/up, activation quantization, and expert output workspace."
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "H": 256,
+          "I": 256
+        }
+      },
+      "impl": {
+        "function": "moe_swiglu_expert_forward_q4k_q4k_workspace",
+        "c_declaration": "int moe_swiglu_expert_forward_q4k_q4k_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/axpy_kernels.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/swiglu_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "indices",
+            "source": "activation:indices",
+            "cast": "const int*",
+            "ports": [
+              "input:indices"
+            ]
+          },
+          {
+            "name": "routing_weights",
+            "source": "activation:routing_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:routing_weights"
+            ]
+          },
+          {
+            "name": "expert_gate",
+            "source": "weight:moe_expert_gate",
+            "ports": [
+              "weight:moe_expert_gate"
+            ]
+          },
+          {
+            "name": "expert_up",
+            "source": "weight:moe_expert_up",
+            "ports": [
+              "weight:moe_expert_up"
+            ]
+          },
+          {
+            "name": "expert_down",
+            "source": "weight:moe_expert_down",
+            "ports": [
+              "weight:moe_expert_down"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:H"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:I"
+          },
+          {
+            "name": "n_experts",
+            "source": "dim:E"
+          },
+          {
+            "name": "top_k",
+            "source": "dim:K"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_swiglu_expert_forward_q4k_q4k_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "selected_slot_order",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Compact mixed-quant routed SwiGLU provider. It preserves selected-slot merge order and allocates no kernel-local heap memory.",
+      "name": "moe_swiglu_expert_forward_q4k_q4k",
+      "_source_file": "moe_swiglu_expert_forward_q4k_q4k.json"
+    },
+    {
       "id": "moe_swiglu_expert_forward_q4k_q5k",
       "op": "moe_swiglu_expert_mlp",
       "operation_interface": "moe_swiglu_expert.q4_k_gate_up.q5_k_down.fp32_output.v1",
@@ -29606,6 +30078,298 @@
       "_source_file": "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
     },
     {
+      "id": "moe_swiglu_expert_forward_q4k_q6k",
+      "op": "moe_swiglu_expert_mlp",
+      "operation_interface": "moe_swiglu_expert.q4_k_gate_up.q6_k_down.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 205,
+        "equivalence_group": "q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32",
+      "variant": "compact_q4_k_gate_up_q6_k_down",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "gate_weight": "q4_k",
+        "up_weight": "q4_k",
+        "down_weight": "q6_k",
+        "activation": "fp32_to_q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "routing_weights",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "moe_expert_gate",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_up",
+          "dtype": "q4_k",
+          "shape": [
+            "E",
+            "I",
+            "H"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_expert_down",
+          "dtype": "q6_k",
+          "shape": [
+            "E",
+            "H",
+            "I"
+          ],
+          "layout": "expert_major_opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4)",
+          "desc": "Planner-owned hidden quantization, gate/up, activation quantization, and expert output workspace."
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I",
+        "E",
+        "K"
+      ],
+      "constraints": {
+        "alignment": {
+          "H": 256,
+          "I": 256
+        }
+      },
+      "impl": {
+        "function": "moe_swiglu_expert_forward_q4k_q6k_workspace",
+        "c_declaration": "int moe_swiglu_expert_forward_q4k_q6k_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/axpy_kernels.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q6k_q8k.c",
+          "src/kernels/swiglu_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "indices",
+            "source": "activation:indices",
+            "cast": "const int*",
+            "ports": [
+              "input:indices"
+            ]
+          },
+          {
+            "name": "routing_weights",
+            "source": "activation:routing_weights",
+            "cast": "const float*",
+            "ports": [
+              "input:routing_weights"
+            ]
+          },
+          {
+            "name": "expert_gate",
+            "source": "weight:moe_expert_gate",
+            "ports": [
+              "weight:moe_expert_gate"
+            ]
+          },
+          {
+            "name": "expert_up",
+            "source": "weight:moe_expert_up",
+            "ports": [
+              "weight:moe_expert_up"
+            ]
+          },
+          {
+            "name": "expert_down",
+            "source": "weight:moe_expert_down",
+            "ports": [
+              "weight:moe_expert_down"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:H"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:I"
+          },
+          {
+            "name": "n_experts",
+            "source": "dim:E"
+          },
+          {
+            "name": "top_k",
+            "source": "dim:K"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_swiglu_expert_forward_q4k_q6k_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "selected_slot_order",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Compact mixed-quant routed SwiGLU provider. It preserves selected-slot merge order and allocates no kernel-local heap memory.",
+      "name": "moe_swiglu_expert_forward_q4k_q6k",
+      "_source_file": "moe_swiglu_expert_forward_q4k_q6k.json"
+    },
+    {
       "id": "moe_swiglu_shared_backward_f32",
       "op": "shared_swiglu_expert_mlp",
       "variant": "fp32",
@@ -29928,6 +30692,523 @@
       "notes": "Shared SwiGLU expert branch used by Kimi/DeepSeek-style MoE; output = routed + shared_down(silu(shared_gate(x))*shared_up(x)).",
       "name": "moe_swiglu_shared_forward_f32",
       "_source_file": "moe_swiglu_shared_forward_f32.json"
+    },
+    {
+      "id": "moe_swiglu_shared_forward_q4k_q4k",
+      "op": "shared_swiglu_expert_mlp",
+      "operation_interface": "moe_swiglu_shared.q4_k_gate_up.q4_k_down.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 205,
+        "equivalence_group": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32",
+      "variant": "compact_q4_k_gate_up_q4_k_down",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "gate_weight": "q4_k",
+        "up_weight": "q4_k",
+        "down_weight": "q4_k",
+        "activation": "fp32_to_q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "routed",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "optional"
+        }
+      ],
+      "weights": [
+        {
+          "name": "moe_shared_gate",
+          "dtype": "q4_k",
+          "shape": [
+            "I",
+            "H"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_shared_up",
+          "dtype": "q4_k",
+          "shape": [
+            "I",
+            "H"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_shared_down",
+          "dtype": "q4_k",
+          "shape": [
+            "H",
+            "I"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4)",
+          "desc": "Planner-owned compact shared-expert workspace."
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I"
+      ],
+      "constraints": {
+        "alignment": {
+          "H": 256,
+          "I": 256
+        }
+      },
+      "impl": {
+        "function": "moe_swiglu_shared_forward_q4k_q4k_workspace",
+        "c_declaration": "int moe_swiglu_shared_forward_q4k_q4k_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/axpy_kernels.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/swiglu_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "routed",
+            "source": "activation:routed",
+            "cast": "const float*",
+            "ports": [
+              "input:routed"
+            ]
+          },
+          {
+            "name": "shared_gate",
+            "source": "weight:moe_shared_gate",
+            "ports": [
+              "weight:moe_shared_gate"
+            ]
+          },
+          {
+            "name": "shared_up",
+            "source": "weight:moe_shared_up",
+            "ports": [
+              "weight:moe_shared_up"
+            ]
+          },
+          {
+            "name": "shared_down",
+            "source": "weight:moe_shared_down",
+            "ports": [
+              "weight:moe_shared_down"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:H"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:I"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_swiglu_shared_forward_q4k_q4k_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Compact mixed-quant shared SwiGLU provider with optional routed residual and no kernel-local allocation.",
+      "name": "moe_swiglu_shared_forward_q4k_q4k",
+      "_source_file": "moe_swiglu_shared_forward_q4k_q4k.json"
+    },
+    {
+      "id": "moe_swiglu_shared_forward_q4k_q6k",
+      "op": "shared_swiglu_expert_mlp",
+      "operation_interface": "moe_swiglu_shared.q4_k_gate_up.q6_k_down.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 205,
+        "equivalence_group": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "contract_schema_version": 1,
+      "numerical_contract": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32",
+      "variant": "compact_q4_k_gate_up_q6_k_down",
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "quant": {
+        "gate_weight": "q4_k",
+        "up_weight": "q4_k",
+        "down_weight": "q6_k",
+        "activation": "fp32_to_q8_k",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "hidden",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "routed",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "optional"
+        }
+      ],
+      "weights": [
+        {
+          "name": "moe_shared_gate",
+          "dtype": "q4_k",
+          "shape": [
+            "I",
+            "H"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_shared_up",
+          "dtype": "q4_k",
+          "shape": [
+            "I",
+            "H"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        },
+        {
+          "name": "moe_shared_down",
+          "dtype": "q6_k",
+          "shape": [
+            "H",
+            "I"
+          ],
+          "layout": "opaque_packed",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "workspace",
+          "dtype": "u8",
+          "alignment": 64,
+          "lifetime": "kernel_call",
+          "size_resolution": "required",
+          "size_bytes": "align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4)",
+          "desc": "Planner-owned compact shared-expert workspace."
+        }
+      ],
+      "dims": [
+        "R",
+        "H",
+        "I"
+      ],
+      "constraints": {
+        "alignment": {
+          "H": 256,
+          "I": 256
+        }
+      },
+      "impl": {
+        "function": "moe_swiglu_shared_forward_q4k_q6k_workspace",
+        "c_declaration": "int moe_swiglu_shared_forward_q4k_q6k_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);",
+        "sources": [
+          "src/kernels/axpy_kernels.c",
+          "src/kernels/gemm_kernels_q4k_q8k.c",
+          "src/kernels/gemm_kernels_q6k_q8k.c",
+          "src/kernels/swiglu_kernels.c"
+        ]
+      },
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*",
+            "ports": [
+              "input:hidden"
+            ]
+          },
+          {
+            "name": "routed",
+            "source": "activation:routed",
+            "cast": "const float*",
+            "ports": [
+              "input:routed"
+            ]
+          },
+          {
+            "name": "shared_gate",
+            "source": "weight:moe_shared_gate",
+            "ports": [
+              "weight:moe_shared_gate"
+            ]
+          },
+          {
+            "name": "shared_up",
+            "source": "weight:moe_shared_up",
+            "ports": [
+              "weight:moe_shared_up"
+            ]
+          },
+          {
+            "name": "shared_down",
+            "source": "weight:moe_shared_down",
+            "ports": [
+              "weight:moe_shared_down"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "dim:R"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:H"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:I"
+          },
+          {
+            "name": "workspace",
+            "source": "scratch:workspace",
+            "cast": "void*"
+          },
+          {
+            "name": "workspace_bytes",
+            "source": "scratch_size:workspace"
+          }
+        ]
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "q4_k_q8_k_shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32",
+          "status": "observed",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "moe_swiglu_shared_forward_q4k_q6k_workspace",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "runtime",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "independent_rows"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "notes": "Compact mixed-quant shared SwiGLU provider with optional routed residual and no kernel-local allocation.",
+      "name": "moe_swiglu_shared_forward_q4k_q6k",
+      "_source_file": "moe_swiglu_shared_forward_q4k_q6k.json"
     },
     {
       "id": "moe_swiglu_shared_forward_q8_0_gated",

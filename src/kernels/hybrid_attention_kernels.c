@@ -129,6 +129,31 @@ void attn_gate_sigmoid_mul_forward(const float *x,
     }
 }
 
+void attn_gate_softplus_mul_forward(const float *x,
+                                    const float *gate,
+                                    float *out,
+                                    int rows,
+                                    int num_heads,
+                                    int state_dim) {
+    const int dim = num_heads * state_dim;
+    for (int row = 0; row < rows; ++row) {
+        const float *x_row = x + (size_t) row * (size_t) dim;
+        const float *gate_row = gate + (size_t) row * (size_t) num_heads;
+        float *out_row = out + (size_t) row * (size_t) dim;
+        for (int head = 0; head < num_heads; ++head) {
+            const float value = gate_row[head];
+            const float scale = value > 20.0f
+                ? value
+                : log1pf(expf(value));
+            const size_t base = (size_t) head * (size_t) state_dim;
+            for (int col = 0; col < state_dim; ++col) {
+                out_row[base + (size_t) col] =
+                    x_row[base + (size_t) col] * scale;
+            }
+        }
+    }
+}
+
 void attn_gate_sigmoid_mul_backward(const float *d_out,
                                     const float *x,
                                     const float *gate,

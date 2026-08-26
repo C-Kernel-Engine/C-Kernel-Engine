@@ -3252,6 +3252,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             decode_layout = output_dir / "layout_decode.json"
             decode_lowered = output_dir / "lowered_decode.json"
             decode_call = output_dir / "call_decode.json"
+            init_ir = output_dir / "init.json"
+            init_call = output_dir / "init_call.json"
             prefill_c_path = output_dir / "decoder_v8_prefill.c"
             prefill_so_path = output_dir / "libdecoder_v8_prefill.so"
             c_path = output_dir / "decoder_v8.c"
@@ -3271,6 +3273,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 decode_layout,
                 decode_lowered,
                 decode_call,
+                init_ir,
+                init_call,
             ):
                 bridge_runner_v8._json_write(
                     path,
@@ -3382,6 +3386,10 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 if "--manifest-map-output" in argv:
                     manifest_map = Path(argv[argv.index("--manifest-map-output") + 1])
                     manifest_map.write_text("{}", encoding="utf-8")
+                if "--init-output" in argv:
+                    init_ir = Path(argv[argv.index("--init-output") + 1])
+                    init_ir.write_text("{}", encoding="utf-8")
+                    (init_ir.parent / "init_call.json").write_text("{}", encoding="utf-8")
                 return 0
 
             def fake_codegen_main() -> int:
@@ -3409,8 +3417,19 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(len(build_calls), 2)
         self.assertTrue(all("--context-len" in call for call in build_calls))
         self.assertTrue(all(call[call.index("--context-len") + 1] == "1024" for call in build_calls))
+        decode_build = [call for call in build_calls if call[call.index("--mode") + 1] == "decode"]
+        self.assertEqual(len(decode_build), 1)
+        self.assertIn("--init-output", decode_build[0])
+        self.assertEqual(
+            Path(decode_build[0][decode_build[0].index("--init-output") + 1]),
+            output_dir / "init.json",
+        )
         decode_codegen = [argv for argv in codegen_argvs if Path(argv[argv.index("--output") + 1]).name == "decoder_v8.c"]
         self.assertEqual(len(decode_codegen), 1)
+        self.assertTrue(all("--init" in argv for argv in codegen_argvs))
+        self.assertTrue(
+            all(Path(argv[argv.index("--init") + 1]) == output_dir / "init_call.json" for argv in codegen_argvs)
+        )
         self.assertIn("--prefill", decode_codegen[0])
         self.assertEqual(
             Path(decode_codegen[0][decode_codegen[0].index("--prefill") + 1]),

@@ -641,6 +641,274 @@ int moe_swiglu_expert_forward_q4k_q5k_workspace(
     return 0;
 }
 
+int moe_swiglu_expert_forward_q4k_q6k_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q5k_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !indices || !routing_weights || !expert_gate ||
+        !expert_up || !expert_down || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0 || n_experts <= 0 ||
+        top_k <= 0 || top_k > n_experts) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *expert_output = (float *)cursor;
+
+    const size_t q4_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t q6_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q6_K, (size_t)intermediate_dim);
+    const uint8_t *gate_base = (const uint8_t *)expert_gate;
+    const uint8_t *up_base = (const uint8_t *)expert_up;
+    const uint8_t *down_base = (const uint8_t *)expert_down;
+
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        for (int slot = 0; slot < top_k; ++slot) {
+            const size_t route_index =
+                (size_t)row * (size_t)top_k + (size_t)slot;
+            const int expert = indices[route_index];
+            if (expert < 0 || expert >= n_experts) return -2;
+            const size_t up_offset =
+                (size_t)expert * (size_t)intermediate_dim * q4_row_bytes;
+            const size_t down_offset =
+                (size_t)expert * (size_t)hidden_dim * q6_row_bytes;
+            gemv_q4_k_q8_k(gate_up, gate_base + up_offset, hidden_q8,
+                           intermediate_dim, hidden_dim);
+            gemv_q4_k_q8_k(gate_up + intermediate_dim,
+                           up_base + up_offset, hidden_q8,
+                           intermediate_dim, hidden_dim);
+            swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+            quantize_row_q8_k(gate_up, act_q8, intermediate_dim);
+            gemv_q6_k_q8_k(expert_output, down_base + down_offset, act_q8,
+                           hidden_dim, intermediate_dim);
+            axpy_f32(y, expert_output, routing_weights[route_index], hidden_dim);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q4k_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q5k_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !indices || !routing_weights || !expert_gate ||
+        !expert_up || !expert_down || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0 || n_experts <= 0 ||
+        top_k <= 0 || top_k > n_experts) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *expert_output = (float *)cursor;
+
+    const size_t gate_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t down_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)intermediate_dim);
+    const uint8_t *gate_base = (const uint8_t *)expert_gate;
+    const uint8_t *up_base = (const uint8_t *)expert_up;
+    const uint8_t *down_base = (const uint8_t *)expert_down;
+
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        for (int slot = 0; slot < top_k; ++slot) {
+            const size_t route_index =
+                (size_t)row * (size_t)top_k + (size_t)slot;
+            const int expert = indices[route_index];
+            if (expert < 0 || expert >= n_experts) return -2;
+            const size_t up_offset =
+                (size_t)expert * (size_t)intermediate_dim * gate_row_bytes;
+            const size_t down_offset =
+                (size_t)expert * (size_t)hidden_dim * down_row_bytes;
+            gemv_q4_k_q8_k(gate_up, gate_base + up_offset, hidden_q8,
+                           intermediate_dim, hidden_dim);
+            gemv_q4_k_q8_k(gate_up + intermediate_dim,
+                           up_base + up_offset, hidden_q8,
+                           intermediate_dim, hidden_dim);
+            swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+            quantize_row_q8_k(gate_up, act_q8, intermediate_dim);
+            gemv_q4_k_q8_k(expert_output, down_base + down_offset, act_q8,
+                           hidden_dim, intermediate_dim);
+            axpy_f32(y, expert_output, routing_weights[route_index], hidden_dim);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_shared_forward_q4k_q6k_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q5k_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !shared_gate || !shared_up || !shared_down || !output ||
+        !workspace || required == 0 || workspace_bytes < required || rows <= 0) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *shared_output = (float *)cursor;
+
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        gemv_q4_k_q8_k(gate_up, shared_gate, hidden_q8,
+                       intermediate_dim, hidden_dim);
+        gemv_q4_k_q8_k(gate_up + intermediate_dim, shared_up, hidden_q8,
+                       intermediate_dim, hidden_dim);
+        swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+        quantize_row_q8_k(gate_up, act_q8, intermediate_dim);
+        gemv_q6_k_q8_k(shared_output, shared_down, act_q8,
+                       hidden_dim, intermediate_dim);
+        const float *route = routed
+            ? routed + (size_t)row * (size_t)hidden_dim
+            : NULL;
+        for (int col = 0; col < hidden_dim; ++col) {
+            y[col] = shared_output[col] + (route ? route[col] : 0.0f);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_shared_forward_q4k_q4k_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q5k_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !shared_gate || !shared_up || !shared_down || !output ||
+        !workspace || required == 0 || workspace_bytes < required || rows <= 0) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *shared_output = (float *)cursor;
+
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        gemv_q4_k_q8_k(gate_up, shared_gate, hidden_q8,
+                       intermediate_dim, hidden_dim);
+        gemv_q4_k_q8_k(gate_up + intermediate_dim, shared_up, hidden_q8,
+                       intermediate_dim, hidden_dim);
+        swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+        quantize_row_q8_k(gate_up, act_q8, intermediate_dim);
+        gemv_q4_k_q8_k(shared_output, shared_down, act_q8,
+                       hidden_dim, intermediate_dim);
+        const float *route = routed
+            ? routed + (size_t)row * (size_t)hidden_dim
+            : NULL;
+        for (int col = 0; col < hidden_dim; ++col) {
+            y[col] = shared_output[col] + (route ? route[col] : 0.0f);
+        }
+    }
+    return 0;
+}
+
 typedef struct {
     const float *hidden;
     const int *indices;

@@ -1,0 +1,59 @@
+{
+  "id": "attn_gate_softplus_mul_forward",
+  "op": "attn_gate_softplus_mul",
+  "operation_interface": "attn_gate_softplus_mul.fp32.v1",
+  "contract_schema_version": 1,
+  "variant": "head_scalar_fp32",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["R", "H", "D"], "layout": "token_head_channel", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_head", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["R", "H", "D"], "layout": "token_head_channel", "access": "write", "storage_class": "activation", "consumption": "required", "may_alias": ["input:x"]}
+  ],
+  "scratch": [],
+  "dims": ["R", "H", "D"],
+  "constraints": {"notes": "One softplus scalar is computed per query head and broadcast over that head's value channels."},
+  "impl": {
+    "function": "attn_gate_softplus_mul_forward",
+    "c_declaration": "void attn_gate_softplus_mul_forward(const float *x, const float *gate, float *out, int rows, int num_heads, int state_dim);",
+    "sources": ["src/kernels/hybrid_attention_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["independent_rows"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
+    }
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "attention_gate_softplus_head_scalar_fp32_output",
+      "status": "observed",
+      "phases": ["prefill", "decode"],
+      "function": "attn_gate_softplus_mul_forward",
+      "explicit_selector": true,
+      "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+      "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "x", "source": "activation:x", "cast": "const float*", "ports": ["input:x"]},
+      {"name": "gate", "source": "activation:gate", "cast": "const float*", "ports": ["input:gate"]},
+      {"name": "out", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
+      {"name": "rows", "source": "runtime:seq_len"},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "state_dim", "source": "dim:head_dim"}
+    ]
+  },
+  "tests": {"unit": ["unittest/test_attn_gate_softplus_mul.py"]},
+  "notes": "Laguna-style attention gate: softplus(head_gate) is broadcast over each head before output projection."
+}

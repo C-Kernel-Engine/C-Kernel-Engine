@@ -779,6 +779,10 @@ def _ck_dump_filter_names(dump_names: str) -> str:
                     for name in ("attn_residual", "ffn_inp")
                 )
             )
+        if canonical_name == "final_norm":
+            candidates.extend(("final_hidden", "final_hidden_last"))
+        if canonical_name == "result_output":
+            candidates.append("logits")
         for candidate in candidates:
             if candidate not in seen:
                 seen.add(candidate)

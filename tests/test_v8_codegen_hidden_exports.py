@@ -420,6 +420,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "function": "group_limited_topk_router_sigmoid_f32",
                 "layer": 1,
                 "args": [
+                    _arg("indices", "SELECTED"),
                     _arg("weights", "ROUTING"),
                     _arg("rows", "30"),
                     _arg("top_k", "6"),
@@ -451,6 +452,10 @@ class HiddenExportExtentTests(unittest.TestCase):
             }
         )
         self.assertIn('"moe_router_logits", (const float*)ROUTER, (30) * (64)', router)
+        self.assertIn(
+            '"moe_selected_experts", (const int32_t*)SELECTED, (30) * (6)',
+            selection,
+        )
         self.assertIn('"moe_routing_weights", (const float*)ROUTING, (30) * (6)', selection)
         self.assertIn('"moe_routed_output", (const float*)ROUTED, (30) * (2048)', routed)
         self.assertIn('"moe_combined_output", (const float*)COMBINED, (30) * (2048)', combined)

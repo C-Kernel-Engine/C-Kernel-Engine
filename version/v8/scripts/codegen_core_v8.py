@@ -1985,7 +1985,7 @@ def emit_op(
                 '"kqv_out", NUM_HEADS * HEAD_DIM);'
             )
             lines.append("    #endif")
-    elif op_name == "attn_gate_sigmoid_mul":
+    elif op_name in ("attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
         out_expr = _hidden_arg("output", "out", "y")
         count_expr = _mul_expr(
             _hidden_arg("num_heads"),
@@ -2088,9 +2088,17 @@ def emit_op(
         _emit_hidden_export(output, "moe_router_logits", _mul_expr(rows, width))
         _emit_hidden_export_last_row(output, "moe_router_logits", width)
     elif op_name in ("group_limited_topk_router", "full_softmax_topk_router"):
+        indices = _hidden_arg("indices")
         weights = _hidden_arg("weights")
         rows = _hidden_arg("rows", "M", "m", "tokens")
         width = _hidden_arg("top_k")
+        raw_indices = _hidden_raw(indices)
+        count = _mul_expr(rows, width)
+        if raw_indices and count:
+            lines.append(
+                f'    ck_debug_export_hidden_i32(model, {layer}, "moe_selected_experts", '
+                f'(const int32_t*){raw_indices}, {count});'
+            )
         _emit_hidden_export(weights, "moe_routing_weights", _mul_expr(rows, width))
         _emit_hidden_export_last_row(weights, "moe_routing_weights", width)
     elif op_name == "moe_swiglu_expert_mlp":
@@ -2588,6 +2596,38 @@ def emit_op(
             k_size = _mul_expr(_get_arg("num_tokens", "tokens") or tokens, num_kv_heads, head_dim)
             _emit_dump(q_expr, "qcur_normed", q_size)
             _emit_dump(k_expr, "kcur_normed", k_size)
+        elif op_name in ("rope_qk", "mrope_qk"):
+            q_expr = _get_arg("q")
+            k_expr = _get_arg("k")
+            rows = _get_arg("num_tokens", "tokens") or tokens
+            if q_expr and rows and num_heads and head_dim:
+                raw_q = q_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(
+                    f'    ck_dump_tensor_head_major_token_major((float*){raw_q}, {layer}, '
+                    f'"Qcur_rope", {num_heads}, {rows}, {head_dim});'
+                )
+                lines.append("    #endif")
+            if k_expr and rows and num_kv_heads and head_dim:
+                raw_k = k_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(
+                    f'    ck_dump_tensor_head_major_token_major((float*){raw_k}, {layer}, '
+                    f'"Kcur_rope", {num_kv_heads}, {rows}, {head_dim});'
+                )
+                lines.append("    #endif")
+        elif op_name in ("attn_gate_sigmoid_mul", "attn_gate_softplus_mul"):
+            out_expr = _get_arg("output", "out", "y")
+            rows = _get_arg("rows", "num_tokens", "tokens") or tokens
+            state_dim = _get_arg("state_dim", "aligned_head_dim", "head_dim") or head_dim
+            if out_expr and rows and num_heads and state_dim:
+                raw_out = out_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(
+                    f'    ck_dump_tensor_head_major_token_major((float*){raw_out}, {layer}, '
+                    f'"attn_gated", {num_heads}, {rows}, {state_dim});'
+                )
+                lines.append("    #endif")
         elif op_name in ("rmsnorm", "layernorm"):
             dump_label = None
             if str(section or "") == "footer":
@@ -3336,6 +3376,29 @@ static void ck_debug_export_hidden(CKModel *model, int layer, const char *name, 
     FILE *f = fopen(path, "wb");
     if (!f) return;
     (void)fwrite(data, sizeof(float), (size_t)count, f);
+    fclose(f);
+}}
+
+static void ck_debug_export_hidden_i32(CKModel *model, int layer, const char *name, const int32_t *data, int count) {{
+    const char *dir = getenv("CK_DEBUG_EXPORT_HIDDEN");
+    if (!dir || !dir[0] || !model || !name || !data || count <= 0) return;
+    const char *layer_filter = getenv("CK_DEBUG_EXPORT_HIDDEN_LAYER");
+    if (layer_filter && layer_filter[0]) {{
+        char *end = NULL;
+        long wanted = strtol(layer_filter, &end, 10);
+        if (end != layer_filter && layer != (int)wanted) return;
+    }}
+    const char *name_filter = getenv("CK_DEBUG_EXPORT_HIDDEN_NAME");
+    if (name_filter && name_filter[0] && strcmp(name_filter, name) != 0) return;
+    const char *name_filters = getenv("CK_DEBUG_EXPORT_HIDDEN_NAMES");
+    if (name_filters && name_filters[0] && !ck_debug_hidden_name_in_list(name_filters, name)) return;
+    char path[1024];
+    int n = snprintf(path, sizeof(path), "%s/tok_%04d_layer_%03d_%s.i32",
+                     dir, model->pos, layer, name);
+    if (n <= 0 || (size_t)n >= sizeof(path)) return;
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    (void)fwrite(data, sizeof(int32_t), (size_t)count, f);
     fclose(f);
 }}
 

@@ -87,6 +87,20 @@ class MultitokenParityEOSContractTests(unittest.TestCase):
 
 
 class PersistentTrajectoryParityTests(unittest.TestCase):
+    def test_hidden_capture_retains_float_and_integer_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            f32 = root / "tok_0002_layer_006_moe_routing_weights.f32"
+            i32 = root / "tok_0002_layer_006_moe_selected_experts.i32"
+            unrelated = root / "tok_0002_layer_006_notes.txt"
+            empty = root / "tok_0002_layer_006_empty.f32"
+            f32.write_bytes(b"\0" * 32)
+            i32.write_bytes(b"\0" * 32)
+            unrelated.write_text("ignored", encoding="utf-8")
+            empty.touch()
+
+            self.assertEqual(runner._hidden_capture_paths(root), [f32, i32])
+
     def test_llama_trajectory_rejects_stale_file_backed_logits(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             output = Path(td) / "llama_logits_sequence.f32"

@@ -231,6 +231,10 @@ def _normalize_layer_and_op(layer_id: int, op_name: str) -> Tuple[int, str]:
         "final_norm": "final_norm",
         "ln_final": "final_norm",
         "result_norm": "final_norm",
+        "final_hidden": "final_norm",
+        "final_hidden_last": "final_norm",
+        "result_output": "result_output",
+        "logits": "result_output",
     }
     return layer_id, aliases.get(op.lower(), op)
 
