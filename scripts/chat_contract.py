@@ -26,6 +26,7 @@ PRESET_ALIASES = {
     "gemma4": "gemma4",
     "glm4": "glm4",
     "glm": "glm4",
+    "kimi_vl": "kimi_vl",
 }
 
 KNOWN_TEMPLATE_MARKERS = (

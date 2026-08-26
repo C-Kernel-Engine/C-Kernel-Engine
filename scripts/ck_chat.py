@@ -871,7 +871,12 @@ class CKModel:
             return True
         auto_tokenizer = _load_transformers_auto_tokenizer()
         if auto_tokenizer is not None:
-            tokenizer_roots = [self.model_dir, model_root]
+            tokenizer_roots = [
+                self.model_dir / "tokenizer_source",
+                model_root / "tokenizer_source",
+                self.model_dir,
+                model_root,
+            ]
             for tokenizer_root in tokenizer_roots:
                 if not (tokenizer_root / "tokenizer_config.json").exists():
                     continue
@@ -995,7 +1000,9 @@ class CKModel:
         tok_contract = self._load_tokenizer_runtime_contract()
         contract_path = tok_contract.get("path") if isinstance(tok_contract, dict) else None
         if isinstance(contract_path, str) and contract_path.strip():
-            candidates.append(Path(contract_path).expanduser())
+            path = Path(contract_path).expanduser()
+            if path.suffix.lower() == ".json":
+                candidates.append(path)
 
         out: List[Path] = []
         seen: set[Path] = set()
@@ -2738,7 +2745,7 @@ def main():
                        help="Stop generation when '<eos>' appears in decoded text")
     parser.add_argument("--stop-on-text", action="append", default=[],
                        help="Stop generation when this decoded text marker appears (repeatable)")
-    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen3", "qwen35", "gemma", "gemma3", "gemma4", "glm4"], default="auto",
+    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen3", "qwen35", "gemma", "gemma3", "gemma4", "glm4", "kimi_vl"], default="auto",
                        help="Chat template mode: auto (from GGUF), none, qwen, qwen3, qwen35, gemma, gemma4, or glm4")
     parser.add_argument("--no-chat-template", action="store_true",
                        help="Disable chat template formatting (same as --chat-template=none)")

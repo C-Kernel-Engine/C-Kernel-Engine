@@ -643,7 +643,7 @@
         "kimi_vl",
         "KimiVLForConditionalGeneration"
       ],
-      "status": "bringup_required",
+      "status": "text_decoder_supported",
       "config": {
         "model": "kimi_vl",
         "arch": "kimi_vl",
@@ -665,7 +665,7 @@
         "vision_tower.*",
         "multi_modal_projector.*"
       ],
-      "notes": "Declared mapping contract only. Full tensor_refs are intentionally absent until Kimi MLA/MoE packing and MoonViT bridge lowering are implemented."
+      "notes": "The text decoder converts official sharded safetensors to BUMP and executes the explicit MLA/MoE circuit with the embedded TikToken chat protocol. Real-weight text smoke is coherent and repeatable; first-token and top-20 ranking match PyTorch. MoonViT encoder/projector lowering and the multimodal bridge remain unimplemented, and internal BF16 drift still requires longer-trajectory attribution."
     },
     "qwen3vl": {
       "template": "qwen3vl",

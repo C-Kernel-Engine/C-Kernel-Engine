@@ -23,9 +23,14 @@
       "version": 1,
       "name": "kimi_vl",
       "raw_prompt_allowed": false,
-      "turn_prefix": "<|im_{role}|>",
-      "turn_suffix": "<|im_middle|>",
-      "assistant_generation_prefix": "<|im_assistant|>",
+      "turn_prefix": "",
+      "turn_prefix_by_role": {
+        "system": "<|im_system|>system<|im_middle|>",
+        "user": "<|im_user|>user<|im_middle|>",
+        "assistant": "<|im_assistant|>assistant<|im_middle|>"
+      },
+      "turn_suffix": "<|im_end|>",
+      "assistant_generation_prefix": "<|im_assistant|>assistant<|im_middle|>",
       "role_labels": {
         "system": "system",
         "user": "user",
@@ -33,8 +38,8 @@
       },
       "system_prompt_mode": "dedicated_turn",
       "system_prompt_separator": "\n\n",
-      "default_system_prompt": "",
-      "inject_default_system_prompt": false,
+      "default_system_prompt": "You are a helpful assistant",
+      "inject_default_system_prompt": true,
       "stop_text_markers": [
         "<|im_user|>",
         "<|im_system|>"
@@ -46,7 +51,9 @@
       "template_markers": [
         "<|im_user|>",
         "<|im_assistant|>",
+        "<|im_system|>",
         "<|im_middle|>",
+        "<|im_end|>",
         "<|media_start|>",
         "<|media_content|>",
         "<|media_pad|>",

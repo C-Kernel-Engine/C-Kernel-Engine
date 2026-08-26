@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 V8_BUILD_PATH = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
+V8_CONVERTER_PATH = ROOT / "version" / "v8" / "scripts" / "convert_safetensors_to_bump_v8.py"
 
 
 def _load_module(name: str, path: Path):
@@ -24,6 +27,7 @@ def _load_module(name: str, path: Path):
 
 
 build_ir_v8 = _load_module("build_ir_v8_kimi_tests", V8_BUILD_PATH)
+convert_safetensors = _load_module("convert_safetensors_kimi_tests", V8_CONVERTER_PATH)
 
 
 def _entry(name: str, dtype: str, shape: list[int], offset: int) -> dict:
@@ -132,6 +136,86 @@ def _make_tiny_kimi_manifest() -> dict:
 
 
 class V8KimiTemplateTests(unittest.TestCase):
+    def test_kimi_nested_text_config_and_tiktoken_sidecar_are_hydrated(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck-kimi-config-") as td:
+            root = Path(td)
+            (root / "config.json").write_text(
+                json.dumps(
+                    {
+                        "architectures": ["KimiVLForConditionalGeneration"],
+                        "model_type": "kimi_vl",
+                        "text_config": {
+                            "num_hidden_layers": 2,
+                            "hidden_size": 8,
+                            "intermediate_size": 16,
+                            "num_attention_heads": 2,
+                            "num_key_value_heads": 2,
+                            "vocab_size": 32,
+                            "max_position_embeddings": 64,
+                            "bos_token_id": 28,
+                            "eos_token_id": 29,
+                            "pad_token_id": 30,
+                            "qk_nope_head_dim": 2,
+                            "qk_rope_head_dim": 2,
+                            "v_head_dim": 2,
+                            "kv_lora_rank": 4,
+                            "first_k_dense_replace": 1,
+                            "moe_layer_freq": 1,
+                            "n_routed_experts": 2,
+                            "n_shared_experts": 1,
+                            "num_experts_per_tok": 1,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "tokenizer_config.json").write_text(
+                json.dumps(
+                    {
+                        "tokenizer_class": "TikTokenTokenizer",
+                        "bos_token": "[BOS]",
+                        "eos_token": "[EOS]",
+                        "pad_token": "[PAD]",
+                        "added_tokens_decoder": {
+                            "28": {"content": "[BOS]"},
+                            "29": {"content": "[EOS]"},
+                            "30": {"content": "[PAD]"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "tiktoken.model").write_bytes(b"fixture")
+            (root / "tokenization_fixture.py").write_text("class Fixture: pass\n", encoding="utf-8")
+            (root / "configuration_fixture.py").write_text("class Fixture: pass\n", encoding="utf-8")
+
+            config = convert_safetensors._build_config(root, "kimi_vl", None)
+            payloads, tokenizer_contract, special = (
+                convert_safetensors._tokenizer_payloads_from_json(root, 32)
+            )
+            output = root / "runtime"
+            output.mkdir()
+            convert_safetensors._copy_tokenizer_sidecars(root, output)
+            staged = tuple(
+                (output / "tokenizer_source" / name).exists()
+                for name in (
+                    "config.json",
+                    "tiktoken.model",
+                    "tokenization_fixture.py",
+                    "configuration_fixture.py",
+                )
+            )
+
+        self.assertEqual(config["bos_token_id"], 28)
+        self.assertEqual(config["eos_token_id"], 29)
+        self.assertEqual(config["pad_token_id"], 30)
+        self.assertEqual(payloads, [])
+        self.assertEqual(tokenizer_contract["tokenizer_type"], "tiktoken")
+        self.assertEqual(special["bos_token_id"], 28)
+        self.assertEqual(special["eos_token_id"], 29)
+        self.assertEqual(special["pad_token_id"], 30)
+        self.assertEqual(staged, (True, True, True, True))
+
     def test_kimi_selected_providers_are_registered(self) -> None:
         registry = build_ir_v8.load_kernel_registry()
         registered = {

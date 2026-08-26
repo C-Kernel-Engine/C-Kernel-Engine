@@ -1248,6 +1248,14 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
     cfg.setdefault("head_dim", text.get("head_dim") or (int(text.get("hidden_size", 0)) // max(1, int(text.get("num_attention_heads", 1)))))
     cfg.setdefault("vocab_size", text.get("vocab_size"))
     cfg.setdefault("context_length", text.get("max_position_embeddings") or text.get("sliding_window"))
+    for token_key in ("bos_token_id", "eos_token_id", "pad_token_id", "unk_token_id"):
+        token_value = text.get(token_key)
+        if token_value is None:
+            token_value = hf.get(token_key)
+        if isinstance(token_value, (list, tuple)):
+            token_value = token_value[0] if token_value else None
+        if token_value is not None:
+            cfg.setdefault(token_key, int(token_value))
     rope_params = text.get("rope_parameters") if isinstance(text.get("rope_parameters"), dict) else {}
     full_rope = rope_params.get("full_attention") if isinstance(rope_params.get("full_attention"), dict) else {}
     sliding_rope = rope_params.get("sliding_attention") if isinstance(rope_params.get("sliding_attention"), dict) else {}
@@ -2155,7 +2163,18 @@ def _write_ref(
 def _tokenizer_payloads_from_json(model_dir: Path, vocab_size: int) -> tuple[list[tuple[str, str, bytes, list[int], str]], dict[str, Any] | None, dict[str, Any]]:
     tok_path = model_dir / "tokenizer.json"
     if not tok_path.exists() or vocab_size <= 0:
-        return [], None, {}
+        tiktoken_path = model_dir / "tiktoken.model"
+        if not tiktoken_path.exists() or vocab_size <= 0:
+            return [], None, {}
+        return (
+            [],
+            {
+                "tokenizer_type": "tiktoken",
+                "source": "tiktoken_model_sidecar",
+                "path": str(tiktoken_path),
+            },
+            _special_tokens_from_tokenizer_config(model_dir, "tiktoken"),
+        )
     info = inspect_tokenizer_json(str(tok_path))
     tok_type = str(info.get("model_type") or "").strip().lower()
     if tok_type not in {"bpe", "wordpiece"}:
@@ -2220,12 +2239,42 @@ def _special_tokens_from_tokenizer_config(model_dir: Path, tokenizer_type: str) 
 
 
 def _copy_tokenizer_sidecars(model_dir: Path, out_dir: Path) -> None:
-    for name in ("tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "generation_config.json"):
+    for name in (
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "generation_config.json",
+        "tiktoken.model",
+        "tokenizer.model",
+    ):
         src = model_dir / name
         if src.exists():
             dst = out_dir / name
             if src.resolve() != dst.resolve():
                 dst.write_bytes(src.read_bytes())
+    for pattern in ("tokenization_*.py", "configuration_*.py"):
+        for src in model_dir.glob(pattern):
+            dst = out_dir / src.name
+            if src.resolve() != dst.resolve():
+                dst.write_bytes(src.read_bytes())
+
+    if (model_dir / "tiktoken.model").exists():
+        source_dir = out_dir / "tokenizer_source"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        for name in (
+            "config.json",
+            "tokenizer_config.json",
+            "special_tokens_map.json",
+            "generation_config.json",
+            "tiktoken.model",
+            "tokenizer.model",
+        ):
+            src = model_dir / name
+            if src.exists():
+                (source_dir / name).write_bytes(src.read_bytes())
+        for pattern in ("tokenization_*.py", "configuration_*.py"):
+            for src in model_dir.glob(pattern):
+                (source_dir / src.name).write_bytes(src.read_bytes())
 
 
 def _resolve_output_path(output: Path | None, *, ram_output: bool, ram_dir: Path, checkpoint: Path) -> Path:

@@ -8,6 +8,7 @@ import ast
 import ctypes
 import gc
 import hashlib
+import inspect
 import json
 import os
 import sys
@@ -185,6 +186,125 @@ def _write_tensor(path: Path, values: np.ndarray) -> dict[str, Any]:
     return {"path": str(path.resolve()), "shape": list(values.shape), "sha256": _sha256(path)}
 
 
+def _load_remote_causal_lm_class(checkpoint: Path, model_config: Any) -> Any:
+    """Resolve a trusted remote model while adapting legacy Transformers APIs."""
+    from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+    auto_map = getattr(model_config, "auto_map", None)
+    class_reference = (
+        auto_map.get("AutoModelForCausalLM") if isinstance(auto_map, dict) else None
+    )
+    if not class_reference:
+        return None
+
+    model_class = get_class_from_dynamic_module(
+        class_reference,
+        str(checkpoint),
+        local_files_only=True,
+    )
+    tie_parameters = inspect.signature(model_class.tie_weights).parameters
+    accepts_extra_keywords = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in tie_parameters.values()
+    )
+    if not accepts_extra_keywords and (
+        "recompute_mapping" not in tie_parameters or "missing_keys" not in tie_parameters
+    ):
+        legacy_tie_weights = model_class.tie_weights
+        accepted_keywords = set(tie_parameters) - {"self"}
+
+        def compatible_tie_weights(self: Any, *args: Any, **kwargs: Any) -> Any:
+            compatible_kwargs = {
+                name: value
+                for name, value in kwargs.items()
+                if name in accepted_keywords
+            }
+            return legacy_tie_weights(self, *args, **compatible_kwargs)
+
+        model_class.tie_weights = compatible_tie_weights
+    return model_class
+
+
+def _repair_invalid_rotary_buffers(model: Any) -> int:
+    """Rebuild rotary caches left invalid by low-memory meta initialization."""
+    import torch
+
+    repaired = 0
+    repaired_caches: dict[tuple[Any, ...], tuple[Any, Any, Any, int]] = {}
+    for module in model.modules():
+        rotary = getattr(module, "rotary_emb", None)
+        if rotary is None or not callable(getattr(rotary, "_set_cos_sin_cache", None)):
+            continue
+        required = ("dim", "base", "max_position_embeddings", "inv_freq")
+        if not all(hasattr(rotary, name) for name in required):
+            continue
+        inv_freq = rotary.inv_freq
+        cos_cached = getattr(rotary, "cos_cached", None)
+        sin_cached = getattr(rotary, "sin_cached", None)
+        buffers = (inv_freq, cos_cached, sin_cached)
+        invalid = any(
+            buffer is None
+            or buffer.device.type == "meta"
+            or buffer.numel() == 0
+            or not bool(torch.isfinite(buffer).all())
+            for buffer in buffers
+        )
+        invalid = invalid or not bool(inv_freq.abs().sum())
+        invalid = invalid or not bool(cos_cached.abs().sum())
+        if not invalid:
+            continue
+
+        cache_key = (
+            type(rotary),
+            int(rotary.dim),
+            float(rotary.base),
+            int(rotary.max_position_embeddings),
+            getattr(rotary, "scaling_factor", None),
+            getattr(rotary, "original_max_position_embeddings", None),
+            getattr(rotary, "beta_fast", None),
+            getattr(rotary, "beta_slow", None),
+            getattr(rotary, "mscale", None),
+            getattr(rotary, "mscale_all_dim", None),
+        )
+        cached = repaired_caches.get(cache_key)
+        if cached is None:
+            device = torch.device("cpu")
+            positions = torch.arange(
+                0,
+                int(rotary.dim),
+                2,
+                dtype=torch.float32,
+                device=device,
+            )
+            rotary.inv_freq = 1.0 / (
+                float(rotary.base) ** (positions / int(rotary.dim))
+            )
+            cache_dtype = (
+                cos_cached.dtype
+                if cos_cached is not None and cos_cached.device.type != "meta"
+                else torch.get_default_dtype()
+            )
+            rotary._set_cos_sin_cache(
+                seq_len=int(rotary.max_position_embeddings),
+                device=device,
+                dtype=cache_dtype,
+            )
+            cached = (
+                rotary.inv_freq,
+                rotary.cos_cached,
+                rotary.sin_cached,
+                int(rotary.max_seq_len_cached),
+            )
+            repaired_caches[cache_key] = cached
+        else:
+            rotary.inv_freq = cached[0]
+            rotary.cos_cached = cached[1]
+            rotary.sin_cached = cached[2]
+            rotary.max_seq_len_cached = cached[3]
+        repaired += 1
+    return repaired
+
+
 def capture_pytorch(
     checkpoint: Path,
     token_ids: list[int],
@@ -194,18 +314,49 @@ def capture_pytorch(
 ) -> tuple[dict[int, dict[str, dict[str, Any]]], np.ndarray]:
     import torch
     import transformers.activations as activations
-    from transformers import AutoModelForCausalLM
+    import transformers.utils.import_utils as import_utils
+
+    if not hasattr(import_utils, "is_torch_fx_available"):
+        import_utils.is_torch_fx_available = lambda: False
+    from transformers import AutoConfig, AutoModelForCausalLM
 
     if not hasattr(activations, "PytorchGELUTanh"):
         activations.PytorchGELUTanh = activations.GELUTanh
     torch.set_num_threads(int(threads))
-    model = AutoModelForCausalLM.from_pretrained(
+    model_config = AutoConfig.from_pretrained(
         checkpoint,
         trust_remote_code=True,
+        local_files_only=True,
+    )
+    source_config = json.loads((checkpoint / "config.json").read_text(encoding="utf-8"))
+    source_text = source_config.get("text_config")
+    runtime_text = getattr(model_config, "text_config", None)
+    if isinstance(source_text, dict) and runtime_text is not None:
+        source_rope = source_text.get("rope_scaling")
+        if source_rope is None:
+            runtime_text.rope_scaling = None
+        elif isinstance(source_rope, dict):
+            runtime_rope = dict(source_rope)
+            if "type" not in runtime_rope and "rope_type" in runtime_rope:
+                runtime_rope["type"] = runtime_rope["rope_type"]
+            runtime_text.rope_scaling = runtime_rope
+    model_class = _load_remote_causal_lm_class(checkpoint, model_config)
+    loader = model_class or AutoModelForCausalLM
+    model = loader.from_pretrained(
+        checkpoint,
+        trust_remote_code=True,
+        config=model_config,
         dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
         attn_implementation="eager",
-    ).eval()
+    )
+    repaired_rotary_buffers = _repair_invalid_rotary_buffers(model)
+    if repaired_rotary_buffers:
+        print(
+            f"[xray] rebuilt {repaired_rotary_buffers} invalid rotary caches",
+            file=sys.stderr,
+        )
+    model = model.eval()
     captured: dict[int, dict[str, Any]] = {}
     layer_residuals: dict[int, Any] = {}
     layer_residuals_full: dict[int, Any] = {}

@@ -230,6 +230,51 @@ class DecoderPyTorchXRayTests(unittest.TestCase):
         )
         self.assertEqual(MODULE.decoder_layers(model), layers)
 
+    def test_invalid_meta_initialized_rotary_caches_are_rebuilt_and_shared(self) -> None:
+        import torch
+
+        class Rotary(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.dim = 4
+                self.base = 10000.0
+                self.max_position_embeddings = 8
+                self.max_seq_len_cached = None
+                self.register_buffer(
+                    "inv_freq", torch.full((2,), float("nan")), persistent=False
+                )
+                self.register_buffer(
+                    "cos_cached", torch.zeros((8, 4)), persistent=False
+                )
+                self.register_buffer(
+                    "sin_cached", torch.zeros((8, 4)), persistent=False
+                )
+
+            def _set_cos_sin_cache(self, seq_len, device, dtype) -> None:
+                positions = torch.arange(seq_len, device=device, dtype=torch.float32)
+                frequencies = torch.outer(positions, self.inv_freq)
+                embedding = torch.cat((frequencies, frequencies), dim=-1)
+                self.cos_cached = embedding.cos().to(dtype)
+                self.sin_cached = embedding.sin().to(dtype)
+                self.max_seq_len_cached = seq_len
+
+        class Attention(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.rotary_emb = Rotary()
+
+        model = torch.nn.ModuleList([Attention(), Attention()])
+
+        repaired = MODULE._repair_invalid_rotary_buffers(model)
+
+        self.assertEqual(repaired, 2)
+        self.assertTrue(torch.isfinite(model[0].rotary_emb.inv_freq).all())
+        self.assertTrue(torch.equal(model[0].rotary_emb.cos_cached[0], torch.ones(4)))
+        self.assertIs(
+            model[0].rotary_emb.cos_cached,
+            model[1].rotary_emb.cos_cached,
+        )
+
     def test_sparse_manifest_keeps_resolved_provider_identity(self) -> None:
         import tempfile
 

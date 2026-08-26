@@ -34,6 +34,60 @@ class _FakeCFunc:
 
 
 class TestCKChatRuntimeContract(unittest.TestCase):
+    def test_tiktoken_contract_path_is_not_treated_as_tokenizer_json(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_tiktoken_contract_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps(
+                    {
+                        "tokenizer_contract": {
+                            "tokenizer_type": "tiktoken",
+                            "path": str(run_dir / "tiktoken.model"),
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "tiktoken.model").write_bytes(b"not-json")
+            model = ck_chat.CKModel(str(run_dir))
+
+            candidates = model._tokenizer_json_candidates(run_dir)
+
+        self.assertNotIn(run_dir / "tiktoken.model", candidates)
+
+    def test_kimi_circuit_contract_matches_embedded_single_turn_protocol(self) -> None:
+        circuit = json.loads(
+            (ROOT / "version" / "v8" / "circuits" / "kimi_vl.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        with tempfile.TemporaryDirectory(prefix="ck_chat_kimi_contract_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps(
+                    {"chat_contract": circuit["contract"]["chat_contract"]}
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<|im_system|>system<|im_middle|>You are a helpful assistant<|im_end|>"
+                "<|im_user|>user<|im_middle|>Hello<|im_end|>"
+                "<|im_assistant|>assistant<|im_middle|>",
+            )
+
+            model._configure_chat_template("kimi_vl")
+            self.assertEqual(model.chat_template_mode, "kimi_vl")
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<|im_system|>system<|im_middle|>You are a helpful assistant<|im_end|>"
+                "<|im_user|>user<|im_middle|>Hello<|im_end|>"
+                "<|im_assistant|>assistant<|im_middle|>",
+            )
+
     def test_manifest_template_contract_is_authoritative(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_manifest_contract_") as td:
             run_dir = Path(td)

@@ -243,12 +243,7 @@ def _missing_ops(arch: str, required_ops: list[str]) -> list[str]:
     if arch == "cohere":
         missing.append("cohere_tensor_name_mapping_audit")
     if arch == "kimi_vl":
-        missing.extend([
-            "kimi_vl_safetensors_to_bump_mapping",
-            "mla_attention_contract",
-            "tiktoken_tokenizer_contract",
-            "moonvit_bridge_contract",
-        ])
+        missing.append("moonvit_bridge_contract")
     if arch not in SUPPORTED_DENSE_ARCHES | SUPPORTED_HYBRID_ARCHES:
         missing.append("v8_template_contract")
         missing.append("safetensors_to_bump_mapping")
@@ -515,7 +510,7 @@ def _notes(arch: str, config: dict[str, Any], layer_kinds: list[str], missing_op
             f"top_k={text.get('num_experts_per_tok')} shared_experts={text.get('n_shared_experts')} "
             f"router={text.get('scoring_func')}/{text.get('topk_method')} scale={text.get('routed_scaling_factor')}."
         )
-        notes.append("Existing group_limited_topk_router plus routed/shared SwiGLU expert kernels cover the scalar MoE math; scalar KV LoRA decompress and partial-RoPE concat helpers cover the first MLA sub-ops. Kimi still needs full MLA lowering, template wiring, tokenizer, and safetensors mapping.")
+        notes.append("The text decoder has safetensors-to-BUMP mapping, an explicit TikToken chat contract, MLA lowering, and routed/shared SwiGLU execution. Real-weight text smoke is coherent and repeatable; MoonViT encoder/projector lowering and the multimodal bridge remain open.")
         if isinstance(config.get("vision_config"), dict):
             vision = config["vision_config"]
             notes.append(

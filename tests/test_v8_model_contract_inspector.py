@@ -252,13 +252,7 @@ class ModelContractInspectorTests(unittest.TestCase):
             "tiktoken_tokenizer",
         ):
             self.assertIn(op, report["required_ops"])
-        for missing in (
-            "kimi_vl_safetensors_to_bump_mapping",
-            "mla_attention_contract",
-            "tiktoken_tokenizer_contract",
-            "moonvit_bridge_contract",
-        ):
-            self.assertIn(missing, report["missing_ops"])
+        self.assertEqual(report["missing_ops"], ["moonvit_bridge_contract"])
         missing_kernel_ops = {
             row["op"] for row in report["kernel_registry"]["missing_kernel_ops"]
         }

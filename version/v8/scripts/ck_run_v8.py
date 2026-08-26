@@ -1143,8 +1143,24 @@ def _stage_safetensors_tokenizer_assets(checkpoint_dir: Path, output_dir: Path) 
         "tokenizer.model",
     ):
         _copy_optional(checkpoint_dir / name, output_dir / name)
-    for path in checkpoint_dir.glob("tokenization_*.py"):
-        _copy_optional(path, output_dir / path.name)
+    for pattern in ("tokenization_*.py", "configuration_*.py"):
+        for path in checkpoint_dir.glob(pattern):
+            _copy_optional(path, output_dir / path.name)
+    if (checkpoint_dir / "tiktoken.model").exists():
+        source_dir = output_dir / "tokenizer_source"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        for name in (
+            "config.json",
+            "tokenizer_config.json",
+            "special_tokens_map.json",
+            "generation_config.json",
+            "tiktoken.model",
+            "tokenizer.model",
+        ):
+            _copy_optional(checkpoint_dir / name, source_dir / name)
+        for pattern in ("tokenization_*.py", "configuration_*.py"):
+            for path in checkpoint_dir.glob(pattern):
+                _copy_optional(path, source_dir / path.name)
     if (checkpoint_dir / "tokenizer_bin").is_dir() and not (output_dir / "tokenizer_bin").exists():
         shutil.copytree(checkpoint_dir / "tokenizer_bin", output_dir / "tokenizer_bin")
 
@@ -2291,7 +2307,7 @@ Examples:
     run_parser.add_argument("--repeat-last-n", type=int, default=None)
     run_parser.add_argument("--no-repeat-ngram-size", type=int, default=None)
     run_parser.add_argument("--prompt", default=None, help="Single prompt (non-interactive if set)")
-    run_parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3", "gemma4", "glm4", "llama"], default="auto")
+    run_parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3", "gemma4", "glm4", "kimi_vl", "llama"], default="auto")
     run_parser.add_argument("--no-chat-template", action="store_true")
     run_parser.add_argument("--allow-raw-prompt", action="store_true")
     run_parser.add_argument("--thinking-mode", choices=["auto", "visible", "suppressed"], default="auto")
