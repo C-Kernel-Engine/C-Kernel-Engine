@@ -1770,6 +1770,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(trace["token_ids"], [0])
             self.assertGreaterEqual(trace["prefill_time_ms"], 0.0)
             self.assertEqual(trace["decode_time_ms"], 0.0)
+            self.assertRegex(trace["first_logits_fnv1a64"], r"^[0-9a-f]{16}$")
+            self.assertGreater(trace["first_logits_count"], 0)
             self.assertEqual(token_trace_path.stat().st_mode & 0o777, 0o600)
             self.assertFalse(list(tmp.glob("native_token_trace.json.tmp.*")))
 

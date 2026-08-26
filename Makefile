@@ -5418,6 +5418,11 @@ nightly-demo-readiness:
 		--json $(BUILD_DIR)/demo-readiness/nightly-latest.json \
 		--markdown $(BUILD_DIR)/demo-readiness/nightly-latest.md
 
+.PHONY: certify-v8-long-context
+certify-v8-long-context: ck-cli-v8
+	@$(PYTHON) version/v8/scripts/run_long_context_certification_v8.py \
+		$${V8_LONG_CONTEXT_ARGS:-}
+
 nightly-baseline:
 	@$(PYTHON) scripts/nightly_runner.py --save-baseline
 

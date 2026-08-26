@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <string.h>
 #include <stdbool.h>
@@ -56,7 +57,6 @@
 #define CK_CLI_DEFAULT_MAX_TOKENS  256
 #define CK_CLI_EOS_MAX             8
 #define CK_CLI_OUTPUT_BUF_SIZE     4096
-#define CK_CLI_MAX_CONTEXT         32768
 #define CK_CLI_HISTORY_FILE        ".ck_cli_history"
 
 static volatile sig_atomic_t g_exit_requested = 0;
@@ -68,6 +68,19 @@ static double g_decode_time_ms = 0.0;
 static int g_decode_count = 0;
 static int g_prompt_tokens = 0;
 static int g_user_tokens = 0;
+static uint64_t g_first_logits_fnv1a64 = 0;
+static int g_first_logits_count = 0;
+static bool g_first_logits_hash_valid = false;
+
+static uint64_t fnv1a64_bytes(const void *data, size_t size) {
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (size_t index = 0; index < size; index++) {
+        hash ^= bytes[index];
+        hash *= UINT64_C(1099511628211);
+    }
+    return hash;
+}
 
 static int threadpool_profile_requested(void) {
     const char *value = getenv("CK_THREADPOOL_PROFILE");
@@ -342,6 +355,7 @@ typedef struct {
     bool require_generated_abi;
     const char *prompt_once;
     const char *prompt_tokens_csv;
+    bool reject_prompt_token_truncation;
     const char *system_prompt;
     const char *token_trace_json_path;
     const char *gemm_schedule;
@@ -417,6 +431,17 @@ static int write_token_trace_json(
     failed |= fprintf(stream, "  \"stop_reason\": \"%s\",\n", stop_reason_name(stop_reason)) < 0;
     failed |= fprintf(stream, "  \"prefill_time_ms\": %.9f,\n", g_prefill_time_ms) < 0;
     failed |= fprintf(stream, "  \"decode_time_ms\": %.9f,\n", g_decode_time_ms) < 0;
+    if (g_first_logits_hash_valid) {
+        failed |= fprintf(
+            stream,
+            "  \"first_logits_fnv1a64\": \"%016" PRIx64 "\",\n",
+            g_first_logits_fnv1a64) < 0;
+        failed |= fprintf(
+            stream, "  \"first_logits_count\": %d,\n", g_first_logits_count) < 0;
+    } else {
+        failed |= fprintf(stream, "  \"first_logits_fnv1a64\": null,\n") < 0;
+        failed |= fprintf(stream, "  \"first_logits_count\": 0,\n") < 0;
+    }
     failed |= fprintf(stream, "  \"token_ids\": [") < 0;
     for (int i = 0; i < token_count; i++) {
         failed |= fprintf(stream, "%s%d", i ? ", " : "", token_ids[i]) < 0;
@@ -2319,6 +2344,9 @@ static int run_generation_loop(ModelAPI *api, CLIOptions *opt) {
         (size_t)(max_tokens > 0 ? max_tokens : 1), sizeof(int32_t));
     int generated_history_count = 0;
     if (!generated_history) return -1;
+    g_first_logits_fnv1a64 = 0;
+    g_first_logits_count = 0;
+    g_first_logits_hash_valid = false;
     const uint32_t generation_flags =
         opt->timestamps ? CK_GENERATION_FLAG_TIMESTAMPS : 0;
 
@@ -2333,6 +2361,12 @@ static int run_generation_loop(ModelAPI *api, CLIOptions *opt) {
                 if (stride > 0) { \
                     if (active < 1) active = 1; \
                     last_logits = logits + (size_t)(active - 1) * (size_t)stride; \
+                } \
+                if (!g_first_logits_hash_valid) { \
+                    g_first_logits_fnv1a64 = fnv1a64_bytes( \
+                        last_logits, (size_t)vocab_size * sizeof(float)); \
+                    g_first_logits_count = vocab_size; \
+                    g_first_logits_hash_valid = true; \
                 } \
                 float *logits_copy = (float *)malloc(vocab_size * sizeof(float)); \
                 if (logits_copy) { \
@@ -2555,10 +2589,17 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
     int ctx = opt->context_override;
     if (ctx <= 0 && api->get_context) ctx = api->get_context();
     if (ctx <= 0) ctx = 4096;
-    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
 
     int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
     if (n > ctx - max_tokens) {
+        if (opt->reject_prompt_token_truncation) {
+            fprintf(
+                stderr,
+                "Error: explicit prompt has %d tokens but context %d reserves %d generation tokens\n",
+                n, ctx, max_tokens);
+            free(ids);
+            return -1;
+        }
         n = ctx - max_tokens;
         if (opt->verbose) {
             printf("[DEBUG] Truncated prompt to %d tokens\n", n);
@@ -2800,7 +2841,6 @@ static int run_bridge_report_with_prefix(
     int ctx = opt->context_override;
     if (ctx <= 0 && api->get_context) ctx = api->get_context();
     if (ctx <= 0) ctx = 4096;
-    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
 
     int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
     int before_count = spec.prompt_tokens_before_count;
@@ -3060,7 +3100,6 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
     int ctx = opt->context_override;
     if (ctx <= 0 && api->get_context) ctx = api->get_context();
     if (ctx <= 0) ctx = 4096;
-    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
 
     /* Tokenize raw user input to get user-only token count */
     int user_tokens = 0;
@@ -5197,6 +5236,7 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
             opt->multiline_input = true;
         } else if (!strcmp(arg, "--prompt-tokens") && i + 1 < argc) {
             opt->prompt_tokens_csv = argv[++i];
+            opt->reject_prompt_token_truncation = true;
         } else if (!strcmp(arg, "--token-trace-json") && i + 1 < argc) {
             opt->token_trace_json_path = argv[++i];
         } else if ((!strcmp(arg, "--system") || !strcmp(arg, "-S")) && i + 1 < argc) {
