@@ -121,6 +121,17 @@ def _read_text(path: str) -> str:
         return ""
 
 
+def _runner_environment(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    """Keep nested Make/Python processes on the runner's proven interpreter."""
+    env = {**os.environ, **(overrides or {})}
+    env["PYTHON"] = sys.executable
+    pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(ROOT), pythonpath) if part
+    )
+    return env
+
+
 def _capture_command(command: list[str]) -> tuple[str, str]:
     try:
         completed = subprocess.run(
@@ -1347,7 +1358,7 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
             capture_output=True,
             text=True,
             timeout=suite.timeout_sec,
-            env={**os.environ, "PYTHONPATH": str(ROOT)},
+            env=_runner_environment(),
         )
         duration = time.time() - start
 
@@ -1441,7 +1452,7 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
             capture_output=True,
             text=True,
             timeout=target_info["timeout_sec"],
-            env={**os.environ, **target_info.get("env", {})},
+            env=_runner_environment(target_info.get("env")),
         )
         duration = time.time() - start
 
@@ -1706,6 +1717,10 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
     report = {
         "timestamp": start_time.isoformat(),
         "duration_sec": sum(r.duration_sec for r in results),
+        "runner_python": {
+            "executable": sys.executable,
+            "version": platform.python_version(),
+        },
         "runner_hardware": capture_runner_hardware(),
         "summary": {
             "total": len(results),

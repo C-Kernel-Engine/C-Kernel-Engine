@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime
@@ -24,6 +27,65 @@ def _load_runner():
 
 
 class NightlyArtifactStatusTests(unittest.TestCase):
+    def test_json_report_records_the_runner_python(self) -> None:
+        runner = _load_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "nightly.json"
+            with mock.patch.object(
+                runner, "capture_runner_hardware", return_value={"available": False}
+            ):
+                runner.save_json_report([], report, datetime(2026, 8, 26, 1, 2, 3))
+            payload = json.loads(report.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["runner_python"]["executable"], sys.executable)
+        self.assertTrue(payload["runner_python"]["version"])
+
+    def test_makefile_reuses_primary_checkout_venv_from_linked_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            primary = Path(tmp) / "primary"
+            shared_python = primary / ".venv" / "bin" / "python"
+            shared_python.parent.mkdir(parents=True)
+            shared_python.touch()
+            command = [
+                "make",
+                "--no-print-directory",
+                f"CK_LOCAL_VENV_PYTHON={primary / 'missing-python'}",
+                f"CK_GIT_COMMON_DIR={primary / '.git'}",
+                '--eval=print-python: ; @printf "%s\\n" "$(PYTHON)"',
+                "print-python",
+            ]
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.splitlines()[-1], str(shared_python))
+
+    def test_make_target_inherits_the_runner_python(self) -> None:
+        runner = _load_runner()
+        target = {
+            "name": "interpreter contract",
+            "category": "inference",
+            "target": "fake-target",
+            "timeout_sec": 10,
+            "env": {"PYTHON": "/tmp/wrong-python", "CK_TEST_FLAG": "1"},
+        }
+        completed = subprocess.CompletedProcess(
+            ["make", "fake-target"], 0, stdout="", stderr=""
+        )
+        with mock.patch.object(runner.subprocess, "run", return_value=completed) as run:
+            result = runner.run_make_target(target)
+
+        self.assertEqual(result.status, "pass")
+        env = run.call_args.kwargs["env"]
+        self.assertEqual(env["PYTHON"], sys.executable)
+        self.assertEqual(env["CK_TEST_FLAG"], "1")
+        self.assertEqual(env["PYTHONPATH"].split(os.pathsep)[0], str(ROOT))
+
     def test_xeon_cache_refuses_nonempty_unmarked_directory(self) -> None:
         runner = _load_runner()
         with tempfile.TemporaryDirectory() as tmp:

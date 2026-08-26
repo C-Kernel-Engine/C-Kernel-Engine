@@ -688,7 +688,18 @@ SMOLLM_BUMP ?= $(BUILD_DIR)/smollm_weights.bin
 SMOLLM_OUT_WEIGHTS ?= $(BUILD_DIR)/smollm_weights_after.bin
 SMOLLM_MAX_LAYERS ?=
 
-PYTHON  ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+# Linked git worktrees do not normally contain the primary checkout's .venv.
+# Reuse that environment before falling back to the system interpreter so
+# model lanes do not fail uniformly because optional runtime packages vanished.
+CK_GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+CK_LOCAL_VENV_PYTHON ?= .venv/bin/python
+CK_PRIMARY_VENV_PYTHON := $(patsubst %/.git,%/.venv/bin/python,$(CK_GIT_COMMON_DIR))
+CK_ACTIVE_VENV_PYTHON := $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python)
+PYTHON  ?= $(firstword \
+	$(wildcard $(CK_LOCAL_VENV_PYTHON)) \
+	$(wildcard $(CK_PRIMARY_VENV_PYTHON)) \
+	$(wildcard $(CK_ACTIVE_VENV_PYTHON)) \
+	python3)
 PYTHONFLAGS ?= -B
 PY_TESTS := unittest/test_layernorm.py \
             unittest/test_gelu.py \
