@@ -3,6 +3,7 @@ var hybrid__attention__kernels_8c =
     [ "ck_hybrid_libm_f32_fn", "hybrid__attention__kernels_8c.html#aab88536d9051cf1162416028965f6bb8", null ],
     [ "attn_gate_sigmoid_mul_backward", "hybrid__attention__kernels_8c.html#ab6037a4196cc424f5a5955dbcbb712b8", null ],
     [ "attn_gate_sigmoid_mul_forward", "hybrid__attention__kernels_8c.html#a5089ebfbaad6fc8dd694b6436b335060", null ],
+    [ "attn_gate_softplus_mul_forward", "hybrid__attention__kernels_8c.html#a5944e4cd6255477d8fd83956de4a2821", null ],
     [ "ck_bind_hybrid_llama_libm", "hybrid__attention__kernels_8c.html#a1ba913013938874c50410af70302d677", null ],
     [ "hybrid_sigmoid", "hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008", null ],
     [ "split_q_gate_backward", "hybrid__attention__kernels_8c.html#a2b1547061dcc5662b76ef3a1a84b5736", null ],

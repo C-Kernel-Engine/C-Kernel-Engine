@@ -1,5 +1,15 @@
 var NAVTREEINDEX19 =
 {
+"structQWEN2__0__5B__DECODEFooterOffsets.html":[1,0,79],
+"structQWEN2__0__5B__DECODEFooterOffsets.html#aa7f30858b9156e6490e32a352acc1e94":[1,0,79,3],
+"structQWEN2__0__5B__DECODEFooterOffsets.html#ac589598a0405dd5321d3605f104c52af":[1,0,79,1],
+"structQWEN2__0__5B__DECODEFooterOffsets.html#ac6811e11a982eaed8ba5bab63e4d7289":[1,0,79,2],
+"structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19":[1,0,79,0],
+"structQWEN2__0__5B__DECODEGlobalOffsets.html":[1,0,80],
+"structQWEN2__0__5B__DECODEGlobalOffsets.html#a8e04d4088aaa68a9725b418e7566a6e9":[1,0,80,0],
+"structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9":[1,0,80,1],
+"structQWEN2__0__5B__DECODEHeaderOffsets.html":[1,0,81],
+"structQWEN2__0__5B__DECODEHeaderOffsets.html#a132bfc09c544e8e77e4643564e740d3b":[1,0,81,1],
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24":[1,0,81,4],
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a7c4211b4f3a7c74aec65281818a81693":[1,0,81,3],
 "structQWEN2__0__5B__DECODEHeaderOffsets.html#a92c86736f04c96df7c5d506b32f1336a":[1,0,81,0],
@@ -239,15 +249,5 @@ var NAVTREEINDEX19 =
 "tokenizer_8c.html#aee4da531cb3a141c94c3f985a62968e1":[2,0,1,2,4,18],
 "tokenizer_8c.html#aeec3f3e9fcc1faea770cb1e0e1b65b12":[2,0,1,2,4,24],
 "tokenizer_8c.html#af62b561a1a9af69c1082f1d617801838":[2,0,1,2,4,19],
-"tokenizer_8c_source.html":[2,0,1,2,4],
-"tokenizer_8h.html":[2,0,0,1,3],
-"tokenizer_8h.html#a03e2f161893f8f58a0999812d5274d2f":[2,0,0,1,3,36],
-"tokenizer_8h.html#a115bba665e9d8c38fea5507a93c4749c":[2,0,0,1,3,34],
-"tokenizer_8h.html#a1b96aadee83cb18a6d1ce9b04ccab5b9":[2,0,0,1,3,22],
-"tokenizer_8h.html#a25fd8f38cf8e62b1e19e347e53225e8c":[2,0,0,1,3,17],
-"tokenizer_8h.html#a2708c0bbb6f926149707c2c61fe43c3e":[2,0,0,1,3,33],
-"tokenizer_8h.html#a276dfd23dea6a3a888d21be343086124":[2,0,0,1,3,13],
-"tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6":[2,0,0,1,3,7],
-"tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be":[2,0,0,1,3,7,0],
-"tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b":[2,0,0,1,3,7,2]
+"tokenizer_8c_source.html":[2,0,1,2,4]
 };

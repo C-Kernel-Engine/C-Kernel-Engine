@@ -226,7 +226,7 @@ python -m pip install -r requirements-v8.txt</pre>
             <tr><td>GLM4 9B Q4_K_M</td><td>Coherent text E2E</td><td>Partial-RoPE, FP16-KV, and llama.cpp parity coverage</td><td>Keep long-context and ISA regression lanes active</td></tr>
             <tr><td>Instella-MoE 16B-A3B BF16</td><td>Coherent short text E2E</td><td>Top-1 matches PyTorch at the tested checkpoint; full-logit cosine 0.999976927</td><td>Short checkpoint only; quantized GGUF and long trajectories are not certified</td></tr>
             <tr><td>Kimi-VL A3B BF16 text decoder</td><td>Coherent and repeatable text E2E on Intel AVX2 and Ryzen AVX-512</td><td>First token and top-20 ranking match PyTorch; full-logit cosine 0.997696</td><td>Internal drift becomes material near layer 7; MoonViT bridge is not certified</td></tr>
-            <tr><td>Laguna-S 2.1 Q4_K_M</td><td>Active numerical bring-up</td><td>Mixed global/sliding RoPE is the current first-divergence target</td><td>Do not promote until real E2E and oracle trajectory gates pass</td></tr>
+            <tr><td>Laguna-XS 2.1 Q4_K_M</td><td>Coherent text E2E; all 684 mapped entries converted</td><td>Embedding and layer-0 RMSNorm are bit-exact; identical-input router replay preserves selected experts and routing weights within one ULP</td><td>The current llama.cpp Laguna loader omits the GGUF YaRN beta metadata; after oracle alignment, small attention/projection drift still changes a near-tied MoE route</td></tr>
         </tbody>
     </table>
 </div>
@@ -319,6 +319,22 @@ make test-v8-kimi-highmem</pre>
     </div>
     <p class="mini-note">The official 32.8 GB sharded checkpoint now converts all text-decoder tensors, preserves the embedded TikToken protocol, and runs coherently on a 64 GB host. Three repeated Ryzen runs produced the same 32-token response hash. X-Ray matched PyTorch's first token and complete top-20 ranking, but internal BF16 drift becomes material around layer 7, so this is text E2E certification rather than bit-exact internal parity. MoonViT and the multimodal bridge remain outside the certified path. See <a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a> for the architecture notes.</p>
 
+    <h3>Laguna-XS 2.1</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  /path/to/Laguna-XS-2.1-Q4_K_M.gguf \
+  --run /srv/cke/profiles/laguna-xs-2.1 \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Write a complete C program that prints the first ten Fibonacci numbers.' \
+  --chat-template auto \
+  --thinking-mode suppressed \
+  --max-tokens 512 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">The tested 20.27 GB Q4_K_M artifact converts all 684 mapped entries and produces coherent text and compilable C on Ryzen. The circuit declares full versus sliding attention, RoPE width, softplus attention gating, and mixed Q4/Q6 expert providers without a Laguna branch in compiler or code generation. Visible thinking is supported but can consume more than 1,024 tokens before the final answer; use a larger output budget when testing that mode. This is coherent E2E bring-up with strong leaf evidence, not long-trajectory bit-exact certification.</p>
+
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -395,7 +411,7 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
         <li><strong>GLM4:</strong> the real Q4_K_M path executes coherently and carries partial-RoPE, persistent FP16-KV, and llama.cpp parity coverage. Keep it in long-context and ISA regression sweeps.</li>
         <li><strong>Instella-MoE:</strong> BF16 text executes coherently with strong short-checkpoint PyTorch agreement. Do not describe quantized GGUF or long trajectories as certified yet.</li>
         <li><strong>Kimi-VL:</strong> the BF16 text decoder is coherent and repeatable; use <code>--chat-template kimi_vl</code>. Vision remains unimplemented, and the current X-Ray evidence is ranking parity rather than bit-exact internal parity.</li>
-        <li><strong>Laguna-S 2.1:</strong> remains an active numerical bring-up until mixed global/sliding RoPE and the complete generated trajectory pass the oracle gate.</li>
+        <li><strong>Laguna-XS 2.1:</strong> Q4_K_M text executes coherently and the mixed global/sliding circuit is map-owned. CKE preserves the GGUF's YaRN <code>beta_fast=64</code>; the current external llama.cpp Laguna loader defaults that value to 32. Even with a metadata-aligned diagnostic oracle, small attention/projection drift can change a near-tied MoE route, so long-trajectory parity remains open.</li>
         <li><strong>Qwen2 / Qwen3 / Qwen3.5:</strong> the <code>v8</code> runner now reproduces the same public command shapes as <code>v7</code> and clean short prompt smokes succeed on the promoted examples.</li>
         <li><strong>NaanBeige / llama-family symptom:</strong> if the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, keep <code>--chat-template auto</code>, do not force <code>none</code>, and treat it as a prompt-wrapper/chat-contract symptom rather than the expected reply.</li>
     </ul>

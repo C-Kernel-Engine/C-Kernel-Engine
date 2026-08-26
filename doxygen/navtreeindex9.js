@@ -1,5 +1,14 @@
 var NAVTREEINDEX9 =
 {
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea34b104e34a7aa0d0937ad1d8d064f0a9":[2,0,0,31,19,2],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea43848ac20412b3e616a81b53bacb02ce":[2,0,0,31,19,4],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea45bba7ecc02555c097f51c9469157a21":[2,0,0,31,19,1],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea6a3bb26ab9dcc8bb90714a3c77250997":[2,0,0,31,19,8],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2":[2,0,0,31,19,7],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeaa4b32bb297017e550a88ca82c0346b02":[2,0,0,31,19,6],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeabdee28d29574a516859ce8a97cdbe959":[2,0,0,31,19,3],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac49b63f12bae2e1fb3db203ec6a60fca":[2,0,0,31,19,5],
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efeac701cd87ffd41b651fdb39fd4d9231db":[2,0,0,31,19,0],
 "ckernel__section__layout_8h_source.html":[2,0,0,31],
 "ckernel__strict_8c.html":[2,0,1,25],
 "ckernel__strict_8c.html#a0878a8fbdd6fbda1d6e6efcd6682b8ae":[2,0,1,25,8],
@@ -240,14 +249,5 @@ var NAVTREEINDEX9 =
 "geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda":[2,0,1,1,16,5],
 "geglu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365":[2,0,1,1,16,6],
 "geglu__kernels_8c.html#ac2146f8009ce79891bd0b7d54e174992":[2,0,1,1,16,3],
-"geglu__kernels_8c_source.html":[2,0,1,1,16],
-"gelu__kernels_8c.html":[2,0,1,1,17],
-"gelu__kernels_8c.html#a00a159366f55fa61abad786ce582d4f8":[2,0,1,1,17,5],
-"gelu__kernels_8c.html#a0bc5158b1cda49eb5176af325bb07bc2":[2,0,1,1,17,6],
-"gelu__kernels_8c.html#a12449dfff2a4607d9b678188e98cac8e":[2,0,1,1,17,32],
-"gelu__kernels_8c.html#a24c201ff2eaeae00fd3fd0d0478388e5":[2,0,1,1,17,17],
-"gelu__kernels_8c.html#a25b9eee043b230c304d7d44b0cfe54d4":[2,0,1,1,17,2],
-"gelu__kernels_8c.html#a28b32095708fdb6304b1b7d322942e42":[2,0,1,1,17,34],
-"gelu__kernels_8c.html#a2abcc2be3ca0cce23cd0e4b0ee3f7a58":[2,0,1,1,17,4],
-"gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb":[2,0,1,1,17,20]
+"geglu__kernels_8c_source.html":[2,0,1,1,16]
 };

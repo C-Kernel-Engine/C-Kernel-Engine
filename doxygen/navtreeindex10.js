@@ -1,5 +1,14 @@
 var NAVTREEINDEX10 =
 {
+"gelu__kernels_8c.html":[2,0,1,1,17],
+"gelu__kernels_8c.html#a00a159366f55fa61abad786ce582d4f8":[2,0,1,1,17,5],
+"gelu__kernels_8c.html#a0bc5158b1cda49eb5176af325bb07bc2":[2,0,1,1,17,6],
+"gelu__kernels_8c.html#a12449dfff2a4607d9b678188e98cac8e":[2,0,1,1,17,32],
+"gelu__kernels_8c.html#a24c201ff2eaeae00fd3fd0d0478388e5":[2,0,1,1,17,17],
+"gelu__kernels_8c.html#a25b9eee043b230c304d7d44b0cfe54d4":[2,0,1,1,17,2],
+"gelu__kernels_8c.html#a28b32095708fdb6304b1b7d322942e42":[2,0,1,1,17,34],
+"gelu__kernels_8c.html#a2abcc2be3ca0cce23cd0e4b0ee3f7a58":[2,0,1,1,17,4],
+"gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb":[2,0,1,1,17,20],
 "gelu__kernels_8c.html#a3075b77764b4b408e3c1c9b89a2822ad":[2,0,1,1,17,14],
 "gelu__kernels_8c.html#a315f43ac44656b5d77360d9879c5f122":[2,0,1,1,17,18],
 "gelu__kernels_8c.html#a363cbee84a1de5954c8bcd09cc2c5683":[2,0,1,1,17,33],
@@ -240,14 +249,5 @@ var NAVTREEINDEX10 =
 "gemm__kernels__q4k__q8k__avx2_8c.html":[2,0,1,1,31],
 "gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf":[2,0,1,1,31,0],
 "gemm__kernels__q4k__q8k__avx2_8c.html#ac01f8caf84e100f3c72919c71217010e":[2,0,1,1,31,1],
-"gemm__kernels__q4k__q8k__avx2_8c_source.html":[2,0,1,1,31],
-"gemm__kernels__q4k__q8k__vnni_8c.html":[2,0,1,1,32],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a000648f03d24790c38b380d068424a69":[2,0,1,1,32,5],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a030c98b26ad610ccea6dabf993b60cdf":[2,0,1,1,32,64],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a04b4e85e307d83bc25fb0ed99e478fb8":[2,0,1,1,32,50],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a09455cbdfd25815690e8a303ad597c2c":[2,0,1,1,32,10],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a0a182d60f8c59b4cf16eac2047fa822a":[2,0,1,1,32,76],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a0c95a01de4f338d776b7d0948ce3935a":[2,0,1,1,32,54],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a0e5bd47e250a20e9752757e4603a0b8c":[2,0,1,1,32,61],
-"gemm__kernels__q4k__q8k__vnni_8c.html#a0ea9f437d0af65398100c4c50c85ece6":[2,0,1,1,32,65]
+"gemm__kernels__q4k__q8k__avx2_8c_source.html":[2,0,1,1,31]
 };

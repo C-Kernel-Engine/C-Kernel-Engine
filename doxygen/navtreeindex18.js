@@ -1,5 +1,15 @@
 var NAVTREEINDEX18 =
 {
+"structCKSessionConfigV8.html#a9d014eabf547a01723365c2632d5e439":[1,0,55,1],
+"structCKSessionConfigV8.html#adddfa06e356784ee8dc61967f1766fbd":[1,0,55,0],
+"structCKSessionConfigV8.html#aff2a54ae49d9384bce0b3cddae97a252":[1,0,55,2],
+"structCKSessionGenerateRequestV8.html":[1,0,56],
+"structCKSessionGenerateRequestV8.html#a24a2da51c5349c60b20a08880423a688":[1,0,56,2],
+"structCKSessionGenerateRequestV8.html#a28007ad9705b62600399c839451ff85c":[1,0,56,6],
+"structCKSessionGenerateRequestV8.html#a70fdc91e18f8203e8f7b535d0a84ec20":[1,0,56,3],
+"structCKSessionGenerateRequestV8.html#a75eb7c89d2b95adb6497b552e098aef1":[1,0,56,1],
+"structCKSessionGenerateRequestV8.html#aa1ebfe5d9b025c62e8d99da0480956be":[1,0,56,8],
+"structCKSessionGenerateRequestV8.html#aa6274c83f941a5c47d04f56a952d72bb":[1,0,56,0],
 "structCKSessionGenerateRequestV8.html#aae79740b1fecc0445423d59cf5549021":[1,0,56,7],
 "structCKSessionGenerateRequestV8.html#ac5fa5c9cd39fee80c8274e6ddca104d1":[1,0,56,9],
 "structCKSessionGenerateRequestV8.html#adfa7c4e95fcc09a55a8c367162c6b5f0":[1,0,56,4],
@@ -239,15 +249,5 @@ var NAVTREEINDEX18 =
 "structPCIeTopology.html#ad6202b8874dbca1e0fdd88dc9a899203":[1,0,77,6],
 "structQWEN2__0__5B__DECODECanary.html":[1,0,78],
 "structQWEN2__0__5B__DECODECanary.html#a18aabfa5f115473f97230e403dd86333":[1,0,78,0],
-"structQWEN2__0__5B__DECODECanary.html#aef48257f4afe7c0a5e13668d907fcc89":[1,0,78,1],
-"structQWEN2__0__5B__DECODEFooterOffsets.html":[1,0,79],
-"structQWEN2__0__5B__DECODEFooterOffsets.html#aa7f30858b9156e6490e32a352acc1e94":[1,0,79,3],
-"structQWEN2__0__5B__DECODEFooterOffsets.html#ac589598a0405dd5321d3605f104c52af":[1,0,79,1],
-"structQWEN2__0__5B__DECODEFooterOffsets.html#ac6811e11a982eaed8ba5bab63e4d7289":[1,0,79,2],
-"structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19":[1,0,79,0],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html":[1,0,80],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html#a8e04d4088aaa68a9725b418e7566a6e9":[1,0,80,0],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9":[1,0,80,1],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html":[1,0,81],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a132bfc09c544e8e77e4643564e740d3b":[1,0,81,1]
+"structQWEN2__0__5B__DECODECanary.html#aef48257f4afe7c0a5e13668d907fcc89":[1,0,78,1]
 };

@@ -1,5 +1,15 @@
 var NAVTREEINDEX16 =
 {
+"structCKKernelId.html#aaa58279e743ef1ec7a4c9cce3dc67c79":[1,0,30,1],
+"structCKKernelId.html#ab2cebeabdb83297de77f4926e9994ac9":[1,0,30,0],
+"structCKKernelSpec.html":[1,0,31],
+"structCKKernelSpec.html#a19f87171754de66c10e0d6a0968489e2":[1,0,31,2],
+"structCKKernelSpec.html#a702e1368abaa202d24597a58f2f5c751":[1,0,31,5],
+"structCKKernelSpec.html#a851ca16066a7dfa2499bee69cfef2360":[1,0,31,1],
+"structCKKernelSpec.html#ab6e588e0f3701c3c63904c231325185d":[1,0,31,4],
+"structCKKernelSpec.html#aba0f53ce7d166eb16ab0a2cb0973040b":[1,0,31,0],
+"structCKKernelSpec.html#af3d9a06048ce2f5e9fa5c852d864d625":[1,0,31,3],
+"structCKLayerBackwardParams.html":[1,0,32],
 "structCKLayerBackwardParams.html#a023a1e75829f8f420e35838f7384c3a3":[1,0,32,19],
 "structCKLayerBackwardParams.html#a0a43398737b3990bce0677aedddd310c":[1,0,32,10],
 "structCKLayerBackwardParams.html#a0b2505938624d2addd57ca43e3f5c685":[1,0,32,6],
@@ -239,15 +249,5 @@ var NAVTREEINDEX16 =
 "structCKLayerOffsets.html#a0f018f2bb9ee6f55108ef52d8170d97e":[1,0,37,19],
 "structCKLayerOffsets.html#a10218069303bec4b99fa47a715b31918":[1,0,37,22],
 "structCKLayerOffsets.html#a13f7bd9b925dd8d55fb6cfa885e8b7d7":[1,0,37,6],
-"structCKLayerOffsets.html#a207b51ce0a5d8afb92fbb3f810ca4574":[1,0,37,8],
-"structCKLayerOffsets.html#a21dedb037033c59edb5c355268bbbad5":[1,0,37,37],
-"structCKLayerOffsets.html#a253ebe103830f66006e992c1942359c6":[1,0,37,30],
-"structCKLayerOffsets.html#a4394bd2a46480cc9ad149128ba576354":[1,0,37,9],
-"structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd":[1,0,37,32],
-"structCKLayerOffsets.html#a4bb907fd60ba2d980d91b4af199671ce":[1,0,37,18],
-"structCKLayerOffsets.html#a4f2f21241cc69041cc62d5ae1c9f8c14":[1,0,37,21],
-"structCKLayerOffsets.html#a52f48fdcdf2b539423f0313b5cab029e":[1,0,37,24],
-"structCKLayerOffsets.html#a599bdd7039ffc353f5302c9c6fa287b4":[1,0,37,33],
-"structCKLayerOffsets.html#a5a50122740389c57c4c993f2aa470e4c":[1,0,37,40],
-"structCKLayerOffsets.html#a5c8f69d516fc4fb0b25cb6dc839ef298":[1,0,37,4]
+"structCKLayerOffsets.html#a207b51ce0a5d8afb92fbb3f810ca4574":[1,0,37,8]
 };
