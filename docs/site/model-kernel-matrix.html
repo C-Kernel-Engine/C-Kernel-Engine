@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model + Kernel Matrix  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Model + Kernel Matrix | C-Kernel-Engine</title>
+    <meta name="description" content="Visual matrix of C-Kernel-Engine v8 model families (Qwen, Gemma, GLM4, Nemotron-H, Kimi, Cohere2, Laguna, Instella, Whisper) mapped to IR templates, kernel families, and quant contracts.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html">
-    <meta property="og:title" content="Model + Kernel Matrix  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <meta property="og:title" content="Model + Kernel Matrix | C-Kernel-Engine">
+    <meta property="og:description" content="Visual matrix of C-Kernel-Engine v8 model families (Qwen, Gemma, GLM4, Nemotron-H, Kimi, Cohere2, Laguna, Instella, Whisper) mapped to IR templates, kernel families, and quant contracts.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -1021,6 +1021,10 @@
     .model-card.mc-whisper::before { background: #f59e0b; }
     .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
+    .model-card.mc-qwen38::before   { background: #26c6da; }
+    .model-card.mc-instella::before { background: #ab47bc; }
+    .model-card.mc-cohere2::before  { background: #ff7043; }
+    .model-card.mc-laguna::before   { background: #5c6bc0; }
 
     .model-badge {
       font-size: 0.75rem;
@@ -1365,15 +1369,20 @@
     <g>
       <rect class="mk-chip" x="616" y="58"  width="120" height="26" rx="6"/><text x="676" y="76" text-anchor="middle" class="mk-chip-t">qwen2/3/3.5</text>
       <rect class="mk-chip" x="746" y="58"  width="120" height="26" rx="6"/><text x="806" y="76" text-anchor="middle" class="mk-chip-t">gemma3/4</text>
-      <rect class="mk-chip" x="876" y="58"  width="120" height="26" rx="6"/><text x="936" y="76" text-anchor="middle" class="mk-chip-t">glm4</text>
-      <rect class="mk-chip" x="1006" y="58" width="150" height="26" rx="6"/><text x="1081" y="76" text-anchor="middle" class="mk-chip-t">nemotron_h</text>
-      <rect class="mk-chip" x="616" y="92"  width="120" height="26" rx="6"/><text x="676" y="110" text-anchor="middle" class="mk-chip-t">llama</text>
-      <rect class="mk-chip" x="746" y="92"  width="120" height="26" rx="6"/><text x="806" y="110" text-anchor="middle" class="mk-chip-t">qwen3vl</text>
-      <rect class="mk-chip" x="876" y="92"  width="160" height="26" rx="6"/><text x="956" y="110" text-anchor="middle" class="mk-chip-t" fill="#9ed6ff">gemma4_vision</text>
-      <rect class="mk-chip" x="1046" y="92" width="110" height="26" rx="6"/><text x="1101" y="110" text-anchor="middle" class="mk-chip-t" fill="#cbb6ff">siglip_vit</text>
-      <rect class="mk-chip" x="616" y="126" width="150" height="26" rx="6"/><text x="691" y="144" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_frontend</text>
-      <rect class="mk-chip" x="776" y="126" width="160" height="26" rx="6"/><text x="856" y="144" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_enc / audio_dec</text>
-      <text x="616" y="172" class="mk-sub" fill="#808080">11 text/vision templates + audio circuit trio → same lowering passes</text>
+      <rect class="mk-chip" x="876" y="58"  width="100" height="26" rx="6"/><text x="926" y="76" text-anchor="middle" class="mk-chip-t">glm4</text>
+      <rect class="mk-chip" x="986" y="58"  width="120" height="26" rx="6"/><text x="1046" y="76" text-anchor="middle" class="mk-chip-t">nemotron_h</text>
+      <rect class="mk-chip" x="616" y="92"  width="100" height="26" rx="6"/><text x="666" y="110" text-anchor="middle" class="mk-chip-t">llama</text>
+      <rect class="mk-chip" x="726" y="92"  width="100" height="26" rx="6"/><text x="776" y="110" text-anchor="middle" class="mk-chip-t">qwen3vl</text>
+      <rect class="mk-chip" x="836" y="92"  width="100" height="26" rx="6"/><text x="886" y="110" text-anchor="middle" class="mk-chip-t">qwen38</text>
+      <rect class="mk-chip" x="946" y="92"  width="100" height="26" rx="6"/><text x="996" y="110" text-anchor="middle" class="mk-chip-t">kimi_vl</text>
+      <rect class="mk-chip" x="616" y="126" width="100" height="26" rx="6"/><text x="666" y="144" text-anchor="middle" class="mk-chip-t">cohere2</text>
+      <rect class="mk-chip" x="726" y="126" width="100" height="26" rx="6"/><text x="776" y="144" text-anchor="middle" class="mk-chip-t">laguna</text>
+      <rect class="mk-chip" x="836" y="126" width="130" height="26" rx="6"/><text x="901" y="144" text-anchor="middle" class="mk-chip-t">instella_moe</text>
+      <rect class="mk-chip" x="976" y="126" width="150" height="26" rx="6"/><text x="1051" y="144" text-anchor="middle" class="mk-chip-t" fill="#9ed6ff">gemma4_vision</text>
+      <rect class="mk-chip" x="616" y="160" width="110" height="26" rx="6"/><text x="671" y="178" text-anchor="middle" class="mk-chip-t" fill="#cbb6ff">siglip_vit</text>
+      <rect class="mk-chip" x="736" y="160" width="150" height="26" rx="6"/><text x="811" y="178" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_frontend</text>
+      <rect class="mk-chip" x="896" y="160" width="160" height="26" rx="6"/><text x="976" y="178" text-anchor="middle" class="mk-chip-t" fill="#ffd38a">audio_enc / audio_dec</text>
+      <text x="616" y="192" class="mk-sub" fill="#808080">16 text/vision templates + audio circuit trio → same lowering passes</text>
     </g>
 
     <!-- arrows sources -> compile -->
@@ -1571,6 +1580,39 @@
       </div>
     </div>
 
+    <!-- Qwen3.8 -->
+    <div class="model-card mc-qwen38">
+      <span class="model-badge">template: qwen38.json</span>
+      <div class="model-title">Qwen3.8 27B</div>
+      <div class="model-arch">Hybrid recurrent + gated attention · Gated DeltaNet (3×recurrent → 1×full)<br>Text M-RoPE split · QK‑Norm (full‑attn only) · SwiGLU · tied LM head · BPE / ChatML</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K_M 27B text runtime — 4,096-token trajectory bit-exact to llama.cpp (4,000/4,000 full-vocabulary rows)</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">262,144-token context memory planner certified (capacity-aware nightly lane)</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Public 128K/262K runtime claims deferred; ~1.49× slower than llama.cpp at 8K tokens</span></div>
+      </div>
+      <div class="source-note">
+        Identity: upstream GGUFs advertise <code>general.architecture=qwen35</code>; the converter selects qwen38 via artifact metadata (basename / size label). Circuit carries validated contract selectors for q5_k, q6_k, q8_0 and BF16 recurrent dtypes. Evidence: PRs #387, #388, #390.
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Qwen3.8 contract + certification lane</span><button class="copy-command" type="button" data-copy-command="cmd-qwen38">Copy</button></div>
+        <pre id="cmd-qwen38"><code>.venv/bin/python -m unittest tests.test_v8_qwen38_contract
+QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
+  make certify-qwen38-svg-parity</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">hybrid_recurrent_attention</span>
+        <span class="tag learned">mrope_text_split</span>
+        <span class="tag fixed">262K planner certified</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q5_K</span>
+        <span class="mq-chip">Q6_K</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">BF16 contracts</span>
+      </div>
+    </div>
+
     <!-- Gemma3 -->
     <div class="model-card mc-gemma3">
       <span class="model-badge">template: gemma3.json</span>
@@ -1699,18 +1741,114 @@
       </div>
     </div>
 
+    <!-- Cohere2 Command R -->
+    <div class="model-card mc-cohere2">
+      <span class="model-badge">template: cohere2.json</span>
+      <div class="model-title">Cohere2 Command R</div>
+      <div class="model-arch">Dense GQA · LayerNorm (shared pre-block norm, synthesized beta) · SwiGLU<br>Parallel attention+MLP residual · 3:1 sliding:full attention<br>Pairwise RoPE on sliding layers only · logit_scale footer · tied embeddings · BPE</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">GGUF discovery via model map — standard cks-v8-run path, no family branch</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Command R7B Q4_K_M — tokenizer-free replay matches llama.cpp for the first 8 greedy positions</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity and matched performance sweeps remain future certification work</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up note (PR #401): lowering honors the model-declared <code>logit_scale</code> via a <code>final_logit_scale_f32</code> footer op, and RoPE applies only to sliding layers per the exported contract. Contract test: <code>tests.test_v8_cohere2_contract</code>.
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Cohere2 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-cohere2">Copy</button></div>
+        <pre id="cmd-cohere2"><code>version/v8/scripts/cks-v8-run run \
+  /path/to/command-r7b-q4_k_m.gguf \
+  --context-len 2048 --force-compile --force-convert --chat-template=auto \
+  --max-tokens 64 --temperature 0.0</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">parallel_attn_mlp</span>
+        <span class="tag fixed">logit_scale contract</span>
+        <span class="tag fixed">rope sliding-layers only</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q6_K</span>
+        <span class="mq-chip">GGUF</span>
+      </div>
+    </div>
+
+    <!-- Laguna -->
+    <div class="model-card mc-laguna">
+      <span class="model-badge">template: laguna.json</span>
+      <div class="model-title">Laguna-XS 2.1</div>
+      <div class="model-arch">Hybrid attention MoE · gated GQA (softplus per-head gate) · QK‑Norm<br>YaRN on global layers / full-rotary on sliding · sigmoid router + correction bias<br>Top‑8 routed + shared SwiGLU experts · RMSNorm · untied output.weight · BPE</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K_M text runtime (PR #404) — mixed Q4/Q6 expert storage, map-owned routed/shared SwiGLU providers</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Embedding and layer-0 RMSNorm bit-exact; identical-input router replay preserves selected experts within one ULP</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity not claimed — near-tied MoE route flips vs llama.cpp</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up note (PR #404): ~20 prefill / 14 decode tok/s on the Ryzen node (bring-up measurement, not a certified benchmark). Known oracle gap: the external llama.cpp Laguna loader omits GGUF YaRN <code>beta_fast=64</code> (defaults 32). Softplus gate formula is observed, not yet oracle-validated. Contract test: <code>tests.test_v8_laguna_contract</code>.
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Laguna smoke</span><button class="copy-command" type="button" data-copy-command="cmd-laguna">Copy</button></div>
+        <pre id="cmd-laguna"><code>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  /path/to/Laguna-XS-2.1-Q4_K_M.gguf \
+  --run /srv/cke/profiles/laguna-xs-2.1 \
+  --context-len 2048 --force-convert --force-compile \
+  --prompt 'Write a complete C program that prints the first ten Fibonacci numbers.' \
+  --chat-template auto --thinking-mode suppressed --max-tokens 512 --temperature 0.0</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">gated_gqa softplus</span>
+        <span class="tag learned">yarn_global / rotary_sliding</span>
+        <span class="tag fixed">mixed Q4/Q6 experts</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q6_K experts</span>
+        <span class="mq-chip">GGUF</span>
+      </div>
+    </div>
+
+    <!-- Instella -->
+    <div class="model-card mc-instella">
+      <span class="model-badge">template: instella_moe.json (safetensors)</span>
+      <div class="model-title">Instella-MoE 16B-A3B</div>
+      <div class="model-arch">MoE + gated MLA · partial interleaved YaRN RoPE · RMSNorm · SwiGLU<br>Sigmoid group-limited top-k router + shared experts (64 experts/layer)<br>FarSkip two-stream residuals · BPE</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">BF16 safetensors runtime certified (PR #389) — coherent chat, top-1 matches PyTorch at the tested checkpoint</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Full-logit cosine 0.99998 vs PyTorch at a 32-token X-Ray checkpoint (30 GiB real runtime)</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Quantized GGUF and long trajectories not yet certified</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up history: fail-closed MoE bring-up (#292), mechanical FarSkip circuit stitching (#294), nightly circuit contracts (#295), BF16 execution certification (#389). A high-memory Instella E2E lane remains follow-up work. Contract lane: <code>tests.test_v8_instella_moe_bringup</code> (runs in the nightly demo-readiness profile).
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Instella contract lane</span><button class="copy-command" type="button" data-copy-command="cmd-instella">Copy</button></div>
+        <pre id="cmd-instella"><code>.venv/bin/python -m unittest tests.test_v8_instella_moe_bringup
+# nightly: registered as v8_instella_moe_circuit_contracts</code></pre>
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">gated_mla</span>
+        <span class="tag learned">farskip_residuals</span>
+        <span class="tag fixed">BF16 certified</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">BF16 ★</span>
+        <span class="mq-chip">safetensors → BUMP</span>
+        <span class="mq-chip">MoE 64 experts</span>
+      </div>
+    </div>
+
     <!-- Kimi / MLA -->
     <div class="model-card mc-kimi">
       <span class="model-badge">template: kimi_vl.json</span>
       <div class="model-title">Kimi / MLA Text Decoder</div>
-      <div class="model-arch">Multi-Head Latent Attention · partial RoPE concat · MoE path<br>Explicit prefill/decode MLA cache contract · DeepSeek-style reference kernels</div>
+      <div class="model-arch">Multi-Head Latent Attention + MoE · partial pairwise-concat RoPE · RMSNorm<br>SwiGLU dense + sigmoid group-limited top-k routed/shared experts · tiktoken · untied LM head</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 template/lowering — explicit MLA cache store/read ops</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Kernel contract — MLA decompress, partial RoPE concat, decode cache attention</span></div>
-        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Full Kimi smoke — high-memory host required; not a laptop CI lane</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Text decoder runtime certified (PR #403) — Kimi-VL-A3B-Instruct BF16, coherent on AVX2 and AVX-512</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Repeatable: three Ryzen runs bit-identical (32-token SHA-256); PyTorch first-token + top-20 match, full-logit cosine 0.9977</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">MoonViT vision bridge / multimodal path — outside the certified lane</span></div>
       </div>
       <div class="source-note">
-        Bring-up scope: Kimi/MLA support now lowers the latent KV path explicitly instead of hiding cache behavior inside attention. Decode inserts <code>mla_kv_cache_store</code> and switches <code>mla_attention</code> to <code>deepseek_mla_attention_decode_f32</code>; prefill inserts <code>mla_kv_cache_batch_store</code>.
+        Certification note (PRs #399, #403): tokenizer source assets + chat protocol (kimi_vl) are now staged by the runner; decode inserts <code>mla_kv_cache_store</code> and switches <code>mla_attention</code> to <code>deepseek_mla_attention_decode_f32</code>; prefill uses <code>mla_kv_cache_batch_store</code>. Internal BF16 drift becomes material near layer 7 — do not claim bit-exact internal parity.
       </div>
       <div class="model-tags">
         <span class="tag fixed">explicit MLA decode cache</span>
@@ -1723,6 +1861,11 @@
 make build/libckernel_engine.so
 .venv/bin/python unittest/test_deepseek_reference_kernels.py
 .venv/bin/python -m unittest tests.test_v8_kimi_template</code></pre>
+      </div>
+      <div class="model-command">
+        <div class="model-command-head"><span>Kimi high-memory lane</span><button class="copy-command" type="button" data-copy-command="cmd-kimi-highmem">Copy</button></div>
+        <pre id="cmd-kimi-highmem"><code>V8_KIMI_MODEL=/path/to/Kimi-VL-A3B-Instruct make test-v8-kimi-highmem
+# requires ≥ 40 GiB RAM host; context 2048, 64 tokens</code></pre>
       </div>
       <div class="model-quant">
         <span class="mq-chip">BF16</span>
@@ -2013,6 +2156,56 @@ make build/libckernel_engine.so
       <div class="cell dim">No</div>
       <div class="cell ok">LM head</div>
 
+      <div class="cell row-head">Qwen3.8</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Full‑attn only</div>
+      <div class="cell ok">M-RoPE text split</div>
+      <div class="cell ok">Hybrid DeltaNet + gated</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
+
+      <div class="cell row-head">Kimi (MLA)</div>
+      <div class="cell ok">tiktoken</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Partial pairwise concat</div>
+      <div class="cell ok">MLA + MoE</div>
+      <div class="cell ok">SwiGLU + routed MoE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Untied</div>
+
+      <div class="cell row-head">Cohere2</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Pairwise, sliding only</div>
+      <div class="cell ok">3:1 sliding + full GQA</div>
+      <div class="cell ok">SwiGLU (parallel)</div>
+      <div class="cell ok">LayerNorm shared</div>
+      <div class="cell ok">Tied + logit_scale</div>
+
+      <div class="cell row-head">Laguna</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">YaRN global / rotary sliding</div>
+      <div class="cell ok">Gated GQA (softplus)</div>
+      <div class="cell ok">SwiGLU MoE top‑8 + shared</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Untied</div>
+
+      <div class="cell row-head">Instella</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Partial interleaved YaRN</div>
+      <div class="cell ok">Gated MLA</div>
+      <div class="cell ok">SwiGLU MoE + shared</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Untied</div>
+
       <div class="cell row-head">Llama / Nanbeige</div>
       <div class="cell ok">SentencePiece</div>
       <div class="cell ok">From weights</div>
@@ -2145,6 +2338,56 @@ make build/libckernel_engine.so
       <div class="cell ok">Yes</div>
       <div class="cell dim">No</div>
 
+      <div class="cell row-head">Qwen3.8</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">hybrid_recurrent + gated_attn</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Kimi (MLA)</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">tiktoken + sidecar</div>
+      <div class="cell ok">deepseek_mla_attention</div>
+      <div class="cell ok">silu_mul + moe</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
+      <div class="cell row-head">Cohere2</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Yes (logit_scale)</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn + attn_sliding</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Laguna</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">attn + attn_gate_softplus</div>
+      <div class="cell ok">silu_mul + moe</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
+      <div class="cell row-head">Instella</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">deepseek_mla_attention (gated)</div>
+      <div class="cell ok">silu_mul + moe</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell dim">No</div>
+
       <div class="cell row-head">Llama / Nanbeige</div>
       <div class="cell dim">No</div>
       <div class="cell dim">No</div>
@@ -2204,6 +2447,105 @@ make build/libckernel_engine.so
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
       Interpretation: DeltaNet earns a dedicated kernel because it mutates recurrent state; gated attention usually does not, because the gate is just an elementwise epilogue on top of otherwise standard attention.
+    </p>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Kernel Delta: What the New Families Required</h2>
+    <p style="margin-top: 0.6rem; color: var(--text-secondary);">
+      Each newly supported family forced the kernel registry to grow. This map shows the kernel families added or hardened per architecture — every entry is a named provider in <code>version/v8/kernel_maps</code> with a source file you can read.
+    </p>
+    <svg viewBox="0 0 1180 560" width="100%" role="img"
+         aria-label="Kernel delta map: six boxes listing kernel families added or hardened for the new model families — latent attention, recurrent SSM, gated and hybrid attention, MoE routing, normalization and residual, and logits footer — each with provider names, source files, and the model families that use them."
+         style="max-width: 1180px; margin: 0.75rem auto 0.25rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .kd-box{fill:#323232;stroke:#454545;stroke-width:1.4;rx:12;}
+        .kd-title{fill:#f5f5f5;font-size:16px;font-weight:700;}
+        .kd-sub{fill:#b0b0b0;font-size:12px;font-family:'JetBrains Mono',monospace;}
+        .kd-src{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .kd-chip{fill:#0f151c;stroke:#263242;stroke-width:1;rx:6;}
+        .kd-chip-t{fill:#9ed6ff;font-size:11px;font-family:'JetBrains Mono',monospace;}
+      </style>
+
+      <!-- Row 1 -->
+      <g>
+        <rect class="kd-box" x="24" y="20" width="360" height="210" rx="12"/>
+        <rect x="24" y="20" width="4" height="210" rx="2" fill="#b48cff"/>
+        <text x="44" y="52" class="kd-title">Latent attention (MLA)</text>
+        <text x="44" y="80" class="kd-sub">mla_kv_cache_store</text>
+        <text x="44" y="98" class="kd-sub">mla_kv_cache_batch_store</text>
+        <text x="44" y="116" class="kd-sub">deepseek_mla_attention_f32 / _decode_f32</text>
+        <text x="44" y="140" class="kd-src">src/kernels/deepseek_kernels.c</text>
+        <rect class="kd-chip" x="44"  y="192" width="56" height="24" rx="6"/><text x="72"  y="208" text-anchor="middle" class="kd-chip-t">Kimi</text>
+        <rect class="kd-chip" x="110" y="192" width="76" height="24" rx="6"/><text x="148" y="208" text-anchor="middle" class="kd-chip-t">Instella</text>
+      </g>
+      <g>
+        <rect class="kd-box" x="410" y="20" width="360" height="210" rx="12"/>
+        <rect x="410" y="20" width="4" height="210" rx="2" fill="#1abc9c"/>
+        <text x="430" y="52" class="kd-title">Recurrent / SSM</text>
+        <text x="430" y="80" class="kd-sub">gated_deltanet_*</text>
+        <text x="430" y="98" class="kd-src">src/kernels/deltanet_kernels.c</text>
+        <text x="430" y="124" class="kd-sub">mamba2_*</text>
+        <text x="430" y="142" class="kd-src">src/kernels/mamba2_kernels.c</text>
+        <text x="430" y="168" class="kd-sub">recurrent_gate / norm / state</text>
+        <text x="430" y="186" class="kd-src">src/kernels/recurrent_*_kernels.c</text>
+        <rect class="kd-chip" x="430" y="192" width="76" height="24" rx="6"/><text x="468" y="208" text-anchor="middle" class="kd-chip-t">Qwen3.5</text>
+        <rect class="kd-chip" x="516" y="192" width="76" height="24" rx="6"/><text x="554" y="208" text-anchor="middle" class="kd-chip-t">Qwen3.8</text>
+        <rect class="kd-chip" x="602" y="192" width="96" height="24" rx="6"/><text x="650" y="208" text-anchor="middle" class="kd-chip-t">Nemotron-H</text>
+      </g>
+      <g>
+        <rect class="kd-box" x="796" y="20" width="360" height="210" rx="12"/>
+        <rect x="796" y="20" width="4" height="210" rx="2" fill="#26c6da"/>
+        <text x="816" y="52" class="kd-title">Gated &amp; hybrid attention</text>
+        <text x="816" y="80" class="kd-sub">attn_gate_softplus_mul_forward</text>
+        <text x="816" y="98" class="kd-src">src/kernels/hybrid_attention_kernels.c</text>
+        <text x="816" y="122" class="kd-sub">rope_forward_qk_split_direct_f32</text>
+        <text x="816" y="140" class="kd-src">src/kernels/rope_kernels.c</text>
+        <text x="816" y="164" class="kd-sub">sliding-window attention</text>
+        <text x="816" y="182" class="kd-src">src/kernels/attention_kernels_sliding.c</text>
+        <rect class="kd-chip" x="816" y="192" width="66" height="24" rx="6"/><text x="849" y="208" text-anchor="middle" class="kd-chip-t">Laguna</text>
+        <rect class="kd-chip" x="892" y="192" width="72" height="24" rx="6"/><text x="928" y="208" text-anchor="middle" class="kd-chip-t">Gemma4</text>
+        <rect class="kd-chip" x="974" y="192" width="70" height="24" rx="6"/><text x="1009" y="208" text-anchor="middle" class="kd-chip-t">Cohere2</text>
+        <rect class="kd-chip" x="1054" y="192" width="72" height="24" rx="6"/><text x="1090" y="208" text-anchor="middle" class="kd-chip-t">Gemma3</text>
+      </g>
+
+      <!-- Row 2 -->
+      <g>
+        <rect class="kd-box" x="24" y="260" width="360" height="210" rx="12"/>
+        <rect x="24" y="260" width="4" height="210" rx="2" fill="#ff7043"/>
+        <text x="44" y="292" class="kd-title">MoE routing</text>
+        <text x="44" y="320" class="kd-sub">nemotron_group_limited_topk_router_f32</text>
+        <text x="44" y="344" class="kd-sub">moe_relu2_expert_forward/backward_f32</text>
+        <text x="44" y="368" class="kd-sub">sigmoid top-k + correction-bias variants</text>
+        <rect class="kd-chip" x="44"  y="432" width="96" height="24" rx="6"/><text x="92"  y="448" text-anchor="middle" class="kd-chip-t">Nemotron-H</text>
+        <rect class="kd-chip" x="150" y="432" width="56" height="24" rx="6"/><text x="178" y="448" text-anchor="middle" class="kd-chip-t">Kimi</text>
+        <rect class="kd-chip" x="216" y="432" width="76" height="24" rx="6"/><text x="254" y="448" text-anchor="middle" class="kd-chip-t">Instella</text>
+        <rect class="kd-chip" x="302" y="432" width="66" height="24" rx="6"/><text x="335" y="448" text-anchor="middle" class="kd-chip-t">Laguna</text>
+      </g>
+      <g>
+        <rect class="kd-box" x="410" y="260" width="360" height="210" rx="12"/>
+        <rect x="410" y="260" width="4" height="210" rx="2" fill="#47b475"/>
+        <text x="430" y="292" class="kd-title">Normalization &amp; residual</text>
+        <text x="430" y="320" class="kd-sub">LayerNorm shared pre-block + synthesized beta</text>
+        <text x="430" y="344" class="kd-sub">FarSkip two-stream residual wiring</text>
+        <text x="430" y="368" class="kd-sub">per-layer embed</text>
+        <text x="430" y="386" class="kd-src">src/kernels/gemma4_per_layer_embed.c</text>
+        <rect class="kd-chip" x="430" y="432" width="70" height="24" rx="6"/><text x="465" y="448" text-anchor="middle" class="kd-chip-t">Cohere2</text>
+        <rect class="kd-chip" x="510" y="432" width="76" height="24" rx="6"/><text x="548" y="448" text-anchor="middle" class="kd-chip-t">Instella</text>
+        <rect class="kd-chip" x="596" y="432" width="72" height="24" rx="6"/><text x="632" y="448" text-anchor="middle" class="kd-chip-t">Gemma4</text>
+      </g>
+      <g>
+        <rect class="kd-box" x="796" y="260" width="360" height="210" rx="12"/>
+        <rect x="796" y="260" width="4" height="210" rx="2" fill="#ffb400"/>
+        <text x="816" y="292" class="kd-title">Logits &amp; footer</text>
+        <text x="816" y="320" class="kd-sub">final_logit_scale_f32</text>
+        <rect class="kd-chip" x="816" y="432" width="70" height="24" rx="6"/><text x="851" y="448" text-anchor="middle" class="kd-chip-t">Cohere2</text>
+      </g>
+
+      <text x="24" y="520" class="kd-sub" fill="#808080">Each chip marks a model family whose circuit selects that kernel family at lowering time.</text>
+    </svg>
+    <p class="source-note" style="margin-top: 0.5rem;">
+      Counts and provider status live in <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (297 provider maps); the audit baseline is <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>.
     </p>
   </div>
 
@@ -2279,6 +2621,15 @@ make build/libckernel_engine.so
       </div>
       <div class="test-item">
         <strong>Qwen3-VL / Gemma4 vision:</strong> Qwen3-VL remains the promoted vision baseline. Gemma4 vision now has a matching CLIP/mmproj conversion path, a Gemma4 image marker contract, and a confirmed encoder-prefix-to-decoder mixed-prefill smoke; semantic parity and speed remain active work.
+      </div>
+      <div class="test-item">
+        <strong>#399/#403 — Kimi text decoder runtime certified:</strong> tokenizer sidecar staging, kimi_vl chat protocol, BF16 KV-LoRA decompression binding; MoonViT vision bridge still outside the certified lane.
+      </div>
+      <div class="test-item">
+        <strong>#401 — Cohere2 Command R:</strong> LayerNorm shared pre-block norm, parallel attention+MLP residual, sliding-only RoPE, model-declared logit_scale footer; 8-token llama.cpp replay agreement on Q4_K_M.
+      </div>
+      <div class="test-item">
+        <strong>#404 — Laguna-XS 2.1 quantized text runtime:</strong> gated GQA softplus gate, YaRN-global/full-rotary-sliding RoPE split, mixed Q4/Q6 MoE expert storage.
       </div>
     </div>
   </div>
@@ -2574,7 +2925,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-02</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-26</p>
             </div>
         </div>
     </footer>

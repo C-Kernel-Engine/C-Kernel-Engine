@@ -32,8 +32,12 @@ closed with a list of missing kernels/templates.
 | Qwen3.5 text | Bring-up active, usable | safetensors + GGUF parity | Hybrid DeltaNet/full-attention decoder. Safetensors require Qwen3.5 norm `+1` transform except `linear_attn.norm.weight`. |
 | Gemma4 text | Bring-up active, usable | GGUF/safetensors parity | Hybrid full/sliding attention with per-layer embedding and per-layer RoPE control. |
 | Whisper Tiny/Base/Small | Supported for FP32 transcription | safetensors + PyTorch parity | Generated audio frontend, encoder, and decoder. JFK tokens match exactly; Base has a 33-second long-form fixture. Longer PCM16 WAV recordings use sequential source windows. |
-| Nematron-H | Not yet lowerable | Mamba kernels | Hybrid Mamba/attention decoder. Existing DeltaNet kernels are not a substitute for Mamba selective scan. |
-| Cohere Command-style models | Needs config access | tensor-name mapping audit | Main public checkpoints are gated in this environment. Start with config/weights access, then determine whether dense decoder mapping is enough. |
+| Nematron-H | Supported (GGUF runtime lane) | GGUF Q4_K_M smoke | Hybrid Mamba2/attention decoder. Coherent Q4_K_M text E2E on the v8 GGUF lane; safetensors/PyTorch parity lane covers Mamba2 stitching and state-shape guardrails. |
+| Cohere Command-style models | Supported as Cohere2 via GGUF (PR #401) | Q4_K_M bring-up | 8-token llama.cpp replay agreement on Command R7B; long-trajectory parity pending. |
+| Qwen3.8 27B | Supported (qwen38 circuit) | Q4_K_M GGUF parity | 4,096-token trajectory bit-exact to llama.cpp; 262K context memory planner certified. |
+| Instella-MoE 16B-A3B | Supported (instella_moe, BF16 safetensors) | PyTorch parity | BF16 safetensors certified; full-logit cosine 0.99998 at the 32-token checkpoint. Quantized GGUF and long trajectories pending. |
+| Kimi-VL A3B text decoder | Supported (kimi_vl) | BF16 text certification | Text decoder certified post-#403 (repeatable on AVX2/AVX-512); MoonViT vision bridge pending. |
+| Laguna-XS 2.1 | Supported (laguna, Q4_K_M text runtime) | GGUF Q4_K_M bring-up | Embedding and layer-0 RMSNorm bit-exact; long-trajectory parity not claimed (near-tied MoE route flips). |
 
 ## Nematron-H Gap
 
@@ -63,18 +67,18 @@ Required new CK contracts before full Nematron-H inference:
 The first implementation should be scalar FP32/BF16 parity-first, then optimized
 with AVX/AVX-512/AMX only after hidden-stream parity is stable.
 
-## Cohere Gap
+## Cohere Gap (closed by PR #401)
 
-Cohere Command repositories were gated during this run, including `config.json`.
-Do not guess the tensor names.  Once access is available:
+Cohere Command repositories were gated during the original survey, including
+`config.json`, so tensor names could not be guessed safely. That gap is now
+closed: declarative GGUF model-map support (#401) routes Command R artifacts to
+the `cohere2` circuit automatically, with the shared pre-block LayerNorm,
+parallel attention+MLP residual, sliding-only RoPE, and the model-declared
+`logit_scale` footer expressed as contract data rather than a family branch.
 
-1. Run the contract inspector on `config.json`.
-2. Dump safetensors headers only.
-3. Compare tensor names against the existing Llama-family importer.
-4. If the graph is dense attention + GLU MLP, add a Cohere-specific name mapper
-   and audit test before adding new math.
-5. If the graph has custom attention, sliding windows, logit scaling, or unusual
-   norms, model those explicitly in sidecar config.
+Current evidence: Q4_K_M bring-up on Command R7B with tokenizer-free replay
+matching llama.cpp for the first 8 greedy positions. Remaining work is
+long-trajectory parity and performance sweeps.
 
 ## Why This Matters
 
