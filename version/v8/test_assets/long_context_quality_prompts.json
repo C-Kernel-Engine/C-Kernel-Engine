@@ -3,14 +3,45 @@
   "schema_version": 1,
   "prompts": [
     {
-      "id": "code",
-      "max_tokens": 1536,
-      "text": "Create a practical, self-contained example showing C, Python, and SQL working together to ingest sensor readings, calculate a rolling average, and store/query alerts. Include complete code blocks, error handling, build or run commands, and a concise explanation. Do not omit implementation details."
+      "id": "rope_simd_kernel",
+      "kind": "c_kernel.v1",
+      "artifact_extension": ".c",
+      "max_tokens": 6144,
+      "required_fragments": [
+        "#include <immintrin.h>",
+        "#include <string.h>",
+        "ck_rope_split_f32_reference",
+        "ck_rope_split_f32_avx2",
+        "_mm256_loadu_ps",
+        "_mm256_storeu_ps",
+        "int main(",
+        "memcmp("
+      ],
+      "forbidden_fragments": [
+        "malloc(",
+        "calloc(",
+        "realloc(",
+        "free(",
+        "_mm256_fmadd",
+        "_mm256_fmsub"
+      ],
+      "text": "Return exactly one c fenced code block and no prose outside it. Write a complete, compile-ready C11 implementation of split-half FP32 RoPE for one token and one attention head. Provide both ck_rope_split_f32_reference and ck_rope_split_f32_avx2 with this signature: int function(float *dst, const float *src, const float *cos_values, const float *sin_values, size_t rotary_dim). rotary_dim is even; its first and second halves form the rotated pairs, while cos_values and sin_values each contain rotary_dim/2 elements. Support dst == src, reject invalid arguments, process eight pairs per AVX2 iteration, and include a scalar tail. Preserve separate multiply then add/subtract arithmetic in both implementations; do not use FMA. Do not allocate memory or create threads. Include all headers, a deterministic test main that compares reference and AVX2 outputs bitwise for in-place and out-of-place calls, and a short comment documenting aliasing, alignment, and numerical-order assumptions. The source must compile with: cc -std=c11 -mavx2 -ffp-contract=off -Wall -Wextra -Werror."
     },
     {
-      "id": "svg",
+      "id": "rope_simd_svg",
+      "kind": "kernel_svg.v1",
+      "artifact_extension": ".svg",
+      "depends_on": "rope_simd_kernel",
       "max_tokens": 8192,
-      "text": "Return one complete standalone SVG and nothing outside the SVG. Create a polished technical infographic showing a CPU inference pipeline: tokenize, long-context prefill, KV or recurrent state, decode, and detokenize. Use a viewBox, title, description, readable labels, arrows, restrained colors, and multiple meaningful visual elements. Do not use scripts or external assets."
+      "required_labels": [
+        "ck_rope_split_f32_avx2",
+        "split-half",
+        "8 pairs",
+        "scalar tail",
+        "separate multiply/add",
+        "no allocation"
+      ],
+      "text": "Return one complete standalone SVG and nothing outside the SVG. Create a polished technical infographic that explains the exact C implementation appended below. Show the split-half input layout, eight-pair AVX2 lane mapping, cosine and sine loads, separate multiply then add/subtract dataflow, in-place safety, scalar tail, validation path, and no-allocation workspace contract. Use a viewBox, title, description, readable labels, arrows, restrained contrasting colors, and at least twelve meaningful graphic elements. Do not use scripts or external assets. Do not invent operations that are absent from the supplied source.\n\nC implementation to explain:\n```c\n{{dependency_output}}\n```"
     }
   ]
 }

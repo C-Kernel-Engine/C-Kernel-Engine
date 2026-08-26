@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +66,14 @@ def test_native_timing_and_peak_rss_are_parsed() -> None:
     assert timing["prompt_tokens"] == 2048
     assert timing["decode_tokens"] == 8
     assert runner.parse_peak_rss("Maximum resident set size (kbytes): 123456") == 123456
+    usage = runner.parse_resource_usage(
+        "User time (seconds): 120.0\nSystem time (seconds): 8.0\n"
+        "Percent of CPU this job got: 1600%\n",
+        8.0,
+    )
+    assert usage is not None
+    assert usage["average_cpu_cores"] == 16.0
+    assert usage["reported_cpu_percent"] == 1600.0
 
 
 def test_time_binary_resolution_is_path_driven_and_optional() -> None:
@@ -137,6 +147,161 @@ def test_quality_checks_reject_corruption_and_accept_structured_outputs() -> Non
         '<line/><line/><circle/></svg>'
     )
     assert svg["pass"]
+
+
+def test_engineering_quality_contract_is_paired_and_fail_closed() -> None:
+    payload = runner.load_schema(
+        ROOT / "version" / "v8" / "test_assets" / "long_context_quality_prompts.json",
+        "cke.v8.long_context_quality_prompts",
+    )
+    prompts = runner.validate_quality_prompts(payload)
+    assert [row["id"] for row in prompts] == ["rope_simd_kernel", "rope_simd_svg"]
+    assert prompts[1]["depends_on"] == prompts[0]["id"]
+    materialized = runner.materialize_quality_prompt(
+        prompts[1], {prompts[0]["id"]: "int generated_kernel(void);\n"}
+    )
+    assert "int generated_kernel(void);" in materialized
+    assert "{{dependency_output}}" not in materialized
+
+    broken = json.loads(json.dumps(payload))
+    broken["prompts"][0]["depends_on"] = "later"
+    try:
+        runner.validate_quality_prompts(broken)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("accepted a forward or missing quality dependency")
+
+
+def test_generated_response_extraction_removes_cli_framing() -> None:
+    stdout = (
+        "Prompt: task\nResponse: ```c\n#include <stddef.h>\nint main(void) { return 0; }\n```\n"
+        "prefill 12 tok  1.0 ms  12.0 tok/s | decode 2 tok  1.0 ms  2.0 tok/s\n"
+        "goodbye\n"
+    )
+    generated = runner.extract_generated(stdout)
+    assert generated.startswith("```c")
+    assert "Prompt:" not in generated
+    assert "prefill" not in generated
+    assert "goodbye" not in generated.lower()
+    assert runner.extract_c_source(generated).startswith("#include <stddef.h>")
+
+
+def test_generated_c_is_strictly_compiled_but_never_executed() -> None:
+    source = """```c
+#include <immintrin.h>
+#include <stddef.h>
+
+static void ck_example(float *dst, const float *src) {
+    __m256 value = _mm256_loadu_ps(src);
+    _mm256_storeu_ps(dst, value);
+}
+
+int main(void) {
+    float src[8] = {0.0f};
+    float dst[8] = {0.0f};
+    ck_example(dst, src);
+    return dst[0] != 0.0f;
+}
+```"""
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        artifact = output / "kernel.c"
+        quality = runner.code_quality(
+            source,
+            artifact,
+            {
+                "kind": "c_kernel.v1",
+                "required_fragments": ["#include <immintrin.h>", "_mm256_loadu_ps"],
+                "forbidden_fragments": ["malloc("],
+            },
+            os.environ.copy(),
+            output,
+        )
+        assert quality["pass"]
+        assert quality["strict_compile"] is True
+        assert quality["compile_scope"].startswith("syntax-only")
+        assert artifact.read_text(encoding="utf-8").startswith("#include <immintrin.h>")
+
+
+def test_quality_runner_feeds_clean_c_into_svg_and_publishes_gallery(monkeypatch) -> None:
+    code = """```c
+#include <immintrin.h>
+#include <stddef.h>
+static void ck_pair(float *dst, const float *src) {
+    __m256 value = _mm256_loadu_ps(src);
+    _mm256_storeu_ps(dst, value);
+}
+int main(void) {
+    float src[8] = {0.0f};
+    float dst[8] = {0.0f};
+    ck_pair(dst, src);
+    return dst[0] != 0.0f;
+}
+```"""
+    svg = (
+        '<svg viewBox="0 0 100 100"><title>RoPE</title><desc>AVX2</desc>'
+        '<defs><marker id="arrow"><path d="M0 0L4 2L0 4z"/></marker></defs>'
+        '<text>ck_pair lanes tail no allocation</text>'
+        '<rect/><rect/><rect/><rect/><rect/><rect/><line marker-end="url(#arrow)"/></svg>'
+    )
+    real_run_command = runner.run_command
+    observed_prompts: list[str] = []
+
+    def fake_run_command(command, **kwargs):
+        if "-fsyntax-only" in command:
+            return real_run_command(command, **kwargs)
+        prompt_text = command[command.index("--prompt") + 1]
+        observed_prompts.append(prompt_text)
+        generated = code if len(observed_prompts) == 1 else svg
+        return {
+            "returncode": 0,
+            "stdout": (
+                f"Response: {generated}\n"
+                "prefill 32 tok  10.0 ms  3200.0 tok/s | "
+                "decode 4 tok  2.0 ms  2000.0 tok/s\n"
+            ),
+            "stderr": "",
+            "peak_rss_kib": 100,
+            "resource_usage": {"average_cpu_cores": 8.0},
+            "stdout_path": str(output / "model.stdout.log"),
+            "stderr_path": str(output / "model.stderr.log"),
+        }
+
+    monkeypatch.setattr(runner, "run_command", fake_run_command)
+    prompts = [
+        {
+            "id": "code", "kind": "c_kernel.v1", "artifact_extension": ".c",
+            "max_tokens": 64, "text": "write code",
+            "required_fragments": ["#include <immintrin.h>", "_mm256_loadu_ps"],
+            "forbidden_fragments": ["malloc("],
+        },
+        {
+            "id": "svg", "kind": "kernel_svg.v1", "artifact_extension": ".svg",
+            "depends_on": "code", "max_tokens": 64,
+            "min_graphic_elements": 8,
+            "required_labels": ["ck_pair", "lanes", "tail", "no allocation"],
+            "text": "explain this source: {{dependency_output}}",
+        },
+    ]
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        rows = runner.run_quality(
+            {"id": "test", "label": "Test Model"},
+            output / "runtime", 256, prompts,
+            SimpleNamespace(resume=False, ck_cli=output / "ck-cli", quality_timeout=10),
+            os.environ.copy(), output / "quality" / "test",
+        )
+        assert [row["status"] for row in rows] == ["PASS", "PASS"]
+        assert "#include <immintrin.h>" in observed_prompts[1]
+        assert Path(rows[0]["artifact_path"]).read_text(encoding="utf-8").startswith(
+            "#include <immintrin.h>"
+        )
+        report = {"quality": rows}
+        runner.write_quality_index(report, output)
+        gallery = (output / "quality" / "index.html").read_text(encoding="utf-8")
+        assert "View generated C" in gallery
+        assert "Generated SIMD kernel diagram" in gallery
 
 
 def test_native_cli_has_no_fixed_32k_context_clamp_and_traces_logits() -> None:

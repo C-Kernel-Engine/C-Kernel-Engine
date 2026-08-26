@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import html
 import json
 import os
 import platform
@@ -35,6 +36,9 @@ CK_TIMING_RE = re.compile(
     re.S,
 )
 RSS_RE = re.compile(r"Maximum resident set size \(kbytes\):\s*(\d+)")
+TIME_USER_RE = re.compile(r"User time \(seconds\):\s*([0-9.]+)")
+TIME_SYSTEM_RE = re.compile(r"System time \(seconds\):\s*([0-9.]+)")
+TIME_CPU_RE = re.compile(r"Percent of CPU this job got:\s*([0-9.]+)%")
 
 
 def atomic_json(path: Path, payload: Any) -> None:
@@ -56,6 +60,32 @@ def parse_contexts(value: str) -> list[int]:
     if not contexts or any(item <= 0 for item in contexts):
         raise ValueError("contexts must be positive integers")
     return contexts
+
+
+def validate_quality_prompts(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    prompts = payload.get("prompts")
+    if not isinstance(prompts, list) or not prompts:
+        raise ValueError("quality prompt set must contain prompts")
+    seen: set[str] = set()
+    for prompt in prompts:
+        if not isinstance(prompt, dict):
+            raise ValueError("quality prompts must be objects")
+        prompt_id = str(prompt.get("id", ""))
+        if not prompt_id or prompt_id in seen:
+            raise ValueError("quality prompt IDs must be non-empty and unique")
+        if str(prompt.get("kind", "")) not in {"c_kernel.v1", "kernel_svg.v1"}:
+            raise ValueError(f"unsupported quality prompt kind for {prompt_id!r}")
+        if int(prompt.get("max_tokens", 0)) <= 0 or not str(prompt.get("text", "")):
+            raise ValueError(f"quality prompt {prompt_id!r} is incomplete")
+        dependency = str(prompt.get("depends_on", ""))
+        if dependency and dependency not in seen:
+            raise ValueError(
+                f"quality prompt {prompt_id!r} depends on unknown or later {dependency!r}"
+            )
+        if dependency and "{{dependency_output}}" not in str(prompt["text"]):
+            raise ValueError(f"quality prompt {prompt_id!r} does not embed its dependency")
+        seen.add(prompt_id)
+    return prompts
 
 
 def resolve_model(row: dict[str, Any], allow_download: bool) -> tuple[str, str]:
@@ -110,6 +140,26 @@ def parse_peak_rss(stderr: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def parse_resource_usage(stderr: str, elapsed_seconds: float) -> dict[str, float] | None:
+    user_match = TIME_USER_RE.search(stderr)
+    system_match = TIME_SYSTEM_RE.search(stderr)
+    cpu_match = TIME_CPU_RE.search(stderr)
+    if not user_match or not system_match:
+        return None
+    user_seconds = float(user_match.group(1))
+    system_seconds = float(system_match.group(1))
+    process_seconds = user_seconds + system_seconds
+    average_cpu_cores = process_seconds / elapsed_seconds if elapsed_seconds > 0.0 else 0.0
+    return {
+        "user_seconds": user_seconds,
+        "system_seconds": system_seconds,
+        "process_seconds": process_seconds,
+        "wall_seconds": elapsed_seconds,
+        "average_cpu_cores": average_cpu_cores,
+        "reported_cpu_percent": float(cpu_match.group(1)) if cpu_match else average_cpu_cores * 100.0,
+    }
+
+
 def resolve_time_binary(env: dict[str, str]) -> str | None:
     configured = env.get("CK_TIME_BIN", "").strip()
     if configured:
@@ -157,15 +207,17 @@ def run_command(
     stderr_path = output_dir / f"{name}.stderr.log"
     stdout_path.write_text(stdout, encoding="utf-8")
     stderr_path.write_text(stderr, encoding="utf-8")
+    elapsed_seconds = (dt.datetime.now(dt.timezone.utc) - started).total_seconds()
     return {
         "command": command,
         "command_shell": shlex.join(command),
         "returncode": returncode,
         "error": error,
         "started_at": started.isoformat(),
-        "elapsed_seconds": (dt.datetime.now(dt.timezone.utc) - started).total_seconds(),
+        "elapsed_seconds": elapsed_seconds,
         "peak_rss_kib": parse_peak_rss(stderr) if time_binary else None,
         "peak_rss_source": "gnu_time" if time_binary else "unavailable",
+        "resource_usage": parse_resource_usage(stderr, elapsed_seconds) if time_binary else None,
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
         "stdout": stdout,
@@ -262,33 +314,110 @@ def extract_generated(stdout: str) -> str:
     marker = "Type /help for commands, Ctrl+C to stop generation"
     if marker in text:
         text = text.split(marker, 1)[1]
+    response_markers = list(re.finditer(r"(?m)^(?:Response|Assistant):[ \t]*", text))
+    if response_markers:
+        text = text[response_markers[-1].end():]
     text = re.split(r"\nprefill\s+\d+\s+tok\b", text, maxsplit=1)[0]
+    text = re.split(r"(?m)^stop:\s", text, maxsplit=1)[0]
+    text = re.sub(r"(?im)\n(?:goodbye!?|model unloaded\.?)\s*$", "", text)
     return text.strip()
 
 
-def code_quality(text: str) -> dict[str, Any]:
+def extract_c_source(text: str) -> str:
+    blocks = re.findall(r"```(?:c|C)\s*\n(.*?)```", text, flags=re.S)
+    if blocks:
+        return max(blocks, key=len).strip() + "\n"
+    start = text.find("#include")
+    return text[start:].strip() + "\n" if start >= 0 else ""
+
+
+def extract_svg_markup(text: str) -> str:
+    lowered = text.lower()
+    start = lowered.find("<svg")
+    end = lowered.rfind("</svg>")
+    if start < 0 or end < start:
+        return ""
+    return text[start:end + len("</svg>")].strip() + "\n"
+
+
+def materialize_quality_prompt(prompt: dict[str, Any], dependencies: dict[str, str]) -> str:
+    text = str(prompt["text"])
+    dependency_id = str(prompt.get("depends_on", ""))
+    if not dependency_id:
+        return text
+    dependency = dependencies.get(dependency_id, "")
+    if not dependency:
+        raise ValueError(f"quality prompt {prompt['id']!r} requires missing {dependency_id!r}")
+    return text.replace("{{dependency_output}}", dependency)
+
+
+def code_quality(
+    text: str,
+    source_path: Path | None = None,
+    prompt: dict[str, Any] | None = None,
+    env: dict[str, str] | None = None,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
     printable = sum(character.isprintable() or character in "\n\r\t" for character in text)
     ratio = printable / max(len(text), 1)
-    lowered = text.lower()
-    languages = {name: token in lowered for name, token in {
-        "c": "#include", "python": "python", "sql": "select"
-    }.items()}
-    passed = len(text) >= 256 and ratio >= 0.96 and all(languages.values())
-    return {
-        "pass": passed,
+    source = extract_c_source(text)
+    contract = prompt or {}
+    required = [str(value) for value in contract.get("required_fragments", [])]
+    forbidden = [str(value) for value in contract.get("forbidden_fragments", [])]
+    result: dict[str, Any] = {
+        "kind": str(contract.get("kind", "c_kernel.v1")),
+        "pass": False,
         "characters": len(text),
         "printable_ratio": ratio,
-        "language_markers": languages,
+        "source_characters": len(source),
+        "required_fragments_present": all(value in source for value in required),
+        "missing_fragments": [value for value in required if value not in source],
+        "forbidden_fragments_absent": all(value not in source for value in forbidden),
+        "forbidden_fragments_found": [value for value in forbidden if value in source],
+        "strict_compile": None,
+        "compile_scope": "syntax-only; generated code is never executed automatically",
     }
+    if source_path is not None and source:
+        source_path.write_text(source, encoding="utf-8")
+    if source_path is not None and source and env is not None and output_dir is not None:
+        compiler = env.get("CC", "cc")
+        compiler_path = shutil.which(compiler, path=env.get("PATH"))
+        if compiler_path:
+            compile_result = run_command(
+                [compiler_path, "-std=c11", "-mavx2", "-ffp-contract=off",
+                 "-Wall", "-Wextra", "-Werror", "-fsyntax-only", str(source_path)],
+                timeout=60,
+                env=env,
+                output_dir=output_dir,
+                name=f"{source_path.stem}-compile",
+            )
+            result["strict_compile"] = compile_result["returncode"] == 0
+            result["compiler"] = compiler_path
+            result["compile_stdout_path"] = compile_result["stdout_path"]
+            result["compile_stderr_path"] = compile_result["stderr_path"]
+        else:
+            result["compile_unavailable"] = compiler
+    checks = (
+        len(text) >= 256,
+        ratio >= 0.96,
+        bool(source),
+        result["required_fragments_present"],
+        result["forbidden_fragments_absent"],
+        result["strict_compile"] is True if source_path is not None else True,
+    )
+    result["pass"] = all(checks)
+    return result
 
 
-def svg_quality(text: str) -> dict[str, Any]:
+def svg_quality(text: str, prompt: dict[str, Any] | None = None) -> dict[str, Any]:
     sys.path.insert(0, str(SCRIPT_DIR))
     from certify_text_prompt_parity_v8 import evaluate_quality_contract
+    contract = prompt or {}
     return evaluate_quality_contract(text, {
         "kind": "standalone_svg.v1",
-        "min_graphic_elements": 8,
-        "required_labels": ["tokenize", "prefill", "decode", "detokenize"],
+        "min_graphic_elements": int(contract.get("min_graphic_elements", 12 if prompt else 8)),
+        "required_labels": contract.get("required_labels", []),
+        "require_arrow_marker": bool(prompt),
     })
 
 
@@ -300,8 +429,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         "",
         "## Performance",
         "",
-        "| Model | Context | Status | CKE prefill | llama.cpp prefill | Relative | CKE decode | Peak RAM | First-logit repeatable | Numerical parity |",
-        "|---|---:|---|---:|---:|---:|---:|---:|---|---|",
+        "| Model | Context | Status | CKE prefill | llama.cpp prefill | Relative | CKE decode | Active cores CKE/llama | Peak RAM | First-logit repeatable | Numerical parity |",
+        "|---|---:|---|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in report.get("performance", []):
         cke = row.get("cke") or {}
@@ -310,20 +439,35 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         llama_timing = llama.get("timing") or {}
         ratio = row.get("relative_prefill")
         peak = cke.get("peak_rss_kib")
+        active_cores = cke.get("average_active_cores")
+        llama_active_cores = llama.get("average_active_cores")
         lines.append(
             f"| {row['model']} | {row['context_tokens']} | {row['status']} | "
             f"{cke_timing.get('prompt_tok_s', '-')} | {llama_timing.get('prompt_tok_s', '-')} | "
             f"{f'{ratio:.2f}x' if isinstance(ratio, float) else '-'} | "
             f"{cke_timing.get('decode_tok_s', '-')} | "
+            f"{f'{active_cores:.1f}' if isinstance(active_cores, float) else '-'} / "
+            f"{f'{llama_active_cores:.1f}' if isinstance(llama_active_cores, float) else '-'} | "
             f"{f'{peak / 1048576:.2f} GiB' if isinstance(peak, int) else '-'} | "
             f"{cke.get('first_logits_repeatable', '-')} | "
             f"{(row.get('numerical_parity') or {}).get('status', '-')} |"
         )
-    lines += ["", "## Quality", "", "| Model | Prompt | Status | Prompt tokens | Output |", "|---|---|---|---:|---|"]
+    lines += [
+        "", "## Engineering Quality", "",
+        "The C gate is syntax-only and never executes generated code. Human review and a numerical oracle remain required before any kernel can enter CKE.",
+        "",
+        "| Model | Task | Status | Prompt tokens | Compile/XML | Clean artifact | Raw response |",
+        "|---|---|---|---:|---|---|---|",
+    ]
     for row in report.get("quality", []):
+        quality = row.get("quality") or {}
+        validation = quality.get("strict_compile")
+        if validation is None:
+            validation = quality.get("xml_parseable", "-")
         lines.append(
             f"| {row['model']} | {row['prompt_id']} | {row['status']} | "
-            f"{(row.get('timing') or {}).get('prompt_tokens', '-')} | `{row.get('output_path', '-')}` |"
+            f"{(row.get('timing') or {}).get('prompt_tokens', '-')} | {validation} | "
+            f"`{row.get('artifact_path', '-')}` | `{row.get('raw_output_path', '-')}` |"
         )
     lines += ["", "## Skips And Failures", ""]
     for row in report.get("events", []):
@@ -333,10 +477,101 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_quality_index(report: dict[str, Any], output_dir: Path) -> None:
+    rows = report.get("quality", [])
+    quality_dir = output_dir / "quality"
+    quality_dir.mkdir(parents=True, exist_ok=True)
+
+    def artifact_href(value: Any) -> str:
+        if not value:
+            return ""
+        try:
+            return os.path.relpath(Path(str(value)), quality_dir)
+        except (OSError, ValueError):
+            return str(value)
+
+    cards = []
+    for row in rows:
+        status = str(row.get("status", "UNKNOWN"))
+        artifact = artifact_href(row.get("artifact_path"))
+        raw = artifact_href(row.get("raw_output_path"))
+        prompt = artifact_href(row.get("prompt_path"))
+        links = []
+        if artifact:
+            links.append(f'<a href="{html.escape(artifact)}">artifact</a>')
+        if raw:
+            links.append(f'<a href="{html.escape(raw)}">raw response</a>')
+        if prompt:
+            links.append(f'<a href="{html.escape(prompt)}">prompt</a>')
+        preview = ""
+        if status == "PASS" and artifact.lower().endswith(".svg"):
+            preview = f'<img src="{html.escape(artifact)}" alt="Generated SIMD kernel diagram">'
+        artifact_source = ""
+        artifact_value = row.get("artifact_path")
+        if artifact_value:
+            artifact_file = Path(str(artifact_value))
+            if artifact_file.is_file():
+                artifact_source = artifact_file.read_text(encoding="utf-8", errors="replace")
+        source_label = "generated C" if artifact.lower().endswith(".c") else "SVG source"
+        source_view = (
+            f'<details><summary>View {html.escape(source_label)}</summary>'
+            f'<pre>{html.escape(artifact_source)}</pre></details>'
+            if artifact_source else ""
+        )
+        quality = row.get("quality") or {}
+        objective = quality.get("strict_compile")
+        objective_label = "strict C compile" if objective is not None else "SVG parse"
+        if objective is None:
+            objective = quality.get("xml_parseable", False)
+        usage = row.get("resource_usage") or {}
+        active_cores = usage.get("average_cpu_cores")
+        utilization_fact = (
+            f'<span>average active cores: {float(active_cores):.1f}</span>'
+            if isinstance(active_cores, (int, float)) else ""
+        )
+        cards.append(
+            '<section class="result">'
+            f'<header><div><h2>{html.escape(str(row.get("model", "unknown")))}</h2>'
+            f'<p>{html.escape(str(row.get("prompt_id", "unknown")))}</p></div>'
+            f'<span class="status {status.lower()}">{html.escape(status)}</span></header>'
+            f'<div class="facts"><span>{html.escape(objective_label)}: {str(bool(objective)).lower()}</span>'
+            f'<span>characters: {int(quality.get("characters", quality.get("answer_characters", 0)))}</span>'
+            f'{utilization_fact}</div>'
+            f'<nav>{" | ".join(links) if links else "no artifact"}</nav>{preview}{source_view}</section>'
+        )
+    document = f'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CKE Engineering Quality Artifacts</title>
+<style>
+body{{margin:0;background:#f4f6f8;color:#17202a;font:15px/1.45 system-ui,sans-serif}}main{{max-width:1180px;margin:auto;padding:32px 20px 64px}}
+h1{{font-size:30px;margin:0 0 8px}}.intro{{max-width:850px;color:#52606d;margin:0 0 26px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}}
+.result{{background:white;border:1px solid #d7dee5;border-radius:6px;padding:16px;min-width:0}}header{{display:flex;justify-content:space-between;gap:12px;align-items:start}}
+h2{{font-size:18px;margin:0}}header p{{margin:2px 0;color:#647381}}.status{{font-weight:700;font-size:12px;padding:3px 7px;border-radius:4px;background:#e8edf2}}
+.status.pass{{background:#dff4e6;color:#176b3a}}.status.fail{{background:#fde3e1;color:#9f2d27}}.facts{{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;color:#465461;font-size:13px}}
+nav{{margin:10px 0}}a{{color:#075da8}}img{{display:block;width:100%;max-height:520px;object-fit:contain;border:1px solid #e1e6eb;background:white;margin-top:14px}}
+details{{margin-top:14px}}summary{{cursor:pointer;font-weight:650}}pre{{overflow:auto;max-height:520px;padding:12px;background:#111820;color:#e7edf3;border-radius:4px;font:12px/1.45 ui-monospace,monospace;white-space:pre}}
+</style></head><body><main><h1>CKE Engineering Quality Artifacts</h1>
+<p class="intro">Generated C is checked with a strict syntax-only compiler invocation and is never executed automatically. SVG checks prove safe, standalone structure. Human review and numerical oracle testing decide whether a kernel is technically useful.</p>
+<div class="grid">{''.join(cards) if cards else '<p>No engineering artifacts have completed yet.</p>'}</div></main></body></html>'''
+    (quality_dir / "index.html").write_text(document, encoding="utf-8")
+
+
 def publish(report: dict[str, Any], output_dir: Path) -> None:
     report["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
     atomic_json(output_dir / "summary.json", report)
     write_markdown(report, output_dir / "summary.md")
+    write_quality_index(report, output_dir)
+
+
+def merge_quality_rows(report: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+    replacement_keys = {
+        (str(row.get("model_id")), str(row.get("prompt_id"))) for row in rows
+    }
+    retained = [
+        row for row in report.get("quality", [])
+        if (str(row.get("model_id")), str(row.get("prompt_id"))) not in replacement_keys
+    ]
+    report["quality"] = retained + rows
 
 
 def build_runtime(
@@ -421,6 +656,7 @@ def run_cke_perf(
             "returncode": result["returncode"],
             "elapsed_seconds": result["elapsed_seconds"],
             "peak_rss_kib": result["peak_rss_kib"],
+            "resource_usage": result["resource_usage"],
             "stdout_path": result["stdout_path"],
             "stderr_path": result["stderr_path"],
         }
@@ -437,14 +673,30 @@ def run_cke_perf(
         and int(sample["timing"].get("prompt_tokens", -1)) == context_tokens
         for sample in successful
     ) and len(successful) == args.repetitions
+    minimum_active_cores = max(1.0, float(args.threads) * args.min_active_core_fraction)
+    utilization_verified = bool(successful) and all(
+        isinstance(sample.get("resource_usage"), dict)
+        and float(sample["resource_usage"].get("average_cpu_cores", 0.0)) >= minimum_active_cores
+        for sample in successful
+    )
     return {
-        "status": "PASS" if consumed and len(set(hashes)) == 1 and hashes[0] else "FAIL",
+        "status": (
+            "PASS" if consumed and len(set(hashes)) == 1 and hashes[0]
+            and utilization_verified else "FAIL"
+        ),
         "samples": samples,
         "timing": median_timing(successful),
         "peak_rss_kib": max((sample.get("peak_rss_kib") or 0 for sample in samples), default=0),
         "first_logits_hashes": hashes,
         "first_logits_repeatable": bool(hashes and len(hashes) == args.repetitions and len(set(hashes)) == 1),
         "consumed_token_count_verified": consumed,
+        "utilization_verified": utilization_verified,
+        "minimum_active_cores": minimum_active_cores,
+        "average_active_cores": statistics.median(
+            float(sample["resource_usage"]["average_cpu_cores"])
+            for sample in successful if isinstance(sample.get("resource_usage"), dict)
+        ) if successful and all(isinstance(sample.get("resource_usage"), dict)
+                                for sample in successful) else None,
         "input_token_id": args.token_id,
         "input_sha256": token_sha256(args.token_id, context_tokens),
     }
@@ -536,6 +788,11 @@ def run_llama_perf(
         "status": "PASS",
         "timing": timing,
         "peak_rss_kib": result["peak_rss_kib"],
+        "resource_usage": result["resource_usage"],
+        "average_active_cores": (
+            float(result["resource_usage"]["average_cpu_cores"])
+            if isinstance(result.get("resource_usage"), dict) else None
+        ),
         "consumed_token_count_verified": int(timing["prompt_tokens"]) == context_tokens,
         "comparison_scope": "matched token count performance; not a token-ID numerical parity claim",
     }
@@ -550,20 +807,38 @@ def run_quality(
     env: dict[str, str],
     output_dir: Path,
 ) -> list[dict[str, Any]]:
+    output_dir.mkdir(parents=True, exist_ok=True)
     results = []
+    dependencies: dict[str, str] = {}
     for prompt in prompts:
         prompt_id = str(prompt["id"])
         result_path = output_dir / f"{prompt_id}.json"
         if args.resume and result_path.is_file():
-            results.append(json.loads(result_path.read_text(encoding="utf-8")))
+            cached = json.loads(result_path.read_text(encoding="utf-8"))
+            artifact_path = Path(str(cached.get("artifact_path", "")))
+            if artifact_path.is_file():
+                dependencies[prompt_id] = artifact_path.read_text(encoding="utf-8")
+            results.append(cached)
             continue
+        try:
+            prompt_text = materialize_quality_prompt(prompt, dependencies)
+        except ValueError as exc:
+            result = {
+                "model_id": row["id"], "model": row["label"], "prompt_id": prompt_id,
+                "status": "FAIL", "quality": {"pass": False, "reason": str(exc)},
+            }
+            atomic_json(result_path, result)
+            results.append(result)
+            continue
+        prompt_path = output_dir / f"{prompt_id}.prompt.txt"
+        prompt_path.write_text(prompt_text + "\n", encoding="utf-8")
         trace_path = output_dir / f"{prompt_id}.trace.json"
         command = [
             str(args.ck_cli),
             "--lib", str(runtime_dir / "libmodel.so"),
             "--weights", str(runtime_dir / "weights.bump"),
             "--manifest", str(runtime_dir / "weights_manifest.map"),
-            "--prompt", str(prompt["text"]),
+            "--prompt", prompt_text,
             "--max-tokens", str(int(prompt["max_tokens"]) + 1),
             "--context", str(runtime_context),
             "--temperature", "0",
@@ -575,9 +850,25 @@ def run_quality(
             name=prompt_id, timed=True,
         )
         generated = extract_generated(command_result["stdout"])
-        output_path = output_dir / (f"{prompt_id}.svg" if prompt_id == "svg" else f"{prompt_id}.txt")
-        output_path.write_text(generated, encoding="utf-8")
-        quality = svg_quality(generated) if prompt_id == "svg" else code_quality(generated)
+        raw_output_path = output_dir / f"{prompt_id}.raw.txt"
+        raw_output_path.write_text(generated + "\n", encoding="utf-8")
+        extension = str(prompt.get("artifact_extension", ".txt"))
+        if not re.fullmatch(r"\.[a-z0-9]+", extension):
+            raise ValueError(f"invalid artifact extension for {prompt_id}: {extension!r}")
+        artifact_path = output_dir / f"{prompt_id}{extension}"
+        kind = str(prompt.get("kind", ""))
+        if kind == "c_kernel.v1":
+            quality = code_quality(
+                generated, artifact_path, prompt, env, output_dir,
+            )
+            artifact_text = extract_c_source(generated)
+        elif kind == "kernel_svg.v1":
+            quality = svg_quality(generated, prompt)
+            artifact_text = extract_svg_markup(generated)
+            artifact_path.write_text(artifact_text, encoding="utf-8")
+        else:
+            raise ValueError(f"unsupported quality prompt kind: {kind!r}")
+        dependencies[prompt_id] = artifact_text
         timing = None
         if command_result["returncode"] == 0:
             try:
@@ -588,7 +879,16 @@ def run_quality(
             "model_id": row["id"], "model": row["label"], "prompt_id": prompt_id,
             "status": "PASS" if command_result["returncode"] == 0 and quality["pass"] else "FAIL",
             "quality": quality, "timing": timing, "peak_rss_kib": command_result["peak_rss_kib"],
-            "output_path": str(output_path), "trace_path": str(trace_path),
+            "resource_usage": command_result["resource_usage"],
+            "prompt_sha256": hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+            "prompt_path": str(prompt_path), "raw_output_path": str(raw_output_path),
+            "artifact_path": str(artifact_path), "output_path": str(artifact_path),
+            "trace_path": str(trace_path),
+            "stdout_log_path": command_result["stdout_path"],
+            "stderr_log_path": command_result["stderr_path"],
+            "evaluation_scope": (
+                "objective structural checks only; human review and numerical oracle required"
+            ),
         }
         atomic_json(result_path, result)
         results.append(result)
@@ -631,6 +931,10 @@ def main() -> int:
     parser.add_argument("--contexts", default="2048,8192,32768,65536,131072,262144")
     parser.add_argument("--models", default="all", help="Comma-separated IDs or all")
     parser.add_argument("--threads", type=int, default=16)
+    parser.add_argument(
+        "--min-active-core-fraction", type=float, default=0.5,
+        help="Fail CKE performance rows below this fraction of requested average core occupancy",
+    )
     parser.add_argument("--repetitions", type=int, default=2)
     parser.add_argument("--decode-tokens", type=int, default=8)
     parser.add_argument("--parity-context", type=int, default=2048)
@@ -646,15 +950,24 @@ def main() -> int:
     parser.add_argument("--allow-download", action="store_true")
     parser.add_argument("--no-llama", action="store_true")
     parser.add_argument("--no-quality", action="store_true")
+    parser.add_argument(
+        "--quality-only", action="store_true",
+        help="Generate and validate paired C/SVG artifacts without running the capacity ladder",
+    )
     parser.add_argument("--no-resume", dest="resume", action="store_false")
     parser.set_defaults(resume=True)
     args = parser.parse_args()
 
     if args.repetitions < 2:
         raise ValueError("at least two repetitions are required for first-logit repeatability")
+    if not 0.0 < args.min_active_core_fraction <= 1.0:
+        raise ValueError("--min-active-core-fraction must be in (0, 1]")
+    if args.quality_only and args.no_quality:
+        raise ValueError("--quality-only and --no-quality cannot be combined")
     contexts = parse_contexts(args.contexts)
     catalog = load_schema(args.catalog, "cke.v8.long_context_model_catalog")
     prompt_payload = load_schema(args.quality_prompts, "cke.v8.long_context_quality_prompts")
+    quality_prompts = validate_quality_prompts(prompt_payload)
     selected = {item.strip() for item in args.models.split(",") if item.strip()}
     rows = [row for row in catalog["models"] if selected == {"all"} or row["id"] in selected]
     if not rows:
@@ -674,11 +987,13 @@ def main() -> int:
         "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "host": host_fingerprint(),
         "config": {"contexts": contexts, "threads": args.threads, "repetitions": args.repetitions,
+                   "min_active_core_fraction": args.min_active_core_fraction,
                    "decode_tokens": args.decode_tokens, "token_id": args.token_id,
                    "capacity_workload": "deterministic_fixed_token",
                    "parity_context": args.parity_context,
                    "parity_new_tokens": args.parity_new_tokens,
-                   "quality_context": args.quality_context},
+                   "quality_context": args.quality_context,
+                   "quality_mode": "engineering_pair_v1"},
         "performance": [], "quality": [], "events": [],
     }
     summary_path = args.output_dir / "summary.json"
@@ -686,16 +1001,27 @@ def main() -> int:
         previous = json.loads(summary_path.read_text(encoding="utf-8"))
         if previous.get("schema") == report["schema"]:
             report = previous
+    report.setdefault("config", {}).update({
+        "quality_mode": "engineering_pair_v1",
+        "quality_prompt_sha256": hashlib.sha256(args.quality_prompts.read_bytes()).hexdigest(),
+    })
 
     completed = {
         (row.get("model_id"), int(row.get("context_tokens", 0)))
         for row in report.get("performance", [])
         if row.get("status") == "PASS"
     }
+    required_quality_ids = {str(prompt["id"]) for prompt in quality_prompts}
+    quality_ids_by_model: dict[str, set[str]] = {}
+    for result in report.get("quality", []):
+        if result.get("status") not in {"PASS", "FAIL"}:
+            continue
+        quality_ids_by_model.setdefault(str(result.get("model_id")), set()).add(
+            str(result.get("prompt_id"))
+        )
     completed_quality = {
-        str(row.get("model_id"))
-        for row in report.get("quality", [])
-        if row.get("status") in {"PASS", "FAIL"}
+        model_id for model_id, prompt_ids in quality_ids_by_model.items()
+        if required_quality_ids <= prompt_ids
     }
     model_runtime: dict[str, Path] = {}
     model_sources: dict[str, tuple[str, str]] = {}
@@ -706,6 +1032,29 @@ def main() -> int:
         if not source[0]:
             report["events"].append({"model_id": row["id"], "status": "SKIP", "reason": source[1]})
     publish(report, args.output_dir)
+
+    if args.quality_only:
+        if not args.ck_cli.is_file():
+            raise FileNotFoundError(f"native CLI is missing: {args.ck_cli}")
+        quality_only_failed = False
+        for row in rows:
+            model_id = str(row["id"])
+            model = model_sources[model_id][0]
+            if not model or model_id in completed_quality:
+                continue
+            quality_rows, event = certify_quality_at_context(
+                row, model, model_runtime[model_id], args.quality_context,
+                quality_prompts, args, env,
+            )
+            merge_quality_rows(report, quality_rows)
+            if event:
+                report["events"].append(event)
+                quality_only_failed = quality_only_failed or event.get("status") == "FAIL"
+            publish(report, args.output_dir)
+        quality_only_failed = quality_only_failed or any(
+            result.get("status") == "FAIL" for result in report.get("quality", [])
+        )
+        return 1 if quality_only_failed else 0
 
     for context_tokens in contexts:
         for row in rows:
@@ -765,9 +1114,9 @@ def main() -> int:
             ):
                 quality_rows, event = certify_quality_at_context(
                     row, model, runtime_dir, context_tokens,
-                    prompt_payload["prompts"], args, env,
+                    quality_prompts, args, env,
                 )
-                report["quality"].extend(quality_rows)
+                merge_quality_rows(report, quality_rows)
                 completed_quality.add(model_id)
                 if event:
                     report["events"].append(event)
@@ -787,15 +1136,19 @@ def main() -> int:
             runtime_dir = model_runtime[model_id]
             quality_rows, event = certify_quality_at_context(
                 row, model_sources[model_id][0], runtime_dir, context_tokens,
-                prompt_payload["prompts"], args, env,
+                quality_prompts, args, env,
             )
-            report["quality"].extend(quality_rows)
+            merge_quality_rows(report, quality_rows)
             completed_quality.add(model_id)
             if event:
                 report["events"].append(event)
             publish(report, args.output_dir)
 
-    failed = any(row.get("status") == "FAIL" for row in report.get("performance", []))
+    failed = any(
+        row.get("status") == "FAIL"
+        for section in ("performance", "quality")
+        for row in report.get(section, [])
+    )
     return 1 if failed else 0
 
 
