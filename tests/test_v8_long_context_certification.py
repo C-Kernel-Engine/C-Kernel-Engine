@@ -20,6 +20,7 @@ def test_catalog_covers_promoted_long_context_families() -> None:
         "cke.v8.long_context_model_catalog",
     )
     assert {row["id"] for row in payload["models"]} == {
+        "qwen36_27b",
         "qwen38_27b",
         "qwen35_35b_a3b",
         "gemma4_e4b",
@@ -28,7 +29,15 @@ def test_catalog_covers_promoted_long_context_families() -> None:
         "instella_moe_16b_a3b",
         "kimi_vl_a3b",
         "laguna_s_2_1",
+        "cohere2_command_r7b",
     }
+
+
+def test_default_context_ladder_reaches_256k() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert 'default="2048,8192,32768,65536,131072,262144"' in source
+    assert '"capacity_workload": "deterministic_fixed_token"' in source
+    assert '"workload": "deterministic_fixed_token"' in source
 
 
 def test_context_parser_is_sorted_unique_and_fail_closed() -> None:

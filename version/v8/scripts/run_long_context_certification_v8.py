@@ -628,7 +628,7 @@ def main() -> int:
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--quality-prompts", type=Path, default=DEFAULT_PROMPTS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--contexts", default="2048,8192,32768,131072")
+    parser.add_argument("--contexts", default="2048,8192,32768,65536,131072,262144")
     parser.add_argument("--models", default="all", help="Comma-separated IDs or all")
     parser.add_argument("--threads", type=int, default=16)
     parser.add_argument("--repetitions", type=int, default=2)
@@ -675,6 +675,7 @@ def main() -> int:
         "host": host_fingerprint(),
         "config": {"contexts": contexts, "threads": args.threads, "repetitions": args.repetitions,
                    "decode_tokens": args.decode_tokens, "token_id": args.token_id,
+                   "capacity_workload": "deterministic_fixed_token",
                    "parity_context": args.parity_context,
                    "parity_new_tokens": args.parity_new_tokens,
                    "quality_context": args.quality_context},
@@ -741,6 +742,7 @@ def main() -> int:
             result = {
                 "model_id": model_id, "model": row["label"], "model_source": source_reason,
                 "context_tokens": context_tokens, "runtime_context": context_tokens + args.decode_tokens + 8,
+                "workload": "deterministic_fixed_token",
                 "status": status, "cke": cke, "llama_cpp": llama,
                 "numerical_parity": parity,
                 "providers": provider_summary(runtime_dir),
