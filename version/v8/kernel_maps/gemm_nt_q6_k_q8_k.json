@@ -150,6 +150,7 @@
     ]
   },
   "weight_preparation": {
+    "status": "candidate",
     "function": "ck_q6_k_prepare_expanded_weight",
     "arguments": {"B": "B", "N": "N", "K": "K"},
     "prepared_format": "q6_k_expanded_integer_metadata_v1",
@@ -157,7 +158,7 @@
     "max_total_bytes": 8589934592,
     "min_remaining_memory_bytes": 17179869184,
     "fallback": "gemm_nt_q6_k_q8_k_parallel_dispatch",
-    "notes": "Expand Q6_K integer codes once at model load while retaining FP16 super-block scales and the established Q8_K/FP32 reduction tree. Resolved prefill weights may use up to 8 GiB while preserving at least 16 GiB of detected host/cgroup memory; remaining weights retain the exact compact M4 fallback."
+    "notes": "Candidate only: expand Q6_K integer codes while retaining FP16 super-block scales and the established Q8_K/FP32 reduction tree. Current cross-topology measurements do not justify production preparation, so generated runtimes retain the exact compact M4 provider until measured winners can be persisted by CPU fingerprint."
   },
   "numerical_capabilities": [
     {

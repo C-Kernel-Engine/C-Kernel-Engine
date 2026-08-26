@@ -55,11 +55,9 @@ class Qwen36Q6KM4PerformanceGateTests(unittest.TestCase):
         self.assertIn("'--mode', 'default', '--verify-row-exact'", benchmark)
         self.assertIn("boundary_exact=", benchmark)
 
-    def test_nightly_registers_prepared_q6_gate(self) -> None:
+    def test_nightly_excludes_candidate_prepared_q6_gate(self) -> None:
         nightly = _load_nightly_runner()
-        entry = nightly.MAKE_TARGETS["q6k_prepared_performance"]
-        self.assertEqual(entry["category"], "bench")
-        self.assertEqual(entry["target"], "test-q6k-prepared-performance")
+        self.assertNotIn("q6k_prepared_performance", nightly.MAKE_TARGETS)
 
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         match = re.search(

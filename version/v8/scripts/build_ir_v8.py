@@ -13946,6 +13946,11 @@ def _validate_kernel_weight_preparation(kernel_id: str, preparation: Any) -> Dic
     bytes_expr = str(preparation.get("prepared_bytes", "") or "").strip()
     max_bytes = preparation.get("max_total_bytes")
     min_remaining_bytes = preparation.get("min_remaining_memory_bytes", 0)
+    status = str(preparation.get("status", "production") or "").strip()
+    if status not in {"production", "candidate"}:
+        raise RuntimeError(
+            f"HARD WEIGHT PREPARATION FAULT: {kernel_id} has invalid status {status!r}."
+        )
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", function):
         raise RuntimeError(
             f"HARD WEIGHT PREPARATION FAULT: {kernel_id} has invalid function {function!r}."
@@ -14011,9 +14016,10 @@ def load_kernel_weight_preparations(
             raise RuntimeError(
                 f"HARD WEIGHT PREPARATION FAULT: invalid or duplicate owner {kernel_id!r}."
             )
-        result[kernel_id] = _validate_kernel_weight_preparation(
-            kernel_id, preparation
-        )
+        validated = _validate_kernel_weight_preparation(kernel_id, preparation)
+        if validated.get("status", "production") != "production":
+            continue
+        result[kernel_id] = validated
     return result
 
 

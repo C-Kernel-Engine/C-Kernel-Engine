@@ -711,12 +711,6 @@ MAKE_TARGETS = {
         "target": "test-qwen36-q6k-m4-performance",
         "timeout_sec": 300,
     },
-    "q6k_prepared_performance": {
-        "name": "Prepared Q6_K Prefill Performance",
-        "category": "bench",
-        "target": "test-q6k-prepared-performance",
-        "timeout_sec": 180,
-    },
     "whisper_f16_gemm_performance": {
         "name": "Whisper AVX2 FP16 GEMM Performance",
         "category": "bench",

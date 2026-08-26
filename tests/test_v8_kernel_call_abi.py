@@ -126,7 +126,6 @@ class V8KernelCallABITests(unittest.TestCase):
                 "gemm_nt_q4_k_q8_k",
                 "gemm_nt_q5_0_q8_0",
                 "gemm_nt_q5_k",
-                "gemm_nt_q6_k_q8_k",
                 "moe_swiglu_expert_forward_q4k_q5k_bucketed",
             },
         )
@@ -162,12 +161,9 @@ class V8KernelCallABITests(unittest.TestCase):
         self.assertEqual(q4_k["prepared_format"], "q4_k_packed_vnni_x8")
         self.assertEqual(q4_k["max_total_bytes"], 2147483648)
         self.assertEqual(registry["gemm_nt_q4_k_q8_k"]["weight_preparation"], q4_k)
-        q6_k = preparations["gemm_nt_q6_k_q8_k"]
-        self.assertEqual(q6_k["function"], "ck_q6_k_prepare_expanded_weight")
-        self.assertEqual(q6_k["prepared_format"], "q6_k_expanded_integer_metadata_v1")
-        self.assertEqual(q6_k["max_total_bytes"], 8589934592)
-        self.assertEqual(q6_k["min_remaining_memory_bytes"], 17179869184)
-        self.assertEqual(registry["gemm_nt_q6_k_q8_k"]["weight_preparation"], q6_k)
+        q6_k = registry["gemm_nt_q6_k_q8_k"]["weight_preparation"]
+        self.assertEqual(q6_k["status"], "candidate")
+        self.assertNotIn("gemm_nt_q6_k_q8_k", preparations)
         q6_variants = {
             variant["name"]: variant
             for variant in registry["gemm_nt_q6_k_q8_k"]["impl"]["variants"]
@@ -310,6 +306,27 @@ class V8KernelCallABITests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(RuntimeError, "min_remaining_memory_bytes"):
+                build_ir_v8.load_kernel_weight_preparations(root)
+
+    def test_weight_preparation_rejects_unknown_promotion_status(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cke_weight_preparation_") as td:
+            root = Path(td)
+            (root / "invalid.json").write_text(
+                json.dumps(
+                    {
+                        "id": "invalid_prepare",
+                        "weight_preparation": {
+                            "status": "automatic",
+                            "function": "prepare_weight",
+                            "arguments": {"B": "B", "N": "N", "K": "K"},
+                            "prepared_bytes": "N * K",
+                            "max_total_bytes": 1024,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "invalid status"):
                 build_ir_v8.load_kernel_weight_preparations(root)
 
     def test_duplicate_map_and_legacy_ownership_is_a_hard_failure(self) -> None:
