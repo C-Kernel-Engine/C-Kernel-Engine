@@ -45,6 +45,46 @@
     .summary-card.passed .value { color: #48bb78; }
     .summary-card.failed .value { color: #f56565; }
 
+    .copy-failures-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin: 0.75rem 0 1.25rem;
+    }
+    .copy-failures-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.5rem 0.95rem;
+      background: rgba(245, 101, 101, 0.12);
+      color: #f56565;
+      border: 1px solid rgba(245, 101, 101, 0.45);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .copy-failures-btn:hover:not(:disabled) {
+      background: rgba(245, 101, 101, 0.22);
+      border-color: #f56565;
+    }
+    .copy-failures-btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .copy-failures-btn.copied {
+      background: rgba(71, 180, 117, 0.15);
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .copy-failures-hint {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
     .runner-hardware {
       position: relative;
       overflow: hidden;
@@ -695,6 +735,14 @@
       </div>
     </div>
 
+    <div class="copy-failures-bar">
+      <button type="button" class="copy-failures-btn" id="copy-failures-btn" disabled
+              title="Copy a Markdown summary of every failed suite and sub-test to the clipboard">
+        ⧉ Copy failed tests
+      </button>
+      <span class="copy-failures-hint">Copies a ready-to-paste Markdown report of failing suites, sub-tests, and runner hardware — hand it straight to an AI agent or issue.</span>
+    </div>
+
     <div class="regression-section">
       <h2>v8 Inference Regression</h2>
       <p class="regression-meta" id="regression-fast-meta">
@@ -1322,6 +1370,10 @@
   </p>
 
   <style>
+    main code { overflow-wrap: anywhere; }
+    @media (max-width: 700px) {
+      .viz-matrix { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
     .viz-matrix {
       width: 100%;
       border-collapse: collapse;
@@ -1542,6 +1594,9 @@ function loadResults() {
 }
 
 function renderResults(data) {
+  window.__ckReportData = data;
+  const copyBtn = document.getElementById('copy-failures-btn');
+  if (copyBtn) copyBtn.disabled = false;
   const summary = data.summary || {};
   const passed = summary.passed || 0;
   const failed = summary.failed || 0;
@@ -1647,6 +1702,107 @@ function renderResults(data) {
       tbody.appendChild(subTr);
     }
   });
+}
+
+function buildFailureReport() {
+  const data = window.__ckReportData || {};
+  const summary = data.summary || {};
+  const results = data.results || [];
+  const failedSuites = results.filter(r => r.status === 'fail' || r.status === 'timeout');
+  const lines = [];
+
+  lines.push('# CKE Nightly Test Report — Failed Tests');
+  lines.push('');
+  const meta = [];
+  if (data.timestamp) meta.push('Report time: ' + data.timestamp);
+  const hw = data.runner_hardware;
+  if (hw && hw.available) {
+    const cpu = (hw.cpu && hw.cpu.model_name) || 'unknown CPU';
+    const isa = Object.entries(hw.isa || {}).filter(([, v]) => v).map(([k]) => k).join(', ');
+    meta.push('Runner: ' + cpu + (isa ? ' (ISA: ' + isa + ')' : ''));
+  }
+  meta.push('Overall: ' + (summary.passed || 0) + ' passed / ' + (summary.failed || 0) +
+            ' failed / ' + (summary.total || 0) + ' total' +
+            (data.duration_sec ? ' in ' + data.duration_sec.toFixed(1) + 's' : ''));
+  meta.push('Page: ' + location.href);
+  lines.push(meta.join('  \n'));
+  lines.push('');
+
+  if (failedSuites.length === 0) {
+    lines.push('No failed suites in this report.');
+  }
+  failedSuites.forEach((r, i) => {
+    const subs = r.sub_tests || [];
+    const badSubs = subs.filter(s => s.status !== 'pass');
+    const head = '## ' + (i + 1) + '. ' + r.name + '  [' + r.status + ']' +
+      '  (' + (r.category || 'general') + (r.duration_sec ? ', ' + r.duration_sec.toFixed(2) + 's' : '') + ')';
+    lines.push(head);
+    if (subs.length > 0) {
+      lines.push(subs.length - badSubs.length + '/' + subs.length + ' sub-tests passed.');
+    }
+    badSubs.forEach(s => {
+      let line = '- ✗ ' + s.name;
+      const m = [];
+      if (s.max_diff !== null && s.max_diff !== undefined) m.push('max_diff: ' + s.max_diff.toExponential(2));
+      if (s.speedup !== null && s.speedup !== undefined) m.push('speedup: ' + s.speedup.toFixed(2) + 'x');
+      if (m.length) line += '  (' + m.join(', ') + ')';
+      lines.push(line);
+    });
+    lines.push('');
+  });
+
+  const rf = data.regression_fast;
+  if (rf && Array.isArray(rf.rows || rf.families)) {
+    const rfRows = rf.rows || rf.families;
+    const badFamilies = rfRows.filter(row => String(row.status || '').toUpperCase() === 'FAIL');
+    if (badFamilies.length) {
+      lines.push('## Regression-fast failing families');
+      badFamilies.forEach(row => {
+        let line = '- ' + (row.label || row.family_id || '?');
+        const stages = ['build_status', 'smoke_status', 'coherence_status', 'contract_status', 'first_token_status']
+          .filter(k => String(row[k] || '').toUpperCase() === 'FAIL')
+          .map(k => k.replace('_status', ''));
+        if (stages.length) line += ' — failed stages: ' + stages.join(', ');
+        const note = row.failure_detail || row.failure_reason;
+        if (note) line += ' — ' + note;
+        lines.push(line);
+      });
+      lines.push('');
+    }
+  }
+
+  return { text: lines.join('\n'), count: failedSuites.length };
+}
+
+function copyFailedTests() {
+  const btn = document.getElementById('copy-failures-btn');
+  const report = buildFailureReport();
+  const done = () => {
+    btn.classList.add('copied');
+    btn.textContent = report.count > 0
+      ? '✓ Copied ' + report.count + ' failed suite' + (report.count === 1 ? '' : 's')
+      : '✓ Copied (no failures)';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '⧉ Copy failed tests';
+    }, 2500);
+  };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = report.text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); }
+    catch (e) { btn.textContent = 'Copy failed — select manually'; }
+    document.body.removeChild(ta);
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(report.text).then(done, fallback);
+  } else {
+    fallback();
+  }
 }
 
 function renderRunnerHardware(data) {
@@ -2298,4 +2454,5 @@ function renderHistory(reports) {
 
 // Load on page load
 document.addEventListener('DOMContentLoaded', loadResults);
+document.getElementById('copy-failures-btn').addEventListener('click', copyFailedTests);
 </script>

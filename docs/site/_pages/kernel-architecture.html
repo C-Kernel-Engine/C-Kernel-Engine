@@ -1,0 +1,571 @@
+<!-- TITLE: v8 Kernel Architecture -->
+<!-- NAV: ARCHITECTURE -->
+
+<div class="container">
+  <h1>v8 Kernel Architecture</h1>
+  <p class="lead">
+    The v8 engine keeps every kernel behind a <strong>provider map</strong>: a JSON document in
+    <code>version/v8/kernel_maps/</code> that names the operation, the numerical contract, the port layout, the C
+    call ABI, and the selection metadata. The registry currently holds <strong>297 provider maps across 108
+    operations</strong>. Circuits choose <em>what</em> runs — a logical operation with a numerical contract; the maps
+    decide <em>which physical kernel</em> satisfies it on this host.
+  </p>
+
+  <style>
+    .ka-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .ka-section h2 { margin: 0 0 0.5rem; color: var(--orange); }
+    .ka-section h3 { color: var(--text-primary); margin: 1.1rem 0 0.35rem; font-size: 1.05rem; }
+    .ka-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .ka-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .ka-card strong { color: var(--text-primary); }
+    .ka-card code { font-size: 0.78rem; }
+    .ka-math {
+      background: #0b1118;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cfe8ff;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+      line-height: 1.6;
+    }
+    .ka-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+    main code { overflow-wrap: anywhere; }
+    .ka-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 0.75rem; }
+    .ka-table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.84rem; }
+    .ka-table th, .ka-table td {
+      border: 1px solid var(--grey); padding: 0.45rem 0.6rem;
+      text-align: left; vertical-align: top; color: var(--text-secondary);
+    }
+    .ka-table th { color: var(--orange); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; background: #121a24; }
+    .ka-table td:first-child { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+    .pill {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid; white-space: nowrap;
+    }
+    .pill.prod { color: #7fd4a3; border-color: #2f8d59; background: rgba(71,180,117,0.1); }
+    .pill.cand { color: #ffd38a; border-color: #b8860b; background: rgba(255,180,0,0.1); }
+    .pill.none { color: #b9b9b9; border-color: #555; background: rgba(158,158,158,0.08); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #ka-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ka-svg-overlay .ka-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ka-svg-overlay .ka-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ka-svg-overlay .ka-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ka-svg-overlay .ka-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ka-svg-overlay .ka-ov-stage img { max-width: none; height: auto; }
+  </style>
+
+  <div class="ka-section">
+    <h2>Registry at a Glance</h2>
+    <p style="color: var(--text-secondary); margin-top: 0.4rem;">
+      297 provider maps, 108 logical operations. Attention dominates because every dtype &times; phase &times;
+      layout combination is a separate physical provider with its own contract; the long tail is singleton
+      operations such as <code>final_logit_scale</code> or <code>attn_gate_softplus_mul</code> that exist because one
+      model family needed exactly that arithmetic.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 470" width="100%" role="img" tabindex="0" data-svg-title="v8 kernel registry — providers per operation family"
+         aria-label="Bar chart of v8 kernel registry providers per operation family: attention 31, gemm 22, rope 17, gemv 14, audio 12, rmsnorm 10, embedding 7, gated deltanet 7, moe swiglu experts 7, gelu 6, sliding attention 6, position embeddings 6, then smaller families and about 55 singleton operations, totalling 297 providers across 108 ops."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .ka-bar{fill:#263242;}
+        .ka-bar-hi{fill:#07adf8;}
+        .ka-bar-lab{fill:#b0b0b0;font-size:12px;font-family:'JetBrains Mono',monospace;}
+        .ka-bar-val{fill:#f5f5f5;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+        .ka-axis{stroke:#454545;stroke-width:1;}
+        .ka-cap{fill:#808080;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <!-- bars: value 1 = 26px, x from 260 -->
+      <g>
+        <text x="24"  y="50"  class="ka-bar-lab">attention</text>            <rect class="ka-bar-hi" x="260" y="36"  width="806" height="20" rx="4"/><text x="1076" y="51" class="ka-bar-val">31</text>
+        <text x="24"  y="80"  class="ka-bar-lab">gemm</text>                 <rect class="ka-bar-hi" x="260" y="66"  width="572" height="20" rx="4"/><text x="842"  y="81" class="ka-bar-val">22</text>
+        <text x="24"  y="110" class="ka-bar-lab">rope</text>                 <rect class="ka-bar"    x="260" y="96"  width="442" height="20" rx="4"/><text x="712"  y="111" class="ka-bar-val">17</text>
+        <text x="24"  y="140" class="ka-bar-lab">gemv</text>                 <rect class="ka-bar"    x="260" y="126" width="364" height="20" rx="4"/><text x="634"  y="141" class="ka-bar-val">14</text>
+        <text x="24"  y="170" class="ka-bar-lab">audio frontend</text>       <rect class="ka-bar"    x="260" y="156" width="312" height="20" rx="4"/><text x="582"  y="171" class="ka-bar-val">12</text>
+        <text x="24"  y="200" class="ka-bar-lab">rmsnorm</text>              <rect class="ka-bar"    x="260" y="186" width="260" height="20" rx="4"/><text x="530"  y="201" class="ka-bar-val">10</text>
+        <text x="24"  y="230" class="ka-bar-lab">embedding</text>            <rect class="ka-bar"    x="260" y="216" width="182" height="20" rx="4"/><text x="452"  y="231" class="ka-bar-val">7</text>
+        <text x="24"  y="260" class="ka-bar-lab">gated_deltanet</text>       <rect class="ka-bar"    x="260" y="246" width="182" height="20" rx="4"/><text x="452"  y="261" class="ka-bar-val">7</text>
+        <text x="24"  y="290" class="ka-bar-lab">moe_swiglu_expert</text>    <rect class="ka-bar"    x="260" y="276" width="182" height="20" rx="4"/><text x="452"  y="291" class="ka-bar-val">7</text>
+        <text x="24"  y="320" class="ka-bar-lab">attention_sliding</text>    <rect class="ka-bar"    x="260" y="306" width="156" height="20" rx="4"/><text x="426"  y="321" class="ka-bar-val">6</text>
+        <text x="24"  y="350" class="ka-bar-lab">gelu</text>                 <rect class="ka-bar"    x="260" y="336" width="156" height="20" rx="4"/><text x="426"  y="351" class="ka-bar-val">6</text>
+        <text x="24"  y="380" class="ka-bar-lab">position_embeddings</text>  <rect class="ka-bar"    x="260" y="366" width="156" height="20" rx="4"/><text x="426"  y="381" class="ka-bar-val">6</text>
+        <text x="24"  y="410" class="ka-bar-lab">&#8776;55 singleton ops</text> <rect class="ka-bar" x="260" y="396" width="520" height="20" rx="4" opacity="0.55"/><text x="790" y="411" class="ka-bar-val">55 &times; 1</text>
+      </g>
+      <line class="ka-axis" x1="260" y1="30" x2="260" y2="424"/>
+      <text x="24" y="452" class="ka-cap">297 provider maps · 108 operations · version/v8/kernel_maps/KERNEL_REGISTRY.json</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Selection status.</strong>
+        <span class="pill prod">production &times;64</span>
+        <span class="pill cand">candidate &times;5</span>
+        <span class="pill none">unmarked &times;228</span><br>
+        The schema also defines <code>diagnostic</code> and <code>deprecated</code>; no current map uses them.
+        Only <code>production</code> providers may auto-select. Candidates resolve only behind explicit opt-in
+        routes (for example <code>production_when_prepared</code> weight layouts), and equal-priority production
+        ambiguity fails closed instead of guessing.
+      </div>
+      <div class="ka-card"><strong>The five candidates today.</strong><br>
+        <code>moe_softmax_topk_router_llama_f32</code>, <code>moe_swiglu_expert_forward_q4k_q5k</code>,
+        <code>moe_swiglu_expert_forward_q4k_q5k_bucketed</code>,
+        <code>moe_swiglu_shared_forward_q8_0_gated</code>,
+        <code>farskip_swiglu_shared_combine_bf16</code> — each waits for measured evidence before promotion.
+      </div>
+      <div class="ka-card"><strong>Where the numbers live.</strong><br>
+        <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> is regenerated by <code>ck_run_v8.py</code>
+        (never hand-edited). The migration ratchet is
+        <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>, enforced by
+        <code>audit_kernel_map_interfaces_v8.py --check</code> in CI. See
+        <a href="kernel-maps.html">Kernel Maps and Provider Selection</a> for the map schema itself.
+      </div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>How a Provider Is Selected</h2>
+    <p style="color: var(--text-secondary); margin-top: 0.4rem;">
+      Selection is a filter chain, not a score. Compatibility gates run first; priority only ranks providers that
+      already implement the same logical and numerical contract. Priority can never promote a candidate over a
+      production provider, pick across equivalence groups, or override dtype, layout, phase, shape, ISA, or ABI
+      compatibility.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Provider selection filter chain"
+         aria-label="Provider selection filter chain: all 297 providers enter; compatibility filters remove wrong dtype, layout, phase, ISA, shape and ABI matches; status filter removes candidates and unmarked providers from automatic selection; equivalence grouping keeps only providers with the same numerical contract; priority ranks what remains; ties fail closed."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .fs-stage{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .fs-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .fs-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .fs-drop{fill:#7a5c5c;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .fs-cap{fill:#808080;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="fs-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <g>
+        <rect class="fs-stage" x="24"  y="60" width="170" height="70" rx="12"/>
+        <text x="44" y="88"  class="fs-title">All providers</text>
+        <text x="44" y="110" class="fs-sub">297 maps · 108 ops</text>
+
+        <rect class="fs-stage" x="244" y="60" width="200" height="70" rx="12"/>
+        <text x="264" y="88"  class="fs-title">1 · Compatibility</text>
+        <text x="264" y="106" class="fs-sub">dtype · layout · phase</text>
+        <text x="264" y="122" class="fs-sub">ISA · shape · ABI</text>
+
+        <rect class="fs-stage" x="494" y="60" width="200" height="70" rx="12"/>
+        <text x="514" y="88"  class="fs-title">2 · Status</text>
+        <text x="514" y="106" class="fs-sub">production only</text>
+        <text x="514" y="122" class="fs-sub">candidate = opt-in</text>
+
+        <rect class="fs-stage" x="744" y="60" width="200" height="70" rx="12"/>
+        <text x="764" y="88"  class="fs-title">3 · Equivalence</text>
+        <text x="764" y="106" class="fs-sub">same numerical contract</text>
+        <text x="764" y="122" class="fs-sub">same equivalence_group</text>
+
+        <rect class="fs-stage" x="994" y="60" width="162" height="70" rx="12"/>
+        <text x="1014" y="88"  class="fs-title">4 · Priority</text>
+        <text x="1014" y="106" class="fs-sub">integer rank</text>
+        <text x="1014" y="122" class="fs-sub">ties fail closed</text>
+      </g>
+      <path d="M194,95 L240,95" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#fs-arrow)"/>
+      <path d="M444,95 L490,95" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#fs-arrow)"/>
+      <path d="M694,95 L740,95" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#fs-arrow)"/>
+      <path d="M944,95 L990,95" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#fs-arrow)"/>
+
+      <!-- rejected drops -->
+      <text x="264" y="170" class="fs-drop">&#10007; bf16 weights on an f32 provider</text>
+      <text x="264" y="190" class="fs-drop">&#10007; decode provider in prefill phase</text>
+      <text x="264" y="210" class="fs-drop">&#10007; AVX-512 kernel on an SSE host</text>
+      <text x="514" y="170" class="fs-drop">&#10007; candidate / diagnostic / deprecated</text>
+      <text x="514" y="190" class="fs-drop">&#10007; unmarked (228 maps never auto-select)</text>
+      <text x="764" y="170" class="fs-drop">&#10007; online-softmax flash vs exact full-score</text>
+      <text x="764" y="190" class="fs-drop">&#10007; grouped vs serial reduction order</text>
+      <text x="1014" y="170" class="fs-drop">&#10007; equal priority, same group</text>
+
+      <!-- worked example -->
+      <rect x="24" y="240" width="1132" height="140" rx="12" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="48" y="272" class="fs-title" font-size="14">Worked example: Q6_K prepared weights stay candidate (PR #405)</text>
+      <text x="48" y="300" class="fs-sub">gemm_nt_q6_k_q8_k prepares an expanded integer layout at load time (q6_k_expanded_integer_metadata_v1)</text>
+      <text x="48" y="322" class="fs-sub">so dot products skip per-block bit unpacking. Priority 300 AVX-512 VNNI / 260 AVX2 — but priority is not evidence.</text>
+      <text x="48" y="348" class="fs-sub" fill="#ffd38a">Measured: 0.923&times; on Ryzen, 0.98&times; to small gains on P3 after compact-M4 scheduling &rarr; preparation demoted to candidate.</text>
+      <text x="48" y="368" class="fs-sub" fill="#7fd4a3">Result: generated runtimes keep exact compact Q6; the prepared path returns only with per-CPU persisted winners.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="ka-note">
+      The Q4_K &times; Q8_K AVX-512 VNNI x16 provider follows the same discipline: prefill routes are
+      <code>candidate</code> behind <code>CK_V8_FORCE_BATCHED_PREFILL=1</code> until 1K logit parity is certified;
+      only the decode (m=1) prepared route is <code>production_when_prepared</code>.
+    </p>
+  </div>
+
+  <div class="ka-section">
+    <h2>Attention — 37 providers</h2>
+    <p style="color: var(--text-secondary);">
+      One logical operation, many physical contracts. Prefill and decode are separate providers with separate
+      phases; flash online-softmax and exact full-score attention sit in different equivalence groups because their
+      reduction order differs. The base math (QK&#7536;/&radic;d, causal mask, softmax, online-softmax tiles) is
+      derived in <a href="concepts.html">Deep Dive Concepts</a> and <a href="flash_attention.html">Flash Attention
+      Analysis</a>; this section covers only the variants the registry distinguishes.
+    </p>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Causal GQA flash (prefill + decode).</strong><br>
+        <code>attention_forward_causal_head_major_gqa_flash_strided</code> <span class="pill prod">production</span>
+        (priority 200, group <code>attention.fp32_online_causal_strided.v1</code>) and the decode flash family
+        (<code>_f16kv</code>, <code>_f16cache</code>, <code>_bf16cache_pytorch_contract</code>). Head-major layout,
+        FP32 online-softmax accumulation, runtime ISA dispatch (AVX-512 / AVX2 / AVX / reference).
+      </div>
+      <div class="ka-card"><strong>Sliding window.</strong><br>
+        <code>attention_forward_*_sliding[_gemma4]</code> (op <code>attention_sliding</code>, 6 maps) — same flash
+        structure with a banded mask; used by Gemma3/4, Cohere2 (3:1 sliding:full), and Laguna's sliding MoE
+        layers. Mask math: <a href="concepts.html">concepts — sliding-window attention</a>.
+      </div>
+      <div class="ka-card"><strong>Gated attention — two different gates.</strong><br>
+        Qwen3.5/3.8 apply an elementwise sigmoid gate
+        (<code>attn_gate_sigmoid_mul_forward</code>):</div>
+      <div class="ka-card"><strong>Gemma4 shared-KV.</strong><br>
+        <code>attention_forward_{causal,decode}_head_major_shared_kv[_sliding]_gemma4</code> — one KV stream shared
+        across head groups, selected from circuit data rather than a family branch.
+      </div>
+    </div>
+    <div class="ka-math">sigmoid gate (Qwen3.5/3.8):   out[h, c] = x[h, c] · σ(g[h, c])
+softplus gate (Laguna):      out[h, c] = x[h, c] · s(h),  s(h) = g_h &gt; 20 ? g_h : log(1 + e^{g_h})</div>
+    <p class="ka-note">
+      The softplus gate (<code>attn_gate_softplus_mul_forward</code>, <code>hybrid_attention_kernels.c</code>) is a
+      <em>per-head scalar</em> — one gate value per head, with a linear branch above 20 for numerical safety. The
+      sigmoid gate is per-element. They share an op shape but not a numerical contract, so they are separate
+      providers, never an equivalence group. Laguna's softplus formula is observed from the model, not yet
+      oracle-validated.
+    </p>
+
+    <h3>Multi-head latent attention (MLA)</h3>
+    <p style="color: var(--text-secondary);">
+      Kimi and Instella cache a <em>compressed</em> latent KV vector, not per-head K/V. Decode and prefill insert
+      explicit cache ops (<code>mla_kv_cache_store</code> / <code>mla_kv_cache_batch_store</code>), and the attention
+      provider decompresses on the fly:
+    </p>
+    <div class="ka-math">cache row:      latent[t, 0:kv_lora_rank]                       (per token, shared across heads)
+decompress:     [k_nope | value][t, h, :] = latent[t, :] · W_kv_b[:, h]ᵀ        (kv_lora_rank → heads·(qk_nope+v))
+attention:      softmax(q·kᵀ/√qk_head_dim)·v over cache_len valid rows, kv_h = h · H_kv / H</div>
+    <p class="ka-note">
+      Providers: <code>deepseek_mla_attention_f32</code> / <code>_decode_f32</code>,
+      <code>deepseek_mla_kv_decompress_{f32,bf16}</code>,
+      <code>deepseek_mla_partial_rope_concat_{f32,packed_f32,packed_bf16_storage}</code> — all in
+      <code>src/kernels/deepseek_kernels.c</code>. Cache rows are zero-padded from head_dim to cache_stride. Full
+      contract walkthrough: <a href="v8-mla-kimi.html">v8 MLA / Kimi decode cache</a>.
+    </p>
+  </div>
+
+  <div class="ka-section">
+    <h2>RoPE — 17 providers + YaRN + M-RoPE</h2>
+    <p style="color: var(--text-secondary);">
+      Every rotary layout is a distinct contract because the channel pairing is a checkpoint semantic, not a tuning
+      knob. The base rotation math and the split-half vs pairwise layouts are derived in
+      <a href="concepts.html">concepts — RoPE</a>; the registry adds three more axes:
+    </p>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Partial rotary.</strong> <code>rotary_dim &lt; head_dim</code>: channels
+        <code>[rotary_dim, head_dim)</code> pass through unrotated (GLM-4, GPT-NeoX-style partial). Implemented by
+        the <code>*_with_rotary_dim</code> providers.</div>
+      <div class="ka-card"><strong>Per-layer direct (Gemma4).</strong>
+        <code>rope_forward_qk_split_direct_f32</code> recomputes
+        frequencies per layer from IR metadata (<code>rope_param_mode: per_layer_direct</code>) instead of one
+        global cache.</div>
+      <div class="ka-card"><strong>YaRN.</strong> <code>yarn_rope_cache_*</code> (3 providers, op
+        <code>yarn_rope_init</code>): ramp-blended inverse frequencies,
+        <code>inv_freq = inv_interp·ramp + inv_extrap·(1−ramp)</code>, with correction-dim and mscale from GGUF
+        metadata. Laguna mixes this with full-rotary sliding layers in one model.</div>
+      <div class="ka-card"><strong>M-RoPE (vision + text).</strong> <code>mrope_qk_*</code> sectioned per-axis
+        positions with YaRN correction per pair; <code>multimodal_mrope_positions_2d</code> builds the position
+        tables. Qwen3-VL, Qwen3.8 text, Gemma4 Vision.</div>
+    </div>
+    <p class="ka-note">
+      ULP-level note: the llama.cpp-exact provider (<code>rope_precompute_cache_llama_cpu</code>) builds the angle
+      table by iterative FP32 multiplication (<code>theta *= theta_scale</code>) instead of per-pair
+      <code>powf</code>, and the M-RoPE contract resolves the system libm <code>cosf/sinf/powf</code> via dlopen to
+      avoid libimf divergence on ICX hosts. Bit-exactness against an oracle is a property of these details, which is
+      why RoPE has 17 providers and not 3.
+    </p>
+  </div>
+
+  <div class="ka-section">
+    <h2>Norms — 19 providers</h2>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>RMSNorm (10).</strong> Plain FP32, FP64-sum exact reference, strided,
+        BF16-storage PyTorch-contract, llama production (incl. parallel prefill), KV-LoRA (MLA), Qwen3Next BF16,
+        no-weight, and backward. Formula and LayerNorm contrast:
+        <a href="concepts.html">concepts — normalization</a>.</div>
+      <div class="ka-card"><strong>LayerNorm (4).</strong> Unrolled slice, FP32-exact, BF16 storage, and
+        BF16 Welford — the Welford single-pass variant exists because Cohere2's shared pre-block LayerNorm is on
+        the critical path of two parallel branches.</div>
+      <div class="ka-card"><strong>QK-norm (4 + backward).</strong> Per-head RMS normalization of Q and K before
+        RoPE (Qwen3, Qwen3.5/3.8 full-attention layers, Gemma, Laguna). Plus <code>v_norm</code> for Gemma4.</div>
+      <div class="ka-card"><strong>Recurrent norm (5).</strong> <code>recurrent_norm_gate_*</code> — RMSNorm fused
+        with the SiLU output gate inside DeltaNet blocks; <code>mamba2_rmsnorm_gate_f32</code> for Nemotron-H.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>Quantized GEMM / GEMV — 36 providers</h2>
+    <p style="color: var(--text-secondary);">
+      Weight-only quantized matmul with BF16/FP32 or Q8_K activations. Format details live in
+      <a href="quantization.html">Quant Fundamentals</a> and <a href="gemm-memory-layout.html">GEMM Memory
+      Layout</a>; the registry-level facts that matter for selection:
+    </p>
+    <div class="ka-table-wrap">
+      <table class="ka-table">
+        <thead><tr><th>Contract</th><th>Providers</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Q4_K &times; Q8_K</td><td><code>gemm_nt_q4_k_q8_k</code>, <code>gemv_q4_k[_q8_k]</code></td>
+            <td>AVX-512 VNNI x16 packed routes: decode (m=1) prepared is <code>production_when_prepared</code>; prefill routes are <code>candidate</code> behind <code>CK_V8_FORCE_BATCHED_PREFILL=1</code> pending 1K parity.</td></tr>
+          <tr><td>Q6_K &times; Q8_K</td><td><code>gemm_nt_q6_k_q8_k</code>, <code>gemv_q6_k[_q8_k]</code></td>
+            <td>Exact compact Q6 is production. The prepared expanded layout (dequant to <code>weight = d·scale·(q6−32)</code> with ql/qh pre-merged at load) is <strong>candidate since PR #405</strong> — measured 0.923&times; on Ryzen.</td></tr>
+          <tr><td>Q8_0 / Q5_x / Q4_0/1</td><td><code>gemm_nt_q8_0*</code>, <code>gemm_nt_q5_*</code>, <code>gemv_*</code></td>
+            <td>Plus fused GEMV with online quant + bias (<code>gemv_fused_q5_0_bias</code>, <code>gemv_fused_q8_0_bias</code>).</td></tr>
+          <tr><td>BF16 / F16</td><td><code>gemm_nt_bf16[_native|_amx|_pytorch_onednn_brgemm]</code>, <code>gemm_nt_f16[_clipped]</code></td>
+            <td>AMX and oneDNN BRGEMM routes for Xeon; BF16 storage contracts for the PyTorch parity lanes.</td></tr>
+          <tr><td>Exact FP32</td><td><code>gemm_nt_fp32_exact</code>, <code>gemm_nt_f32_llama_production</code></td>
+            <td>The exact parallel row providers (<code>ck_parallel_prefill_v8.c</code>) that the Qwen3.6/3.8 long-prefill lanes use when parity outranks speed.</td></tr>
+          <tr><td>Head-major projection</td><td><code>qkv_projection</code>, <code>attention_projection</code></td>
+            <td><code>ck_qkv_project_head_major_quant</code> / <code>ck_attention_project_head_major_quant</code> write head-major outputs directly — no layout conversion pass between projection and attention.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>MoE — routers and experts</h2>
+    <p style="color: var(--text-secondary);">
+      Four model families route: Nemotron-H (group-limited top-k + ReLU2), Kimi and Instella (sigmoid group-limited
+      top-k + shared SwiGLU), Laguna (sigmoid + correction bias, top-8 + shared, mixed Q4/Q6 expert storage).
+      The selection rule, verified from <code>src/kernels/topk_kernels.c</code>:
+    </p>
+    <div class="ka-math">choice_scores   = scores + correction_bias              # bias steers selection only
+group_scores    = Σ top2(choice_scores within group)
+selected_groups = topk(group_scores, topk_group)
+selected        = topk(choice_scores masked to selected_groups, k)
+weights         = gather(raw_scores, selected)                   # NOT the biased scores
+if norm_topk_prob: weights /= Σweights + 1e-20;  weights ×= routed_scaling_factor</div>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Routers.</strong> <code>nemotron_group_limited_topk_router_f32</code> and
+        <code>group_limited_topk_router_sigmoid_f32</code> (same rule, sigmoid-scored).
+        <code>moe_softmax_topk_router_llama_f32</code> (full softmax then top-k, floor 6.1e-5) is
+        <span class="pill cand">candidate</span>.</div>
+      <div class="ka-card"><strong>Experts.</strong> ReLU2 (<code>moe_relu2_expert_*</code>) for Nemotron-H;
+        SwiGLU routed + shared (<code>moe_swiglu_expert_*</code>, <code>moe_swiglu_shared_*</code>) for Kimi /
+        Instella / Laguna. Production quant contracts: q4k_q4k and q4k_q6k; q4k_q5k(+bucketed) and q8_0_gated are
+        <span class="pill cand">candidate</span>. FarSkip shared-combine
+        (<code>farskip_swiglu_shared_combine_bf16</code>) is <span class="pill cand">candidate</span>.</div>
+      <div class="ka-card"><strong>Why correction bias is load-balancing, not math.</strong> The bias shifts
+        <em>which</em> experts fire; the weights are gathered from the raw scores, so a biased router and an
+        unbiased one produce different token routings — they are different numerical contracts and can never share
+        an equivalence group.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>Recurrent / SSM — DeltaNet and Mamba2</h2>
+    <p style="color: var(--text-secondary);">
+      Full derivations live in <a href="concepts.html">concepts — recurrent attention &amp; Mamba2</a> and the
+      <a href="deltanet-deep-dive.html">Gated DeltaNet deep dive</a>. The registry-level view:
+    </p>
+    <div class="ka-math">Gated DeltaNet (per head, per token — llama.cpp qwen3next-compatible):
+  β_s = sigmoid(β);   gate = exp(g);   S ← gate · S
+  kv_mem = Sᵀ·k̂;      δ = (v − kv_mem)·β_s;          S ← S + k̂ ⊗ δ
+  out = Sᵀ·(q/√state_dim)                              # q, k arrive pre-normalized
+
+Mamba2 (per head, per state element):
+  dt  = clamp(softplus(dt_raw), dt_min, dt_max)        # linear branch &gt; 20
+  S ← S·exp(dt·a[h]) + dt·b[s]·x
+  y  = Σ_s S[s]·c[s] + d[h]·x</div>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>DeltaNet providers (7).</strong> Autoregressive forward/backward, prefill,
+        llama-AVX2 decode (<code>..._parallel_forward</code>), llama-AVX2 prefill dispatch, and PyTorch-grouped BF16
+        storage variants — <code>src/kernels/deltanet_kernels.c</code>. Qwen3.5, Qwen3.6, Qwen3.8.</div>
+      <div class="ka-card"><strong>Mamba2 providers (6).</strong> in-proj split, conv1d decode, dt softplus,
+        selective scan, selective state-update decode, RMSNorm gate — <code>src/kernels/mamba2_kernels.c</code>.
+        Nemotron-H. State is shaped <code>[heads, head_dim, state_dim]</code>, not a square DeltaNet matrix.</div>
+      <div class="ka-card"><strong>Support ops.</strong> <code>recurrent_gate</code>, <code>recurrent_silu</code>,
+        <code>recurrent_qk_l2_norm</code>, <code>recurrent_split_(conv_)qkv</code>,
+        <code>recurrent_conv_state_update</code>, <code>ssm_conv1d_*</code> — the plumbing that keeps conv state and
+        split layouts explicit in the IR instead of hidden inside a monolith kernel.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>KV Cache — persistent state, valid rows vs capacity</h2>
+    <p style="color: var(--text-secondary);">
+      Cache tensors are persistent state ports, not ephemeral outputs. The layout is head-major
+      <code>[kv_head, token, aligned_head_dim]</code>; capacity (<code>max_seq_len</code>) and valid-token count are
+      declared separately, and kernels must never read beyond valid rows — scheduling may round to a physical
+      extent, the kernel may not.
+    </p>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Store providers.</strong> <code>kv_cache_store</code> (f32),
+        <code>_f16</code>, <code>_bf16</code>, batch f16/bf16, and <code>kv_cache_store_shared_q</code> for Gemma4
+        shared KV. Single-token stores guard <code>pos &lt; max_seq_len</code>; batch stores guard
+        <code>start_pos + num_tokens ≤ max_seq_len</code>.</div>
+      <div class="ka-card"><strong>Repack.</strong> <code>kv_cache_repack_head_major_inplace</code> clamps
+        <code>tokens = min(tokens, cache_capacity)</code> and memmoves head blocks high→low when capacity grows —
+        the memory planner can resize the arena without invalidating live state.</div>
+      <div class="ka-card"><strong>Reads are inside attention.</strong> There is no standalone cache-read provider:
+        flash attention takes the valid length as an argument. MLA caches
+        (<code>deepseek_mla_kv_cache_{store,batch_store}</code>) keep head-major rows zero-padded to
+        cache_stride.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>Fused providers — earned, not assumed</h2>
+    <p style="color: var(--text-secondary);">
+      <code>src/kernels/fused/</code> holds 11 fusion sources. Fusion is a measured decision, not a default: the
+      policy (see <a href="kernels.html">Kernel Reference — composed vs fused</a>) keeps operations composed in the
+      IR unless profiling proves the fused epilogue is worth the maintenance. Registered examples:
+      <code>mega_fused_attention_decode_q5_0</code> (9 ops fused),
+      <code>mega_fused_attention_prefill[_q8_0]</code> (RMSNorm → QKV → RoPE → flash → out-proj + residual),
+      <code>fused_mlp_block</code> (OutProj → residual → RMSNorm → MLP → residual),
+      <code>fused_rmsnorm_qkv_prefill_head_major_quant</code>, and
+      <code>rmsnorm_q8_k_fused</code> (norm + activation quantization).
+    </p>
+  </div>
+
+  <div class="ka-section">
+    <h2>Logits and footer ops</h2>
+    <div class="ka-grid">
+      <div class="ka-card"><strong><code>final_logit_scale_f32</code></strong> (<code>logit_kernels.c</code>):
+        in-place <code>logits[i] *= scale</code>. Cohere2 declares <code>logit_scale</code> in its GGUF metadata; the
+        circuit carries it and lowering appends this footer op — no family branch in codegen.</div>
+      <div class="ka-card"><strong><code>gemma4_final_logit_softcap_forward</code></strong>:
+        <code>logits = tanh(logits / cap) · cap</code> — Gemma-style softcapping as an explicit op.</div>
+      <div class="ka-card"><strong><code>assistant_layer_scale_forward</code></strong> and
+        <strong><code>logits_copy_to_position</code></strong>: Gemma4 assistant-layer scaling and decode-time
+        logits placement — small ops that exist because correctness lives in the details.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>Audio, vision, and training</h2>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>Audio frontend (12).</strong> WAV/PCM decode → resample (linear or windowed-sinc)
+        → pad/truncate → STFT power → Slaney mel → log-mel → conv stem → transpose. FP32 throughout; walkthrough in
+        <a href="concepts.html#audio-frontend">concepts — audio frontend</a> and
+        <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>.</div>
+      <div class="ka-card"><strong>Vision.</strong> <code>im2patch</code>, BF16 patch projection (oneDNN conv3d
+        storage), spatial merge (2&times;2 / tiled / average-pool), 2D position ids, multimodal prefix insert.
+        Deep dive: <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>.</div>
+      <div class="ka-card"><strong>Training.</strong> Backward providers mirror the forward contracts
+        (attention, rmsnorm, qk_norm, rope, embedding, gemm, MoE experts, DeltaNet, recurrent family), plus
+        <code>adamw_update</code> and softmax cross-entropy loss. The v7 training lane:
+        <a href="v7-runbook.html">v7 Inference + Training Runbook</a>.</div>
+    </div>
+  </div>
+
+  <div class="ka-section">
+    <h2>Further Reading</h2>
+    <div class="ka-grid">
+      <div class="ka-card"><a href="kernel-maps.html">Kernel Maps and Provider Selection</a> — the map schema, the
+        DSL/map split, and where residual DSL logic still lives.</div>
+      <div class="ka-card"><a href="model-kernel-matrix.html">Model + Kernel Matrix</a> — which families exercise
+        these providers, with evidence-specific certification status.</div>
+      <div class="ka-card"><a href="architecture-variants.html">Architecture Variants</a> — what each contract-novel
+        family (Laguna, Cohere2, Instella, Nemotron-H) forced the registry to grow.</div>
+      <div class="ka-card"><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> — how numerical
+        contracts are declared and gated.</div>
+    </div>
+  </div>
+
+  <div id="ka-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="ka-ov-bar">
+      <span class="ka-ov-title" id="ka-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="ka-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="ka-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="ka-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="ka-ov-stage" id="ka-ov-stage"><img id="ka-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('ka-svg-overlay');
+      var stage = document.getElementById('ka-ov-stage');
+      var img = document.getElementById('ka-ov-img');
+      var title = document.getElementById('ka-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('ka-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('ka-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('ka-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('ka-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+</div>
