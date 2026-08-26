@@ -1,0 +1,339 @@
+<!-- TITLE: Architecture Variants -->
+<!-- NAV: ARCHITECTURE -->
+
+<div class="container">
+  <h1>Architecture Variants</h1>
+  <p class="lead">
+    Every family enters through the same pipeline — GGUF or safetensors artifact, template, lowering, memory plan,
+    codegen. Most families differ only in contract <em>values</em>. This page documents the families that differ in
+    contract <em>structure</em>: the ones that forced new kernel families into the registry. Each section links to
+    the provider-level math in <a href="kernel-architecture.html">v8 Kernel Architecture</a>.
+  </p>
+
+  <style>
+    .av-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .av-section h2 { margin: 0 0 0.4rem; color: var(--orange); }
+    .av-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .av-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .av-card strong { color: var(--text-primary); }
+    .av-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #av-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #av-svg-overlay .av-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #av-svg-overlay .av-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #av-svg-overlay .av-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #av-svg-overlay .av-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #av-svg-overlay .av-ov-stage img { max-width: none; height: auto; }
+  </style>
+
+  <div class="av-section">
+    <h2>Already covered by dedicated deep dives</h2>
+    <div class="av-grid">
+      <div class="av-card"><strong>Kimi / MLA.</strong> Latent KV cache contract, prefill/decode store ops, and the
+        text-decoder certification evidence: <a href="v8-mla-kimi.html">v8 MLA / Kimi</a>.</div>
+      <div class="av-card"><strong>Qwen3.5 / 3.6 / 3.8 hybrid recurrent.</strong> Gated DeltaNet block math, forward
+        and backward kernels: <a href="deltanet-deep-dive.html">Gated DeltaNet Deep Dive</a>. Qwen3.8's addition is
+        identity, not structure: upstream GGUFs advertise <code>architecture=qwen35</code> and the converter selects
+        the qwen38 circuit from artifact metadata.</div>
+      <div class="av-card"><strong>Whisper.</strong> The generated audio frontend and encoder–decoder pair:
+        <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> and
+        <a href="v8-whisper-tiny.html">Whisper end to end</a>.</div>
+    </div>
+  </div>
+
+  <div class="av-section">
+    <h2>Laguna — gated GQA, split RoPE, mixed-quant MoE</h2>
+    <p style="color: var(--text-secondary);">
+      Laguna-XS 2.1 (PR #404) combines three structures that previously existed only separately: a softplus
+      per-head attention gate, two RoPE contracts in one model, and MoE layers on top of sliding attention with
+      mixed Q4/Q6 expert storage.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 440" width="100%" role="img" tabindex="0" data-svg-title="Laguna variant map"
+         aria-label="Laguna-XS architecture variant map: leading dense global-attention layers, then MoE global-attention and MoE sliding-attention layers; YaRN RoPE on global layers, full rotary on sliding; softplus per-head attention gate; sigmoid router with correction bias selecting top-8 routed experts stored as Q4 plus shared SwiGLU experts stored as Q6."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .av-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .av-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .av-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .av-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .av-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .av-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="av-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <!-- layer stack -->
+      <text x="24" y="40" class="av-band">Layer kinds (in order)</text>
+      <rect class="av-box" x="24" y="56" width="330" height="64" rx="10"/>
+      <text x="44" y="82" class="av-title" font-size="13">dense_global_attention</text>
+      <text x="44" y="102" class="av-sub">leading dense block · full attention · dense MLP</text>
+      <rect class="av-box" x="24" y="132" width="330" height="64" rx="10"/>
+      <text x="44" y="158" class="av-title" font-size="13">moe_global_attention</text>
+      <text x="44" y="178" class="av-sub">full attention + routed/shared MoE</text>
+      <rect class="av-box" x="24" y="208" width="330" height="64" rx="10"/>
+      <text x="44" y="234" class="av-title" font-size="13">moe_sliding_attention</text>
+      <text x="44" y="254" class="av-sub">sliding window + routed/shared MoE</text>
+
+      <!-- attention contract -->
+      <text x="414" y="40" class="av-band">Attention contract</text>
+      <rect class="av-box" x="414" y="56" width="360" height="100" rx="10"/>
+      <text x="434" y="82" class="av-title" font-size="13">Gated GQA — softplus head gate</text>
+      <text x="434" y="104" class="av-sub">out[h,c] = attn[h,c] · softplus(gate[h])</text>
+      <text x="434" y="122" class="av-sub">attn_gate_softplus_mul_forward</text>
+      <text x="434" y="142" class="av-hi">per-head scalar · linear branch &gt; 20</text>
+      <rect class="av-box" x="414" y="168" width="360" height="104" rx="10"/>
+      <text x="434" y="194" class="av-title" font-size="13">Two RoPE contracts, one model</text>
+      <text x="434" y="216" class="av-sub">global layers → YaRN (theta 8M family)</text>
+      <text x="434" y="234" class="av-sub">sliding layers → full rotary</text>
+      <text x="434" y="254" class="av-hi">per-layer head dims: 48 vs 64 · rotary 64 vs 128</text>
+
+      <!-- MoE contract -->
+      <text x="834" y="40" class="av-band">MoE contract</text>
+      <rect class="av-box" x="834" y="56" width="322" height="216" rx="10"/>
+      <text x="854" y="82" class="av-title" font-size="13">Sigmoid router + correction bias</text>
+      <text x="854" y="104" class="av-sub">bias steers selection; weights stay raw</text>
+      <text x="854" y="130" class="av-sub">top-8 routed experts · Q4 storage</text>
+      <text x="854" y="150" class="av-sub">shared SwiGLU experts · Q6 storage</text>
+      <text x="854" y="176" class="av-hi">mixed Q4/Q6 in one model:</text>
+      <text x="854" y="194" class="av-hi">map-owned per-tensor providers</text>
+      <text x="854" y="224" class="av-sub">qk_norm on · RMSNorm · untied head</text>
+
+      <path d="M354,88 L410,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M354,164 L410,164" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M354,240 L410,240" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M774,150 L830,150" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+
+      <text x="24" y="330" class="av-cap">Evidence (PR #404): Q4_K_M coherent text E2E · embedding and layer-0 RMSNorm bit-exact · router replay within one ULP.</text>
+      <text x="24" y="352" class="av-cap">Caveats: long-trajectory parity not claimed (near-tied MoE route flips) · softplus gate observed, not oracle-validated.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="av-note">Provider math: <a href="kernel-architecture.html">kernel architecture — attention gates, MoE
+      routers, RoPE</a>. Operator lane: <a href="v8-runbook.html">v8 runbook</a>.</p>
+  </div>
+
+  <div class="av-section">
+    <h2>Cohere2 — parallel branches, shared LayerNorm, logit scale</h2>
+    <p style="color: var(--text-secondary);">
+      Command R (PR #401) is the first family where attention and MLP read the <em>same</em> normalized tensor and
+      add <em>both</em> results back, and the first to declare a model-level logit scale.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 400" width="100%" role="img" tabindex="0" data-svg-title="Cohere2 variant map"
+         aria-label="Cohere2 Command R architecture variant: a shared pre-block LayerNorm feeds attention and MLP branches in parallel; the residual update adds both branch outputs to the input; three sliding-attention layers per one full-attention layer; pairwise RoPE only on sliding layers; a final logit-scale footer multiplies logits by the model-declared logit scale."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <!-- residual block diagram -->
+      <text x="24" y="40" class="av-band">Block structure</text>
+      <rect class="av-box" x="24" y="56" width="150" height="56" rx="10"/>
+      <text x="99" y="89" text-anchor="middle" class="av-title" font-size="13">x</text>
+      <rect class="av-box" x="224" y="56" width="220" height="56" rx="10"/>
+      <text x="334" y="80" text-anchor="middle" class="av-title" font-size="13">LayerNorm (shared)</text>
+      <text x="334" y="100" text-anchor="middle" class="av-sub">one norm · synthesized beta</text>
+      <rect class="av-box" x="494" y="20" width="260" height="56" rx="10"/>
+      <text x="624" y="44" text-anchor="middle" class="av-title" font-size="13">Attention (GQA)</text>
+      <text x="624" y="64" text-anchor="middle" class="av-sub">3 sliding : 1 full · RoPE sliding-only</text>
+      <rect class="av-box" x="494" y="96" width="260" height="56" rx="10"/>
+      <text x="624" y="120" text-anchor="middle" class="av-title" font-size="13">MLP (SwiGLU)</text>
+      <text x="624" y="140" text-anchor="middle" class="av-sub">reads the same normed tensor</text>
+      <rect class="av-box" x="824" y="56" width="220" height="56" rx="10"/>
+      <text x="934" y="80" text-anchor="middle" class="av-title" font-size="13">x + attn + mlp</text>
+      <text x="934" y="100" text-anchor="middle" class="av-sub">single residual update</text>
+      <path d="M174,84 L220,84" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M444,84 C470,84 470,48 490,48" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M444,84 C470,84 470,124 490,124" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M754,48 C790,48 790,84 820,84" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M754,124 C790,124 790,84 820,84" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M99,112 C99,180 934,180 934,116" fill="none" stroke="#8aa0b4" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#av-arrow)"/>
+
+      <!-- footer -->
+      <text x="24" y="240" class="av-band">Footer contract</text>
+      <rect class="av-box" x="24" y="256" width="520" height="64" rx="10"/>
+      <text x="44" y="282" class="av-title" font-size="13">final_logit_scale_f32</text>
+      <text x="44" y="302" class="av-sub">logits ×= model-declared logit_scale (GGUF metadata, not a constant)</text>
+
+      <text x="24" y="370" class="av-cap">Evidence (PR #401): Command R7B Q4_K_M — tokenizer-free replay matches llama.cpp for the first 8 greedy positions.</text>
+      <text x="24" y="390" class="av-cap">Caveats: long-trajectory parity and performance sweeps pending.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="av-note">The shared norm makes the parallel branches a contract, not a fusion decision: both branches
+      must consume the identical normed tensor, which the circuit declares and the memory plan shares. Provider math:
+      <a href="kernel-architecture.html">kernel architecture — norms, footer ops</a>.</p>
+  </div>
+
+  <div class="av-section">
+    <h2>Instella — gated MLA with FarSkip residual streams</h2>
+    <p style="color: var(--text-secondary);">
+      Instella-MoE 16B-A3B (PRs #292/#294/#295, certified BF16 in #389) combines Kimi-style latent attention with a
+      gate, and replaces the single residual highway with two coordinated streams.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 400" width="100%" role="img" tabindex="0" data-svg-title="Instella variant map"
+         aria-label="Instella-MoE architecture variant: gated multi-head latent attention with sigmoid gate; FarSkip two-stream residuals carrying a main stream and a routed-free stream; sigmoid group-limited top-k router with 64 experts per layer plus shared experts; partial interleaved YaRN RoPE; BF16 safetensors."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <text x="24" y="40" class="av-band">Block structure</text>
+      <rect class="av-box" x="24" y="56" width="250" height="76" rx="10"/>
+      <text x="44" y="82" class="av-title" font-size="13">Gated MLA</text>
+      <text x="44" y="102" class="av-sub">sigmoid(gate) · mla_attention</text>
+      <text x="44" y="120" class="av-sub">latent KV cache · kv_lora decompress</text>
+      <rect class="av-box" x="324" y="56" width="250" height="76" rx="10"/>
+      <text x="344" y="82" class="av-title" font-size="13">MoE</text>
+      <text x="344" y="102" class="av-sub">sigmoid group-limited top-k</text>
+      <text x="344" y="120" class="av-sub">64 routed + shared SwiGLU experts</text>
+      <rect class="av-box" x="624" y="56" width="250" height="76" rx="10"/>
+      <text x="644" y="82" class="av-title" font-size="13">FarSkip residual</text>
+      <text x="644" y="102" class="av-sub">two streams: main + routed-free</text>
+      <text x="644" y="120" class="av-sub">stitched mechanically, fail-closed</text>
+      <path d="M274,94 L320,94" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+      <path d="M574,94 L620,94" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#av-arrow)"/>
+
+      <text x="24" y="196" class="av-band">Position contract</text>
+      <rect class="av-box" x="24" y="212" width="520" height="64" rx="10"/>
+      <text x="44" y="238" class="av-title" font-size="13">Partial interleaved YaRN</text>
+      <text x="44" y="258" class="av-sub">rotary subset · interleaved pairing · YaRN long-context scaling</text>
+
+      <rect class="av-box" x="624" y="212" width="250" height="64" rx="10"/>
+      <text x="644" y="238" class="av-title" font-size="13">BF16 safetensors</text>
+      <text x="644" y="258" class="av-sub">safetensors → BUMP · no GGUF lane yet</text>
+
+      <text x="24" y="330" class="av-cap">Evidence (PR #389): coherent chat E2E · top-1 matches PyTorch at the tested checkpoint · full-logit cosine 0.999976927 (32-token X-Ray checkpoint, 30 GiB runtime).</text>
+      <text x="24" y="352" class="av-cap">Caveats: quantized GGUF and long trajectories uncertified; high-memory E2E lane is follow-up work.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="av-note">MLA provider math: <a href="kernel-architecture.html">kernel architecture — MLA</a> and
+      <a href="v8-mla-kimi.html">v8 MLA / Kimi</a>. The FarSkip shared-combine provider
+      (<code>farskip_swiglu_shared_combine_bf16</code>) is <strong>candidate</strong> status.</p>
+  </div>
+
+  <div class="av-section">
+    <h2>Nemotron-H — Mamba2 state, sparse attention, ReLU2 experts</h2>
+    <p style="color: var(--text-secondary);">
+      Nemotron Nano 9B v2 mixes three block types. The contract that mattered most: Mamba2 state is
+      <code>[heads, head_dim, state_dim]</code>, not a square DeltaNet-style matrix — the template carries that shape
+      explicitly instead of reusing the DeltaNet kernels.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 380" width="100%" role="img" tabindex="0" data-svg-title="Nemotron-H variant map"
+         aria-label="Nemotron-H architecture variant: hybrid blocks of full attention without RoPE, Mamba2 selective-scan blocks with state shaped heads by head-dim by state-dim, and MoE blocks with group-limited top-k router and ReLU2 experts; KV stored after v_proj; native BPE encode by default."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <text x="24" y="40" class="av-band">Block kinds</text>
+      <rect class="av-box" x="24" y="56" width="300" height="92" rx="10"/>
+      <text x="44" y="82" class="av-title" font-size="13">Attention (no RoPE)</text>
+      <text x="44" y="102" class="av-sub">sparse attention layers</text>
+      <text x="44" y="122" class="av-sub">KV stored after v_proj</text>
+      <rect class="av-box" x="354" y="56" width="300" height="92" rx="10"/>
+      <text x="374" y="82" class="av-title" font-size="13">Mamba2</text>
+      <text x="374" y="102" class="av-sub">selective scan · dt softplus+clamp</text>
+      <text x="374" y="122" class="av-sub">state [heads, head_dim, state_dim]</text>
+      <rect class="av-box" x="684" y="56" width="300" height="92" rx="10"/>
+      <text x="704" y="82" class="av-title" font-size="13">MoE — ReLU2 experts</text>
+      <text x="704" y="102" class="av-sub">group-limited top-k router</text>
+      <text x="704" y="122" class="av-sub">moe_relu2_expert_forward/backward</text>
+
+      <text x="24" y="212" class="av-band">Why DeltaNet kernels were not reused</text>
+      <rect class="av-box" x="24" y="228" width="960" height="64" rx="10"/>
+      <text x="44" y="254" class="av-sub">DeltaNet: S is a square per-head state matrix updated by outer products.</text>
+      <text x="44" y="274" class="av-sub">Mamba2: state is per-(head, head_dim, state_dim) with a diagonal exp(dt·a) decay — different shape, different update, different kernels.</text>
+
+      <text x="24" y="346" class="av-cap">Evidence: GGUF Q4_K_M coherent text E2E; safetensors/PyTorch parity lane covers Mamba2 stitching and state-shape guardrails.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="av-note">Mamba2 update math and the decode contract:
+      <a href="concepts.html">concepts — Nemotron-H hybrid circuit</a>; provider list:
+      <a href="kernel-architecture.html">kernel architecture — recurrent/SSM</a>.</p>
+  </div>
+
+  <div id="av-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="av-ov-bar">
+      <span class="av-ov-title" id="av-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="av-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="av-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="av-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="av-ov-stage" id="av-ov-stage"><img id="av-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('av-svg-overlay');
+      var stage = document.getElementById('av-ov-stage');
+      var img = document.getElementById('av-ov-img');
+      var title = document.getElementById('av-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('av-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('av-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('av-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('av-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+</div>

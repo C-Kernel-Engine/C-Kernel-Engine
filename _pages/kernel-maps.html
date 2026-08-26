@@ -18,6 +18,21 @@
 .km-dot.floor{background:var(--green)}
 .km-dot.ceiling{background:#fb7185}
 .km-tag{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.35);color:var(--text-secondary);border-radius:999px;padding:.18rem .55rem;display:inline-block;margin:.15rem .25rem .15rem 0}
+.km-details{border:1px solid var(--grey);border-radius:8px;margin:1rem 0;background:rgba(255,255,255,.02)}
+.km-details>summary{padding:.7rem 1rem;cursor:pointer;font-weight:600;color:var(--orange)}
+.km-details>.km-details-body{padding:0 1rem 1rem}
+.km-details pre{margin:.5rem 0 0}
+.km-prov{font-size:.78rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.svg-expand{position:relative}
+.svg-expand svg{cursor:zoom-in}
+.svg-expand svg:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
+.svg-expand-hint{text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:-.6rem;margin-bottom:1rem;font-family:'JetBrains Mono',monospace}
+#km-svg-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.95);padding:3.2rem 1rem 1rem}
+#km-svg-overlay .km-ov-bar{position:fixed;top:0;left:0;right:0;padding:.55rem 1rem;background:rgba(0,0,0,.9);border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;gap:.6rem}
+#km-svg-overlay .km-ov-title{color:#ccc;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#km-svg-overlay .km-ov-bar button{background:#333;color:#ffb400;border:1px solid #555;padding:.3rem .7rem;cursor:pointer;border-radius:4px;font-size:.85rem}
+#km-svg-overlay .km-ov-stage{width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
+#km-svg-overlay .km-ov-stage img{max-width:none;height:auto}
 main code{overflow-wrap:anywhere}
 @media (max-width:700px){.km-table{display:block;max-width:100%;overflow-x:auto}.km-table td:first-child{white-space:normal}}
 </style>
@@ -26,7 +41,7 @@ main code{overflow-wrap:anywhere}
 
 <p class="lead">
     How CKE v8 decides <em>which physical C kernel</em> executes each logical operation — and why that decision
-    lives in 284 machine-checked JSON maps instead of in Python conditionals.
+    lives in 297 machine-checked JSON maps instead of in Python conditionals.
 </p>
 
 <div class="alert alert-warning">
@@ -42,6 +57,31 @@ main code{overflow-wrap:anywhere}
     </div>
 </div>
 
+<h2>Choose Your Path</h2>
+
+<div class="km-grid">
+  <div class="km-card">
+    <h3>Understand the maps</h3>
+    <p>Start with the <a href="#anatomy">annotated anatomy</a> and the <a href="#taxonomy">six field groups</a>; background math lives in <a href="concepts.html">Deep Dive Concepts</a>.</p>
+  </div>
+  <div class="km-card">
+    <h3>Add a provider</h3>
+    <p>Follow the <a href="#contributor-recipe">end-to-end contributor recipe</a>: map JSON &rarr; schema validation &rarr; registry &rarr; parity &rarr; generated C.</p>
+  </div>
+  <div class="km-card">
+    <h3>Diagnose a selection</h3>
+    <p>Read the <a href="#selection-trace">resolver trace</a> — every rejection carries a recorded reason; the full evidence pipeline is <a href="xray.html">X-Ray</a>.</p>
+  </div>
+  <div class="km-card">
+    <h3>Add an ISA variant</h3>
+    <p>Variants are gated by <code>requires</code> in the map's <code>impl</code> block — see the <a href="#field-reference">field reference</a> and <a href="kernel-architecture.html">v8 Kernel Architecture</a>.</p>
+  </div>
+  <div class="km-card">
+    <h3>Define scratch / arenas</h3>
+    <p>See <a href="#memory-planning">memory planning</a>: sizing formulas, alignment, arena offsets, and fail-closed validation; runtime-side setup is in the <a href="v8-runbook.html">v8 Runbook</a>.</p>
+  </div>
+</div>
+
 <h2>The Three-Level Separation — and Why</h2>
 
 <p>
@@ -51,7 +91,7 @@ main code{overflow-wrap:anywhere}
 </p>
 
 <div class="img-container svg-viewer km-flow" data-title="The three-level stack: circuit, DSL resolver, kernel map, C kernel, with what each level owns">
-  <img src="assets/kernel-maps-layers.svg" alt="Four-level stack. Level 1, the circuit in version/v8/circuits, owns what math is required: op instances, named port edges and required numerical contracts, and must not name physical provider IDs. Level 2, the DSL resolver in build_ir_v8.py, owns which provider runs: mechanical matching on contract, phase, dtype, shape, layout, ISA and alias safety, with no model-name checks. Level 3, the 284 kernel maps in version/v8/kernel_maps, own how the op is executed: numerical-contract identity, port dtype, layout, stride, storage, persistent-state and alias semantics, call ABI, lifecycle and priority. Level 4, the C kernel, owns nothing but the math.">
+  <img src="assets/kernel-maps-layers.svg" alt="Four-level stack. Level 1, the circuit in version/v8/circuits, owns what math is required: op instances, named port edges and required numerical contracts, and must not name physical provider IDs. Level 2, the DSL resolver in build_ir_v8.py, owns which provider runs: mechanical matching on contract, phase, dtype, shape, layout, ISA and alias safety, with no model-name checks. Level 3, the 297 kernel maps in version/v8/kernel_maps, own how the op is executed: numerical-contract identity, port dtype, layout, stride, storage, persistent-state and alias semantics, call ABI, lifecycle and priority. Level 4, the C kernel, owns nothing but the math.">
 </div>
 
 <div class="km-grid">
@@ -61,7 +101,7 @@ main code{overflow-wrap:anywhere}
   </div>
   <div class="km-card">
     <h3>Kernel maps own the physical</h3>
-    <p><code>version/v8/kernel_maps/*.json</code> — 284 maps — own the operation interface, numerical-contract identity, port dtype/layout/stride/storage, prefill/decode phase support, persistent-state and alias semantics, the C call ABI, lifecycle status, and priority.</p>
+    <p><code>version/v8/kernel_maps/*.json</code> — 297 maps — own the operation interface, numerical-contract identity, port dtype/layout/stride/storage, prefill/decode phase support, persistent-state and alias semantics, the C call ABI, lifecycle status, and priority.</p>
   </div>
   <div class="km-card">
     <h3>The DSL resolves mechanically</h3>
@@ -69,7 +109,7 @@ main code{overflow-wrap:anywhere}
   </div>
 </div>
 
-<h2>Anatomy of a Kernel Map</h2>
+<h2 id="anatomy">Anatomy of a Kernel Map</h2>
 
 <p>
     <code>version/v8/kernel_maps/memcpy.json</code> is the canonical annotated example — the production map behind
@@ -89,9 +129,9 @@ main code{overflow-wrap:anywhere}
 
 <table class="km-table">
   <tr><th>Field</th><th>Type</th><th>Rule</th></tr>
-  <tr><td>status</td><td><code>production | candidate | diagnostic | deprecated</code></td><td>Lifecycle rank. Only <code>production</code> providers auto-select; candidate, diagnostic, and deprecated never do.</td></tr>
+  <tr><td>status</td><td><code>production | candidate | diagnostic | deprecated</code></td><td>Lifecycle rank. Explicit candidate, diagnostic, and deprecated providers never auto-select. A map <em>without</em> a selection block is an implicit <code>legacy</code> provider: it stays eligible as a compatibility fallback and ranks below production &mdash; migration debt, not an unreachable provider.</td></tr>
   <tr><td>priority</td><td>integer</td><td>Ranks providers <strong>within one equivalence group only</strong>. It cannot compare across groups.</td></tr>
-  <tr><td>equivalence_group</td><td>non-empty string</td><td>Mandatory. A provider that omits it is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
+  <tr><td>equivalence_group</td><td>non-empty string</td><td>Mandatory once a <code>selection</code> block exists. An explicit provider that omits it is a <code>HARD KERNEL SELECTION FAULT</code>.</td></tr>
   <tr><td>phases</td><td>non-empty unique list of <code>init | prefill | decode | training | backward</code></td><td>Declares which execution phases the provider supports.</td></tr>
 </table>
 
@@ -104,7 +144,101 @@ main code{overflow-wrap:anywhere}
     states this is a byte copy, performs no arithmetic, and is undefined for overlapping writable views.
 </p>
 
-<h2>Reading a Kernel Map: Field Reference</h2>
+<h2 id="taxonomy">Parameter Taxonomy: Six Field Groups</h2>
+
+<p>
+    Every field in a kernel map answers exactly one of six questions. Keeping the groups distinct is what lets
+    the resolver treat them differently: compatibility fields <em>filter</em>, ranking fields <em>order the
+    survivors</em>, and memory/scheduling fields never influence numerics at all.
+</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 640" width="100%" role="img" tabindex="0" data-svg-title="Kernel-map parameter taxonomy — six field groups"
+     aria-label="A kernel map JSON document feeds six field groups. Identity and numerical contract: id, op, variant, operation_interface, numerical_contract and numerical_capabilities, the names a circuit binds to. Compatibility: quant weight, activation and output dtypes, port dtype shape and layout, phases and ISA requires, alias and overlap rules, used by the filter stage to reject with a recorded reason. Scheduling: parallelization strategies and per-phase preference, chunk and alignment minimums, phase_selection; scheduling never changes numerics. Memory: scratch size_bytes formulas, power-of-two alignment, lifetime such as model_runtime, weight_preparation prepared bytes with an aggregate budget; feeds the arena planner. Ranking: selection status, priority within one equivalence group, equivalence_group, direction and activation preference; ordering happens only after filters pass. Evidence: tests parity oracles, reference scalar oracle, tolerances or bit-exact comparison, production reference comparison; promotion requires proof."
+     style="max-width:1180px;margin:.5rem auto 1rem;display:block;font-family:'Inter',system-ui,sans-serif;">
+  <style>
+    .tx-hub{fill:#263242;stroke:#07adf8;stroke-width:1.6;}
+    .tx-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .tx-title{fill:#f5f5f5;font-size:14.5px;font-weight:700;}
+    .tx-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .tx-note{fill:#7fd4a3;font-size:11px;font-family:'JetBrains Mono',monospace;}
+    .tx-cap{fill:#808080;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="tx-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <rect class="tx-hub" x="24" y="240" width="220" height="150" rx="12"/>
+  <text x="44" y="292" class="tx-title" font-size="16">kernel map</text>
+  <text x="44" y="316" class="tx-sub">one JSON document</text>
+  <text x="44" y="334" class="tx-sub">per provider</text>
+  <text x="44" y="366" class="tx-sub">version/v8/kernel_maps/</text>
+
+  <g>
+    <rect class="tx-box" x="300" y="30" width="272" height="250" rx="12"/>
+    <text x="320" y="62"  class="tx-title">1 · identity &amp; contract</text>
+    <text x="320" y="92"  class="tx-sub">id · op · variant</text>
+    <text x="320" y="112" class="tx-sub">operation_interface</text>
+    <text x="320" y="132" class="tx-sub">numerical_contract</text>
+    <text x="320" y="152" class="tx-sub">numerical_capabilities</text>
+    <text x="320" y="258" class="tx-note">the names a circuit binds to</text>
+
+    <rect class="tx-box" x="596" y="30" width="272" height="250" rx="12"/>
+    <text x="616" y="62"  class="tx-title">2 · compatibility</text>
+    <text x="616" y="92"  class="tx-sub">quant {weight, act, out}</text>
+    <text x="616" y="112" class="tx-sub">port dtype · shape · layout</text>
+    <text x="616" y="132" class="tx-sub">phases · ISA requires</text>
+    <text x="616" y="152" class="tx-sub">alias &amp; overlap rules</text>
+    <text x="616" y="258" class="tx-note">filter stage: reject with reason</text>
+
+    <rect class="tx-box" x="892" y="30" width="272" height="250" rx="12"/>
+    <text x="912" y="62"  class="tx-title">3 · scheduling</text>
+    <text x="912" y="92"  class="tx-sub">parallelization strategies</text>
+    <text x="912" y="112" class="tx-sub">preferred per phase</text>
+    <text x="912" y="132" class="tx-sub">chunk &amp; alignment mins</text>
+    <text x="912" y="152" class="tx-sub">phase_selection</text>
+    <text x="912" y="258" class="tx-note">never changes numerics</text>
+
+    <rect class="tx-box" x="300" y="330" width="272" height="250" rx="12"/>
+    <text x="320" y="362" class="tx-title">4 · memory</text>
+    <text x="320" y="392" class="tx-sub">scratch size_bytes formula</text>
+    <text x="320" y="412" class="tx-sub">alignment (power of two)</text>
+    <text x="320" y="432" class="tx-sub">lifetime: model_runtime</text>
+    <text x="320" y="452" class="tx-sub">weight_preparation + budget</text>
+    <text x="320" y="558" class="tx-note">feeds the arena planner</text>
+
+    <rect class="tx-box" x="596" y="330" width="272" height="250" rx="12"/>
+    <text x="616" y="362" class="tx-title">5 · ranking</text>
+    <text x="616" y="392" class="tx-sub">selection.status</text>
+    <text x="616" y="412" class="tx-sub">priority (within group)</text>
+    <text x="616" y="432" class="tx-sub">equivalence_group</text>
+    <text x="616" y="452" class="tx-sub">direction · act preference</text>
+    <text x="616" y="558" class="tx-note">orders survivors, after filters</text>
+
+    <rect class="tx-box" x="892" y="330" width="272" height="250" rx="12"/>
+    <text x="912" y="362" class="tx-title">6 · evidence</text>
+    <text x="912" y="392" class="tx-sub">tests: parity oracles</text>
+    <text x="912" y="412" class="tx-sub">reference: scalar oracle</text>
+    <text x="912" y="432" class="tx-sub">tolerances · bit_exact</text>
+    <text x="912" y="452" class="tx-sub">production.reference_comparison</text>
+    <text x="912" y="558" class="tx-note">promotion requires proof</text>
+  </g>
+
+  <path d="M244,300 L296,155"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+  <path d="M244,305 L592,155"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+  <path d="M244,310 L888,155"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+  <path d="M244,330 L296,455"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+  <path d="M244,325 L592,455"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+  <path d="M244,320 L888,455"  fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#tx-arrow)"/>
+
+  <text x="24" y="622" class="tx-cap">groups 1–2 decide eligibility · group 5 orders what survives · groups 3–4 schedule and place · group 6 justifies promotion</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<h2 id="field-reference">Reading a Kernel Map: Field Reference</h2>
 
 <p>
     The anatomy figure above shows the shape of one map. This section is the member-by-member reference:
@@ -126,6 +260,9 @@ main code{overflow-wrap:anywhere}
   different piece of the hardened format — that is deliberate, and the page says so per example.
 </div>
 
+<details class="km-details">
+  <summary>Full field-by-field reference table (19 rows)</summary>
+  <div class="km-details-body">
 <table class="km-table">
   <tr><th>Field</th><th>What it means</th><th>Consumed by</th><th>If missing or wrong</th></tr>
   <tr><td>id</td><td>Registry identity of the provider.</td><td>Resolver, X-Ray (selections and rejections are recorded by id), audits.</td><td>Every map has one in practice; X-Ray and audit output key on it.</td></tr>
@@ -146,6 +283,8 @@ main code{overflow-wrap:anywhere}
   <tr><td>reference</td><td>The scalar contract oracle: reference function, adapter, validation status, and external oracles. <code>production.reference_comparison</code> can demand <code>bit_exact</code> agreement.</td><td>Parity gates.</td><td>Optional extension; where present, the optimized path must match the oracle's reduction order.</td></tr>
   <tr><td>phase_selection, production, implementation</td><td>Map-specific extension blocks: per-phase kernel families and scheduling policy, the production function with its comparison requirement, and execution metadata (ISA dispatch style, storage formats, threading runtime).</td><td>Lowering, resolver, parity gates.</td><td>Optional; richer maps carry them, minimal maps omit them.</td></tr>
 </table>
+  </div>
+</details>
 
 <h2>Worked Example 1: memcpy — the Baseline Read</h2>
 
@@ -155,6 +294,9 @@ main code{overflow-wrap:anywhere}
     (<code>…</code> marks elided lines):
 </p>
 
+<details class="km-details">
+  <summary>Verbatim map excerpt: memcpy.json</summary>
+  <div class="km-details-body">
 <pre><code>{
   "id": "memcpy",
   "op": "residual_save",
@@ -174,6 +316,8 @@ main code{overflow-wrap:anywhere}
     {"name": "size", "source": "dim:_memcpy_bytes"} ]},
   "tests": {}
 }</code></pre>
+  </div>
+</details>
 
 <p><strong>How to read it.</strong> The resolver reaches this map when a circuit needs
 <code>residual_save</code> in prefill or decode: the <code>selection</code> block makes it eligible in both
@@ -195,6 +339,9 @@ a copy with one possible behavior.</p>
   <img src="assets/kernel-maps-gemm-anatomy.svg" alt="Six field groups of the Q8 GEMM kernel map. Blue groups also exist in memcpy.json: identity plus selection with status production, priority 200 and prefill-only phases; ports A and B in Q8_0, optional FP32 bias, FP32 output C, with quant q8_0, q8_0, fp32; and a map-owned seven-argument call ABI. Purple groups are absent from memcpy.json: the numerical contract whose equivalence group name q8_0_weight_q8_0_input_llama_fp32_output encodes the arithmetic so priority never picks across numerics; ISA variants avx2_m2n4, avx2 and avx_vnni gated by requires and compile flags; and validation oracles with a scalar reference function and a bit-exact llama.cpp parity test.">
 </div>
 
+<details class="km-details">
+  <summary>Verbatim map excerpt: gemm_nt_q8_0_q8_0.json</summary>
+  <div class="km-details-body">
 <pre><code>{
   "id": "gemm_nt_q8_0_q8_0",
   "op": "gemm",
@@ -230,6 +377,8 @@ a copy with one possible behavior.</p>
     {"name": "K", "source": "dim:_input_dim"} ]},
   …
 }</code></pre>
+  </div>
+</details>
 
 <p><strong>How the resolver uses it.</strong> Three facts interact:</p>
 
@@ -263,6 +412,9 @@ migration ratchet tracks.</p>
     excerpt:
 </p>
 
+<details class="km-details">
+  <summary>Verbatim map excerpt: kv_cache_store_bf16.json</summary>
+  <div class="km-details-body">
 <pre><code>{
   "id": "kv_cache_store_bf16",
   "op": "kv_cache_store",
@@ -293,6 +445,8 @@ migration ratchet tracks.</p>
     {"name": "head_dim", "source": "dim:head_dim"}, {"name": "max_seq_len", "source": "dim:max_seq_len"} ]},
   …
 }</code></pre>
+  </div>
+</details>
 
 <p><strong>How to read it.</strong></p>
 
@@ -321,33 +475,96 @@ migration ratchet tracks.</p>
     resolver knows about a provider comes from these fields, and everything it rejects leaves a recorded reason.
 </p>
 
-<h2>The Resolution Algorithm</h2>
+<h2 id="resolution">The Resolution Algorithm</h2>
 
 <p>
-    Provider selection lives in <code>_provider_selection_metadata</code> and <code>_rank_provider_matches</code>
-    (<code>build_ir_v8.py:5666-5770</code>). The pipeline:
+    Provider selection lives in <code>_provider_selection_metadata</code>, <code>_rank_provider_matches</code>,
+    and <code>find_kernel</code> in <code>version/v8/scripts/build_ir_v8.py</code>. The pipeline:
 </p>
 
 <div class="img-container svg-viewer km-flow" data-title="Resolver flow: compatibility filters before priority ranking, fail closed on tie or empty result, X-Ray evidence">
-  <img src="assets/kernel-maps-resolver-flow.svg" alt="Resolver flow. 284 candidate kernel maps enter compatibility filters — required numerical contracts, phase, dtype, shape, layout, ISA and alias safety — where any mismatch is rejected with a recorded reason and a missing equivalence group is a hard selection fault. Survivors rank by direction, activation preference, lifecycle with production first, then priority within one group only; candidate, diagnostic and deprecated never auto-select. Three outcomes: exactly one provider left is selected before GraphIR and preserved through generated C; no compatible provider fails closed as a compile-time error; an equal-priority production tie is a hard fault — ambiguous within a group, and priority cannot choose across groups. X-Ray records the selected provider plus every rejection reason, proving compatibility rejection precedes priority ranking.">
+  <img src="assets/kernel-maps-resolver-flow.svg" alt="Resolver flow. 297 candidate kernel maps enter compatibility filters — required numerical contracts, phase, dtype, shape, layout, ISA and alias safety — where any mismatch is rejected with a recorded reason and a missing equivalence group is a hard selection fault. Survivors rank by direction, activation preference, lifecycle with production first, then priority within one group only; candidate, diagnostic and deprecated never auto-select. Three outcomes: exactly one provider left is selected before GraphIR and preserved through generated C; no compatible provider fails closed as a compile-time error; an equal-priority production tie is a hard fault — ambiguous within a group, and priority cannot choose across groups. X-Ray records the selected provider plus every rejection reason, proving compatibility rejection precedes priority ranking.">
 </div>
 
 <ol>
-  <li><strong>Validate selection metadata.</strong> Every provider must declare an <code>equivalence_group</code>; a missing or malformed <code>selection</code> block is a <code>HARD KERNEL SELECTION FAULT</code>. Providers with no <code>selection</code> block at all are treated as legacy.</li>
+  <li><strong>Validate selection metadata.</strong> Every explicit provider must declare an <code>equivalence_group</code>; a malformed <code>selection</code> block (bad status, non-integer priority, empty group) is a <code>HARD KERNEL SELECTION FAULT</code>. Providers with no <code>selection</code> block at all are implicit legacy: they stay eligible and rank below production. Explicit candidate, diagnostic, and deprecated providers are rejected here with a recorded reason.</li>
   <li><strong>Filter by compatibility.</strong> Contract identity, phase, dtype, shape, layout, ISA, and alias safety — any mismatch rejects the provider with a recorded reason.</li>
   <li><strong>Rank the survivors.</strong> The ranking tuple is direction (inference vs backward) &rarr; activation preference &rarr; lifecycle rank (<code>production</code> first) &rarr; priority (higher wins, within the group).</li>
   <li><strong>Fail closed on ambiguity.</strong> A tie among explicit production providers raises <code>"equal-priority production providers are ambiguous"</code> when they share a group, or <code>"priority cannot choose between different equivalence groups"</code> when they do not. Zero compatible providers is also a compile-time failure — the build never silently substitutes different numerics.</li>
 </ol>
 
+<h3 id="selection-trace">A Real Resolver Trace</h3>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Provider selection trace — real X-Ray fixture"
+     aria-label="Resolver trace for op residual_add in prefill with fp32 weights, recorded as one X-Ray entry per decision. Row 1: provider candidate_900, status candidate, priority 900, stage provider_selection, rejected with reason status_not_production candidate. Row 2: provider wrong_phase_800, status production, priority 800, stage provider_selection, rejected with reason phase_mismatch. Row 3: provider wrong_dtype_700, status production, priority 700, stage dtype_compatibility, rejected with reason weight_dtype_mismatch. Row 4: provider compatible_100, status production, priority 100, stage priority_ranking, selected at rank 0. Every rejection is recorded before any priority ranking begins."
+     style="max-width:1180px;margin:.5rem auto 1rem;display:block;font-family:'Inter',system-ui,sans-serif;">
+  <style>
+    .tr-head{fill:#808080;font-size:11.5px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;}
+    .tr-cell{fill:#e8e8e8;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+    .tr-rej{fill:#fb7185;font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+    .tr-sel{fill:#7fd4a3;font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+    .tr-row-r{fill:rgba(251,113,133,.06);stroke:rgba(251,113,133,.4);stroke-width:1;}
+    .tr-row-s{fill:rgba(48,196,141,.08);stroke:rgba(48,196,141,.5);stroke-width:1.4;}
+    .tr-cap{fill:#808080;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+  </style>
+
+  <text x="24" y="34" class="tr-cell" fill="#b0b0b0">op residual_add · prefill · weight dtype fp32 — one X-Ray entry per decision</text>
+
+  <g>
+    <text x="48"  y="76" class="tr-head">provider</text>
+    <text x="330" y="76" class="tr-head">status</text>
+    <text x="480" y="76" class="tr-head">priority</text>
+    <text x="620" y="76" class="tr-head">stage</text>
+    <text x="880" y="76" class="tr-head">decision · reason</text>
+
+    <rect class="tr-row-r" x="24" y="92"  width="1132" height="52" rx="10"/>
+    <text x="48"  y="124" class="tr-cell">candidate_900</text>
+    <text x="330" y="124" class="tr-cell">candidate</text>
+    <text x="480" y="124" class="tr-cell">900</text>
+    <text x="620" y="124" class="tr-cell">provider_selection</text>
+    <text x="880" y="124" class="tr-rej">rejected — status_not_production:candidate</text>
+
+    <rect class="tr-row-r" x="24" y="156" width="1132" height="52" rx="10"/>
+    <text x="48"  y="188" class="tr-cell">wrong_phase_800</text>
+    <text x="330" y="188" class="tr-cell">production</text>
+    <text x="480" y="188" class="tr-cell">800</text>
+    <text x="620" y="188" class="tr-cell">provider_selection</text>
+    <text x="880" y="188" class="tr-rej">rejected — phase_mismatch</text>
+
+    <rect class="tr-row-r" x="24" y="220" width="1132" height="52" rx="10"/>
+    <text x="48"  y="252" class="tr-cell">wrong_dtype_700</text>
+    <text x="330" y="252" class="tr-cell">production</text>
+    <text x="480" y="252" class="tr-cell">700</text>
+    <text x="620" y="252" class="tr-cell">dtype_compatibility</text>
+    <text x="880" y="252" class="tr-rej">rejected — weight_dtype_mismatch</text>
+
+    <rect class="tr-row-s" x="24" y="284" width="1132" height="52" rx="10"/>
+    <text x="48"  y="316" class="tr-cell">compatible_100</text>
+    <text x="330" y="316" class="tr-cell">production</text>
+    <text x="480" y="316" class="tr-cell">100</text>
+    <text x="620" y="316" class="tr-cell">priority_ranking</text>
+    <text x="880" y="316" class="tr-sel">selected — rank 0</text>
+  </g>
+
+  <text x="24" y="386" class="tr-cap">version/v8/tests/fixtures/xray/provider_selection_trace.json — recorded by the live resolver, pinned verbatim by tests/test_v8_shared_provider_migration.py</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
 <p>
-    <strong>Evidence, not assertion.</strong> The X-Ray fixture
-    <code>version/v8/tests/fixtures/xray/provider_selection_trace.json</code> records a real selection trace:
-    a <code>candidate</code> provider with priority 900 is rejected for <code>status_not_production</code>,
-    a priority-800 production provider for <code>phase_mismatch</code>, and a priority-700 production provider
-    for <code>weight_dtype_mismatch</code> — all before the compatible priority-100 production provider is
-    selected at rank 0. Higher priority loses to incompatibility every time, because compatibility filtering
-    happens <em>before</em> priority ranking. See <a href="xray.html">X-Ray: Evidence and Divergence
-    Attribution</a> for the full evidence pipeline this trace belongs to.
+    <strong>Evidence, not assertion.</strong> This is not an illustrative mock-up: the X-Ray fixture
+    <code>version/v8/tests/fixtures/xray/provider_selection_trace.json</code> records a real selection trace from
+    the live resolver, and <code>tests/test_v8_shared_provider_migration.py</code>
+    (<code>test_filtering_precedes_priority_ranking</code>) regenerates the trace and asserts it matches the
+    fixture exactly — including that every rejection is recorded <em>before</em> any priority-ranking entry.
+    In the trace, a <code>candidate</code> provider with priority 900 is rejected for
+    <code>status_not_production</code>, a priority-800 production provider for <code>phase_mismatch</code>, and a
+    priority-700 production provider for <code>weight_dtype_mismatch</code> — all before the compatible
+    priority-100 production provider is selected at rank 0. Higher priority loses to incompatibility every time,
+    because compatibility filtering happens <em>before</em> priority ranking. See
+    <a href="xray.html">X-Ray: Evidence and Divergence Attribution</a> for the full evidence pipeline this trace
+    belongs to.
 </p>
 
 <h2>Case Study: residual_save &rarr; memcpy</h2>
@@ -380,12 +597,148 @@ migration ratchet tracks.</p>
     page; it is not re-explained here.
 </p>
 
+<h2 id="memory-planning">Memory Planning: From Port Shapes to a Checked Arena</h2>
+
+<p>
+    Kernel maps declare memory symbolically; lowering turns the declarations into one arena with hard bounds.
+    Nothing allocates outside this flow — a kernel that needs workspace names a <code>scratch</code> port with a
+    sizing formula, and a kernel that keeps state marks the port <code>storage_class: "state"</code>. The pipeline,
+    all in <code>build_ir_v8.py</code> lowering with the arena emitted by <code>codegen_core_v8.py</code>:
+</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 640" width="100%" role="img" tabindex="0" data-svg-title="Memory planning flow — port shapes to fail-closed runtime validation"
+     aria-label="Six-stage memory planning flow. Stage 1, port shapes: symbolic shapes from the map's ports, such as M by K or KV by S_max by D; dims resolve to integers at lowering. Stage 2, sizing formula: scratch size_bytes is symbolic, for example ceil of N over 8 times K over 256 times sizeof the packed block, and weight_preparation declares prepared_bytes. Stage 3, alignment: every offset is aligned up to a power of two of at least 64 bytes; a non-power-of-two scratch alignment is a hard scratch contract fault. Stage 4, arena offset: a bump cursor assigns offsets, activations_base is align_up of the weights end to 64, and the layout carries one arena block. Stage 5, live range: lifetime model_runtime scratch persists for the process; storage_class state such as the KV cache is long-lived, not per-op. Stage 6, runtime validation: _validate_lowered_activation_memory requires every offset plus extent to land inside the arena, otherwise a hard fault — fail closed. Two callouts: prepared weights are repacked at load only when the aggregate fits the 2 GiB max_total_bytes budget, otherwise the named fallback provider serves; persistent KV state allocates physical capacity S_max rows while the valid-token count is tracked separately through the append index, and kernels never read or write beyond valid rows."
+     style="max-width:1180px;margin:.5rem auto 1rem;display:block;font-family:'Inter',system-ui,sans-serif;">
+  <style>
+    .mp-stage{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .mp-guard{fill:#323232;stroke:rgba(48,196,141,.55);stroke-width:1.6;}
+    .mp-title{fill:#f5f5f5;font-size:14.5px;font-weight:700;}
+    .mp-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .mp-cap{fill:#808080;font-size:12.5px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="mp-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <g>
+    <rect class="mp-stage" x="24"  y="40" width="352" height="150" rx="12"/>
+    <text x="44" y="72"  class="mp-title">1 · port shapes</text>
+    <text x="44" y="102" class="mp-sub">symbolic shapes from the map's ports:</text>
+    <text x="44" y="122" class="mp-sub">["M","K"] · ["KV","S_max","D"]</text>
+    <text x="44" y="150" class="mp-sub">dims resolve to integers at lowering</text>
+
+    <rect class="mp-stage" x="414" y="40" width="352" height="150" rx="12"/>
+    <text x="434" y="72"  class="mp-title">2 · sizing formula</text>
+    <text x="434" y="102" class="mp-sub">scratch.size_bytes is symbolic:</text>
+    <text x="434" y="122" class="mp-sub">ceil(N/8)·(K/256)·sizeof(block)</text>
+    <text x="434" y="150" class="mp-sub">weight_preparation.prepared_bytes</text>
+
+    <rect class="mp-stage" x="804" y="40" width="352" height="150" rx="12"/>
+    <text x="824" y="72"  class="mp-title">3 · alignment</text>
+    <text x="824" y="102" class="mp-sub">every offset align_up to a power of two</text>
+    <text x="824" y="122" class="mp-sub">(&#8805; 64 B); non-power-of-two scratch</text>
+    <text x="824" y="150" class="mp-sub">alignment = HARD SCRATCH CONTRACT FAULT</text>
+
+    <rect class="mp-stage" x="804" y="250" width="352" height="150" rx="12"/>
+    <text x="824" y="282" class="mp-title">4 · arena offset</text>
+    <text x="824" y="312" class="mp-sub">bump cursor assigns offsets;</text>
+    <text x="824" y="332" class="mp-sub">activations_base = align_up(weights_end, 64)</text>
+    <text x="824" y="360" class="mp-sub">layout carries one arena block</text>
+
+    <rect class="mp-stage" x="414" y="250" width="352" height="150" rx="12"/>
+    <text x="434" y="282" class="mp-title">5 · live range</text>
+    <text x="434" y="312" class="mp-sub">lifetime: model_runtime scratch persists;</text>
+    <text x="434" y="332" class="mp-sub">storage_class: state (KV cache) is</text>
+    <text x="434" y="360" class="mp-sub">long-lived state, not a per-op allocation</text>
+
+    <rect class="mp-guard" x="24"  y="250" width="352" height="150" rx="12"/>
+    <text x="44" y="282" class="mp-title">6 · runtime validation</text>
+    <text x="44" y="312" class="mp-sub">_validate_lowered_activation_memory:</text>
+    <text x="44" y="332" class="mp-sub">offset + extent inside the arena,</text>
+    <text x="44" y="360" class="mp-sub">else hard fault — fail closed</text>
+  </g>
+
+  <path d="M376,115 L408,115"  fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mp-arrow)"/>
+  <path d="M766,115 L798,115"  fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mp-arrow)"/>
+  <path d="M980,190 L980,244"  fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mp-arrow)"/>
+  <path d="M804,325 L772,325"  fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mp-arrow)"/>
+  <path d="M414,325 L382,325"  fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#mp-arrow)"/>
+
+  <g>
+    <rect class="mp-stage" x="24"  y="450" width="554" height="130" rx="12"/>
+    <text x="44" y="482" class="mp-title">prepared weights</text>
+    <text x="44" y="510" class="mp-sub">weight_preparation repacks at load (e.g. q4_k_packed_vnni_x8)</text>
+    <text x="44" y="530" class="mp-sub">only when the aggregate fits the 2 GiB max_total_bytes budget;</text>
+    <text x="44" y="550" class="mp-sub">otherwise the named fallback provider serves</text>
+
+    <rect class="mp-stage" x="602" y="450" width="554" height="130" rx="12"/>
+    <text x="622" y="482" class="mp-title">persistent KV state</text>
+    <text x="622" y="510" class="mp-sub">physical capacity S_max rows allocated; valid-token count</text>
+    <text x="622" y="530" class="mp-sub">tracked separately via the append index (runtime:pos) —</text>
+    <text x="622" y="550" class="mp-sub">kernels never read or write beyond valid rows</text>
+  </g>
+
+  <text x="24" y="622" class="mp-cap">lowering in build_ir_v8.py · one bump arena emitted by codegen_core_v8.py · plans certified by certify_model_memory_plans_v8.py</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<p>
+    The fail-closed property is the point: a map whose scratch formula overflows the arena, or whose alignment is
+    not a power of two, fails the build with a named hard fault — the runtime never discovers the overflow by
+    corruption. <code>version/v8/scripts/certify_model_memory_plans_v8.py</code> certifies per-model memory plans
+    against a checked-in baseline without compiling or executing model code.
+</p>
+
+<h2 id="contributor-recipe">Contributor Recipe: Map JSON to Generated C</h2>
+
+<p>The full lane for adding or changing a provider, with the scripts that enforce each step:</p>
+
+<ol>
+  <li><strong>Author the map.</strong> Create or edit <code>version/v8/kernel_maps/&lt;id&gt;.json</code>: <code>id</code>, <code>op</code>, a <code>selection</code> block (<code>status</code>, <code>priority</code>, <code>equivalence_group</code>, <code>phases</code>), typed ports with dtype/shape/layout, and <code>quant</code>.</li>
+  <li><strong>Pass schema validation.</strong> <code>tests/test_v8_provider_selection.py</code> validates every map's <code>selection</code> block against <code>version/v8/schemas/kernel_provider_selection.schema.json</code>, and <code>tests/test_v8_kernel_call_abi.py</code> validates each declared <code>call_abi</code> against <code>kernel_call_abi.schema.json</code>; <code>_validate_kernel_call_abi</code> in <code>build_ir_v8.py</code> additionally hard-faults a malformed ABI at build time.</li>
+  <li><strong>Regenerate the registry.</strong> <code>version/v8/scripts/ck_run_v8.py</code> rebuilds <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> — never hand-edit it.</li>
+  <li><strong>Run the audit.</strong> <code>python3 version/v8/scripts/audit_kernel_map_interfaces_v8.py --check</code> — the migration ratchet must not regress.</li>
+  <li><strong>Run the unit gates.</strong> <code>tests/test_v8_provider_selection.py</code>, <code>tests/test_v8_kernel_call_abi.py</code>, <code>tests/test_v8_shared_provider_migration.py</code>.</li>
+  <li><strong>Prove leaf parity.</strong> <code>version/v8/scripts/parity_test_v8.py</code> compares intermediate activations against llama.cpp dumps within declared tolerances.</li>
+  <li><strong>Inspect the resolver trace.</strong> Confirm your provider is selected (or rejected) for the reason you expect — every decision is recorded in the selection trace; <a href="#selection-trace">the fixture above</a> shows the format.</li>
+  <li><strong>Validate end to end.</strong> Codegen emits exactly the map-owned call ABI; <code>version/v8/scripts/run_regression_v8.py</code> (family regression lane) and <code>stitched_parity_v8.py</code> exercise the generated C. Promote <code>candidate</code> &rarr; <code>production</code> only with measured evidence.</li>
+</ol>
+
+<h2>Production-Readiness Checklist</h2>
+
+<ul>
+  <li>Valid <code>selection</code> block with a non-empty <code>equivalence_group</code> — a missing group is a <code>HARD KERNEL SELECTION FAULT</code>.</li>
+  <li><code>status: production</code> only with parity evidence attached; anything unproven stays <code>candidate</code>.</li>
+  <li><code>call_abi</code> version 1 whose <code>ports</code> cover every declared input/weight/output port — the audit cross-validates this.</li>
+  <li>Every ISA variant gated by <code>requires</code> with its own <code>compile_flags</code>, and a portable fallback variant or provider reachable.</li>
+  <li>Scratch sized by formula with power-of-two alignment and a declared <code>lifetime</code> — no hidden allocation.</li>
+  <li>A named numerical contract and reference oracle wherever the kernel performs arithmetic.</li>
+  <li><code>audit_kernel_map_interfaces_v8.py --check</code> passes with no ratchet regression.</li>
+</ul>
+
+<h2>Anti-Patterns the System Rejects</h2>
+
+<table class="km-table">
+  <tr><th>Anti-pattern</th><th>Why it is dangerous</th><th>What the map system does instead</th></tr>
+  <tr><td>hidden malloc</td><td>A kernel allocating its own workspace bypasses the arena and defeats memory certification.</td><td>All memory is declared — ports, <code>scratch</code> with <code>size_bytes</code>/<code>lifetime</code> — and codegen emits one bump arena with fail-closed bounds validation.</td></tr>
+  <tr><td>unknown ABI source</td><td>A call argument drawn from an unsupported namespace means codegen would guess at a value.</td><td><code>HARD CALL ABI FAULT</code>: unknown field, <code>version &ne; 1</code>, missing name/source, or a source outside the declared namespaces fails validation.</td></tr>
+  <tr><td>model-name branches in the DSL</td><td><code>if model == "…"</code> in the resolver produces silently different numerics per family.</td><td>Circuits state contracts; the resolver has no model-name checks. The remaining overrides are named debt tracked by the ratchet.</td></tr>
+  <tr><td>missing fallback provider</td><td>An ISA-gated or prepared path with no portable route leaves some hosts with zero providers.</td><td>Zero compatible providers is a compile-time failure, never a silent substitution; prepared paths name an explicit <code>fallback</code> provider.</td></tr>
+  <tr><td>ISA leakage</td><td>Compile flags or <code>#ifdef</code>s outside the variant system produce binaries that crash on unsupported hosts.</td><td>Variants carry <code>requires</code> and <code>compile_flags</code>; ineligible variants are filtered out by the resolver, never guessed at.</td></tr>
+  <tr><td>equal-priority tie</td><td>Two production providers at the same priority is a coin flip between kernels.</td><td>Hard fault: <em>"equal-priority production providers are ambiguous"</em> — resolve by changing priority or narrowing compatibility.</td></tr>
+  <tr><td>cross-group ranking</td><td>Comparing priority across equivalence groups swaps one arithmetic for another, silently.</td><td>Hard fault: <em>"priority cannot choose between different equivalence groups"</em> — priority ranks within one group only.</td></tr>
+</table>
+
 <h2>Evolution Timeline</h2>
 
 <p>An honest, PR-dated history. The direction is monotonic: physics moves into the maps, heuristics leave the DSL.</p>
 
 <div class="img-container svg-viewer km-flow" data-title="Timeline from legacy bindings to the agnostic-DSL end state">
-  <img src="assets/kernel-maps-evolution.svg" alt="Timeline with five milestones. Legacy era: kernel_bindings.json plus function-name ABI fallback, where naming conventions were the contract. PR 302: hardened provider selection with lifecycle status, priority and equivalence groups, and the operation-interface format. PR 305: shared RoPE, residual-copy and KV-cache providers migrated to maps. PRs 318 and 320: layout provider selection and direct-layout attention providers. Future, dashed: rebind circuits to hardened metadata and delete legacy branches, then attention and quantized GEMM migrations, ending in an agnostic DSL. A scoreboard strip shows the ratcheted burn-down: 32 hardened maps, 32 interface and ABI cross-validated, 131 map-owned call ABI, 43 selection-managed, 25 legacy-interface-ready, with ceilings of 54 contract-pending, 191 legacy, 73 legacy selection conditionals and 35 operation-specific conditionals. The baseline is monotonic: the audit fails if a floor drops or a ceiling rises.">
+  <img src="assets/kernel-maps-evolution.svg" alt="Timeline with five milestones. Legacy era: kernel_bindings.json plus function-name ABI fallback, where naming conventions were the contract. PR 302: hardened provider selection with lifecycle status, priority and equivalence groups, and the operation-interface format. PR 305: shared RoPE, residual-copy and KV-cache providers migrated to maps. PRs 318 and 320: layout provider selection and direct-layout attention providers. Future, dashed: rebind circuits to hardened metadata and delete legacy branches, then attention and quantized GEMM migrations, ending in an agnostic DSL. A scoreboard strip shows the ratcheted burn-down of hardened versus legacy maps and resolver conditionals — the current audited values are in the Migration Scoreboard table below. The baseline is monotonic: the audit fails if a floor drops or a ceiling rises.">
 </div>
 
 <ul>
@@ -400,28 +753,34 @@ migration ratchet tracks.</p>
 
 <p>
     <code>version/v8/contracts/kernel_interface_migration_baseline.json</code> is a <strong>monotonic ratchet</strong>
-    checked by <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code>: floors may only rise, ceilings
-    may only fall. The audit currently reports the baseline values exactly — this is the starting line the
-    burn-down is measured from:
+    checked by <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py --check</code>: floors may only rise,
+    ceilings may only fall. The current audit values against the checked-in ratchet bounds:
 </p>
 
 <table class="km-table">
-  <tr><th>Metric</th><th>Bound</th><th>Direction</th></tr>
-  <tr><td>hardened maps</td><td>&ge; 32</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>interface + ABI cross-validated</td><td>&ge; 32</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>map-owned call ABI</td><td>&ge; 131</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>selection-managed maps</td><td>&ge; 43</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>legacy-interface-ready maps</td><td>&ge; 25</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>contract-pending maps</td><td>&le; 54</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>legacy maps</td><td>&le; 191</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>legacy selection conditionals</td><td>&le; 73</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>operation-specific conditionals</td><td>&le; 35</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><th>Metric</th><th>Now (audit)</th><th>Ratchet bound</th><th>Direction</th></tr>
+  <tr><td>hardened maps</td><td>54</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>interface + ABI cross-validated</td><td>54</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>map-owned call ABI</td><td>161</td><td>&ge; 153</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>selection-managed maps</td><td>69</td><td>&ge; 65</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>legacy-interface-ready maps</td><td>34</td><td>&ge; 33</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>contract-pending maps</td><td>51</td><td>&le; 51</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy maps</td><td>188</td><td>&le; 188</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy selection conditionals</td><td>67</td><td>&le; 69</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>operation-specific conditionals</td><td>33</td><td>&le; 33</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
 </table>
+
+<p class="km-prov">
+    Generated from <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (297 maps) +
+    <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code> at commit <code>f49a85192</code> (2026-08).
+    Intended direction: these metrics should be regenerated during the docs build rather than hand-maintained —
+    that pipeline is not implemented yet, so until it is, this page is updated manually against audit output.
+</p>
 
 <h2>Is This Over-Engineered?</h2>
 
 <p>
-    Fair question — the project owner has asked it directly. 284 JSON maps, a schema for four fields, a ratchet
+    Fair question — the project owner has asked it directly. 297 JSON maps, a schema for four fields, a ratchet
     file, and an audit script can look like architecture for its own sake. The honest answer has three parts.
 </p>
 
@@ -432,7 +791,7 @@ migration ratchet tracks.</p>
   </div>
   <div class="km-card">
     <h3>The costs are real</h3>
-    <p>284 maps to maintain. 73 legacy selection conditionals still in the resolver. A migration still in flight, with named debt (RoPE, position embeddings, decode KV store) that has not yet moved into maps. Nobody should pretend this is finished or free.</p>
+    <p>297 maps to maintain. 67 legacy selection conditionals still in the resolver. A migration still in flight, with named debt (RoPE, position embeddings, decode KV store) that has not yet moved into maps. Nobody should pretend this is finished or free.</p>
   </div>
   <div class="km-card">
     <h3>Why it is not ceremony</h3>
@@ -446,5 +805,58 @@ migration ratchet tracks.</p>
   ratchet keeps tightening and conditionals keep leaving the DSL, the structure is paying for itself in
   eliminated ambiguity.
 </div>
+
+<div id="km-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+  <div class="km-ov-bar">
+    <span class="km-ov-title" id="km-ov-title">Diagram</span>
+    <span>
+      <button type="button" id="km-ov-out" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="km-ov-in" aria-label="Zoom in">+</button>
+      <button type="button" id="km-ov-close" aria-label="Close">&times;</button>
+    </span>
+  </div>
+  <div class="km-ov-stage" id="km-ov-stage"><img id="km-ov-img" alt=""></div>
+</div>
+
+<script>
+  (function() {
+    var overlay = document.getElementById('km-svg-overlay');
+    var stage = document.getElementById('km-ov-stage');
+    var img = document.getElementById('km-ov-img');
+    var title = document.getElementById('km-ov-title');
+    var scale = 1;
+    function applyScale() {
+      var base = Math.max(stage.clientWidth - 32, 280);
+      img.style.width = Math.round(base * scale) + 'px';
+    }
+    function open(svg) {
+      var xml = new XMLSerializer().serializeToString(svg);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+      img.alt = svg.getAttribute('aria-label') || 'diagram';
+      title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+      scale = 1;
+      overlay.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      img.onload = applyScale;
+      applyScale();
+      document.getElementById('km-ov-close').focus();
+    }
+    function close() {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+      svg.addEventListener('click', function() { open(svg); });
+      svg.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+      });
+    });
+    document.getElementById('km-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+    document.getElementById('km-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+    document.getElementById('km-ov-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+  })();
+</script>
 
 <p>Related: <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a>, <a href="architecture.html">System Architecture</a>, <a href="codegen.html">Code Generation</a>, <a href="gguf-bump.html">GGUF to Bump</a>, and <a href="architecture-links.html">Architecture Links</a>.</p>
