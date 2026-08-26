@@ -1190,6 +1190,25 @@ python -m pip install -r requirements-v8.txt</pre>
 
 <h2>Canonical Text Bring-Up</h2>
 
+<div class="card">
+    <h3 style="margin-top: 0;">Current Large-Model Evidence</h3>
+    <p>Support levels are intentionally separate: coherent execution does not imply bit-exact numerical parity, multimodal support, long-trajectory certification, or competitive performance.</p>
+    <table class="table">
+        <thead>
+            <tr><th>Family</th><th>Real-weight execution</th><th>Numerical evidence</th><th>Open boundary</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Qwen3.8 27B dense Q4_K_M</td><td>Coherent long text; 4,000-token trajectory</td><td>4,000/4,000 full-vocabulary rows and 4,011 internal rows bit-exact to llama.cpp</td><td>SVG answer hit the tested 4,096-token capacity; matched performance remains separate</td></tr>
+            <tr><td>Qwen3.5 35B-A3B Q4_K_M</td><td>Coherent text E2E</td><td>Quantized provider and trajectory gates are available</td><td>Continue long-context performance and broader prompt certification</td></tr>
+            <tr><td>Nemotron Nano 9B v2 Q4_K_M</td><td>Coherent text E2E</td><td>Mamba2/compiler contracts plus runtime smoke</td><td>Broader long-trajectory parity and performance</td></tr>
+            <tr><td>GLM4 9B Q4_K_M</td><td>Coherent text E2E</td><td>Partial-RoPE, FP16-KV, and llama.cpp parity coverage</td><td>Keep long-context and ISA regression lanes active</td></tr>
+            <tr><td>Instella-MoE 16B-A3B BF16</td><td>Coherent short text E2E</td><td>Top-1 matches PyTorch at the tested checkpoint; full-logit cosine 0.999976927</td><td>Short checkpoint only; quantized GGUF and long trajectories are not certified</td></tr>
+            <tr><td>Kimi-VL A3B BF16 text decoder</td><td>Coherent and repeatable text E2E on Intel AVX2 and Ryzen AVX-512</td><td>First token and top-20 ranking match PyTorch; full-logit cosine 0.997696</td><td>Internal drift becomes material near layer 7; MoonViT bridge is not certified</td></tr>
+            <tr><td>Laguna-S 2.1 Q4_K_M</td><td>Active numerical bring-up</td><td>Mixed global/sliding RoPE is the current first-divergence target</td><td>Do not promote until real E2E and oracle trajectory gates pass</td></tr>
+        </tbody>
+    </table>
+</div>
+
 <div class="card card-blue">
     <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
     <p class="mini-note">These raw CLI examples use the shell wrapper so a first-time user can be prompted to create <code>.venv</code> and install <code>requirements-v8.txt</code> if the repo-local environment is missing.</p>
@@ -1259,19 +1278,24 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
     <p class="mini-note">GLM4 has a real Q4_K_M runtime lane with partial pairwise RoPE, persistent FP16 KV cache, and llama.cpp parity coverage. <code>--force-compile</code> force-builds both <code>libckernel_engine.so</code> and <code>libckernel_tokenizer.so</code>, compiles the generated model into a staging directory, verifies that the complete bundle loads without unresolved symbols, and only then replaces the cached runtime. No manual library copy is required.</p>
 
-    <h3>Kimi / MLA Decoder Contract</h3>
+    <h3>Kimi-VL A3B Text Decoder</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre># Low-memory validation lane: MLA template + explicit decode cache kernels
-.venv/bin/python -m py_compile version/v8/scripts/build_ir_v8.py
-make build/libckernel_engine.so
-.venv/bin/python unittest/test_deepseek_reference_kernels.py
-.venv/bin/python -m unittest \
-  tests.test_v8_kimi_template \
-  tests.test_v8_model_contract_inspector \
-  tests.test_v8_template_circuit_audit</pre>
+<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  /path/to/moonshotai--Kimi-VL-A3B-Instruct \
+  --run /srv/cke/profiles/kimi-vl-a3b-instruct \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Give me a concise example of safe C code.' \
+  --chat-template kimi_vl \
+  --max-tokens 64 \
+  --temperature 0.0
+
+# Capacity-aware nightly smoke using the same source directory:
+V8_KIMI_MODEL=/path/to/moonshotai--Kimi-VL-A3B-Instruct \
+make test-v8-kimi-highmem</pre>
     </div>
-    <p class="mini-note">Kimi/MLA is currently a v8 compiler/kernel-contract lane. The template now declares explicit MLA decode-cache behavior, lowering inserts <code>mla_kv_cache_store</code> / <code>mla_kv_cache_batch_store</code>, and decode attention switches to <code>deepseek_mla_attention_decode_f32</code>. See <a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a> for the architecture notes. Full Kimi runtime smoke belongs on a high-memory host.</p>
+    <p class="mini-note">The official 32.8 GB sharded checkpoint now converts all text-decoder tensors, preserves the embedded TikToken protocol, and runs coherently on a 64 GB host. Three repeated Ryzen runs produced the same 32-token response hash. X-Ray matched PyTorch's first token and complete top-20 ranking, but internal BF16 drift becomes material around layer 7, so this is text E2E certification rather than bit-exact internal parity. MoonViT and the multimodal bridge remain outside the certified path. See <a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a> for the architecture notes.</p>
 
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
@@ -1346,7 +1370,10 @@ V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
         <li><strong>Gemma 3:</strong> use <code>--chat-template auto</code> for normal instruction/chat runs. <code>--chat-template none</code> is raw continuation mode now and needs <code>--allow-raw-prompt</code> if you intentionally want it.</li>
         <li><strong>Gemma 4:</strong> use <code>--chat-template gemma4</code>. The template uses explicit per-layer/direct split-half RoPE metadata; do not replace it with the older global split-half RoPE path when debugging.</li>
         <li><strong>Nemotron Nano 9B v2:</strong> use <code>--chat-template auto</code>. The BPE runtime should encode raw prompts by default; set <code>CK_DISABLE_FULL_BPE_TOKENIZER=1</code> only for token-id fallback/debug runs.</li>
-        <li><strong>GLM4:</strong> start with the template and safetensors/GGUF conversion tests. It has partial-RoPE and BPE contract coverage, but should stay in the conversion/parity lane until real-model smoke runs on a higher-memory host.</li>
+        <li><strong>GLM4:</strong> the real Q4_K_M path executes coherently and carries partial-RoPE, persistent FP16-KV, and llama.cpp parity coverage. Keep it in long-context and ISA regression sweeps.</li>
+        <li><strong>Instella-MoE:</strong> BF16 text executes coherently with strong short-checkpoint PyTorch agreement. Do not describe quantized GGUF or long trajectories as certified yet.</li>
+        <li><strong>Kimi-VL:</strong> the BF16 text decoder is coherent and repeatable; use <code>--chat-template kimi_vl</code>. Vision remains unimplemented, and the current X-Ray evidence is ranking parity rather than bit-exact internal parity.</li>
+        <li><strong>Laguna-S 2.1:</strong> remains an active numerical bring-up until mixed global/sliding RoPE and the complete generated trajectory pass the oracle gate.</li>
         <li><strong>Qwen2 / Qwen3 / Qwen3.5:</strong> the <code>v8</code> runner now reproduces the same public command shapes as <code>v7</code> and clean short prompt smokes succeed on the promoted examples.</li>
         <li><strong>NaanBeige / llama-family symptom:</strong> if the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, keep <code>--chat-template auto</code>, do not force <code>none</code>, and treat it as a prompt-wrapper/chat-contract symptom rather than the expected reply.</li>
     </ul>
