@@ -175,6 +175,7 @@ var ckernel__engine_8h =
     [ "feature_concat", "ckernel__engine_8h.html#ac3987d3d95a62a769029100abbbf852a", null ],
     [ "feature_concat_2way", "ckernel__engine_8h.html#a9af0dbbeb1b7fd100f99d796eaf0623f", null ],
     [ "feature_slice_copy", "ckernel__engine_8h.html#a6414bc6af9c28e7baf31b434073e794f", null ],
+    [ "final_logit_scale_f32", "ckernel__engine_8h.html#af663e5281c62cbfa52c770bad37dc7f4", null ],
     [ "fused_mlp_swiglu_decode", "ckernel__engine_8h.html#a3897324e415431e53b4dba88a774e804", null ],
     [ "fused_mlp_swiglu_decode_tiled", "ckernel__engine_8h.html#a36d3ddf5aa9f0d689888e2782eb9e608", null ],
     [ "fused_mlp_swiglu_decode_v2", "ckernel__engine_8h.html#ac7e379fa8eb4c8b963e70daf7e761277", null ],
