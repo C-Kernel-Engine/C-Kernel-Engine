@@ -1069,6 +1069,92 @@
     .mp-dot.inference { background: var(--blue); }
     .mp-dot.training  { background: var(--green); }
     .mp-dot.no        { background: var(--grey); }
+    /* evidence-specific status dots (see the legend above the cards) */
+    .mp-dot.st-traj     { background: #47b475; }
+    .mp-dot.st-num      { background: #ffb400; }
+    .mp-dot.st-e2e      { background: #07adf8; }
+    .mp-dot.st-contract { background: #9e9e9e; }
+    .mp-dot.st-plan     { background: #ab47bc; }
+    .status-legend {
+      display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem;
+      margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-secondary);
+    }
+    .status-legend .sl-item { display: flex; align-items: center; gap: 0.45rem; }
+    .status-legend .sl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-legend .sl-dot.st-traj     { background: #47b475; }
+    .status-legend .sl-dot.st-num      { background: #ffb400; }
+    .status-legend .sl-dot.st-e2e      { background: #07adf8; }
+    .status-legend .sl-dot.st-contract { background: #9e9e9e; }
+    .status-legend .sl-dot.st-plan     { background: #ab47bc; }
+    .status-legend strong { color: var(--text-primary); font-weight: 600; }
+
+    .cert-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 0.85rem; }
+    .cert-table { border-collapse: collapse; min-width: 1080px; width: 100%; font-size: 0.82rem; }
+    .cert-table th, .cert-table td {
+      border: 1px solid var(--grey); padding: 0.45rem 0.6rem;
+      text-align: left; vertical-align: top; color: var(--text-secondary);
+    }
+    .cert-table th { color: var(--orange); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; background: #121a24; }
+    .cert-table td.cert-model { font-weight: 700; color: var(--text-primary); white-space: nowrap; position: sticky; left: 0; background: #0f151c; }
+    .cert-status { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; white-space: nowrap; }
+    .cert-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cert-status.st-traj     { color: #7fd4a3; } .cert-status.st-traj::before     { background: #47b475; }
+    .cert-status.st-num      { color: #ffd38a; } .cert-status.st-num::before      { background: #ffb400; }
+    .cert-status.st-e2e      { color: #7dd3fc; } .cert-status.st-e2e::before      { background: #07adf8; }
+    .cert-status.st-contract { color: #b9b9b9; } .cert-status.st-contract::before { background: #9e9e9e; }
+    .cert-status.st-plan     { color: #d0a8f0; } .cert-status.st-plan::before     { background: #ab47bc; }
+
+    .jump-nav {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem;
+    }
+    .jump-nav a {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+      padding: 0.18rem 0.55rem; border-radius: 999px;
+      background: #15202b; color: #9ed6ff; border: 1px solid #22313f;
+      text-decoration: none;
+    }
+    .jump-nav a:hover { border-color: var(--orange); color: var(--orange); }
+    .jump-nav a:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+    details.card-details { margin: 0.6rem 0 0.2rem; }
+    details.card-details > summary {
+      cursor: pointer; font-size: 0.78rem; color: #9ed6ff;
+      font-family: 'JetBrains Mono', monospace; user-select: none;
+      padding: 0.3rem 0.55rem; border: 1px solid #22313f; border-radius: 6px;
+      background: #0f151c; display: inline-block;
+    }
+    details.card-details > summary:hover { border-color: var(--orange); color: var(--orange); }
+    details.card-details > summary:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+    details.card-details[open] > summary { margin-bottom: 0.4rem; }
+    details.card-details .model-command { margin-top: 0.5rem; }
+
+    .matrix-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .matrix-grid { min-width: 1120px; }
+    .matrix-grid .row-head { position: sticky; left: 0; z-index: 1; box-shadow: 2px 0 0 #22313f; }
+
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.9rem; margin-bottom: 1.2rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #mk-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #mk-svg-overlay .mk-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #mk-svg-overlay .mk-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #mk-svg-overlay .mk-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #mk-svg-overlay .mk-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #mk-svg-overlay .mk-ov-stage img { max-width: none; height: auto; }
     .mp-text { color: var(--text-secondary); }
     .mp-text.dim { color: var(--text-muted); }
 
@@ -1313,7 +1399,8 @@
     becomes cross-attention memory that the decoder reads on every generated token.
   </p>
 
-  <svg viewBox="0 0 1180 648" width="100%" role="img"
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 648" width="100%" role="img" tabindex="0" data-svg-title="One pipeline, every model — compile path"
        aria-label="C-Kernel-Engine model compilation pipeline: GGUF and template lower to IR, memory plan, codegen and runtime, with a vision encoder lane bridging into the decoder and an audio encoder-decoder lane feeding cross-attention memory."
        style="max-width: 1180px; margin: 0.5rem auto 1.75rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
     <defs>
@@ -1473,25 +1560,91 @@
     <path d="M934,586 C1020,566 1075,420 1075,354" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#mk-arrow-a)"/>
     <text x="920" y="540" text-anchor="end" class="mk-sub" fill="#ffd38a">safetensors &#8594; BUMP &#183; encoder K/V read every decode step</text>
   </svg>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Certification Summary</h2>
+    <p class="source-note" style="margin-top: 0.6rem;">
+      Evidence is not one bucket. Each family below is labeled with the strongest evidence class it has actually
+      earned — an eight-token replay agreement and a 4,096-token bit-exact trajectory are different claims, and the
+      dots on the cards use the same classes.
+    </p>
+    <div class="status-legend">
+      <span class="sl-item"><span class="sl-dot st-traj"></span><span><strong>Trajectory exact</strong> — full token trajectory bit-exact against the oracle</span></span>
+      <span class="sl-item"><span class="sl-dot st-num"></span><span><strong>Numerical sampled</strong> — oracle agreement at sampled checkpoints (first-token / top-k / cosine / prefix replay)</span></span>
+      <span class="sl-item"><span class="sl-dot st-e2e"></span><span><strong>Coherent E2E</strong> — coherent end-to-end generation; smoke-level evidence</span></span>
+      <span class="sl-item"><span class="sl-dot st-contract"></span><span><strong>Contract-only</strong> — circuit and contract tests; no model-weight run claimed</span></span>
+      <span class="sl-item"><span class="sl-dot st-plan"></span><span><strong>Planner-only</strong> — memory-plan certification; runtime not claimed at that scale</span></span>
+    </div>
+    <div class="cert-table-wrap">
+      <table class="cert-table">
+        <thead>
+          <tr><th>Model</th><th>Runtime status</th><th>Strongest evidence</th><th>Max tested context</th><th>Oracle</th><th>Remaining gap</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="cert-model">Qwen2 0.5B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression smoke</td><td>1,024</td><td>v8 nightly regression</td><td>long-context and perf sweeps</td></tr>
+          <tr><td class="cert-model">Qwen3 0.6B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression smoke</td><td>1,024</td><td>v8 nightly regression</td><td>long-context and perf sweeps</td></tr>
+          <tr><td class="cert-model">Qwen3.5 0.8B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression smoke (hybrid DeltaNet)</td><td>1,034</td><td>v8 nightly regression</td><td>long-generation parity monitored</td></tr>
+          <tr><td class="cert-model">Qwen3.6 27B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>kernel-exact head-parallel DeltaNet prefill + Q4_K&times;Q8_K VNNI x16 providers</td><td>&mdash;</td><td>kernel parity gates</td><td>1K logit parity open; batched prefill opt-in</td></tr>
+          <tr><td class="cert-model">Qwen3.8 27B</td><td><span class="cert-status st-traj">Trajectory exact</span> <span class="cert-status st-plan">Planner-only</span></td><td>4,096-token trajectory bit-exact (4,000/4,000 vocab rows); 262K memory planner certified</td><td>4,096 runtime / 262,144 planner</td><td>llama.cpp</td><td>128K/262K runtime claims deferred; ~1.49&times; slower than llama.cpp at 8K</td></tr>
+          <tr><td class="cert-model">Qwen3-VL 8B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>BF16 and llama.cpp corpus certification lanes; promoted vision baseline</td><td>1,024 smoke</td><td>PyTorch + llama.cpp corpus</td><td>semantic vision parity ongoing</td></tr>
+          <tr><td class="cert-model">Gemma3 270M</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression Q5_K_M</td><td>1,024</td><td>v8 nightly regression</td><td>&mdash;</td></tr>
+          <tr><td class="cert-model">Gemma4 E4B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>Q4_K_M coherent smoke + BF16 safetensors PyTorch parity lane</td><td>2,048</td><td>PyTorch</td><td>semantic vision parity active</td></tr>
+          <tr><td class="cert-model">GLM4 9B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>GGUF Q4_K_M coherent generation; safetensors comparator lane</td><td>1,024</td><td>PyTorch comparator</td><td>long-trajectory sweeps</td></tr>
+          <tr><td class="cert-model">Nemotron Nano 9B v2</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>Q4_K_M coherent smoke; Mamba2 state-shape contracts</td><td>1,024</td><td>PyTorch parity lane</td><td>long-trajectory sweeps</td></tr>
+          <tr><td class="cert-model">Kimi-VL A3B (text)</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>first-token + top-20 ranking match, cosine 0.997696; bit-identical repeat runs</td><td>2,048</td><td>PyTorch</td><td>MoonViT vision bridge; internal BF16 drift near layer 7</td></tr>
+          <tr><td class="cert-model">Cohere2 Command R7B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>tokenizer-free replay matches llama.cpp for the first 8 greedy positions</td><td>2,048</td><td>llama.cpp</td><td>long-trajectory parity; performance sweeps</td></tr>
+          <tr><td class="cert-model">Laguna-XS 2.1</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>bit-exact embedding + layer-0 RMSNorm; router replay within one ULP</td><td>2,048</td><td>llama.cpp (diagnostic)</td><td>long-trajectory parity not claimed (near-tied MoE route flips)</td></tr>
+          <tr><td class="cert-model">Instella-MoE 16B-A3B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>full-logit cosine 0.99998 + top-1 match at a 32-token checkpoint</td><td>32-token checkpoint</td><td>PyTorch</td><td>quantized GGUF and long trajectories uncertified</td></tr>
+          <tr><td class="cert-model">Llama / Nanbeige 3B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression smoke</td><td>1,024</td><td>v8 nightly regression</td><td>&mdash;</td></tr>
+          <tr><td class="cert-model">Whisper Tiny/Base/Small</td><td><span class="cert-status st-traj">Trajectory exact</span></td><td>JFK fixtures match Hugging Face token for token (all three sizes)</td><td>JFK sample; 33 s Base long-form</td><td>Hugging Face</td><td>broader corpus certification; hour-scale recordings</td></tr>
+          <tr><td class="cert-model">GPT-2</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>GGUF baseline</td><td>&mdash;</td><td>v8 nightly regression</td><td>legacy lane</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav class="jump-nav" aria-label="Jump to model card">
+      <a href="#card-qwen2">qwen2</a>
+      <a href="#card-qwen3">qwen3</a>
+      <a href="#card-qwen35">qwen3.5</a>
+      <a href="#card-qwen36">qwen3.6</a>
+      <a href="#card-qwen38">qwen3.8</a>
+      <a href="#card-gemma3">gemma3</a>
+      <a href="#card-gemma4">gemma4</a>
+      <a href="#card-qwen3vl">qwen3-vl</a>
+      <a href="#card-gemma4v">gemma4-vision</a>
+      <a href="#card-siglip">siglip</a>
+      <a href="#card-glm4">glm4</a>
+      <a href="#card-cohere2">cohere2</a>
+      <a href="#card-laguna">laguna</a>
+      <a href="#card-instella">instella</a>
+      <a href="#card-kimi">kimi</a>
+      <a href="#card-nemotron">nemotron</a>
+      <a href="#card-nanbeige">llama/nanbeige</a>
+      <a href="#card-whisper">whisper</a>
+      <a href="#card-gpt2">gpt-2</a>
+    </nav>
+  </div>
 
   <div class="matrix-hero">
 
     <!-- Qwen2 -->
-    <div class="model-card mc-qwen2">
+    <div class="model-card mc-qwen2" id="card-qwen2">
       <span class="model-badge">template: qwen2.json</span>
       <div class="model-title">Qwen2</div>
       <div class="model-arch">RMSNorm · RoPE split-half · SwiGLU · GQA<br>QKV bias from weights · BPE tokenizer</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen2">Copy</button></div>
         <pre id="cmd-qwen2"><code>version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
   --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q5_K</span>
@@ -1502,21 +1655,22 @@
     </div>
 
     <!-- Qwen3 -->
-    <div class="model-card mc-qwen3">
+    <div class="model-card mc-qwen3" id="card-qwen3">
       <span class="model-badge">template: qwen3.json</span>
       <div class="model-title">Qwen3</div>
       <div class="model-arch">RMSNorm · RoPE split-half · QK‑Norm · SwiGLU<br>No QKV bias · BPE tokenizer · learned QK‑Norm</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen3">Copy</button></div>
         <pre id="cmd-qwen3"><code>version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
   --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q5_K</span>
@@ -1527,12 +1681,12 @@
     </div>
 
     <!-- Qwen3.5 -->
-    <div class="model-card mc-qwen35">
+    <div class="model-card mc-qwen35" id="card-qwen35">
       <span class="model-badge">template: qwen35.json</span>
       <div class="model-title">Qwen3.5</div>
       <div class="model-arch">Hybrid recurrent + gated attention · RMSNorm · RoPE<br>QK‑Norm (full‑attn only) · SwiGLU · Gated DeltaNet · BPE tokenizer<br>Block pattern: 3×recurrent → 1×full_attention</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — hybrid recurrent-attention decode, DeltaNet kernel parity</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — hybrid recurrent-attention decode, DeltaNet kernel parity</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, DeltaNet backward kernels, AdamW, parity gates</span></div>
       </div>
       <div class="source-note">
@@ -1543,13 +1697,14 @@
         <span class="tag learned">gated_deltanet</span>
         <span class="tag learned">0.8B dense compatible</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen35">Copy</button></div>
         <pre id="cmd-qwen35"><code>version/v8/scripts/cks-v8-run run \
   hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
   --context-len 1034 --force-compile --force-convert --chat-template=qwen35 \
   --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q8_0</span>
@@ -1558,13 +1713,13 @@
     </div>
 
     <!-- Qwen3.6 -->
-    <div class="model-card mc-qwen36">
+    <div class="model-card mc-qwen36" id="card-qwen36">
       <span class="model-badge">qwen35-family hybrid circuit</span>
       <div class="model-title">Qwen3.6 27B</div>
       <div class="model-arch">Hybrid recurrent + gated attention · Gated DeltaNet<br>Q4_K_M quantized inference · optimized batched prefill (opt-in)</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Exact head-parallel DeltaNet prefill — value heads partitioned across the threadpool once per prompt</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K × Q8_K AVX-512 VNNI x16 prefill — AVX2 / reference fallback on other CPUs</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Exact head-parallel DeltaNet prefill — value heads partitioned across the threadpool once per prompt</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Q4_K × Q8_K AVX-512 VNNI x16 prefill — AVX2 / reference fallback on other CPUs</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Sequential prefill remains the default while long-context parity is unresolved</span></div>
       </div>
       <div class="source-note">
@@ -1581,24 +1736,25 @@
     </div>
 
     <!-- Qwen3.8 -->
-    <div class="model-card mc-qwen38">
+    <div class="model-card mc-qwen38" id="card-qwen38">
       <span class="model-badge">template: qwen38.json</span>
       <div class="model-title">Qwen3.8 27B</div>
       <div class="model-arch">Hybrid recurrent + gated attention · Gated DeltaNet (3×recurrent → 1×full)<br>Text M-RoPE split · QK‑Norm (full‑attn only) · SwiGLU · tied LM head · BPE / ChatML</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K_M 27B text runtime — 4,096-token trajectory bit-exact to llama.cpp (4,000/4,000 full-vocabulary rows)</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">262,144-token context memory planner certified (capacity-aware nightly lane)</span></div>
+        <div class="mp-row"><span class="mp-dot st-traj"></span><span class="mp-text">Q4_K_M 27B text runtime — 4,096-token trajectory bit-exact to llama.cpp (4,000/4,000 full-vocabulary rows)</span></div>
+        <div class="mp-row"><span class="mp-dot st-plan"></span><span class="mp-text">262,144-token context memory planner certified (capacity-aware nightly lane)</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Public 128K/262K runtime claims deferred; ~1.49× slower than llama.cpp at 8K tokens</span></div>
       </div>
       <div class="source-note">
         Identity: upstream GGUFs advertise <code>general.architecture=qwen35</code>; the converter selects qwen38 via artifact metadata (basename / size label). Circuit carries validated contract selectors for q5_k, q6_k, q8_0 and BF16 recurrent dtypes. Evidence: PRs #387, #388, #390.
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Qwen3.8 contract + certification lane</span><button class="copy-command" type="button" data-copy-command="cmd-qwen38">Copy</button></div>
         <pre id="cmd-qwen38"><code>.venv/bin/python -m unittest tests.test_v8_qwen38_contract
 QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
   make certify-qwen38-svg-parity</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">hybrid_recurrent_attention</span>
         <span class="tag learned">mrope_text_split</span>
@@ -1614,12 +1770,12 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Gemma3 -->
-    <div class="model-card mc-gemma3">
+    <div class="model-card mc-gemma3" id="card-gemma3">
       <span class="model-badge">template: gemma3.json</span>
       <div class="model-title">Gemma3</div>
       <div class="model-arch">RMSNorm · RoPE split-half · QK‑Norm · GeGLU · Sliding Window<br>Post-norms · embed scale √dim · SentencePiece</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, sliding-window attn kernel, split-half RoPE parity restored</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF, sliding-window attn kernel, split-half RoPE parity restored</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
       </div>
       <div class="source-note">
@@ -1629,13 +1785,14 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <span class="tag fixed">first-divergence @ rope_qk</span>
         <span class="tag fixed">rope_layout contract honored</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma3">Copy</button></div>
         <pre id="cmd-gemma3"><code>version/v8/scripts/cks-v8-run run \
   hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
   --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q8_0 ★</span>
         <span class="mq-chip">Q4_K</span>
@@ -1646,17 +1803,18 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
 
 
     <!-- Qwen3-VL -->
-    <div class="model-card mc-qwen3vl">
+    <div class="model-card mc-qwen3vl" id="card-qwen3vl">
       <span class="model-badge">template: qwen3_vl.json + mmproj</span>
       <div class="model-title">Qwen3-VL 8B Instruct</div>
       <div class="model-arch">Vision encoder bridge · multimodal token stitching · Qwen3 decoder<br>GGUF decoder + mmproj runtime · thinking-mode control</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 multimodal inference — image preprocessing, bridge, mixed prompt prefill</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Nightly vision smoke — promoted baseline before adding more vision families</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">v8 multimodal inference — image preprocessing, bridge, mixed prompt prefill</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Nightly vision smoke — promoted baseline before adding more vision families</span></div>
       </div>
       <div class="source-note">
         Bring-up scope: Qwen3-VL is the current promoted multimodal baseline. It validates that the encoder bridge, image marker contract, and decoder mixed-prefill path work together before Gemma4 vision and later audio lanes are treated as production-ready.
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Qwen3-VL vision smoke</span><button class="copy-command" type="button" data-copy-command="cmd-qwen3vl">Copy</button></div>
         <pre id="cmd-qwen3vl"><code>version/v8/scripts/cks-v8-run run \
@@ -1666,7 +1824,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
   --prompt 'Explain this image.' \
   --context-len 1024 --force-compile --force-convert \
   --thinking-mode suppressed</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">multimodal_bridge</span>
         <span class="tag learned">mixed_prefill</span>
@@ -1680,22 +1838,23 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Whisper Tiny, Base, and Small -->
-    <div class="model-card mc-whisper">
+    <div class="model-card mc-whisper" id="card-whisper">
       <span class="model-badge">circuits: audio frontend + encoder + decoder</span>
       <div class="model-title">Whisper Tiny / Base / Small</div>
       <div class="model-arch">First encoder&#8211;decoder family &#183; generated frontend (7 ops &#8594; ck_model_run_audio_wav)<br>LayerNorm &#183; learned absolute position &#183; GELU (erf) &#183; dense bidirectional encoder</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 audio inference — WAV to transcript via cks-v8-run audio, cached cross-attn K/V (&asymp;79&times; decode)</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Artifact-gated E2E — Tiny, Base, and Small JFK fixtures match Hugging Face token for token</span></div>
+        <div class="mp-row"><span class="mp-dot st-traj"></span><span class="mp-text">v8 audio inference — WAV to transcript via cks-v8-run audio, cached cross-attn K/V (&asymp;79&times; decode)</span></div>
+        <div class="mp-row"><span class="mp-dot st-traj"></span><span class="mp-text">Artifact-gated E2E — Tiny, Base, and Small JFK fixtures match Hugging Face token for token</span></div>
       </div>
       <div class="source-note">
         Bring-up scope: Whisper Tiny, Base, and Small FP32 — English text and timestamp decoding certified on the JFK fixture; Base also has a 33-second long-form parity fixture. PCM16 WAV input; longer recordings use sequential source windows but arbitrary hour-scale recordings are not yet corpus-certified. A single safetensors checkpoint builds a generated encoder + decoder run-directory pair.
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Whisper Base end to end</span><button class="copy-command" type="button" data-copy-command="cmd-whisper">Copy</button></div>
         <pre id="cmd-whisper"><code>version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \
   --wav /path/to/audio.wav --language en --task transcribe</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">encoder_decoder</span>
         <span class="tag learned">cross_attention</span>
@@ -1709,13 +1868,13 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- GLM4 -->
-    <div class="model-card mc-qwen">
+    <div class="model-card mc-qwen" id="card-glm4">
       <span class="model-badge">template: glm4.json</span>
       <div class="model-title">GLM4</div>
       <div class="model-arch">RMSNorm · partial RoPE · GQA · SwiGLU<br>BPE tokenizer · attention bias · GGUF + safetensors conversion lane</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 template — GLM4 chat contract and partial-RoPE metadata</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Conversion/parity harness — GGUF fixes, safetensors declarative map, PyTorch-vs-CK comparator</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">v8 template — GLM4 chat contract and partial-RoPE metadata</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Conversion/parity harness — GGUF fixes, safetensors declarative map, PyTorch-vs-CK comparator</span></div>
       </div>
       <div class="source-note">
         Bring-up scope: GLM4 now has the real GGUF runtime lane plus the safetensors/PyTorch parity lane. The key hardening was making partial pairwise RoPE and projection producer/consumer wiring explicit enough that Q4_K_M GGUF generation stays coherent instead of collapsing at the first token.
@@ -1725,6 +1884,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <span class="tag learned">partial_rope contract</span>
         <span class="tag fixed">synthetic conversion tested</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-glm4">Copy</button></div>
         <pre id="cmd-glm4"><code>version/v8/scripts/cks-v8-run run \
@@ -1732,7 +1892,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=glm4 \
   --prompt 'Give me a detailed example of C, Python and SQL code.' \
   --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip">BF16 safetensors</span>
         <span class="mq-chip">GGUF</span>
@@ -1742,25 +1902,26 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Cohere2 Command R -->
-    <div class="model-card mc-cohere2">
+    <div class="model-card mc-cohere2" id="card-cohere2">
       <span class="model-badge">template: cohere2.json</span>
       <div class="model-title">Cohere2 Command R</div>
       <div class="model-arch">Dense GQA · LayerNorm (shared pre-block norm, synthesized beta) · SwiGLU<br>Parallel attention+MLP residual · 3:1 sliding:full attention<br>Pairwise RoPE on sliding layers only · logit_scale footer · tied embeddings · BPE</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">GGUF discovery via model map — standard cks-v8-run path, no family branch</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Command R7B Q4_K_M — tokenizer-free replay matches llama.cpp for the first 8 greedy positions</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">GGUF discovery via model map — standard cks-v8-run path, no family branch</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Command R7B Q4_K_M — tokenizer-free replay matches llama.cpp for the first 8 greedy positions</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity and matched performance sweeps remain future certification work</span></div>
       </div>
       <div class="source-note">
         Bring-up note (PR #401): lowering honors the model-declared <code>logit_scale</code> via a <code>final_logit_scale_f32</code> footer op, and RoPE applies only to sliding layers per the exported contract. Contract test: <code>tests.test_v8_cohere2_contract</code>.
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Cohere2 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-cohere2">Copy</button></div>
         <pre id="cmd-cohere2"><code>version/v8/scripts/cks-v8-run run \
   /path/to/command-r7b-q4_k_m.gguf \
   --context-len 2048 --force-compile --force-convert --chat-template=auto \
   --max-tokens 64 --temperature 0.0</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">parallel_attn_mlp</span>
         <span class="tag fixed">logit_scale contract</span>
@@ -1774,18 +1935,19 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Laguna -->
-    <div class="model-card mc-laguna">
+    <div class="model-card mc-laguna" id="card-laguna">
       <span class="model-badge">template: laguna.json</span>
       <div class="model-title">Laguna-XS 2.1</div>
       <div class="model-arch">Hybrid attention MoE · gated GQA (softplus per-head gate) · QK‑Norm<br>YaRN on global layers / full-rotary on sliding · sigmoid router + correction bias<br>Top‑8 routed + shared SwiGLU experts · RMSNorm · untied output.weight · BPE</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Q4_K_M text runtime (PR #404) — mixed Q4/Q6 expert storage, map-owned routed/shared SwiGLU providers</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Embedding and layer-0 RMSNorm bit-exact; identical-input router replay preserves selected experts within one ULP</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Q4_K_M text runtime (PR #404) — mixed Q4/Q6 expert storage, map-owned routed/shared SwiGLU providers</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Embedding and layer-0 RMSNorm bit-exact; identical-input router replay preserves selected experts within one ULP</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity not claimed — near-tied MoE route flips vs llama.cpp</span></div>
       </div>
       <div class="source-note">
         Bring-up note (PR #404): ~20 prefill / 14 decode tok/s on the Ryzen node (bring-up measurement, not a certified benchmark). Known oracle gap: the external llama.cpp Laguna loader omits GGUF YaRN <code>beta_fast=64</code> (defaults 32). Softplus gate formula is observed, not yet oracle-validated. Contract test: <code>tests.test_v8_laguna_contract</code>.
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Laguna smoke</span><button class="copy-command" type="button" data-copy-command="cmd-laguna">Copy</button></div>
         <pre id="cmd-laguna"><code>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
@@ -1794,7 +1956,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
   --context-len 2048 --force-convert --force-compile \
   --prompt 'Write a complete C program that prints the first ten Fibonacci numbers.' \
   --chat-template auto --thinking-mode suppressed --max-tokens 512 --temperature 0.0</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">gated_gqa softplus</span>
         <span class="tag learned">yarn_global / rotary_sliding</span>
@@ -1808,23 +1970,24 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Instella -->
-    <div class="model-card mc-instella">
+    <div class="model-card mc-instella" id="card-instella">
       <span class="model-badge">template: instella_moe.json (safetensors)</span>
       <div class="model-title">Instella-MoE 16B-A3B</div>
       <div class="model-arch">MoE + gated MLA · partial interleaved YaRN RoPE · RMSNorm · SwiGLU<br>Sigmoid group-limited top-k router + shared experts (64 experts/layer)<br>FarSkip two-stream residuals · BPE</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">BF16 safetensors runtime certified (PR #389) — coherent chat, top-1 matches PyTorch at the tested checkpoint</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Full-logit cosine 0.99998 vs PyTorch at a 32-token X-Ray checkpoint (30 GiB real runtime)</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">BF16 safetensors runtime certified (PR #389) — coherent chat, top-1 matches PyTorch at the tested checkpoint</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Full-logit cosine 0.99998 vs PyTorch at a 32-token X-Ray checkpoint (30 GiB real runtime)</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Quantized GGUF and long trajectories not yet certified</span></div>
       </div>
       <div class="source-note">
         Bring-up history: fail-closed MoE bring-up (#292), mechanical FarSkip circuit stitching (#294), nightly circuit contracts (#295), BF16 execution certification (#389). A high-memory Instella E2E lane remains follow-up work. Contract lane: <code>tests.test_v8_instella_moe_bringup</code> (runs in the nightly demo-readiness profile).
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Instella contract lane</span><button class="copy-command" type="button" data-copy-command="cmd-instella">Copy</button></div>
         <pre id="cmd-instella"><code>.venv/bin/python -m unittest tests.test_v8_instella_moe_bringup
 # nightly: registered as v8_instella_moe_circuit_contracts</code></pre>
-      </div>
+      </div></details>
       <div class="model-tags">
         <span class="tag learned">gated_mla</span>
         <span class="tag learned">farskip_residuals</span>
@@ -1838,13 +2001,13 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
     </div>
 
     <!-- Kimi / MLA -->
-    <div class="model-card mc-kimi">
+    <div class="model-card mc-kimi" id="card-kimi">
       <span class="model-badge">template: kimi_vl.json</span>
       <div class="model-title">Kimi / MLA Text Decoder</div>
       <div class="model-arch">Multi-Head Latent Attention + MoE · partial pairwise-concat RoPE · RMSNorm<br>SwiGLU dense + sigmoid group-limited top-k routed/shared experts · tiktoken · untied LM head</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Text decoder runtime certified (PR #403) — Kimi-VL-A3B-Instruct BF16, coherent on AVX2 and AVX-512</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Repeatable: three Ryzen runs bit-identical (32-token SHA-256); PyTorch first-token + top-20 match, full-logit cosine 0.9977</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Text decoder runtime certified (PR #403) — Kimi-VL-A3B-Instruct BF16, coherent on AVX2 and AVX-512</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Repeatable: three Ryzen runs bit-identical (32-token SHA-256); PyTorch first-token + top-20 match, full-logit cosine 0.9977</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">MoonViT vision bridge / multimodal path — outside the certified lane</span></div>
       </div>
       <div class="source-note">
@@ -1855,18 +2018,20 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <span class="tag fixed">BF16 kv_lora path</span>
         <span class="tag learned">template contract tested</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Laptop-safe contract check</span><button class="copy-command" type="button" data-copy-command="cmd-kimi-mla">Copy</button></div>
         <pre id="cmd-kimi-mla"><code>.venv/bin/python -m py_compile version/v8/scripts/build_ir_v8.py
 make build/libckernel_engine.so
 .venv/bin/python unittest/test_deepseek_reference_kernels.py
 .venv/bin/python -m unittest tests.test_v8_kimi_template</code></pre>
-      </div>
+      </div></details>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Kimi high-memory lane</span><button class="copy-command" type="button" data-copy-command="cmd-kimi-highmem">Copy</button></div>
         <pre id="cmd-kimi-highmem"><code>V8_KIMI_MODEL=/path/to/Kimi-VL-A3B-Instruct make test-v8-kimi-highmem
 # requires ≥ 40 GiB RAM host; context 2048, 64 tokens</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip">BF16</span>
         <span class="mq-chip">FP32 reference</span>
@@ -1876,14 +2041,14 @@ make build/libckernel_engine.so
     </div>
 
     <!-- Gemma4 -->
-    <div class="model-card mc-gemma4">
+    <div class="model-card mc-gemma4" id="card-gemma4">
       <span class="model-badge">template: gemma4.json</span>
       <div class="model-title">Gemma4 E4B IT</div>
       <div class="model-arch">RMSNorm · split-half direct RoPE · QK‑Norm · GeGLU<br>Hybrid full/sliding attention · per-layer theta · SentencePiece</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent long-answer smoke</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">BF16 safetensors → BUMP — PyTorch parity bring-up path</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Vision bridge smoke — Gemma4 mmproj-F16 encoder → mixed decoder prefill</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent long-answer smoke</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">BF16 safetensors → BUMP — PyTorch parity bring-up path</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Vision bridge smoke — Gemma4 mmproj-F16 encoder → mixed decoder prefill</span></div>
       </div>
       <div class="source-note">
         Bring-up fix: Gemma4 keeps the split-half RoPE channel layout, but it cannot use one global cached split-half contract. The template exports per-layer/direct RoPE metadata, and lowering selects <code>rope_forward_qk_split_direct_f32</code> from IR data rather than hard-coding a Gemma-only kernel.
@@ -1894,6 +2059,7 @@ make build/libckernel_engine.so
         <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
         <span class="tag learned">vision bridge smoke-tested</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 text smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma4">Copy</button></div>
         <pre id="cmd-gemma4"><code>version/v8/scripts/cks-v8-run run \
@@ -1901,7 +2067,8 @@ make build/libckernel_engine.so
   --context-len 2048 --force-compile --force-convert --chat-template=gemma4 \
   --prompt 'Give me a detailed example of C code.' \
   --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
-      </div>
+      </div></details>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Gemma4 vision bridge smoke</span><button class="copy-command" type="button" data-copy-command="cmd-gemma4-vision">Copy</button></div>
         <pre id="cmd-gemma4-vision"><code>version/v8/scripts/cks-v8-run run \
@@ -1911,7 +2078,7 @@ make build/libckernel_engine.so
   --prompt 'Explain this image in one short paragraph.' \
   --context-len 1024 --chat-template=gemma4 \
   --max-tokens 8 --temperature 0.0</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">BF16 safetensors</span>
@@ -1921,13 +2088,13 @@ make build/libckernel_engine.so
     </div>
 
     <!-- Nemotron -->
-    <div class="model-card mc-llama">
+    <div class="model-card mc-llama" id="card-nemotron">
       <span class="model-badge">template: nemotron_h.json</span>
       <div class="model-title">Nemotron Nano 9B v2</div>
       <div class="model-arch">Nemotron-H · Mamba2 recurrent blocks · sparse attention layers<br>ReLU2 MLP · Q5_0/Q4_K/Q8_0 GGUF · BPE tokenizer</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent C-code smoke</span></div>
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Safetensors/PyTorch parity lane — Mamba2 stitching and state-shape guardrails</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent C-code smoke</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Safetensors/PyTorch parity lane — Mamba2 stitching and state-shape guardrails</span></div>
       </div>
       <div class="source-note">
         Bring-up fix: Nemotron-H uses Mamba2 state shaped as <code>[heads, head_dim, state_dim]</code>, not a square DeltaNet-style recurrent matrix. The template/lowering path now carries that contract explicitly, stores no-RoPE attention KV after <code>v_proj</code>, and generated BPE runtimes can encode raw prompts end-to-end by default.
@@ -1937,6 +2104,7 @@ make build/libckernel_engine.so
         <span class="tag fixed">native BPE encode default-on</span>
         <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-nemotron">Copy</button></div>
         <pre id="cmd-nemotron"><code>version/v8/scripts/cks-v8-run run \
@@ -1944,7 +2112,7 @@ make build/libckernel_engine.so
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
   --prompt 'Give me a detailed example of C, Python and SQL code.' \
   --max-tokens 256 --temperature 0.0 --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip preferred">Q4_K_M ★</span>
         <span class="mq-chip">Q5_0</span>
@@ -1954,12 +2122,12 @@ make build/libckernel_engine.so
     </div>
 
     <!-- Llama / Nanbeige -->
-    <div class="model-card mc-llama">
+    <div class="model-card mc-llama" id="card-nanbeige">
       <span class="model-badge">template: llama.json</span>
       <div class="model-title">Llama / Nanbeige</div>
       <div class="model-arch">RMSNorm · RoPE pairwise · SwiGLU · GQA<br>Untied LM head supported · SentencePiece · ChatML markers via GGUF</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — active GGUF bring-up lane on Nanbeige 4.1 3B</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — active GGUF bring-up lane on Nanbeige 4.1 3B</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">v7 training — not yet a documented preset; use template-audit + parity gates first</span></div>
       </div>
       <div class="source-note">
@@ -1970,13 +2138,14 @@ make build/libckernel_engine.so
         <span class="tag learned">ChatML auto template</span>
         <span class="tag fixed">template-audit first</span>
       </div>
+      <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
         <div class="model-command-head"><span>Latest hardened v8 smoke</span><button class="copy-command" type="button" data-copy-command="cmd-nanbeige">Copy</button></div>
         <pre id="cmd-nanbeige"><code>version/v8/scripts/cks-v8-run run \
   hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=auto \
   --generate-visualizer</code></pre>
-      </div>
+      </div></details>
       <div class="model-quant">
         <span class="mq-chip">Q4_K_M</span>
         <span class="mq-chip">Q8_0</span>
@@ -1985,12 +2154,12 @@ make build/libckernel_engine.so
     </div>
 
     <!-- GPT-2 -->
-    <div class="model-card mc-gpt2">
+    <div class="model-card mc-gpt2" id="card-gpt2">
       <span class="model-badge">template: gpt2.json</span>
       <div class="model-title">GPT‑2</div>
       <div class="model-arch">LayerNorm · Learned PosEmb · GELU<br>QKV bias · tied embeddings · BPE tokenizer</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF baseline</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Quantized inference — GGUF baseline</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">v7 training — not yet in scope</span></div>
       </div>
       <div class="model-quant">
@@ -2003,12 +2172,12 @@ make build/libckernel_engine.so
     </div>
 
     <!-- Gemma4 Vision -->
-    <div class="model-card mc-gemma4v">
+    <div class="model-card mc-gemma4v" id="card-gemma4v">
       <span class="model-badge">template: gemma4_vision.json</span>
       <div class="model-title">Gemma4 Vision</div>
       <div class="model-arch">SigLIP-style ViT encoder · XY position embeddings · average-pool merge<br>projector prep → Gemma4 decoder bridge · deterministic patch frontend</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 multimodal inference — patch frontend, encoder graph, projector bridge</span></div>
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">v8 multimodal inference — patch frontend, encoder graph, projector bridge</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Bring-up lane — staged behind the promoted Qwen3-VL baseline</span></div>
       </div>
       <div class="source-note">
@@ -2028,12 +2197,12 @@ make build/libckernel_engine.so
     </div>
 
     <!-- SigLIP ViT -->
-    <div class="model-card mc-siglip">
+    <div class="model-card mc-siglip" id="card-siglip">
       <span class="model-badge">template: siglip_vit.json</span>
       <div class="model-title">SigLIP ViT (encoder)</div>
       <div class="model-arch">Standalone vision tower · im2patch → patch embed · LayerNorm · full attention<br>learned position embeddings · GELU MLP · reusable encoder contract</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">v8 encoder graph — patch frontend, transformer body, projector footer</span></div>
+        <div class="mp-row"><span class="mp-dot st-contract"></span><span class="mp-text">v8 encoder graph — patch frontend, transformer body, projector footer</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Encoder-only — pairs with a decoder template via the bridge contract</span></div>
       </div>
       <div class="source-note">
@@ -2055,6 +2224,7 @@ make build/libckernel_engine.so
 
   <div class="matrix-section">
     <h2 style="margin: 0; color: var(--orange);">Kernel Families by Model</h2>
+    <div class="matrix-scroll">
     <div class="matrix-grid">
       <div class="cell row-head">Model</div>
       <div class="cell">Tokenizer</div>
@@ -2226,6 +2396,7 @@ make build/libckernel_engine.so
       <div class="cell dim">No</div>
       <div class="cell ok">Tied</div>
     </div>
+    </div>
     <p class="source-note" style="margin-top: 0.75rem;">
       Whisper Tiny, Base, and Small share this encoder&#8211;decoder row: the encoder runs full self-attention over 1500 audio frames,
       the decoder adds the cross-attention lane (K/V from encoder memory, computed once) on top of causal self-attention.
@@ -2237,6 +2408,7 @@ make build/libckernel_engine.so
 
   <div class="matrix-section">
     <h2 style="margin: 0; color: var(--orange);">IR + Quant Contracts</h2>
+    <div class="matrix-scroll">
     <div class="matrix-grid">
       <div class="cell row-head">Model</div>
       <div class="cell">Embed Scale</div>
@@ -2398,6 +2570,7 @@ make build/libckernel_engine.so
       <div class="cell ok">Yes</div>
       <div class="cell dim">No</div>
     </div>
+    </div>
   </div>
 
   <div class="matrix-section">
@@ -2455,7 +2628,8 @@ make build/libckernel_engine.so
     <p style="margin-top: 0.6rem; color: var(--text-secondary);">
       Each newly supported family forced the kernel registry to grow. This map shows the kernel families added or hardened per architecture — every entry is a named provider in <code>version/v8/kernel_maps</code> with a source file you can read.
     </p>
-    <svg viewBox="0 0 1180 560" width="100%" role="img"
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 560" width="100%" role="img" tabindex="0" data-svg-title="Kernel delta — what the new families required"
          aria-label="Kernel delta map: six boxes listing kernel families added or hardened for the new model families — latent attention, recurrent SSM, gated and hybrid attention, MoE routing, normalization and residual, and logits footer — each with provider names, source files, and the model families that use them."
          style="max-width: 1180px; margin: 0.75rem auto 0.25rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <style>
@@ -2544,6 +2718,8 @@ make build/libckernel_engine.so
 
       <text x="24" y="520" class="kd-sub" fill="#808080">Each chip marks a model family whose circuit selects that kernel family at lowering time.</text>
     </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
     <p class="source-note" style="margin-top: 0.5rem;">
       Counts and provider status live in <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (297 provider maps); the audit baseline is <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>.
     </p>
@@ -2653,7 +2829,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Qwen3-VL/Gemma3/Gemma4 text, Gemma4 vision bridge smoke support, Nemotron-H, GLM4, plus the Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Qwen3.6/Qwen3.8/Qwen3-VL/Gemma3/Gemma4 text, Gemma4 vision bridge smoke support, Nemotron-H, GLM4, Kimi (MLA text decoder), Cohere2, Laguna, and Instella, plus the Llama/Nanbeige bring-up lane.
     Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
     Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, Nemotron-H adds Mamba2 recurrent state coverage, GLM4 adds partial-RoPE/BPE conversion contracts, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
@@ -2668,6 +2844,59 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
     <a href="https://www.nature.com/articles/323533a0" target="_blank" rel="noopener">Nature 1986 — Backpropagation</a>
   </div>
 
+
+  <div id="mk-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="mk-ov-bar">
+      <span class="mk-ov-title" id="mk-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="mk-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="mk-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="mk-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="mk-ov-stage" id="mk-ov-stage"><img id="mk-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('mk-svg-overlay');
+      var stage = document.getElementById('mk-ov-stage');
+      var img = document.getElementById('mk-ov-img');
+      var title = document.getElementById('mk-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('mk-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('mk-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('mk-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('mk-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
 
   <script>
     document.addEventListener('click', async function(event) {
