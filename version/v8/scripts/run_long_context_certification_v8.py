@@ -695,11 +695,17 @@ def extract_svg_markup(text: str) -> str:
     return text[start:end + len("</svg>")].strip() + "\n"
 
 
-def materialize_quality_prompt(prompt: dict[str, Any], dependencies: dict[str, str]) -> str:
+def materialize_quality_prompt(
+    prompt: dict[str, Any],
+    dependencies: dict[str, str],
+    prefix: str = "",
+) -> str:
     text = str(prompt["text"])
     dependency_id = str(prompt.get("depends_on", ""))
     if not dependency_id:
-        return text
+        if not prefix:
+            return text
+        return f"{prefix.rstrip()}\n\nTask:\n{text}"
     dependency = dependencies.get(dependency_id, "")
     if not dependency:
         raise ValueError(f"quality prompt {prompt['id']!r} requires missing {dependency_id!r}")
@@ -1224,18 +1230,17 @@ def run_quality(
     output_dir.mkdir(parents=True, exist_ok=True)
     results = []
     dependencies: dict[str, str] = {}
+    quality_prefix = str(getattr(args, "quality_prefix", ""))
+    minimum_root_prefill_tokens = max(
+        0, int(getattr(args, "quality_min_root_prefill_tokens", 0))
+    )
     for prompt in prompts:
         prompt_id = str(prompt["id"])
         result_path = output_dir / f"{prompt_id}.json"
-        if args.resume and result_path.is_file():
-            cached = json.loads(result_path.read_text(encoding="utf-8"))
-            artifact_path = Path(str(cached.get("artifact_path", "")))
-            if artifact_path.is_file():
-                dependencies[prompt_id] = artifact_path.read_text(encoding="utf-8")
-            results.append(cached)
-            continue
         try:
-            prompt_text = materialize_quality_prompt(prompt, dependencies)
+            prompt_text = materialize_quality_prompt(
+                prompt, dependencies, quality_prefix
+            )
         except ValueError as exc:
             result = {
                 "model_id": row["id"], "model": row["label"], "prompt_id": prompt_id,
@@ -1244,6 +1249,17 @@ def run_quality(
             atomic_json(result_path, result)
             results.append(result)
             continue
+        prompt_sha256 = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+        if args.resume and result_path.is_file():
+            cached = json.loads(result_path.read_text(encoding="utf-8"))
+            artifact_path = Path(str(cached.get("artifact_path", "")))
+            if (
+                cached.get("prompt_sha256") == prompt_sha256
+                and artifact_path.is_file()
+            ):
+                dependencies[prompt_id] = artifact_path.read_text(encoding="utf-8")
+                results.append(cached)
+                continue
         prompt_path = output_dir / f"{prompt_id}.prompt.txt"
         prompt_path.write_text(prompt_text + "\n", encoding="utf-8")
         trace_path = output_dir / f"{prompt_id}.trace.json"
@@ -1289,14 +1305,30 @@ def run_quality(
                 timing = parse_timing(command_result["stdout"] + command_result["stderr"])
             except ValueError:
                 pass
+        prefill_requirement_applies = not str(prompt.get("depends_on", ""))
+        prefill_tokens = int(timing["prompt_tokens"]) if timing is not None else None
+        prefill_consumption_verified = (
+            not prefill_requirement_applies
+            or minimum_root_prefill_tokens == 0
+            or (
+                prefill_tokens is not None
+                and prefill_tokens >= minimum_root_prefill_tokens
+            )
+        )
         result = {
             "model_id": row["id"], "model": row["label"], "prompt_id": prompt_id,
-            "status": "PASS" if command_result["returncode"] == 0 and quality["pass"] else "FAIL",
+            "status": (
+                "PASS" if command_result["returncode"] == 0 and quality["pass"]
+                and prefill_consumption_verified else "FAIL"
+            ),
             "quality": quality, "timing": timing, "peak_rss_kib": command_result["peak_rss_kib"],
             "resource_usage": command_result["resource_usage"],
             "utilization": command_result.get("utilization", {}),
             "utilization_timeline_path": command_result.get("utilization_timeline_path"),
-            "prompt_sha256": hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+            "prompt_sha256": prompt_sha256,
+            "minimum_root_prefill_tokens": minimum_root_prefill_tokens,
+            "prefill_requirement_applies": prefill_requirement_applies,
+            "prefill_consumption_verified": prefill_consumption_verified,
             "prompt_path": str(prompt_path), "raw_output_path": str(raw_output_path),
             "artifact_path": str(artifact_path), "output_path": str(artifact_path),
             "trace_path": str(trace_path),
@@ -1368,6 +1400,20 @@ def main() -> int:
     parser.add_argument("--run-timeout", type=int, default=43200)
     parser.add_argument("--quality-timeout", type=int, default=43200)
     parser.add_argument("--quality-context", type=int, default=8192)
+    parser.add_argument(
+        "--quality-prefix-file", type=Path,
+        help=(
+            "Prepend this dossier to root quality prompts; dependent prompts "
+            "receive only their declared artifact"
+        ),
+    )
+    parser.add_argument(
+        "--quality-min-root-prefill-tokens", type=int, default=0,
+        help=(
+            "Fail a root quality prompt unless native timing reports at least "
+            "this many consumed prompt tokens"
+        ),
+    )
     parser.add_argument("--ck-cli", type=Path, default=ROOT / "build" / "ck-cli-v8")
     parser.add_argument("--llama-root", type=Path, default=ROOT / "llama.cpp")
     parser.add_argument("--allow-download", action="store_true")
@@ -1385,6 +1431,8 @@ def main() -> int:
         raise ValueError("at least two repetitions are required for first-logit repeatability")
     if args.threads < 0:
         raise ValueError("--threads must be non-negative")
+    if args.quality_min_root_prefill_tokens < 0:
+        raise ValueError("--quality-min-root-prefill-tokens must be non-negative")
     if not 0.0 < args.min_active_core_fraction <= 1.0:
         raise ValueError("--min-active-core-fraction must be in (0, 1]")
     if args.quality_only and args.no_quality:
@@ -1393,6 +1441,16 @@ def main() -> int:
     catalog = load_schema(args.catalog, "cke.v8.long_context_model_catalog")
     prompt_payload = load_schema(args.quality_prompts, "cke.v8.long_context_quality_prompts")
     quality_prompts = validate_quality_prompts(prompt_payload)
+    args.quality_prefix = ""
+    quality_prefix_sha256 = None
+    if args.quality_prefix_file is not None:
+        prefix_path = args.quality_prefix_file.expanduser().resolve()
+        args.quality_prefix = prefix_path.read_text(encoding="utf-8")
+        if not args.quality_prefix.strip():
+            raise ValueError("--quality-prefix-file must not be empty")
+        quality_prefix_sha256 = hashlib.sha256(
+            args.quality_prefix.encode("utf-8")
+        ).hexdigest()
     selected = {item.strip() for item in args.models.split(",") if item.strip()}
     rows = [row for row in catalog["models"] if selected == {"all"} or row["id"] in selected]
     if not rows:
@@ -1413,6 +1471,14 @@ def main() -> int:
     env["OMP_NUM_THREADS"] = "1"
     env["CK_THREADPOOL_PROFILE"] = "1"
 
+    quality_signature = {
+        "quality_mode": "engineering_pair_v1",
+        "quality_prompt_sha256": hashlib.sha256(
+            args.quality_prompts.read_bytes()
+        ).hexdigest(),
+        "quality_prefix_sha256": quality_prefix_sha256,
+        "quality_min_root_prefill_tokens": args.quality_min_root_prefill_tokens,
+    }
     report: dict[str, Any] = {
         "schema": "cke.v8.long_context_certification", "schema_version": 1,
         "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -1425,18 +1491,21 @@ def main() -> int:
                    "parity_context": args.parity_context,
                    "parity_new_tokens": args.parity_new_tokens,
                    "quality_context": args.quality_context,
-                   "quality_mode": "engineering_pair_v1"},
+                   **quality_signature},
         "performance": [], "quality": [], "events": [],
     }
     summary_path = args.output_dir / "summary.json"
+    quality_resume_compatible = True
     if args.resume and summary_path.is_file():
         previous = json.loads(summary_path.read_text(encoding="utf-8"))
         if previous.get("schema") == report["schema"]:
+            previous_config = previous.get("config", {})
+            quality_resume_compatible = all(
+                previous_config.get(key) == value
+                for key, value in quality_signature.items()
+            )
             report = previous
-    report.setdefault("config", {}).update({
-        "quality_mode": "engineering_pair_v1",
-        "quality_prompt_sha256": hashlib.sha256(args.quality_prompts.read_bytes()).hexdigest(),
-    })
+    report.setdefault("config", {}).update(quality_signature)
 
     completed = {
         (row.get("model_id"), int(row.get("context_tokens", 0)))
@@ -1455,6 +1524,8 @@ def main() -> int:
         model_id for model_id, prompt_ids in quality_ids_by_model.items()
         if required_quality_ids <= prompt_ids
     }
+    if not quality_resume_compatible:
+        completed_quality.clear()
     model_runtime: dict[str, Path] = {}
     model_sources: dict[str, tuple[str, str]] = {}
     for row in rows:

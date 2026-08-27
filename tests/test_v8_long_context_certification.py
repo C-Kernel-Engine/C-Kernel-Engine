@@ -252,6 +252,12 @@ def test_engineering_quality_contract_is_paired_and_fail_closed() -> None:
     )
     assert "int generated_kernel(void);" in materialized
     assert "{{dependency_output}}" not in materialized
+    prefixed = runner.materialize_quality_prompt(prompts[0], {}, "dossier body\n")
+    assert prefixed.startswith("dossier body\n\nTask:\n")
+    dependent = runner.materialize_quality_prompt(
+        prompts[1], {prompts[0]["id"]: "int generated_kernel(void);\n"}, "ignored"
+    )
+    assert "ignored" not in dependent
 
     broken = json.loads(json.dumps(payload))
     broken["prompts"][0]["depends_on"] = "later"
@@ -392,6 +398,57 @@ int main(void) {
         gallery = (output / "quality" / "index.html").read_text(encoding="utf-8")
         assert "View generated C" in gallery
         assert "Generated SIMD kernel diagram" in gallery
+
+
+def test_quality_runner_enforces_root_prefill_and_invalidates_stale_resume(
+    monkeypatch,
+) -> None:
+    generated = "```c\n#include <stddef.h>\nint main(void) { return 0; }\n```\n" + "x" * 300
+    inference_calls = 0
+
+    def fake_run_command(command, **kwargs):
+        nonlocal inference_calls
+        if "--prompt" in command:
+            inference_calls += 1
+        return {
+            "returncode": 0,
+            "stdout": (
+                f"Response: {generated}\n"
+                "prefill 31 tok  10.0 ms  3100.0 tok/s | "
+                "decode 4 tok  2.0 ms  2000.0 tok/s\n"
+            ),
+            "stderr": "",
+            "peak_rss_kib": 100,
+            "resource_usage": {"average_cpu_cores": 8.0},
+            "stdout_path": str(kwargs["output_dir"] / "model.stdout.log"),
+            "stderr_path": str(kwargs["output_dir"] / "model.stderr.log"),
+        }
+
+    monkeypatch.setattr(runner, "run_command", fake_run_command)
+    prompt = {
+        "id": "code", "kind": "c_kernel.v1", "artifact_extension": ".c",
+        "max_tokens": 64, "text": "write code",
+    }
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        args = SimpleNamespace(
+            resume=True, ck_cli=output / "ck-cli", quality_timeout=10,
+            quality_prefix="dossier", quality_min_root_prefill_tokens=32,
+        )
+        first = runner.run_quality(
+            {"id": "test", "label": "Test Model"},
+            output / "runtime", 256, [prompt], args,
+            os.environ.copy(), output / "quality" / "test",
+        )
+        assert first[0]["status"] == "FAIL"
+        assert first[0]["prefill_consumption_verified"] is False
+        args.quality_prefix = "changed dossier"
+        runner.run_quality(
+            {"id": "test", "label": "Test Model"},
+            output / "runtime", 256, [prompt], args,
+            os.environ.copy(), output / "quality" / "test",
+        )
+        assert inference_calls == 2
 
 
 def test_native_cli_has_no_fixed_32k_context_clamp_and_traces_logits() -> None:
