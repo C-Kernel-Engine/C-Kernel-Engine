@@ -1157,17 +1157,25 @@
 <div class="card card-blue">
     <h3 style="margin-top: 0;">Long-context capacity and quality sweep</h3>
     <p>
-        Run the resumable long-context matrix separately from demo readiness. It visits every configured family at 2K, 8K, 32K, 64K, 128K, and 256K tokens, where supported. The 64K, 128K, and 256K rows are the long-context certification region. Every row records exact consumed-token evidence, input hashes, prefill/decode wall time, peak RSS, first-logit repeatability, selected generated providers, and matched llama.cpp performance when a local GGUF oracle is available. Code and standalone SVG prompts are retained as separate quality artifacts.
+        Run the resumable long-context matrix separately from demo readiness. It visits every configured family at 2K, 8K, 32K, 64K, 128K, and 256K tokens, where supported. The 64K, 128K, and 256K rows are the long-context certification region. Every row records exact consumed-token evidence, input hashes, prefill/decode wall time, average active cores, peak RSS, first-logit repeatability, selected generated providers, and matched llama.cpp performance when a local GGUF oracle is available. By default, a CKE performance row fails when average occupancy is below half of the requested worker count; override <code>--min-active-core-fraction</code> only for a documented topology experiment.
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>V8_LONG_CONTEXT_ARGS="--allow-download --threads 16" \
 make certify-v8-long-context</pre>
     </div>
+    <p>
+        Run the engineering-quality phase independently when you need reviewable outputs before the multi-day capacity ladder finishes. Every model receives the same complete FP32 RoPE task. Its extracted C source is checked with a strict syntax-only compiler invocation, then passed verbatim back to the model to produce a matching standalone SVG. Generated code is never executed automatically. The gate proves artifact structure, not algorithmic correctness; human review and a numerical oracle remain mandatory before a generated kernel can enter CKE.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>V8_ENGINEERING_QUALITY_ARGS="--allow-download --threads 16" \
+make certify-v8-engineering-quality</pre>
+    </div>
     <p class="v8-note" style="margin-bottom: 0;">
         Configure local checkpoints with <code>V8_QWEN36_MODEL</code>, <code>V8_QWEN38_MODEL</code>, <code>V8_QWEN35_MOE_MODEL</code>, <code>V8_GEMMA4_MODEL</code>, <code>V8_GLM4_MODEL</code>, <code>V8_NEMOTRON9_MODEL</code>, <code>V8_INSTELLA_MODEL</code>, <code>V8_KIMI_MODEL</code>, <code>V8_LAGUNA_MODEL</code>, and <code>V8_COHERE2_MODEL</code>. The corresponding <code>V8_*_GGUF</code> variables may identify a separate llama.cpp oracle. Reports are written incrementally to <code>build/v8-long-context-certification/summary.md</code> and <code>summary.json</code>, so an interrupted multi-day run resumes completed rows. Qwen3.6-VL is intentionally excluded from this text matrix and remains covered by <code>make test-qwen36vl-private-corpus-parity-auto</code>, which exercises its encoder, bridge, decoder, and 40-image OCR corpus.
     </p>
-    <p class="mini-note">The capacity matrix uses a deterministic fixed-token sequence so exact consumption, hashes, timing, and oracle comparisons remain reproducible. It does not claim that normal prompts should fill every supported context window. Code and SVG prompts provide a separate quality smoke; repository, documentation, retrieval, and multi-turn application corpora are the next certification layer.</p>
+    <p class="mini-note">The capacity matrix uses a deterministic fixed-token sequence so exact consumption, hashes, timing, and oracle comparisons remain reproducible. It does not claim that normal prompts should fill every supported context window. The standalone engineering command writes to <code>build/v8-engineering-quality/quality/</code>: open <code>index.html</code> for the readable gallery, or inspect each model's exact prompt, raw response, clean <code>.c</code>/<code>.svg</code> artifact, compiler logs, trace, and validation JSON. Repository, documentation, retrieval, and multi-turn application corpora are the next certification layer.</p>
 </div>
 
 <div class="card card-blue">
@@ -2297,7 +2305,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-27</p>
             </div>
         </div>
     </footer>
