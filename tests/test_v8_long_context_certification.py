@@ -24,6 +24,7 @@ def test_catalog_covers_promoted_long_context_families() -> None:
     )
     assert {row["id"] for row in payload["models"]} == {
         "qwen36_27b",
+        "qwen36_35b_a3b",
         "qwen38_27b",
         "qwen35_35b_a3b",
         "gemma4_e4b",
