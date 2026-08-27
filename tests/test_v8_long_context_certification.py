@@ -33,6 +33,7 @@ def test_catalog_covers_promoted_long_context_families() -> None:
         "instella_moe_16b_a3b",
         "kimi_vl_a3b",
         "laguna_s_2_1",
+        "laguna_xs_2_1",
         "cohere2_command_r7b",
     }
 
