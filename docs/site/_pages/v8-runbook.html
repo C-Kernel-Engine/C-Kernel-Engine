@@ -191,6 +191,14 @@ make certify-v8-long-context</pre>
 <pre>V8_ENGINEERING_QUALITY_ARGS="--allow-download --threads 16" \
 make certify-v8-engineering-quality</pre>
     </div>
+    <p>
+        To certify a full 128K generation envelope, allocate the total context explicitly. Here <code>--quality-context 8192</code> reserves room for the prompt and <code>--quality-total-context 131072</code> is the exact compiled runtime capacity. Decode receives every remaining token after the reserve and safety margin, and normally stops on the model's EOS signal. The report records the allocated context, effective output budget, consumed tokens, and native stop reason; it does not relabel an 8K+8K run as 128K.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>V8_ENGINEERING_QUALITY_ARGS="--allow-download --threads 0 --cpu-policy physical --quality-context 8192 --quality-total-context 131072" \
+make certify-v8-engineering-quality</pre>
+    </div>
     <p class="v8-note" style="margin-bottom: 0;">
         Configure local checkpoints with <code>V8_QWEN36_MODEL</code>, <code>V8_QWEN38_MODEL</code>, <code>V8_QWEN35_MOE_MODEL</code>, <code>V8_GEMMA4_MODEL</code>, <code>V8_GLM4_MODEL</code>, <code>V8_NEMOTRON9_MODEL</code>, <code>V8_INSTELLA_MODEL</code>, <code>V8_KIMI_MODEL</code>, <code>V8_LAGUNA_MODEL</code>, and <code>V8_COHERE2_MODEL</code>. The corresponding <code>V8_*_GGUF</code> variables may identify a separate llama.cpp oracle. Reports are written incrementally to <code>build/v8-long-context-certification/summary.md</code> and <code>summary.json</code>, so an interrupted multi-day run resumes completed rows. Qwen3.6-VL is intentionally excluded from this text matrix and remains covered by <code>make test-qwen36vl-private-corpus-parity-auto</code>, which exercises its encoder, bridge, decoder, and 40-image OCR corpus.
     </p>

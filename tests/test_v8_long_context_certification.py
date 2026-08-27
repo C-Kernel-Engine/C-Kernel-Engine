@@ -189,6 +189,26 @@ def test_build_failures_distinguish_capacity_from_contract_faults() -> None:
     })[0] == "FAIL"
 
 
+def test_quality_context_plan_allocates_exact_total_and_remaining_decode() -> None:
+    prompts = [{"max_tokens": 6144}, {"max_tokens": 8192}]
+    fixed = runner.quality_context_plan(8192, prompts, 131072)
+    assert fixed == {
+        "mode": "fixed_total_context",
+        "total_context_tokens": 131072,
+        "input_reserve_tokens": 8192,
+        "output_budget_tokens": 122872,
+    }
+    legacy = runner.quality_context_plan(8192, prompts, 0)
+    assert legacy["total_context_tokens"] == 16392
+    assert legacy["output_budget_tokens"] is None
+    try:
+        runner.quality_context_plan(8192, prompts, 8200)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("accepted total context without decode capacity")
+
+
 def test_provider_summary_records_selected_kernel_counts() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -449,6 +469,61 @@ def test_quality_runner_enforces_root_prefill_and_invalidates_stale_resume(
             os.environ.copy(), output / "quality" / "test",
         )
         assert inference_calls == 2
+
+
+def test_quality_runner_uses_remaining_total_context_until_native_eos(
+    monkeypatch,
+) -> None:
+    generated = "```c\n#include <stddef.h>\nint main(void) { return 0; }\n```\n" + "x" * 300
+    inference_commands: list[list[str]] = []
+
+    def fake_run_command(command, **kwargs):
+        if "--prompt" in command:
+            inference_commands.append(command)
+            trace_path = Path(command[command.index("--token-trace-json") + 1])
+            trace_path.write_text(
+                json.dumps({"prompt_tokens": 100, "generated_tokens": 200,
+                            "stop_reason": "eos"}),
+                encoding="utf-8",
+            )
+        return {
+            "returncode": 0,
+            "stdout": (
+                f"Response: {generated}\n"
+                "prefill 100 tok  10.0 ms  10000.0 tok/s | "
+                "decode 200 tok  20.0 ms  10000.0 tok/s\n"
+            ),
+            "stderr": "",
+            "peak_rss_kib": 100,
+            "resource_usage": {"average_cpu_cores": 8.0},
+            "stdout_path": str(kwargs["output_dir"] / "model.stdout.log"),
+            "stderr_path": str(kwargs["output_dir"] / "model.stderr.log"),
+        }
+
+    monkeypatch.setattr(runner, "run_command", fake_run_command)
+    prompt = {
+        "id": "code", "kind": "c_kernel.v1", "artifact_extension": ".c",
+        "max_tokens": 64, "text": "write code",
+    }
+    context_plan = runner.quality_context_plan(8192, [prompt], 131072)
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        rows = runner.run_quality(
+            {"id": "test", "label": "Test Model"},
+            output / "runtime", 131072, [prompt],
+            SimpleNamespace(
+                resume=False, ck_cli=output / "ck-cli", quality_timeout=10,
+                quality_prefix="", quality_min_root_prefill_tokens=0,
+            ),
+            os.environ.copy(), output / "quality" / "test",
+            context_plan=context_plan,
+        )
+        command = inference_commands[0]
+        assert command[command.index("--context") + 1] == "131072"
+        assert command[command.index("--max-tokens") + 1] == "122872"
+        assert rows[0]["output_budget_tokens"] == 122872
+        assert rows[0]["native_stop_reason"] == "eos"
+        assert rows[0]["configured_prompt_cap_tokens"] == 64
 
 
 def test_native_cli_has_no_fixed_32k_context_clamp_and_traces_logits() -> None:
