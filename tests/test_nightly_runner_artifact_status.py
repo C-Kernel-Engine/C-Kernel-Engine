@@ -54,9 +54,15 @@ class NightlyArtifactStatusTests(unittest.TestCase):
                 '--eval=print-python: ; @printf "%s\\n" "$(PYTHON)"',
                 "print-python",
             ]
+            # Scrub PYTHON from the inherited environment: the nightly runner
+            # exports PYTHON=<its interpreter>, and the Makefile's `PYTHON ?=`
+            # would then yield to it instead of resolving the primary
+            # checkout's venv — which is exactly what this test verifies.
+            env = {k: v for k, v in os.environ.items() if k != "PYTHON"}
             completed = subprocess.run(
                 command,
                 cwd=ROOT,
+                env=env,
                 capture_output=True,
                 text=True,
                 check=False,

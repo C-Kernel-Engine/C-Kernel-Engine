@@ -70,6 +70,9 @@ jobs:
           pip install -c requirements-nightly-constraints.txt -r requirements.txt
           pip install -c requirements-nightly-constraints.txt -r requirements-v7.txt
           pip install -c requirements-nightly-constraints.txt -r server/requirements.txt
+          # v8 inference (ck_run_v8.py) hard-requires its own requirement set —
+          # tiktoken in particular — and refuses to auto-bootstrap inside CI.
+          pip install -c requirements-nightly-constraints.txt -r requirements-v8.txt
           pip install -c requirements-nightly-constraints.txt huggingface_hub torch
 
       - name: Build CK-Engine
