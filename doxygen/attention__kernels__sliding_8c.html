@@ -162,6 +162,10 @@ Functions</h2></td></tr>
 <tr class="separator:a43ffa6b99b2073d4a8b25792fb518d9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0f5842331ec2c2b846dd4f8bd552d2a1" id="r_a0f5842331ec2c2b846dd4f8bd552d2a1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#a0f5842331ec2c2b846dd4f8bd552d2a1">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</td></tr>
 <tr class="separator:a0f5842331ec2c2b846dd4f8bd552d2a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad421a83d65111abd3922de3379a2d085" id="r_ad421a83d65111abd3922de3379a2d085"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#ad421a83d65111abd3922de3379a2d085">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window, int output_token_major)</td></tr>
+<tr class="separator:ad421a83d65111abd3922de3379a2d085"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a54f116c9af42c0893a661c174e6a20c2" id="r_a54f116c9af42c0893a661c174e6a20c2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#a54f116c9af42c0893a661c174e6a20c2">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output</a> (const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</td></tr>
+<tr class="separator:a54f116c9af42c0893a661c174e6a20c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad1c1ad639ac24461da3ffe45cb260e51" id="r_ad1c1ad639ac24461da3ffe45cb260e51"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#ad1c1ad639ac24461da3ffe45cb260e51">attention_forward_causal_head_major_shared_kv_sliding_gemma4</a> (const float *q, float *output, int num_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</td></tr>
 <tr class="separator:ad1c1ad639ac24461da3ffe45cb260e51"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a52ccbcfc06ddbe5086502aa2e8400b43" id="r_a52ccbcfc06ddbe5086502aa2e8400b43"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#a52ccbcfc06ddbe5086502aa2e8400b43">attention_forward_decode_head_major_gqa_flash_sliding</a> (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window)</td></tr>
@@ -170,6 +174,8 @@ Functions</h2></td></tr>
 <tr class="separator:a2c00d95e1569d4606f8f15fe3583fb10"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa20814964bba26260a8819e471f93185" id="r_aa20814964bba26260a8819e471f93185"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#aa20814964bba26260a8819e471f93185">attention_forward_decode_head_major_shared_kv_sliding_gemma4</a> (const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window)</td></tr>
 <tr class="separator:aa20814964bba26260a8819e471f93185"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad3bc8cb1ed71aa0d9ac16274c72eb76c" id="r_ad3bc8cb1ed71aa0d9ac16274c72eb76c"><td class="memItemLeft" align="right" valign="top">static size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#ad3bc8cb1ed71aa0d9ac16274c72eb76c">attention_output_index</a> (int h, int t, int num_heads, int num_tokens, int aligned_head_dim, int output_token_major)</td></tr>
+<tr class="separator:ad3bc8cb1ed71aa0d9ac16274c72eb76c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2470faa4b87ccb9b9783d010713f5b01" id="r_a2470faa4b87ccb9b9783d010713f5b01"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a> (const char *name, int fallback)</td></tr>
 <tr class="separator:a2470faa4b87ccb9b9783d010713f5b01"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9d02ee81426f42c962f04362b2e1a138" id="r_a9d02ee81426f42c962f04362b2e1a138"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">ck_sliding_attention_compute_one</a> (const ck_sliding_attention_args_t *a, int job)</td></tr>
@@ -341,60 +347,60 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00378">378</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  388</span>{</div>
-<div class="line"><span class="lineno">  389</span>    <span class="keywordtype">float</span> m = -INFINITY;</div>
-<div class="line"><span class="lineno">  390</span>    <span class="keywordtype">float</span> s = 0.0f;</div>
-<div class="line"><span class="lineno">  391</span> </div>
-<div class="line"><span class="lineno">  392</span>    <span class="keywordtype">int</span> window_start = 0;</div>
-<div class="line"><span class="lineno">  393</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0) {</div>
-<div class="line"><span class="lineno">  394</span>        window_start = query_pos - sliding_window + 1;</div>
-<div class="line"><span class="lineno">  395</span>        <span class="keywordflow">if</span> (window_start &lt; 0) window_start = 0;</div>
-<div class="line"><span class="lineno">  396</span>    }</div>
-<div class="line"><span class="lineno">  397</span> </div>
-<div class="line"><span class="lineno">  398</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  399</span>        out_vec[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  400</span>    }</div>
-<div class="line"><span class="lineno">  401</span> </div>
-<div class="line"><span class="lineno">  402</span>    <span class="keywordtype">int</span> effective_kv_end = query_pos &lt; kv_tokens ? query_pos : kv_tokens - 1;</div>
-<div class="line"><span class="lineno">  403</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = window_start; j &lt;= effective_kv_end; ++j) {</div>
-<div class="line"><span class="lineno">  404</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_vec = k_head + (size_t)j * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  405</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_vec = v_head + (size_t)j * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  406</span> </div>
-<div class="line"><span class="lineno">  407</span>        <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno">  408</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  409</span>            dot += q_vec[d] * k_vec[d];</div>
-<div class="line"><span class="lineno">  410</span>        }</div>
-<div class="line"><span class="lineno">  411</span>        <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
-<div class="line"><span class="lineno">  412</span> </div>
-<div class="line"><span class="lineno">  413</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m) {</div>
-<div class="line"><span class="lineno">  414</span>            <span class="keywordtype">float</span> exp_m = (m == -INFINITY) ? 0.0f : expf(m - <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>);</div>
-<div class="line"><span class="lineno">  415</span>            s *= exp_m;</div>
-<div class="line"><span class="lineno">  416</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  417</span>                out_vec[d] *= exp_m;</div>
-<div class="line"><span class="lineno">  418</span>            }</div>
-<div class="line"><span class="lineno">  419</span>            s += 1.0f;</div>
-<div class="line"><span class="lineno">  420</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  421</span>                out_vec[d] += v_vec[d];</div>
-<div class="line"><span class="lineno">  422</span>            }</div>
-<div class="line"><span class="lineno">  423</span>            m = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
-<div class="line"><span class="lineno">  424</span>        } <span class="keywordflow">else</span> {</div>
-<div class="line"><span class="lineno">  425</span>            <span class="keywordtype">float</span> e = expf(<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> - m);</div>
-<div class="line"><span class="lineno">  426</span>            s += e;</div>
-<div class="line"><span class="lineno">  427</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  428</span>                out_vec[d] += e * v_vec[d];</div>
-<div class="line"><span class="lineno">  429</span>            }</div>
-<div class="line"><span class="lineno">  430</span>        }</div>
-<div class="line"><span class="lineno">  431</span>    }</div>
-<div class="line"><span class="lineno">  432</span> </div>
-<div class="line"><span class="lineno">  433</span>    <span class="keywordtype">float</span> inv_s = 1.0f / s;</div>
-<div class="line"><span class="lineno">  434</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  435</span>        out_vec[d] *= inv_s;</div>
-<div class="line"><span class="lineno">  436</span>    }</div>
-<div class="line"><span class="lineno">  437</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = head_dim; d &lt; aligned_head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  438</span>        out_vec[d] = 0.0f;</div>
-<div class="line"><span class="lineno">  439</span>    }</div>
-<div class="line"><span class="lineno">  440</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00392">392</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  402</span>{</div>
+<div class="line"><span class="lineno">  403</span>    <span class="keywordtype">float</span> m = -INFINITY;</div>
+<div class="line"><span class="lineno">  404</span>    <span class="keywordtype">float</span> s = 0.0f;</div>
+<div class="line"><span class="lineno">  405</span> </div>
+<div class="line"><span class="lineno">  406</span>    <span class="keywordtype">int</span> window_start = 0;</div>
+<div class="line"><span class="lineno">  407</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0) {</div>
+<div class="line"><span class="lineno">  408</span>        window_start = query_pos - sliding_window + 1;</div>
+<div class="line"><span class="lineno">  409</span>        <span class="keywordflow">if</span> (window_start &lt; 0) window_start = 0;</div>
+<div class="line"><span class="lineno">  410</span>    }</div>
+<div class="line"><span class="lineno">  411</span> </div>
+<div class="line"><span class="lineno">  412</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  413</span>        out_vec[d] = 0.0f;</div>
+<div class="line"><span class="lineno">  414</span>    }</div>
+<div class="line"><span class="lineno">  415</span> </div>
+<div class="line"><span class="lineno">  416</span>    <span class="keywordtype">int</span> effective_kv_end = query_pos &lt; kv_tokens ? query_pos : kv_tokens - 1;</div>
+<div class="line"><span class="lineno">  417</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = window_start; j &lt;= effective_kv_end; ++j) {</div>
+<div class="line"><span class="lineno">  418</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_vec = k_head + (size_t)j * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  419</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_vec = v_head + (size_t)j * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  420</span> </div>
+<div class="line"><span class="lineno">  421</span>        <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  422</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  423</span>            dot += q_vec[d] * k_vec[d];</div>
+<div class="line"><span class="lineno">  424</span>        }</div>
+<div class="line"><span class="lineno">  425</span>        <span class="keywordtype">float</span> <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> = dot * scale;</div>
+<div class="line"><span class="lineno">  426</span> </div>
+<div class="line"><span class="lineno">  427</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> &gt; m) {</div>
+<div class="line"><span class="lineno">  428</span>            <span class="keywordtype">float</span> exp_m = (m == -INFINITY) ? 0.0f : expf(m - <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>);</div>
+<div class="line"><span class="lineno">  429</span>            s *= exp_m;</div>
+<div class="line"><span class="lineno">  430</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  431</span>                out_vec[d] *= exp_m;</div>
+<div class="line"><span class="lineno">  432</span>            }</div>
+<div class="line"><span class="lineno">  433</span>            s += 1.0f;</div>
+<div class="line"><span class="lineno">  434</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  435</span>                out_vec[d] += v_vec[d];</div>
+<div class="line"><span class="lineno">  436</span>            }</div>
+<div class="line"><span class="lineno">  437</span>            m = <a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a>;</div>
+<div class="line"><span class="lineno">  438</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  439</span>            <span class="keywordtype">float</span> e = expf(<a class="code hl_variable" href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a> - m);</div>
+<div class="line"><span class="lineno">  440</span>            s += e;</div>
+<div class="line"><span class="lineno">  441</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  442</span>                out_vec[d] += e * v_vec[d];</div>
+<div class="line"><span class="lineno">  443</span>            }</div>
+<div class="line"><span class="lineno">  444</span>        }</div>
+<div class="line"><span class="lineno">  445</span>    }</div>
+<div class="line"><span class="lineno">  446</span> </div>
+<div class="line"><span class="lineno">  447</span>    <span class="keywordtype">float</span> inv_s = 1.0f / s;</div>
+<div class="line"><span class="lineno">  448</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  449</span>        out_vec[d] *= inv_s;</div>
+<div class="line"><span class="lineno">  450</span>    }</div>
+<div class="line"><span class="lineno">  451</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = head_dim; d &lt; aligned_head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  452</span>        out_vec[d] = 0.0f;</div>
+<div class="line"><span class="lineno">  453</span>    }</div>
+<div class="line"><span class="lineno">  454</span>}</div>
 <div class="ttc" id="atokenizer_8h_html_a86dbad16ac00b8aa3c450398e4f8b741"><div class="ttname"><a href="tokenizer_8h.html#a86dbad16ac00b8aa3c450398e4f8b741">score</a></div><div class="ttdeci">int32_t float * score</div><div class="ttdef"><b>Definition</b> <a href="tokenizer_8h_source.html#l00328">tokenizer.h:328</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h_source.html#l00328">score</a>.</p>
@@ -484,94 +490,97 @@ Functions</h2></td></tr>
 <p>Sliding-window attention for prefill: each token attends to the last W tokens. When sliding_window &lt;= 0, behaves like regular causal attention.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00550">550</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  562</span>{</div>
-<div class="line"><span class="lineno">  563</span>    <span class="keywordflow">if</span> (!q || !k || !v || !output) {</div>
-<div class="line"><span class="lineno">  564</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  565</span>    }</div>
-<div class="line"><span class="lineno">  566</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno">  567</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  568</span>    }</div>
-<div class="line"><span class="lineno">  569</span>    <span class="keywordflow">if</span> (kv_stride_tokens &lt; num_tokens) {</div>
-<div class="line"><span class="lineno">  570</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  571</span>    }</div>
-<div class="line"><span class="lineno">  572</span> </div>
-<div class="line"><span class="lineno">  573</span>    <span class="comment">/* Debug escape hatch:</span></div>
-<div class="line"><span class="lineno">  574</span><span class="comment">     * For Gemma bring-up, force the proven non-sliding flash kernel to isolate</span></div>
-<div class="line"><span class="lineno">  575</span><span class="comment">     * whether divergence is caused by sliding-window implementation details.</span></div>
-<div class="line"><span class="lineno">  576</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  577</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
-<div class="line"><span class="lineno">  578</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a>(</div>
-<div class="line"><span class="lineno">  579</span>            q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  580</span>            head_dim, aligned_head_dim, kv_stride_tokens</div>
-<div class="line"><span class="lineno">  581</span>        );</div>
-<div class="line"><span class="lineno">  582</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  583</span>    }</div>
-<div class="line"><span class="lineno">  584</span> </div>
-<div class="line"><span class="lineno">  585</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
-<div class="line"><span class="lineno">  586</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = num_tokens;</div>
-<div class="line"><span class="lineno">  587</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)kv_stride_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">566</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  578</span>{</div>
+<div class="line"><span class="lineno">  579</span>    <span class="keywordflow">if</span> (!q || !k || !v || !output) {</div>
+<div class="line"><span class="lineno">  580</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  581</span>    }</div>
+<div class="line"><span class="lineno">  582</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno">  583</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  584</span>    }</div>
+<div class="line"><span class="lineno">  585</span>    <span class="keywordflow">if</span> (kv_stride_tokens &lt; num_tokens) {</div>
+<div class="line"><span class="lineno">  586</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  587</span>    }</div>
 <div class="line"><span class="lineno">  588</span> </div>
-<div class="line"><span class="lineno">  589</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = num_heads * T;</div>
-<div class="line"><span class="lineno">  590</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
-<div class="line"><span class="lineno">  591</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> active = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a>(pool, total_jobs, T, head_dim);</div>
-<div class="line"><span class="lineno">  592</span>    <span class="keywordflow">if</span> (pool &amp;&amp; active &gt; 1) {</div>
-<div class="line"><span class="lineno">  593</span>        ck_sliding_attention_args_t args = {</div>
-<div class="line"><span class="lineno">  594</span>            .q = q,</div>
-<div class="line"><span class="lineno">  595</span>            .k = k,</div>
-<div class="line"><span class="lineno">  596</span>            .v = v,</div>
-<div class="line"><span class="lineno">  597</span>            .output = output,</div>
-<div class="line"><span class="lineno">  598</span>            .num_heads = num_heads,</div>
-<div class="line"><span class="lineno">  599</span>            .num_kv_heads = num_kv_heads,</div>
-<div class="line"><span class="lineno">  600</span>            .num_tokens = T,</div>
-<div class="line"><span class="lineno">  601</span>            .head_dim = head_dim,</div>
-<div class="line"><span class="lineno">  602</span>            .aligned_head_dim = aligned_head_dim,</div>
-<div class="line"><span class="lineno">  603</span>            .kv_stride_tokens = kv_stride_tokens,</div>
-<div class="line"><span class="lineno">  604</span>            .sliding_window = sliding_window,</div>
-<div class="line"><span class="lineno">  605</span>            .scale = scale,</div>
-<div class="line"><span class="lineno">  606</span>        };</div>
-<div class="line"><span class="lineno">  607</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  608</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  609</span>    }</div>
-<div class="line"><span class="lineno">  610</span> </div>
-<div class="line"><span class="lineno">  611</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  612</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx512</span></div>
-<div class="line"><span class="lineno">  613</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  614</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx2</span></div>
-<div class="line"><span class="lineno">  615</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  616</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx</span></div>
-<div class="line"><span class="lineno">  617</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  618</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding</span></div>
-<div class="line"><span class="lineno">  619</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  620</span> </div>
-<div class="line"><span class="lineno">  621</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  622</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno">  623</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  624</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  625</span> </div>
-<div class="line"><span class="lineno">  626</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
-<div class="line"><span class="lineno">  627</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  628</span>            <span class="keywordtype">float</span> *out_vec = output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  629</span>            <a class="code hl_define" href="attention__kernels__sliding_8c.html#ab21dd17029fc259dee0b11f03c1e2a1f">SLIDING_FLASH_IMPL</a>(q_vec, k_head, v_head,</div>
-<div class="line"><span class="lineno">  630</span>                               <span class="comment">/*query_pos=*/</span>i,</div>
-<div class="line"><span class="lineno">  631</span>                               <span class="comment">/*kv_tokens=*/</span>T,</div>
-<div class="line"><span class="lineno">  632</span>                               head_dim, aligned_head_dim,</div>
-<div class="line"><span class="lineno">  633</span>                               scale, out_vec,</div>
-<div class="line"><span class="lineno">  634</span>                               sliding_window);</div>
-<div class="line"><span class="lineno">  635</span>        }</div>
-<div class="line"><span class="lineno">  636</span>    }</div>
+<div class="line"><span class="lineno">  589</span>    <span class="comment">/* Debug escape hatch:</span></div>
+<div class="line"><span class="lineno">  590</span><span class="comment">     * For Gemma bring-up, force the proven non-sliding flash kernel to isolate</span></div>
+<div class="line"><span class="lineno">  591</span><span class="comment">     * whether divergence is caused by sliding-window implementation details.</span></div>
+<div class="line"><span class="lineno">  592</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  593</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
+<div class="line"><span class="lineno">  594</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a>(</div>
+<div class="line"><span class="lineno">  595</span>            q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  596</span>            head_dim, aligned_head_dim, kv_stride_tokens</div>
+<div class="line"><span class="lineno">  597</span>        );</div>
+<div class="line"><span class="lineno">  598</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  599</span>    }</div>
+<div class="line"><span class="lineno">  600</span> </div>
+<div class="line"><span class="lineno">  601</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><span class="lineno">  602</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = num_tokens;</div>
+<div class="line"><span class="lineno">  603</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)kv_stride_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  604</span> </div>
+<div class="line"><span class="lineno">  605</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = num_heads * T;</div>
+<div class="line"><span class="lineno">  606</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  607</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> active = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a>(pool, total_jobs, T, head_dim);</div>
+<div class="line"><span class="lineno">  608</span>    <span class="keywordflow">if</span> (pool &amp;&amp; active &gt; 1) {</div>
+<div class="line"><span class="lineno">  609</span>        ck_sliding_attention_args_t args = {</div>
+<div class="line"><span class="lineno">  610</span>            .q = q,</div>
+<div class="line"><span class="lineno">  611</span>            .k = k,</div>
+<div class="line"><span class="lineno">  612</span>            .v = v,</div>
+<div class="line"><span class="lineno">  613</span>            .output = output,</div>
+<div class="line"><span class="lineno">  614</span>            .num_heads = num_heads,</div>
+<div class="line"><span class="lineno">  615</span>            .num_kv_heads = num_kv_heads,</div>
+<div class="line"><span class="lineno">  616</span>            .num_tokens = T,</div>
+<div class="line"><span class="lineno">  617</span>            .head_dim = head_dim,</div>
+<div class="line"><span class="lineno">  618</span>            .aligned_head_dim = aligned_head_dim,</div>
+<div class="line"><span class="lineno">  619</span>            .kv_stride_tokens = kv_stride_tokens,</div>
+<div class="line"><span class="lineno">  620</span>            .sliding_window = sliding_window,</div>
+<div class="line"><span class="lineno">  621</span>            .output_token_major = 0,</div>
+<div class="line"><span class="lineno">  622</span>            .scale = scale,</div>
+<div class="line"><span class="lineno">  623</span>        };</div>
+<div class="line"><span class="lineno">  624</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  625</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  626</span>    }</div>
+<div class="line"><span class="lineno">  627</span> </div>
+<div class="line"><span class="lineno">  628</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  629</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx512</span></div>
+<div class="line"><span class="lineno">  630</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  631</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx2</span></div>
+<div class="line"><span class="lineno">  632</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  633</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding_avx</span></div>
+<div class="line"><span class="lineno">  634</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  635</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL attention_flash_query_sliding</span></div>
+<div class="line"><span class="lineno">  636</span><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="lineno">  637</span> </div>
-<div class="line"><span class="lineno">  638</span><span class="preprocessor">#undef SLIDING_FLASH_IMPL</span></div>
-<div class="line"><span class="lineno">  639</span>}</div>
+<div class="line"><span class="lineno">  638</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  639</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><span class="lineno">  640</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  641</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  642</span> </div>
+<div class="line"><span class="lineno">  643</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
+<div class="line"><span class="lineno">  644</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  645</span>            <span class="keywordtype">float</span> *out_vec = output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#ad3bc8cb1ed71aa0d9ac16274c72eb76c">attention_output_index</a>(</div>
+<div class="line"><span class="lineno">  646</span>                h, i, num_heads, T, aligned_head_dim, 0);</div>
+<div class="line"><span class="lineno">  647</span>            <a class="code hl_define" href="attention__kernels__sliding_8c.html#ab21dd17029fc259dee0b11f03c1e2a1f">SLIDING_FLASH_IMPL</a>(q_vec, k_head, v_head,</div>
+<div class="line"><span class="lineno">  648</span>                               <span class="comment">/*query_pos=*/</span>i,</div>
+<div class="line"><span class="lineno">  649</span>                               <span class="comment">/*kv_tokens=*/</span>T,</div>
+<div class="line"><span class="lineno">  650</span>                               head_dim, aligned_head_dim,</div>
+<div class="line"><span class="lineno">  651</span>                               scale, out_vec,</div>
+<div class="line"><span class="lineno">  652</span>                               sliding_window);</div>
+<div class="line"><span class="lineno">  653</span>        }</div>
+<div class="line"><span class="lineno">  654</span>    }</div>
+<div class="line"><span class="lineno">  655</span> </div>
+<div class="line"><span class="lineno">  656</span><span class="preprocessor">#undef SLIDING_FLASH_IMPL</span></div>
+<div class="line"><span class="lineno">  657</span>}</div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_a0102833b3c8a1d4114e65c0638ddbfb1"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a></div><div class="ttdeci">static size_t qkv_index(int h, int t, int d, int num_tokens, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00016">attention_kernels_sliding.c:16</a></div></div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a349f41453f9d1add857dbf9e6fdb1c75"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a></div><div class="ttdeci">static int ck_sliding_attention_pick_threads(ck_threadpool_t *pool, int total_jobs, int num_tokens, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00475">attention_kernels_sliding.c:475</a></div></div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a349f41453f9d1add857dbf9e6fdb1c75"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a></div><div class="ttdeci">static int ck_sliding_attention_pick_threads(ck_threadpool_t *pool, int total_jobs, int num_tokens, int head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00490">attention_kernels_sliding.c:490</a></div></div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_ab21dd17029fc259dee0b11f03c1e2a1f"><div class="ttname"><a href="attention__kernels__sliding_8c.html#ab21dd17029fc259dee0b11f03c1e2a1f">SLIDING_FLASH_IMPL</a></div><div class="ttdeci">#define SLIDING_FLASH_IMPL</div></div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_ae339a3f9bda7dfd5b4859cca7094a275"><div class="ttname"><a href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a></div><div class="ttdeci">static void ck_sliding_attention_work_fn(int ith, int nth, void *args)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00531">attention_kernels_sliding.c:531</a></div></div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_ad3bc8cb1ed71aa0d9ac16274c72eb76c"><div class="ttname"><a href="attention__kernels__sliding_8c.html#ad3bc8cb1ed71aa0d9ac16274c72eb76c">attention_output_index</a></div><div class="ttdeci">static size_t attention_output_index(int h, int t, int num_heads, int num_tokens, int aligned_head_dim, int output_token_major)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00026">attention_kernels_sliding.c:26</a></div></div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_ae339a3f9bda7dfd5b4859cca7094a275"><div class="ttname"><a href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a></div><div class="ttdeci">static void ck_sliding_attention_work_fn(int ith, int nth, void *args)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00547">attention_kernels_sliding.c:547</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_a4554995880b7a47e275f9b10511b5e43"><div class="ttname"><a href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a></div><div class="ttdeci">void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00364">ck_threadpool.c:364</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00640">ck_threadpool.c:640</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ckernel__engine_8h.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l04421">attention_kernels.c:4421</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l04421">attention_forward_causal_head_major_gqa_flash_strided()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00475">ck_sliding_attention_pick_threads()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00531">ck_sliding_attention_work_fn()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#ab21dd17029fc259dee0b11f03c1e2a1f">SLIDING_FLASH_IMPL</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l04421">attention_forward_causal_head_major_gqa_flash_strided()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00026">attention_output_index()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00547">ck_sliding_attention_work_fn()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#ab21dd17029fc259dee0b11f03c1e2a1f">SLIDING_FLASH_IMPL</a>.</p>
 
 </div>
 </div>
@@ -654,91 +663,300 @@ Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00763">763</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  775</span>{</div>
+<div class="line"><span class="lineno">  776</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#ad421a83d65111abd3922de3379a2d085">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl</a>(</div>
+<div class="line"><span class="lineno">  777</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens, head_dim,</div>
+<div class="line"><span class="lineno">  778</span>        aligned_head_dim, kv_stride_tokens, sliding_window,</div>
+<div class="line"><span class="lineno">  779</span>        <span class="comment">/*output_token_major=*/</span>0);</div>
+<div class="line"><span class="lineno">  780</span>}</div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_ad421a83d65111abd3922de3379a2d085"><div class="ttname"><a href="attention__kernels__sliding_8c.html#ad421a83d65111abd3922de3379a2d085">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl</a></div><div class="ttdeci">static void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window, int output_token_major)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00668">attention_kernels_sliding.c:668</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00801">attention_forward_causal_head_major_shared_kv_sliding_gemma4()</a>.</p>
+
+</div>
+</div>
+<a id="ad421a83d65111abd3922de3379a2d085" name="ad421a83d65111abd3922de3379a2d085"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad421a83d65111abd3922de3379a2d085">&#9670;&#160;</a></span>attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>kv_stride_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>sliding_window</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>output_token_major</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
 <p>Flash attention decode with sliding window </p><dl class="test"><dt><b><a class="el" href="test.html#_test000015">Test:</a></b></dt><dd>test_attention.py::TestAttentionForward::test_sliding_window_decode</dd></dl>
 <p>Single query token attends to the last W tokens in the KV cache. For decode: effective_kv_tokens = min(kv_tokens, sliding_window)</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00650">650</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  662</span>{</div>
-<div class="line"><span class="lineno">  663</span>    <span class="keywordflow">if</span> (!q || !k || !v || !output) {</div>
-<div class="line"><span class="lineno">  664</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  665</span>    }</div>
-<div class="line"><span class="lineno">  666</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno">  667</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  668</span>    }</div>
-<div class="line"><span class="lineno">  669</span>    <span class="keywordflow">if</span> (kv_stride_tokens &lt; num_tokens) {</div>
-<div class="line"><span class="lineno">  670</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  671</span>    }</div>
-<div class="line"><span class="lineno">  672</span> </div>
-<div class="line"><span class="lineno">  673</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
-<div class="line"><span class="lineno">  674</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a5433f61bc3a85a34d8a37a1b8e8d4a9b">attention_forward_causal_head_major_gqa_flash_strided_gemma4</a>(</div>
-<div class="line"><span class="lineno">  675</span>            q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  676</span>            head_dim, aligned_head_dim, kv_stride_tokens</div>
-<div class="line"><span class="lineno">  677</span>        );</div>
-<div class="line"><span class="lineno">  678</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  679</span>    }</div>
-<div class="line"><span class="lineno">  680</span> </div>
-<div class="line"><span class="lineno">  681</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f;</div>
-<div class="line"><span class="lineno">  682</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = num_tokens;</div>
-<div class="line"><span class="lineno">  683</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)kv_stride_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  684</span> </div>
-<div class="line"><span class="lineno">  685</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = num_heads * T;</div>
-<div class="line"><span class="lineno">  686</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
-<div class="line"><span class="lineno">  687</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> active = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a>(pool, total_jobs, T, head_dim);</div>
-<div class="line"><span class="lineno">  688</span>    <span class="keywordflow">if</span> (pool &amp;&amp; active &gt; 1) {</div>
-<div class="line"><span class="lineno">  689</span>        ck_sliding_attention_args_t args = {</div>
-<div class="line"><span class="lineno">  690</span>            .q = q,</div>
-<div class="line"><span class="lineno">  691</span>            .k = k,</div>
-<div class="line"><span class="lineno">  692</span>            .v = v,</div>
-<div class="line"><span class="lineno">  693</span>            .output = output,</div>
-<div class="line"><span class="lineno">  694</span>            .num_heads = num_heads,</div>
-<div class="line"><span class="lineno">  695</span>            .num_kv_heads = num_kv_heads,</div>
-<div class="line"><span class="lineno">  696</span>            .num_tokens = T,</div>
-<div class="line"><span class="lineno">  697</span>            .head_dim = head_dim,</div>
-<div class="line"><span class="lineno">  698</span>            .aligned_head_dim = aligned_head_dim,</div>
-<div class="line"><span class="lineno">  699</span>            .kv_stride_tokens = kv_stride_tokens,</div>
-<div class="line"><span class="lineno">  700</span>            .sliding_window = sliding_window,</div>
-<div class="line"><span class="lineno">  701</span>            .scale = scale,</div>
-<div class="line"><span class="lineno">  702</span>        };</div>
-<div class="line"><span class="lineno">  703</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a>, &amp;args);</div>
-<div class="line"><span class="lineno">  704</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  705</span>    }</div>
-<div class="line"><span class="lineno">  706</span> </div>
-<div class="line"><span class="lineno">  707</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  708</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx512</span></div>
-<div class="line"><span class="lineno">  709</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  710</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx2</span></div>
-<div class="line"><span class="lineno">  711</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  712</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx</span></div>
-<div class="line"><span class="lineno">  713</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  714</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding</span></div>
-<div class="line"><span class="lineno">  715</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  716</span> </div>
-<div class="line"><span class="lineno">  717</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  718</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno">  719</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  720</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  721</span> </div>
-<div class="line"><span class="lineno">  722</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
-<div class="line"><span class="lineno">  723</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  724</span>            <span class="keywordtype">float</span> *out_vec = output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
-<div class="line"><span class="lineno">  725</span>            <a class="code hl_define" href="attention__kernels__sliding_8c.html#aaffd946235fad0bbdf00158a14d39baf">SLIDING_FLASH_IMPL_GEMMA4</a>(q_vec, k_head, v_head,</div>
-<div class="line"><span class="lineno">  726</span>                                      <span class="comment">/*query_pos=*/</span>i,</div>
-<div class="line"><span class="lineno">  727</span>                                      <span class="comment">/*kv_tokens=*/</span>T,</div>
-<div class="line"><span class="lineno">  728</span>                                      head_dim, aligned_head_dim,</div>
-<div class="line"><span class="lineno">  729</span>                                      scale, out_vec,</div>
-<div class="line"><span class="lineno">  730</span>                                      sliding_window);</div>
-<div class="line"><span class="lineno">  731</span>        }</div>
-<div class="line"><span class="lineno">  732</span>    }</div>
-<div class="line"><span class="lineno">  733</span> </div>
-<div class="line"><span class="lineno">  734</span><span class="preprocessor">#undef SLIDING_FLASH_IMPL_GEMMA4</span></div>
-<div class="line"><span class="lineno">  735</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">668</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  681</span>{</div>
+<div class="line"><span class="lineno">  682</span>    <span class="keywordflow">if</span> (!q || !k || !v || !output) {</div>
+<div class="line"><span class="lineno">  683</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  684</span>    }</div>
+<div class="line"><span class="lineno">  685</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || num_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno">  686</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  687</span>    }</div>
+<div class="line"><span class="lineno">  688</span>    <span class="keywordflow">if</span> (kv_stride_tokens &lt; num_tokens) {</div>
+<div class="line"><span class="lineno">  689</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  690</span>    }</div>
+<div class="line"><span class="lineno">  691</span> </div>
+<div class="line"><span class="lineno">  692</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
+<div class="line"><span class="lineno">  693</span>        <span class="keywordflow">if</span> (output_token_major) {</div>
+<div class="line"><span class="lineno">  694</span>            <a class="code hl_function" href="ckernel__engine_8h.html#abf76cd1132bf1a48fe626b41ab93180d">attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output</a>(</div>
+<div class="line"><span class="lineno">  695</span>                q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  696</span>                head_dim, aligned_head_dim, kv_stride_tokens);</div>
+<div class="line"><span class="lineno">  697</span>        } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  698</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a5433f61bc3a85a34d8a37a1b8e8d4a9b">attention_forward_causal_head_major_gqa_flash_strided_gemma4</a>(</div>
+<div class="line"><span class="lineno">  699</span>                q, k, v, output, num_heads, num_kv_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  700</span>                head_dim, aligned_head_dim, kv_stride_tokens);</div>
+<div class="line"><span class="lineno">  701</span>        }</div>
+<div class="line"><span class="lineno">  702</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  703</span>    }</div>
+<div class="line"><span class="lineno">  704</span> </div>
+<div class="line"><span class="lineno">  705</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f;</div>
+<div class="line"><span class="lineno">  706</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = num_tokens;</div>
+<div class="line"><span class="lineno">  707</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)kv_stride_tokens * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  708</span> </div>
+<div class="line"><span class="lineno">  709</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = num_heads * T;</div>
+<div class="line"><span class="lineno">  710</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  711</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> active = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">ck_sliding_attention_pick_threads</a>(pool, total_jobs, T, head_dim);</div>
+<div class="line"><span class="lineno">  712</span>    <span class="keywordflow">if</span> (pool &amp;&amp; active &gt; 1) {</div>
+<div class="line"><span class="lineno">  713</span>        ck_sliding_attention_args_t args = {</div>
+<div class="line"><span class="lineno">  714</span>            .q = q,</div>
+<div class="line"><span class="lineno">  715</span>            .k = k,</div>
+<div class="line"><span class="lineno">  716</span>            .v = v,</div>
+<div class="line"><span class="lineno">  717</span>            .output = output,</div>
+<div class="line"><span class="lineno">  718</span>            .num_heads = num_heads,</div>
+<div class="line"><span class="lineno">  719</span>            .num_kv_heads = num_kv_heads,</div>
+<div class="line"><span class="lineno">  720</span>            .num_tokens = T,</div>
+<div class="line"><span class="lineno">  721</span>            .head_dim = head_dim,</div>
+<div class="line"><span class="lineno">  722</span>            .aligned_head_dim = aligned_head_dim,</div>
+<div class="line"><span class="lineno">  723</span>            .kv_stride_tokens = kv_stride_tokens,</div>
+<div class="line"><span class="lineno">  724</span>            .sliding_window = sliding_window,</div>
+<div class="line"><span class="lineno">  725</span>            .output_token_major = output_token_major,</div>
+<div class="line"><span class="lineno">  726</span>            .scale = scale,</div>
+<div class="line"><span class="lineno">  727</span>        };</div>
+<div class="line"><span class="lineno">  728</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, active, <a class="code hl_function" href="attention__kernels__sliding_8c.html#ae339a3f9bda7dfd5b4859cca7094a275">ck_sliding_attention_work_fn</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  729</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  730</span>    }</div>
+<div class="line"><span class="lineno">  731</span> </div>
+<div class="line"><span class="lineno">  732</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  733</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx512</span></div>
+<div class="line"><span class="lineno">  734</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  735</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx2</span></div>
+<div class="line"><span class="lineno">  736</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  737</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding_avx</span></div>
+<div class="line"><span class="lineno">  738</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  739</span><span class="preprocessor">    #define SLIDING_FLASH_IMPL_GEMMA4 attention_flash_query_sliding</span></div>
+<div class="line"><span class="lineno">  740</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  741</span> </div>
+<div class="line"><span class="lineno">  742</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  743</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><span class="lineno">  744</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  745</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  746</span> </div>
+<div class="line"><span class="lineno">  747</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; T; ++i) {</div>
+<div class="line"><span class="lineno">  748</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, aligned_head_dim);</div>
+<div class="line"><span class="lineno">  749</span>            <span class="keywordtype">float</span> *out_vec = output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#ad3bc8cb1ed71aa0d9ac16274c72eb76c">attention_output_index</a>(</div>
+<div class="line"><span class="lineno">  750</span>                h, i, num_heads, T, aligned_head_dim, output_token_major);</div>
+<div class="line"><span class="lineno">  751</span>            <a class="code hl_define" href="attention__kernels__sliding_8c.html#aaffd946235fad0bbdf00158a14d39baf">SLIDING_FLASH_IMPL_GEMMA4</a>(q_vec, k_head, v_head,</div>
+<div class="line"><span class="lineno">  752</span>                                      <span class="comment">/*query_pos=*/</span>i,</div>
+<div class="line"><span class="lineno">  753</span>                                      <span class="comment">/*kv_tokens=*/</span>T,</div>
+<div class="line"><span class="lineno">  754</span>                                      head_dim, aligned_head_dim,</div>
+<div class="line"><span class="lineno">  755</span>                                      scale, out_vec,</div>
+<div class="line"><span class="lineno">  756</span>                                      sliding_window);</div>
+<div class="line"><span class="lineno">  757</span>        }</div>
+<div class="line"><span class="lineno">  758</span>    }</div>
+<div class="line"><span class="lineno">  759</span> </div>
+<div class="line"><span class="lineno">  760</span><span class="preprocessor">#undef SLIDING_FLASH_IMPL_GEMMA4</span></div>
+<div class="line"><span class="lineno">  761</span>}</div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_aaffd946235fad0bbdf00158a14d39baf"><div class="ttname"><a href="attention__kernels__sliding_8c.html#aaffd946235fad0bbdf00158a14d39baf">SLIDING_FLASH_IMPL_GEMMA4</a></div><div class="ttdeci">#define SLIDING_FLASH_IMPL_GEMMA4</div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a5433f61bc3a85a34d8a37a1b8e8d4a9b"><div class="ttname"><a href="ckernel__engine_8h.html#a5433f61bc3a85a34d8a37a1b8e8d4a9b">attention_forward_causal_head_major_gqa_flash_strided_gemma4</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided_gemma4(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05023">attention_kernels.c:5023</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_abf76cd1132bf1a48fe626b41ab93180d"><div class="ttname"><a href="ckernel__engine_8h.html#abf76cd1132bf1a48fe626b41ab93180d">attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05046">attention_kernels.c:5046</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05023">attention_forward_causal_head_major_gqa_flash_strided_gemma4()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00475">ck_sliding_attention_pick_threads()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00531">ck_sliding_attention_work_fn()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#aaffd946235fad0bbdf00158a14d39baf">SLIDING_FLASH_IMPL_GEMMA4</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05023">attention_forward_causal_head_major_gqa_flash_strided_gemma4()</a>, <a class="el" href="attention__kernels_8c_source.html#l05046">attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00026">attention_output_index()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00547">ck_sliding_attention_work_fn()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#aaffd946235fad0bbdf00158a14d39baf">SLIDING_FLASH_IMPL_GEMMA4</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00737">attention_forward_causal_head_major_shared_kv_sliding_gemma4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00763">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00782">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output()</a>.</p>
+
+</div>
+</div>
+<a id="a54f116c9af42c0893a661c174e6a20c2" name="a54f116c9af42c0893a661c174e6a20c2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a54f116c9af42c0893a661c174e6a20c2">&#9670;&#160;</a></span>attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>kv_stride_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>sliding_window</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00782">782</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  794</span>{</div>
+<div class="line"><span class="lineno">  795</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#ad421a83d65111abd3922de3379a2d085">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl</a>(</div>
+<div class="line"><span class="lineno">  796</span>        q, k, v, output, num_heads, num_kv_heads, num_tokens, head_dim,</div>
+<div class="line"><span class="lineno">  797</span>        aligned_head_dim, kv_stride_tokens, sliding_window,</div>
+<div class="line"><span class="lineno">  798</span>        <span class="comment">/*output_token_major=*/</span>1);</div>
+<div class="line"><span class="lineno">  799</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>.</p>
 
 </div>
 </div>
@@ -804,16 +1022,16 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00737">737</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  746</span>{</div>
-<div class="line"><span class="lineno">  747</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0f5842331ec2c2b846dd4f8bd552d2a1">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4</a>(</div>
-<div class="line"><span class="lineno">  748</span>        q, q, q, output, num_heads, num_heads, num_tokens,</div>
-<div class="line"><span class="lineno">  749</span>        head_dim, aligned_head_dim, kv_stride_tokens, sliding_window</div>
-<div class="line"><span class="lineno">  750</span>    );</div>
-<div class="line"><span class="lineno">  751</span>}</div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a0f5842331ec2c2b846dd4f8bd552d2a1"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a0f5842331ec2c2b846dd4f8bd552d2a1">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00650">attention_kernels_sliding.c:650</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00801">801</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  810</span>{</div>
+<div class="line"><span class="lineno">  811</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0f5842331ec2c2b846dd4f8bd552d2a1">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4</a>(</div>
+<div class="line"><span class="lineno">  812</span>        q, q, q, output, num_heads, num_heads, num_tokens,</div>
+<div class="line"><span class="lineno">  813</span>        head_dim, aligned_head_dim, kv_stride_tokens, sliding_window</div>
+<div class="line"><span class="lineno">  814</span>    );</div>
+<div class="line"><span class="lineno">  815</span>}</div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a0f5842331ec2c2b846dd4f8bd552d2a1"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a0f5842331ec2c2b846dd4f8bd552d2a1">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00763">attention_kernels_sliding.c:763</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00650">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00763">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>.</p>
 
 </div>
 </div>
@@ -897,84 +1115,84 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00753">753</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  765</span>{</div>
-<div class="line"><span class="lineno">  766</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
-<div class="line"><span class="lineno">  767</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  768</span>    }</div>
-<div class="line"><span class="lineno">  769</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
-<div class="line"><span class="lineno">  770</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  771</span>    }</div>
-<div class="line"><span class="lineno">  772</span>    <span class="keywordflow">if</span> (kv_tokens &lt;= 0 || kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  773</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  774</span>    }</div>
-<div class="line"><span class="lineno">  775</span> </div>
-<div class="line"><span class="lineno">  776</span>    <span class="comment">/* Debug escape hatch:</span></div>
-<div class="line"><span class="lineno">  777</span><span class="comment">     * Route decode through non-sliding flash attention when requested to</span></div>
-<div class="line"><span class="lineno">  778</span><span class="comment">     * quickly A/B check sliding-window kernel correctness.</span></div>
-<div class="line"><span class="lineno">  779</span><span class="comment">     */</span></div>
-<div class="line"><span class="lineno">  780</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
-<div class="line"><span class="lineno">  781</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a>(</div>
-<div class="line"><span class="lineno">  782</span>            q_token, k_cache, v_cache, out_token,</div>
-<div class="line"><span class="lineno">  783</span>            num_heads, num_kv_heads, kv_tokens, cache_capacity,</div>
-<div class="line"><span class="lineno">  784</span>            head_dim, aligned_head_dim</div>
-<div class="line"><span class="lineno">  785</span>        );</div>
-<div class="line"><span class="lineno">  786</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  787</span>    }</div>
-<div class="line"><span class="lineno">  788</span> </div>
-<div class="line"><span class="lineno">  789</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
-<div class="line"><span class="lineno">  790</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  791</span> </div>
-<div class="line"><span class="lineno">  792</span>    <span class="comment">// Compute effective KV tokens based on sliding window</span></div>
-<div class="line"><span class="lineno">  793</span>    <span class="keywordtype">int</span> effective_kv_tokens = kv_tokens;</div>
-<div class="line"><span class="lineno">  794</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0 &amp;&amp; sliding_window &lt; kv_tokens) {</div>
-<div class="line"><span class="lineno">  795</span>        effective_kv_tokens = sliding_window;</div>
-<div class="line"><span class="lineno">  796</span>    }</div>
-<div class="line"><span class="lineno">  797</span> </div>
-<div class="line"><span class="lineno">  798</span>    <span class="comment">// Guard against empty window (shouldn&#39;t happen with kv_tokens &gt;= 1)</span></div>
-<div class="line"><span class="lineno">  799</span>    <span class="keywordflow">if</span> (effective_kv_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno">  800</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  801</span>    }</div>
-<div class="line"><span class="lineno">  802</span> </div>
-<div class="line"><span class="lineno">  803</span>    <span class="comment">// Offset to start reading from the last effective_kv_tokens entries</span></div>
-<div class="line"><span class="lineno">  804</span>    <span class="keywordtype">int</span> kv_start_offset = kv_tokens - effective_kv_tokens;</div>
-<div class="line"><span class="lineno">  805</span> </div>
-<div class="line"><span class="lineno">  806</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  807</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx512</span></div>
-<div class="line"><span class="lineno">  808</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  809</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx2</span></div>
-<div class="line"><span class="lineno">  810</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  811</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx</span></div>
-<div class="line"><span class="lineno">  812</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  813</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding</span></div>
-<div class="line"><span class="lineno">  814</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  815</span> </div>
-<div class="line"><span class="lineno">  816</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  817</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno">  818</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  819</span>        <span class="comment">// Offset K/V pointer to start from the first token in the sliding window</span></div>
-<div class="line"><span class="lineno">  820</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride</div>
-<div class="line"><span class="lineno">  821</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  822</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride</div>
-<div class="line"><span class="lineno">  823</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  824</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  825</span> </div>
-<div class="line"><span class="lineno">  826</span>        <span class="comment">// Use query_pos relative to the windowed KV (last token = effective_kv_tokens - 1)</span></div>
-<div class="line"><span class="lineno">  827</span>        <span class="comment">// sliding_window = 0 since we&#39;ve already windowed via K/V pointer offset</span></div>
-<div class="line"><span class="lineno">  828</span>        <a class="code hl_define" href="attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e">SLIDING_DECODE_IMPL</a>(q_head, k_head, v_head,</div>
-<div class="line"><span class="lineno">  829</span>                            <span class="comment">/*query_pos=*/</span>effective_kv_tokens - 1,</div>
-<div class="line"><span class="lineno">  830</span>                            <span class="comment">/*kv_tokens=*/</span>effective_kv_tokens,</div>
-<div class="line"><span class="lineno">  831</span>                            head_dim, aligned_head_dim,</div>
-<div class="line"><span class="lineno">  832</span>                            scale, out_head,</div>
-<div class="line"><span class="lineno">  833</span>                            <span class="comment">/*sliding_window=*/</span>0);</div>
-<div class="line"><span class="lineno">  834</span>    }</div>
-<div class="line"><span class="lineno">  835</span> </div>
-<div class="line"><span class="lineno">  836</span><span class="preprocessor">#undef SLIDING_DECODE_IMPL</span></div>
-<div class="line"><span class="lineno">  837</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00817">817</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  829</span>{</div>
+<div class="line"><span class="lineno">  830</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
+<div class="line"><span class="lineno">  831</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  832</span>    }</div>
+<div class="line"><span class="lineno">  833</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><span class="lineno">  834</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  835</span>    }</div>
+<div class="line"><span class="lineno">  836</span>    <span class="keywordflow">if</span> (kv_tokens &lt;= 0 || kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  837</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  838</span>    }</div>
+<div class="line"><span class="lineno">  839</span> </div>
+<div class="line"><span class="lineno">  840</span>    <span class="comment">/* Debug escape hatch:</span></div>
+<div class="line"><span class="lineno">  841</span><span class="comment">     * Route decode through non-sliding flash attention when requested to</span></div>
+<div class="line"><span class="lineno">  842</span><span class="comment">     * quickly A/B check sliding-window kernel correctness.</span></div>
+<div class="line"><span class="lineno">  843</span><span class="comment">     */</span></div>
+<div class="line"><span class="lineno">  844</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
+<div class="line"><span class="lineno">  845</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a>(</div>
+<div class="line"><span class="lineno">  846</span>            q_token, k_cache, v_cache, out_token,</div>
+<div class="line"><span class="lineno">  847</span>            num_heads, num_kv_heads, kv_tokens, cache_capacity,</div>
+<div class="line"><span class="lineno">  848</span>            head_dim, aligned_head_dim</div>
+<div class="line"><span class="lineno">  849</span>        );</div>
+<div class="line"><span class="lineno">  850</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  851</span>    }</div>
+<div class="line"><span class="lineno">  852</span> </div>
+<div class="line"><span class="lineno">  853</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><span class="lineno">  854</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  855</span> </div>
+<div class="line"><span class="lineno">  856</span>    <span class="comment">// Compute effective KV tokens based on sliding window</span></div>
+<div class="line"><span class="lineno">  857</span>    <span class="keywordtype">int</span> effective_kv_tokens = kv_tokens;</div>
+<div class="line"><span class="lineno">  858</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0 &amp;&amp; sliding_window &lt; kv_tokens) {</div>
+<div class="line"><span class="lineno">  859</span>        effective_kv_tokens = sliding_window;</div>
+<div class="line"><span class="lineno">  860</span>    }</div>
+<div class="line"><span class="lineno">  861</span> </div>
+<div class="line"><span class="lineno">  862</span>    <span class="comment">// Guard against empty window (shouldn&#39;t happen with kv_tokens &gt;= 1)</span></div>
+<div class="line"><span class="lineno">  863</span>    <span class="keywordflow">if</span> (effective_kv_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno">  864</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  865</span>    }</div>
+<div class="line"><span class="lineno">  866</span> </div>
+<div class="line"><span class="lineno">  867</span>    <span class="comment">// Offset to start reading from the last effective_kv_tokens entries</span></div>
+<div class="line"><span class="lineno">  868</span>    <span class="keywordtype">int</span> kv_start_offset = kv_tokens - effective_kv_tokens;</div>
+<div class="line"><span class="lineno">  869</span> </div>
+<div class="line"><span class="lineno">  870</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  871</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx512</span></div>
+<div class="line"><span class="lineno">  872</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  873</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx2</span></div>
+<div class="line"><span class="lineno">  874</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  875</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding_avx</span></div>
+<div class="line"><span class="lineno">  876</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  877</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL attention_flash_query_sliding</span></div>
+<div class="line"><span class="lineno">  878</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  879</span> </div>
+<div class="line"><span class="lineno">  880</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  881</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><span class="lineno">  882</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  883</span>        <span class="comment">// Offset K/V pointer to start from the first token in the sliding window</span></div>
+<div class="line"><span class="lineno">  884</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride</div>
+<div class="line"><span class="lineno">  885</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  886</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride</div>
+<div class="line"><span class="lineno">  887</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  888</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  889</span> </div>
+<div class="line"><span class="lineno">  890</span>        <span class="comment">// Use query_pos relative to the windowed KV (last token = effective_kv_tokens - 1)</span></div>
+<div class="line"><span class="lineno">  891</span>        <span class="comment">// sliding_window = 0 since we&#39;ve already windowed via K/V pointer offset</span></div>
+<div class="line"><span class="lineno">  892</span>        <a class="code hl_define" href="attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e">SLIDING_DECODE_IMPL</a>(q_head, k_head, v_head,</div>
+<div class="line"><span class="lineno">  893</span>                            <span class="comment">/*query_pos=*/</span>effective_kv_tokens - 1,</div>
+<div class="line"><span class="lineno">  894</span>                            <span class="comment">/*kv_tokens=*/</span>effective_kv_tokens,</div>
+<div class="line"><span class="lineno">  895</span>                            head_dim, aligned_head_dim,</div>
+<div class="line"><span class="lineno">  896</span>                            scale, out_head,</div>
+<div class="line"><span class="lineno">  897</span>                            <span class="comment">/*sliding_window=*/</span>0);</div>
+<div class="line"><span class="lineno">  898</span>    }</div>
+<div class="line"><span class="lineno">  899</span> </div>
+<div class="line"><span class="lineno">  900</span><span class="preprocessor">#undef SLIDING_DECODE_IMPL</span></div>
+<div class="line"><span class="lineno">  901</span>}</div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_a7d2f80b73d7c7a8c95cd87a05a6c8b8e"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e">SLIDING_DECODE_IMPL</a></div><div class="ttdeci">#define SLIDING_DECODE_IMPL</div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a84803f8c5509c325dd6b9feec50a0493"><div class="ttname"><a href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05716">attention_kernels.c:5716</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a84803f8c5509c325dd6b9feec50a0493"><div class="ttname"><a href="ckernel__engine_8h.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05739">attention_kernels.c:5739</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05716">attention_forward_decode_head_major_gqa_flash()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e">SLIDING_DECODE_IMPL</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05739">attention_forward_decode_head_major_gqa_flash()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#a7d2f80b73d7c7a8c95cd87a05a6c8b8e">SLIDING_DECODE_IMPL</a>.</p>
 
 </div>
 </div>
@@ -1058,73 +1276,73 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00839">839</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  851</span>{</div>
-<div class="line"><span class="lineno">  852</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
-<div class="line"><span class="lineno">  853</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  854</span>    }</div>
-<div class="line"><span class="lineno">  855</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
-<div class="line"><span class="lineno">  856</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  857</span>    }</div>
-<div class="line"><span class="lineno">  858</span>    <span class="keywordflow">if</span> (kv_tokens &lt;= 0 || kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno">  859</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  860</span>    }</div>
-<div class="line"><span class="lineno">  861</span> </div>
-<div class="line"><span class="lineno">  862</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
-<div class="line"><span class="lineno">  863</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a28882fbf48309e088051ad33ff4486a9">attention_forward_decode_head_major_gqa_flash_gemma4</a>(</div>
-<div class="line"><span class="lineno">  864</span>            q_token, k_cache, v_cache, out_token,</div>
-<div class="line"><span class="lineno">  865</span>            num_heads, num_kv_heads, kv_tokens, cache_capacity,</div>
-<div class="line"><span class="lineno">  866</span>            head_dim, aligned_head_dim</div>
-<div class="line"><span class="lineno">  867</span>        );</div>
-<div class="line"><span class="lineno">  868</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  869</span>    }</div>
-<div class="line"><span class="lineno">  870</span> </div>
-<div class="line"><span class="lineno">  871</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f;</div>
-<div class="line"><span class="lineno">  872</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  873</span>    <span class="keywordtype">int</span> effective_kv_tokens = kv_tokens;</div>
-<div class="line"><span class="lineno">  874</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0 &amp;&amp; sliding_window &lt; kv_tokens) {</div>
-<div class="line"><span class="lineno">  875</span>        effective_kv_tokens = sliding_window;</div>
-<div class="line"><span class="lineno">  876</span>    }</div>
-<div class="line"><span class="lineno">  877</span>    <span class="keywordflow">if</span> (effective_kv_tokens &lt;= 0) {</div>
-<div class="line"><span class="lineno">  878</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  879</span>    }</div>
-<div class="line"><span class="lineno">  880</span>    <span class="keywordtype">int</span> kv_start_offset = kv_tokens - effective_kv_tokens;</div>
-<div class="line"><span class="lineno">  881</span> </div>
-<div class="line"><span class="lineno">  882</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  883</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx512</span></div>
-<div class="line"><span class="lineno">  884</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  885</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx2</span></div>
-<div class="line"><span class="lineno">  886</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  887</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx</span></div>
-<div class="line"><span class="lineno">  888</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  889</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding</span></div>
-<div class="line"><span class="lineno">  890</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  891</span> </div>
-<div class="line"><span class="lineno">  892</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  893</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno">  894</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  895</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride</div>
-<div class="line"><span class="lineno">  896</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  897</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride</div>
-<div class="line"><span class="lineno">  898</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  899</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno">  900</span> </div>
-<div class="line"><span class="lineno">  901</span>        <a class="code hl_define" href="attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab">SLIDING_DECODE_IMPL_GEMMA4</a>(q_head, k_head, v_head,</div>
-<div class="line"><span class="lineno">  902</span>                                   <span class="comment">/*query_pos=*/</span>effective_kv_tokens - 1,</div>
-<div class="line"><span class="lineno">  903</span>                                   <span class="comment">/*kv_tokens=*/</span>effective_kv_tokens,</div>
-<div class="line"><span class="lineno">  904</span>                                   head_dim, aligned_head_dim,</div>
-<div class="line"><span class="lineno">  905</span>                                   scale, out_head,</div>
-<div class="line"><span class="lineno">  906</span>                                   <span class="comment">/*sliding_window=*/</span>0);</div>
-<div class="line"><span class="lineno">  907</span>    }</div>
-<div class="line"><span class="lineno">  908</span> </div>
-<div class="line"><span class="lineno">  909</span><span class="preprocessor">#undef SLIDING_DECODE_IMPL_GEMMA4</span></div>
-<div class="line"><span class="lineno">  910</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00903">903</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  915</span>{</div>
+<div class="line"><span class="lineno">  916</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
+<div class="line"><span class="lineno">  917</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  918</span>    }</div>
+<div class="line"><span class="lineno">  919</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><span class="lineno">  920</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  921</span>    }</div>
+<div class="line"><span class="lineno">  922</span>    <span class="keywordflow">if</span> (kv_tokens &lt;= 0 || kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  923</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  924</span>    }</div>
+<div class="line"><span class="lineno">  925</span> </div>
+<div class="line"><span class="lineno">  926</span>    <span class="keywordflow">if</span> (getenv(<span class="stringliteral">&quot;CK_FORCE_NONSLIDING_ATTN&quot;</span>)) {</div>
+<div class="line"><span class="lineno">  927</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a28882fbf48309e088051ad33ff4486a9">attention_forward_decode_head_major_gqa_flash_gemma4</a>(</div>
+<div class="line"><span class="lineno">  928</span>            q_token, k_cache, v_cache, out_token,</div>
+<div class="line"><span class="lineno">  929</span>            num_heads, num_kv_heads, kv_tokens, cache_capacity,</div>
+<div class="line"><span class="lineno">  930</span>            head_dim, aligned_head_dim</div>
+<div class="line"><span class="lineno">  931</span>        );</div>
+<div class="line"><span class="lineno">  932</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  933</span>    }</div>
+<div class="line"><span class="lineno">  934</span> </div>
+<div class="line"><span class="lineno">  935</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f;</div>
+<div class="line"><span class="lineno">  936</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  937</span>    <span class="keywordtype">int</span> effective_kv_tokens = kv_tokens;</div>
+<div class="line"><span class="lineno">  938</span>    <span class="keywordflow">if</span> (sliding_window &gt; 0 &amp;&amp; sliding_window &lt; kv_tokens) {</div>
+<div class="line"><span class="lineno">  939</span>        effective_kv_tokens = sliding_window;</div>
+<div class="line"><span class="lineno">  940</span>    }</div>
+<div class="line"><span class="lineno">  941</span>    <span class="keywordflow">if</span> (effective_kv_tokens &lt;= 0) {</div>
+<div class="line"><span class="lineno">  942</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  943</span>    }</div>
+<div class="line"><span class="lineno">  944</span>    <span class="keywordtype">int</span> kv_start_offset = kv_tokens - effective_kv_tokens;</div>
+<div class="line"><span class="lineno">  945</span> </div>
+<div class="line"><span class="lineno">  946</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  947</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx512</span></div>
+<div class="line"><span class="lineno">  948</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  949</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx2</span></div>
+<div class="line"><span class="lineno">  950</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  951</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding_avx</span></div>
+<div class="line"><span class="lineno">  952</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  953</span><span class="preprocessor">    #define SLIDING_DECODE_IMPL_GEMMA4 attention_flash_query_sliding</span></div>
+<div class="line"><span class="lineno">  954</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  955</span> </div>
+<div class="line"><span class="lineno">  956</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  957</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><span class="lineno">  958</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  959</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride</div>
+<div class="line"><span class="lineno">  960</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  961</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride</div>
+<div class="line"><span class="lineno">  962</span>                            + (<span class="keywordtype">size_t</span>)kv_start_offset * (size_t)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  963</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno">  964</span> </div>
+<div class="line"><span class="lineno">  965</span>        <a class="code hl_define" href="attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab">SLIDING_DECODE_IMPL_GEMMA4</a>(q_head, k_head, v_head,</div>
+<div class="line"><span class="lineno">  966</span>                                   <span class="comment">/*query_pos=*/</span>effective_kv_tokens - 1,</div>
+<div class="line"><span class="lineno">  967</span>                                   <span class="comment">/*kv_tokens=*/</span>effective_kv_tokens,</div>
+<div class="line"><span class="lineno">  968</span>                                   head_dim, aligned_head_dim,</div>
+<div class="line"><span class="lineno">  969</span>                                   scale, out_head,</div>
+<div class="line"><span class="lineno">  970</span>                                   <span class="comment">/*sliding_window=*/</span>0);</div>
+<div class="line"><span class="lineno">  971</span>    }</div>
+<div class="line"><span class="lineno">  972</span> </div>
+<div class="line"><span class="lineno">  973</span><span class="preprocessor">#undef SLIDING_DECODE_IMPL_GEMMA4</span></div>
+<div class="line"><span class="lineno">  974</span>}</div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_a5c5b435d153c3e7d24d113374c6a60ab"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab">SLIDING_DECODE_IMPL_GEMMA4</a></div><div class="ttdeci">#define SLIDING_DECODE_IMPL_GEMMA4</div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a28882fbf48309e088051ad33ff4486a9"><div class="ttname"><a href="ckernel__engine_8h.html#a28882fbf48309e088051ad33ff4486a9">attention_forward_decode_head_major_gqa_flash_gemma4</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_gemma4(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05760">attention_kernels.c:5760</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a28882fbf48309e088051ad33ff4486a9"><div class="ttname"><a href="ckernel__engine_8h.html#a28882fbf48309e088051ad33ff4486a9">attention_forward_decode_head_major_gqa_flash_gemma4</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_gemma4(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l05783">attention_kernels.c:5783</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05760">attention_forward_decode_head_major_gqa_flash_gemma4()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab">SLIDING_DECODE_IMPL_GEMMA4</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l05783">attention_forward_decode_head_major_gqa_flash_gemma4()</a>, and <a class="el" href="attention__kernels__sliding_8c.html#a5c5b435d153c3e7d24d113374c6a60ab">SLIDING_DECODE_IMPL_GEMMA4</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00912">attention_forward_decode_head_major_shared_kv_sliding_gemma4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00976">attention_forward_decode_head_major_shared_kv_sliding_gemma4()</a>.</p>
 
 </div>
 </div>
@@ -1202,16 +1420,89 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00912">912</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  923</span>{</div>
-<div class="line"><span class="lineno">  924</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2c00d95e1569d4606f8f15fe3583fb10">attention_forward_decode_head_major_gqa_flash_sliding_gemma4</a>(</div>
-<div class="line"><span class="lineno">  925</span>        q_token, k_cache, v_cache, out_token, num_heads, num_heads,</div>
-<div class="line"><span class="lineno">  926</span>        kv_tokens, cache_capacity, head_dim, aligned_head_dim, sliding_window</div>
-<div class="line"><span class="lineno">  927</span>    );</div>
-<div class="line"><span class="lineno">  928</span>}</div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a2c00d95e1569d4606f8f15fe3583fb10"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a2c00d95e1569d4606f8f15fe3583fb10">attention_forward_decode_head_major_gqa_flash_sliding_gemma4</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_sliding_gemma4(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00839">attention_kernels_sliding.c:839</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00976">976</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  987</span>{</div>
+<div class="line"><span class="lineno">  988</span>    <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2c00d95e1569d4606f8f15fe3583fb10">attention_forward_decode_head_major_gqa_flash_sliding_gemma4</a>(</div>
+<div class="line"><span class="lineno">  989</span>        q_token, k_cache, v_cache, out_token, num_heads, num_heads,</div>
+<div class="line"><span class="lineno">  990</span>        kv_tokens, cache_capacity, head_dim, aligned_head_dim, sliding_window</div>
+<div class="line"><span class="lineno">  991</span>    );</div>
+<div class="line"><span class="lineno">  992</span>}</div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a2c00d95e1569d4606f8f15fe3583fb10"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a2c00d95e1569d4606f8f15fe3583fb10">attention_forward_decode_head_major_gqa_flash_sliding_gemma4</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash_sliding_gemma4(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00903">attention_kernels_sliding.c:903</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00839">attention_forward_decode_head_major_gqa_flash_sliding_gemma4()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00903">attention_forward_decode_head_major_gqa_flash_sliding_gemma4()</a>.</p>
+
+</div>
+</div>
+<a id="ad3bc8cb1ed71aa0d9ac16274c72eb76c" name="ad3bc8cb1ed71aa0d9ac16274c72eb76c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad3bc8cb1ed71aa0d9ac16274c72eb76c">&#9670;&#160;</a></span>attention_output_index()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static size_t attention_output_index </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>h</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>t</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>output_token_major</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00026">26</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   32</span>{</div>
+<div class="line"><span class="lineno">   33</span>    <span class="keywordflow">if</span> (output_token_major) {</div>
+<div class="line"><span class="lineno">   34</span>        <span class="keywordflow">return</span> ((<span class="keywordtype">size_t</span>)t * (<span class="keywordtype">size_t</span>)num_heads + (<span class="keywordtype">size_t</span>)h)</div>
+<div class="line"><span class="lineno">   35</span>             * (size_t)aligned_head_dim;</div>
+<div class="line"><span class="lineno">   36</span>    }</div>
+<div class="line"><span class="lineno">   37</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, t, 0, num_tokens, aligned_head_dim);</div>
+<div class="line"><span class="lineno">   38</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00509">ck_sliding_attention_compute_one()</a>.</p>
 
 </div>
 </div>
@@ -1249,22 +1540,22 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00457">457</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  458</span>{</div>
-<div class="line"><span class="lineno">  459</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *v = getenv(name);</div>
-<div class="line"><span class="lineno">  460</span>    <span class="keywordflow">if</span> (!v || !v[0]) <span class="keywordflow">return</span> fallback;</div>
-<div class="line"><span class="lineno">  461</span>    <span class="keywordtype">char</span> *<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = NULL;</div>
-<div class="line"><span class="lineno">  462</span>    <span class="keywordtype">long</span> parsed = strtol(v, &amp;<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, 10);</div>
-<div class="line"><span class="lineno">  463</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> == v || (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &amp;&amp; *<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> != <span class="charliteral">&#39;\0&#39;</span>)) <span class="keywordflow">return</span> fallback;</div>
-<div class="line"><span class="lineno">  464</span>    <span class="keywordflow">if</span> (parsed &lt; 0) parsed = 0;</div>
-<div class="line"><span class="lineno">  465</span>    <span class="keywordflow">if</span> (parsed &gt; 1 &lt;&lt; 20) parsed = 1 &lt;&lt; 20;</div>
-<div class="line"><span class="lineno">  466</span>    <span class="keywordflow">return</span> (<span class="keywordtype">int</span>)parsed;</div>
-<div class="line"><span class="lineno">  467</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00472">472</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  473</span>{</div>
+<div class="line"><span class="lineno">  474</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *v = getenv(name);</div>
+<div class="line"><span class="lineno">  475</span>    <span class="keywordflow">if</span> (!v || !v[0]) <span class="keywordflow">return</span> fallback;</div>
+<div class="line"><span class="lineno">  476</span>    <span class="keywordtype">char</span> *<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = NULL;</div>
+<div class="line"><span class="lineno">  477</span>    <span class="keywordtype">long</span> parsed = strtol(v, &amp;<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, 10);</div>
+<div class="line"><span class="lineno">  478</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> == v || (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &amp;&amp; *<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> != <span class="charliteral">&#39;\0&#39;</span>)) <span class="keywordflow">return</span> fallback;</div>
+<div class="line"><span class="lineno">  479</span>    <span class="keywordflow">if</span> (parsed &lt; 0) parsed = 0;</div>
+<div class="line"><span class="lineno">  480</span>    <span class="keywordflow">if</span> (parsed &gt; 1 &lt;&lt; 20) parsed = 1 &lt;&lt; 20;</div>
+<div class="line"><span class="lineno">  481</span>    <span class="keywordflow">return</span> (<span class="keywordtype">int</span>)parsed;</div>
+<div class="line"><span class="lineno">  482</span>}</div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00475">ck_sliding_attention_pick_threads()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>.</p>
 
 </div>
 </div>
@@ -1302,46 +1593,47 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00494">494</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  496</span>{</div>
-<div class="line"><span class="lineno">  497</span>    <span class="keywordflow">if</span> (!a || job &lt; 0) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  498</span> </div>
-<div class="line"><span class="lineno">  499</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = a-&gt;num_tokens;</div>
-<div class="line"><span class="lineno">  500</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)a-&gt;kv_stride_tokens * (<span class="keywordtype">size_t</span>)a-&gt;aligned_head_dim;</div>
-<div class="line"><span class="lineno">  501</span> </div>
-<div class="line"><span class="lineno">  502</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  503</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx512</span></div>
-<div class="line"><span class="lineno">  504</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  505</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx2</span></div>
-<div class="line"><span class="lineno">  506</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  507</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx</span></div>
-<div class="line"><span class="lineno">  508</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  509</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding</span></div>
-<div class="line"><span class="lineno">  510</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  511</span> </div>
-<div class="line"><span class="lineno">  512</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> h = job / T;</div>
-<div class="line"><span class="lineno">  513</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> i = job - h * T;</div>
-<div class="line"><span class="lineno">  514</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)a-&gt;num_kv_heads /</div>
-<div class="line"><span class="lineno">  515</span>                              (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)a-&gt;num_heads);</div>
-<div class="line"><span class="lineno">  516</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = a-&gt;k + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  517</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = a-&gt;v + (size_t)kv_head * kv_head_stride;</div>
-<div class="line"><span class="lineno">  518</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = a-&gt;q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, a-&gt;aligned_head_dim);</div>
-<div class="line"><span class="lineno">  519</span>    <span class="keywordtype">float</span> *out_vec = a-&gt;output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, a-&gt;aligned_head_dim);</div>
-<div class="line"><span class="lineno">  520</span> </div>
-<div class="line"><span class="lineno">  521</span>    <a class="code hl_define" href="attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852">CK_SLIDING_FLASH_IMPL</a>(q_vec, k_head, v_head,</div>
-<div class="line"><span class="lineno">  522</span>                          <span class="comment">/*query_pos=*/</span>i,</div>
-<div class="line"><span class="lineno">  523</span>                          <span class="comment">/*kv_tokens=*/</span>T,</div>
-<div class="line"><span class="lineno">  524</span>                          a-&gt;head_dim, a-&gt;aligned_head_dim,</div>
-<div class="line"><span class="lineno">  525</span>                          a-&gt;scale, out_vec,</div>
-<div class="line"><span class="lineno">  526</span>                          a-&gt;sliding_window);</div>
-<div class="line"><span class="lineno">  527</span> </div>
-<div class="line"><span class="lineno">  528</span><span class="preprocessor">#undef CK_SLIDING_FLASH_IMPL</span></div>
-<div class="line"><span class="lineno">  529</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00509">509</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  511</span>{</div>
+<div class="line"><span class="lineno">  512</span>    <span class="keywordflow">if</span> (!a || job &lt; 0) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  513</span> </div>
+<div class="line"><span class="lineno">  514</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> T = a-&gt;num_tokens;</div>
+<div class="line"><span class="lineno">  515</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> kv_head_stride = (size_t)a-&gt;kv_stride_tokens * (<span class="keywordtype">size_t</span>)a-&gt;aligned_head_dim;</div>
+<div class="line"><span class="lineno">  516</span> </div>
+<div class="line"><span class="lineno">  517</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  518</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx512</span></div>
+<div class="line"><span class="lineno">  519</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  520</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx2</span></div>
+<div class="line"><span class="lineno">  521</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  522</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding_avx</span></div>
+<div class="line"><span class="lineno">  523</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  524</span><span class="preprocessor">    #define CK_SLIDING_FLASH_IMPL attention_flash_query_sliding</span></div>
+<div class="line"><span class="lineno">  525</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  526</span> </div>
+<div class="line"><span class="lineno">  527</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> h = job / T;</div>
+<div class="line"><span class="lineno">  528</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> i = job - h * T;</div>
+<div class="line"><span class="lineno">  529</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)a-&gt;num_kv_heads /</div>
+<div class="line"><span class="lineno">  530</span>                              (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)a-&gt;num_heads);</div>
+<div class="line"><span class="lineno">  531</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = a-&gt;k + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  532</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = a-&gt;v + (size_t)kv_head * kv_head_stride;</div>
+<div class="line"><span class="lineno">  533</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> *q_vec = a-&gt;q + <a class="code hl_function" href="attention__kernels__sliding_8c.html#a0102833b3c8a1d4114e65c0638ddbfb1">qkv_index</a>(h, i, 0, T, a-&gt;aligned_head_dim);</div>
+<div class="line"><span class="lineno">  534</span>    <span class="keywordtype">float</span> *out_vec = a-&gt;output + <a class="code hl_function" href="attention__kernels__sliding_8c.html#ad3bc8cb1ed71aa0d9ac16274c72eb76c">attention_output_index</a>(</div>
+<div class="line"><span class="lineno">  535</span>        h, i, a-&gt;num_heads, T, a-&gt;aligned_head_dim, a-&gt;output_token_major);</div>
+<div class="line"><span class="lineno">  536</span> </div>
+<div class="line"><span class="lineno">  537</span>    <a class="code hl_define" href="attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852">CK_SLIDING_FLASH_IMPL</a>(q_vec, k_head, v_head,</div>
+<div class="line"><span class="lineno">  538</span>                          <span class="comment">/*query_pos=*/</span>i,</div>
+<div class="line"><span class="lineno">  539</span>                          <span class="comment">/*kv_tokens=*/</span>T,</div>
+<div class="line"><span class="lineno">  540</span>                          a-&gt;head_dim, a-&gt;aligned_head_dim,</div>
+<div class="line"><span class="lineno">  541</span>                          a-&gt;scale, out_vec,</div>
+<div class="line"><span class="lineno">  542</span>                          a-&gt;sliding_window);</div>
+<div class="line"><span class="lineno">  543</span> </div>
+<div class="line"><span class="lineno">  544</span><span class="preprocessor">#undef CK_SLIDING_FLASH_IMPL</span></div>
+<div class="line"><span class="lineno">  545</span>}</div>
 <div class="ttc" id="aattention__kernels__sliding_8c_html_a588e0b4751afb347018327d907f28852"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852">CK_SLIDING_FLASH_IMPL</a></div><div class="ttdeci">#define CK_SLIDING_FLASH_IMPL</div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852">CK_SLIDING_FLASH_IMPL</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00026">attention_output_index()</a>, <a class="el" href="attention__kernels__sliding_8c.html#a588e0b4751afb347018327d907f28852">CK_SLIDING_FLASH_IMPL</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00016">qkv_index()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00531">ck_sliding_attention_work_fn()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00547">ck_sliding_attention_work_fn()</a>.</p>
 
 </div>
 </div>
@@ -1369,13 +1661,13 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00469">469</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  470</span>{</div>
-<div class="line"><span class="lineno">  471</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *v = getenv(<span class="stringliteral">&quot;CK_DISABLE_SLIDING_ATTN_PARALLEL&quot;</span>);</div>
-<div class="line"><span class="lineno">  472</span>    <span class="keywordflow">return</span> v &amp;&amp; v[0] &amp;&amp; v[0] != <span class="charliteral">&#39;0&#39;</span>;</div>
-<div class="line"><span class="lineno">  473</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00484">484</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  485</span>{</div>
+<div class="line"><span class="lineno">  486</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *v = getenv(<span class="stringliteral">&quot;CK_DISABLE_SLIDING_ATTN_PARALLEL&quot;</span>);</div>
+<div class="line"><span class="lineno">  487</span>    <span class="keywordflow">return</span> v &amp;&amp; v[0] &amp;&amp; v[0] != <span class="charliteral">&#39;0&#39;</span>;</div>
+<div class="line"><span class="lineno">  488</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00475">ck_sliding_attention_pick_threads()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>.</p>
 
 </div>
 </div>
@@ -1425,29 +1717,29 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00475">475</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  479</span>{</div>
-<div class="line"><span class="lineno">  480</span>    <span class="keywordflow">if</span> (!pool || total_jobs &lt;= 0) <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  481</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="attention__kernels__sliding_8c.html#a4a0c48a01997d7cd6e335445bb2ec65d">ck_sliding_attention_parallel_disabled</a>()) <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  482</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a>(pool) &gt; 0) <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  483</span> </div>
-<div class="line"><span class="lineno">  484</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> min_tokens = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a>(<span class="stringliteral">&quot;CK_SLIDING_ATTN_PARALLEL_MIN_TOKENS&quot;</span>, 128);</div>
-<div class="line"><span class="lineno">  485</span>    <span class="keywordflow">if</span> (num_tokens &lt; min_tokens || head_dim &lt; 8) <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  486</span> </div>
-<div class="line"><span class="lineno">  487</span>    <span class="keywordtype">int</span> active = <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool);</div>
-<div class="line"><span class="lineno">  488</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cap = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a>(<span class="stringliteral">&quot;CK_SLIDING_ATTN_THREAD_CAP&quot;</span>, active);</div>
-<div class="line"><span class="lineno">  489</span>    <span class="keywordflow">if</span> (cap &gt; 0 &amp;&amp; active &gt; cap) active = cap;</div>
-<div class="line"><span class="lineno">  490</span>    <span class="keywordflow">if</span> (active &gt; total_jobs) active = total_jobs;</div>
-<div class="line"><span class="lineno">  491</span>    <span class="keywordflow">return</span> active &gt; 1 ? active : 1;</div>
-<div class="line"><span class="lineno">  492</span>}</div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a2470faa4b87ccb9b9783d010713f5b01"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a></div><div class="ttdeci">static int ck_env_int_default(const char *name, int fallback)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00457">attention_kernels_sliding.c:457</a></div></div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a4a0c48a01997d7cd6e335445bb2ec65d"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a4a0c48a01997d7cd6e335445bb2ec65d">ck_sliding_attention_parallel_disabled</a></div><div class="ttdeci">static int ck_sliding_attention_parallel_disabled(void)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00469">attention_kernels_sliding.c:469</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">490</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  494</span>{</div>
+<div class="line"><span class="lineno">  495</span>    <span class="keywordflow">if</span> (!pool || total_jobs &lt;= 0) <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  496</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="attention__kernels__sliding_8c.html#a4a0c48a01997d7cd6e335445bb2ec65d">ck_sliding_attention_parallel_disabled</a>()) <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  497</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a>(pool) &gt; 0) <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  498</span> </div>
+<div class="line"><span class="lineno">  499</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> min_tokens = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a>(<span class="stringliteral">&quot;CK_SLIDING_ATTN_PARALLEL_MIN_TOKENS&quot;</span>, 128);</div>
+<div class="line"><span class="lineno">  500</span>    <span class="keywordflow">if</span> (num_tokens &lt; min_tokens || head_dim &lt; 8) <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  501</span> </div>
+<div class="line"><span class="lineno">  502</span>    <span class="keywordtype">int</span> active = <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool);</div>
+<div class="line"><span class="lineno">  503</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> cap = <a class="code hl_function" href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a>(<span class="stringliteral">&quot;CK_SLIDING_ATTN_THREAD_CAP&quot;</span>, active);</div>
+<div class="line"><span class="lineno">  504</span>    <span class="keywordflow">if</span> (cap &gt; 0 &amp;&amp; active &gt; cap) active = cap;</div>
+<div class="line"><span class="lineno">  505</span>    <span class="keywordflow">if</span> (active &gt; total_jobs) active = total_jobs;</div>
+<div class="line"><span class="lineno">  506</span>    <span class="keywordflow">return</span> active &gt; 1 ? active : 1;</div>
+<div class="line"><span class="lineno">  507</span>}</div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a2470faa4b87ccb9b9783d010713f5b01"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a2470faa4b87ccb9b9783d010713f5b01">ck_env_int_default</a></div><div class="ttdeci">static int ck_env_int_default(const char *name, int fallback)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00472">attention_kernels_sliding.c:472</a></div></div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a4a0c48a01997d7cd6e335445bb2ec65d"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a4a0c48a01997d7cd6e335445bb2ec65d">ck_sliding_attention_parallel_disabled</a></div><div class="ttdeci">static int ck_sliding_attention_parallel_disabled(void)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00484">attention_kernels_sliding.c:484</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00550">ck_threadpool.c:550</a></div></div>
 <div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00540">ck_threadpool.c:540</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00457">ck_env_int_default()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00469">ck_sliding_attention_parallel_disabled()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00540">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00550">ck_threadpool_thread_id()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00472">ck_env_int_default()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00484">ck_sliding_attention_parallel_disabled()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00540">ck_threadpool_n_threads()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00550">ck_threadpool_thread_id()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00550">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00650">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>.</p>
 
 </div>
 </div>
@@ -1491,20 +1783,20 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00531">531</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  532</span>{</div>
-<div class="line"><span class="lineno">  533</span>    <span class="keyword">const</span> ck_sliding_attention_args_t *a = (<span class="keyword">const</span> ck_sliding_attention_args_t *)args;</div>
-<div class="line"><span class="lineno">  534</span>    <span class="keywordflow">if</span> (!a || ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  535</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = a-&gt;num_heads * a-&gt;num_tokens;</div>
-<div class="line"><span class="lineno">  536</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> job = ith; job &lt; total_jobs; job += nth) {</div>
-<div class="line"><span class="lineno">  537</span>        <a class="code hl_function" href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">ck_sliding_attention_compute_one</a>(a, job);</div>
-<div class="line"><span class="lineno">  538</span>    }</div>
-<div class="line"><span class="lineno">  539</span>}</div>
-<div class="ttc" id="aattention__kernels__sliding_8c_html_a9d02ee81426f42c962f04362b2e1a138"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">ck_sliding_attention_compute_one</a></div><div class="ttdeci">static void ck_sliding_attention_compute_one(const ck_sliding_attention_args_t *a, int job)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00494">attention_kernels_sliding.c:494</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels__sliding_8c_source.html#l00547">547</a> of file <a class="el" href="attention__kernels__sliding_8c_source.html">attention_kernels_sliding.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  548</span>{</div>
+<div class="line"><span class="lineno">  549</span>    <span class="keyword">const</span> ck_sliding_attention_args_t *a = (<span class="keyword">const</span> ck_sliding_attention_args_t *)args;</div>
+<div class="line"><span class="lineno">  550</span>    <span class="keywordflow">if</span> (!a || ith &lt; 0 || nth &lt;= 0 || ith &gt;= nth) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  551</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_jobs = a-&gt;num_heads * a-&gt;num_tokens;</div>
+<div class="line"><span class="lineno">  552</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> job = ith; job &lt; total_jobs; job += nth) {</div>
+<div class="line"><span class="lineno">  553</span>        <a class="code hl_function" href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">ck_sliding_attention_compute_one</a>(a, job);</div>
+<div class="line"><span class="lineno">  554</span>    }</div>
+<div class="line"><span class="lineno">  555</span>}</div>
+<div class="ttc" id="aattention__kernels__sliding_8c_html_a9d02ee81426f42c962f04362b2e1a138"><div class="ttname"><a href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">ck_sliding_attention_compute_one</a></div><div class="ttdeci">static void ck_sliding_attention_compute_one(const ck_sliding_attention_args_t *a, int job)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels__sliding_8c_source.html#l00509">attention_kernels_sliding.c:509</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00494">ck_sliding_attention_compute_one()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels__sliding_8c_source.html#l00509">ck_sliding_attention_compute_one()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00550">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00650">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>.</p>
 
 </div>
 </div>
@@ -1566,7 +1858,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   23</span>         + (<span class="keywordtype">size_t</span>)d;</div>
 <div class="line"><span class="lineno">   24</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00550">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00650">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00494">ck_sliding_attention_compute_one()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00026">attention_output_index()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00509">ck_sliding_attention_compute_one()</a>.</p>
 
 </div>
 </div>
