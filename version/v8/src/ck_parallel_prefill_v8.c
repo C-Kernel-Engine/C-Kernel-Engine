@@ -47,6 +47,27 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+extern void mamba2_conv1d_decode_f32(
+    const float *state_in, const float *x, const float *weight,
+    const float *bias, float *conv_out, float *state_out,
+    int rows, int conv_dim, int kernel_size);
+extern void mamba2_conv1d_f32_channel_range(
+    const float *state_in, const float *x, const float *weight,
+    const float *bias, float *conv_out, float *state_out,
+    int rows, int conv_dim, int kernel_size,
+    int channel_begin, int channel_end);
+extern void mamba2_selective_scan_f32(
+    const float *state_init, const float *x, const float *dt,
+    const float *a, const float *b, const float *c, const float *d,
+    float *state_out, float *y, int batch, int seq_len, int num_heads,
+    int head_dim, int state_dim, int num_groups);
+extern void mamba2_selective_scan_f32_head_range(
+    const float *state_init, const float *x, const float *dt,
+    const float *a, const float *b, const float *c, const float *d,
+    float *state_out, float *y, int batch, int seq_len, int num_heads,
+    int head_dim, int state_dim, int num_groups,
+    int head_begin, int head_end);
+
 enum {
     CK_GEMM_ROUTE_OUTPUT_TILES = 1 << 0,
     CK_GEMM_ROUTE_COMPACT_M4 = 1 << 1,
@@ -404,6 +425,36 @@ typedef struct {
     float eps;
 } recurrent_norm_gate_args_t;
 
+typedef struct {
+    const float *state_in;
+    const float *x;
+    const float *weight;
+    const float *bias;
+    float *conv_out;
+    float *state_out;
+    int rows;
+    int conv_dim;
+    int kernel_size;
+} mamba2_conv_args_t;
+
+typedef struct {
+    const float *state_init;
+    const float *x;
+    const float *dt;
+    const float *a;
+    const float *b;
+    const float *c;
+    const float *d;
+    float *state_out;
+    float *y;
+    int batch;
+    int seq_len;
+    int num_heads;
+    int head_dim;
+    int state_dim;
+    int num_groups;
+} mamba2_scan_args_t;
+
 static int ck_min_int(int a, int b) { return a < b ? a : b; }
 static int ck_env_enabled(const char *name);
 
@@ -414,6 +465,115 @@ static int ck_independent_row_active_threads(
     const int jobs = (rows + grain_size - 1) / grain_size;
     if (active > jobs) active = jobs;
     return active > 0 ? active : 1;
+}
+
+static void work_mamba2_conv_channels(int begin, int end, void *userdata)
+{
+    const mamba2_conv_args_t *args = (const mamba2_conv_args_t *)userdata;
+    mamba2_conv1d_f32_channel_range(
+        args->state_in, args->x, args->weight, args->bias,
+        args->conv_out, args->state_out, args->rows, args->conv_dim,
+        args->kernel_size, begin, end);
+}
+
+void mamba2_conv1d_f32_parallel_dispatch(const float *state_in,
+                                         const float *x,
+                                         const float *weight,
+                                         const float *bias,
+                                         float *conv_out,
+                                         float *state_out,
+                                         int rows,
+                                         int conv_dim,
+                                         int kernel_size)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_MAMBA2_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || rows < 8 ||
+        conv_dim < 16) {
+        mamba2_conv1d_decode_f32(
+            state_in, x, weight, bias, conv_out, state_out,
+            rows, conv_dim, kernel_size);
+        return;
+    }
+
+    mamba2_conv_args_t args = {
+        .state_in = state_in,
+        .x = x,
+        .weight = weight,
+        .bias = bias,
+        .conv_out = conv_out,
+        .state_out = state_out,
+        .rows = rows,
+        .conv_dim = conv_dim,
+        .kernel_size = kernel_size,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > conv_dim) active = conv_dim;
+    int grain = conv_dim / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, conv_dim, grain,
+        work_mamba2_conv_channels, &args);
+}
+
+static void work_mamba2_scan_heads(int begin, int end, void *userdata)
+{
+    const mamba2_scan_args_t *args = (const mamba2_scan_args_t *)userdata;
+    mamba2_selective_scan_f32_head_range(
+        args->state_init, args->x, args->dt, args->a, args->b, args->c,
+        args->d, args->state_out, args->y, args->batch, args->seq_len,
+        args->num_heads, args->head_dim, args->state_dim, args->num_groups,
+        begin, end);
+}
+
+void mamba2_selective_scan_f32_parallel_dispatch(const float *state_init,
+                                                  const float *x,
+                                                  const float *dt,
+                                                  const float *a,
+                                                  const float *b,
+                                                  const float *c,
+                                                  const float *d,
+                                                  float *state_out,
+                                                  float *y,
+                                                  int batch,
+                                                  int seq_len,
+                                                  int num_heads,
+                                                  int head_dim,
+                                                  int state_dim,
+                                                  int num_groups)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_MAMBA2_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || seq_len < 8 ||
+        num_heads <= 1) {
+        mamba2_selective_scan_f32(
+            state_init, x, dt, a, b, c, d, state_out, y,
+            batch, seq_len, num_heads, head_dim, state_dim, num_groups);
+        return;
+    }
+
+    mamba2_scan_args_t args = {
+        .state_init = state_init,
+        .x = x,
+        .dt = dt,
+        .a = a,
+        .b = b,
+        .c = c,
+        .d = d,
+        .state_out = state_out,
+        .y = y,
+        .batch = batch,
+        .seq_len = seq_len,
+        .num_heads = num_heads,
+        .head_dim = head_dim,
+        .state_dim = state_dim,
+        .num_groups = num_groups,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > num_heads) active = num_heads;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, num_heads, 1,
+        work_mamba2_scan_heads, &args);
 }
 
 static void work_quantize_q8_k_rows(int begin, int end, void *userdata)

@@ -25851,7 +25851,6 @@
           "name": "state_in",
           "dtype": "fp32",
           "shape": [
-            "R",
             "C",
             "K"
           ]
@@ -25896,7 +25895,6 @@
           "name": "state_out",
           "dtype": "fp32",
           "shape": [
-            "R",
             "C",
             "K"
           ]
@@ -25911,34 +25909,88 @@
       "params": [],
       "parallelization": {
         "supported": [
-          "row"
+          "channel"
         ],
         "preferred": {
-          "prefill": "row",
-          "decode": "row"
+          "prefill": "channel",
+          "decode": "serial"
         },
         "strategies": [
           {
-            "name": "row",
-            "partition_dim": "R",
+            "name": "channel",
+            "partition_dim": "C",
             "param_style": "range",
             "range": {
-              "min_chunk": 1
+              "min_chunk": 16
             }
           }
         ]
       },
       "impl": {
-        "function": "mamba2_conv1d_decode_f32",
-        "c_declaration": "void mamba2_conv1d_decode_f32(const float *state_in, const float *x, const float *weight, const float *bias, float *conv_out, float *state_out, int rows, int conv_dim, int kernel_size);",
+        "function": "mamba2_conv1d_f32_parallel_dispatch",
+        "c_declaration": "void mamba2_conv1d_f32_parallel_dispatch(const float *state_in, const float *x, const float *weight, const float *bias, float *conv_out, float *state_out, int rows, int conv_dim, int kernel_size);",
         "sources": [
-          "src/kernels/mamba2_kernels.c"
+          "src/kernels/mamba2_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
-            "name": "scalar_ref",
+            "name": "parallel_channel_ranges",
+            "function": "mamba2_conv1d_f32_parallel_dispatch",
             "requires": [],
-            "compile_flags": []
+            "compile_flags": [],
+            "shape_constraints": {
+              "R_min": 8,
+              "C_min": 16
+            },
+            "fallback": "mamba2_conv1d_decode_f32"
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "state_in",
+            "source": "activation:state_in",
+            "cast": "const float*"
+          },
+          {
+            "name": "x",
+            "source": "activation:x",
+            "cast": "const float*"
+          },
+          {
+            "name": "weight",
+            "source": "weight:mamba_conv1d",
+            "cast": "const float*"
+          },
+          {
+            "name": "bias",
+            "source": "weight_f:mamba_conv1d_bias",
+            "cast": "const float*"
+          },
+          {
+            "name": "conv_out",
+            "source": "output:conv_out",
+            "cast": "float*"
+          },
+          {
+            "name": "state_out",
+            "source": "output:state_out",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "dim:_m"
+          },
+          {
+            "name": "conv_dim",
+            "source": "dim:mamba_conv_dim"
+          },
+          {
+            "name": "kernel_size",
+            "source": "dim:ssm_conv_kernel"
           }
         ]
       },
@@ -26411,16 +26463,16 @@
       "params": [],
       "parallelization": {
         "supported": [
-          "batch"
+          "head"
         ],
         "preferred": {
-          "prefill": "batch",
-          "decode": "batch"
+          "prefill": "head",
+          "decode": "serial"
         },
         "strategies": [
           {
-            "name": "batch",
-            "partition_dim": "B",
+            "name": "head",
+            "partition_dim": "H",
             "param_style": "range",
             "range": {
               "min_chunk": 1
@@ -26429,16 +26481,97 @@
         ]
       },
       "impl": {
-        "function": "mamba2_selective_scan_f32",
-        "c_declaration": "void mamba2_selective_scan_f32(const float *state_init, const float *x, const float *dt, const float *a, const float *b, const float *c, const float *d, float *state_out, float *y, int batch, int seq_len, int num_heads, int head_dim, int state_dim, int num_groups);",
+        "function": "mamba2_selective_scan_f32_parallel_dispatch",
+        "c_declaration": "void mamba2_selective_scan_f32_parallel_dispatch(const float *state_init, const float *x, const float *dt, const float *a, const float *b, const float *c, const float *d, float *state_out, float *y, int batch, int seq_len, int num_heads, int head_dim, int state_dim, int num_groups);",
         "sources": [
-          "src/kernels/mamba2_kernels.c"
+          "src/kernels/mamba2_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
-            "name": "scalar_ref",
+            "name": "parallel_head_ranges",
+            "function": "mamba2_selective_scan_f32_parallel_dispatch",
             "requires": [],
-            "compile_flags": []
+            "compile_flags": [],
+            "shape_constraints": {
+              "T_min": 8,
+              "H_min": 2
+            },
+            "fallback": "mamba2_selective_scan_f32"
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "state_init",
+            "source": "activation:state_init",
+            "cast": "const float*"
+          },
+          {
+            "name": "x",
+            "source": "activation:x",
+            "cast": "const float*"
+          },
+          {
+            "name": "dt",
+            "source": "activation:dt",
+            "cast": "const float*"
+          },
+          {
+            "name": "a",
+            "source": "weight:mamba_a",
+            "cast": "const float*"
+          },
+          {
+            "name": "b",
+            "source": "activation:B",
+            "cast": "const float*"
+          },
+          {
+            "name": "c",
+            "source": "activation:C",
+            "cast": "const float*"
+          },
+          {
+            "name": "d",
+            "source": "weight:mamba_d",
+            "cast": "const float*"
+          },
+          {
+            "name": "state_out",
+            "source": "output:state_out",
+            "cast": "float*"
+          },
+          {
+            "name": "y",
+            "source": "output:y",
+            "cast": "float*"
+          },
+          {
+            "name": "batch",
+            "source": "const:1"
+          },
+          {
+            "name": "seq_len",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:mamba_num_heads"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:mamba_head_dim"
+          },
+          {
+            "name": "state_dim",
+            "source": "dim:ssm_state_size"
+          },
+          {
+            "name": "num_groups",
+            "source": "dim:ssm_group_count"
           }
         ]
       },

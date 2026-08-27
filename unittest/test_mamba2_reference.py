@@ -31,12 +31,23 @@ LIB.mamba2_in_proj_split_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, c
 LIB.mamba2_in_proj_split_f32.restype = None
 LIB.mamba2_conv1d_decode_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.mamba2_conv1d_decode_f32.restype = None
+LIB.mamba2_conv1d_f32_channel_range.argtypes = [
+    fptr, fptr, fptr, fptr, fptr, fptr,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+LIB.mamba2_conv1d_f32_channel_range.restype = None
 LIB.mamba2_dt_softplus_f32.argtypes = [fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_float, ctypes.c_float]
 LIB.mamba2_dt_softplus_f32.restype = None
 LIB.mamba2_selective_state_update_decode_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.mamba2_selective_state_update_decode_f32.restype = None
 LIB.mamba2_selective_scan_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.mamba2_selective_scan_f32.restype = None
+LIB.mamba2_selective_scan_f32_head_range.argtypes = [
+    fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+LIB.mamba2_selective_scan_f32_head_range.restype = None
 LIB.mamba2_rmsnorm_gate_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float]
 LIB.mamba2_rmsnorm_gate_f32.restype = None
 
@@ -84,6 +95,31 @@ class TestMamba2Reference(unittest.TestCase):
         LIB.mamba2_conv1d_decode_f32(_fptr(state_np), _fptr(x_np), _fptr(weight_np), _fptr(bias_np), _fptr(conv), _fptr(state_out), rows, conv_dim, kernel)
         np.testing.assert_allclose(state_out, _np(state_ref), atol=0.0, rtol=0.0)
         np.testing.assert_allclose(conv, _np(conv_ref), atol=1e-6, rtol=0.0)
+
+    def test_conv1d_channel_ranges_are_byte_exact(self) -> None:
+        rows, conv_dim, kernel = 9, 17, 4
+        rng = np.random.default_rng(2026)
+        state = rng.standard_normal((conv_dim, kernel), dtype=np.float32)
+        x = rng.standard_normal((rows, conv_dim), dtype=np.float32)
+        weight = rng.standard_normal((conv_dim, kernel), dtype=np.float32)
+        bias = rng.standard_normal(conv_dim, dtype=np.float32)
+        expected = np.empty((rows, conv_dim), dtype=np.float32)
+        expected_state = np.empty((conv_dim, kernel), dtype=np.float32)
+        actual = np.full((rows, conv_dim), np.nan, dtype=np.float32)
+        actual_state = np.full((conv_dim, kernel), np.nan, dtype=np.float32)
+
+        LIB.mamba2_conv1d_decode_f32(
+            _fptr(state), _fptr(x), _fptr(weight), _fptr(bias),
+            _fptr(expected), _fptr(expected_state), rows, conv_dim, kernel,
+        )
+        for begin, end in ((0, 3), (3, 11), (11, conv_dim)):
+            LIB.mamba2_conv1d_f32_channel_range(
+                _fptr(state), _fptr(x), _fptr(weight), _fptr(bias),
+                _fptr(actual), _fptr(actual_state), rows, conv_dim, kernel,
+                begin, end,
+            )
+        self.assertEqual(actual.tobytes(), expected.tobytes())
+        self.assertEqual(actual_state.tobytes(), expected_state.tobytes())
 
     def test_dt_softplus_matches_torch(self) -> None:
         rows, heads = 4, 7
@@ -188,6 +224,42 @@ class TestMamba2Reference(unittest.TestCase):
         LIB.mamba2_selective_scan_f32(*map(_fptr, arrays), _fptr(state_out), _fptr(y), batch, seq, heads, head_dim, state_dim, groups)
         np.testing.assert_allclose(state_out, _np(state_ref), atol=1e-6, rtol=0.0)
         np.testing.assert_allclose(y, _np(y_ref), atol=1e-6, rtol=0.0)
+
+    def test_selective_scan_head_ranges_are_byte_exact(self) -> None:
+        batch, seq, heads, head_dim, state_dim, groups = 1, 13, 9, 4, 3, 3
+        rng = np.random.default_rng(3036)
+        state = rng.standard_normal(
+            (batch, heads, head_dim, state_dim), dtype=np.float32
+        )
+        x = rng.standard_normal(
+            (batch, seq, heads, head_dim), dtype=np.float32
+        )
+        dt = np.abs(rng.standard_normal((batch, seq, heads), dtype=np.float32))
+        a = -np.abs(rng.standard_normal(heads, dtype=np.float32))
+        b = rng.standard_normal(
+            (batch, seq, groups, state_dim), dtype=np.float32
+        )
+        c = rng.standard_normal(
+            (batch, seq, groups, state_dim), dtype=np.float32
+        )
+        d = rng.standard_normal(heads, dtype=np.float32)
+        expected_state = np.empty_like(state)
+        expected_y = np.empty_like(x)
+        actual_state = np.full_like(state, np.nan)
+        actual_y = np.full_like(x, np.nan)
+        common = tuple(map(_fptr, (state, x, dt, a, b, c, d)))
+
+        LIB.mamba2_selective_scan_f32(
+            *common, _fptr(expected_state), _fptr(expected_y),
+            batch, seq, heads, head_dim, state_dim, groups,
+        )
+        for begin, end in ((0, 2), (2, 7), (7, heads)):
+            LIB.mamba2_selective_scan_f32_head_range(
+                *common, _fptr(actual_state), _fptr(actual_y),
+                batch, seq, heads, head_dim, state_dim, groups, begin, end,
+            )
+        self.assertEqual(actual_state.tobytes(), expected_state.tobytes())
+        self.assertEqual(actual_y.tobytes(), expected_y.tobytes())
 
     def test_selective_state_update_decode_matches_single_token_scan_mapping(self) -> None:
         # Nemotron-H prefill and decode must use the same repeating B/C

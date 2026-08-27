@@ -99,6 +99,52 @@ void mamba2_in_proj_split_f32(const float *projected,
     ck_mamba_debug_finite("split.dt[0]", dt, (size_t)num_heads);
 }
 
+void mamba2_conv1d_f32_channel_range(const float *state_in,
+                                     const float *x,
+                                     const float *weight,
+                                     const float *bias,
+                                     float *conv_out,
+                                     float *state_out,
+                                     int rows,
+                                     int conv_dim,
+                                     int kernel_size,
+                                     int channel_begin,
+                                     int channel_end) {
+    if (!state_in || !x || !weight || !conv_out || !state_out ||
+        rows <= 0 || conv_dim <= 0 || kernel_size <= 0 ||
+        channel_begin < 0 || channel_begin >= channel_end ||
+        channel_end > conv_dim) {
+        return;
+    }
+
+    /* Time rows are dependent, but channels are independent. Keeping one
+     * channel's rolling state local preserves its exact update order while
+     * allowing disjoint channel ranges to execute concurrently.
+     */
+    for (int ch = channel_begin; ch < channel_end; ++ch) {
+        float state_work[(size_t)kernel_size];
+        const size_t base = (size_t)ch * (size_t)kernel_size;
+        memcpy(state_work, state_in + base,
+               (size_t)kernel_size * sizeof(float));
+        for (int row = 0; row < rows; ++row) {
+            for (int k = 0; k < kernel_size - 1; ++k) {
+                state_work[(size_t)k] = state_work[(size_t)k + 1u];
+            }
+            state_work[(size_t)kernel_size - 1u] =
+                x[(size_t)row * (size_t)conv_dim + (size_t)ch];
+
+            float acc = bias ? bias[ch] : 0.0f;
+            for (int k = 0; k < kernel_size; ++k) {
+                acc += state_work[(size_t)k] *
+                       weight[(size_t)ch * (size_t)kernel_size + (size_t)k];
+            }
+            conv_out[(size_t)row * (size_t)conv_dim + (size_t)ch] = mamba2_silu_f32(acc);
+        }
+        memcpy(state_out + base, state_work,
+               (size_t)kernel_size * sizeof(float));
+    }
+}
+
 void mamba2_conv1d_decode_f32(const float *state_in,
                               const float *x,
                               const float *weight,
@@ -115,33 +161,9 @@ void mamba2_conv1d_decode_f32(const float *state_in,
 
     ck_mamba_debug_finite("conv.state_in", state_in, (size_t)conv_dim * (size_t)kernel_size);
     ck_mamba_debug_finite("conv.x[0]", x, (size_t)conv_dim);
-
-    /* State layout is [conv_dim, kernel_size]. Rows are time steps, not
-     * independent batch entries. Keep a local rolling state so prefill scans
-     * the prompt in order and decode (rows=1) is the same contract.
-     */
-    float state_work[(size_t)conv_dim * (size_t)kernel_size];
-    memcpy(state_work, state_in, (size_t)conv_dim * (size_t)kernel_size * sizeof(float));
-
-    for (int row = 0; row < rows; ++row) {
-        for (int ch = 0; ch < conv_dim; ++ch) {
-            const size_t base = (size_t)ch * (size_t)kernel_size;
-            for (int k = 0; k < kernel_size - 1; ++k) {
-                state_work[base + (size_t)k] = state_work[base + (size_t)k + 1u];
-            }
-            state_work[base + (size_t)kernel_size - 1u] =
-                x[(size_t)row * (size_t)conv_dim + (size_t)ch];
-
-            float acc = bias ? bias[ch] : 0.0f;
-            for (int k = 0; k < kernel_size; ++k) {
-                acc += state_work[base + (size_t)k] *
-                       weight[(size_t)ch * (size_t)kernel_size + (size_t)k];
-            }
-            conv_out[(size_t)row * (size_t)conv_dim + (size_t)ch] = mamba2_silu_f32(acc);
-        }
-    }
-
-    memcpy(state_out, state_work, (size_t)conv_dim * (size_t)kernel_size * sizeof(float));
+    mamba2_conv1d_f32_channel_range(
+        state_in, x, weight, bias, conv_out, state_out,
+        rows, conv_dim, kernel_size, 0, conv_dim);
     ck_mamba_debug_finite("conv.out[0]", conv_out, (size_t)conv_dim);
     ck_mamba_debug_finite("conv.state_out", state_out, (size_t)conv_dim * (size_t)kernel_size);
 }
@@ -239,6 +261,81 @@ void mamba2_selective_state_update_decode_f32(const float *state_in,
 }
 
 
+void mamba2_selective_scan_f32_head_range(const float *state_init,
+                                          const float *x,
+                                          const float *dt,
+                                          const float *a,
+                                          const float *b,
+                                          const float *c,
+                                          const float *d,
+                                          float *state_out,
+                                          float *y,
+                                          int batch,
+                                          int seq_len,
+                                          int num_heads,
+                                          int head_dim,
+                                          int state_dim,
+                                          int num_groups,
+                                          int head_begin,
+                                          int head_end) {
+    if (!state_init || !x || !dt || !a || !b || !c || !d || !state_out || !y ||
+        batch <= 0 || seq_len <= 0 || num_heads <= 0 || head_dim <= 0 ||
+        state_dim <= 0 || num_groups <= 0 || head_begin < 0 ||
+        head_begin >= head_end || head_end > num_heads) {
+        return;
+    }
+
+    const size_t state_per_batch = (size_t)num_heads * (size_t)head_dim * (size_t)state_dim;
+    const size_t head_state = (size_t)head_dim * (size_t)state_dim;
+    const int packed_xbc = (x == b && b == c);
+    const size_t inner_dim = (size_t)num_heads * (size_t)head_dim;
+    const size_t bc_dim = (size_t)num_groups * (size_t)state_dim;
+    const size_t packed_stride = inner_dim + 2u * bc_dim;
+    const int heads_per_group = (num_heads + num_groups - 1) / num_groups;
+
+    for (int bs = 0; bs < batch; ++bs) {
+        float *state_batch = state_out + (size_t)bs * state_per_batch;
+        memcpy(state_batch + (size_t)head_begin * head_state,
+               state_init + (size_t)bs * state_per_batch + (size_t)head_begin * head_state,
+               (size_t)(head_end - head_begin) * head_state * sizeof(float));
+        for (int t = 0; t < seq_len; ++t) {
+            for (int h = head_begin; h < head_end; ++h) {
+                /* Nemotron-H prefill and decode both use the repeating
+                 * B/C group map from repeat_interleave semantics.  Keeping
+                 * this in sync is required for full-prefix and incremental
+                 * decode equivalence.
+                 */
+                int group = h / heads_per_group;
+                if (group >= num_groups) group = num_groups - 1;
+                const float dt_h = dt[((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_heads + (size_t)h];
+                const float d_a = expf(dt_h * a[h]);
+                const float d_h = d[h];
+                const float *packed_row = x + ((size_t)bs * (size_t)seq_len + (size_t)t) * packed_stride;
+                const float *b_row = packed_xbc
+                    ? (packed_row + inner_dim + (size_t)group * (size_t)state_dim)
+                    : (b + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);
+                const float *c_row = packed_xbc
+                    ? (packed_row + inner_dim + bc_dim + (size_t)group * (size_t)state_dim)
+                    : (c + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);
+
+                for (int hd = 0; hd < head_dim; ++hd) {
+                    const size_t x_idx = (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_heads + (size_t)h) * (size_t)head_dim + (size_t)hd;
+                    const float x_val = packed_xbc ? packed_row[(size_t)h * (size_t)head_dim + (size_t)hd] : x[x_idx];
+                    const size_t state_base = ((size_t)h * (size_t)head_dim + (size_t)hd) * (size_t)state_dim;
+                    float acc = 0.0f;
+                    for (int st = 0; st < state_dim; ++st) {
+                        const size_t si = state_base + (size_t)st;
+                        const float new_state = state_batch[si] * d_a + dt_h * b_row[st] * x_val;
+                        state_batch[si] = new_state;
+                        acc += new_state * c_row[st];
+                    }
+                    y[x_idx] = acc + d_h * x_val;
+                }
+            }
+        }
+    }
+}
+
 void mamba2_selective_scan_f32(const float *state_init,
                                const float *x,
                                const float *dt,
@@ -265,51 +362,10 @@ void mamba2_selective_scan_f32(const float *state_init,
     ck_mamba_debug_finite("scan.dt[0]", dt, (size_t)num_heads);
     ck_mamba_debug_finite("scan.a", a, (size_t)num_heads);
     ck_mamba_debug_finite("scan.d", d, (size_t)num_heads);
-    memcpy(state_out, state_init, (size_t)batch * state_per_batch * sizeof(float));
-
-    for (int bs = 0; bs < batch; ++bs) {
-        float *state_batch = state_out + (size_t)bs * state_per_batch;
-        for (int t = 0; t < seq_len; ++t) {
-            for (int h = 0; h < num_heads; ++h) {
-                /* Nemotron-H prefill and decode both use the repeating
-                 * B/C group map from repeat_interleave semantics.  Keeping
-                 * this in sync is required for full-prefix and incremental
-                 * decode equivalence.
-                 */
-                const int heads_per_group = (num_heads + num_groups - 1) / num_groups;
-                int group = h / heads_per_group;
-                if (group >= num_groups) group = num_groups - 1;
-                const float dt_h = dt[((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_heads + (size_t)h];
-                const float d_a = expf(dt_h * a[h]);
-                const float d_h = d[h];
-                const int packed_xbc = (x == b && b == c);
-                const size_t inner_dim = (size_t)num_heads * (size_t)head_dim;
-                const size_t bc_dim = (size_t)num_groups * (size_t)state_dim;
-                const size_t packed_stride = inner_dim + 2u * bc_dim;
-                const float *packed_row = x + ((size_t)bs * (size_t)seq_len + (size_t)t) * packed_stride;
-                const float *b_row = packed_xbc
-                    ? (packed_row + inner_dim + (size_t)group * (size_t)state_dim)
-                    : (b + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);
-                const float *c_row = packed_xbc
-                    ? (packed_row + inner_dim + bc_dim + (size_t)group * (size_t)state_dim)
-                    : (c + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);
-
-                for (int hd = 0; hd < head_dim; ++hd) {
-                    const size_t x_idx = (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_heads + (size_t)h) * (size_t)head_dim + (size_t)hd;
-                    const float x_val = packed_xbc ? packed_row[(size_t)h * (size_t)head_dim + (size_t)hd] : x[x_idx];
-                    const size_t state_base = ((size_t)h * (size_t)head_dim + (size_t)hd) * (size_t)state_dim;
-                    float acc = 0.0f;
-                    for (int st = 0; st < state_dim; ++st) {
-                        const size_t si = state_base + (size_t)st;
-                        const float new_state = state_batch[si] * d_a + dt_h * b_row[st] * x_val;
-                        state_batch[si] = new_state;
-                        acc += new_state * c_row[st];
-                    }
-                    y[x_idx] = acc + d_h * x_val;
-                }
-            }
-        }
-    }
+    mamba2_selective_scan_f32_head_range(
+        state_init, x, dt, a, b, c, d, state_out, y,
+        batch, seq_len, num_heads, head_dim, state_dim, num_groups,
+        0, num_heads);
     ck_mamba_debug_finite("scan.state_out", state_out, (size_t)batch * state_per_batch);
     ck_mamba_debug_finite("scan.y[0]", y, (size_t)num_heads * (size_t)head_dim);
 }

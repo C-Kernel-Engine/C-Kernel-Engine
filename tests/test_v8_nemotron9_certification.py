@@ -62,3 +62,30 @@ def test_nemotron9_high_memory_target_uses_certification_manifest() -> None:
     assert "--family nemotron9" in makefile
     assert "--mode full" in makefile
     assert "--force-rebuild" in makefile
+
+
+def test_nemotron9_prefill_parallelism_follows_recurrent_ownership() -> None:
+    maps = ROOT / "version/v8/kernel_maps"
+    conv = json.loads((maps / "mamba2_conv1d_decode_f32.json").read_text())
+    scan = json.loads((maps / "mamba2_selective_scan_f32.json").read_text())
+
+    assert conv["inputs"][0]["shape"] == ["C", "K"]
+    assert conv["parallelization"]["preferred"] == {
+        "prefill": "channel",
+        "decode": "serial",
+    }
+    assert conv["parallelization"]["strategies"][0]["partition_dim"] == "C"
+    assert conv["impl"]["function"] == "mamba2_conv1d_f32_parallel_dispatch"
+    assert conv["call_abi"]["version"] == 1
+
+    assert scan["parallelization"]["preferred"] == {
+        "prefill": "head",
+        "decode": "serial",
+    }
+    assert scan["parallelization"]["strategies"][0]["partition_dim"] == "H"
+    assert scan["impl"]["function"] == "mamba2_selective_scan_f32_parallel_dispatch"
+    assert scan["call_abi"]["version"] == 1
+
+    legacy = json.loads((maps / "kernel_bindings.overlay.json").read_text())["bindings"]
+    assert "mamba2_conv1d_decode_f32" not in legacy
+    assert "mamba2_selective_scan_f32" not in legacy
