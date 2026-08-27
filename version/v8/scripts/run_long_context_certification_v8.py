@@ -295,8 +295,37 @@ def _proc_cpu_ticks_and_rss(root_pid: int) -> tuple[int, int]:
     return ticks, rss_kib
 
 
+def _system_cpu_totals(
+    cpu_ids: set[int] | None = None,
+    proc_stat: Path = Path("/proc/stat"),
+) -> dict[int, tuple[int, int]]:
+    """Return per-CPU (busy, total) ticks using the same counters as top."""
+    totals: dict[int, tuple[int, int]] = {}
+    try:
+        lines = proc_stat.read_text(encoding="ascii").splitlines()
+    except OSError:
+        return totals
+    for line in lines:
+        fields = line.split()
+        if not fields or not re.fullmatch(r"cpu\d+", fields[0]):
+            continue
+        cpu = int(fields[0][3:])
+        if cpu_ids is not None and cpu not in cpu_ids:
+            continue
+        try:
+            counters = [int(value) for value in fields[1:]]
+        except ValueError:
+            continue
+        if len(counters) < 4:
+            continue
+        total = sum(counters)
+        idle = counters[3] + (counters[4] if len(counters) > 4 else 0)
+        totals[cpu] = (total - idle, total)
+    return totals
+
+
 def summarize_utilization_samples(
-    samples: list[dict[str, float]], requested_threads: int
+    samples: list[dict[str, Any]], requested_threads: int
 ) -> dict[str, Any]:
     active = sorted(
         float(sample["active_cores"])
@@ -330,7 +359,25 @@ def summarize_utilization_samples(
     if low_started is not None:
         longest_low = max(longest_low, previous_time - low_started)
 
-    return {
+    per_cpu_values: dict[int, list[float]] = {}
+    selected_active: list[float] = []
+    all_cores_80_samples = 0
+    per_cpu_sample_count = 0
+    for sample in samples:
+        per_cpu = sample.get("per_cpu_busy_pct")
+        if not isinstance(per_cpu, dict) or not per_cpu:
+            continue
+        values = [float(value) for value in per_cpu.values()]
+        for cpu, value in per_cpu.items():
+            per_cpu_values.setdefault(int(cpu), []).append(float(value))
+        selected_active.append(sum(values) / 100.0)
+        all_cores_80_samples += int(all(value >= 80.0 for value in values))
+        per_cpu_sample_count += 1
+    per_cpu_means = {
+        str(cpu): statistics.fmean(values)
+        for cpu, values in sorted(per_cpu_values.items()) if values
+    }
+    result = {
         "sample_count": len(active),
         "requested_threads": requested_threads,
         "mean_active_cores": statistics.fmean(active),
@@ -345,32 +392,75 @@ def summarize_utilization_samples(
             (int(sample.get("rss_kib", 0)) for sample in samples), default=0
         ),
     }
+    if selected_active and per_cpu_means:
+        selected_sorted = sorted(selected_active)
+
+        def selected_percentile(fraction: float) -> float:
+            position = fraction * (len(selected_sorted) - 1)
+            lower = int(position)
+            upper = min(lower + 1, len(selected_sorted) - 1)
+            weight = position - lower
+            return selected_sorted[lower] * (1.0 - weight) + selected_sorted[upper] * weight
+
+        result.update({
+            "per_cpu_sample_count": per_cpu_sample_count,
+            "sampled_cpu_ids": [int(cpu) for cpu in per_cpu_means],
+            "per_cpu_mean_utilization_pct": per_cpu_means,
+            "mean_selected_cpu_active_cores": statistics.fmean(selected_active),
+            "p10_selected_cpu_active_cores": selected_percentile(0.10),
+            "minimum_per_cpu_mean_utilization_pct": min(per_cpu_means.values()),
+            "maximum_per_cpu_mean_utilization_pct": max(per_cpu_means.values()),
+            "all_sampled_cpus_ge_80pct_fraction": (
+                all_cores_80_samples / per_cpu_sample_count
+            ),
+        })
+    return result
 
 
 def _sample_process_tree(
     root_pid: int,
     stop: threading.Event,
-    samples: list[dict[str, float]],
+    samples: list[dict[str, Any]],
+    monitored_cpus: set[int] | None = None,
     interval_seconds: float = 0.25,
 ) -> None:
     ticks_per_second = float(os.sysconf("SC_CLK_TCK"))
     origin = time.monotonic()
     previous_time = origin
     previous_ticks: int | None = None
+    previous_cpu_totals: dict[int, tuple[int, int]] | None = None
     while True:
         now = time.monotonic()
         ticks, rss_kib = _proc_cpu_ticks_and_rss(root_pid)
+        cpu_totals = _system_cpu_totals(monitored_cpus)
         active_cores = None
+        per_cpu_busy_pct: dict[str, float] | None = None
         elapsed = now - previous_time
         if previous_ticks is not None and elapsed > 0.0 and ticks >= previous_ticks:
             active_cores = (ticks - previous_ticks) / ticks_per_second / elapsed
-        samples.append({
+        if previous_cpu_totals is not None:
+            per_cpu_busy_pct = {}
+            for cpu, (busy, total) in cpu_totals.items():
+                previous = previous_cpu_totals.get(cpu)
+                if previous is None:
+                    continue
+                busy_delta = busy - previous[0]
+                total_delta = total - previous[1]
+                if total_delta > 0 and busy_delta >= 0:
+                    per_cpu_busy_pct[str(cpu)] = min(
+                        100.0, 100.0 * busy_delta / total_delta
+                    )
+        sample: dict[str, Any] = {
             "elapsed_seconds": now - origin,
             "active_cores": active_cores,
             "rss_kib": float(rss_kib),
-        })
+        }
+        if per_cpu_busy_pct:
+            sample["per_cpu_busy_pct"] = per_cpu_busy_pct
+        samples.append(sample)
         previous_time = now
         previous_ticks = ticks
+        previous_cpu_totals = cpu_totals
         if stop.wait(interval_seconds):
             break
 
@@ -397,7 +487,7 @@ def run_command(
         preexec_fn = lambda: os.sched_setaffinity(0, affinity)
     started = dt.datetime.now(dt.timezone.utc)
     usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
-    utilization_samples: list[dict[str, float]] = []
+    utilization_samples: list[dict[str, Any]] = []
     sampler_stop = threading.Event()
     sampler: threading.Thread | None = None
     try:
@@ -414,9 +504,10 @@ def run_command(
             preexec_fn=preexec_fn,
         )
         if timed and sys.platform.startswith("linux"):
+            monitored_cpus = affinity or set(os.sched_getaffinity(0))
             sampler = threading.Thread(
                 target=_sample_process_tree,
-                args=(process.pid, sampler_stop, utilization_samples),
+                args=(process.pid, sampler_stop, utilization_samples, monitored_cpus),
                 name=f"cke-utilization-{name}",
                 daemon=True,
             )
@@ -735,6 +826,26 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             f"{(row.get('timing') or {}).get('prompt_tokens', '-')} | {validation} | "
             f"`{row.get('artifact_path', '-')}` | `{row.get('raw_output_path', '-')}` |"
         )
+    lines += [
+        "", "## Engineering Quality Performance", "",
+        "| Model | Task | Prefill tok/s | Decode tok/s | Process cores | p10 sampled cores | Top-like selected cores | Weakest core mean | >=80% all-core samples | Peak RAM |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for row in report.get("quality", []):
+        timing = row.get("timing") or {}
+        usage = row.get("resource_usage") or {}
+        utilization = row.get("utilization") or {}
+        peak = row.get("peak_rss_kib")
+        lines.append(
+            f"| {row['model']} | {row['prompt_id']} | "
+            f"{timing.get('prompt_tok_s', '-')} | {timing.get('decode_tok_s', '-')} | "
+            f"{usage.get('average_cpu_cores', '-')} | "
+            f"{utilization.get('p10_active_cores', '-')} | "
+            f"{utilization.get('mean_selected_cpu_active_cores', '-')} | "
+            f"{utilization.get('minimum_per_cpu_mean_utilization_pct', '-')} | "
+            f"{utilization.get('all_sampled_cpus_ge_80pct_fraction', '-')} | "
+            f"{f'{peak / 1048576:.2f} GiB' if isinstance(peak, int) else '-'} |"
+        )
     lines += ["", "## Skips And Failures", ""]
     for row in report.get("events", []):
         if row.get("status") in {"SKIP", "FAIL"}:
@@ -791,10 +902,33 @@ def write_quality_index(report: dict[str, Any], output_dir: Path) -> None:
             objective = quality.get("xml_parseable", False)
         usage = row.get("resource_usage") or {}
         active_cores = usage.get("average_cpu_cores")
+        utilization = row.get("utilization") or {}
+        timing = row.get("timing") or {}
         utilization_fact = (
             f'<span>average active cores: {float(active_cores):.1f}</span>'
             if isinstance(active_cores, (int, float)) else ""
         )
+        p10 = utilization.get("p10_active_cores")
+        selected = utilization.get("mean_selected_cpu_active_cores")
+        weakest = utilization.get("minimum_per_cpu_mean_utilization_pct")
+        sustained = utilization.get("all_sampled_cpus_ge_80pct_fraction")
+        peak = row.get("peak_rss_kib")
+        performance_facts = "".join((
+            f'<span>prefill: {float(timing["prompt_tok_s"]):.1f} tok/s</span>'
+            if isinstance(timing.get("prompt_tok_s"), (int, float)) else "",
+            f'<span>decode: {float(timing["decode_tok_s"]):.2f} tok/s</span>'
+            if isinstance(timing.get("decode_tok_s"), (int, float)) else "",
+            f'<span>p10 process cores: {float(p10):.1f}</span>'
+            if isinstance(p10, (int, float)) else "",
+            f'<span>top-like selected cores: {float(selected):.1f}</span>'
+            if isinstance(selected, (int, float)) else "",
+            f'<span>weakest core mean: {float(weakest):.1f}%</span>'
+            if isinstance(weakest, (int, float)) else "",
+            f'<span>all cores >=80%: {100.0 * float(sustained):.1f}% samples</span>'
+            if isinstance(sustained, (int, float)) else "",
+            f'<span>peak RAM: {float(peak) / 1048576.0:.2f} GiB</span>'
+            if isinstance(peak, int) else "",
+        ))
         cards.append(
             '<section class="result">'
             f'<header><div><h2>{html.escape(str(row.get("model", "unknown")))}</h2>'
@@ -802,7 +936,7 @@ def write_quality_index(report: dict[str, Any], output_dir: Path) -> None:
             f'<span class="status {status.lower()}">{html.escape(status)}</span></header>'
             f'<div class="facts"><span>{html.escape(objective_label)}: {str(bool(objective)).lower()}</span>'
             f'<span>characters: {int(quality.get("characters", quality.get("answer_characters", 0)))}</span>'
-            f'{utilization_fact}</div>'
+            f'{utilization_fact}{performance_facts}</div>'
             f'<nav>{" | ".join(links) if links else "no artifact"}</nav>{preview}{source_view}</section>'
         )
     document = f'''<!doctype html>
@@ -1160,6 +1294,8 @@ def run_quality(
             "status": "PASS" if command_result["returncode"] == 0 and quality["pass"] else "FAIL",
             "quality": quality, "timing": timing, "peak_rss_kib": command_result["peak_rss_kib"],
             "resource_usage": command_result["resource_usage"],
+            "utilization": command_result.get("utilization", {}),
+            "utilization_timeline_path": command_result.get("utilization_timeline_path"),
             "prompt_sha256": hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
             "prompt_path": str(prompt_path), "raw_output_path": str(raw_output_path),
             "artifact_path": str(artifact_path), "output_path": str(artifact_path),

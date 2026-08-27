@@ -120,16 +120,36 @@ def test_cpu_plan_selects_one_allowed_sibling_per_physical_core() -> None:
 def test_utilization_summary_exposes_low_occupancy_intervals() -> None:
     samples = [
         {"elapsed_seconds": 0.0, "active_cores": None, "rss_kib": 10},
-        {"elapsed_seconds": 0.25, "active_cores": 0.5, "rss_kib": 20},
-        {"elapsed_seconds": 0.50, "active_cores": 0.5, "rss_kib": 30},
-        {"elapsed_seconds": 0.75, "active_cores": 7.5, "rss_kib": 25},
-        {"elapsed_seconds": 1.00, "active_cores": 8.0, "rss_kib": 20},
+        {"elapsed_seconds": 0.25, "active_cores": 0.5, "rss_kib": 20,
+         "per_cpu_busy_pct": {"0": 20.0, "1": 40.0}},
+        {"elapsed_seconds": 0.50, "active_cores": 0.5, "rss_kib": 30,
+         "per_cpu_busy_pct": {"0": 100.0, "1": 80.0}},
+        {"elapsed_seconds": 0.75, "active_cores": 7.5, "rss_kib": 25,
+         "per_cpu_busy_pct": {"0": 100.0, "1": 100.0}},
+        {"elapsed_seconds": 1.00, "active_cores": 8.0, "rss_kib": 20,
+         "per_cpu_busy_pct": {"0": 100.0, "1": 100.0}},
     ]
     summary = runner.summarize_utilization_samples(samples, requested_threads=8)
     assert summary["sample_count"] == 4
     assert summary["peak_sampled_rss_kib"] == 30
     assert summary["longest_low_utilization_seconds"] == 0.75
     assert summary["p90_active_cores"] > 7.0
+    assert summary["mean_selected_cpu_active_cores"] == 1.6
+    assert summary["minimum_per_cpu_mean_utilization_pct"] == 80.0
+    assert summary["maximum_per_cpu_mean_utilization_pct"] == 80.0
+    assert summary["all_sampled_cpus_ge_80pct_fraction"] == 0.75
+
+
+def test_top_like_per_cpu_parser_tracks_busy_and_total_ticks() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        proc_stat = Path(directory) / "stat"
+        proc_stat.write_text(
+            "cpu  20 0 10 70 0 0 0 0 0 0\n"
+            "cpu0 10 0 5 35 0 0 0 0 0 0\n"
+            "cpu1 10 0 5 30 5 0 0 0 0 0\n",
+            encoding="ascii",
+        )
+        assert runner._system_cpu_totals({1}, proc_stat) == {1: (15, 50)}
 
 
 def test_timed_command_publishes_process_utilization_timeline() -> None:
