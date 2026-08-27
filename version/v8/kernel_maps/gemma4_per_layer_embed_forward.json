@@ -8,11 +8,22 @@
     "equivalence_group": "per_layer_input.apply.fp32.v1",
     "phases": ["prefill", "decode"]
   },
-  "variant": "gemma4_scalar_correctness",
+  "variant": "gemma4_token_row_parallel_exact",
   "modes": {
     "inference": true,
     "training": false,
     "backward": false
+  },
+  "parallelization": {
+    "preferred": {"prefill": "token_row", "decode": "serial"},
+    "strategies": [
+      {
+        "name": "token_row",
+        "partition_dim": "T",
+        "param_style": "internal_dispatch",
+        "schedule": "dynamic_independent_rows"
+      }
+    ]
   },
   "quant": {
     "weight": "fp32",
@@ -154,5 +165,5 @@
       {"name": "eps", "source": "dim:rms_eps"}
     ]
   },
-  "notes": "First-pass correctness implementation of llama.cpp Gemma4 per-layer embedding branch."
+  "notes": "Gemma4 per-layer embedding branch with dynamic independent-token scheduling for prefill. Each token retains its projection and RMSNorm reduction order."
 }

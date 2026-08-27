@@ -37,6 +37,16 @@ lib.deepseek_mla_kv_decompress_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_
 lib.deepseek_mla_kv_decompress_f32.restype = None
 lib.deepseek_mla_kv_decompress_bf16.argtypes = [fptr, u16ptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_kv_decompress_bf16.restype = None
+lib.deepseek_mla_kv_decompress_bf16_token_range.argtypes = [
+    *lib.deepseek_mla_kv_decompress_bf16.argtypes,
+    ctypes.c_int,
+    ctypes.c_int,
+]
+lib.deepseek_mla_kv_decompress_bf16_token_range.restype = None
+lib.deepseek_mla_kv_decompress_bf16_parallel_dispatch.argtypes = (
+    lib.deepseek_mla_kv_decompress_bf16.argtypes
+)
+lib.deepseek_mla_kv_decompress_bf16_parallel_dispatch.restype = None
 lib.deepseek_mla_partial_rope_concat_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_partial_rope_concat_f32.restype = None
 lib.deepseek_mla_partial_rope_concat_packed_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
@@ -56,6 +66,10 @@ lib.deepseek_mla_attention_f32_workspace.argtypes = [
     ctypes.c_size_t,
 ]
 lib.deepseek_mla_attention_f32_workspace.restype = None
+lib.deepseek_mla_attention_f32_parallel_dispatch.argtypes = (
+    lib.deepseek_mla_attention_f32_workspace.argtypes
+)
+lib.deepseek_mla_attention_f32_parallel_dispatch.restype = None
 lib.deepseek_mla_attention_decode_f32.argtypes = [fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 lib.deepseek_mla_attention_decode_f32.restype = None
 lib.deepseek_mla_attention_decode_f32_workspace.argtypes = [
@@ -103,6 +117,18 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
             ptr(scores), scores.nbytes,
         )
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+
+        parallel = np.empty_like(expected)
+        parallel_scores = np.empty((heads, tokens), dtype=np.float32)
+        lib.deepseek_mla_attention_f32_parallel_dispatch(
+            ptr(q), ptr(k), ptr(v), ptr(parallel),
+            heads, kv_heads, tokens, qk_dim, v_dim,
+            1.0 / math.sqrt(qk_dim),
+            ptr(parallel_scores), parallel_scores.nbytes,
+        )
+        np.testing.assert_array_equal(
+            parallel.view(np.uint32), expected.view(np.uint32)
+        )
 
         sentinel = np.full_like(actual, -19.0)
         lib.deepseek_mla_attention_f32_workspace(
@@ -253,6 +279,27 @@ class TestDeepSeekReferenceKernels(unittest.TestCase):
         )
         np.testing.assert_array_equal(k_np, ref_k)
         np.testing.assert_array_equal(v_np, ref_v)
+
+        split_k = np.empty_like(k_np)
+        split_v = np.empty_like(v_np)
+        range_args = (
+            ptr(compressed_np), kv_b_np.ctypes.data_as(u16ptr),
+            ptr(split_k), ptr(split_v), tokens, heads, rank, nope_dim, v_dim,
+        )
+        lib.deepseek_mla_kv_decompress_bf16_token_range(*range_args, 0, 1)
+        lib.deepseek_mla_kv_decompress_bf16_token_range(*range_args, 1, tokens)
+        np.testing.assert_array_equal(split_k, ref_k)
+        np.testing.assert_array_equal(split_v, ref_v)
+
+        parallel_k = np.empty_like(k_np)
+        parallel_v = np.empty_like(v_np)
+        lib.deepseek_mla_kv_decompress_bf16_parallel_dispatch(
+            ptr(compressed_np), kv_b_np.ctypes.data_as(u16ptr),
+            ptr(parallel_k), ptr(parallel_v),
+            tokens, heads, rank, nope_dim, v_dim,
+        )
+        np.testing.assert_array_equal(parallel_k, ref_k)
+        np.testing.assert_array_equal(parallel_v, ref_v)
 
     def test_mla_partial_rope_concat_matches_kimi_layout(self):
         torch.manual_seed(23)

@@ -136,6 +136,67 @@ def _make_tiny_kimi_manifest() -> dict:
 
 
 class V8KimiTemplateTests(unittest.TestCase):
+    def test_mla_prefill_maps_partition_independent_outputs(self) -> None:
+        maps = ROOT / "version/v8/kernel_maps"
+        attention = json.loads(
+            (maps / "deepseek_mla_attention_f32.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            attention["impl"]["function"],
+            "deepseek_mla_attention_f32_parallel_dispatch",
+        )
+        self.assertEqual(attention["scratch"][0]["shape"], ["H", "T"])
+        self.assertEqual(
+            attention["parallelization"]["preferred"]["prefill"], "token_row"
+        )
+        self.assertEqual(
+            attention["parallelization"]["strategies"][0]["partition_dim"], "T"
+        )
+
+        decompress = json.loads(
+            (maps / "deepseek_mla_kv_decompress_bf16.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            decompress["impl"]["function"],
+            "deepseek_mla_kv_decompress_bf16_parallel_dispatch",
+        )
+        self.assertEqual(
+            decompress["parallelization"]["preferred"],
+            {"prefill": "token", "decode": "serial"},
+        )
+
+    def test_bf16_moe_prefill_partitions_independent_rows(self) -> None:
+        maps = ROOT / "version/v8/kernel_maps"
+        expected = {
+            "gemm_nt_bf16.json": (
+                "gemm_nt_bf16_parallel_dispatch", "M"
+            ),
+            "moe_swiglu_expert_forward_bf16.json": (
+                "moe_swiglu_expert_forward_bf16_parallel_dispatch", "R"
+            ),
+            "moe_swiglu_shared_forward_bf16.json": (
+                "moe_swiglu_shared_forward_bf16_parallel_dispatch", "R"
+            ),
+            "farskip_swiglu_shared_combine_bf16.json": (
+                "farskip_swiglu_shared_combine_bf16_parallel_dispatch", "R"
+            ),
+        }
+        for name, (function, partition_dim) in expected.items():
+            with self.subTest(map=name):
+                doc = json.loads((maps / name).read_text(encoding="utf-8"))
+                self.assertEqual(
+                    doc["parallelization"]["preferred"],
+                    {"prefill": "row", "decode": "serial"},
+                )
+                self.assertEqual(
+                    doc["parallelization"]["strategies"][0]["partition_dim"],
+                    partition_dim,
+                )
+                self.assertEqual(doc["impl"]["function"], function)
+                self.assertEqual(doc["call_abi"]["version"], 1)
+
     def test_kimi_nested_text_config_and_tiktoken_sidecar_are_hydrated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck-kimi-config-") as td:
             root = Path(td)

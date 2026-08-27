@@ -18,9 +18,16 @@
   "scratch": [],
   "dims": ["M", "N", "K"],
   "constraints": {},
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "serial"},
+    "strategies": [
+      {"name": "row", "partition_dim": "M", "param_style": "range", "range": {"min_chunk": 1}}
+    ]
+  },
   "impl": {
-    "function": "gemm_nt_bf16",
-    "c_declaration": "void gemm_nt_bf16(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+    "function": "gemm_nt_bf16_parallel_dispatch",
+    "c_declaration": "void gemm_nt_bf16_parallel_dispatch(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels_bf16.c"]
   },
   "modes": {"inference": true, "training": false, "backward": false},
@@ -29,14 +36,14 @@
       "contract_id": "bf16_weight_bf16_input_fp32_dot_fp32_output",
       "status": "observed",
       "phases": ["prefill"],
-      "function": "gemm_nt_bf16",
+      "function": "gemm_nt_bf16_parallel_dispatch",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "openmp",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows"],
-          "dispatch": ["openmp_parallel_for"],
+          "dispatch": ["ck_threadpool_parallel_for_n"],
           "reduction_order_effect": "none"
         }
       },

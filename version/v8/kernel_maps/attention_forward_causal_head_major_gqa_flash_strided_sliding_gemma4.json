@@ -1,6 +1,23 @@
 {
   "id": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
   "op": "attention_sliding",
+  "selection": {
+    "status": "production",
+    "priority": 200,
+    "equivalence_group": "attention.fp32_online_causal_sliding_gemma4_noscale.v1",
+    "phases": ["prefill"]
+  },
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "implementation": {
+    "isa_dispatch": "runtime",
+    "threading": {
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_query_blocks"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
+      "reduction_order_effect": "none"
+    }
+  },
   "variant": "causal_flash_fp32_sliding_gemma4_noscale",
   "quant": {
     "weight": "none",
@@ -100,18 +117,17 @@
   ],
   "parallelization": {
     "supported": [
-      "head"
+      "query_row"
     ],
     "preferred": {
-      "prefill": "head",
-      "decode": "head"
+      "prefill": "query_row"
     },
     "strategies": [
       {
-        "name": "head",
-        "partition_dim": "H",
+        "name": "query_row",
+        "partition_dim": "H*T",
         "param_style": "ith_nth",
-        "notes": "Parallelize across heads; each thread handles one or more heads."
+        "notes": "Independent (head, token) query rows are distributed cyclically; each row preserves its online-softmax reduction order."
       }
     ]
   },
@@ -185,6 +201,22 @@
     ]
   },
   "notes": "Gemma4 no-scale causal sliding-window attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "float*"},
+      {"name": "k", "source": "scratch:k_scratch", "cast": "float*"},
+      {"name": "v", "source": "scratch:v_scratch", "cast": "float*"},
+      {"name": "output", "source": "output:out", "cast": "float*"},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "kv_stride_tokens", "source": "dim:max_seq_len"},
+      {"name": "sliding_window", "source": "dim:sliding_window"}
+    ]
+  },
   "name": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
   "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4.json"
 }

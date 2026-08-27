@@ -39,9 +39,9 @@
     "notes": "Token-major residual add."
   },
   "impl": {
-    "function": "ck_residual_add_token_major",
-    "c_declaration": "void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
-    "sources": ["src/ckernel_orchestration.c"],
+    "function": "ck_residual_add_token_major_parallel_dispatch",
+    "c_declaration": "void ck_residual_add_token_major_parallel_dispatch(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
+    "sources": ["src/ckernel_orchestration.c", "version/v8/src/ck_parallel_prefill_v8.c"],
     "variants": [
       {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
     ]

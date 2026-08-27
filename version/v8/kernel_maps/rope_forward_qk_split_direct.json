@@ -28,11 +28,16 @@
     {"name": "freq_base", "dtype": "float32", "source": "dim:rope_freq_base", "desc": "Per-layer RoPE theta/base"}
   ],
   "impl": {
-    "function": "rope_forward_qk_split_direct_f32",
-    "c_declaration": "void rope_forward_qk_split_direct_f32(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
-    "sources": ["src/kernels/rope_kernels.c"],
+    "function": "rope_forward_qk_split_direct_parallel_dispatch",
+    "c_declaration": "void rope_forward_qk_split_direct_parallel_dispatch(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
+    "sources": ["src/kernels/rope_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"],
     "variants": [
-      {"name": "ref", "requires": [], "compile_flags": []}
+      {
+        "name": "parallel_token_rows",
+        "requires": [],
+        "compile_flags": [],
+        "work_partition": "independent_token_rows"
+      }
     ]
   },
   "call_abi": {"version": 1, "params": [

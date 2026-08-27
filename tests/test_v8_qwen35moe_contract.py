@@ -23,6 +23,7 @@ from build_ir_v8 import (  # type: ignore
     TEMPLATE_OP_WEIGHTS,
     _apply_prefill_policy_override,
     _kernel_port_size_bytes,
+    _required_kernel_call_arena_bytes,
     _required_kernel_call_scratch_bytes,
     _kernel_scratch_size_bytes,
     _resolve_body_ops_for_layer,
@@ -353,6 +354,39 @@ class Qwen35MoeContractTests(unittest.TestCase):
             ),
             64 * 15296,
         )
+
+    def test_required_provider_arena_includes_live_mlp_output(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        config = {
+            "embed_dim": HIDDEN,
+            "moe_intermediate_size": EXPERT_DIM,
+            "n_routed_experts": EXPERTS,
+            "experts_per_tok": TOP_K,
+            "context_length": 512,
+        }
+        op = {
+            "op": "moe_swiglu_expert_mlp",
+            "kernel": provider["id"],
+            "params": {},
+            "outputs": {
+                "output": {
+                    "slot": "mlp_scratch",
+                    "dtype": "fp32",
+                    "shape": ["R", "H"],
+                }
+            },
+            "scratch": provider["scratch"],
+        }
+        workspace = _required_kernel_call_scratch_bytes([op], config, 1)
+        arena = _required_kernel_call_arena_bytes([op], config, 1)
+        self.assertEqual(arena, workspace + HIDDEN * 4)
 
     def test_required_q5_workspace_uses_logical_projection_dimensions(self) -> None:
         provider_path = (

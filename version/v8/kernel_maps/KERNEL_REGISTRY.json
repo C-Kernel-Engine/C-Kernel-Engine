@@ -5,14 +5,14 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 297,
+      "total": 299,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 31,
+        "attention": 32,
         "attention_projection": 1,
-        "attention_sliding": 6,
+        "attention_sliding": 7,
         "attn_gate_sigmoid_mul": 1,
         "attn_gate_sigmoid_mul_backward": 1,
         "attn_gate_softplus_mul": 1,
@@ -1603,6 +1603,29 @@
     {
       "id": "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
       "op": "attention",
+      "selection": {
+        "status": "production",
+        "priority": 200,
+        "equivalence_group": "attention.fp32_online_causal_strided_gemma4_noscale.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_query_blocks"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
       "variant": "causal_flash_fp32_gemma4_noscale",
       "quant": {
         "weight": "none",
@@ -1697,18 +1720,17 @@
       ],
       "parallelization": {
         "supported": [
-          "head"
+          "query_row"
         ],
         "preferred": {
-          "prefill": "head",
-          "decode": "head"
+          "prefill": "query_row"
         },
         "strategies": [
           {
-            "name": "head",
-            "partition_dim": "H",
+            "name": "query_row",
+            "partition_dim": "H*T",
             "param_style": "ith_nth",
-            "notes": "Parallelize across heads; each thread handles one or more heads."
+            "notes": "Independent (head, token) query rows are distributed cyclically; each row preserves its online-softmax reduction order."
           }
         ]
       },
@@ -1782,8 +1804,258 @@
         ]
       },
       "notes": "Gemma4 no-scale causal multi-head attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          }
+        ]
+      },
       "name": "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_gemma4.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+      "op": "attention",
+      "selection": {
+        "status": "production",
+        "priority": 300,
+        "equivalence_group": "attention.fp32_online_causal_strided_gemma4_noscale.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "physical_contract_version": 1,
+      "physical_alias_of": "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
+      "operation_interface": "attention.causal_gqa.fp32.gemma4_noscale.v1",
+      "variant": "causal_flash_fp32_gemma4_noscale_token_output",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_query_blocks"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32"
+        }
+      ],
+      "constraints": {
+        "notes": "Changes only independent output addresses; every query row retains the numerical owner's reduction order."
+      },
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+        "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "notes": "Direct token-major physical provider for Gemma4 no-scale causal prefill attention.",
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+      "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output.json"
     },
     {
       "id": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
@@ -2071,6 +2343,29 @@
     {
       "id": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
       "op": "attention_sliding",
+      "selection": {
+        "status": "production",
+        "priority": 200,
+        "equivalence_group": "attention.fp32_online_causal_sliding_gemma4_noscale.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_query_blocks"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
       "variant": "causal_flash_fp32_sliding_gemma4_noscale",
       "quant": {
         "weight": "none",
@@ -2170,18 +2465,17 @@
       ],
       "parallelization": {
         "supported": [
-          "head"
+          "query_row"
         ],
         "preferred": {
-          "prefill": "head",
-          "decode": "head"
+          "prefill": "query_row"
         },
         "strategies": [
           {
-            "name": "head",
-            "partition_dim": "H",
+            "name": "query_row",
+            "partition_dim": "H*T",
             "param_style": "ith_nth",
-            "notes": "Parallelize across heads; each thread handles one or more heads."
+            "notes": "Independent (head, token) query rows are distributed cyclically; each row preserves its online-softmax reduction order."
           }
         ]
       },
@@ -2255,8 +2549,270 @@
         ]
       },
       "notes": "Gemma4 no-scale causal sliding-window attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          }
+        ]
+      },
       "name": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4.json"
+    },
+    {
+      "id": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+      "op": "attention_sliding",
+      "selection": {
+        "status": "production",
+        "priority": 300,
+        "equivalence_group": "attention.fp32_online_causal_sliding_gemma4_noscale.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "physical_contract_version": 1,
+      "physical_alias_of": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
+      "operation_interface": "attention.causal_sliding_gqa.fp32.gemma4_noscale.v1",
+      "variant": "causal_flash_fp32_sliding_gemma4_noscale_token_output",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "implementation": {
+        "isa_dispatch": "runtime",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_query_blocks"
+          ],
+          "dispatch": [
+            "ck_threadpool_dispatch_n"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "sliding_window",
+          "dtype": "int32"
+        }
+      ],
+      "constraints": {
+        "notes": "Changes only independent output addresses; every query row retains the numerical owner's reduction order."
+      },
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+        "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window);",
+        "sources": [
+          "src/kernels/attention_kernels_sliding.c",
+          "src/kernels/softmax_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_direct_layout_attention.py"
+        ]
+      },
+      "notes": "Direct token-major physical provider for Gemma4 no-scale sliding prefill attention.",
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          }
+        ]
+      },
+      "name": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+      "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output.json"
     },
     {
       "id": "attention_forward_causal_head_major_gqa_flash_strided_token_output",
@@ -10168,10 +10724,11 @@
         "notes": "Token-major residual add."
       },
       "impl": {
-        "function": "ck_residual_add_token_major",
-        "c_declaration": "void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
+        "function": "ck_residual_add_token_major_parallel_dispatch",
+        "c_declaration": "void ck_residual_add_token_major_parallel_dispatch(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
         "sources": [
-          "src/ckernel_orchestration.c"
+          "src/ckernel_orchestration.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
@@ -10675,11 +11232,12 @@
           "name": "scores",
           "dtype": "fp32",
           "shape": [
+            "H",
             "T"
           ],
           "size_resolution": "required",
           "lifetime": "kernel_call",
-          "desc": "Reusable causal score row sized for the complete prefill sequence."
+          "desc": "Planner-owned causal score row per query-head worker."
         }
       ],
       "dims": [
@@ -10690,9 +11248,26 @@
         "V",
         "attention_scale"
       ],
+      "parallelization": {
+        "supported": [
+          "query_head"
+        ],
+        "preferred": {
+          "prefill": "token_row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "token_row",
+            "partition_dim": "T",
+            "param_style": "internal_dispatch",
+            "schedule": "dynamic_causal_token_rows"
+          }
+        ]
+      },
       "impl": {
-        "function": "deepseek_mla_attention_f32_workspace",
-        "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
+        "function": "deepseek_mla_attention_f32_parallel_dispatch",
+        "c_declaration": "void deepseek_mla_attention_f32_parallel_dispatch(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
         "sources": [
           "src/kernels/deepseek_kernels.c"
         ]
@@ -10755,7 +11330,7 @@
           }
         ]
       },
-      "notes": "Reference causal MLA prefill attention over the current token sequence. The model-derived softmax scale is an explicit ABI dimension, including any YaRN mscale multiplier.",
+      "notes": "Reference causal MLA prefill attention over the current token sequence. Workers dynamically claim complete token rows to balance both increasing causal-history cost and asymmetric core throughput. Query/head rows remain independent and retain their original reduction order; planner-owned score rows prevent cross-worker aliasing. The model-derived softmax scale is explicit.",
       "name": "deepseek_mla_attention_f32",
       "_source_file": "deepseek_mla_attention_f32.json"
     },
@@ -11046,22 +11621,41 @@
         "Dk",
         "Dv"
       ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "implementation": {
         "isa_dispatch": "scalar",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": [
-            "serial"
+            "independent_rows"
           ],
           "dispatch": [
-            "inline"
+            "ck_threadpool_parallel_for_n"
           ],
           "reduction_order_effect": "none"
         }
       },
       "impl": {
-        "function": "deepseek_mla_kv_decompress_bf16",
-        "c_declaration": "void deepseek_mla_kv_decompress_bf16(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);",
+        "function": "deepseek_mla_kv_decompress_bf16_parallel_dispatch",
+        "c_declaration": "void deepseek_mla_kv_decompress_bf16_parallel_dispatch(const float *compressed_kv, const uint16_t *kv_b_proj, float *k_nope, float *value, int tokens, int heads, int kv_lora_rank, int qk_nope_dim, int v_dim);",
         "sources": [
           "src/kernels/deepseek_kernels.c"
         ],
@@ -11081,17 +11675,17 @@
             "prefill",
             "decode"
           ],
-          "function": "deepseek_mla_kv_decompress_bf16",
+          "function": "deepseek_mla_kv_decompress_bf16_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -11174,7 +11768,7 @@
           }
         ]
       },
-      "notes": "Model-agnostic MLA KV-B projection for BF16 checkpoints. Input and outputs use BF16-RNE values in FP32 activation carriers; the provider owns the BF16 weight ABI and output-storage boundary.",
+      "notes": "Model-agnostic MLA KV-B projection for BF16 checkpoints. Prefill partitions independent token rows through the common thread pool; decode retains the serial single-row leaf. Input and outputs use BF16-RNE values in FP32 activation carriers.",
       "name": "deepseek_mla_kv_decompress_bf16",
       "_source_file": "deepseek_mla_kv_decompress_bf16.json"
     },
@@ -13287,10 +13881,29 @@
         "I"
       ],
       "scratch": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "implementation": {
-        "isa_dispatch": "scalar",
+        "isa_dispatch": "runtime",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": [
             "independent_rows"
           ],
@@ -13301,10 +13914,11 @@
         }
       },
       "impl": {
-        "function": "farskip_swiglu_shared_combine_bf16",
-        "c_declaration": "void farskip_swiglu_shared_combine_bf16(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
+        "function": "farskip_swiglu_shared_combine_bf16_parallel_dispatch",
+        "c_declaration": "void farskip_swiglu_shared_combine_bf16_parallel_dispatch(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
         "sources": [
-          "src/kernels/axpy_kernels.c"
+          "src/kernels/axpy_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ]
       },
       "numerical_capabilities": [
@@ -13315,12 +13929,12 @@
             "prefill",
             "decode"
           ],
-          "function": "farskip_swiglu_shared_combine_bf16",
+          "function": "farskip_swiglu_shared_combine_bf16_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
-            "isa_dispatch": "scalar",
+            "isa_dispatch": "runtime",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
                 "independent_rows"
               ],
@@ -16745,9 +17359,28 @@
         "K"
       ],
       "constraints": {},
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "impl": {
-        "function": "gemm_nt_bf16",
-        "c_declaration": "void gemm_nt_bf16(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "function": "gemm_nt_bf16_parallel_dispatch",
+        "c_declaration": "void gemm_nt_bf16_parallel_dispatch(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
         "sources": [
           "src/kernels/gemm_kernels_bf16.c"
         ]
@@ -16764,17 +17397,17 @@
           "phases": [
             "prefill"
           ],
-          "function": "gemm_nt_bf16",
+          "function": "gemm_nt_bf16_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "compile_time",
             "threading": {
-              "runtime": "openmp",
+              "runtime": "ck_threadpool",
               "work_partition": [
                 "independent_rows"
               ],
               "dispatch": [
-                "openmp_parallel_for"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -17065,9 +17698,28 @@
         "K"
       ],
       "constraints": {},
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "M",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "impl": {
-        "function": "gemm_nt_bf16_bf16_storage",
-        "c_declaration": "void gemm_nt_bf16_bf16_storage(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+        "function": "gemm_nt_bf16_bf16_storage_parallel_dispatch",
+        "c_declaration": "void gemm_nt_bf16_bf16_storage_parallel_dispatch(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
         "sources": [
           "src/kernels/gemm_kernels_bf16.c"
         ]
@@ -17085,17 +17737,17 @@
             "prefill",
             "decode"
           ],
-          "function": "gemm_nt_bf16_bf16_storage",
+          "function": "gemm_nt_bf16_bf16_storage_parallel_dispatch",
           "explicit_selector": true,
           "implementation": {
             "isa_dispatch": "compile_time",
             "threading": {
-              "runtime": "openmp",
+              "runtime": "ck_threadpool",
               "work_partition": [
                 "independent_rows"
               ],
               "dispatch": [
-                "openmp_parallel_for"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -18261,11 +18913,12 @@
         "K"
       ],
       "constraints": {
-        "notes": "Exact FP32 NT GEMM that preserves the scalar accumulation order used for parity-sensitive header paths."
+        "schedule": "independent_token_rows",
+        "notes": "Exact FP32 NT GEMM. Persistent-pool workers own disjoint token rows while preserving each output element's scalar accumulation order."
       },
       "impl": {
-        "function": "gemm_naive_parallel",
-        "c_declaration": "void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
+        "function": "gemm_nt_fp32_exact_parallel_dispatch",
+        "c_declaration": "void gemm_nt_fp32_exact_parallel_dispatch(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
         "sources": [
           "src/kernels/gemm_kernels.c"
         ]
@@ -18325,7 +18978,7 @@
           "tests/test_v8_qwen3vl_template.py"
         ]
       },
-      "notes": "Generic exact FP32 NT GEMM for parity-sensitive matmuls such as image patch projection.",
+      "notes": "Generic exact FP32 NT GEMM for parity-sensitive matmuls such as MoE routing and image patch projection.",
       "name": "gemm_nt_fp32_exact",
       "_source_file": "gemm_nt_fp32_exact.json"
     },
@@ -21051,11 +21704,25 @@
           "decode"
         ]
       },
-      "variant": "gemma4_scalar_correctness",
+      "variant": "gemma4_token_row_parallel_exact",
       "modes": {
         "inference": true,
         "training": false,
         "backward": false
+      },
+      "parallelization": {
+        "preferred": {
+          "prefill": "token_row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "token_row",
+            "partition_dim": "T",
+            "param_style": "internal_dispatch",
+            "schedule": "dynamic_independent_rows"
+          }
+        ]
       },
       "quant": {
         "weight": "fp32",
@@ -21254,7 +21921,7 @@
           }
         ]
       },
-      "notes": "First-pass correctness implementation of llama.cpp Gemma4 per-layer embedding branch.",
+      "notes": "Gemma4 per-layer embedding branch with dynamic independent-token scheduling for prefill. Each token retains its projection and RMSNorm reduction order.",
       "name": "gemma4_per_layer_embed_forward",
       "_source_file": "gemma4_per_layer_embed_forward.json"
     },
@@ -21271,11 +21938,25 @@
           "decode"
         ]
       },
-      "variant": "gemma4_bf16_scalar_correctness",
+      "variant": "gemma4_bf16_token_row_parallel_exact",
       "modes": {
         "inference": true,
         "training": false,
         "backward": false
+      },
+      "parallelization": {
+        "preferred": {
+          "prefill": "token_row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "token_row",
+            "partition_dim": "T",
+            "param_style": "internal_dispatch",
+            "schedule": "dynamic_independent_rows"
+          }
+        ]
       },
       "quant": {
         "weight": "bf16",
@@ -21458,7 +22139,7 @@
           }
         ]
       },
-      "notes": "Prepare Gemma4 per-layer input stream from BF16 safetensors token embeddings and BF16 projection weights.",
+      "notes": "Prepare Gemma4 per-layer input stream from BF16 safetensors token embeddings and BF16 projection weights. Prefill dynamically partitions independent token rows through the persistent thread pool while retaining each row's projection reduction order.",
       "name": "gemma4_per_layer_prepare_bf16_forward",
       "_source_file": "gemma4_per_layer_prepare_bf16_forward.json"
     },
@@ -21475,11 +22156,25 @@
           "decode"
         ]
       },
-      "variant": "gemma4_scalar_correctness",
+      "variant": "gemma4_token_row_parallel_exact",
       "modes": {
         "inference": true,
         "training": false,
         "backward": false
+      },
+      "parallelization": {
+        "preferred": {
+          "prefill": "token_row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "token_row",
+            "partition_dim": "T",
+            "param_style": "internal_dispatch",
+            "schedule": "dynamic_independent_rows"
+          }
+        ]
       },
       "quant": {
         "weight": "q5_k",
@@ -21661,7 +22356,7 @@
           }
         ]
       },
-      "notes": "Prepare Gemma4 per-layer input stream once from original token embedding stream.",
+      "notes": "Prepare Gemma4 per-layer input stream once from the original token embedding stream. Prefill dynamically partitions independent token rows through the persistent thread pool while retaining each row's projection reduction order.",
       "name": "gemma4_per_layer_prepare_forward",
       "_source_file": "gemma4_per_layer_prepare_forward.json"
     },
@@ -28029,19 +28724,34 @@
         }
       ],
       "parallelization": {
-        "supported": [],
+        "supported": [
+          "row"
+        ],
         "preferred": {
-          "prefill": null,
+          "prefill": "row",
           "decode": null
         },
-        "strategies": []
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "N",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1048576
+            },
+            "notes": "Split large contiguous copies into non-overlapping byte ranges; small copies remain serial."
+          }
+        ]
       },
       "constraints": {
         "notes": "Byte copy implementing logical residual_save; performs no arithmetic. src and dst must not overlap (undefined for overlapping writable views)."
       },
       "impl": {
-        "function": "memcpy",
-        "sources": [],
+        "function": "ck_memcpy_parallel_dispatch",
+        "c_declaration": "void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size);",
+        "sources": [
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ],
         "variants": [
           {
             "name": "default",
@@ -28076,7 +28786,7 @@
         ]
       },
       "tests": {},
-      "notes": "Memory copy for saving residual before RMSNorm for skip connections. Pure byte copy; no arithmetic.",
+      "notes": "Memory copy for saving residual before RMSNorm for skip connections. Pure byte copy; large prefill buffers use the shared thread pool.",
       "name": "memcpy",
       "_source_file": "memcpy.json"
     },
@@ -29135,11 +29845,91 @@
         "E",
         "K"
       ],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "impl": {
-        "function": "moe_swiglu_expert_forward_bf16",
-        "c_declaration": "void moe_swiglu_expert_forward_bf16(const float *hidden, const int *indices, const float *routing_weights, const uint16_t *expert_gate, const uint16_t *expert_up, const uint16_t *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k);",
+        "function": "moe_swiglu_expert_forward_bf16_parallel_dispatch",
+        "c_declaration": "void moe_swiglu_expert_forward_bf16_parallel_dispatch(const float *hidden, const int *indices, const float *routing_weights, const uint16_t *expert_gate, const uint16_t *expert_up, const uint16_t *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k);",
         "sources": [
-          "src/kernels/axpy_kernels.c"
+          "src/kernels/axpy_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*"
+          },
+          {
+            "name": "indices",
+            "source": "activation:indices",
+            "cast": "const int*"
+          },
+          {
+            "name": "routing_weights",
+            "source": "activation:routing_weights",
+            "cast": "const float*"
+          },
+          {
+            "name": "expert_gate",
+            "source": "weight:moe_expert_gate",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "expert_up",
+            "source": "weight:moe_expert_up",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "expert_down",
+            "source": "weight:moe_expert_down",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "dim:_m"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:moe_intermediate_size"
+          },
+          {
+            "name": "n_experts",
+            "source": "dim:n_routed_experts"
+          },
+          {
+            "name": "top_k",
+            "source": "dim:num_experts_per_tok"
+          }
         ]
       },
       "notes": "Reference routed SwiGLU MoE provider with BF16 weight storage and FP32 activation/accumulation.",
@@ -30712,11 +31502,78 @@
         "H",
         "I"
       ],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "serial"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
       "impl": {
-        "function": "moe_swiglu_shared_forward_bf16",
-        "c_declaration": "void moe_swiglu_shared_forward_bf16(const float *hidden, const float *routed, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *output, int rows, int hidden_dim, int intermediate_dim);",
+        "function": "moe_swiglu_shared_forward_bf16_parallel_dispatch",
+        "c_declaration": "void moe_swiglu_shared_forward_bf16_parallel_dispatch(const float *hidden, const float *routed, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *output, int rows, int hidden_dim, int intermediate_dim);",
         "sources": [
-          "src/kernels/axpy_kernels.c"
+          "src/kernels/axpy_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "hidden",
+            "source": "activation:hidden",
+            "cast": "const float*"
+          },
+          {
+            "name": "routed",
+            "source": "activation:routed",
+            "cast": "const float*"
+          },
+          {
+            "name": "shared_gate",
+            "source": "weight:moe_shared_gate",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "shared_up",
+            "source": "weight:moe_shared_up",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "shared_down",
+            "source": "weight:moe_shared_down",
+            "cast": "const uint16_t*"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "dim:_m"
+          },
+          {
+            "name": "hidden_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "intermediate_dim",
+            "source": "dim:moe_shared_expert_intermediate_size"
+          }
         ]
       },
       "notes": "Reference shared SwiGLU expert provider with BF16 weight storage and FP32 activation/accumulation.",
@@ -35931,25 +36788,21 @@
       ],
       "parallelization": {
         "supported": [
-          "head",
           "token"
         ],
         "preferred": {
-          "prefill": "head",
-          "decode": "head"
+          "prefill": "token",
+          "decode": null
         },
         "strategies": [
           {
-            "name": "head",
-            "partition_dim": "H",
-            "param_style": "ith_nth",
-            "notes": "Each head is independent. Parallelize across heads for Q, then across kv_heads for K."
-          },
-          {
             "name": "token",
             "partition_dim": "T",
-            "param_style": "ith_nth",
-            "notes": "Parallelize across tokens; each thread handles one or more tokens across all heads."
+            "param_style": "range",
+            "range": {
+              "min_chunk": 8
+            },
+            "notes": "Flatten independent head/token rows and preserve each row's serial reduction order."
           }
         ]
       },
@@ -35960,16 +36813,77 @@
         "notes": "D (head_dim) should be multiple of 64 for optimal SIMD in underlying rmsnorm_forward."
       },
       "impl": {
-        "function": "qk_norm_forward",
-        "c_declaration": "void qk_norm_forward(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+        "function": "qk_norm_forward_parallel_dispatch",
+        "c_declaration": "void qk_norm_forward_parallel_dispatch(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
         "sources": [
-          "src/kernels/qk_norm_kernels.c"
+          "src/kernels/qk_norm_kernels.c",
+          "src/kernels/rmsnorm_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
             "name": "ref",
             "requires": [],
             "compile_flags": []
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:q",
+              "output:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:k",
+              "output:k"
+            ]
+          },
+          {
+            "name": "q_gamma",
+            "source": "weight_f:q_norm",
+            "cast": "const float*",
+            "ports": [
+              "weight:q_gamma"
+            ]
+          },
+          {
+            "name": "k_gamma",
+            "source": "weight_f:k_norm",
+            "cast": "const float*",
+            "ports": [
+              "weight:k_gamma"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
           }
         ]
       },
@@ -37008,7 +37922,9 @@
         "function": "quantize_row_q8_k",
         "sources": [
           "src/kernels/gemm_kernels_q4k_q8k.c",
-          "src/kernels/quantize_row_q8_k_sse.c"
+          "src/kernels/quantize_row_q8_k_sse.c",
+          "src/kernels/gemm_kernels_q8_0.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
@@ -37029,6 +37945,12 @@
           "block_bytes": 292,
           "block_elements_symbol": "QK_K",
           "c_block_type": "block_q8_K"
+        },
+        "prefill_batch": {
+          "function": "quantize_batch_q8_k_parallel_dispatch",
+          "row_group": 4,
+          "tail_function": "quantize_row_q8_k",
+          "rounding_contract": "canonical_q8_k_row_nearest"
         }
       },
       "tests": {
@@ -40804,10 +41726,11 @@
         "notes": "For optimal performance, E should be multiple of 64 for SIMD vectorization"
       },
       "impl": {
-        "function": "rmsnorm_forward",
-        "c_declaration": "void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+        "function": "rmsnorm_forward_parallel_dispatch",
+        "c_declaration": "void rmsnorm_forward_parallel_dispatch(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
         "sources": [
-          "src/kernels/rmsnorm_kernels.c"
+          "src/kernels/rmsnorm_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
@@ -40834,6 +41757,66 @@
             "name": "ref",
             "requires": [],
             "compile_flags": []
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "weight_f:_gamma",
+            "alt": [
+              "ln1_gamma",
+              "ln2_gamma",
+              "post_attention_norm",
+              "post_ffn_norm",
+              "v_norm_gamma",
+              "final_ln_weight"
+            ],
+            "cast": "const float*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null",
+            "ports": [
+              "output:rstd"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "d_model",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "aligned_embed_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
           }
         ]
       },
@@ -42164,11 +43147,73 @@
           "default": 1e-06
         }
       ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": null
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "tokens",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 8
+            },
+            "notes": "Normalize independent token/head rows on the shared pool."
+          }
+        ]
+      },
       "impl": {
-        "function": "gemma4_v_norm_forward",
-        "c_declaration": "void gemma4_v_norm_forward(const float *input, float *output, float *rstd_cache, int tokens, int num_kv_heads, int head_dim, float eps);",
+        "function": "gemma4_v_norm_forward_parallel_dispatch",
+        "c_declaration": "void gemma4_v_norm_forward_parallel_dispatch(const float *input, float *output, float *rstd_cache, int tokens, int num_kv_heads, int head_dim, float eps);",
         "sources": [
-          "src/kernels/rmsnorm_kernels.c"
+          "src/kernels/rmsnorm_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "rstd_cache",
+            "source": "null"
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "eps",
+            "source": "dim:rms_eps"
+          }
         ]
       },
       "notes": "Gemma4 V RMSNorm without gamma. Normalizes each [head_dim] V head independently, matching llama.cpp ggml_rms_norm after reshape.",
@@ -44361,16 +45406,18 @@
         }
       ],
       "impl": {
-        "function": "rope_forward_qk_split_direct_f32",
-        "c_declaration": "void rope_forward_qk_split_direct_f32(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
+        "function": "rope_forward_qk_split_direct_parallel_dispatch",
+        "c_declaration": "void rope_forward_qk_split_direct_parallel_dispatch(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
         "sources": [
-          "src/kernels/rope_kernels.c"
+          "src/kernels/rope_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
         ],
         "variants": [
           {
-            "name": "ref",
+            "name": "parallel_token_rows",
             "requires": [],
-            "compile_flags": []
+            "compile_flags": [],
+            "work_partition": "independent_token_rows"
           }
         ]
       },

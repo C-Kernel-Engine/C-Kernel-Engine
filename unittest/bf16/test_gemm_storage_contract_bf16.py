@@ -19,6 +19,10 @@ LIB_PATH = Path(
 )
 LIB = ctypes.CDLL(str(LIB_PATH))
 KERNEL = LIB.gemm_nt_bf16_bf16_storage
+STORAGE_RANGE_KERNEL = LIB.gemm_nt_bf16_bf16_storage_row_range
+STORAGE_PARALLEL_KERNEL = LIB.gemm_nt_bf16_bf16_storage_parallel_dispatch
+EXACT_KERNEL = LIB.gemm_nt_bf16
+EXACT_RANGE_KERNEL = LIB.gemm_nt_bf16_row_range
 NATIVE_KERNEL = LIB.gemm_nt_bf16_native_bf16_storage
 AMX_KERNEL = LIB.gemm_nt_bf16_amx_bf16_storage
 AMX_WORKSPACE_KERNEL = LIB.gemm_nt_bf16_amx_bf16_storage_workspace
@@ -30,6 +34,14 @@ KERNEL.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_int,
 ]
 KERNEL.restype = None
+STORAGE_RANGE_KERNEL.argtypes = KERNEL.argtypes + [ctypes.c_int, ctypes.c_int]
+STORAGE_RANGE_KERNEL.restype = None
+STORAGE_PARALLEL_KERNEL.argtypes = KERNEL.argtypes
+STORAGE_PARALLEL_KERNEL.restype = None
+EXACT_KERNEL.argtypes = KERNEL.argtypes
+EXACT_KERNEL.restype = None
+EXACT_RANGE_KERNEL.argtypes = KERNEL.argtypes + [ctypes.c_int, ctypes.c_int]
+EXACT_RANGE_KERNEL.restype = None
 NATIVE_KERNEL.argtypes = KERNEL.argtypes
 NATIVE_KERNEL.restype = None
 AMX_KERNEL.argtypes = KERNEL.argtypes
@@ -102,6 +114,47 @@ def run_case(m: int, n: int, k: int, seed: int) -> tuple[float, float]:
 
 
 def main() -> int:
+    rng = np.random.default_rng(19)
+    m, n, k = 7, 13, 24
+    a = np.ascontiguousarray(rng.standard_normal((m, k), dtype=np.float32))
+    b = bf16_bits(rng.standard_normal((n, k), dtype=np.float32))
+    bias = np.ascontiguousarray(rng.standard_normal(n, dtype=np.float32))
+    exact = np.empty((m, n), dtype=np.float32)
+    split = np.empty_like(exact)
+    args = (
+        a.ctypes.data_as(FLOAT_P), ctypes.c_void_p(b.ctypes.data),
+        bias.ctypes.data_as(FLOAT_P), exact.ctypes.data_as(FLOAT_P), m, n, k,
+    )
+    EXACT_KERNEL(*args)
+    for begin, end in ((0, 2), (2, 5), (5, m)):
+        EXACT_RANGE_KERNEL(
+            args[0], args[1], args[2], split.ctypes.data_as(FLOAT_P),
+            m, n, k, begin, end,
+        )
+    if exact.tobytes() != split.tobytes():
+        raise AssertionError("BF16 exact GEMM row ranges changed output bytes")
+
+    storage_exact = np.empty_like(exact)
+    storage_split = np.empty_like(exact)
+    storage_parallel = np.empty_like(exact)
+    STORAGE_RANGE_KERNEL(
+        args[0], args[1], args[2], storage_exact.ctypes.data_as(FLOAT_P),
+        m, n, k, 0, m,
+    )
+    for begin, end in ((0, 2), (2, 5), (5, m)):
+        STORAGE_RANGE_KERNEL(
+            args[0], args[1], args[2], storage_split.ctypes.data_as(FLOAT_P),
+            m, n, k, begin, end,
+        )
+    STORAGE_PARALLEL_KERNEL(
+        args[0], args[1], args[2], storage_parallel.ctypes.data_as(FLOAT_P),
+        m, n, k,
+    )
+    if storage_exact.tobytes() != storage_split.tobytes():
+        raise AssertionError("BF16 storage row ranges changed output bytes")
+    if storage_exact.tobytes() != storage_parallel.tobytes():
+        raise AssertionError("BF16 storage parallel dispatch changed output bytes")
+
     cases = [(2, 24, 16, 1), (3, 144, 72, 2), (1, 3456, 1152, 3)]
     for m, n, k, seed in cases:
         max_abs, rmse = run_case(m, n, k, seed)

@@ -18,6 +18,7 @@
  */
 
 #include "ckernel_engine.h"
+#include "ck_threadpool.h"
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
@@ -140,6 +141,65 @@ static void gemm_naive_serial_float(const float *A,
             C[i * N + j] = sum;
         }
     }
+}
+
+typedef struct {
+    const float *A;
+    const float *B;
+    const float *bias;
+    float *C;
+    int M;
+    int N;
+    int K;
+    int bias_before_reduction;
+} ck_gemm_nt_fp32_exact_args_t;
+
+static void ck_gemm_nt_fp32_exact_rows(int begin, int end, void *opaque)
+{
+    const ck_gemm_nt_fp32_exact_args_t *args =
+        (const ck_gemm_nt_fp32_exact_args_t *)opaque;
+    for (int i = begin; i < end; ++i) {
+        const float *a_row = args->A + (size_t)i * (size_t)args->K;
+        float *c_row = args->C + (size_t)i * (size_t)args->N;
+        for (int j = 0; j < args->N; ++j) {
+            const float *b_row = args->B + (size_t)j * (size_t)args->K;
+            float sum = args->bias_before_reduction && args->bias
+                ? args->bias[j] : 0.0f;
+            for (int k = 0; k < args->K; ++k) {
+                sum += a_row[k] * b_row[k];
+            }
+            if (!args->bias_before_reduction && args->bias) {
+                sum += args->bias[j];
+            }
+            c_row[j] = sum;
+        }
+    }
+}
+
+void gemm_nt_fp32_exact_parallel_dispatch(const float *A,
+                                          const float *B,
+                                          const float *bias,
+                                          float *C,
+                                          int M, int N, int K)
+{
+    if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0) return;
+    ck_gemm_nt_fp32_exact_args_t args = {
+        .A = A, .B = B, .bias = bias, .C = C,
+        .M = M, .N = N, .K = K,
+        .bias_before_reduction = ck_strict_parity_enabled(),
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)N <= 4096) {
+        ck_gemm_nt_fp32_exact_rows(0, M, &args);
+        return;
+    }
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemm_nt_fp32_exact_rows, &args);
 }
 
 // Naive parallel GEMM (reference baseline) – copied from C-Transformer.

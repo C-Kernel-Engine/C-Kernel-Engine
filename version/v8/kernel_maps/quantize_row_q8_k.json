@@ -37,7 +37,9 @@
     "function": "quantize_row_q8_k",
     "sources": [
       "src/kernels/gemm_kernels_q4k_q8k.c",
-      "src/kernels/quantize_row_q8_k_sse.c"
+      "src/kernels/quantize_row_q8_k_sse.c",
+      "src/kernels/gemm_kernels_q8_0.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
     ],
     "variants": [
       {"name": "default", "requires": [], "compile_flags": []}
@@ -54,6 +56,12 @@
       "block_bytes": 292,
       "block_elements_symbol": "QK_K",
       "c_block_type": "block_q8_K"
+    },
+    "prefill_batch": {
+      "function": "quantize_batch_q8_k_parallel_dispatch",
+      "row_group": 4,
+      "tail_function": "quantize_row_q8_k",
+      "rounding_contract": "canonical_q8_k_row_nearest"
     }
   },
   "tests": {

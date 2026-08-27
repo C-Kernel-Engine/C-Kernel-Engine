@@ -11,12 +11,16 @@ import json
 import os
 import platform
 import re
+import resource
+import signal
 import shlex
 import shutil
 import statistics
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -160,12 +164,215 @@ def parse_resource_usage(stderr: str, elapsed_seconds: float) -> dict[str, float
     }
 
 
+def resource_usage_delta(
+    before: resource.struct_rusage,
+    after: resource.struct_rusage,
+    elapsed_seconds: float,
+) -> dict[str, float]:
+    user_seconds = max(0.0, float(after.ru_utime - before.ru_utime))
+    system_seconds = max(0.0, float(after.ru_stime - before.ru_stime))
+    process_seconds = user_seconds + system_seconds
+    average_cpu_cores = process_seconds / elapsed_seconds if elapsed_seconds > 0.0 else 0.0
+    return {
+        "user_seconds": user_seconds,
+        "system_seconds": system_seconds,
+        "process_seconds": process_seconds,
+        "wall_seconds": elapsed_seconds,
+        "average_cpu_cores": average_cpu_cores,
+        "reported_cpu_percent": average_cpu_cores * 100.0,
+    }
+
+
 def resolve_time_binary(env: dict[str, str]) -> str | None:
     configured = env.get("CK_TIME_BIN", "").strip()
     if configured:
         path = Path(configured).expanduser()
         return str(path) if path.is_file() and os.access(path, os.X_OK) else None
     return shutil.which("time", path=env.get("PATH"))
+
+
+def discover_physical_cpu_representatives(
+    *,
+    allowed_cpus: set[int] | None = None,
+    sysfs_root: Path = Path("/sys/devices/system/cpu"),
+) -> list[int]:
+    if allowed_cpus is None:
+        try:
+            allowed_cpus = set(os.sched_getaffinity(0))
+        except AttributeError:
+            allowed_cpus = set(range(os.cpu_count() or 1))
+    representatives: dict[tuple[int, int], int] = {}
+    unresolved: list[int] = []
+    for cpu in sorted(allowed_cpus):
+        topology = sysfs_root / f"cpu{cpu}" / "topology"
+        try:
+            package = int((topology / "physical_package_id").read_text(encoding="ascii"))
+            core = int((topology / "core_id").read_text(encoding="ascii"))
+        except (OSError, ValueError):
+            unresolved.append(cpu)
+            continue
+        representatives.setdefault((package, core), cpu)
+    if representatives:
+        return sorted(representatives.values())
+    return unresolved or sorted(allowed_cpus)
+
+
+def resolve_cpu_plan(
+    requested_threads: int,
+    cpu_policy: str,
+    *,
+    allowed_cpus: set[int] | None = None,
+    sysfs_root: Path = Path("/sys/devices/system/cpu"),
+) -> dict[str, Any]:
+    if allowed_cpus is None:
+        try:
+            allowed_cpus = set(os.sched_getaffinity(0))
+        except AttributeError:
+            allowed_cpus = set(range(os.cpu_count() or 1))
+    allowed = sorted(allowed_cpus)
+    if not allowed:
+        allowed = [0]
+    physical = discover_physical_cpu_representatives(
+        allowed_cpus=set(allowed), sysfs_root=sysfs_root
+    )
+    effective_threads = requested_threads if requested_threads > 0 else len(physical)
+    effective_threads = max(1, min(effective_threads, len(allowed)))
+    affinity: list[int] | None = None
+    if cpu_policy == "physical":
+        affinity = physical[:effective_threads]
+        if len(affinity) < effective_threads:
+            affinity.extend(cpu for cpu in allowed if cpu not in affinity)
+            affinity = affinity[:effective_threads]
+    elif cpu_policy != "inherit":
+        raise ValueError(f"unsupported CPU policy: {cpu_policy}")
+    return {
+        "policy": cpu_policy,
+        "requested_threads": requested_threads,
+        "effective_threads": effective_threads,
+        "allowed_cpus": allowed,
+        "physical_representatives": physical,
+        "affinity": affinity,
+    }
+
+
+def _proc_tree(root_pid: int) -> set[int]:
+    pending = [root_pid]
+    found: set[int] = set()
+    while pending:
+        pid = pending.pop()
+        if pid in found:
+            continue
+        found.add(pid)
+        task_root = Path(f"/proc/{pid}/task")
+        try:
+            tasks = list(task_root.iterdir())
+        except OSError:
+            continue
+        for task in tasks:
+            try:
+                children = (task / "children").read_text(encoding="ascii").split()
+            except OSError:
+                continue
+            pending.extend(int(child) for child in children)
+    return found
+
+
+def _proc_cpu_ticks_and_rss(root_pid: int) -> tuple[int, int]:
+    ticks = 0
+    rss_kib = 0
+    for pid in _proc_tree(root_pid):
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+            fields = stat[stat.rfind(")") + 2:].split()
+            ticks += int(fields[11]) + int(fields[12])
+            status = Path(f"/proc/{pid}/status").read_text(encoding="ascii")
+        except (OSError, ValueError, IndexError):
+            continue
+        for line in status.splitlines():
+            if line.startswith("VmRSS:"):
+                rss_kib += int(line.split()[1])
+                break
+    return ticks, rss_kib
+
+
+def summarize_utilization_samples(
+    samples: list[dict[str, float]], requested_threads: int
+) -> dict[str, Any]:
+    active = sorted(
+        float(sample["active_cores"])
+        for sample in samples
+        if sample.get("active_cores") is not None
+    )
+    if not active:
+        return {"sample_count": 0, "requested_threads": requested_threads}
+
+    def percentile(fraction: float) -> float:
+        position = fraction * (len(active) - 1)
+        lower = int(position)
+        upper = min(lower + 1, len(active) - 1)
+        weight = position - lower
+        return active[lower] * (1.0 - weight) + active[upper] * weight
+
+    low_threshold = max(1.0, requested_threads * 0.25)
+    longest_low = 0.0
+    low_started: float | None = None
+    previous_time = 0.0
+    for sample in samples:
+        current_time = float(sample["elapsed_seconds"])
+        value = sample.get("active_cores")
+        if value is not None and float(value) < low_threshold:
+            if low_started is None:
+                low_started = previous_time
+        elif low_started is not None:
+            longest_low = max(longest_low, current_time - low_started)
+            low_started = None
+        previous_time = current_time
+    if low_started is not None:
+        longest_low = max(longest_low, previous_time - low_started)
+
+    return {
+        "sample_count": len(active),
+        "requested_threads": requested_threads,
+        "mean_active_cores": statistics.fmean(active),
+        "p10_active_cores": percentile(0.10),
+        "p50_active_cores": percentile(0.50),
+        "p90_active_cores": percentile(0.90),
+        "minimum_active_cores": active[0],
+        "maximum_active_cores": active[-1],
+        "low_utilization_threshold_cores": low_threshold,
+        "longest_low_utilization_seconds": longest_low,
+        "peak_sampled_rss_kib": max(
+            (int(sample.get("rss_kib", 0)) for sample in samples), default=0
+        ),
+    }
+
+
+def _sample_process_tree(
+    root_pid: int,
+    stop: threading.Event,
+    samples: list[dict[str, float]],
+    interval_seconds: float = 0.25,
+) -> None:
+    ticks_per_second = float(os.sysconf("SC_CLK_TCK"))
+    origin = time.monotonic()
+    previous_time = origin
+    previous_ticks: int | None = None
+    while True:
+        now = time.monotonic()
+        ticks, rss_kib = _proc_cpu_ticks_and_rss(root_pid)
+        active_cores = None
+        elapsed = now - previous_time
+        if previous_ticks is not None and elapsed > 0.0 and ticks >= previous_ticks:
+            active_cores = (ticks - previous_ticks) / ticks_per_second / elapsed
+        samples.append({
+            "elapsed_seconds": now - origin,
+            "active_cores": active_cores,
+            "rss_kib": float(rss_kib),
+        })
+        previous_time = now
+        previous_ticks = ticks
+        if stop.wait(interval_seconds):
+            break
 
 
 def run_command(
@@ -180,9 +387,21 @@ def run_command(
     output_dir.mkdir(parents=True, exist_ok=True)
     time_binary = resolve_time_binary(env) if timed else None
     executed = [time_binary, "-v", *command] if time_binary else command
+    affinity_text = env.get("CK_BENCH_CPU_AFFINITY", "").strip()
+    affinity = (
+        {int(value) for value in affinity_text.split(",") if value.strip()}
+        if affinity_text else None
+    )
+    preexec_fn = None
+    if affinity and hasattr(os, "sched_setaffinity"):
+        preexec_fn = lambda: os.sched_setaffinity(0, affinity)
     started = dt.datetime.now(dt.timezone.utc)
+    usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    utilization_samples: list[dict[str, float]] = []
+    sampler_stop = threading.Event()
+    sampler: threading.Thread | None = None
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             executed,
             cwd=ROOT,
             env=env,
@@ -191,23 +410,63 @@ def run_command(
             errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=timeout,
-            check=False,
+            start_new_session=True,
+            preexec_fn=preexec_fn,
         )
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
+        if timed and sys.platform.startswith("linux"):
+            sampler = threading.Thread(
+                target=_sample_process_tree,
+                args=(process.pid, sampler_stop, utilization_samples),
+                name=f"cke-utilization-{name}",
+                daemon=True,
+            )
+            sampler.start()
+        stdout, stderr = process.communicate(timeout=timeout)
+        returncode = process.returncode
         error = None
     except subprocess.TimeoutExpired as exc:
         returncode = 124
         stdout = exc.stdout or ""
         stderr = exc.stderr or ""
         error = f"timeout after {timeout}s"
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (NameError, ProcessLookupError):
+            pass
+        final_stdout, final_stderr = process.communicate()
+        stdout = final_stdout or stdout
+        stderr = final_stderr or stderr
+    finally:
+        sampler_stop.set()
+        if sampler is not None:
+            sampler.join(timeout=2.0)
     stdout_path = output_dir / f"{name}.stdout.log"
     stderr_path = output_dir / f"{name}.stderr.log"
     stdout_path.write_text(stdout, encoding="utf-8")
     stderr_path.write_text(stderr, encoding="utf-8")
+    utilization_path = output_dir / f"{name}.utilization.json"
+    requested_threads = max(1, int(env.get("CK_NUM_THREADS", "1") or "1"))
+    utilization = summarize_utilization_samples(
+        utilization_samples, requested_threads
+    )
+    if utilization_samples:
+        atomic_json(
+            utilization_path,
+            {
+                "schema": "cke.process_utilization_timeline",
+                "schema_version": 1,
+                "sample_interval_seconds": 0.25,
+                "summary": utilization,
+                "samples": utilization_samples,
+            },
+        )
     elapsed_seconds = (dt.datetime.now(dt.timezone.utc) - started).total_seconds()
+    usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    measured_usage = parse_resource_usage(stderr, elapsed_seconds) if time_binary else None
+    usage_source = "gnu_time" if measured_usage is not None else "unavailable"
+    if timed and measured_usage is None:
+        measured_usage = resource_usage_delta(usage_before, usage_after, elapsed_seconds)
+        usage_source = "getrusage_children"
     return {
         "command": command,
         "command_shell": shlex.join(command),
@@ -217,7 +476,12 @@ def run_command(
         "elapsed_seconds": elapsed_seconds,
         "peak_rss_kib": parse_peak_rss(stderr) if time_binary else None,
         "peak_rss_source": "gnu_time" if time_binary else "unavailable",
-        "resource_usage": parse_resource_usage(stderr, elapsed_seconds) if time_binary else None,
+        "resource_usage": measured_usage if timed else None,
+        "resource_usage_source": usage_source,
+        "utilization": utilization if timed else None,
+        "utilization_timeline_path": (
+            str(utilization_path) if timed and utilization_samples else None
+        ),
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
         "stdout": stdout,
@@ -429,8 +693,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         "",
         "## Performance",
         "",
-        "| Model | Context | Status | CKE prefill | llama.cpp prefill | Relative | CKE decode | Active cores CKE/llama | Peak RAM | First-logit repeatable | Numerical parity |",
-        "|---|---:|---|---:|---:|---:|---:|---:|---:|---|---|",
+        "| Model | Context | Status | CKE prefill | llama.cpp prefill | Relative | CKE decode | Active cores avg/p10 | Longest low interval | Peak RAM | First-logit repeatable | Numerical parity |",
+        "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in report.get("performance", []):
         cke = row.get("cke") or {}
@@ -440,14 +704,16 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         ratio = row.get("relative_prefill")
         peak = cke.get("peak_rss_kib")
         active_cores = cke.get("average_active_cores")
-        llama_active_cores = llama.get("average_active_cores")
+        p10_active_cores = cke.get("p10_active_cores")
+        longest_low = cke.get("longest_low_utilization_seconds")
         lines.append(
             f"| {row['model']} | {row['context_tokens']} | {row['status']} | "
             f"{cke_timing.get('prompt_tok_s', '-')} | {llama_timing.get('prompt_tok_s', '-')} | "
             f"{f'{ratio:.2f}x' if isinstance(ratio, float) else '-'} | "
             f"{cke_timing.get('decode_tok_s', '-')} | "
             f"{f'{active_cores:.1f}' if isinstance(active_cores, float) else '-'} / "
-            f"{f'{llama_active_cores:.1f}' if isinstance(llama_active_cores, float) else '-'} | "
+            f"{f'{p10_active_cores:.1f}' if isinstance(p10_active_cores, float) else '-'} | "
+            f"{f'{longest_low:.2f} s' if isinstance(longest_low, float) else '-'} | "
             f"{f'{peak / 1048576:.2f} GiB' if isinstance(peak, int) else '-'} | "
             f"{cke.get('first_logits_repeatable', '-')} | "
             f"{(row.get('numerical_parity') or {}).get('status', '-')} |"
@@ -657,6 +923,8 @@ def run_cke_perf(
             "elapsed_seconds": result["elapsed_seconds"],
             "peak_rss_kib": result["peak_rss_kib"],
             "resource_usage": result["resource_usage"],
+            "utilization": result["utilization"],
+            "utilization_timeline_path": result["utilization_timeline_path"],
             "stdout_path": result["stdout_path"],
             "stderr_path": result["stderr_path"],
         }
@@ -667,6 +935,11 @@ def run_cke_perf(
             sample["error"] = result["error"] or result["stderr"][-2000:]
         samples.append(sample)
     successful = [sample for sample in samples if "timing" in sample]
+    utilization_rows = [
+        sample["utilization"] for sample in successful
+        if isinstance(sample.get("utilization"), dict)
+        and int(sample["utilization"].get("sample_count", 0)) > 0
+    ]
     hashes = [sample["trace"].get("first_logits_fnv1a64") for sample in successful]
     consumed = all(
         int(sample["trace"].get("prompt_tokens", -1)) == context_tokens
@@ -697,6 +970,13 @@ def run_cke_perf(
             for sample in successful if isinstance(sample.get("resource_usage"), dict)
         ) if successful and all(isinstance(sample.get("resource_usage"), dict)
                                 for sample in successful) else None,
+        "p10_active_cores": statistics.median(
+            float(row["p10_active_cores"]) for row in utilization_rows
+        ) if utilization_rows else None,
+        "longest_low_utilization_seconds": max(
+            (float(row["longest_low_utilization_seconds"])
+             for row in utilization_rows), default=None,
+        ),
         "input_token_id": args.token_id,
         "input_sha256": token_sha256(args.token_id, context_tokens),
     }
@@ -930,7 +1210,14 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--contexts", default="2048,8192,32768,65536,131072,262144")
     parser.add_argument("--models", default="all", help="Comma-separated IDs or all")
-    parser.add_argument("--threads", type=int, default=16)
+    parser.add_argument(
+        "--threads", type=int, default=0,
+        help="Worker count; 0 selects the allowed physical cores (default)",
+    )
+    parser.add_argument(
+        "--cpu-policy", choices=("physical", "inherit"), default="inherit",
+        help="Inherit scheduler affinity (default) or pin one worker per physical core",
+    )
     parser.add_argument(
         "--min-active-core-fraction", type=float, default=0.5,
         help="Fail CKE performance rows below this fraction of requested average core occupancy",
@@ -960,6 +1247,8 @@ def main() -> int:
 
     if args.repetitions < 2:
         raise ValueError("at least two repetitions are required for first-logit repeatability")
+    if args.threads < 0:
+        raise ValueError("--threads must be non-negative")
     if not 0.0 < args.min_active_core_fraction <= 1.0:
         raise ValueError("--min-active-core-fraction must be in (0, 1]")
     if args.quality_only and args.no_quality:
@@ -977,8 +1266,14 @@ def main() -> int:
     args.ck_cli = args.ck_cli.expanduser().resolve()
     args.llama_root = args.llama_root.expanduser().resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    cpu_plan = resolve_cpu_plan(args.threads, args.cpu_policy)
+    args.threads = int(cpu_plan["effective_threads"])
     env = os.environ.copy()
     env["CK_NUM_THREADS"] = str(args.threads)
+    if cpu_plan["affinity"]:
+        env["CK_BENCH_CPU_AFFINITY"] = ",".join(
+            str(cpu) for cpu in cpu_plan["affinity"]
+        )
     env["OMP_NUM_THREADS"] = "1"
     env["CK_THREADPOOL_PROFILE"] = "1"
 
@@ -986,7 +1281,8 @@ def main() -> int:
         "schema": "cke.v8.long_context_certification", "schema_version": 1,
         "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "host": host_fingerprint(),
-        "config": {"contexts": contexts, "threads": args.threads, "repetitions": args.repetitions,
+        "config": {"contexts": contexts, "threads": args.threads,
+                   "cpu_plan": cpu_plan, "repetitions": args.repetitions,
                    "min_active_core_fraction": args.min_active_core_fraction,
                    "decode_tokens": args.decode_tokens, "token_id": args.token_id,
                    "capacity_workload": "deterministic_fixed_token",
@@ -1066,6 +1362,7 @@ def main() -> int:
                 continue
             runtime_dir = model_runtime[model_id]
             evidence_dir = args.output_dir / "models" / model_id / f"ctx-{context_tokens}"
+            print(f"[{model_id} ctx={context_tokens}] build", flush=True)
             build = build_runtime(model, runtime_dir, context_tokens, args.decode_tokens, args, env, evidence_dir)
             if build["returncode"] != 0:
                 failure_status, failure_reason = classify_build_failure(build)
@@ -1074,10 +1371,18 @@ def main() -> int:
                 report["performance"].append(result)
                 report["events"].append(result)
                 publish(report, args.output_dir)
+                print(
+                    f"[{model_id} ctx={context_tokens}] {failure_status} build",
+                    flush=True,
+                )
                 continue
             if not args.ck_cli.is_file():
                 raise FileNotFoundError(f"native CLI is missing: {args.ck_cli}")
             gguf = resolve_gguf(row, model, runtime_dir)
+            print(
+                f"[{model_id} ctx={context_tokens}] CKE x{args.repetitions}",
+                flush=True,
+            )
             cke = run_cke_perf(runtime_dir, context_tokens, args, env, evidence_dir)
             llama = run_llama_perf(gguf, context_tokens, args, env, evidence_dir)
             parity = run_numerical_parity(
@@ -1105,6 +1410,14 @@ def main() -> int:
                 report["events"].append({"model_id": model_id, "status": "FAIL",
                                          "reason": f"context {context_tokens} certification failed"})
             publish(report, args.output_dir)
+            timing = cke.get("timing") if isinstance(cke.get("timing"), dict) else {}
+            prompt_tok_s = timing.get("prompt_tok_s", "n/a")
+            active_cores = cke.get("average_active_cores", "n/a")
+            print(
+                f"[{model_id} ctx={context_tokens}] {status} "
+                f"prefill_tok_s={prompt_tok_s} active_cores={active_cores}",
+                flush=True,
+            )
 
             if (
                 not args.no_quality

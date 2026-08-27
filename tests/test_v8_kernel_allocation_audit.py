@@ -123,8 +123,8 @@ class TestKernelAllocationAudit(unittest.TestCase):
 
     def test_deepseek_mla_workspace_providers_are_planner_owned(self):
         cases = {
-            "deepseek_mla_attention_f32.json": ("T", 9 * 4),
-            "deepseek_mla_attention_decode_f32.json": ("S", 257 * 4),
+            "deepseek_mla_attention_f32.json": (["H", "T"], 4 * 9 * 4),
+            "deepseek_mla_attention_decode_f32.json": (["S"], 257 * 4),
         }
         allocating = {
             row["function"] for row in AUDIT.build_report()["mapped_allocating_providers"]
@@ -138,15 +138,14 @@ class TestKernelAllocationAudit(unittest.TestCase):
         build_ir = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(build_ir)
 
-        for filename, (shape_symbol, expected_bytes) in cases.items():
+        for filename, (shape, expected_bytes) in cases.items():
             with self.subTest(filename=filename):
                 kernel_map = json.loads(
                     (ROOT / "version/v8/kernel_maps" / filename).read_text(
                         encoding="utf-8"
                     )
                 )
-                self.assertTrue(kernel_map["impl"]["function"].endswith("_workspace"))
-                self.assertEqual(kernel_map["scratch"][0]["shape"], [shape_symbol])
+                self.assertEqual(kernel_map["scratch"][0]["shape"], shape)
                 sources = {
                     param["name"]: param["source"]
                     for param in kernel_map["call_abi"]["params"]
@@ -156,7 +155,7 @@ class TestKernelAllocationAudit(unittest.TestCase):
                 self.assertNotIn(kernel_map["impl"]["function"], allocating)
                 size = build_ir._kernel_scratch_size_bytes(
                     kernel_map["scratch"][0],
-                    {"seq_len": 9},
+                    {"seq_len": 9, "num_heads": 4},
                     {"max_seq_len": 257},
                 )
                 self.assertEqual(size, expected_bytes)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -86,6 +87,75 @@ def test_time_binary_resolution_is_path_driven_and_optional() -> None:
         assert runner.resolve_time_binary({"CK_TIME_BIN": str(executable)}) == str(executable)
         executable.chmod(0o644)
         assert runner.resolve_time_binary({"CK_TIME_BIN": str(executable)}) is None
+
+
+def test_resource_usage_falls_back_to_child_cpu_deltas() -> None:
+    before = SimpleNamespace(ru_utime=10.0, ru_stime=2.0)
+    after = SimpleNamespace(ru_utime=22.0, ru_stime=4.0)
+    usage = runner.resource_usage_delta(before, after, 2.0)
+    assert usage["process_seconds"] == 14.0
+    assert usage["average_cpu_cores"] == 7.0
+    assert usage["reported_cpu_percent"] == 700.0
+
+
+def test_cpu_plan_selects_one_allowed_sibling_per_physical_core() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        topology = {
+            0: (0, 0), 1: (0, 1), 2: (0, 0), 3: (0, 1),
+        }
+        for cpu, (package, core) in topology.items():
+            path = root / f"cpu{cpu}" / "topology"
+            path.mkdir(parents=True)
+            (path / "physical_package_id").write_text(str(package), encoding="ascii")
+            (path / "core_id").write_text(str(core), encoding="ascii")
+        plan = runner.resolve_cpu_plan(
+            0, "physical", allowed_cpus={0, 1, 2, 3}, sysfs_root=root
+        )
+        assert plan["effective_threads"] == 2
+        assert plan["physical_representatives"] == [0, 1]
+        assert plan["affinity"] == [0, 1]
+
+
+def test_utilization_summary_exposes_low_occupancy_intervals() -> None:
+    samples = [
+        {"elapsed_seconds": 0.0, "active_cores": None, "rss_kib": 10},
+        {"elapsed_seconds": 0.25, "active_cores": 0.5, "rss_kib": 20},
+        {"elapsed_seconds": 0.50, "active_cores": 0.5, "rss_kib": 30},
+        {"elapsed_seconds": 0.75, "active_cores": 7.5, "rss_kib": 25},
+        {"elapsed_seconds": 1.00, "active_cores": 8.0, "rss_kib": 20},
+    ]
+    summary = runner.summarize_utilization_samples(samples, requested_threads=8)
+    assert summary["sample_count"] == 4
+    assert summary["peak_sampled_rss_kib"] == 30
+    assert summary["longest_low_utilization_seconds"] == 0.75
+    assert summary["p90_active_cores"] > 7.0
+
+
+def test_timed_command_publishes_process_utilization_timeline() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        env = os.environ.copy()
+        env["CK_NUM_THREADS"] = "1"
+        result = runner.run_command(
+            [
+                sys.executable,
+                "-c",
+                "import time\nend=time.monotonic()+0.6\nwhile time.monotonic()<end: pass",
+            ],
+            timeout=5,
+            env=env,
+            output_dir=output,
+            name="busy",
+            timed=True,
+        )
+        assert result["returncode"] == 0
+        assert result["utilization"]["sample_count"] >= 1
+        timeline = json.loads(
+            Path(result["utilization_timeline_path"]).read_text(encoding="utf-8")
+        )
+        assert timeline["schema"] == "cke.process_utilization_timeline"
+        assert timeline["summary"]["p50_active_cores"] > 0.5
 
 
 def test_build_failures_distinguish_capacity_from_contract_faults() -> None:

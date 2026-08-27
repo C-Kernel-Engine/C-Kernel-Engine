@@ -115,7 +115,9 @@ class NumericalExecutionContractTests(unittest.TestCase):
             circuit(), self.contracts, self.kernels, "gemm", "prefill"
         )
         self.assertEqual(plan["kernel"]["id"], "gemm_nt_bf16")
-        self.assertEqual(plan["kernel"]["function"], "gemm_nt_bf16")
+        self.assertEqual(
+            plan["kernel"]["function"], "gemm_nt_bf16_parallel_dispatch"
+        )
         self.assertEqual(plan["contract"]["semantics"]["compute"]["input"], "bf16_rne")
         self.assertEqual(plan["contract"]["semantics"]["reduction"]["order"], "ascending_k")
         self.assertFalse(
@@ -571,17 +573,17 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 297)
-        self.assertEqual(report["counts"]["physical_layout_maps"], 4)
+        self.assertEqual(report["counts"]["kernel_maps"], 299)
+        self.assertEqual(report["counts"]["physical_layout_maps"], 6)
         self.assertEqual(report["counts"]["resolver_governed_maps"], 105)
         self.assertEqual(report["counts"]["interface_hardened_maps"], 54)
         self.assertEqual(
             report["counts"]["interface_abi_crossvalidated_maps"], 54
         )
         self.assertEqual(report["counts"]["contract_pending_maps"], 51)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 163)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 172)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 34)
-        self.assertEqual(report["counts"]["selection_managed_maps"], 69)
+        self.assertEqual(report["counts"]["selection_managed_maps"], 73)
         self.assertEqual(report["selection"]["legacy_selection_if_statements"], 67)
         self.assertEqual(report["selection"]["operation_specific_if_statements"], 33)
 
@@ -1845,7 +1847,7 @@ class NumericalExecutionContractTests(unittest.TestCase):
         self.assertEqual(metadata["required_contract_id"], CONTRACT_ID)
         self.assertEqual(metadata["resolved_contract_id"], CONTRACT_ID)
         self.assertEqual(metadata["kernel_id"], "gemm_nt_bf16")
-        self.assertEqual(metadata["function"], "gemm_nt_bf16")
+        self.assertEqual(metadata["function"], "gemm_nt_bf16_parallel_dispatch")
         self.assertEqual(metadata["semantics"]["rounding"]["points"], ["input_load"])
         self.assertEqual(metadata["checkpoint"]["id"], "vision.layer.0.mlp.up")
 

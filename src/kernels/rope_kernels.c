@@ -1198,6 +1198,70 @@ void rope_forward_qk_split_direct_f32(float *q,
                                   pos_offset, rotary_dim, freq_base);
 }
 
+void rope_forward_qk_split_direct_token_range_f32(
+    float *q,
+    float *k,
+    const float *freq_factors,
+    int use_freq_factors,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int pos_offset,
+    int rotary_dim,
+    float freq_base,
+    int token_begin,
+    int token_end)
+{
+    if ((!q && !k) || num_tokens <= 0 || head_dim <= 0 ||
+        aligned_head_dim <= 0 || token_begin < 0 ||
+        token_begin >= token_end || token_end > num_tokens) {
+        return;
+    }
+    if (rotary_dim <= 0 || rotary_dim > head_dim) {
+        rotary_dim = head_dim;
+    }
+    if (freq_base <= 0.0f) {
+        freq_base = 10000.0f;
+    }
+
+    const int rotary_half = rotary_dim / 2;
+    const size_t head_stride =
+        (size_t)num_tokens * (size_t)aligned_head_dim;
+    const float theta_scale = powf(freq_base, -2.0f / (float)rotary_dim);
+
+    for (int t = token_begin; t < token_end; ++t) {
+        const float pos = (float)(pos_offset + t);
+        for (int i = 0; i < rotary_half; ++i) {
+            const int idx0 = i;
+            const int idx1 = i + rotary_half;
+            const float ff =
+                (use_freq_factors && freq_factors) ? freq_factors[i] : 1.0f;
+            const float theta = pos * powf(theta_scale, (float)i) / ff;
+            const float c = cosf(theta);
+            const float sv = sinf(theta);
+
+            for (int h = 0; q && h < num_heads; ++h) {
+                float *row = q + (size_t)h * head_stride +
+                             (size_t)t * (size_t)aligned_head_dim;
+                const float x0 = row[idx0];
+                const float x1 = row[idx1];
+                row[idx0] = x0 * c - x1 * sv;
+                row[idx1] = x1 * c + x0 * sv;
+            }
+            for (int h = 0; k && h < num_kv_heads; ++h) {
+                float *row = k + (size_t)h * head_stride +
+                             (size_t)t * (size_t)aligned_head_dim;
+                const float x0 = row[idx0];
+                const float x1 = row[idx1];
+                row[idx0] = x0 * c - x1 * sv;
+                row[idx1] = x1 * c + x0 * sv;
+            }
+        }
+    }
+}
+
 void rope_forward_q_split_direct_f32(float *q,
                                      const float *freq_factors,
                                      int use_freq_factors,

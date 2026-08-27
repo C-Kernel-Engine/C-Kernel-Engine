@@ -38,31 +38,38 @@
   ],
   "dims": ["R", "H", "I"],
   "scratch": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "serial"},
+    "strategies": [
+      {"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}
+    ]
+  },
   "implementation": {
-    "isa_dispatch": "scalar",
+    "isa_dispatch": "runtime",
     "threading": {
-      "runtime": "serial",
+      "runtime": "ck_threadpool",
       "work_partition": ["independent_rows"],
       "dispatch": ["inline"],
       "reduction_order_effect": "none"
     }
   },
   "impl": {
-    "function": "farskip_swiglu_shared_combine_bf16",
-    "c_declaration": "void farskip_swiglu_shared_combine_bf16(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
-    "sources": ["src/kernels/axpy_kernels.c"]
+    "function": "farskip_swiglu_shared_combine_bf16_parallel_dispatch",
+    "c_declaration": "void farskip_swiglu_shared_combine_bf16_parallel_dispatch(const float *hidden, const float *routed, const float *post_attn_residual, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, float *main_output, float *routed_free_output, int rows, int hidden_dim, int intermediate_dim);",
+    "sources": ["src/kernels/axpy_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"]
   },
   "numerical_capabilities": [
     {
       "contract_id": "instella_farskip_bf16_shared_swiglu_fp32_two_stream",
       "status": "observed",
       "phases": ["prefill", "decode"],
-      "function": "farskip_swiglu_shared_combine_bf16",
+      "function": "farskip_swiglu_shared_combine_bf16_parallel_dispatch",
       "explicit_selector": true,
       "implementation": {
-        "isa_dispatch": "scalar",
+        "isa_dispatch": "runtime",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows"],
           "dispatch": ["inline"],
           "reduction_order_effect": "none"

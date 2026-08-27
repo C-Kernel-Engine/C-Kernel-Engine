@@ -1,0 +1,69 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+  "op": "attention",
+  "selection": {
+    "status": "production",
+    "priority": 300,
+    "equivalence_group": "attention.fp32_online_causal_strided_gemma4_noscale.v1",
+    "phases": ["prefill"]
+  },
+  "physical_contract_version": 1,
+  "physical_alias_of": "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
+  "operation_interface": "attention.causal_gqa.fp32.gemma4_noscale.v1",
+  "variant": "causal_flash_fp32_gemma4_noscale_token_output",
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "implementation": {
+    "isa_dispatch": "runtime",
+    "threading": {
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_query_blocks"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
+      "reduction_order_effect": "none"
+    }
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "S", "D"], "layout": "head_major_strided", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "S", "D"], "layout": "head_major_strided", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["T", "H", "D"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32"},
+    {"name": "head_dim", "dtype": "int32"},
+    {"name": "aligned_head_dim", "dtype": "int32"}
+  ],
+  "constraints": {
+    "notes": "Changes only independent output addresses; every query row retains the numerical owner's reduction order."
+  },
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+    "sources": ["src/kernels/attention_kernels.c", "src/kernels/softmax_kernels.c"]
+  },
+  "tests": {"unit": ["tests/test_v8_direct_layout_attention.py"]},
+  "notes": "Direct token-major physical provider for Gemma4 no-scale causal prefill attention.",
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "float*", "ports": ["input:q"]},
+      {"name": "k", "source": "scratch:k_scratch", "cast": "float*", "ports": ["input:k"]},
+      {"name": "v", "source": "scratch:v_scratch", "cast": "float*", "ports": ["input:v"]},
+      {"name": "output", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "kv_stride_tokens", "source": "dim:max_seq_len"}
+    ]
+  }
+}

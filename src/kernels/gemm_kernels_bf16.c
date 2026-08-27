@@ -20,7 +20,7 @@
  *   1. AVX-512 BF16 instructions (VDPBF16PS) when available
  *   2. Cache blocking for L1/L2 efficiency
  *   3. Vectorized BF16<->FP32 conversion
- *   4. OpenMP parallelization
+ *   4. CKE thread-pool row parallelization
  */
 
 #include <stdint.h>
@@ -619,19 +619,20 @@ void gemv_bf16(float *y,
     }
 }
 
-void gemm_nt_bf16(const float *A,
-                  const void *B,
-                  const float *bias,
-                  float *C,
-                  int M, int N, int K)
+void gemm_nt_bf16_row_range(const float *A,
+                            const void *B,
+                            const float *bias,
+                            float *C,
+                            int M, int N, int K,
+                            int row_begin, int row_end)
 {
     const uint16_t *w = (const uint16_t *)B;
-    if (!A || !w || !C || M <= 0 || N <= 0 || K <= 0) {
+    if (!A || !w || !C || M <= 0 || N <= 0 || K <= 0 ||
+        row_begin < 0 || row_begin >= row_end || row_end > M) {
         return;
     }
 
-#pragma omp parallel for schedule(dynamic) if(M * N > 4096)
-    for (int i = 0; i < M; ++i) {
+    for (int i = row_begin; i < row_end; ++i) {
         const float *a_row = A + (size_t)i * (size_t)K;
         float *c_row = C + (size_t)i * (size_t)N;
         for (int j = 0; j < N; ++j) {
@@ -644,6 +645,61 @@ void gemm_nt_bf16(const float *A,
             c_row[j] = sum;
         }
     }
+}
+
+void gemm_nt_bf16(const float *A,
+                  const void *B,
+                  const float *bias,
+                  float *C,
+                  int M, int N, int K)
+{
+    if (M <= 0) return;
+    gemm_nt_bf16_row_range(A, B, bias, C, M, N, K, 0, M);
+}
+
+typedef struct {
+    const float *A;
+    const void *B;
+    const float *bias;
+    float *C;
+    int M;
+    int N;
+    int K;
+} ck_gemm_nt_bf16_exact_args_t;
+
+static void ck_gemm_nt_bf16_exact_rows(int begin, int end, void *opaque)
+{
+    const ck_gemm_nt_bf16_exact_args_t *args =
+        (const ck_gemm_nt_bf16_exact_args_t *)opaque;
+    gemm_nt_bf16_row_range(
+        args->A, args->B, args->bias, args->C,
+        args->M, args->N, args->K, begin, end);
+}
+
+void gemm_nt_bf16_parallel_dispatch(const float *A,
+                                    const void *B,
+                                    const float *bias,
+                                    float *C,
+                                    int M, int N, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const char *disabled = getenv("CK_DISABLE_BF16_GEMM_PARALLEL_PREFILL");
+    if ((disabled && disabled[0] && strcmp(disabled, "0") != 0) ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)N <= 4096) {
+        gemm_nt_bf16(A, B, bias, C, M, N, K);
+        return;
+    }
+
+    ck_gemm_nt_bf16_exact_args_t args = {
+        .A = A, .B = B, .bias = bias, .C = C, .M = M, .N = N, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemm_nt_bf16_exact_rows, &args);
 }
 
 /* ==========================================================================
@@ -1626,17 +1682,62 @@ void patch_projection_image_bf16_pytorch_onednn_conv3d_storage(
 #endif
 }
 
-void gemm_nt_bf16_bf16_storage(const float *A,
-                                      const void *B,
-                                      const float *bias,
-                                      float *C,
-                                      int M, int N, int K)
+void gemm_nt_bf16_bf16_storage_row_range(const float *A,
+                                          const void *B,
+                                          const float *bias,
+                                          float *C,
+                                          int M, int N, int K,
+                                          int row_begin, int row_end)
 {
-    gemm_nt_bf16(A, B, bias, C, M, N, K);
-    const size_t count = (size_t)M * (size_t)N;
-    for (size_t i = 0; i < count; ++i) {
-        C[i] = bf16_to_float(float_to_bf16(C[i]));
+    gemm_nt_bf16_row_range(A, B, bias, C, M, N, K, row_begin, row_end);
+    for (int row = row_begin; row < row_end; ++row) {
+        float *dst = C + (size_t)row * (size_t)N;
+        for (int col = 0; col < N; ++col) {
+            dst[col] = bf16_to_float(float_to_bf16(dst[col]));
+        }
     }
+}
+
+static void ck_gemm_nt_bf16_storage_exact_rows(int begin, int end, void *opaque)
+{
+    const ck_gemm_nt_bf16_exact_args_t *args =
+        (const ck_gemm_nt_bf16_exact_args_t *)opaque;
+    gemm_nt_bf16_bf16_storage_row_range(
+        args->A, args->B, args->bias, args->C,
+        args->M, args->N, args->K, begin, end);
+}
+
+void gemm_nt_bf16_bf16_storage_parallel_dispatch(const float *A,
+                                                  const void *B,
+                                                  const float *bias,
+                                                  float *C,
+                                                  int M, int N, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)N <= 4096) {
+        gemm_nt_bf16_bf16_storage_row_range(A, B, bias, C, M, N, K, 0, M);
+        return;
+    }
+
+    ck_gemm_nt_bf16_exact_args_t args = {
+        .A = A, .B = B, .bias = bias, .C = C, .M = M, .N = N, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemm_nt_bf16_storage_exact_rows, &args);
+}
+
+void gemm_nt_bf16_bf16_storage(const float *A,
+                                const void *B,
+                                const float *bias,
+                                float *C,
+                                int M, int N, int K)
+{
+    gemm_nt_bf16_bf16_storage_parallel_dispatch(A, B, bias, C, M, N, K);
 }
 
 void gemm_backward_bf16_mixed(const uint16_t *d_output,

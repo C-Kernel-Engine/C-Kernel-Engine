@@ -232,6 +232,10 @@ class Qwen38ContractTests(unittest.TestCase):
             "outputs": {},
             "weights": {},
             "scratch": [],
+            "graph_slots": {
+                "inputs": {"a": "main_stream", "b": "residual"},
+                "outputs": {"out": "main_stream"},
+            },
             "params": {"seq_len": context_capacity},
         }
         buffers = []
@@ -272,6 +276,9 @@ class Qwen38ContractTests(unittest.TestCase):
         params = lowered["operations"][0]["params"]
         self.assertEqual(params["seq_len"], chunk_extent)
         self.assertEqual(params["_m"], chunk_extent)
+        self.assertEqual(
+            lowered["operations"][0]["graph_slots"], op["graph_slots"]
+        )
 
 
 if __name__ == "__main__":

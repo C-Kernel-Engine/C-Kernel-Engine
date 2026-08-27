@@ -3921,6 +3921,8 @@ typedef struct {
     const char *kernel;     /* e.g. "gemv_q5_0_q8_0" */
     const char *op;         /* e.g. "q_proj", "mlp_gate_up" */
     int layer;
+    double start_us;
+    double end_us;
     double time_us;
     double cpu_time_us;
 } CKProfileEntry;
@@ -3929,6 +3931,7 @@ typedef struct {
 static CKProfileEntry _ck_profile_entries[CK_PROFILE_MAX_ENTRIES];
 static int _ck_profile_count = 0;
 static int _ck_profile_token_id = 0;
+static double _ck_profile_origin_us = -1.0;
 
 static inline void _ck_profile_log(const char *mode, const char *kernel,
                                     const char *op, int layer,
@@ -3938,8 +3941,13 @@ static inline void _ck_profile_log(const char *mode, const char *kernel,
     double us = (t1.tv_sec - t0.tv_sec) * 1e6 + (t1.tv_nsec - t0.tv_nsec) / 1e3;
     double cpu_us = (cpu_t1.tv_sec - cpu_t0.tv_sec) * 1e6
                   + (cpu_t1.tv_nsec - cpu_t0.tv_nsec) / 1e3;
+    double start_us = t0.tv_sec * 1e6 + t0.tv_nsec / 1e3;
+    double end_us = t1.tv_sec * 1e6 + t1.tv_nsec / 1e3;
+    if (_ck_profile_origin_us < 0.0) _ck_profile_origin_us = start_us;
     _ck_profile_entries[_ck_profile_count++] = (CKProfileEntry){
-        mode, kernel, op, layer, us, cpu_us
+        mode, kernel, op, layer,
+        start_us - _ck_profile_origin_us, end_us - _ck_profile_origin_us,
+        us, cpu_us
     };
 }
 
@@ -3948,9 +3956,11 @@ static void _ck_profile_dump_json(FILE *f) {
     for (int i = 0; i < _ck_profile_count; i++) {
         CKProfileEntry *e = &_ck_profile_entries[i];
         fprintf(f, "    {\\"mode\\":\\"%s\\",\\"kernel\\":\\"%s\\",\\"op\\":\\"%s\\","
-                "\\"layer\\":%d,\\"time_us\\":%.1f,\\"cpu_time_us\\":%.1f,"
+                "\\"layer\\":%d,\\"start_us\\":%.1f,\\"end_us\\":%.1f,"
+                "\\"time_us\\":%.1f,\\"cpu_time_us\\":%.1f,"
                 "\\"token_id\\":%d}%s\\n",
-                e->mode, e->kernel, e->op, e->layer, e->time_us, e->cpu_time_us,
+                e->mode, e->kernel, e->op, e->layer, e->start_us, e->end_us,
+                e->time_us, e->cpu_time_us,
                 _ck_profile_token_id,
                 i < _ck_profile_count - 1 ? "," : "");
     }
@@ -3965,12 +3975,13 @@ static void _ck_profile_dump(void) {
         FILE *f = fopen(csv_path, _ck_profile_token_id == 0 ? "w" : "a");
         if (f) {
             if (_ck_profile_token_id == 0) {
-                fprintf(f, "mode,kernel,op,layer,time_us,cpu_time_us,token_id\\n");
+                fprintf(f, "mode,kernel,op,layer,start_us,end_us,time_us,cpu_time_us,token_id\\n");
             }
             for (int i = 0; i < _ck_profile_count; i++) {
                 CKProfileEntry *e = &_ck_profile_entries[i];
-                fprintf(f, "%s,%s,%s,%d,%.1f,%.1f,%d\\n",
+                fprintf(f, "%s,%s,%s,%d,%.1f,%.1f,%.1f,%.1f,%d\\n",
                         e->mode, e->kernel, e->op, e->layer,
+                        e->start_us, e->end_us,
                         e->time_us, e->cpu_time_us,
                         _ck_profile_token_id);
             }
@@ -3982,16 +3993,18 @@ static void _ck_profile_dump(void) {
         if (f) { _ck_profile_dump_json(f); fclose(f); }
     }
     if (!csv_path && !json_path) {
-        fprintf(stderr, "mode,kernel,op,layer,time_us,cpu_time_us,token_id\\n");
+        fprintf(stderr, "mode,kernel,op,layer,start_us,end_us,time_us,cpu_time_us,token_id\\n");
         for (int i = 0; i < _ck_profile_count; i++) {
             CKProfileEntry *e = &_ck_profile_entries[i];
-            fprintf(stderr, "%s,%s,%s,%d,%.1f,%.1f,%d\\n",
+            fprintf(stderr, "%s,%s,%s,%d,%.1f,%.1f,%.1f,%.1f,%d\\n",
                     e->mode, e->kernel, e->op, e->layer,
+                    e->start_us, e->end_us,
                     e->time_us, e->cpu_time_us,
                     _ck_profile_token_id);
         }
     }
     _ck_profile_count = 0;
+    _ck_profile_origin_us = -1.0;
     _ck_profile_token_id++;
 }
 

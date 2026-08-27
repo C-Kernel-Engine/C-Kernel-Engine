@@ -44,9 +44,24 @@ void ck_parallel_prefill_release_transient_caches(void);
  * arithmetic is serial within each independent row. */
 void quantize_batch_q8_k_4row_nearest_even_parallel_dispatch(
     const float *x, void *y, int num_rows, int k);
+void quantize_batch_q8_k_parallel_dispatch(
+    const float *x, void *y, int num_rows, int k);
 void rmsnorm_forward_llama_production_parallel_dispatch(
     const float *input, const float *gamma, float *output, float *rstd_cache,
     int tokens, int d_model, int aligned_embed_dim, float eps);
+void rmsnorm_forward_parallel_dispatch(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
+void qk_norm_forward_parallel_dispatch(
+    float *q, float *k, const float *q_gamma, const float *k_gamma,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);
+void gemma4_v_norm_forward_parallel_dispatch(
+    const float *input, float *output, float *rstd_cache,
+    int tokens, int num_kv_heads, int head_dim, float eps);
+void ck_residual_add_token_major_parallel_dispatch(
+    const float *a, const float *b, float *out,
+    int tokens, int aligned_embed_dim);
+void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size);
 void recurrent_norm_gate_llama_avx2_parallel_dispatch(
     const float *x, const float *gate, const float *weight, float *out,
     int rows, int num_heads, int head_dim, float eps);
@@ -157,6 +172,11 @@ void gemm_nt_q5_1_q8_1_parallel_dispatch(
 
 void geglu_forward_exact_parallel_dispatch(
     const float *input, float *output, int tokens, int dim);
+
+void rope_forward_qk_split_direct_parallel_dispatch(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);
 
 void gemm_nt_q5_k_parallel_dispatch(
     const float *A, const void *B, const float *bias, float *C,

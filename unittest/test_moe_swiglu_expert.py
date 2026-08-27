@@ -37,13 +37,22 @@ LIB.moe_swiglu_shared_forward_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr
 LIB.moe_swiglu_shared_forward_f32.restype = None
 LIB.moe_swiglu_expert_forward_bf16.argtypes = [fptr, iptr, fptr, u16ptr, u16ptr, u16ptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.moe_swiglu_expert_forward_bf16.restype = None
+LIB.moe_swiglu_expert_forward_bf16_row_range.argtypes = [fptr, iptr, fptr, u16ptr, u16ptr, u16ptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+LIB.moe_swiglu_expert_forward_bf16_row_range.restype = None
 LIB.moe_swiglu_shared_forward_bf16.argtypes = [fptr, fptr, u16ptr, u16ptr, u16ptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.moe_swiglu_shared_forward_bf16.restype = None
+LIB.moe_swiglu_shared_forward_bf16_row_range.argtypes = [fptr, fptr, u16ptr, u16ptr, u16ptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+LIB.moe_swiglu_shared_forward_bf16_row_range.restype = None
 LIB.farskip_swiglu_shared_combine_bf16.argtypes = [
     fptr, fptr, fptr, u16ptr, u16ptr, u16ptr, fptr, fptr,
     ctypes.c_int, ctypes.c_int, ctypes.c_int,
 ]
 LIB.farskip_swiglu_shared_combine_bf16.restype = None
+LIB.farskip_swiglu_shared_combine_bf16_row_range.argtypes = [
+    fptr, fptr, fptr, u16ptr, u16ptr, u16ptr, fptr, fptr,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+LIB.farskip_swiglu_shared_combine_bf16_row_range.restype = None
 LIB.moe_swiglu_shared_backward_f32.argtypes = [fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, fptr, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 LIB.moe_swiglu_shared_backward_f32.restype = None
 
@@ -190,6 +199,75 @@ class TestMoESwiGLUExpert(unittest.TestCase):
         )
         np.testing.assert_allclose(routed_out, routed_ref.numpy(), atol=2e-6, rtol=0.0)
         np.testing.assert_allclose(shared_out, shared_ref.numpy(), atol=2e-6, rtol=0.0)
+
+    def test_bf16_row_ranges_are_byte_exact(self) -> None:
+        rows, hidden_dim, intermediate_dim, n_experts, top_k = 7, 8, 6, 5, 2
+        rng = np.random.default_rng(127)
+        hidden = np.ascontiguousarray((0.2 * rng.standard_normal((rows, hidden_dim))).astype(np.float32))
+        routed = np.ascontiguousarray((0.1 * rng.standard_normal((rows, hidden_dim))).astype(np.float32))
+        indices = np.ascontiguousarray(np.stack([
+            rng.choice(n_experts, size=top_k, replace=False) for _ in range(rows)
+        ]).astype(np.int32))
+        raw_routes = rng.random((rows, top_k)).astype(np.float32)
+        routes = np.ascontiguousarray(raw_routes / raw_routes.sum(axis=1, keepdims=True))
+        gate = _bf16_bits(np.ascontiguousarray((0.13 * rng.standard_normal((n_experts, intermediate_dim, hidden_dim))).astype(np.float32)))
+        up = _bf16_bits(np.ascontiguousarray((0.11 * rng.standard_normal((n_experts, intermediate_dim, hidden_dim))).astype(np.float32)))
+        down = _bf16_bits(np.ascontiguousarray((0.09 * rng.standard_normal((n_experts, hidden_dim, intermediate_dim))).astype(np.float32)))
+
+        expert_ref = np.empty_like(hidden)
+        expert_split = np.empty_like(hidden)
+        LIB.moe_swiglu_expert_forward_bf16(
+            _fptr(hidden), _iptr(indices), _fptr(routes), _u16ptr(gate),
+            _u16ptr(up), _u16ptr(down), _fptr(expert_ref), rows, hidden_dim,
+            intermediate_dim, n_experts, top_k,
+        )
+        for begin, end in ((0, 2), (2, 5), (5, rows)):
+            LIB.moe_swiglu_expert_forward_bf16_row_range(
+                _fptr(hidden), _iptr(indices), _fptr(routes), _u16ptr(gate),
+                _u16ptr(up), _u16ptr(down), _fptr(expert_split), rows,
+                hidden_dim, intermediate_dim, n_experts, top_k, begin, end,
+            )
+        self.assertEqual(expert_ref.tobytes(), expert_split.tobytes())
+
+        shared_gate, shared_up, shared_down = gate[0], up[0], down[0]
+        shared_ref = np.empty_like(hidden)
+        shared_split = np.empty_like(hidden)
+        LIB.moe_swiglu_shared_forward_bf16(
+            _fptr(hidden), _fptr(routed), _u16ptr(shared_gate),
+            _u16ptr(shared_up), _u16ptr(shared_down), _fptr(shared_ref),
+            rows, hidden_dim, intermediate_dim,
+        )
+        for begin, end in ((0, 3), (3, 6), (6, rows)):
+            LIB.moe_swiglu_shared_forward_bf16_row_range(
+                _fptr(hidden), _fptr(routed), _u16ptr(shared_gate),
+                _u16ptr(shared_up), _u16ptr(shared_down), _fptr(shared_split),
+                rows, hidden_dim, intermediate_dim, begin, end,
+            )
+        self.assertEqual(shared_ref.tobytes(), shared_split.tobytes())
+
+        residual = np.ascontiguousarray(
+            (0.3 * rng.standard_normal((rows, hidden_dim))).astype(np.float32)
+        )
+        farskip_main_ref = np.empty_like(hidden)
+        farskip_free_ref = np.empty_like(hidden)
+        farskip_main_split = np.empty_like(hidden)
+        farskip_free_split = np.empty_like(hidden)
+        LIB.farskip_swiglu_shared_combine_bf16(
+            _fptr(hidden), _fptr(routed), _fptr(residual),
+            _u16ptr(shared_gate), _u16ptr(shared_up), _u16ptr(shared_down),
+            _fptr(farskip_main_ref), _fptr(farskip_free_ref), rows,
+            hidden_dim, intermediate_dim,
+        )
+        for begin, end in ((0, 1), (1, 4), (4, rows)):
+            LIB.farskip_swiglu_shared_combine_bf16_row_range(
+                _fptr(hidden), _fptr(routed), _fptr(residual),
+                _u16ptr(shared_gate), _u16ptr(shared_up),
+                _u16ptr(shared_down), _fptr(farskip_main_split),
+                _fptr(farskip_free_split), rows, hidden_dim,
+                intermediate_dim, begin, end,
+            )
+        self.assertEqual(farskip_main_ref.tobytes(), farskip_main_split.tobytes())
+        self.assertEqual(farskip_free_ref.tobytes(), farskip_free_split.tobytes())
 
     def test_routed_forward_backward(self) -> None:
         rows, hidden_dim, intermediate_dim, n_experts, top_k = 4, 9, 7, 6, 3

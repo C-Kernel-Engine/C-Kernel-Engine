@@ -61,6 +61,13 @@ void ck_residual_add_token_major(const float *a,
                                  float *out,
                                  int tokens,
                                  int aligned_embed_dim);
+void ck_residual_add_token_major_parallel_dispatch(
+    const float *a,
+    const float *b,
+    float *out,
+    int tokens,
+    int aligned_embed_dim);
+void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size);
 void ck_residual_add_token_major_bf16_storage(const float *a,
                                                   const float *b,
                                                   float *out,
@@ -78,6 +85,11 @@ void gemm_naive_parallel(const float *A,
                          const float *bias,
                          float *C,
                          int M, int N, int K);
+void gemm_nt_fp32_exact_parallel_dispatch(const float *A,
+                                          const float *B,
+                                          const float *bias,
+                                          float *C,
+                                          int M, int N, int K);
 
 void gemm_avx512_parallel(const float *A,
                           const float *B,
@@ -238,11 +250,33 @@ void gemm_nt_bf16(const float *A,
                   const float *bias,
                   float *C,
                   int M, int N, int K);
+void gemm_nt_bf16_row_range(const float *A,
+                            const void *B,
+                            const float *bias,
+                            float *C,
+                            int M, int N, int K,
+                            int row_begin, int row_end);
+void gemm_nt_bf16_parallel_dispatch(const float *A,
+                                    const void *B,
+                                    const float *bias,
+                                    float *C,
+                                    int M, int N, int K);
 void gemm_nt_bf16_bf16_storage(const float *A,
-                                      const void *B,
-                                      const float *bias,
-                                      float *C,
-                                      int M, int N, int K);
+                                const void *B,
+                                const float *bias,
+                                float *C,
+                                int M, int N, int K);
+void gemm_nt_bf16_bf16_storage_row_range(const float *A,
+                                          const void *B,
+                                          const float *bias,
+                                          float *C,
+                                          int M, int N, int K,
+                                          int row_begin, int row_end);
+void gemm_nt_bf16_bf16_storage_parallel_dispatch(const float *A,
+                                                  const void *B,
+                                                  const float *bias,
+                                                  float *C,
+                                                  int M, int N, int K);
 
 void gemm_nt_bf16_native_bf16_storage(const float *A,
                                       const void *B,
@@ -1005,6 +1039,15 @@ void rmsnorm_forward(const float *input,
                      int d_model,
                      int aligned_embed_dim,
                      float eps);
+void rmsnorm_forward_parallel_dispatch(
+    const float *input,
+    const float *gamma,
+    float *output,
+    float *rstd_cache,
+    int tokens,
+    int d_model,
+    int aligned_embed_dim,
+    float eps);
 void rmsnorm_forward_fp64_sum(const float *input,
                               const float *gamma,
                               float *output,
@@ -1085,6 +1128,13 @@ void gemma4_v_norm_forward(const float *input,
                            int num_kv_heads,
                            int head_dim,
                            float eps);
+void gemma4_v_norm_forward_parallel_dispatch(const float *input,
+                                             float *output,
+                                             float *rstd_cache,
+                                             int tokens,
+                                             int num_kv_heads,
+                                             int head_dim,
+                                             float eps);
 
 void rmsnorm_backward(const float *d_output,
                       const float *input,
@@ -1106,6 +1156,15 @@ void qk_norm_forward(float *q,
                      int num_tokens,
                      int head_dim,
                      float eps);
+void qk_norm_forward_parallel_dispatch(float *q,
+                                       float *k,
+                                       const float *q_gamma,
+                                       const float *k_gamma,
+                                       int num_heads,
+                                       int num_kv_heads,
+                                       int num_tokens,
+                                       int head_dim,
+                                       float eps);
 void qk_norm_forward_fp64_sum(float *q,
                               float *k,
                               const float *q_gamma,
@@ -1529,6 +1588,18 @@ void deepseek_mla_attention_f32_workspace(const float *q,
                                           float scale,
                                           float *scores,
                                           size_t scores_bytes);
+void deepseek_mla_attention_f32_parallel_dispatch(const float *q,
+                                                   const float *k,
+                                                   const float *v,
+                                                   float *output,
+                                                   int num_heads,
+                                                   int num_kv_heads,
+                                                   int num_tokens,
+                                                   int qk_head_dim,
+                                                   int v_head_dim,
+                                                   float scale,
+                                                   float *scores,
+                                                   size_t scores_bytes);
 
 void deepseek_mla_kv_cache_batch_store_f32(float *k_cache,
                                            float *v_cache,
@@ -1668,6 +1739,10 @@ void attention_forward_causal_head_major_gqa_flash_strided_gemma4(const float *q
                                                                   int head_dim,
                                                                   int aligned_head_dim,
                                                                   int kv_stride_tokens);
+void attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens);
 void attention_forward_causal_head_major_shared_kv_gemma4(const float *q,
                                                           float *output,
                                                           int num_heads,
@@ -2088,6 +2163,18 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
     int sliding_window);
 
 void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    int sliding_window);
+void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output(
     const float *q,
     const float *k,
     const float *v,
@@ -3283,6 +3370,19 @@ void moe_swiglu_expert_forward_bf16(const float *hidden,
                                     int n_experts,
                                     int top_k);
 
+void moe_swiglu_expert_forward_bf16_row_range(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate, const uint16_t *expert_up,
+    const uint16_t *expert_down, float *output, int rows, int hidden_dim,
+    int intermediate_dim, int n_experts, int top_k,
+    int row_begin, int row_end);
+
+void moe_swiglu_expert_forward_bf16_parallel_dispatch(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate, const uint16_t *expert_up,
+    const uint16_t *expert_down, float *output, int rows, int hidden_dim,
+    int intermediate_dim, int n_experts, int top_k);
+
 size_t moe_swiglu_expert_q4k_q5k_workspace_bytes(int hidden_dim,
                                                   int intermediate_dim);
 
@@ -3482,6 +3582,15 @@ void moe_swiglu_shared_forward_bf16(const float *hidden,
                                     int rows,
                                     int hidden_dim,
                                     int intermediate_dim);
+void moe_swiglu_shared_forward_bf16_row_range(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down, float *output,
+    int rows, int hidden_dim, int intermediate_dim,
+    int row_begin, int row_end);
+void moe_swiglu_shared_forward_bf16_parallel_dispatch(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down, float *output,
+    int rows, int hidden_dim, int intermediate_dim);
 void farskip_swiglu_shared_combine_bf16(const float *hidden,
                                         const float *routed,
                                         const float *post_attn_residual,
@@ -3493,6 +3602,18 @@ void farskip_swiglu_shared_combine_bf16(const float *hidden,
                                         int rows,
                                         int hidden_dim,
                                         int intermediate_dim);
+void farskip_swiglu_shared_combine_bf16_row_range(
+    const float *hidden, const float *routed,
+    const float *post_attn_residual, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    float *main_output, float *routed_free_output, int rows,
+    int hidden_dim, int intermediate_dim, int row_begin, int row_end);
+void farskip_swiglu_shared_combine_bf16_parallel_dispatch(
+    const float *hidden, const float *routed,
+    const float *post_attn_residual, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    float *main_output, float *routed_free_output, int rows,
+    int hidden_dim, int intermediate_dim);
 
 void group_limited_topk_router_sigmoid_f32(const float *logits,
                                            const float *correction_bias,
@@ -3742,6 +3863,27 @@ void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
                                      int kv_lora_rank,
                                      int qk_nope_dim,
                                      int v_dim);
+void deepseek_mla_kv_decompress_bf16_token_range(const float *compressed_kv,
+                                                 const uint16_t *kv_b_proj,
+                                                 float *k_nope,
+                                                 float *value,
+                                                 int tokens,
+                                                 int heads,
+                                                 int kv_lora_rank,
+                                                 int qk_nope_dim,
+                                                 int v_dim,
+                                                 int token_begin,
+                                                 int token_end);
+void deepseek_mla_kv_decompress_bf16_parallel_dispatch(
+    const float *compressed_kv,
+    const uint16_t *kv_b_proj,
+    float *k_nope,
+    float *value,
+    int tokens,
+    int heads,
+    int kv_lora_rank,
+    int qk_nope_dim,
+    int v_dim);
 
 void deepseek_mla_partial_rope_concat_f32(const float *q_nope,
                                           const float *q_pe,
@@ -4027,6 +4169,21 @@ void rope_forward_qk_split_direct_f32(float *q,
                                       int pos_offset,
                                       int rotary_dim,
                                       float freq_base);
+void rope_forward_qk_split_direct_token_range_f32(
+    float *q,
+    float *k,
+    const float *freq_factors,
+    int use_freq_factors,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int pos_offset,
+    int rotary_dim,
+    float freq_base,
+    int token_begin,
+    int token_end);
 void rope_forward_q_split_direct_f32(float *q,
                                      const float *freq_factors,
                                      int use_freq_factors,

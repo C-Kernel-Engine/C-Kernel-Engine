@@ -22,16 +22,25 @@
     {"name": "_memcpy_bytes", "type": "size_t", "desc": "Number of bytes to copy"}
   ],
   "parallelization": {
-    "supported": [],
-    "preferred": {"prefill": null, "decode": null},
-    "strategies": []
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": null},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "N",
+        "param_style": "range",
+        "range": {"min_chunk": 1048576},
+        "notes": "Split large contiguous copies into non-overlapping byte ranges; small copies remain serial."
+      }
+    ]
   },
   "constraints": {
     "notes": "Byte copy implementing logical residual_save; performs no arithmetic. src and dst must not overlap (undefined for overlapping writable views)."
   },
   "impl": {
-    "function": "memcpy",
-    "sources": [],
+    "function": "ck_memcpy_parallel_dispatch",
+    "c_declaration": "void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size);",
+    "sources": ["version/v8/src/ck_parallel_prefill_v8.c"],
     "variants": [
       {"name": "default", "requires": [], "compile_flags": []}
     ]
@@ -42,5 +51,5 @@
     {"name": "size", "source": "dim:_memcpy_bytes"}
   ]},
   "tests": {},
-  "notes": "Memory copy for saving residual before RMSNorm for skip connections. Pure byte copy; no arithmetic."
+  "notes": "Memory copy for saving residual before RMSNorm for skip connections. Pure byte copy; large prefill buffers use the shared thread pool."
 }

@@ -12,6 +12,17 @@
     "post_attention_norm": true,
     "attention": "hybrid_sliding_window"
   },
+  "activation_bindings": {
+    "mlp_compact": "mlp_compact"
+  },
+  "activation_buffers": {
+    "mlp_compact": {
+      "shape": [
+        {"config": "execution_extent"},
+        {"config": "intermediate_size"}
+      ]
+    }
+  },
   "contract": {
     "tokenizer_contract": {
       "tokenizer_type": "sentencepiece",
@@ -201,8 +212,8 @@
             "residual_add",
             "ffn_norm",
             "mlp_gate_up",
-            "geglu",
-            "mlp_down",
+            {"op":"geglu","graph_slots":{"inputs":{"x":"mlp_scratch"},"outputs":{"out":"mlp_compact"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"x":"mlp_compact"}}},
             "post_ffn_norm",
             "residual_add",
             "gemma4_per_layer_embed"
@@ -221,8 +232,8 @@
             "residual_add",
             "ffn_norm",
             "mlp_gate_up",
-            "geglu",
-            "mlp_down",
+            {"op":"geglu","graph_slots":{"inputs":{"x":"mlp_scratch"},"outputs":{"out":"mlp_compact"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"x":"mlp_compact"}}},
             "post_ffn_norm",
             "residual_add",
             "gemma4_per_layer_embed"
@@ -238,8 +249,8 @@
             "residual_add",
             "ffn_norm",
             "mlp_gate_up",
-            "geglu",
-            "mlp_down",
+            {"op":"geglu","graph_slots":{"inputs":{"x":"mlp_scratch"},"outputs":{"out":"mlp_compact"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"x":"mlp_compact"}}},
             "post_ffn_norm",
             "residual_add",
             "gemma4_per_layer_embed"
@@ -255,8 +266,8 @@
             "residual_add",
             "ffn_norm",
             "mlp_gate_up",
-            "geglu",
-            "mlp_down",
+            {"op":"geglu","graph_slots":{"inputs":{"x":"mlp_scratch"},"outputs":{"out":"mlp_compact"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"x":"mlp_compact"}}},
             "post_ffn_norm",
             "residual_add",
             "gemma4_per_layer_embed"

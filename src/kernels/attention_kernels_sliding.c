@@ -23,6 +23,20 @@ static inline size_t qkv_index(int h,
          + (size_t)d;
 }
 
+static inline size_t attention_output_index(int h,
+                                            int t,
+                                            int num_heads,
+                                            int num_tokens,
+                                            int aligned_head_dim,
+                                            int output_token_major)
+{
+    if (output_token_major) {
+        return ((size_t)t * (size_t)num_heads + (size_t)h)
+             * (size_t)aligned_head_dim;
+    }
+    return qkv_index(h, t, 0, num_tokens, aligned_head_dim);
+}
+
 #if defined(__AVX2__)
 static inline float hsum256_ps_flash(__m256 v) {
     __m128 hi = _mm256_extractf128_ps(v, 1);
@@ -451,6 +465,7 @@ typedef struct {
     int aligned_head_dim;
     int kv_stride_tokens;
     int sliding_window;
+    int output_token_major;
     float scale;
 } ck_sliding_attention_args_t;
 
@@ -516,7 +531,8 @@ static void ck_sliding_attention_compute_one(const ck_sliding_attention_args_t *
     const float *k_head = a->k + (size_t)kv_head * kv_head_stride;
     const float *v_head = a->v + (size_t)kv_head * kv_head_stride;
     const float *q_vec = a->q + qkv_index(h, i, 0, T, a->aligned_head_dim);
-    float *out_vec = a->output + qkv_index(h, i, 0, T, a->aligned_head_dim);
+    float *out_vec = a->output + attention_output_index(
+        h, i, a->num_heads, T, a->aligned_head_dim, a->output_token_major);
 
     CK_SLIDING_FLASH_IMPL(q_vec, k_head, v_head,
                           /*query_pos=*/i,
@@ -602,6 +618,7 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
             .aligned_head_dim = aligned_head_dim,
             .kv_stride_tokens = kv_stride_tokens,
             .sliding_window = sliding_window,
+            .output_token_major = 0,
             .scale = scale,
         };
         ck_threadpool_dispatch_n(pool, active, ck_sliding_attention_work_fn, &args);
@@ -625,7 +642,8 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
 
         for (int i = 0; i < T; ++i) {
             const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
-            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + attention_output_index(
+                h, i, num_heads, T, aligned_head_dim, 0);
             SLIDING_FLASH_IMPL(q_vec, k_head, v_head,
                                /*query_pos=*/i,
                                /*kv_tokens=*/T,
@@ -647,7 +665,7 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
  *
  * After changes: make test
  */
-void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
+static void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl(
     const float *q,
     const float *k,
     const float *v,
@@ -658,7 +676,8 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
     int head_dim,
     int aligned_head_dim,
     int kv_stride_tokens,
-    int sliding_window)
+    int sliding_window,
+    int output_token_major)
 {
     if (!q || !k || !v || !output) {
         return;
@@ -671,10 +690,15 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
     }
 
     if (getenv("CK_FORCE_NONSLIDING_ATTN")) {
-        attention_forward_causal_head_major_gqa_flash_strided_gemma4(
-            q, k, v, output, num_heads, num_kv_heads, num_tokens,
-            head_dim, aligned_head_dim, kv_stride_tokens
-        );
+        if (output_token_major) {
+            attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output(
+                q, k, v, output, num_heads, num_kv_heads, num_tokens,
+                head_dim, aligned_head_dim, kv_stride_tokens);
+        } else {
+            attention_forward_causal_head_major_gqa_flash_strided_gemma4(
+                q, k, v, output, num_heads, num_kv_heads, num_tokens,
+                head_dim, aligned_head_dim, kv_stride_tokens);
+        }
         return;
     }
 
@@ -698,6 +722,7 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
             .aligned_head_dim = aligned_head_dim,
             .kv_stride_tokens = kv_stride_tokens,
             .sliding_window = sliding_window,
+            .output_token_major = output_token_major,
             .scale = scale,
         };
         ck_threadpool_dispatch_n(pool, active, ck_sliding_attention_work_fn, &args);
@@ -721,7 +746,8 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
 
         for (int i = 0; i < T; ++i) {
             const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
-            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + attention_output_index(
+                h, i, num_heads, T, aligned_head_dim, output_token_major);
             SLIDING_FLASH_IMPL_GEMMA4(q_vec, k_head, v_head,
                                       /*query_pos=*/i,
                                       /*kv_tokens=*/T,
@@ -732,6 +758,44 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
     }
 
 #undef SLIDING_FLASH_IMPL_GEMMA4
+}
+
+void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    int sliding_window)
+{
+    attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens, head_dim,
+        aligned_head_dim, kv_stride_tokens, sliding_window,
+        /*output_token_major=*/0);
+}
+
+void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int kv_stride_tokens,
+    int sliding_window)
+{
+    attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens, head_dim,
+        aligned_head_dim, kv_stride_tokens, sliding_window,
+        /*output_token_major=*/1);
 }
 
 void attention_forward_causal_head_major_shared_kv_sliding_gemma4(

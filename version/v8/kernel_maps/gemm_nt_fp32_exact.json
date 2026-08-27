@@ -62,11 +62,12 @@
   "scratch": [],
   "dims": ["M", "N", "K"],
   "constraints": {
-    "notes": "Exact FP32 NT GEMM that preserves the scalar accumulation order used for parity-sensitive header paths."
+    "schedule": "independent_token_rows",
+    "notes": "Exact FP32 NT GEMM. Persistent-pool workers own disjoint token rows while preserving each output element's scalar accumulation order."
   },
   "impl": {
-    "function": "gemm_naive_parallel",
-    "c_declaration": "void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
+    "function": "gemm_nt_fp32_exact_parallel_dispatch",
+    "c_declaration": "void gemm_nt_fp32_exact_parallel_dispatch(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels.c"]
   },
   "call_abi": {
@@ -85,5 +86,5 @@
   "tests": {
     "unit": ["unittest/test_gemm.py", "tests/test_v8_qwen3vl_template.py"]
   },
-  "notes": "Generic exact FP32 NT GEMM for parity-sensitive matmuls such as image patch projection."
+  "notes": "Generic exact FP32 NT GEMM for parity-sensitive matmuls such as MoE routing and image patch projection."
 }

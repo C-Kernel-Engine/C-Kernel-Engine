@@ -478,33 +478,36 @@ void moe_swiglu_expert_forward_f32(const float *hidden,
     }
 }
 
-void moe_swiglu_expert_forward_bf16(const float *hidden,
-                                    const int *indices,
-                                    const float *routing_weights,
-                                    const uint16_t *expert_gate,
-                                    const uint16_t *expert_up,
-                                    const uint16_t *expert_down,
-                                    float *output,
-                                    int rows,
-                                    int hidden_dim,
-                                    int intermediate_dim,
-                                    int n_experts,
-                                    int top_k)
+void moe_swiglu_expert_forward_bf16_row_range(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const uint16_t *expert_gate,
+    const uint16_t *expert_up,
+    const uint16_t *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    int row_begin,
+    int row_end)
 {
     if (!hidden || !indices || !routing_weights || !expert_gate || !expert_up || !expert_down || !output ||
-        rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0 || n_experts <= 0 || top_k <= 0) {
+        rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0 || n_experts <= 0 || top_k <= 0 ||
+        row_begin < 0 || row_begin >= row_end || row_end > rows) {
         return;
     }
-
-    for (size_t p = 0; p < (size_t)rows * (size_t)hidden_dim; ++p) output[p] = 0.0f;
 
     float gate[intermediate_dim];
     float up[intermediate_dim];
     float act[intermediate_dim];
 
-    for (int r = 0; r < rows; ++r) {
+    for (int r = row_begin; r < row_end; ++r) {
         const float *x = hidden + (size_t)r * (size_t)hidden_dim;
         float *y = output + (size_t)r * (size_t)hidden_dim;
+        for (int h = 0; h < hidden_dim; ++h) y[h] = 0.0f;
         for (int slot = 0; slot < top_k; ++slot) {
             const int e = indices[(size_t)r * (size_t)top_k + (size_t)slot];
             if (e < 0 || e >= n_experts) continue;
@@ -531,6 +534,25 @@ void moe_swiglu_expert_forward_bf16(const float *hidden,
             }
         }
     }
+}
+
+void moe_swiglu_expert_forward_bf16(const float *hidden,
+                                    const int *indices,
+                                    const float *routing_weights,
+                                    const uint16_t *expert_gate,
+                                    const uint16_t *expert_up,
+                                    const uint16_t *expert_down,
+                                    float *output,
+                                    int rows,
+                                    int hidden_dim,
+                                    int intermediate_dim,
+                                    int n_experts,
+                                    int top_k)
+{
+    if (rows <= 0) return;
+    moe_swiglu_expert_forward_bf16_row_range(
+        hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
+        output, rows, hidden_dim, intermediate_dim, n_experts, top_k, 0, rows);
 }
 
 static size_t ck_moe_align64(size_t value)
@@ -2008,18 +2030,22 @@ void moe_swiglu_shared_forward_f32(const float *hidden,
     }
 }
 
-void moe_swiglu_shared_forward_bf16(const float *hidden,
-                                    const float *routed,
-                                    const uint16_t *shared_gate,
-                                    const uint16_t *shared_up,
-                                    const uint16_t *shared_down,
-                                    float *output,
-                                    int rows,
-                                    int hidden_dim,
-                                    int intermediate_dim)
+void moe_swiglu_shared_forward_bf16_row_range(
+    const float *hidden,
+    const float *routed,
+    const uint16_t *shared_gate,
+    const uint16_t *shared_up,
+    const uint16_t *shared_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int row_begin,
+    int row_end)
 {
     if (!hidden || !shared_gate || !shared_up || !shared_down || !output ||
-        rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0) {
+        rows <= 0 || hidden_dim <= 0 || intermediate_dim <= 0 ||
+        row_begin < 0 || row_begin >= row_end || row_end > rows) {
         return;
     }
 
@@ -2027,7 +2053,7 @@ void moe_swiglu_shared_forward_bf16(const float *hidden,
     float up[intermediate_dim];
     float act[intermediate_dim];
 
-    for (int r = 0; r < rows; ++r) {
+    for (int r = row_begin; r < row_end; ++r) {
         const float *x = hidden + (size_t)r * (size_t)hidden_dim;
         const float *route = routed ? (routed + (size_t)r * (size_t)hidden_dim) : NULL;
         float *y = output + (size_t)r * (size_t)hidden_dim;
@@ -2052,6 +2078,22 @@ void moe_swiglu_shared_forward_bf16(const float *hidden,
     }
 }
 
+void moe_swiglu_shared_forward_bf16(const float *hidden,
+                                    const float *routed,
+                                    const uint16_t *shared_gate,
+                                    const uint16_t *shared_up,
+                                    const uint16_t *shared_down,
+                                    float *output,
+                                    int rows,
+                                    int hidden_dim,
+                                    int intermediate_dim)
+{
+    if (rows <= 0) return;
+    moe_swiglu_shared_forward_bf16_row_range(
+        hidden, routed, shared_gate, shared_up, shared_down, output,
+        rows, hidden_dim, intermediate_dim, 0, rows);
+}
+
 /*
  * FarSkip shared-expert combine used by Instella-MoE.
  *
@@ -2064,27 +2106,31 @@ void moe_swiglu_shared_forward_bf16(const float *hidden,
  * preserve those two explicit addition boundaries.  Folding routed into the
  * down-projection accumulator changes the rounding contract.
  */
-void farskip_swiglu_shared_combine_bf16(const float *hidden,
-                                        const float *routed,
-                                        const float *post_attn_residual,
-                                        const uint16_t *shared_gate,
-                                        const uint16_t *shared_up,
-                                        const uint16_t *shared_down,
-                                        float *main_output,
-                                        float *routed_free_output,
-                                        int rows,
-                                        int hidden_dim,
-                                        int intermediate_dim)
+void farskip_swiglu_shared_combine_bf16_row_range(
+    const float *hidden,
+    const float *routed,
+    const float *post_attn_residual,
+    const uint16_t *shared_gate,
+    const uint16_t *shared_up,
+    const uint16_t *shared_down,
+    float *main_output,
+    float *routed_free_output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int row_begin,
+    int row_end)
 {
     if (!hidden || !routed || !post_attn_residual || !shared_gate || !shared_up ||
         !shared_down || !main_output || !routed_free_output || rows <= 0 ||
-        hidden_dim <= 0 || intermediate_dim <= 0) {
+        hidden_dim <= 0 || intermediate_dim <= 0 || row_begin < 0 ||
+        row_begin >= row_end || row_end > rows) {
         return;
     }
 
     float act[intermediate_dim];
 
-    for (int r = 0; r < rows; ++r) {
+    for (int r = row_begin; r < row_end; ++r) {
         const float *x = hidden + (size_t)r * (size_t)hidden_dim;
         const float *route = routed + (size_t)r * (size_t)hidden_dim;
         const float *residual = post_attn_residual + (size_t)r * (size_t)hidden_dim;
@@ -2111,6 +2157,25 @@ void farskip_swiglu_shared_combine_bf16(const float *hidden,
             main[h] = residual[h] + mlp_output;
         }
     }
+}
+
+void farskip_swiglu_shared_combine_bf16(const float *hidden,
+                                        const float *routed,
+                                        const float *post_attn_residual,
+                                        const uint16_t *shared_gate,
+                                        const uint16_t *shared_up,
+                                        const uint16_t *shared_down,
+                                        float *main_output,
+                                        float *routed_free_output,
+                                        int rows,
+                                        int hidden_dim,
+                                        int intermediate_dim)
+{
+    if (rows <= 0) return;
+    farskip_swiglu_shared_combine_bf16_row_range(
+        hidden, routed, post_attn_residual, shared_gate, shared_up, shared_down,
+        main_output, routed_free_output, rows, hidden_dim, intermediate_dim,
+        0, rows);
 }
 
 void moe_swiglu_shared_backward_f32(const float *d_output,

@@ -8,11 +8,22 @@
     "equivalence_group": "per_layer_input.prepare.q5_k_token_bf16_projection.fp32.v1",
     "phases": ["prefill", "decode"]
   },
-  "variant": "gemma4_scalar_correctness",
+  "variant": "gemma4_token_row_parallel_exact",
   "modes": {
     "inference": true,
     "training": false,
     "backward": false
+  },
+  "parallelization": {
+    "preferred": {"prefill": "token_row", "decode": "serial"},
+    "strategies": [
+      {
+        "name": "token_row",
+        "partition_dim": "T",
+        "param_style": "internal_dispatch",
+        "schedule": "dynamic_independent_rows"
+      }
+    ]
   },
   "quant": {
     "weight": "q5_k",
@@ -136,5 +147,5 @@
       {"name": "eps", "source": "dim:rms_eps"}
     ]
   },
-  "notes": "Prepare Gemma4 per-layer input stream once from original token embedding stream."
+  "notes": "Prepare Gemma4 per-layer input stream once from the original token embedding stream. Prefill dynamically partitions independent token rows through the persistent thread pool while retaining each row's projection reduction order."
 }

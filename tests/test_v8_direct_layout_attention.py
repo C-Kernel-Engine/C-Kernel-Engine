@@ -37,6 +37,11 @@ class DirectLayoutAttentionTests(unittest.TestCase):
         ]
         cls._lib.attention_forward_causal_head_major_gqa_flash_strided.argtypes = signature
         cls._lib.attention_forward_causal_head_major_gqa_flash_strided_token_output.argtypes = signature
+        cls._lib.attention_forward_causal_head_major_gqa_flash_strided_gemma4.argtypes = signature
+        cls._lib.attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output.argtypes = signature
+        sliding_signature = signature + [ctypes.c_int]
+        cls._lib.attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4.argtypes = sliding_signature
+        cls._lib.attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output.argtypes = sliding_signature
         mixed_signature = signature + [ctypes.c_int, ctypes.c_int]
         cls._lib.attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4.argtypes = mixed_signature
         cls._lib.attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_token_output.argtypes = mixed_signature
@@ -164,6 +169,54 @@ class DirectLayoutAttentionTests(unittest.TestCase):
                 os.environ["CK_NUM_THREADS"] = old_threads
 
         self.assertEqual(serial.tobytes(), threaded.tobytes())
+
+    def test_gemma4_direct_token_outputs_are_bit_exact(self):
+        heads, kv_heads, tokens, dim = 4, 2, 13, 16
+        count = heads * tokens * dim
+        kv_count = kv_heads * tokens * dim
+        q = array("f", (math.sin(index * 0.011) for index in range(count)))
+        k = array("f", (math.cos(index * 0.017) for index in range(kv_count)))
+        v = array("f", (math.sin(index * 0.023 + 0.2) for index in range(kv_count)))
+
+        def pointer(values):
+            return (ctypes.c_float * len(values)).from_buffer(values)
+
+        def expected_token_output(head_output):
+            token_output = array("f", [0.0]) * count
+            for token in range(tokens):
+                for head in range(heads):
+                    src = (head * tokens + token) * dim
+                    dst = (token * heads + head) * dim
+                    token_output[dst:dst + dim] = head_output[src:src + dim]
+            return token_output
+
+        common = (pointer(q), pointer(k), pointer(v))
+        old_threads = os.environ.get("CK_NUM_THREADS")
+        os.environ["CK_NUM_THREADS"] = "4"
+        try:
+            for head_fn, token_fn, tail in (
+                (
+                    self._lib.attention_forward_causal_head_major_gqa_flash_strided_gemma4,
+                    self._lib.attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output,
+                    (),
+                ),
+                (
+                    self._lib.attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4,
+                    self._lib.attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output,
+                    (5,),
+                ),
+            ):
+                head_output = array("f", [0.0]) * count
+                token_output = array("f", [0.0]) * count
+                geometry = (heads, kv_heads, tokens, dim, dim, tokens, *tail)
+                head_fn(*common, pointer(head_output), *geometry)
+                token_fn(*common, pointer(token_output), *geometry)
+                self.assertEqual(expected_token_output(head_output).tobytes(), token_output.tobytes())
+        finally:
+            if old_threads is None:
+                os.environ.pop("CK_NUM_THREADS", None)
+            else:
+                os.environ["CK_NUM_THREADS"] = old_threads
 
     def test_mixed_visual_attention_preserves_direct_output_layout(self):
         heads, kv_heads, tokens, dim = 4, 2, 9, 64

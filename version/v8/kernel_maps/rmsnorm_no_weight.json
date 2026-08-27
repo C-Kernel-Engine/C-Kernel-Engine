@@ -13,10 +13,32 @@
   "params": [
     {"name": "eps", "dtype": "float", "default": 1e-6}
   ],
-  "impl": {
-    "function": "gemma4_v_norm_forward",
-    "c_declaration": "void gemma4_v_norm_forward(const float *input, float *output, float *rstd_cache, int tokens, int num_kv_heads, int head_dim, float eps);",
-    "sources": ["src/kernels/rmsnorm_kernels.c"]
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": null},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "tokens",
+        "param_style": "range",
+        "range": {"min_chunk": 8},
+        "notes": "Normalize independent token/head rows on the shared pool."
+      }
+    ]
   },
+  "impl": {
+    "function": "gemma4_v_norm_forward_parallel_dispatch",
+    "c_declaration": "void gemma4_v_norm_forward_parallel_dispatch(const float *input, float *output, float *rstd_cache, int tokens, int num_kv_heads, int head_dim, float eps);",
+    "sources": ["src/kernels/rmsnorm_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"]
+  },
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "rstd_cache", "source": "null"},
+    {"name": "tokens", "source": "dim:seq_len"},
+    {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+    {"name": "head_dim", "source": "dim:head_dim"},
+    {"name": "eps", "source": "dim:rms_eps"}
+  ]},
   "notes": "Gemma4 V RMSNorm without gamma. Normalizes each [head_dim] V head independently, matching llama.cpp ggml_rms_norm after reshape."
 }

@@ -174,6 +174,34 @@ class LayoutProviderSelectionTests(unittest.TestCase):
         )
         self.assertEqual(execution["output_layout"], "token_major_contiguous")
 
+    def test_gemma4_attention_selects_direct_token_major_providers(self):
+        registry = json.loads(
+            (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()
+        )
+        cases = (
+            (
+                "attention_forward_causal_head_major_gqa_flash_strided_gemma4",
+                "attention_forward_causal_head_major_gqa_flash_strided_gemma4_token_output",
+            ),
+            (
+                "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4",
+                "attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_token_output",
+            ),
+        )
+        for numerical, physical in cases:
+            with self.subTest(numerical=numerical):
+                managed, converter, execution = build_ir._resolve_layout_edge(
+                    registry,
+                    producer_kernel=numerical,
+                    producer_port="out",
+                    consumer_kernel="gemm_nt_q8_0_q8_0",
+                    consumer_port="A",
+                )
+                self.assertTrue(managed)
+                self.assertIsNone(converter)
+                self.assertEqual(execution["provider_id"], physical)
+                self.assertEqual(execution["output_layout"], "token_major_contiguous")
+
     def test_direct_layout_provider_explicitly_aliases_numerical_owner(self):
         provider_map = json.loads(
             (ROOT / "version" / "v8" / "kernel_maps" /

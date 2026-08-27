@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "benchmarks"))
 
 from bench_v8_decoder_matrix import ANSI_RE, CACHE, CK_CLI, CK_RE, MODELS  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "version" / "v8" / "scripts"))
+from run_long_context_certification_v8 import resolve_cpu_plan  # noqa: E402
 
 CK_RUN_V8 = ROOT / "version" / "v8" / "scripts" / "ck_run_v8.py"
 PREFILL_RE = re.compile(r"prefill\s+(\d+)\s+tok.*?([0-9.]+)\s+ms\s+([0-9.]+)\s+tok/s", re.S)
@@ -44,6 +49,33 @@ def _run(cmd: list[str], *, env: dict[str, str], timeout: int) -> tuple[int, str
         check=False,
     )
     return proc.returncode, proc.stdout
+
+
+def _load_prompt_token_ids(path: Path, *, limit: int) -> list[int]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = [item for item in re.split(r"[\s,]+", text.strip()) if item]
+    if isinstance(payload, dict):
+        payload = payload.get("token_ids", payload.get("tokens"))
+    if not isinstance(payload, list):
+        raise ValueError(f"prompt token file must contain a list: {path}")
+    token_ids = [int(value) for value in payload]
+    if any(token_id < 0 for token_id in token_ids):
+        raise ValueError(f"prompt token IDs must be non-negative: {path}")
+    if len(token_ids) < limit:
+        raise ValueError(
+            f"prompt token file has {len(token_ids)} IDs, but {limit} were requested: {path}"
+        )
+    return token_ids[:limit]
+
+
+def _token_ids_sha256(token_ids: list[int]) -> str:
+    digest = hashlib.sha256()
+    for token_id in token_ids:
+        digest.update(int(token_id).to_bytes(4, "little", signed=False))
+    return digest.hexdigest()
 
 
 def _compile_profile_runtime(
@@ -93,12 +125,17 @@ def _compile_profile_runtime(
     }
 
 
-def _profile_run(run_dir: Path, *, prompt: int, decode: int, threads: int, csv_path: Path, json_path: Path, timeout: int) -> dict[str, Any]:
+def _profile_run(
+    run_dir: Path, *, prompt_token_ids: list[int], decode: int, threads: int,
+    cpu_affinity: list[int] | None, csv_path: Path, json_path: Path, timeout: int,
+) -> dict[str, Any]:
     lib = run_dir / "libmodel.so"
     weights = run_dir / "weights.bump"
     manifest = run_dir / "weights_manifest.map"
     env = os.environ.copy()
     env["CK_NUM_THREADS"] = str(threads)
+    if cpu_affinity:
+        env["CK_BENCH_CPU_AFFINITY"] = ",".join(str(cpu) for cpu in cpu_affinity)
     env["OMP_NUM_THREADS"] = env.get("OMP_NUM_THREADS", "1")
     env["CK_PROFILE"] = "1"
     env["CK_THREADPOOL_PROFILE"] = "1"
@@ -107,7 +144,9 @@ def _profile_run(run_dir: Path, *, prompt: int, decode: int, threads: int, csv_p
     env["LD_LIBRARY_PATH"] = f"{ROOT / 'build'}:{run_dir}:{env.get('LD_LIBRARY_PATH', '')}"
     csv_path.unlink(missing_ok=True)
     json_path.unlink(missing_ok=True)
-    prompt_tokens = ",".join(["100"] * prompt)
+    trace_path = json_path.with_name(f"{json_path.stem}.trace.json")
+    trace_path.unlink(missing_ok=True)
+    prompt_tokens = ",".join(str(token_id) for token_id in prompt_token_ids)
     cmd = [
         str(CK_CLI),
         "--lib",
@@ -125,13 +164,24 @@ def _profile_run(run_dir: Path, *, prompt: int, decode: int, threads: int, csv_p
         "--no-chat-template",
         "--no-stream",
         "--timing",
+        "--token-trace-json",
+        str(trace_path),
     ]
+    if cpu_affinity and shutil.which("taskset"):
+        cmd = ["taskset", "-c", env["CK_BENCH_CPU_AFFINITY"], *cmd]
     rc, out = _run(cmd, env=env, timeout=timeout)
     clean = ANSI_RE.sub("", out)
     row: dict[str, Any] = {
-        "command": [f"<{prompt} ids>" if value == prompt_tokens else value for value in cmd],
+        "command": [
+            f"<{len(prompt_token_ids)} ids>" if value == prompt_tokens else value
+            for value in cmd
+        ],
         "returncode": rc,
         "stdout_tail": "\n".join(clean.splitlines()[-80:]),
+        "input": {
+            "token_count": len(prompt_token_ids),
+            "token_ids_sha256": _token_ids_sha256(prompt_token_ids),
+        },
     }
     match = CK_RE.search(clean)
     if match:
@@ -163,6 +213,9 @@ def _profile_run(run_dir: Path, *, prompt: int, decode: int, threads: int, csv_p
             "main_work_ms": float(threadpool_match.group(3)),
             "completion_wait_ms": float(threadpool_match.group(4)),
         }
+    if trace_path.is_file():
+        row["trace"] = json.loads(trace_path.read_text(encoding="utf-8"))
+        row["trace_path"] = str(trace_path)
     return row
 
 
@@ -172,6 +225,8 @@ def _load_profile_rows(csv_path: Path) -> list[dict[str, Any]]:
         rows = []
         for row in reader:
             row["layer"] = int(row.get("layer") or -1)
+            row["start_us"] = float(row.get("start_us") or 0.0)
+            row["end_us"] = float(row.get("end_us") or 0.0)
             row["time_us"] = float(row.get("time_us") or 0.0)
             row["cpu_time_us"] = float(row.get("cpu_time_us") or 0.0)
             row["token_id"] = int(row.get("token_id") or 0)
@@ -195,6 +250,46 @@ def _group(rows: list[dict[str, Any]], keys: tuple[str, ...], *, limit: int) -> 
     return ranked[:limit]
 
 
+def _layer_topology(rows: list[dict[str, Any]]) -> str:
+    terms = " ".join(
+        f"{row.get('op', '')} {row.get('kernel', '')}" for row in rows
+    ).lower()
+    if "mla" in terms:
+        sequence = "mla_attention"
+    elif "deltanet" in terms or "recurrent" in terms:
+        sequence = "deltanet_recurrent"
+    elif "mamba" in terms:
+        sequence = "mamba"
+    elif "sliding" in terms and ("attention" in terms or "attn" in terms):
+        sequence = "sliding_attention"
+    elif "attention" in terms or "attn" in terms:
+        sequence = "full_attention"
+    else:
+        sequence = "feed_forward_only"
+    feed_forward = (
+        "moe" if any(term in terms for term in ("expert", "router", "moe"))
+        else "dense_mlp"
+    )
+    return f"{sequence}+{feed_forward}"
+
+
+def _representative_layers(
+    rows: list[dict[str, Any]], by_layer: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    rows_by_layer: dict[int, list[dict[str, Any]]] = {}
+    for row in rows:
+        layer = int(row.get("layer", -1))
+        if layer >= 0:
+            rows_by_layer.setdefault(layer, []).append(row)
+    metrics = {int(row["layer"]): row for row in by_layer}
+    selected: dict[str, dict[str, Any]] = {}
+    for layer in sorted(rows_by_layer):
+        topology = _layer_topology(rows_by_layer[layer])
+        if topology not in selected:
+            selected[topology] = {"topology": topology} | dict(metrics[layer])
+    return list(selected.values())
+
+
 def _summarize(
     rows: list[dict[str, Any]], *, limit: int, threads: int
 ) -> dict[str, Any]:
@@ -203,8 +298,35 @@ def _summarize(
     total_cpu_us = sum(float(r["cpu_time_us"]) for r in prefill)
     by_op = _group(prefill, ("op",), limit=limit)
     by_kernel = _group(prefill, ("kernel", "op"), limit=limit)
-    by_layer = _group(prefill, ("layer",), limit=limit)
+    layer_count = len({int(row.get("layer", -1)) for row in prefill})
+    by_layer = _group(prefill, ("layer",), limit=max(limit, layer_count))
     by_layer_op = _group(prefill, ("layer", "op"), limit=limit)
+    transitions: dict[tuple[Any, ...], dict[str, Any]] = {}
+    previous: dict[str, Any] | None = None
+    for row in prefill:
+        start_us = float(row.get("start_us") or 0.0)
+        previous_end_us = float(previous.get("end_us") or 0.0) if previous else 0.0
+        if previous is not None and start_us > 0.0 and previous_end_us > 0.0:
+            gap_us = max(0.0, start_us - previous_end_us)
+            key = (
+                previous["layer"], previous.get("op", ""),
+                row["layer"], row.get("op", ""),
+            )
+            bucket = transitions.setdefault(
+                key,
+                {
+                    "from_layer": key[0], "from_op": key[1],
+                    "to_layer": key[2], "to_op": key[3],
+                    "gap_us": 0.0, "max_gap_us": 0.0, "count": 0,
+                },
+            )
+            bucket["gap_us"] += gap_us
+            bucket["max_gap_us"] = max(bucket["max_gap_us"], gap_us)
+            bucket["count"] += 1
+        previous = row
+    by_transition = sorted(
+        transitions.values(), key=lambda row: float(row["gap_us"]), reverse=True
+    )[:limit]
     for table in (by_op, by_kernel, by_layer, by_layer_op):
         for row in table:
             row["time_ms"] = row["time_us"] / 1000.0
@@ -216,6 +338,7 @@ def _summarize(
                 100.0 * row["core_equivalents"] / threads if threads > 0 else 0.0
             )
             row["pct"] = (100.0 * row["time_us"] / total_us) if total_us > 0 else 0.0
+    representatives = _representative_layers(prefill, by_layer)
     return {
         "prefill_total_us": total_us,
         "prefill_total_ms": total_us / 1000.0,
@@ -232,6 +355,8 @@ def _summarize(
         "by_kernel_op": by_kernel,
         "by_layer": by_layer,
         "by_layer_op": by_layer_op,
+        "by_transition": by_transition,
+        "representative_layers": representatives,
     }
 
 
@@ -267,8 +392,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--models", default="qwen35-0.8b-q4_k_m,qwen2-0.5b-q4_k_m", help="Comma-separated model ids, or 'all'")
     parser.add_argument("--prompt", type=int, default=128)
+    parser.add_argument(
+        "--prompt-token-file", type=Path,
+        help="JSON/CSV token IDs; the first --prompt IDs are consumed",
+    )
     parser.add_argument("--decode", type=int, default=1)
-    parser.add_argument("--threads", type=int, default=12)
+    parser.add_argument(
+        "--threads", type=int, default=0,
+        help="Worker count; 0 selects one allowed CPU per physical core",
+    )
+    parser.add_argument(
+        "--cpu-policy", choices=("physical", "inherit"), default="inherit",
+    )
     parser.add_argument("--context-len", type=int, default=1024)
     parser.add_argument("--limit", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=1200)
@@ -276,40 +411,90 @@ def main() -> int:
     parser.add_argument("--runtime-root", type=Path, default=ROOT / "build" / "v8_profile_runtimes")
     parser.add_argument("--artifact-root", type=Path, default=ROOT / "build", help="Directory for raw CSV/JSON profiler artifacts")
     parser.add_argument("--json-out", type=Path, default=ROOT / "build" / "v8_prefill_ops_profile.json")
+    parser.add_argument(
+        "--existing-runtime", type=Path,
+        help="Profile one already compiled CK_PROFILE runtime instead of the built-in model matrix",
+    )
+    parser.add_argument("--runtime-label", default="existing-runtime")
     args = parser.parse_args()
+    if args.threads < 0:
+        raise ValueError("--threads must be non-negative")
+    if args.prompt <= 0:
+        raise ValueError("--prompt must be positive")
+    prompt_token_ids = (
+        _load_prompt_token_ids(args.prompt_token_file.expanduser(), limit=args.prompt)
+        if args.prompt_token_file
+        else [100] * args.prompt
+    )
+    prompt_input = {
+        "source": str(args.prompt_token_file.expanduser().resolve())
+        if args.prompt_token_file else "synthetic_repeated_token",
+        "token_count": len(prompt_token_ids),
+        "token_ids_sha256": _token_ids_sha256(prompt_token_ids),
+    }
+    cpu_plan = resolve_cpu_plan(args.threads, args.cpu_policy)
+    args.threads = int(cpu_plan["effective_threads"])
 
-    selected = list(MODELS) if args.models == "all" else [x.strip() for x in args.models.split(",") if x.strip()]
+    selected = (
+        [args.runtime_label] if args.existing_runtime else
+        (list(MODELS) if args.models == "all" else
+         [x.strip() for x in args.models.split(",") if x.strip()])
+    )
     build_dir = args.artifact_root.expanduser().resolve()
     build_dir.mkdir(parents=True, exist_ok=True)
 
     results: list[dict[str, Any]] = []
     for model_id in selected:
+        if args.existing_runtime:
+            spec = {"label": args.runtime_label, "quant": "runtime", "gguf": ""}
+            run_dir = args.existing_runtime.expanduser().resolve()
+            missing = [
+                str(path) for path in (
+                    CK_CLI, run_dir / "libmodel.so", run_dir / "weights.bump",
+                    run_dir / "weights_manifest.map",
+                ) if not path.exists()
+            ]
+            compile_row = {
+                "model_id": model_id, "returncode": 0,
+                "reused_profile_runtime": str(run_dir),
+            }
+            if missing:
+                results.append({
+                    "id": model_id, "label": spec["label"], "quant": spec["quant"],
+                    "status": "skip", "missing": missing,
+                })
+                continue
+        else:
+            if model_id not in MODELS:
+                raise KeyError(f"unknown model id: {model_id}")
+            spec = MODELS[model_id]
+            run_dir = args.runtime_root / _safe_id(model_id)
         if model_id not in MODELS:
-            raise KeyError(f"unknown model id: {model_id}")
-        spec = MODELS[model_id]
-        run_dir = args.runtime_root / _safe_id(model_id)
+            if not args.existing_runtime:
+                raise KeyError(f"unknown model id: {model_id}")
         print(f"\n== {spec['label']} {spec['quant']} ==", flush=True)
 
-        missing = [str(CK_CLI)]
-        gguf = Path(spec["gguf"])
-        if not gguf.is_absolute():
-            gguf = CACHE / gguf
-        missing.append(str(gguf))
-        missing = [p for p in missing if not Path(p).exists()]
-        if missing:
-            row = {"id": model_id, "label": spec["label"], "quant": spec["quant"], "status": "skip", "missing": missing}
-            print(f"skip: missing {missing}")
-            results.append(row)
-            continue
+        if not args.existing_runtime:
+            missing = [str(CK_CLI)]
+            gguf = Path(spec["gguf"])
+            if not gguf.is_absolute():
+                gguf = CACHE / gguf
+            missing.append(str(gguf))
+            missing = [p for p in missing if not Path(p).exists()]
+            if missing:
+                row = {"id": model_id, "label": spec["label"], "quant": spec["quant"], "status": "skip", "missing": missing}
+                print(f"skip: missing {missing}")
+                results.append(row)
+                continue
 
-        compile_row = _compile_profile_runtime(
-            model_id,
-            spec,
-            run_dir=run_dir,
-            context_len=max(args.context_len, args.prompt + args.decode + 8),
-            timeout=args.timeout,
-            force=not args.reuse_runtime,
-        )
+            compile_row = _compile_profile_runtime(
+                model_id,
+                spec,
+                run_dir=run_dir,
+                context_len=max(args.context_len, args.prompt + args.decode + 8),
+                timeout=args.timeout,
+                force=not args.reuse_runtime,
+            )
         if compile_row["returncode"] != 0:
             compile_row["status"] = "fail"
             print(compile_row["stdout_tail"])
@@ -320,9 +505,10 @@ def main() -> int:
         profile_json_path = build_dir / f"v8_prefill_profile_{_safe_id(model_id)}_p{args.prompt}_t{args.threads}.raw.json"
         run_row = _profile_run(
             run_dir,
-            prompt=args.prompt,
+            prompt_token_ids=prompt_token_ids,
             decode=args.decode,
             threads=args.threads,
+            cpu_affinity=cpu_plan["affinity"],
             csv_path=csv_path,
             json_path=profile_json_path,
             timeout=args.timeout,
@@ -363,6 +549,19 @@ def main() -> int:
         _fmt_table("Top prefill kernel/op sites", summary["by_kernel_op"], ("kernel", "op"))
         _fmt_table("Prefill layers", summary["by_layer"], ("layer",))
         _fmt_table("Top prefill layer/op sites", summary["by_layer_op"], ("layer", "op"))
+        _fmt_table(
+            "Representative layer topologies",
+            summary["representative_layers"], ("topology", "layer"),
+        )
+        print("\nTop unprofiled transitions")
+        for transition in summary["by_transition"]:
+            print(
+                f"  L{transition['from_layer']}:{transition['from_op']} -> "
+                f"L{transition['to_layer']}:{transition['to_op']}  "
+                f"total={transition['gap_us'] / 1000.0:.3f} ms  "
+                f"max={transition['max_gap_us'] / 1000.0:.3f} ms  "
+                f"count={transition['count']}"
+            )
 
         results.append(
             {
@@ -383,8 +582,10 @@ def main() -> int:
         "args": {
             "models": selected,
             "prompt": args.prompt,
+            "prompt_input": prompt_input,
             "decode": args.decode,
             "threads": args.threads,
+            "cpu_plan": cpu_plan,
             "context_len": args.context_len,
             "limit": args.limit,
             "reuse_runtime": args.reuse_runtime,

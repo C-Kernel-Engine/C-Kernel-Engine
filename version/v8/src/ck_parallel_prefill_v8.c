@@ -67,6 +67,26 @@ extern void mamba2_selective_scan_f32_head_range(
     float *state_out, float *y, int batch, int seq_len, int num_heads,
     int head_dim, int state_dim, int num_groups,
     int head_begin, int head_end);
+extern void moe_swiglu_expert_forward_bf16(
+    const float *, const int *, const float *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, int, int, int, int, int);
+extern void moe_swiglu_expert_forward_bf16_row_range(
+    const float *, const int *, const float *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, int, int, int, int, int,
+    int, int);
+extern void moe_swiglu_shared_forward_bf16(
+    const float *, const float *, const uint16_t *, const uint16_t *,
+    const uint16_t *, float *, int, int, int);
+extern void moe_swiglu_shared_forward_bf16_row_range(
+    const float *, const float *, const uint16_t *, const uint16_t *,
+    const uint16_t *, float *, int, int, int, int, int);
+extern void farskip_swiglu_shared_combine_bf16(
+    const float *, const float *, const float *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, float *, int, int, int);
+extern void farskip_swiglu_shared_combine_bf16_row_range(
+    const float *, const float *, const float *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, float *, int, int, int,
+    int, int);
 
 enum {
     CK_GEMM_ROUTE_OUTPUT_TILES = 1 << 0,
@@ -299,9 +319,26 @@ extern void gemm_nt_q5_k_prepared_m4(const float *A, const void *B_prepared,
 extern void quantize_row_q8_k(const float *x, void *y, int k);
 extern void quantize_batch_q8_k_4row_nearest_even(
     const float *x, void *y, int num_rows, int k);
+extern void quantize_batch_q8_k(
+    const float *x, void *y, int num_rows, int k);
 extern void rmsnorm_forward_llama_production(
     const float *input, const float *gamma, float *output, float *rstd_cache,
     int tokens, int d_model, int aligned_embed_dim, float eps);
+extern void rmsnorm_forward(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
+extern void rmsnorm_forward_no_weight(
+    const float *input, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps);
+extern void gemma4_v_norm_forward(
+    const float *input, float *output, float *rstd_cache,
+    int tokens, int num_kv_heads, int head_dim, float eps);
+extern void qk_norm_forward(
+    float *q, float *k, const float *q_gamma, const float *k_gamma,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);
+extern void ck_residual_add_token_major(
+    const float *a, const float *b, float *out,
+    int tokens, int aligned_embed_dim);
 extern void recurrent_norm_gate_llama_avx2_forward(
     const float *x, const float *gate, const float *weight, float *out,
     int rows, int num_heads, int head_dim, float eps);
@@ -329,6 +366,15 @@ extern void gated_deltanet_llama_chunk64_prefill_forward(
     const float *g, const float *beta,
     const float *state_in, float *state_out, float *out,
     int rows, int num_heads, int group_count, int state_dim, float norm_eps);
+extern void rope_forward_qk_split_direct_f32(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);
+extern void rope_forward_qk_split_direct_token_range_f32(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base,
+    int token_begin, int token_end);
 
 /* ============================================================================
  * Lifecycle
@@ -397,6 +443,21 @@ typedef struct {
 } geglu_args_t;
 
 typedef struct {
+    float *q;
+    float *k;
+    const float *freq_factors;
+    int use_freq_factors;
+    int num_heads;
+    int num_kv_heads;
+    int num_tokens;
+    int head_dim;
+    int aligned_head_dim;
+    int pos_offset;
+    int rotary_dim;
+    float freq_base;
+} rope_split_direct_args_t;
+
+typedef struct {
     const float *input;
     void *output;
     int rows;
@@ -413,6 +474,28 @@ typedef struct {
     int aligned_embed_dim;
     float eps;
 } rmsnorm_exact_args_t;
+
+typedef struct {
+    const float *input;
+    float *output;
+    float *rstd_cache;
+    int head_dim;
+    float eps;
+} rmsnorm_no_weight_args_t;
+
+typedef struct {
+    const float *a;
+    const float *b;
+    float *output;
+    int tokens;
+    int aligned_embed_dim;
+} residual_add_args_t;
+
+typedef struct {
+    unsigned char *dst;
+    const unsigned char *src;
+    size_t size;
+} memcpy_args_t;
 
 typedef struct {
     const float *x;
@@ -454,6 +537,47 @@ typedef struct {
     int state_dim;
     int num_groups;
 } mamba2_scan_args_t;
+
+typedef struct {
+    const float *hidden;
+    const int *indices;
+    const float *routing_weights;
+    const uint16_t *expert_gate;
+    const uint16_t *expert_up;
+    const uint16_t *expert_down;
+    float *output;
+    int rows;
+    int hidden_dim;
+    int intermediate_dim;
+    int n_experts;
+    int top_k;
+} bf16_moe_expert_args_t;
+
+typedef struct {
+    const float *hidden;
+    const float *routed;
+    const uint16_t *shared_gate;
+    const uint16_t *shared_up;
+    const uint16_t *shared_down;
+    float *output;
+    int rows;
+    int hidden_dim;
+    int intermediate_dim;
+} bf16_moe_shared_args_t;
+
+typedef struct {
+    const float *hidden;
+    const float *routed;
+    const float *post_attn_residual;
+    const uint16_t *shared_gate;
+    const uint16_t *shared_up;
+    const uint16_t *shared_down;
+    float *main_output;
+    float *routed_free_output;
+    int rows;
+    int hidden_dim;
+    int intermediate_dim;
+} bf16_farskip_shared_args_t;
 
 static int ck_min_int(int a, int b) { return a < b ? a : b; }
 static int ck_env_enabled(const char *name);
@@ -576,6 +700,118 @@ void mamba2_selective_scan_f32_parallel_dispatch(const float *state_init,
         work_mamba2_scan_heads, &args);
 }
 
+static void work_bf16_moe_expert_rows(int begin, int end, void *userdata)
+{
+    const bf16_moe_expert_args_t *args =
+        (const bf16_moe_expert_args_t *)userdata;
+    moe_swiglu_expert_forward_bf16_row_range(
+        args->hidden, args->indices, args->routing_weights,
+        args->expert_gate, args->expert_up, args->expert_down, args->output,
+        args->rows, args->hidden_dim, args->intermediate_dim,
+        args->n_experts, args->top_k, begin, end);
+}
+
+void moe_swiglu_expert_forward_bf16_parallel_dispatch(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate, const uint16_t *expert_up,
+    const uint16_t *expert_down, float *output, int rows, int hidden_dim,
+    int intermediate_dim, int n_experts, int top_k)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_BF16_MOE_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || rows < 2) {
+        moe_swiglu_expert_forward_bf16(
+            hidden, indices, routing_weights, expert_gate, expert_up,
+            expert_down, output, rows, hidden_dim, intermediate_dim,
+            n_experts, top_k);
+        return;
+    }
+
+    bf16_moe_expert_args_t args = {
+        hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
+        output, rows, hidden_dim, intermediate_dim, n_experts, top_k,
+    };
+    const int active = ck_independent_row_active_threads(pool, rows, 1);
+    int grain = rows / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, rows, grain, work_bf16_moe_expert_rows, &args);
+}
+
+static void work_bf16_moe_shared_rows(int begin, int end, void *userdata)
+{
+    const bf16_moe_shared_args_t *args =
+        (const bf16_moe_shared_args_t *)userdata;
+    moe_swiglu_shared_forward_bf16_row_range(
+        args->hidden, args->routed, args->shared_gate, args->shared_up,
+        args->shared_down, args->output, args->rows, args->hidden_dim,
+        args->intermediate_dim, begin, end);
+}
+
+void moe_swiglu_shared_forward_bf16_parallel_dispatch(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down, float *output,
+    int rows, int hidden_dim, int intermediate_dim)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_BF16_MOE_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || rows < 2) {
+        moe_swiglu_shared_forward_bf16(
+            hidden, routed, shared_gate, shared_up, shared_down, output,
+            rows, hidden_dim, intermediate_dim);
+        return;
+    }
+
+    bf16_moe_shared_args_t args = {
+        hidden, routed, shared_gate, shared_up, shared_down, output,
+        rows, hidden_dim, intermediate_dim,
+    };
+    const int active = ck_independent_row_active_threads(pool, rows, 1);
+    int grain = rows / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, rows, grain, work_bf16_moe_shared_rows, &args);
+}
+
+static void work_bf16_farskip_shared_rows(int begin, int end, void *userdata)
+{
+    const bf16_farskip_shared_args_t *args =
+        (const bf16_farskip_shared_args_t *)userdata;
+    farskip_swiglu_shared_combine_bf16_row_range(
+        args->hidden, args->routed, args->post_attn_residual,
+        args->shared_gate, args->shared_up, args->shared_down,
+        args->main_output, args->routed_free_output, args->rows,
+        args->hidden_dim, args->intermediate_dim, begin, end);
+}
+
+void farskip_swiglu_shared_combine_bf16_parallel_dispatch(
+    const float *hidden, const float *routed,
+    const float *post_attn_residual, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    float *main_output, float *routed_free_output, int rows,
+    int hidden_dim, int intermediate_dim)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_BF16_MOE_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || rows < 2) {
+        farskip_swiglu_shared_combine_bf16(
+            hidden, routed, post_attn_residual, shared_gate, shared_up,
+            shared_down, main_output, routed_free_output, rows, hidden_dim,
+            intermediate_dim);
+        return;
+    }
+
+    bf16_farskip_shared_args_t args = {
+        hidden, routed, post_attn_residual, shared_gate, shared_up, shared_down,
+        main_output, routed_free_output, rows, hidden_dim, intermediate_dim,
+    };
+    const int active = ck_independent_row_active_threads(pool, rows, 1);
+    int grain = rows / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, rows, grain, work_bf16_farskip_shared_rows, &args);
+}
+
 static void work_quantize_q8_k_rows(int begin, int end, void *userdata)
 {
     q8_k_quantize_args_t *args = (q8_k_quantize_args_t *)userdata;
@@ -583,6 +819,19 @@ static void work_quantize_q8_k_rows(int begin, int end, void *userdata)
     const size_t output_row_bytes =
         (size_t)(args->k / QK_K) * sizeof(block_q8_K);
     quantize_batch_q8_k_4row_nearest_even(
+        args->input + (size_t)begin * input_row_elems,
+        (unsigned char *)args->output + (size_t)begin * output_row_bytes,
+        end - begin, args->k);
+}
+
+static void work_quantize_q8_k_canonical_rows(
+    int begin, int end, void *userdata)
+{
+    q8_k_quantize_args_t *args = (q8_k_quantize_args_t *)userdata;
+    const size_t input_row_elems = (size_t)args->k;
+    const size_t output_row_bytes =
+        (size_t)(args->k / QK_K) * sizeof(block_q8_K);
+    quantize_batch_q8_k(
         args->input + (size_t)begin * input_row_elems,
         (unsigned char *)args->output + (size_t)begin * output_row_bytes,
         end - begin, args->k);
@@ -596,6 +845,47 @@ static void work_rmsnorm_exact_rows(int begin, int end, void *userdata)
         args->input + offset, args->gamma, args->output + offset,
         args->rstd_cache ? args->rstd_cache + begin : NULL,
         end - begin, args->d_model, args->aligned_embed_dim, args->eps);
+}
+
+static void work_rmsnorm_rows(int begin, int end, void *userdata)
+{
+    rmsnorm_exact_args_t *args = (rmsnorm_exact_args_t *)userdata;
+    const size_t offset = (size_t)begin * (size_t)args->aligned_embed_dim;
+    rmsnorm_forward(
+        args->input + offset, args->gamma, args->output + offset,
+        args->rstd_cache ? args->rstd_cache + begin : NULL,
+        end - begin, args->d_model, args->aligned_embed_dim, args->eps);
+}
+
+static void work_rmsnorm_no_weight_rows(int begin, int end, void *userdata)
+{
+    rmsnorm_no_weight_args_t *args =
+        (rmsnorm_no_weight_args_t *)userdata;
+    const size_t offset = (size_t)begin * (size_t)args->head_dim;
+    rmsnorm_forward_no_weight(
+        args->input + offset, args->output + offset,
+        args->rstd_cache ? args->rstd_cache + begin : NULL,
+        end - begin, args->head_dim, args->head_dim, args->eps);
+}
+
+static void work_residual_add_rows(int begin, int end, void *userdata)
+{
+    residual_add_args_t *args = (residual_add_args_t *)userdata;
+    const size_t offset =
+        (size_t)begin * (size_t)args->aligned_embed_dim;
+    ck_residual_add_token_major(
+        args->a + offset, args->b + offset, args->output + offset,
+        end - begin, args->aligned_embed_dim);
+}
+
+static void work_memcpy_jobs(int begin, int end, void *userdata)
+{
+    enum { CHUNK_BYTES = 1 << 20 };
+    memcpy_args_t *args = (memcpy_args_t *)userdata;
+    const size_t offset = (size_t)begin * CHUNK_BYTES;
+    size_t limit = (size_t)end * CHUNK_BYTES;
+    if (limit > args->size) limit = args->size;
+    memcpy(args->dst + offset, args->src + offset, limit - offset);
 }
 
 static void work_recurrent_norm_gate_rows(int begin, int end, void *userdata)
@@ -633,6 +923,28 @@ void quantize_batch_q8_k_4row_nearest_even_parallel_dispatch(
         0, num_rows, grain, work_quantize_q8_k_rows, &args);
 }
 
+void quantize_batch_q8_k_parallel_dispatch(
+    const float *x, void *y, int num_rows, int k)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 16;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || num_rows < grain * 2 ||
+        k <= 0 || (k % QK_K) != 0) {
+        quantize_batch_q8_k(x, y, num_rows, k);
+        return;
+    }
+
+    q8_k_quantize_args_t args = {
+        .input = x,
+        .output = y,
+        .rows = num_rows,
+        .k = k,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, num_rows, grain),
+        0, num_rows, grain, work_quantize_q8_k_canonical_rows, &args);
+}
+
 void rmsnorm_forward_llama_production_parallel_dispatch(
     const float *input, const float *gamma, float *output, float *rstd_cache,
     int tokens, int d_model, int aligned_embed_dim, float eps)
@@ -660,6 +972,138 @@ void rmsnorm_forward_llama_production_parallel_dispatch(
     ck_threadpool_parallel_for_n(
         pool, ck_independent_row_active_threads(pool, tokens, grain),
         0, tokens, grain, work_rmsnorm_exact_rows, &args);
+}
+
+void rmsnorm_forward_parallel_dispatch(
+    const float *input, const float *gamma, float *output, float *rstd_cache,
+    int tokens, int d_model, int aligned_embed_dim, float eps)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 8;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || tokens < grain * 2 ||
+        d_model <= 0 || aligned_embed_dim < d_model) {
+        rmsnorm_forward(
+            input, gamma, output, rstd_cache,
+            tokens, d_model, aligned_embed_dim, eps);
+        return;
+    }
+
+    rmsnorm_exact_args_t args = {
+        .input = input,
+        .gamma = gamma,
+        .output = output,
+        .rstd_cache = rstd_cache,
+        .tokens = tokens,
+        .d_model = d_model,
+        .aligned_embed_dim = aligned_embed_dim,
+        .eps = eps,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, tokens, grain),
+        0, tokens, grain, work_rmsnorm_rows, &args);
+}
+
+void qk_norm_forward_parallel_dispatch(
+    float *q, float *k, const float *q_gamma, const float *k_gamma,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)
+{
+    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0 ||
+        head_dim <= 0 || num_tokens > INT_MAX / num_heads ||
+        num_tokens > INT_MAX / num_kv_heads) {
+        qk_norm_forward(
+            q, k, q_gamma, k_gamma, num_heads, num_kv_heads,
+            num_tokens, head_dim, eps);
+        return;
+    }
+    rmsnorm_forward_parallel_dispatch(
+        q, q_gamma, q, NULL, num_heads * num_tokens,
+        head_dim, head_dim, eps);
+    rmsnorm_forward_parallel_dispatch(
+        k, k_gamma, k, NULL, num_kv_heads * num_tokens,
+        head_dim, head_dim, eps);
+}
+
+void gemma4_v_norm_forward_parallel_dispatch(
+    const float *input, float *output, float *rstd_cache,
+    int tokens, int num_kv_heads, int head_dim, float eps)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 8;
+    if (tokens <= 0 || num_kv_heads <= 0 ||
+        tokens > INT_MAX / num_kv_heads) {
+        gemma4_v_norm_forward(
+            input, output, rstd_cache,
+            tokens, num_kv_heads, head_dim, eps);
+        return;
+    }
+    const int rows = tokens * num_kv_heads;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 ||
+        rows < grain * 2 || head_dim <= 0) {
+        gemma4_v_norm_forward(
+            input, output, rstd_cache,
+            tokens, num_kv_heads, head_dim, eps);
+        return;
+    }
+
+    rmsnorm_no_weight_args_t args = {
+        .input = input,
+        .output = output,
+        .rstd_cache = rstd_cache,
+        .head_dim = head_dim,
+        .eps = eps,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, rows, grain),
+        0, rows, grain, work_rmsnorm_no_weight_rows, &args);
+}
+
+void ck_residual_add_token_major_parallel_dispatch(
+    const float *a, const float *b, float *out,
+    int tokens, int aligned_embed_dim)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 16;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || tokens < grain * 2 ||
+        aligned_embed_dim <= 0) {
+        ck_residual_add_token_major(a, b, out, tokens, aligned_embed_dim);
+        return;
+    }
+
+    residual_add_args_t args = {
+        .a = a,
+        .b = b,
+        .output = out,
+        .tokens = tokens,
+        .aligned_embed_dim = aligned_embed_dim,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, tokens, grain),
+        0, tokens, grain, work_residual_add_rows, &args);
+}
+
+void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size)
+{
+    enum {
+        CHUNK_BYTES = 1 << 20,
+        MIN_PARALLEL_BYTES = 4 << 20,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const size_t job_count = size ? 1 + (size - 1) / CHUNK_BYTES : 0;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 ||
+        size < MIN_PARALLEL_BYTES || job_count > INT_MAX) {
+        return memcpy(dst, src, size);
+    }
+
+    memcpy_args_t args = {
+        .dst = (unsigned char *)dst,
+        .src = (const unsigned char *)src,
+        .size = size,
+    };
+    const int jobs = (int)job_count;
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, jobs, 1),
+        0, jobs, 1, work_memcpy_jobs, &args);
+    return dst;
 }
 
 void recurrent_norm_gate_llama_avx2_parallel_dispatch(
@@ -2417,6 +2861,18 @@ static void work_geglu_exact_range(int begin, int end, void *args)
         end - begin, a->dim);
 }
 
+static void work_rope_split_direct_token_range(
+    int begin, int end, void *userdata)
+{
+    const rope_split_direct_args_t *args =
+        (const rope_split_direct_args_t *)userdata;
+    rope_forward_qk_split_direct_token_range_f32(
+        args->q, args->k, args->freq_factors, args->use_freq_factors,
+        args->num_heads, args->num_kv_heads, args->num_tokens,
+        args->head_dim, args->aligned_head_dim, args->pos_offset,
+        args->rotary_dim, args->freq_base, begin, end);
+}
+
 static void work_gemm_nt_q5_k(int ith, int nth, void *args)
 {
     const gemm_args_t *a = (const gemm_args_t *)args;
@@ -3173,6 +3629,44 @@ void geglu_forward_exact_parallel_dispatch(
         ck_threadpool_dispatch_n(
             pool, active, work_geglu_exact_rows, &args);
     }
+}
+
+void rope_forward_qk_split_direct_parallel_dispatch(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_ROPE_SPLIT_DIRECT_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || num_tokens <= 1) {
+        rope_forward_qk_split_direct_f32(
+            q, k, freq_factors, use_freq_factors, num_heads, num_kv_heads,
+            num_tokens, head_dim, aligned_head_dim, pos_offset, rotary_dim,
+            freq_base);
+        return;
+    }
+
+    rope_split_direct_args_t args = {
+        .q = q,
+        .k = k,
+        .freq_factors = freq_factors,
+        .use_freq_factors = use_freq_factors,
+        .num_heads = num_heads,
+        .num_kv_heads = num_kv_heads,
+        .num_tokens = num_tokens,
+        .head_dim = head_dim,
+        .aligned_head_dim = aligned_head_dim,
+        .pos_offset = pos_offset,
+        .rotary_dim = rotary_dim,
+        .freq_base = freq_base,
+    };
+    const int active =
+        ck_independent_row_active_threads(pool, num_tokens, 1);
+    int grain = num_tokens / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, num_tokens, grain,
+        work_rope_split_direct_token_range, &args);
 }
 
 static void gemm_nt_q5_k_parallel_dispatch_impl(

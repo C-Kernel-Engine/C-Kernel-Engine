@@ -51,13 +51,26 @@
     "notes": "For optimal performance, E should be multiple of 64 for SIMD vectorization"
   },
   "impl": {
-    "function": "rmsnorm_forward",
-    "c_declaration": "void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
-    "sources": ["src/kernels/rmsnorm_kernels.c"],
+    "function": "rmsnorm_forward_parallel_dispatch",
+    "c_declaration": "void rmsnorm_forward_parallel_dispatch(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+    "sources": ["src/kernels/rmsnorm_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
       {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
       {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+      {"name": "gamma", "source": "weight_f:_gamma", "alt": ["ln1_gamma", "ln2_gamma", "post_attention_norm", "post_ffn_norm", "v_norm_gamma", "final_ln_weight"], "cast": "const float*", "ports": ["weight:gamma"]},
+      {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+      {"name": "rstd_cache", "source": "null", "ports": ["output:rstd"]},
+      {"name": "tokens", "source": "dim:seq_len"},
+      {"name": "d_model", "source": "dim:embed_dim"},
+      {"name": "aligned_embed_dim", "source": "dim:embed_dim"},
+      {"name": "eps", "source": "dim:rms_eps"}
     ]
   },
   "tests": {

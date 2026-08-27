@@ -19,16 +19,28 @@
     {
       "name": "scores",
       "dtype": "fp32",
-      "shape": ["T"],
+      "shape": ["H", "T"],
       "size_resolution": "required",
       "lifetime": "kernel_call",
-      "desc": "Reusable causal score row sized for the complete prefill sequence."
+      "desc": "Planner-owned causal score row per query-head worker."
     }
   ],
   "dims": ["T", "H", "KV", "QK", "V", "attention_scale"],
+  "parallelization": {
+    "supported": ["query_head"],
+    "preferred": {"prefill": "token_row", "decode": "serial"},
+    "strategies": [
+      {
+        "name": "token_row",
+        "partition_dim": "T",
+        "param_style": "internal_dispatch",
+        "schedule": "dynamic_causal_token_rows"
+      }
+    ]
+  },
   "impl": {
-    "function": "deepseek_mla_attention_f32_workspace",
-    "c_declaration": "void deepseek_mla_attention_f32_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
+    "function": "deepseek_mla_attention_f32_parallel_dispatch",
+    "c_declaration": "void deepseek_mla_attention_f32_parallel_dispatch(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int qk_head_dim, int v_head_dim, float scale, float *scores, size_t scores_bytes);",
     "sources": ["src/kernels/deepseek_kernels.c"]
   },
   "call_abi": {
@@ -48,5 +60,5 @@
       {"name": "scores_bytes", "source": "scratch_size:scores"}
     ]
   },
-  "notes": "Reference causal MLA prefill attention over the current token sequence. The model-derived softmax scale is an explicit ABI dimension, including any YaRN mscale multiplier."
+  "notes": "Reference causal MLA prefill attention over the current token sequence. Workers dynamically claim complete token rows to balance both increasing causal-history cost and asymmetric core throughput. Query/head rows remain independent and retain their original reduction order; planner-owned score rows prevent cross-worker aliasing. The model-derived softmax scale is explicit."
 }

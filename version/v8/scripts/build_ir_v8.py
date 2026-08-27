@@ -4917,19 +4917,20 @@ def _kernel_scratch_size_bytes(
     return elements * _dtype_size_bytes(str(scratch.get("dtype", "fp32")))
 
 
-def _required_kernel_call_scratch_bytes(
+def _required_kernel_call_storage_bytes(
     ir_lower_1_ops: List[Dict[str, Any]],
     config: Dict[str, Any],
     seq_len: int,
-) -> int:
-    """Return the largest planner-owned call workspace selected by the IR."""
+) -> Tuple[int, int]:
+    """Return the largest workspace and live-plus-workspace arena extents."""
     scratch_config = dict(config)
     scratch_config["seq_len"] = int(seq_len)
     scratch_config["context_length"] = int(
         config.get("context_length", config.get("context_len", seq_len)) or seq_len
     )
 
-    maximum = 0
+    maximum_workspace = 0
+    maximum_arena = 0
     for op in ir_lower_1_ops:
         params = dict(op.get("params", {}) or {})
         params["seq_len"] = int(seq_len)
@@ -4944,10 +4945,36 @@ def _required_kernel_call_scratch_bytes(
         raw_layer = op.get("layer", -1)
         layer = int(raw_layer) if raw_layer is not None else -1
         apply_layer_attention_dims(op_name, params, layer, scratch_config)
-        cursor = 0
-        for scratch in op.get("scratch", []) or []:
-            if not isinstance(scratch, dict):
-                continue
+        scratch_items = [
+            scratch
+            for scratch in (op.get("scratch", []) or [])
+            if isinstance(scratch, dict)
+        ]
+        required_scratch_contract = any(
+            scratch.get("size_resolution") == "required"
+            for scratch in scratch_items
+        )
+        live_prefix = 0
+        if scratch_items:
+            for logical_ports in (op.get("inputs", {}), op.get("outputs", {})):
+                if not isinstance(logical_ports, dict):
+                    continue
+                for port_name, logical in logical_ports.items():
+                    if not isinstance(logical, dict) or logical.get("slot") != "mlp_scratch":
+                        continue
+                    required_bytes = _kernel_port_size_bytes(logical, params, scratch_config)
+                    if required_bytes is None:
+                        if required_scratch_contract:
+                            raise RuntimeError(
+                                "HARD SCRATCH CONTRACT FAULT: planner cannot resolve live "
+                                f"mlp_scratch port for {op.get('kernel')}:{port_name}"
+                            )
+                        continue
+                    live_prefix = max(live_prefix, int(required_bytes))
+
+        workspace_cursor = 0
+        arena_cursor = live_prefix
+        for scratch in scratch_items:
             size = _kernel_scratch_size_bytes(scratch, params, scratch_config)
             if size is None:
                 if scratch.get("size_resolution") == "required":
@@ -4961,10 +4988,31 @@ def _required_kernel_call_scratch_bytes(
                 raise RuntimeError(
                     "HARD SCRATCH CONTRACT FAULT: workspace alignment must be a power of two"
                 )
-            cursor = (cursor + alignment - 1) & ~(alignment - 1)
-            cursor += int(size)
-        maximum = max(maximum, cursor)
-    return maximum
+            workspace_cursor = (workspace_cursor + alignment - 1) & ~(alignment - 1)
+            workspace_cursor += int(size)
+            arena_cursor = (arena_cursor + alignment - 1) & ~(alignment - 1)
+            arena_cursor += int(size)
+        maximum_workspace = max(maximum_workspace, workspace_cursor)
+        maximum_arena = max(maximum_arena, arena_cursor)
+    return maximum_workspace, maximum_arena
+
+
+def _required_kernel_call_scratch_bytes(
+    ir_lower_1_ops: List[Dict[str, Any]],
+    config: Dict[str, Any],
+    seq_len: int,
+) -> int:
+    """Return the largest planner-owned call workspace selected by the IR."""
+    return _required_kernel_call_storage_bytes(ir_lower_1_ops, config, seq_len)[0]
+
+
+def _required_kernel_call_arena_bytes(
+    ir_lower_1_ops: List[Dict[str, Any]],
+    config: Dict[str, Any],
+    seq_len: int,
+) -> int:
+    """Return the arena needed for live mlp_scratch ports and call workspace."""
+    return _required_kernel_call_storage_bytes(ir_lower_1_ops, config, seq_len)[1]
 
 
 def _resolve_branch_collect_contract(
@@ -8379,7 +8427,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                         if quantize_kernel:
                                             quant_op_name = f"quantize_{op}_input"
                                             quant_op_info = get_op_info(quant_op_name, "body", layer_idx)
-                                            arranged_kernels.append({
+                                            quant_arranged = {
                                                 "op_id": quant_op_info["op_id"],
                                                 "kernel": quantize_kernel,
                                                 "op": quant_op_name,
@@ -8387,7 +8435,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                 "section": "body",
                                                 "layer": layer_idx,
                                                 "instance": 0,
-                                            })
+                                            }
+                                            graph_slots = _template_graph_slots(op_item)
+                                            graph_inputs = graph_slots.get("inputs", {})
+                                            projection_input = (
+                                                graph_inputs.get("x")
+                                                or graph_inputs.get("A")
+                                                or graph_inputs.get("input")
+                                            )
+                                            if projection_input:
+                                                quant_arranged["graph_slots"] = {
+                                                    "inputs": {"input": projection_input}
+                                                }
+                                            arranged_kernels.append(quant_arranged)
                                             # Projection-input quantizers share the
                                             # planner-owned Q8 workspace. Writing a
                                             # transformed stream there invalidates
@@ -9652,6 +9712,8 @@ def generate_ir_lower_1(
             lowered_op["resolved_codegen_capability"] = codegen_capability
         if ir_op.get("required_contract") is not None:
             lowered_op["required_contract"] = copy.deepcopy(ir_op["required_contract"])
+        if isinstance(ir_op.get("graph_slots"), dict):
+            lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
         if ir_op.get("resolved_contract") is not None:
             lowered_op["resolved_contract"] = copy.deepcopy(ir_op["resolved_contract"])
             if lowered_op["resolved_contract"].get("kernel_id") != kernel_id:
@@ -11174,7 +11236,7 @@ def generate_memory_layout(
     fused_attn_scratch = max(350 * 1024, 3 * num_heads * seq_len * max_attn_head_dim * 4 + embed_dim * 4 * seq_len * 4)
     # BF16 GeGLU needs 3 * seq_len * dim * 4 (input [a,b] + output)
     geglu_bf16_scratch = seq_len * intermediate_size * 3 * 4
-    provider_scratch_reserve = _required_kernel_call_scratch_bytes(
+    provider_scratch_reserve = _required_kernel_call_arena_bytes(
         ir_lower_1_ops, config, seq_len
     )
     scratch_size = max(
@@ -11409,7 +11471,7 @@ def generate_memory_layout_packed(
             config.get("context_length", 32768),
         )
     )
-    provider_scratch_reserve = _required_kernel_call_scratch_bytes(
+    provider_scratch_reserve = _required_kernel_call_arena_bytes(
         ir_lower_1_ops, config, seq_len
     )
     if provider_scratch_reserve:
@@ -11890,6 +11952,8 @@ def generate_ir_lower_2(
         }
         if ir_op.get("required_contract") is not None:
             lowered_op["required_contract"] = copy.deepcopy(ir_op["required_contract"])
+        if isinstance(ir_op.get("graph_slots"), dict):
+            lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
         if ir_op.get("resolved_contract") is not None:
             lowered_op["resolved_contract"] = copy.deepcopy(ir_op["resolved_contract"])
             if lowered_op["resolved_contract"].get("kernel_id") != ir_op["kernel"]:

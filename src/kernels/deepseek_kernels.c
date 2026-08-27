@@ -8,11 +8,14 @@
 
 #include <math.h>
 #include <float.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "bf16_utils.h"
+#include "ck_threadpool.h"
 
 static inline size_t ds_mhc_idx(int t, int s, int d, int n_streams, int dim)
 {
@@ -219,23 +222,26 @@ void deepseek_mla_kv_decompress_f32(const float *compressed_kv,
     }
 }
 
-void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
-                                     const uint16_t *kv_b_proj,
-                                     float *k_nope,
-                                     float *value,
-                                     int tokens,
-                                     int heads,
-                                     int kv_lora_rank,
-                                     int qk_nope_dim,
-                                     int v_dim)
+void deepseek_mla_kv_decompress_bf16_token_range(const float *compressed_kv,
+                                                 const uint16_t *kv_b_proj,
+                                                 float *k_nope,
+                                                 float *value,
+                                                 int tokens,
+                                                 int heads,
+                                                 int kv_lora_rank,
+                                                 int qk_nope_dim,
+                                                 int v_dim,
+                                                 int token_begin,
+                                                 int token_end)
 {
     if (!compressed_kv || !kv_b_proj || !k_nope || !value ||
-        tokens <= 0 || heads <= 0 || kv_lora_rank <= 0 || qk_nope_dim <= 0 || v_dim <= 0) {
+        tokens <= 0 || heads <= 0 || kv_lora_rank <= 0 || qk_nope_dim <= 0 || v_dim <= 0 ||
+        token_begin < 0 || token_begin >= token_end || token_end > tokens) {
         return;
     }
 
     const int out_per_head = qk_nope_dim + v_dim;
-    for (int t = 0; t < tokens; ++t) {
+    for (int t = token_begin; t < token_end; ++t) {
         for (int h = 0; h < heads; ++h) {
             for (int d = 0; d < qk_nope_dim; ++d) {
                 const int out_col = h * out_per_head + d;
@@ -259,6 +265,83 @@ void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
             }
         }
     }
+}
+
+void deepseek_mla_kv_decompress_bf16(const float *compressed_kv,
+                                     const uint16_t *kv_b_proj,
+                                     float *k_nope,
+                                     float *value,
+                                     int tokens,
+                                     int heads,
+                                     int kv_lora_rank,
+                                     int qk_nope_dim,
+                                     int v_dim)
+{
+    if (tokens <= 0) return;
+    deepseek_mla_kv_decompress_bf16_token_range(
+        compressed_kv, kv_b_proj, k_nope, value, tokens, heads,
+        kv_lora_rank, qk_nope_dim, v_dim, 0, tokens);
+}
+
+typedef struct {
+    const float *compressed_kv;
+    const uint16_t *kv_b_proj;
+    float *k_nope;
+    float *value;
+    int tokens;
+    int heads;
+    int kv_lora_rank;
+    int qk_nope_dim;
+    int v_dim;
+} ds_mla_kv_decompress_bf16_args_t;
+
+static void ds_mla_kv_decompress_bf16_rows(int begin, int end, void *opaque)
+{
+    const ds_mla_kv_decompress_bf16_args_t *args =
+        (const ds_mla_kv_decompress_bf16_args_t *)opaque;
+    deepseek_mla_kv_decompress_bf16_token_range(
+        args->compressed_kv, args->kv_b_proj, args->k_nope, args->value,
+        args->tokens, args->heads, args->kv_lora_rank, args->qk_nope_dim,
+        args->v_dim, begin, end);
+}
+
+void deepseek_mla_kv_decompress_bf16_parallel_dispatch(
+    const float *compressed_kv,
+    const uint16_t *kv_b_proj,
+    float *k_nope,
+    float *value,
+    int tokens,
+    int heads,
+    int kv_lora_rank,
+    int qk_nope_dim,
+    int v_dim)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const char *disabled = getenv("CK_DISABLE_MLA_PARALLEL_PREFILL");
+    if ((disabled && disabled[0] && strcmp(disabled, "0") != 0) ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || tokens < 2) {
+        deepseek_mla_kv_decompress_bf16(
+            compressed_kv, kv_b_proj, k_nope, value, tokens, heads,
+            kv_lora_rank, qk_nope_dim, v_dim);
+        return;
+    }
+    ds_mla_kv_decompress_bf16_args_t args = {
+        .compressed_kv = compressed_kv,
+        .kv_b_proj = kv_b_proj,
+        .k_nope = k_nope,
+        .value = value,
+        .tokens = tokens,
+        .heads = heads,
+        .kv_lora_rank = kv_lora_rank,
+        .qk_nope_dim = qk_nope_dim,
+        .v_dim = v_dim,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > tokens) active = tokens;
+    int grain = tokens / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, tokens, grain, ds_mla_kv_decompress_bf16_rows, &args);
 }
 
 /* Model-agnostic implementation of the DeepSeek-V3 interleaved MLA rotary
@@ -630,6 +713,58 @@ void deepseek_hybrid_attention_f32(const float *q,
 }
 
 
+static void ds_mla_attention_f32_query_range(const float *q,
+                                             const float *k,
+                                             const float *v,
+                                             float *output,
+                                             int num_heads,
+                                             int num_kv_heads,
+                                             int num_tokens,
+                                             int qk_head_dim,
+                                             int v_head_dim,
+                                             float scale,
+                                             float *scores,
+                                             int query_begin,
+                                             int query_end,
+                                             int query_step)
+{
+    for (int query = query_begin; query < query_end; query += query_step) {
+        const int t = query / num_heads;
+        const int h = query - t * num_heads;
+        const int kv_h = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+        const float *q_vec = q + ds_mla_thd_idx(t, h, 0, num_heads, qk_head_dim);
+
+        float max_score = -FLT_MAX;
+        for (int j = 0; j <= t; ++j) {
+            const float *k_vec = k + ds_mla_thd_idx(j, kv_h, 0, num_kv_heads, qk_head_dim);
+            float dot = 0.0f;
+            for (int d = 0; d < qk_head_dim; ++d) {
+                dot += q_vec[d] * k_vec[d];
+            }
+            const float score = dot * scale;
+            scores[j] = score;
+            if (score > max_score) max_score = score;
+        }
+
+        float sum = 0.0f;
+        for (int j = 0; j <= t; ++j) {
+            const float e = expf(scores[j] - max_score);
+            scores[j] = e;
+            sum += e;
+        }
+        const float inv_sum = sum > 0.0f ? (1.0f / sum) : 0.0f;
+        float *out = output + ((size_t)t * (size_t)num_heads + (size_t)h) * (size_t)v_head_dim;
+        for (int d = 0; d < v_head_dim; ++d) out[d] = 0.0f;
+        for (int j = 0; j <= t; ++j) {
+            const float weight = scores[j] * inv_sum;
+            const float *v_vec = v + ds_mla_thd_idx(j, kv_h, 0, num_kv_heads, v_head_dim);
+            for (int d = 0; d < v_head_dim; ++d) {
+                out[d] += weight * v_vec[d];
+            }
+        }
+    }
+}
+
 void deepseek_mla_attention_f32_workspace(const float *q,
                                           const float *k,
                                           const float *v,
@@ -645,6 +780,7 @@ void deepseek_mla_attention_f32_workspace(const float *q,
 {
     if (!q || !k || !v || !output || num_heads <= 0 || num_kv_heads <= 0 ||
         num_tokens <= 0 || qk_head_dim <= 0 || v_head_dim <= 0 ||
+        num_tokens > INT_MAX / num_heads ||
         !isfinite(scale) || scale <= 0.0f) {
         return;
     }
@@ -653,42 +789,91 @@ void deepseek_mla_attention_f32_workspace(const float *q,
         return;
     }
 
-    for (int t = 0; t < num_tokens; ++t) {
-        for (int h = 0; h < num_heads; ++h) {
-            const int kv_h = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
-            const float *q_vec = q + ds_mla_thd_idx(t, h, 0, num_heads, qk_head_dim);
+    ds_mla_attention_f32_query_range(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens,
+        qk_head_dim, v_head_dim, scale, scores,
+        0, num_tokens * num_heads, 1);
+}
 
-            float max_score = -FLT_MAX;
-            for (int j = 0; j <= t; ++j) {
-                const float *k_vec = k + ds_mla_thd_idx(j, kv_h, 0, num_kv_heads, qk_head_dim);
-                float dot = 0.0f;
-                for (int d = 0; d < qk_head_dim; ++d) {
-                    dot += q_vec[d] * k_vec[d];
-                }
-                const float score = dot * scale;
-                scores[j] = score;
-                if (score > max_score) max_score = score;
-            }
+typedef struct {
+    const float *q;
+    const float *k;
+    const float *v;
+    float *output;
+    int num_heads;
+    int num_kv_heads;
+    int num_tokens;
+    int qk_head_dim;
+    int v_head_dim;
+    float scale;
+    float *scores;
+    _Alignas(CK_CACHE_LINE) atomic_int next_token;
+} ds_mla_attention_f32_args_t;
 
-            float sum = 0.0f;
-            for (int j = 0; j <= t; ++j) {
-                const float e = expf(scores[j] - max_score);
-                scores[j] = e;
-                sum += e;
-            }
-            const float inv_sum = sum > 0.0f ? (1.0f / sum) : 0.0f;
-            float *out = output + ((size_t)t * (size_t)num_heads + (size_t)h) * (size_t)v_head_dim;
-            for (int d = 0; d < v_head_dim; ++d) out[d] = 0.0f;
-            for (int j = 0; j <= t; ++j) {
-                const float w = scores[j] * inv_sum;
-                const float *v_vec = v + ds_mla_thd_idx(j, kv_h, 0, num_kv_heads, v_head_dim);
-                for (int d = 0; d < v_head_dim; ++d) {
-                    out[d] += w * v_vec[d];
-                }
-            }
-        }
+static void ds_mla_attention_f32_work(int ith, int nth, void *opaque)
+{
+    ds_mla_attention_f32_args_t *args =
+        (ds_mla_attention_f32_args_t *)opaque;
+    float *thread_scores = args->scores + (size_t)ith * (size_t)args->num_tokens;
+    (void)nth;
+    /* One token row contains every query head and costs O(t). Dynamic claims
+     * keep asymmetric cores busy without sharing score scratch. Query rows are
+     * independent, and every row retains its original reduction order. */
+    for (;;) {
+        const int token = atomic_fetch_add_explicit(
+            &args->next_token,
+            1,
+            memory_order_relaxed);
+        if (token >= args->num_tokens) break;
+        ds_mla_attention_f32_query_range(
+            args->q, args->k, args->v, args->output,
+            args->num_heads, args->num_kv_heads, args->num_tokens,
+            args->qk_head_dim, args->v_head_dim, args->scale,
+            thread_scores,
+            token * args->num_heads,
+            (token + 1) * args->num_heads,
+            1);
     }
+}
 
+void deepseek_mla_attention_f32_parallel_dispatch(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int qk_head_dim,
+    int v_head_dim,
+    float scale,
+    float *scores,
+    size_t scores_bytes)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const char *disabled = getenv("CK_DISABLE_MLA_PARALLEL_PREFILL");
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > num_heads) active = num_heads;
+    const size_t score_row_bytes =
+        num_tokens > 0 ? (size_t)num_tokens * sizeof(float) : 0;
+    if ((disabled && disabled[0] && strcmp(disabled, "0") != 0) ||
+        !pool || active <= 1 || num_tokens <= 0 || num_heads <= 0 ||
+        num_tokens > INT_MAX / num_heads ||
+        score_row_bytes == 0 || (size_t)active > SIZE_MAX / score_row_bytes ||
+        scores_bytes < (size_t)active * score_row_bytes) {
+        deepseek_mla_attention_f32_workspace(
+            q, k, v, output, num_heads, num_kv_heads, num_tokens,
+            qk_head_dim, v_head_dim, scale, scores, scores_bytes);
+        return;
+    }
+    ds_mla_attention_f32_args_t args = {
+        .q = q, .k = k, .v = v, .output = output,
+        .num_heads = num_heads, .num_kv_heads = num_kv_heads,
+        .num_tokens = num_tokens, .qk_head_dim = qk_head_dim,
+        .v_head_dim = v_head_dim, .scale = scale, .scores = scores,
+    };
+    atomic_init(&args.next_token, 0);
+    ck_threadpool_dispatch_n(pool, active, ds_mla_attention_f32_work, &args);
 }
 
 void deepseek_mla_attention_f32(const float *q,

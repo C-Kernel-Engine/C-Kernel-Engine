@@ -26,20 +26,15 @@
     {"name": "eps", "dtype": "float", "desc": "RMSNorm epsilon (e.g. 1e-6)"}
   ],
   "parallelization": {
-    "supported": ["head", "token"],
-    "preferred": {"prefill": "head", "decode": "head"},
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": null},
     "strategies": [
-      {
-        "name": "head",
-        "partition_dim": "H",
-        "param_style": "ith_nth",
-        "notes": "Each head is independent. Parallelize across heads for Q, then across kv_heads for K."
-      },
       {
         "name": "token",
         "partition_dim": "T",
-        "param_style": "ith_nth",
-        "notes": "Parallelize across tokens; each thread handles one or more tokens across all heads."
+        "param_style": "range",
+        "range": {"min_chunk": 8},
+        "notes": "Flatten independent head/token rows and preserve each row's serial reduction order."
       }
     ]
   },
@@ -48,13 +43,24 @@
     "notes": "D (head_dim) should be multiple of 64 for optimal SIMD in underlying rmsnorm_forward."
   },
   "impl": {
-    "function": "qk_norm_forward",
-    "c_declaration": "void qk_norm_forward(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
-    "sources": ["src/kernels/qk_norm_kernels.c"],
+    "function": "qk_norm_forward_parallel_dispatch",
+    "c_declaration": "void qk_norm_forward_parallel_dispatch(float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);",
+    "sources": ["src/kernels/qk_norm_kernels.c", "src/kernels/rmsnorm_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"],
     "variants": [
       {"name": "ref", "requires": [], "compile_flags": []}
     ]
   },
+  "call_abi": {"version": 1, "params": [
+    {"name": "q", "source": "scratch:q_scratch", "cast": "float*", "ports": ["input:q", "output:q"]},
+    {"name": "k", "source": "scratch:k_scratch", "cast": "float*", "ports": ["input:k", "output:k"]},
+    {"name": "q_gamma", "source": "weight_f:q_norm", "cast": "const float*", "ports": ["weight:q_gamma"]},
+    {"name": "k_gamma", "source": "weight_f:k_norm", "cast": "const float*", "ports": ["weight:k_gamma"]},
+    {"name": "num_heads", "source": "dim:num_heads"},
+    {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+    {"name": "num_tokens", "source": "dim:seq_len"},
+    {"name": "head_dim", "source": "dim:head_dim"},
+    {"name": "eps", "source": "dim:rms_eps"}
+  ]},
   "tests": {
     "unit": ["unittest/test_qk_norm.py"],
     "parity": [

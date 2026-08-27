@@ -352,6 +352,35 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
         self.assertNotIn("k_proj", shared_ops)
         self.assertNotIn("v_proj", shared_ops)
 
+    def test_gemma4_geglu_declares_disjoint_compact_stream(self) -> None:
+        template_path = REPO_ROOT / "version" / "v8" / "circuits" / "gemma4.json"
+        template = json.loads(template_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(template["activation_bindings"]["mlp_compact"], "mlp_compact")
+        self.assertEqual(
+            template["activation_buffers"]["mlp_compact"]["shape"],
+            [
+                {"config": "execution_extent"},
+                {"config": "intermediate_size"},
+            ],
+        )
+        for ops in template["block_types"]["decoder"]["body"]["ops_by_kind"].values():
+            by_name = {
+                item if isinstance(item, str) else item["op"]: item
+                for item in ops
+            }
+            self.assertEqual(
+                by_name["geglu"]["graph_slots"],
+                {
+                    "inputs": {"x": "mlp_scratch"},
+                    "outputs": {"out": "mlp_compact"},
+                },
+            )
+            self.assertEqual(
+                by_name["mlp_down"]["graph_slots"]["inputs"]["x"],
+                "mlp_compact",
+            )
+
     def test_gemma4_assistant_q_only_ops_are_lowerable(self) -> None:
         import json
         import build_ir_v8  # type: ignore
