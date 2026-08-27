@@ -1310,9 +1310,15 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             branch_fc2_bias = next(arg for arg in branch_fc2.get("args", []) if arg.get("name") == "bias")
             self.assertEqual(branch_fc2_bias.get("weight_ref"), "v.deepstack.0.fc2.bias")
             patch_proj = next(op for op in call_ops if op.get("op") == "patch_proj")
-            self.assertEqual(patch_proj.get("function"), "gemm_naive_parallel")
+            self.assertEqual(
+                patch_proj.get("function"),
+                "gemm_nt_fp32_exact_parallel_dispatch",
+            )
             patch_proj_aux = next(op for op in call_ops if op.get("op") == "patch_proj_aux")
-            self.assertEqual(patch_proj_aux.get("function"), "gemm_naive_parallel")
+            self.assertEqual(
+                patch_proj_aux.get("function"),
+                "gemm_nt_fp32_exact_parallel_dispatch",
+            )
             attn_norm = next(op for op in call_ops if op.get("op") == "layernorm")
             self.assertEqual(attn_norm.get("function"), "layernorm_naive_serial_matched_precision")
             branch_norm = next(op for op in call_ops if op.get("op") == "branch_layernorm")
@@ -1354,7 +1360,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stderr)
             self.assertTrue(c_path.exists())
             text = c_path.read_text(encoding="utf-8")
-            self.assertIn("gemm_naive_parallel", text)
+            self.assertIn("gemm_nt_fp32_exact_parallel_dispatch", text)
             self.assertIn("position_embeddings_add_tiled_2d", text)
             self.assertIn("spatial_merge_contiguous_tiled", text)
             self.assertIn("gemm_nt_q8_0_q8_0_contract", text)
