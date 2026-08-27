@@ -1837,6 +1837,19 @@
 
   <!-- Detailed Roadmap Table -->
   <h2>Detailed Roadmap</h2>
+  <div class="alert alert-success" style="margin: 0.5rem 0 1.25rem;">
+    <span class="alert-icon">&#9889;</span>
+    <div>
+      <strong>Pulled forward into v8.</strong> Several capabilities originally scheduled for later versions
+      hardened inside the v8 compiler instead of waiting:
+      <strong>audio inference</strong> (v10 &rarr; v8: Whisper Tiny/Base end-to-end),
+      <strong>MoE inference</strong> (v12 &rarr; v8: router + expert providers in production),
+      <strong>distributed evidence</strong> (v18 &rarr; first measured two-node ZIP prefill, research lane),
+      and the <strong>kernel-map hardening</strong> program (297 maps, fail-closed selection, X-Ray resolver traces).
+      What did <em>not</em> move: hardened training backprop stays with v7, and distributed <em>training</em>
+      stays with v18. Rows below carry the PR references.
+    </div>
+  </div>
   <table class="roadmap-table">
     <thead>
       <tr>
@@ -1879,7 +1892,7 @@
       <tr>
         <td><strong>v8.0</strong></td>
         <td>Inference Compiler + Vision Encoder</td>
-        <td>Circuit-owned topology and weight policy, fail-closed kernel capability resolution, explicit numerical and threading contracts, GraphIR-to-call-IR decision preservation, bounded X-ray attribution, patch embedding, resized position encoding, M-RoPE, deepstack, and multimodal stitching &mdash; plus the first audio lane: Whisper Tiny/Base encoder and decoder circuits, originally slated for v10, now incorporating and hardening inside the v8 compiler</td>
+        <td>Circuit-owned topology and weight policy, fail-closed kernel capability resolution, explicit numerical and threading contracts, GraphIR-to-call-IR decision preservation, bounded X-ray attribution, patch embedding, resized position encoding, M-RoPE, deepstack, and multimodal stitching &mdash; plus the first audio lane: Whisper Tiny/Base encoder and decoder circuits, originally slated for v10, now incorporating and hardening inside the v8 compiler. The kernel-map layer hardened into <a href="kernel-maps.html">297 machine-checked provider maps with fail-closed selection</a>, and the family surface widened far past the original plan: Qwen3.5/3.6/3.8 (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/387" target="_blank" rel="noopener">#387</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/388" target="_blank" rel="noopener">#388</a>), Gemma3/4 (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/375" target="_blank" rel="noopener">#375</a>), GLM4 (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/386" target="_blank" rel="noopener">#386</a>), Instella (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/389" target="_blank" rel="noopener">#389</a>), Cohere2 (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/401" target="_blank" rel="noopener">#401</a>), Kimi (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/403" target="_blank" rel="noopener">#403</a>), Laguna (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/404" target="_blank" rel="noopener">#404</a>), and Nemotron-H (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/402" target="_blank" rel="noopener">#402</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/412" target="_blank" rel="noopener">#412</a>), with long-context certification sweeps (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/407" target="_blank" rel="noopener">#407</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/408" target="_blank" rel="noopener">#408</a>) &mdash; see <a href="model-kernel-matrix.html">Model + Kernel Matrix</a> and <a href="architecture-variants.html">Architecture Variants</a></td>
         <td>v7.x training</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -1907,9 +1920,9 @@
       <tr>
         <td><strong>v12.0</strong></td>
         <td>MoE - Mixture of Experts</td>
-        <td>Expert selection kernels, router computation, load balancing loss</td>
+        <td>Expert selection kernels, router computation, load balancing loss. The inference half landed early in v8: group-limited top-k routing with correction bias, Q4_K/Q5_K/Q8_0 expert GEMM providers, shared experts, and parallel decode expert routes (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/376" target="_blank" rel="noopener">#376</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/378" target="_blank" rel="noopener">#378</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/380" target="_blank" rel="noopener">#380</a>) power the production Qwen3.5/3.6 MoE and Laguna runtimes &mdash; see <a href="kernel-architecture.html">v8 Kernel Architecture</a>. Load-balancing loss and MoE backward stay with the training lane.</td>
         <td>v7.x training</td>
-        <td><span class="version-status status-planned">Planned</span></td>
+        <td><span class="version-status status-building">Building</span></td>
       </tr>
       <tr>
         <td><strong>v13.0</strong></td>
@@ -1949,7 +1962,7 @@
       <tr>
         <td><strong>v18.0</strong></td>
         <td>Distributed HPC Training</td>
-        <td>Multi-node CPU training with RDMA (InfiniBand/RoCE), gradient compression, and HPC cluster orchestration for large-scale model training (10-100B parameters) on commodity hardware</td>
+        <td>Multi-node CPU training with RDMA (InfiniBand/RoCE), gradient compression, and HPC cluster orchestration for large-scale model training (10-100B parameters) on commodity hardware. Distributed <em>inference</em> has its first measured evidence already: the research ZIP lane sharded Qwen3.5-35B-A3B MoE prefill across a Ryzen plus P3 over 1 GbE with a bit-exact same-ISA control (<a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/377" target="_blank" rel="noopener">#377</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/378" target="_blank" rel="noopener">#378</a>, <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/382" target="_blank" rel="noopener">#382</a>), and the architectural case lives in <a href="distributed-cpu.html">Distributed CPU: Zip Fusion</a>. The training-scale version stays planned.</td>
         <td>v17.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
