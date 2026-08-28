@@ -4956,11 +4956,26 @@ def _required_kernel_call_storage_bytes(
         )
         live_prefix = 0
         if scratch_items:
-            for logical_ports in (op.get("inputs", {}), op.get("outputs", {})):
+            dataflow = op.get("dataflow", {})
+            if not isinstance(dataflow, dict):
+                dataflow = {}
+            for port_kind, logical_ports in (
+                ("inputs", op.get("inputs", {})),
+                ("outputs", op.get("outputs", {})),
+            ):
                 if not isinstance(logical_ports, dict):
                     continue
+                flow_ports = dataflow.get(port_kind, {})
+                if not isinstance(flow_ports, dict):
+                    flow_ports = {}
                 for port_name, logical in logical_ports.items():
-                    if not isinstance(logical, dict) or logical.get("slot") != "mlp_scratch":
+                    if not isinstance(logical, dict):
+                        continue
+                    flow_port = flow_ports.get(port_name, {})
+                    if not isinstance(flow_port, dict):
+                        flow_port = {}
+                    slot = logical.get("slot", flow_port.get("slot"))
+                    if slot != "mlp_scratch":
                         continue
                     required_bytes = _kernel_port_size_bytes(logical, params, scratch_config)
                     if required_bytes is None:

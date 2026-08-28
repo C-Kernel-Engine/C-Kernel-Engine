@@ -388,6 +388,46 @@ class Qwen35MoeContractTests(unittest.TestCase):
         arena = _required_kernel_call_arena_bytes([op], config, 1)
         self.assertEqual(arena, workspace + HIDDEN * 4)
 
+    def test_required_provider_arena_joins_mapped_shape_to_dataflow_slot(self) -> None:
+        provider_path = (
+            REPO_ROOT
+            / "version"
+            / "v8"
+            / "kernel_maps"
+            / "moe_swiglu_expert_forward_q4k_q5k_bucketed.json"
+        )
+        provider = json.loads(provider_path.read_text(encoding="utf-8"))
+        config = {
+            "embed_dim": HIDDEN,
+            "moe_intermediate_size": EXPERT_DIM,
+            "n_routed_experts": EXPERTS,
+            "experts_per_tok": TOP_K,
+            "context_length": 512,
+        }
+        op = {
+            "op": "moe_swiglu_expert_mlp",
+            "kernel": provider["id"],
+            "params": {},
+            "outputs": {
+                "output": {
+                    "buffer": "buf_0_output",
+                    "dtype": "fp32",
+                    "shape": ["R", "H"],
+                }
+            },
+            "dataflow": {
+                "outputs": {
+                    "output": {"dtype": "fp32", "slot": "mlp_scratch"},
+                }
+            },
+            "scratch": provider["scratch"],
+        }
+        workspace = _required_kernel_call_scratch_bytes([op], config, 1)
+        self.assertEqual(
+            _required_kernel_call_arena_bytes([op], config, 1),
+            workspace + HIDDEN * 4,
+        )
+
     def test_required_q5_workspace_uses_logical_projection_dimensions(self) -> None:
         provider_path = (
             REPO_ROOT
