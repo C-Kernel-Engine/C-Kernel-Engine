@@ -765,10 +765,11 @@
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot st-traj"></span><span class="mp-text">Q4_K_M 27B text runtime — 4,096-token trajectory bit-exact to llama.cpp (4,000/4,000 full-vocabulary rows)</span></div>
         <div class="mp-row"><span class="mp-dot st-plan"></span><span class="mp-text">262,144-token context memory planner certified (capacity-aware nightly lane)</span></div>
-        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Public 128K/262K runtime claims deferred; ~1.49× slower than llama.cpp at 8K tokens</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Six 131,072-token artifact runs completed at 32.37–32.71 tok/s prefill and 1.36–1.41 tok/s decode</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">128K bit-exact parity and 262K runtime execution remain separate open certification boundaries</span></div>
       </div>
       <div class="source-note">
-        Identity: upstream GGUFs advertise <code>general.architecture=qwen35</code>; the converter selects qwen38 via artifact metadata (basename / size label). Circuit carries validated contract selectors for q5_k, q6_k, q8_0 and BF16 recurrent dtypes. Evidence: PRs #387, #388, #390.
+        Identity: upstream GGUFs advertise <code>general.architecture=qwen35</code>; the converter selects qwen38 via artifact metadata (basename / size label). Circuit carries validated contract selectors for q5_k, q6_k, q8_0 and BF16 recurrent dtypes. Evidence: PRs #387, #388, #390. <a href="qwen38-generated-artifacts.html">Inspect the generated 128K engineering artifacts.</a>
       </div>
       <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">

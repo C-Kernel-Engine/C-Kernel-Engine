@@ -1,0 +1,349 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="svgTitle svgDesc">
+  <title id="svgTitle">Sustaining 16 Zen 5 Cores: CKE Scheduling from Prefill to Decode</title>
+  <desc id="svgDesc">Diagram showing two eight-core CCD/L3 domains with sixteen pinned cores, persistent workers, dynamic tiles, deterministic output-range reductions, barriers, and topology-weighted assignment. Contrasts earlier 70-80 percent prefill utilization with improved 91-97 percent intervals and occasional 100 percent. Includes a diagnostic decode snapshot where CPUs 0-7 show about 66-69 percent and CPUs 8-15 show about 91-98 percent, explicitly not a final causal claim. Shows worker timelines, queue depth, barrier wait, tile ownership, exactness, and kernel-map topology metadata.</desc>
+
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="#1c1c2e"/>
+
+  <!-- Title Bar -->
+  <rect x="0" y="0" width="1600" height="52" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="24" y="33" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#f0a030">Sustaining 16 Zen 5 Cores: CKE Scheduling from Prefill to Decode</text>
+  <text x="1576" y="33" font-family="system-ui,sans-serif" font-size="11" fill="#a0a0b8" text-anchor="end">C-Kernel-Engine · v8 Runtime · 2026-08</text>
+
+  <!-- ===== SECTION 1: TWO CCD DOMAINS ===== -->
+  <!-- CCD Domain 0 (CPUs 0-7) -->
+  <rect x="20" y="62" width="770" height="200" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="36" y="84" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#e8e8f0">CCD 0 · L3 Domain A · 8 Zen 5 Cores</text>
+  <text x="36" y="100" font-family="system-ui,sans-serif" font-size="10" fill="#a0a0b8">CPUs 0–7 · 32 MB L3 · 2× 16 MB L2 per core · AVX-512 / AMX-BF16</text>
+
+  <!-- Cores 0-7 -->
+  <g id="cores-ccd0">
+    <rect x="36" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="77" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 0</text>
+    <text x="77" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="77" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W0</text>
+
+    <rect x="126" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="167" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 1</text>
+    <text x="167" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="167" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W1</text>
+
+    <rect x="216" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="257" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 2</text>
+    <text x="257" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="257" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W2</text>
+
+    <rect x="306" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="347" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 3</text>
+    <text x="347" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="347" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W3</text>
+
+    <rect x="396" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="437" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 4</text>
+    <text x="437" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="437" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W4</text>
+
+    <rect x="486" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="527" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 5</text>
+    <text x="527" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="527" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W5</text>
+
+    <rect x="576" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="617" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 6</text>
+    <text x="617" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="617" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W6</text>
+
+    <rect x="666" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="707" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 7</text>
+    <text x="707" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="707" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W7</text>
+  </g>
+
+  <!-- CCD0 utilization bar -->
+  <rect x="36" y="180" width="712" height="14" rx="3" fill="#303050"/>
+  <rect x="36" y="180" width="648" height="14" rx="3" fill="#50c878" opacity="0.7"/>
+  <text x="36" y="208" font-family="monospace" font-size="9" fill="#a0a0b8">Prefill: 91–97% (improved) · Decode: 66–69% (diagnostic)</text>
+
+  <!-- CCD Domain 1 (CPUs 8-15) -->
+  <rect x="810" y="62" width="770" height="200" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="826" y="84" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#e8e8f0">CCD 1 · L3 Domain B · 8 Zen 5 Cores</text>
+  <text x="826" y="100" font-family="system-ui,sans-serif" font-size="10" fill="#a0a0b8">CPUs 8–15 · 32 MB L3 · 2× 16 MB L2 per core · AVX-512 / AMX-BF16</text>
+
+  <g id="cores-ccd1">
+    <rect x="826" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="867" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 8</text>
+    <text x="867" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="867" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W8</text>
+
+    <rect x="916" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="957" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 9</text>
+    <text x="957" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="957" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W9</text>
+
+    <rect x="1006" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1047" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 10</text>
+    <text x="1047" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1047" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W10</text>
+
+    <rect x="1096" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1137" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 11</text>
+    <text x="1137" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1137" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W11</text>
+
+    <rect x="1186" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1227" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 12</text>
+    <text x="1227" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1227" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W12</text>
+
+    <rect x="1276" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1317" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 13</text>
+    <text x="1317" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1317" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W13</text>
+
+    <rect x="1366" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1407" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 14</text>
+    <text x="1407" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1407" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W14</text>
+
+    <rect x="1456" y="112" width="82" height="56" rx="4" fill="#303050" stroke="#4a4a6a" stroke-width="1"/>
+    <text x="1497" y="134" font-family="monospace" font-size="10" fill="#e8e8f0" text-anchor="middle">CPU 15</text>
+    <text x="1497" y="150" font-family="monospace" font-size="9" fill="#50c878" text-anchor="middle">pinned</text>
+    <text x="1497" y="162" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="middle">W15</text>
+  </g>
+
+  <!-- CCD1 utilization bar -->
+  <rect x="826" y="180" width="712" height="14" rx="3" fill="#303050"/>
+  <rect x="826" y="180" width="690" height="14" rx="3" fill="#50c878" opacity="0.85"/>
+  <text x="826" y="208" font-family="monospace" font-size="9" fill="#a0a0b8">Prefill: 91–97% (improved, occasional 100%) · Decode: 91–98% (diagnostic)</text>
+
+  <!-- ===== SECTION 2: WORKER TIMELINES ===== -->
+  <rect x="20" y="272" width="1560" height="260" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="36" y="294" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#e8e8f0">Worker Timelines · Persistent Threads · Dynamic Tile Assignment</text>
+
+  <!-- Timeline axis -->
+  <line x1="120" y1="310" x2="1560" y2="310" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="120" y="306" font-family="monospace" font-size="8" fill="#a0a0b8">t=0</text>
+  <text x="840" y="306" font-family="monospace" font-size="8" fill="#a0a0b8">t=mid</text>
+  <text x="1540" y="306" font-family="monospace" font-size="8" fill="#a0a0b8" text-anchor="end">t=end</text>
+
+  <!-- Prefill timeline (improved) -->
+  <text x="36" y="330" font-family="monospace" font-size="10" fill="#f0a030">PREFILL (improved)</text>
+
+  <!-- W0-W7 prefill bars -->
+  <rect x="120" y="336" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="336" width="1316" height="12" rx="2" fill="#50c878" opacity="0.6"/>
+  <rect x="1436" y="336" width="84" height="12" rx="2" fill="#e05050" opacity="0.5"/>
+  <text x="120" y="345" font-family="monospace" font-size="8" fill="#e8e8f0">W0</text>
+  <text x="1540" y="345" font-family="monospace" font-size="8" fill="#e05050" text-anchor="end">barrier</text>
+
+  <rect x="120" y="352" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="352" width="1332" height="12" rx="2" fill="#50c878" opacity="0.65"/>
+  <rect x="1452" y="352" width="68" height="12" rx="2" fill="#e05050" opacity="0.5"/>
+  <text x="120" y="361" font-family="monospace" font-size="8" fill="#e8e8f0">W1</text>
+
+  <rect x="120" y="368" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="368" width="1348" height="12" rx="2" fill="#50c878" opacity="0.7"/>
+  <rect x="1468" y="368" width="52" height="12" rx="2" fill="#e05050" opacity="0.5"/>
+  <text x="120" y="377" font-family="monospace" font-size="8" fill="#e8e8f0">W2</text>
+
+  <rect x="120" y="384" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="384" width="1364" height="12" rx="2" fill="#50c878" opacity="0.7"/>
+  <rect x="1484" y="384" width="36" height="12" rx="2" fill="#e05050" opacity="0.5"/>
+  <text x="120" y="393" font-family="monospace" font-size="8" fill="#e8e8f0">W3</text>
+
+  <rect x="120" y="400" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="400" width="1380" height="12" rx="2" fill="#50c878" opacity="0.75"/>
+  <rect x="1500" y="400" width="20" height="12" rx="2" fill="#e05050" opacity="0.5"/>
+  <text x="120" y="409" font-family="monospace" font-size="8" fill="#e8e8f0">W4</text>
+
+  <rect x="120" y="416" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="416" width="1396" height="12" rx="2" fill="#50c878" opacity="0.75"/>
+  <text x="120" y="425" font-family="monospace" font-size="8" fill="#e8e8f0">W5</text>
+
+  <rect x="120" y="432" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="432" width="1400" height="12" rx="2" fill="#50c878" opacity="0.8"/>
+  <text x="120" y="441" font-family="monospace" font-size="8" fill="#e8e8f0">W6</text>
+
+  <rect x="120" y="448" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="448" width="1400" height="12" rx="2" fill="#50c878" opacity="0.8"/>
+  <text x="120" y="457" font-family="monospace" font-size="8" fill="#e8e8f0">W7</text>
+
+  <!-- Tile markers on prefill -->
+  <rect x="300" y="336" width="4" height="124" fill="#f0a030" opacity="0.4"/>
+  <rect x="700" y="336" width="4" height="124" fill="#f0a030" opacity="0.4"/>
+  <rect x="1100" y="336" width="4" height="124" fill="#f0a030" opacity="0.4"/>
+  <text x="302" y="476" font-family="monospace" font-size="7" fill="#f0a030">tile boundary</text>
+
+  <!-- Decode timeline (diagnostic) -->
+  <text x="36" y="496" font-family="monospace" font-size="10" fill="#4090d0">DECODE (diagnostic)</text>
+
+  <!-- W0-W7 decode: 66-69% -->
+  <rect x="120" y="502" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="502" width="924" height="12" rx="2" fill="#4090d0" opacity="0.5"/>
+  <text x="120" y="511" font-family="monospace" font-size="8" fill="#e8e8f0">W0</text>
+  <text x="1050" y="511" font-family="monospace" font-size="7" fill="#a0a0b8">~67%</text>
+
+  <rect x="120" y="518" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="518" width="938" height="12" rx="2" fill="#4090d0" opacity="0.5"/>
+  <text x="120" y="527" font-family="monospace" font-size="8" fill="#e8e8f0">W1</text>
+
+  <rect x="120" y="534" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="534" width="952" height="12" rx="2" fill="#4090d0" opacity="0.5"/>
+  <text x="120" y="543" font-family="monospace" font-size="8" fill="#e8e8f0">W2</text>
+
+  <rect x="120" y="550" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="550" width="966" height="12" rx="2" fill="#4090d0" opacity="0.5"/>
+  <text x="120" y="559" font-family="monospace" font-size="8" fill="#e8e8f0">W3</text>
+
+  <!-- W8-W15 decode: 91-98% -->
+  <rect x="120" y="566" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="566" width="1274" height="12" rx="2" fill="#50c878" opacity="0.6"/>
+  <text x="120" y="575" font-family="monospace" font-size="8" fill="#e8e8f0">W8</text>
+  <text x="1400" y="575" font-family="monospace" font-size="7" fill="#50c878">~91%</text>
+
+  <rect x="120" y="582" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="582" width="1316" height="12" rx="2" fill="#50c878" opacity="0.65"/>
+  <text x="120" y="591" font-family="monospace" font-size="8" fill="#e8e8f0">W9</text>
+
+  <rect x="120" y="598" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="598" width="1358" height="12" rx="2" fill="#50c878" opacity="0.7"/>
+  <text x="120" y="607" font-family="monospace" font-size="8" fill="#e8e8f0">W10</text>
+
+  <rect x="120" y="614" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="614" width="1372" height="12" rx="2" fill="#50c878" opacity="0.7"/>
+  <text x="120" y="623" font-family="monospace" font-size="8" fill="#e8e8f0">W11</text>
+
+  <rect x="120" y="630" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="630" width="1386" height="12" rx="2" fill="#50c878" opacity="0.75"/>
+  <text x="120" y="639" font-family="monospace" font-size="8" fill="#e8e8f0">W12</text>
+
+  <rect x="120" y="646" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="646" width="1400" height="12" rx="2" fill="#50c878" opacity="0.8"/>
+  <text x="120" y="655" font-family="monospace" font-size="8" fill="#e8e8f0">W13</text>
+
+  <rect x="120" y="662" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="662" width="1400" height="12" rx="2" fill="#50c878" opacity="0.8"/>
+  <text x="120" y="671" font-family="monospace" font-size="8" fill="#e8e8f0">W14</text>
+
+  <rect x="120" y="678" width="1400" height="12" rx="2" fill="#4060a0"/>
+  <rect x="120" y="678" width="1400" height="12" rx="2" fill="#50c878" opacity="0.8"/>
+  <text x="120" y="687" font-family="monospace" font-size="8" fill="#e8e8f0">W15</text>
+
+  <!-- Legend for timelines -->
+  <rect x="1200" y="336" width="12" height="12" fill="#50c878" opacity="0.7"/>
+  <text x="1218" y="346" font-family="monospace" font-size="8" fill="#a0a0b8">compute</text>
+  <rect x="1200" y="352" width="12" height="12" fill="#e05050" opacity="0.5"/>
+  <text x="1218" y="362" font-family="monospace" font-size="8" fill="#a0a0b8">barrier wait</text>
+  <rect x="1200" y="368" width="12" height="12" fill="#4090d0" opacity="0.5"/>
+  <text x="1218" y="378" font-family="monospace" font-size="8" fill="#a0a0b8">decode (diag)</text>
+  <rect x="1200" y="384" width="12" height="12" fill="#f0a030" opacity="0.4"/>
+  <text x="1218" y="394" font-family="monospace" font-size="8" fill="#a0a0b8">tile boundary</text>
+
+  <!-- ===== SECTION 3: METRICS ROW ===== -->
+  <!-- Queue Depth -->
+  <rect x="20" y="742" width="370" height="150" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="36" y="764" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e8e8f0">Queue Depth · Per-Worker</text>
+  <text x="36" y="780" font-family="monospace" font-size="9" fill="#a0a0b8">Dynamic tile queue (FIFO per CCD)</text>
+
+  <!-- Queue bars -->
+  <rect x="36" y="792" width="200" height="10" rx="2" fill="#303050"/>
+  <rect x="36" y="792" width="180" height="10" rx="2" fill="#4090d0" opacity="0.7"/>
+  <text x="244" y="801" font-family="monospace" font-size="8" fill="#a0a0b8">CCD0: 9/10</text>
+
+  <rect x="36" y="808" width="200" height="10" rx="2" fill="#303050"/>
+  <rect x="36" y="808" width="196" height="10" rx="2" fill="#4090d0" opacity="0.8"/>
+  <text x="244" y="817" font-family="monospace" font-size="8" fill="#a0a0b8">CCD1: 10/10</text>
+
+  <rect x="36" y="824" width="200" height="10" rx="2" fill="#303050"/>
+  <rect x="36" y="824" width="120" height="10" rx="2" fill="#4090d0" opacity="0.5"/>
+  <text x="244" y="833" font-family="monospace" font-size="8" fill="#a0a0b8">Decode: 6/10</text>
+
+  <text x="36" y="856" font-family="monospace" font-size="9" fill="#f0a030">Prefill: 91–97% (was 70–80%)</text>
+  <text x="36" y="872" font-family="monospace" font-size="9" fill="#50c878">Occasional 100% on CCD1</text>
+  <text x="36" y="888" font-family="monospace" font-size="9" fill="#4090d0">Decode: 66–69% / 91–98%</text>
+
+  <!-- Barrier Wait -->
+  <rect x="410" y="742" width="370" height="150" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="426" y="764" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e8e8f0">Barrier Wait · Deterministic Reduction</text>
+  <text x="426" y="780" font-family="monospace" font-size="9" fill="#a0a0b8">Output-range partial sums · fixed order</text>
+
+  <!-- Barrier timeline mini -->
+  <rect x="426" y="792" width="330" height="8" rx="2" fill="#303050"/>
+  <rect x="426" y="792" width="280" height="8" rx="2" fill="#50c878" opacity="0.6"/>
+  <rect x="706" y="792" width="50" height="8" rx="2" fill="#e05050" opacity="0.6"/>
+  <text x="426" y="812" font-family="monospace" font-size="8" fill="#a0a0b8">compute → reduce → barrier</text>
+
+  <rect x="426" y="824" width="330" height="8" rx="2" fill="#303050"/>
+  <rect x="426" y="824" width="300" height="8" rx="2" fill="#50c878" opacity="0.65"/>
+  <rect x="726" y="824" width="30" height="8" rx="2" fill="#e05050" opacity="0.6"/>
+  <text x="426" y="844" font-family="monospace" font-size="8" fill="#a0a0b8">improved: barrier ~3–5%</text>
+
+  <text x="426" y="864" font-family="monospace" font-size="9" fill="#e05050">Barrier: 3–5% of wall (prefill)</text>
+  <text x="426" y="880" font-family="monospace" font-size="9" fill="#a0a0b8">Order: CPU0→1→...→15 (fixed)</text>
+  <text x="426" y="896" font-family="monospace" font-size="9" fill="#50c878">Exact: bit-identical to serial</text>
+
+  <!-- Tile Ownership -->
+  <rect x="800" y="742" width="370" height="150" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="816" y="764" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e8e8f0">Tile Ownership · Topology-Weighted</text>
+  <text x="816" y="780" font-family="monospace" font-size="9" fill="#a0a0b8">AMX-capable cores get wider tiles</text>
+
+  <!-- Tile grid -->
+  <rect x="816" y="792" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="846" y="806" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T0·W0</text>
+  <rect x="880" y="792" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="910" y="806" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T1·W1</text>
+  <rect x="944" y="792" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="974" y="806" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T2·W2</text>
+  <rect x="1008" y="792" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="1038" y="806" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T3·W3</text>
+
+  <rect x="816" y="816" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="846" y="830" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T4·W4</text>
+  <rect x="880" y="816" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="910" y="830" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T5·W5</text>
+  <rect x="944" y="816" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="974" y="830" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T6·W6</text>
+  <rect x="1008" y="816" width="60" height="20" rx="2" fill="#6040a0" opacity="0.7"/>
+  <text x="1038" y="830" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T7·W7</text>
+
+  <rect x="816" y="840" width="60" height="20" rx="2" fill="#6040a0" opacity="0.8"/>
+  <text x="846" y="854" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T8·W8</text>
+  <rect x="880" y="840" width="60" height="20" rx="2" fill="#6040a0" opacity="0.8"/>
+  <text x="910" y="854" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T9·W9</text>
+  <rect x="944" y="840" width="60" height="20" rx="2" fill="#6040a0" opacity="0.8"/>
+  <text x="974" y="854" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T10·W10</text>
+  <rect x="1008" y="840" width="60" height="20" rx="2" fill="#6040a0" opacity="0.8"/>
+  <text x="1038" y="854" font-family="monospace" font-size="7" fill="#e8e8f0" text-anchor="middle">T11·W11</text>
+
+  <text x="816" y="878" font-family="monospace" font-size="9" fill="#a0a0b8">CCD0: 4 tiles × 2 rows (AMX 256-bit)</text>
+  <text x="816" y="894" font-family="monospace" font-size="9" fill="#a0a0b8">CCD1: 4 tiles × 2 rows (AMX 256-bit)</text>
+
+  <!-- Exactness -->
+  <rect x="1190" y="742" width="390" height="150" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="1206" y="764" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e8e8f0">Exactness · Reduction Contract</text>
+  <text x="1206" y="780" font-family="monospace" font-size="9" fill="#a0a0b8">Deterministic output-range partial sums</text>
+
+  <text x="1206" y="800" font-family="monospace" font-size="10" fill="#50c878">✓ Bit-identical to serial reference</text>
+  <text x="1206" y="818" font-family="monospace" font-size="10" fill="#50c878">✓ Fixed reduction order (CPU 0→15)</text>
+  <text x="1206" y="836" font-family="monospace" font-size="10" fill="#50c878">✓ No FMA reassociation across tiles</text>
+  <text x="1206" y="854" font-family="monospace" font-size="10" fill="#50c878">✓ AMX tile-local accumulate → FP32 sum</text>
+  <text x="1206" y="872" font-family="monospace" font-size="10" fill="#a0a0b8">Kernel-map: q8_0_w_q8_0_a_llama_fp32</text>
+  <text x="1206" y="890" font-family="monospace" font-size="10" fill="#a0a0b8">Parity: llama.cpp bit-exact (rolling)</text>
+
+  <!-- ===== SECTION 4: KERNEL-MAP TOPOLOGY METADATA ===== -->
+  <rect x="20" y="902" width="1560" height="120" rx="8" fill="#24243a" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="36" y="924" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#e8e8f0">Kernel-Map Topology Metadata · v8 Provider Selection</text>
+
+  <text x="36" y="944" font-family="monospace" font-size="10" fill="#a0a0b8">op: gemm · op_interface: gemm.nt_q8_0_q8_0.v1 · selection: {status: production, priority: 200, equiv_group: q8_0_w_q8_0_a_llama_fp32, phases: [prefill, decode]}</text>
+  <text x="36" y="962" font-family="monospace" font-size="10" fill="#a0a0b8">quant: {weight: q8_0, activation: q8_0, output: fp32} · impl: {function: gemm_nt_q8_0_q8_0, variants: [avx2_m2n4, avx2, avx_vnni, amx_bf16]}</text>
+  <text x="36" y="980" font-family="monospace" font-size="10" fill="#a0a0b8">topology: {ccd_count: 2, cores_per_ccd: 8, l3_per_ccd: 32MB, amx: true, avx512: true, avx_vnni: true} · threading: {model: persistent_pinned, workers: 16, queue: per_ccd_fifo}</text>
+  <text x="36" y="998" font-family="monospace" font-size="10" fill="#a0a0b8">reduction: {order: fixed_cpu_ascending, partial: per_tile_fp32, final: serial_sum, exactness: bit_identical} · call_abi: {version: 1, params: [A, B, bias, C, M, N, K]}</text>
+  <text x="36" y="1016" font-family="monospace" font-size="10" fill="#f0a030">constraints: {alignment: {K: 32}, notes: "AMX tile-local accumulate; FP32 cross-tile sum in fixed CPU order; no reassociation"}</text>
+
+  <!-- ===== SECTION 5: FOOTER / DIAGNOSTIC NOTE ===== -->
+  <rect x="20" y="1032" width="1560" height="56" rx="6" fill="#1c1c2e" stroke="#3a3a5a" stroke-width="1"/>
+  <text x="36" y="1052" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#e05050">DIAGNOSTIC NOTE:</text>
+  <text x="180" y="1052" font-family="system-ui,sans-serif" font-size="10" fill="#a0a0b8">Decode snapshot (CPUs 0–7: ~66–69%, CPUs 8–15: ~91–98%) is a single-observation diagnostic, NOT a final causal claim.</text>
+  <text x="36" y="1070" font-family="system-ui,sans-serif" font-size="10" fill="#a0a0b8">The asymmetry may reflect tile distribution, AMX pipeline depth, or L3 residency differences between CCDs. Further controlled experiments required before attribution.</text>
+  <text x="36" y="1086" font-family="monospace" font-size="9" fill="#606080">C-Kernel-Engine · v8 · 2026-08-16 · Static SVG · No script / foreignObject / external asset / animation / raster</text>
+</svg>

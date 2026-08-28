@@ -1,0 +1,368 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 920" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Split-Half FP32 RoPE — AVX2 Vector Path with Scalar Reference</title>
+  <desc>Technical infographic of ck_rope_split_f32_avx2 and ck_rope_split_f32_reference: split-half input pairing, eight-pair AVX2 lane mapping, cosine/sine loads, four multiplies followed by add/subtract, in-place safety (all loads before any store), scalar tail, validation path, and the no-allocation workspace contract.</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8fa0ba"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1200" height="920" fill="#1a2030"/>
+
+  <!-- header -->
+  <text x="600" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#eef2f8">Split-Half FP32 RoPE — AVX2 Vector Path with Scalar Reference</text>
+  <text x="600" y="56" text-anchor="middle" font-size="12" fill="#9aa7bd">ck_rope_split_f32_avx2 / ck_rope_split_f32_reference · dst[i] = a·c − b·s · dst[i+half] = b·c + a·s</text>
+
+  <!-- ============ PANEL 1: VALIDATION ============ -->
+  <g>
+    <rect x="20" y="76" width="350" height="190" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="36" y="98" font-size="14" font-weight="bold" fill="#dfe6f2">1 · Validation (both entry points)</text>
+    <line x1="36" y1="104" x2="354" y2="104" stroke="#38445e" stroke-width="1"/>
+
+    <rect x="36" y="112" width="176" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="44" y="126" font-size="11" fill="#c9d3e4">dst == NULL</text>
+    <rect x="36" y="136" width="176" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="44" y="150" font-size="11" fill="#c9d3e4">src == NULL</text>
+    <rect x="36" y="160" width="176" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="44" y="174" font-size="11" fill="#c9d3e4">cos_values == NULL</text>
+    <rect x="36" y="184" width="176" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="44" y="198" font-size="11" fill="#c9d3e4">sin_values == NULL</text>
+    <rect x="36" y="208" width="176" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="44" y="222" font-size="11" fill="#c9d3e4">rotary_dim &amp; 1u (odd)</text>
+
+    <line x1="212" y1="154" x2="226" y2="154" stroke="#8fa0ba" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="228" y="140" width="126" height="28" rx="5" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="291" y="158" text-anchor="middle" font-size="12" font-weight="bold" fill="#e8a0a0">return −1</text>
+
+    <line x1="212" y1="214" x2="226" y2="214" stroke="#8fa0ba" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="228" y="200" width="126" height="28" rx="5" fill="#26382c" stroke="#6fbf8f"/>
+    <text x="291" y="218" text-anchor="middle" font-size="12" font-weight="bold" fill="#9fd8b4">half = dim / 2</text>
+
+    <text x="36" y="252" font-size="10" fill="#8fa0ba">checked identically in the reference and AVX2 paths</text>
+  </g>
+
+  <!-- ============ PANEL 2: SPLIT-HALF INPUT LAYOUT ============ -->
+  <g>
+    <rect x="390" y="76" width="430" height="190" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="406" y="98" font-size="14" font-weight="bold" fill="#dfe6f2">2 · Split-Half Input Layout (rotary_dim = 16, half = 8)</text>
+    <line x1="406" y1="104" x2="804" y2="104" stroke="#38445e" stroke-width="1"/>
+
+    <!-- pairing bracket -->
+    <path d="M415 110 V104 H607 V110" fill="none" stroke="#8fa0ba" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="511" y="101" text-anchor="middle" font-size="10" fill="#9aa7bd">pair i = (src[i], src[i+half])</text>
+
+    <!-- src cells 0..7 (a side) -->
+    <g font-size="8" fill="#c9d3e4" text-anchor="middle">
+      <rect x="404" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="415" y="128">0</text>
+      <rect x="428" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="439" y="128">1</text>
+      <rect x="452" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="463" y="128">2</text>
+      <rect x="476" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="487" y="128">3</text>
+      <rect x="500" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="511" y="128">4</text>
+      <rect x="524" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="535" y="128">5</text>
+      <rect x="548" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="559" y="128">6</text>
+      <rect x="572" y="112" width="22" height="24" fill="#2e4a6b" stroke="#4f8fd0"/><text x="583" y="128">7</text>
+      <!-- src cells 8..15 (b side) -->
+      <rect x="596" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="607" y="128">8</text>
+      <rect x="620" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="631" y="128">9</text>
+      <rect x="644" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="655" y="128">10</text>
+      <rect x="668" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="679" y="128">11</text>
+      <rect x="692" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="703" y="128">12</text>
+      <rect x="716" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="727" y="128">13</text>
+      <rect x="740" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="751" y="128">14</text>
+      <rect x="764" y="112" width="22" height="24" fill="#4a3a26" stroke="#e09a52"/><text x="775" y="128">15</text>
+    </g>
+    <text x="404" y="148" font-size="10" fill="#4f8fd0">a side: src[0..7]</text>
+    <text x="596" y="148" font-size="10" fill="#e09a52">b side: src[8..15]</text>
+
+    <!-- cos cells -->
+    <g font-size="8" fill="#c9d3e4" text-anchor="middle">
+      <rect x="404" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="415" y="171">0</text>
+      <rect x="428" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="439" y="171">1</text>
+      <rect x="452" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="463" y="171">2</text>
+      <rect x="476" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="487" y="171">3</text>
+      <rect x="500" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="511" y="171">4</text>
+      <rect x="524" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="535" y="171">5</text>
+      <rect x="548" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="559" y="171">6</text>
+      <rect x="572" y="156" width="22" height="22" fill="#2a4436" stroke="#6fbf8f"/><text x="583" y="171">7</text>
+    </g>
+    <text x="612" y="171" font-size="10" fill="#6fbf8f">cos_values[0..7] (c)</text>
+
+    <!-- sin cells -->
+    <g font-size="8" fill="#c9d3e4" text-anchor="middle">
+      <rect x="404" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="415" y="201">0</text>
+      <rect x="428" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="439" y="201">1</text>
+      <rect x="452" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="463" y="201">2</text>
+      <rect x="476" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="487" y="201">3</text>
+      <rect x="500" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="511" y="201">4</text>
+      <rect x="524" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="535" y="201">5</text>
+      <rect x="548" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="559" y="201">6</text>
+      <rect x="572" y="186" width="22" height="22" fill="#264442" stroke="#4fb8b0"/><text x="583" y="201">7</text>
+    </g>
+    <text x="612" y="201" font-size="10" fill="#4fb8b0">sin_values[0..7] (s)</text>
+
+    <text x="406" y="228" font-size="11" fill="#c9d3e4">pair i uses c[i], s[i]:  dst[i] = a·c − b·s</text>
+    <text x="406" y="246" font-size="11" fill="#c9d3e4">dst[i+half] = b·c + a·s</text>
+  </g>
+
+  <!-- ============ PANEL 3: NO-ALLOCATION CONTRACT ============ -->
+  <g>
+    <rect x="840" y="76" width="340" height="190" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="856" y="98" font-size="14" font-weight="bold" fill="#dfe6f2">3 · No-Allocation Workspace Contract</text>
+    <line x1="856" y1="104" x2="1164" y2="104" stroke="#38445e" stroke-width="1"/>
+
+    <text x="856" y="126" font-size="12" fill="#c9d3e4">• No malloc, no temp / workspace buffer.</text>
+    <text x="856" y="146" font-size="12" fill="#c9d3e4">• All work happens in caller-provided</text>
+    <text x="868" y="162" font-size="12" fill="#c9d3e4">dst / src / cos_values / sin_values.</text>
+    <text x="856" y="182" font-size="12" fill="#c9d3e4">• Unaligned 256-bit loads &amp; stores:</text>
+    <text x="868" y="198" font-size="12" fill="#c9d3e4">_mm256_loadu_ps / _mm256_storeu_ps.</text>
+    <text x="856" y="218" font-size="12" fill="#c9d3e4">• 32-byte alignment recommended for</text>
+    <text x="868" y="234" font-size="12" fill="#c9d3e4">performance; not required.</text>
+
+    <rect x="856" y="244" width="150" height="18" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="931" y="257" text-anchor="middle" font-size="10" fill="#9aa7bd">workspace: none · returns 0 / −1</text>
+  </g>
+
+  <!-- ============ PANEL 4: AVX2 LANE MAPPING ============ -->
+  <g>
+    <rect x="20" y="286" width="560" height="290" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="36" y="306" font-size="14" font-weight="bold" fill="#dfe6f2">4 · AVX2 Lane Mapping — 8 pairs per iteration</text>
+    <line x1="36" y1="312" x2="564" y2="312" stroke="#38445e" stroke-width="1"/>
+
+    <!-- lane index numbers -->
+    <g font-size="9" fill="#8fa0ba" text-anchor="middle">
+      <text x="74" y="320">0</text><text x="130" y="320">1</text><text x="186" y="320">2</text><text x="242" y="320">3</text>
+      <text x="298" y="320">4</text><text x="354" y="320">5</text><text x="410" y="320">6</text><text x="466" y="320">7</text>
+    </g>
+
+    <!-- row a -->
+    <text x="40" y="341" text-anchor="end" font-size="15" font-weight="bold" fill="#4f8fd0">a</text>
+    <g font-size="10" fill="#c9d3e4" text-anchor="middle">
+      <rect x="48" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="74" y="341">a[i]</text>
+      <rect x="104" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="130" y="341">a[i+1]</text>
+      <rect x="160" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="186" y="341">a[i+2]</text>
+      <rect x="216" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="242" y="341">a[i+3]</text>
+      <rect x="272" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="298" y="341">a[i+4]</text>
+      <rect x="328" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="354" y="341">a[i+5]</text>
+      <rect x="384" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="410" y="341">a[i+6]</text>
+      <rect x="440" y="322" width="52" height="30" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/><text x="466" y="341">a[i+7]</text>
+    </g>
+
+    <!-- row b -->
+    <text x="40" y="379" text-anchor="end" font-size="15" font-weight="bold" fill="#e09a52">b</text>
+    <g font-size="10" fill="#c9d3e4" text-anchor="middle">
+      <rect x="48" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="74" y="379">b[i]</text>
+      <rect x="104" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="130" y="379">b[i+1]</text>
+      <rect x="160" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="186" y="379">b[i+2]</text>
+      <rect x="216" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="242" y="379">b[i+3]</text>
+      <rect x="272" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="298" y="379">b[i+4]</text>
+      <rect x="328" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="354" y="379">b[i+5]</text>
+      <rect x="384" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="410" y="379">b[i+6]</text>
+      <rect x="440" y="360" width="52" height="30" rx="4" fill="#4a3a26" stroke="#e09a52"/><text x="466" y="379">b[i+7]</text>
+    </g>
+
+    <!-- row c -->
+    <text x="40" y="417" text-anchor="end" font-size="15" font-weight="bold" fill="#6fbf8f">c</text>
+    <g font-size="10" fill="#c9d3e4" text-anchor="middle">
+      <rect x="48" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="74" y="417">c[i]</text>
+      <rect x="104" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="130" y="417">c[i+1]</text>
+      <rect x="160" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="186" y="417">c[i+2]</text>
+      <rect x="216" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="242" y="417">c[i+3]</text>
+      <rect x="272" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="298" y="417">c[i+4]</text>
+      <rect x="328" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="354" y="417">c[i+5]</text>
+      <rect x="384" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="410" y="417">c[i+6]</text>
+      <rect x="440" y="398" width="52" height="30" rx="4" fill="#2a4436" stroke="#6fbf8f"/><text x="466" y="417">c[i+7]</text>
+    </g>
+
+    <!-- row s -->
+    <text x="40" y="455" text-anchor="end" font-size="15" font-weight="bold" fill="#4fb8b0">s</text>
+    <g font-size="10" fill="#c9d3e4" text-anchor="middle">
+      <rect x="48" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="74" y="455">s[i]</text>
+      <rect x="104" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="130" y="455">s[i+1]</text>
+      <rect x="160" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="186" y="455">s[i+2]</text>
+      <rect x="216" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="242" y="455">s[i+3]</text>
+      <rect x="272" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="298" y="455">s[i+4]</text>
+      <rect x="328" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="354" y="455">s[i+5]</text>
+      <rect x="384" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="410" y="455">s[i+6]</text>
+      <rect x="440" y="436" width="52" height="30" rx="4" fill="#264442" stroke="#4fb8b0"/><text x="466" y="455">s[i+7]</text>
+    </g>
+
+    <text x="36" y="492" font-size="11" fill="#c9d3e4">a = _mm256_loadu_ps(src + i)          b = _mm256_loadu_ps(src + i + half)</text>
+    <text x="36" y="512" font-size="11" fill="#c9d3e4">c = _mm256_loadu_ps(cos_values + i)    s = _mm256_loadu_ps(sin_values + i)</text>
+    <text x="36" y="536" font-size="11" fill="#9aa7bd">loop:  for (; i + 8u &lt;= half; i += 8u)</text>
+    <text x="36" y="558" font-size="11" fill="#9aa7bd">one 256-bit lane per half → 8 pairs processed per iteration</text>
+  </g>
+
+  <!-- ============ PANEL 5: DATAFLOW ============ -->
+  <g>
+    <rect x="600" y="286" width="580" height="290" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="616" y="306" font-size="14" font-weight="bold" fill="#dfe6f2">5 · Dataflow — Four Multiplies, Then Add / Subtract</text>
+    <line x1="616" y1="312" x2="1164" y2="312" stroke="#38445e" stroke-width="1"/>
+
+    <!-- input chips -->
+    <rect x="630" y="326" width="60" height="26" rx="5" fill="#2e4a6b" stroke="#4f8fd0"/>
+    <text x="660" y="343" text-anchor="middle" font-size="12" font-weight="bold" fill="#9cc4ea">a</text>
+    <rect x="630" y="426" width="60" height="26" rx="5" fill="#4a3a26" stroke="#e09a52"/>
+    <text x="660" y="443" text-anchor="middle" font-size="12" font-weight="bold" fill="#eec49a">b</text>
+    <rect x="1090" y="326" width="60" height="26" rx="5" fill="#2a4436" stroke="#6fbf8f"/>
+    <text x="1120" y="343" text-anchor="middle" font-size="12" font-weight="bold" fill="#a8dcc0">c</text>
+    <rect x="1090" y="426" width="60" height="26" rx="5" fill="#264442" stroke="#4fb8b0"/>
+    <text x="1120" y="443" text-anchor="middle" font-size="12" font-weight="bold" fill="#9adcd6">s</text>
+
+    <!-- multiply chips -->
+    <rect x="755" y="326" width="70" height="26" rx="5" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="790" y="343" text-anchor="middle" font-size="12" fill="#c9d3e4">a·c</text>
+    <rect x="755" y="426" width="70" height="26" rx="5" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="790" y="443" text-anchor="middle" font-size="12" fill="#c9d3e4">a·s</text>
+    <rect x="915" y="326" width="70" height="26" rx="5" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="950" y="343" text-anchor="middle" font-size="12" fill="#c9d3e4">b·c</text>
+    <rect x="915" y="426" width="70" height="26" rx="5" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="950" y="443" text-anchor="middle" font-size="12" fill="#c9d3e4">b·s</text>
+
+    <!-- input → multiply arrows -->
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="690" y1="339" x2="753" y2="339" marker-end="url(#arr)"/>
+      <line x1="690" y1="339" x2="753" y2="439" marker-end="url(#arr)"/>
+      <line x1="690" y1="439" x2="913" y2="339" marker-end="url(#arr)"/>
+      <line x1="690" y1="439" x2="913" y2="439" marker-end="url(#arr)"/>
+      <line x1="1090" y1="339" x2="827" y2="339" marker-end="url(#arr)"/>
+      <line x1="1090" y1="339" x2="987" y2="339" marker-end="url(#arr)"/>
+      <line x1="1090" y1="439" x2="827" y2="439" marker-end="url(#arr)"/>
+      <line x1="1090" y1="439" x2="987" y2="439" marker-end="url(#arr)"/>
+    </g>
+
+    <!-- combine chips -->
+    <rect x="745" y="466" width="90" height="26" rx="5" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="790" y="483" text-anchor="middle" font-size="12" font-weight="bold" fill="#e8a0a0">ac − bs</text>
+    <rect x="905" y="466" width="90" height="26" rx="5" fill="#26382c" stroke="#6fbf8f"/>
+    <text x="950" y="483" text-anchor="middle" font-size="12" font-weight="bold" fill="#9fd8b4">bc + as</text>
+
+    <!-- multiply → combine arrows -->
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="790" y1="352" x2="790" y2="464" marker-end="url(#arr)"/>
+      <line x1="950" y1="439" x2="837" y2="479" marker-end="url(#arr)"/>
+      <line x1="950" y1="352" x2="950" y2="464" marker-end="url(#arr)"/>
+      <line x1="790" y1="439" x2="903" y2="479" marker-end="url(#arr)"/>
+    </g>
+
+    <!-- output chips -->
+    <rect x="735" y="520" width="110" height="26" rx="5" fill="#2e4a6b" stroke="#4f8fd0"/>
+    <text x="790" y="537" text-anchor="middle" font-size="12" font-weight="bold" fill="#9cc4ea">dst[i]</text>
+    <rect x="895" y="520" width="130" height="26" rx="5" fill="#4a3a26" stroke="#e09a52"/>
+    <text x="960" y="537" text-anchor="middle" font-size="12" font-weight="bold" fill="#eec49a">dst[i+half]</text>
+
+    <!-- combine → output arrows -->
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="790" y1="492" x2="790" y2="518" marker-end="url(#arr)"/>
+      <line x1="950" y1="492" x2="950" y2="518" marker-end="url(#arr)"/>
+    </g>
+
+    <text x="870" y="566" text-anchor="middle" font-size="11" fill="#9aa7bd">No FMA contraction (−ffp-contract=off): same op order as reference → bitwise-identical results</text>
+  </g>
+
+  <!-- ============ PANEL 6: IN-PLACE SAFETY ============ -->
+  <g>
+    <rect x="20" y="596" width="560" height="290" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="36" y="618" font-size="14" font-weight="bold" fill="#dfe6f2">6 · In-Place Safety — All Loads Before Any Store</text>
+    <line x1="36" y1="624" x2="564" y2="624" stroke="#38445e" stroke-width="1"/>
+
+    <text x="44" y="640" font-size="11" fill="#8fa0ba">phase 1 · read</text>
+    <text x="470" y="640" font-size="11" fill="#8fa0ba">phase 2 · write</text>
+
+    <rect x="44" y="648" width="92" height="28" rx="5" fill="#2e4a6b" stroke="#4f8fd0"/>
+    <text x="90" y="666" text-anchor="middle" font-size="11" fill="#9cc4ea">LOAD a</text>
+    <rect x="146" y="648" width="92" height="28" rx="5" fill="#4a3a26" stroke="#e09a52"/>
+    <text x="192" y="666" text-anchor="middle" font-size="11" fill="#eec49a">LOAD b</text>
+    <rect x="248" y="648" width="92" height="28" rx="5" fill="#2a4436" stroke="#6fbf8f"/>
+    <text x="294" y="666" text-anchor="middle" font-size="11" fill="#a8dcc0">LOAD c</text>
+    <rect x="350" y="648" width="92" height="28" rx="5" fill="#264442" stroke="#4fb8b0"/>
+    <text x="396" y="666" text-anchor="middle" font-size="11" fill="#9adcd6">LOAD s</text>
+
+    <line x1="458" y1="634" x2="458" y2="712" stroke="#8fa0ba" stroke-width="1" stroke-dasharray="5 4"/>
+
+    <rect x="470" y="648" width="96" height="28" rx="5" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="518" y="666" text-anchor="middle" font-size="11" fill="#e8a0a0">STORE dst[i]</text>
+    <rect x="470" y="684" width="96" height="28" rx="5" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="518" y="702" text-anchor="middle" font-size="11" fill="#e8a0a0">STORE dst[i+half]</text>
+
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="442" y1="656" x2="468" y2="660" marker-end="url(#arr)"/>
+      <line x1="442" y1="668" x2="468" y2="696" marker-end="url(#arr)"/>
+    </g>
+
+    <text x="36" y="736" font-size="11" fill="#c9d3e4">dst == src is safe: all four 256-bit vectors (a, b, c, s)</text>
+    <text x="36" y="754" font-size="11" fill="#c9d3e4">are loaded before any _mm256_storeu_ps writes dst.</text>
+    <text x="36" y="772" font-size="11" fill="#c9d3e4">Scalar tail keeps the same load-then-store order.</text>
+
+    <!-- buffer diagram -->
+    <text x="80" y="798" font-size="10" fill="#8fa0ba">reads first</text>
+    <text x="380" y="798" font-size="10" fill="#8fa0ba">writes after</text>
+    <g stroke-width="2">
+      <line x1="80" y1="802" x2="80" y2="810" stroke="#4f8fd0"/>
+      <line x1="140" y1="802" x2="140" y2="810" stroke="#e09a52"/>
+      <line x1="200" y1="802" x2="200" y2="810" stroke="#6fbf8f"/>
+      <line x1="260" y1="802" x2="260" y2="810" stroke="#4fb8b0"/>
+      <line x1="380" y1="830" x2="380" y2="838" stroke="#d97b7b"/>
+      <line x1="440" y1="830" x2="440" y2="838" stroke="#d97b7b"/>
+    </g>
+    <rect x="44" y="810" width="500" height="20" rx="4" fill="#2c3a52" stroke="#4a5a7a"/>
+    <text x="294" y="824" text-anchor="middle" font-size="10" fill="#9aa7bd">src / dst — same buffer (dst == src supported)</text>
+  </g>
+
+  <!-- ============ PANEL 7: SCALAR TAIL ============ -->
+  <g>
+    <rect x="600" y="596" width="580" height="290" rx="10" fill="#222b3e" stroke="#38445e"/>
+    <text x="616" y="618" font-size="14" font-weight="bold" fill="#dfe6f2">7 · Scalar Tail — Remaining Pairs</text>
+    <line x1="616" y1="624" x2="1164" y2="624" stroke="#38445e" stroke-width="1"/>
+
+    <rect x="630" y="634" width="220" height="28" rx="5" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="740" y="652" text-anchor="middle" font-size="12" fill="#c9d3e4">for (; i &lt; half; ++i)</text>
+    <text x="870" y="652" font-size="11" fill="#8fa0ba">runs only when half % 8 ≠ 0 (i left over from AVX2 loop)</text>
+
+    <line x1="740" y1="662" x2="740" y2="674" stroke="#8fa0ba" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- per-pair loads -->
+    <rect x="630" y="676" width="112" height="24" rx="4" fill="#2e4a6b" stroke="#4f8fd0"/>
+    <text x="686" y="692" text-anchor="middle" font-size="11" fill="#9cc4ea">a = src[i]</text>
+    <rect x="758" y="676" width="112" height="24" rx="4" fill="#4a3a26" stroke="#e09a52"/>
+    <text x="814" y="692" text-anchor="middle" font-size="11" fill="#eec49a">b = src[i+half]</text>
+    <rect x="886" y="676" width="112" height="24" rx="4" fill="#2a4436" stroke="#6fbf8f"/>
+    <text x="942" y="692" text-anchor="middle" font-size="11" fill="#a8dcc0">c = cos[i]</text>
+    <rect x="1014" y="676" width="112" height="24" rx="4" fill="#264442" stroke="#4fb8b0"/>
+    <text x="1070" y="692" text-anchor="middle" font-size="11" fill="#9adcd6">s = sin[i]</text>
+
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="686" y1="700" x2="686" y2="722" marker-end="url(#arr)"/>
+      <line x1="814" y1="700" x2="814" y2="722" marker-end="url(#arr)"/>
+      <line x1="942" y1="700" x2="942" y2="722" marker-end="url(#arr)"/>
+      <line x1="1070" y1="700" x2="1070" y2="722" marker-end="url(#arr)"/>
+    </g>
+
+    <!-- per-pair multiplies -->
+    <rect x="630" y="724" width="112" height="24" rx="4" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="686" y="740" text-anchor="middle" font-size="11" fill="#c9d3e4">ac = a·c</text>
+    <rect x="758" y="724" width="112" height="24" rx="4" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="814" y="740" text-anchor="middle" font-size="11" fill="#c9d3e4">bs = b·s</text>
+    <rect x="886" y="724" width="112" height="24" rx="4" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="942" y="740" text-anchor="middle" font-size="11" fill="#c9d3e4">bc = b·c</text>
+    <rect x="1014" y="724" width="112" height="24" rx="4" fill="#2c3a52" stroke="#8fa0ba"/>
+    <text x="1070" y="740" text-anchor="middle" font-size="11" fill="#c9d3e4">as = a·s</text>
+
+    <g stroke="#8fa0ba" stroke-width="1.5" fill="none">
+      <line x1="686" y1="748" x2="740" y2="770" marker-end="url(#arr)"/>
+      <line x1="814" y1="748" x2="790" y2="770" marker-end="url(#arr)"/>
+      <line x1="942" y1="748" x2="950" y2="770" marker-end="url(#arr)"/>
+      <line x1="1070" y1="748" x2="1010" y2="770" marker-end="url(#arr)"/>
+    </g>
+
+    <!-- per-pair stores -->
+    <rect x="690" y="772" width="150" height="24" rx="4" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="765" y="788" text-anchor="middle" font-size="11" fill="#e8a0a0">dst[i] = ac − bs</text>
+    <rect x="880" y="772" width="180" height="24" rx="4" fill="#3a2730" stroke="#d97b7b"/>
+    <text x="970" y="788" text-anchor="middle" font-size="11" fill="#e8a0a0">dst[i+half] = bc + as</text>
+
+    <text x="616" y="822" font-size="11" fill="#c9d3e4">Same four multiplies, then add/subtract — identical numerical order</text>
+    <text x="616" y="840" font-size="11" fill="#c9d3e4">to the AVX2 path (no FMA contraction) → bitwise-identical results.</text>
+  </g>
+</svg>

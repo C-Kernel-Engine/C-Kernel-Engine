@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">Theory of Constraints for CPU AI: Compute, Cache, DRAM, and NVMe in Flow</title>
+  <desc id="svg-desc">A systems diagram showing how wall time decomposes into serial work, the maximum of overlapped compute and memory transfer, and exposed stalls. The pipeline flows from NVMe Memory Tetris through DRAM at a 56 GB/s ceiling, L3 prefetch, prepared representations in L1/L2, and SIMD unpack and dot-product execution on persistent workers with barriers. Measured evidence shows 93 to 97 percent prefill core occupancy after fixes, 82 to 83 percent decode occupancy with an eight-core-group imbalance, and no I/O wait. The diagram contrasts stop-and-go scheduling with balanced flow and explains why DRAM saturation alone is not the goal, and how kernel maps select shape and topology providers.</desc>
+
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="#0f1117"/>
+
+  <!-- ===== TITLE BAR ===== -->
+  <rect x="0" y="0" width="1600" height="56" fill="#1a1d27"/>
+  <rect x="0" y="54" width="1600" height="2" fill="#ffb400"/>
+  <text x="800" y="36" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Theory of Constraints for CPU AI: Compute, Cache, DRAM, and NVMe in Flow</text>
+
+  <!-- ===== WALL TIME EQUATION ===== -->
+  <rect x="40" y="66" width="1520" height="62" rx="8" fill="#1e2233" stroke="#3a3f55" stroke-width="1"/>
+  <text x="800" y="90" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#8890a4">Wall time decomposes into three additive terms — the constraint is whichever term dominates:</text>
+  <text x="800" y="116" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', monospace" font-size="18" font-weight="600" fill="#ffb400">T_wall  =  T_serial  +  max( T_compute , T_memory )  +  T_exposed_stalls</text>
+
+  <!-- ===== MAIN PIPELINE FLOW (y: 138 – 490) ===== -->
+  <rect x="40" y="138" width="1520" height="352" rx="10" fill="#141824" stroke="#2a2f44" stroke-width="1"/>
+  <text x="60" y="160" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#8890a4">PIPELINE: NVMe → DRAM → L3 → L1/L2 → SIMD (persistent workers)</text>
+
+  <!-- NVMe / Memory Tetris box -->
+  <rect x="60" y="175" width="200" height="120" rx="8" fill="#1a1430" stroke="#7c4dff" stroke-width="1.5"/>
+  <text x="160" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#b388ff">NVMe — Memory Tetris</text>
+  <text x="160" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#9575cd">Lifetime-aware DRAM arena</text>
+  <text x="160" y="232" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#9575cd">Async prefetch, slot reuse</text>
+  <text x="160" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#9575cd">Double/triple buffering</text>
+  <text x="160" y="264" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#9575cd">Completion events</text>
+  <text x="160" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#7c4dff">~7 GB/s Gen4 (measured)</text>
+
+  <!-- Arrow NVMe → DRAM -->
+  <line x1="260" y1="235" x2="310" y2="235" stroke="#7c4dff" stroke-width="2" marker-end="url(#arrow-purple)"/>
+  <text x="285" y="225" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#b388ff">DMA</text>
+
+  <!-- DRAM box -->
+  <rect x="315" y="175" width="220" height="120" rx="8" fill="#0d1b2a" stroke="#00b4d8" stroke-width="1.5"/>
+  <text x="425" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#48cae4">DRAM (main memory)</text>
+  <text x="425" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#90e0ef">Compact quant weights</text>
+  <text x="425" y="232" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#90e0ef">Q4_K / Q5_K / Q6_K / Q8_0</text>
+  <text x="425" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#90e0ef">KV cache, activations</text>
+  <text x="425" y="264" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#90e0ef">Planner scratch (temp)</text>
+  <text x="425" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffb400">≈ 56 GB/s ceiling (measured)</text>
+
+  <!-- Arrow DRAM → L3 -->
+  <line x1="535" y1="235" x2="585" y2="235" stroke="#00b4d8" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="560" y="225" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#48cae4">prefetch</text>
+
+  <!-- L3 Cache box -->
+  <rect x="590" y="175" width="200" height="120" rx="8" fill="#1a2a1a" stroke="#47b475" stroke-width="1.5"/>
+  <text x="690" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#69db7c">L3 Cache (shared)</text>
+  <text x="690" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#8ce99a">Prefetch next tile</text>
+  <text x="690" y="232" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#8ce99a">Current tile resident</text>
+  <text x="690" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#8ce99a">Staging: compute now,</text>
+  <text x="690" y="264" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#8ce99a">fetch next in parallel</text>
+  <text x="690" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#47b475">Cache = staging, not residence</text>
+
+  <!-- Arrow L3 → L1/L2 -->
+  <line x1="790" y1="235" x2="840" y2="235" stroke="#47b475" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="815" y="225" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#69db7c">load</text>
+
+  <!-- L1/L2 box -->
+  <rect x="845" y="175" width="210" height="120" rx="8" fill="#2a1a0a" stroke="#ff922b" stroke-width="1.5"/>
+  <text x="950" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffa94d">L1 / L2 (per-core)</text>
+  <text x="950" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#ffd8a8">Prepared representations</text>
+  <text x="950" y="232" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#ffd8a8">Unpacked FP32/FP16 tiles</text>
+  <text x="950" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#ffd8a8">Scale/block metadata</text>
+  <text x="950" y="264" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#ffd8a8">Activation fragments</text>
+  <text x="950" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#ff922b">Shape determined by kernel map</text>
+
+  <!-- Arrow L1/L2 → SIMD -->
+  <line x1="1055" y1="235" x2="1105" y2="235" stroke="#ff922b" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="1080" y="225" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#ffa94d">FMA</text>
+
+  <!-- SIMD box -->
+  <rect x="1110" y="175" width="220" height="120" rx="8" fill="#2a0a1a" stroke="#f783ac" stroke-width="1.5"/>
+  <text x="1220" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#faa2c1">SIMD Execution</text>
+  <text x="1220" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#fcc2d7">AVX2 / AVX-512 / AMX</text>
+  <text x="1220" y="232" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#fcc2d7">Unpack → dot product</text>
+  <text x="1220" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#fcc2d7">Q8×Q8 → FP32 accumulate</text>
+  <text x="1220" y="264" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#fcc2d7">SwiGLU, RMSNorm partials</text>
+  <text x="1220" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#f783ac">Topology: M×N tile from map</text>
+
+  <!-- Persistent Workers / Barriers (below pipeline) -->
+  <rect x="60" y="315" width="1270" height="70" rx="6" fill="#1a1d2b" stroke="#3a3f55" stroke-width="1"/>
+  <text x="80" y="338" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#8890a4">PERSISTENT WORKERS (thread pool)</text>
+  <!-- Worker lanes -->
+  <rect x="80" y="348" width="140" height="26" rx="4" fill="#252a3a" stroke="#4a5068" stroke-width="0.5"/>
+  <text x="150" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#a0a8c0">Worker 0 (core 0)</text>
+  <rect x="230" y="348" width="140" height="26" rx="4" fill="#252a3a" stroke="#4a5068" stroke-width="0.5"/>
+  <text x="300" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#a0a8c0">Worker 1 (core 1)</text>
+  <rect x="380" y="348" width="140" height="26" rx="4" fill="#252a3a" stroke="#4a5068" stroke-width="0.5"/>
+  <text x="450" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#a0a8c0">Worker 2 (core 2)</text>
+  <rect x="530" y="348" width="140" height="26" rx="4" fill="#252a3a" stroke="#4a5068" stroke-width="0.5"/>
+  <text x="600" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#a0a8c0">Worker 3 (core 3)</text>
+  <text x="700" y="365" font-family="system-ui, sans-serif" font-size="12" fill="#5a6078">···</text>
+  <rect x="730" y="348" width="140" height="26" rx="4" fill="#252a3a" stroke="#4a5068" stroke-width="0.5"/>
+  <text x="800" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#a0a8c0">Worker 7 (core 7)</text>
+  <!-- Barrier -->
+  <rect x="900" y="348" width="100" height="26" rx="4" fill="#2a1a1a" stroke="#f783ac" stroke-width="1"/>
+  <text x="950" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#f783ac">BARRIER</text>
+  <text x="1050" y="365" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">sync → next tile</text>
+  <!-- Planner scratch -->
+  <rect x="1150" y="348" width="160" height="26" rx="4" fill="#1a2a2a" stroke="#00b4d8" stroke-width="1"/>
+  <text x="1230" y="365" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#48cae4">Planner scratch (temp)</text>
+
+  <!-- Flow annotation -->
+  <text x="60" y="405" font-family="system-ui, sans-serif" font-size="10" fill="#5a6078">Flow: NVMe async → DRAM stream → L3 prefetch (next tile) → L1/L2 (current tile prepared) → SIMD (unpack + dot) → barrier → repeat</text>
+  <text x="60" y="422" font-family="system-ui, sans-serif" font-size="10" fill="#5a6078">Constraint: whichever stage cannot keep up sets the pace. DRAM at 56 GB/s is the ceiling; compute must stay below it to avoid stalls.</text>
+
+  <!-- Overlap illustration -->
+  <rect x="60" y="435" width="1270" height="42" rx="4" fill="#1a1d2b" stroke="#2a2f44" stroke-width="0.5"/>
+  <text x="80" y="452" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">OVERLAP:</text>
+  <rect x="150" y="442" width="200" height="14" rx="2" fill="#2a1a0a" stroke="#ff922b" stroke-width="0.5"/>
+  <text x="250" y="453" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#ffa94d">Compute tile N (SIMD)</text>
+  <rect x="150" y="458" width="200" height="14" rx="2" fill="#0d1b2a" stroke="#00b4d8" stroke-width="0.5"/>
+  <text x="250" y="469" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#48cae4">Fetch tile N+1 (DRAM→L3)</text>
+  <text x="380" y="460" font-family="system-ui, sans-serif" font-size="9" fill="#69db7c">← runs in parallel; wall time = max(compute, memory), not sum</text>
+
+  <!-- ===== STOP-AND-GO vs BALANCED FLOW (y: 498 – 680) ===== -->
+  <rect x="40" y="498" width="740" height="182" rx="8" fill="#1a1414" stroke="#f783ac" stroke-width="1"/>
+  <text x="410" y="520" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#f783ac">STOP-AND-GO (unbalanced)</text>
+  <!-- Timeline bars -->
+  <text x="70" y="545" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Compute:</text>
+  <rect x="140" y="535" width="80" height="14" rx="2" fill="#ff922b"/>
+  <rect x="230" y="535" width="40" height="14" rx="2" fill="#3a2a1a" stroke="#f783ac" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <rect x="280" y="535" width="80" height="14" rx="2" fill="#ff922b"/>
+  <rect x="370" y="535" width="40" height="14" rx="2" fill="#3a2a1a" stroke="#f783ac" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <rect x="420" y="535" width="80" height="14" rx="2" fill="#ff922b"/>
+  <text x="70" y="565" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Memory:</text>
+  <rect x="140" y="555" width="40" height="14" rx="2" fill="#00b4d8"/>
+  <rect x="190" y="555" width="80" height="14" rx="2" fill="#1a2a3a" stroke="#00b4d8" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <rect x="280" y="555" width="40" height="14" rx="2" fill="#00b4d8"/>
+  <rect x="330" y="555" width="80" height="14" rx="2" fill="#1a2a3a" stroke="#00b4d8" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <rect x="420" y="555" width="40" height="14" rx="2" fill="#00b4d8"/>
+  <text x="70" y="590" font-family="system-ui, sans-serif" font-size="9" fill="#f783ac">Stalls (dashed): cores idle waiting for data; DRAM idle waiting for compute. Exposed T_stalls dominates.</text>
+  <text x="70" y="608" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Cause: no prefetch, synchronous reads, small tiles, barrier before next fetch.</text>
+  <text x="70" y="626" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Result: effective throughput well below 56 GB/s ceiling; core occupancy drops.</text>
+  <text x="70" y="648" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Fix: double-buffer, prefetch next tile while computing current, larger M×N from kernel map.</text>
+
+  <rect x="820" y="498" width="740" height="182" rx="8" fill="#0a1a14" stroke="#47b475" stroke-width="1"/>
+  <text x="1190" y="520" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#69db7c">BALANCED FLOW (overlapped)</text>
+  <!-- Timeline bars -->
+  <text x="850" y="545" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Compute:</text>
+  <rect x="920" y="535" width="120" height="14" rx="2" fill="#ff922b"/>
+  <rect x="1050" y="535" width="120" height="14" rx="2" fill="#ff922b"/>
+  <rect x="1180" y="535" width="120" height="14" rx="2" fill="#ff922b"/>
+  <rect x="1310" y="535" width="120" height="14" rx="2" fill="#ff922b"/>
+  <text x="850" y="565" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Memory:</text>
+  <rect x="920" y="555" width="120" height="14" rx="2" fill="#00b4d8"/>
+  <rect x="1050" y="555" width="120" height="14" rx="2" fill="#00b4d8"/>
+  <rect x="1180" y="555" width="120" height="14" rx="2" fill="#00b4d8"/>
+  <rect x="1310" y="555" width="120" height="14" rx="2" fill="#00b4d8"/>
+  <text x="850" y="590" font-family="system-ui, sans-serif" font-size="9" fill="#69db7c">Both lanes run continuously. Wall time per tile = max(T_compute, T_memory). No exposed stalls.</text>
+  <text x="850" y="608" font-family="system-ui, sans-serif" font-size="9" fill="#8890a4">Mechanism: L3 holds tile N+1 while SIMD processes tile N. DRAM streams ahead. NVMe feeds DRAM async.</text>
+  <text x="850" y="626" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Result: cores at 93–97% occupancy (prefill); DRAM near ceiling but not saturated (headroom for KV, activations).</text>
+  <text x="850" y="648" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Key: the constraint shifts from "waiting for data" to "keeping compute fed" — a scheduling problem, not a bandwidth problem.</text>
+
+  <!-- ===== MEASURED EVIDENCE (y: 690 – 880) ===== -->
+  <rect x="40" y="690" width="1520" height="190" rx="8" fill="#141824" stroke="#2a2f44" stroke-width="1"/>
+  <text x="60" y="714" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffb400">MEASURED EVIDENCE (CKE hardware evidence program)</text>
+
+  <!-- Evidence cards -->
+  <rect x="60" y="728" width="350" height="70" rx="6" fill="#1a1d2b" stroke="#00b4d8" stroke-width="1"/>
+  <text x="80" y="748" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#48cae4">DRAM Ceiling</text>
+  <text x="80" y="766" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">≈ 56 GB/s sustained (i7-14700T, 2-channel DDR5)</text>
+  <text x="80" y="782" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Workloads run below it — headroom for KV, activations, scratch</text>
+
+  <rect x="430" y="728" width="350" height="70" rx="6" fill="#1a1d2b" stroke="#47b475" stroke-width="1"/>
+  <text x="450" y="748" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#69db7c">Prefill Core Occupancy (after fixes)</text>
+  <text x="450" y="766" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">93–97% across all core groups (VTune + perf)</text>
+  <text x="450" y="782" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Double-buffer + prefetch + larger tiles eliminated stalls</text>
+
+  <rect x="800" y="728" width="350" height="70" rx="6" fill="#1a1d2b" stroke="#ff922b" stroke-width="1"/>
+  <text x="820" y="748" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffa94d">Decode Core Occupancy</text>
+  <text x="820" y="766" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">≈ 82–83% overall; 8-core-group imbalance</text>
+  <text x="820" y="782" font-family="system-ui, sans-serif" font-size="10" fill="#ff922b">One group lags (tail latency on KV gather); target: rebalance</text>
+
+  <rect x="1170" y="728" width="370" height="70" rx="6" fill="#1a1d2b" stroke="#47b475" stroke-width="1"/>
+  <text x="1190" y="748" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#69db7c">I/O Wait</text>
+  <text x="1190" y="766" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">No measurable I/O wait in steady-state inference</text>
+  <text x="1190" y="782" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Model resident in DRAM; NVMe not on critical path (yet)</text>
+
+  <!-- Evidence footnote -->
+  <text x="60" y="820" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Method: Linux perf, Intel VTune, Advisor roofline, flamegraphs, assembly inspection. Every result identifies CPU, ISA flags, dtype, model, quant, thread policy, warmup/repeats, profiler mode.</text>
+  <text x="60" y="836" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">The 8-core-group imbalance in decode is the active constraint: one group's KV gather tail adds ~17% exposed time. Fix: rebalance shard fractions per kernel map topology.</text>
+  <text x="60" y="852" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">DRAM at 56 GB/s is a ceiling, not a target. Saturating it would leave no bandwidth for KV cache reads, activation writes, or planner scratch — the system would stall on its own state.</text>
+  <text x="60" y="868" font-family="system-ui, sans-serif" font-size="9" fill="#5a6078">Goal: keep compute fed (93–97% occupancy) while DRAM runs at 70–85% of ceiling, leaving headroom for the full working set.</text>
+
+  <!-- ===== WHY DRAM SATURATION ISN'T THE GOAL + KERNEL MAPS (y: 888 – 1090) ===== -->
+  <rect x="40" y="888" width="740" height="202" rx="8" fill="#141824" stroke="#2a2f44" stroke-width="1"/>
+  <text x="60" y="912" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ffb400">WHY DRAM SATURATION ALONE IS NOT THE GOAL</text>
+  <text x="60" y="934" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">1. DRAM serves multiple consumers: weight stream, KV cache reads, activation writes, planner scratch.</text>
+  <text x="60" y="952" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">2. Saturating the weight stream starves KV and activations → new stalls appear elsewhere.</text>
+  <text x="60" y="970" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">3. The real goal is core occupancy: keep SIMD units busy with prepared tiles.</text>
+  <text x="60" y="988" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">4. Theory of Constraints: improve the active constraint (compute feed), not the ceiling (DRAM BW).</text>
+  <text x="60" y="1006" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">5. After fixing the constraint, profile again — the bottleneck moves (Amdahl's Law).</text>
+  <text x="60" y="1028" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Measured: workloads run below 56 GB/s. The constraint is compute scheduling, not bandwidth.</text>
+  <text x="60" y="1048" font-family="system-ui, sans-serif" font-size="10" fill="#5a6078">Next constraint after decode imbalance fix: likely KV gather tail or barrier cost at 8+ cores.</text>
+  <text x="60" y="1068" font-family="system-ui, sans-serif" font-size="10" fill="#5a6078">NVMe Memory Tetris becomes relevant only when model exceeds DRAM capacity — then it feeds DRAM async.</text>
+
+  <rect x="820" y="888" width="740" height="202" rx="8" fill="#141824" stroke="#2a2f44" stroke-width="1"/>
+  <text x="840" y="912" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ffb400">HOW KERNEL MAPS SELECT SHAPE / TOPOLOGY PROVIDERS</text>
+  <text x="840" y="934" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">Each logical op (gemm, gemv, attention, kv_store) has 284 machine-checked JSON kernel maps.</text>
+  <text x="840" y="952" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">The DSL resolver selects a provider by: contract → phase → dtype → shape → layout → ISA → alias safety.</text>
+  <text x="840" y="970" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">The winning map declares: M×N tile shape, SIMD variant (AVX2/AVX-512/AMX), thread partitioning,</text>
+  <text x="840" y="988" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">reduction order, call ABI, and priority within its equivalence group. Fail-closed on ambiguity.</text>
+  <text x="840" y="1010" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Example: gemm_nt_q8_0_q8_0 → avx2_m2n4 variant (M≥2, K%32=0) at priority 240 for prefill.</text>
+  <text x="840" y="1028" font-family="system-ui, sans-serif" font-size="10" fill="#69db7c">Decode uses gemv_q8_0_q8_0 (single-token, bandwidth-shaped) — a different map, different topology.</text>
+  <text x="840" y="1050" font-family="system-ui, sans-serif" font-size="10" fill="#a0a8c0">The map determines how many workers get which tile slice → directly controls the 8-core-group balance.</text>
+  <text x="840" y="1068" font-family="system-ui, sans-serif" font-size="10" fill="#5a6078">Rebalancing the decode imbalance = adjusting shard fractions in the kernel map topology, not changing DRAM.</text>
+
+  <!-- ===== ARROW MARKERS ===== -->
+  <defs>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#7c4dff"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#00b4d8"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ff922b"/>
+    </marker>
+  </defs>
+
+  <!-- ===== FOOTER ===== -->
+  <rect x="0" y="1092" width="1600" height="8" fill="#1a1d27"/>
+  <text x="800" y="1099" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#5a6078">C-Kernel-Engine · Theory of Constraints · CPU AI Systems · Evidence over benchmark theater · Correctness before optimization</text>
+</svg>

@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">CKE and llama.cpp at 128K: Matched CPU Performance and Parity</title>
+  <desc id="svg-desc">Performance comparison of C-Kernel-Engine and llama.cpp at 128K context with repeated-token workloads. Matched measurements require identical model, quantization, token count, context length, thread count, and wall-clock scope. Three matched runs are shown: llama.cpp at 5362.45 seconds (24.44 tok/s), CKE baseline at 4199.72 seconds (31.21 tok/s), and CKE FP32-pool at 4067.91 seconds (32.22 tok/s). A fourth non-matched CKE run at 4013.10 seconds (32.66 tok/s) is labeled as realistic-dossier input evidence only. Verification includes consumed-token hashes, full-logit SHA and top-1 checks, X-Ray divergence localization, provider timing, occupancy, regression gates, and fair accelerator comparison.</desc>
+
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="#232323"/>
+
+  <!-- Header Bar -->
+  <rect x="0" y="0" width="1600" height="72" fill="#2a2a2a"/>
+  <rect x="0" y="70" width="1600" height="3" fill="#ffb400"/>
+  <rect x="24" y="16" width="40" height="40" rx="6" fill="#ffb400"/>
+  <text x="44" y="43" font-family="monospace" font-size="18" font-weight="700" fill="#2a2a2a" text-anchor="middle">CK</text>
+  <text x="80" y="36" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffffff">CKE and llama.cpp at 128K: Matched CPU Performance and Parity</text>
+  <text x="80" y="58" font-family="Inter, sans-serif" font-size="13" fill="#b0b0b0">Claims permitted only when model, quant, tokens, context, threads, and wall scope all match</text>
+
+  <!-- Section 1: Matched Conditions -->
+  <rect x="24" y="88" width="1552" height="82" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="88" width="4" height="82" rx="2" fill="#ffb400"/>
+  <text x="48" y="112" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400">MATCHED CONDITIONS (all six must align for a valid comparison)</text>
+  <text x="48" y="134" font-family="monospace" font-size="12" fill="#b0b0b0">model: identical checkpoint + revision    quant: identical format (e.g. Q5_K_M)    tokens: identical prompt + generation length</text>
+  <text x="48" y="154" font-family="monospace" font-size="12" fill="#b0b0b0">context: 128K (131072)    threads: identical count + affinity policy    wall scope: identical start/stop boundaries (no warmup exclusion)</text>
+
+  <!-- Section 2: Matched Performance Table -->
+  <rect x="24" y="184" width="1552" height="168" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="184" width="4" height="168" rx="2" fill="#47b475"/>
+  <text x="48" y="208" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#47b475">MATCHED 128K REPEATED-TOKEN MEASUREMENTS</text>
+
+  <!-- Table Header Row -->
+  <rect x="48" y="218" width="1504" height="30" rx="4" fill="#2a2a2a"/>
+  <text x="72" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">RUNNER</text>
+  <text x="320" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">VARIANT</text>
+  <text x="560" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">WALL TIME (s)</text>
+  <text x="780" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">THROUGHPUT (tok/s)</text>
+  <text x="1020" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">SPEEDUP vs llama.cpp</text>
+  <text x="1280" y="238" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#ffb400">STATUS</text>
+
+  <!-- Row 1: llama.cpp -->
+  <rect x="48" y="250" width="1504" height="32" rx="0" fill="#323232"/>
+  <line x1="48" y1="282" x2="1552" y2="282" stroke="#454545" stroke-width="0.5"/>
+  <text x="72" y="271" font-family="monospace" font-size="12" fill="#f5f5f5">llama.cpp</text>
+  <text x="320" y="271" font-family="monospace" font-size="12" fill="#b0b0b0">reference baseline</text>
+  <text x="560" y="271" font-family="monospace" font-size="13" font-weight="600" fill="#f5f5f5">5362.45</text>
+  <text x="780" y="271" font-family="monospace" font-size="13" font-weight="600" fill="#f5f5f5">24.44</text>
+  <text x="1020" y="271" font-family="monospace" font-size="12" fill="#b0b0b0">1.00x (reference)</text>
+  <rect x="1280" y="258" width="72" height="18" rx="9" fill="#454545"/>
+  <text x="1316" y="271" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#b0b0b0" text-anchor="middle">MATCHED</text>
+
+  <!-- Row 2: CKE baseline -->
+  <rect x="48" y="282" width="1504" height="32" rx="0" fill="#2e2e2e"/>
+  <line x1="48" y1="314" x2="1552" y2="314" stroke="#454545" stroke-width="0.5"/>
+  <text x="72" y="303" font-family="monospace" font-size="12" fill="#f5f5f5">CKE</text>
+  <text x="320" y="303" font-family="monospace" font-size="12" fill="#b0b0b0">baseline (default pool)</text>
+  <text x="560" y="303" font-family="monospace" font-size="13" font-weight="600" fill="#47b475">4199.72</text>
+  <text x="780" y="303" font-family="monospace" font-size="13" font-weight="600" fill="#47b475">31.21</text>
+  <text x="1020" y="303" font-family="monospace" font-size="12" fill="#47b475">1.28x</text>
+  <rect x="1280" y="290" width="72" height="18" rx="9" fill="#47b475"/>
+  <text x="1316" y="303" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffffff" text-anchor="middle">MATCHED</text>
+
+  <!-- Row 3: CKE FP32-pool -->
+  <rect x="48" y="314" width="1504" height="32" rx="0" fill="#323232"/>
+  <text x="72" y="335" font-family="monospace" font-size="12" fill="#f5f5f5">CKE</text>
+  <text x="320" y="335" font-family="monospace" font-size="12" fill="#b0b0b0">FP32-pool (activation)</text>
+  <text x="560" y="335" font-family="monospace" font-size="13" font-weight="600" fill="#47b475">4067.91</text>
+  <text x="780" y="335" font-family="monospace" font-size="13" font-weight="600" fill="#47b475">32.22</text>
+  <text x="1020" y="335" font-family="monospace" font-size="12" fill="#47b475">1.32x</text>
+  <rect x="1280" y="322" width="72" height="18" rx="9" fill="#47b475"/>
+  <text x="1316" y="335" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#ffffff" text-anchor="middle">MATCHED</text>
+
+  <!-- Section 3: Non-Matched Evidence -->
+  <rect x="24" y="366" width="1552" height="72" rx="8" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+  <rect x="24" y="366" width="4" height="72" rx="2" fill="#ffb400"/>
+  <text x="48" y="390" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400">NON-MATCHED INPUT EVIDENCE (realistic-dossier CKE run)</text>
+  <text x="48" y="412" font-family="monospace" font-size="12" fill="#b0b0b0">CKE realistic-dossier: 4013.10 s / 32.66 tok/s</text>
+  <text x="48" y="430" font-family="Inter, sans-serif" font-size="11" fill="#808080">Labeled separately because input conditions (prompt, token count, or wall scope) differ from the matched set. Not a valid speedup claim.</text>
+  <rect x="1280" y="380" width="120" height="18" rx="9" fill="#ffb400"/>
+  <text x="1340" y="393" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a" text-anchor="middle">NON-MATCHED</text>
+
+  <!-- Section 4: Verification Methodology (left column) -->
+  <!-- 4a: Consumed-Token Hashes -->
+  <rect x="24" y="452" width="768" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="452" width="4" height="130" rx="2" fill="#07adf8"/>
+  <text x="48" y="476" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#07adf8">CONSUMED-TOKEN HASHES</text>
+  <text x="48" y="498" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Every generated token is hashed (SHA-256 of token ID + position) and the</text>
+  <text x="48" y="514" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">full sequence hash is compared across runners. A mismatch at any position</text>
+  <text x="48" y="530" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">triggers X-Ray localization. For repeated-token workloads, the expected</text>
+  <text x="48" y="546" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">hash sequence is deterministic and must match bit-for-bit.</text>
+  <text x="48" y="568" font-family="monospace" font-size="10" fill="#808080">gate: token_hash_seq_cke == token_hash_seq_llama_cpp (full length)</text>
+
+  <!-- 4b: Full-Logit SHA / Top-1 Checks -->
+  <rect x="24" y="594" width="768" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="594" width="4" height="130" rx="2" fill="#07adf8"/>
+  <text x="48" y="618" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#07adf8">FULL-LOGIT SHA / TOP-1 CHECKS</text>
+  <text x="48" y="640" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">At each decode step, the full vocabulary logit vector is SHA-256 hashed.</text>
+  <text x="48" y="656" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Top-1 (argmax) token ID is recorded independently. Both must agree</text>
+  <text x="48" y="672" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">across runners within the declared numerical contract tolerance.</text>
+  <text x="48" y="688" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">For quantized paths, bit-exact logit match is required (llama.cpp oracle).</text>
+  <text x="48" y="710" font-family="monospace" font-size="10" fill="#808080">gate: logit_sha_cke == logit_sha_ref AND top1_cke == top1_ref (per step)</text>
+
+  <!-- 4c: X-Ray Divergence Localization -->
+  <rect x="24" y="736" width="768" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="736" width="4" height="130" rx="2" fill="#07adf8"/>
+  <text x="48" y="760" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#07adf8">X-RAY DIVERGENCE LOCALIZATION</text>
+  <text x="48" y="782" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">When a hash or logit mismatch occurs, X-Ray moves from sparse checkpoints</text>
+  <text x="48" y="798" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">to the first failing layer, then to the first failing operation. The</text>
+  <text x="48" y="814" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">divergence is attributed to a specific kernel, provider, or circuit node.</text>
+  <text x="48" y="830" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Fixes belong in the kernel map or tested kernel, never as a DSL special case.</text>
+  <text x="48" y="852" font-family="monospace" font-size="10" fill="#808080">gate: xray_first_divergence == null (no divergence at matched conditions)</text>
+
+  <!-- 4d: Provider Timing -->
+  <rect x="24" y="878" width="768" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="24" y="878" width="4" height="130" rx="2" fill="#07adf8"/>
+  <text x="48" y="902" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#07adf8">PROVIDER TIMING</text>
+  <text x="48" y="924" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Each kernel-map provider records per-call wall time via X-Ray. The</text>
+  <text x="48" y="940" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">aggregate per-layer provider time must sum to the observed layer time</text>
+  <text x="48" y="956" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">within scheduler overhead. This exposes hidden copies, misrouted</text>
+  <text x="48" y="972" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">providers, or unaccounted staging that would invalidate a speedup claim.</text>
+  <text x="48" y="994" font-family="monospace" font-size="10" fill="#808080">gate: sum(provider_times) + scheduler_overhead == layer_wall_time (+/- 2%)</text>
+
+  <!-- Section 5: Right column -->
+  <!-- 5a: Occupancy -->
+  <rect x="816" y="452" width="760" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="816" y="452" width="4" height="130" rx="2" fill="#bc8cff"/>
+  <text x="840" y="476" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#bc8cff">OCCUPANCY</text>
+  <text x="840" y="498" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Thread-pool occupancy is measured per layer: active threads / pool size.</text>
+  <text x="840" y="514" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">At 128K context, KV-cache operations and attention tiles must maintain</text>
+  <text x="840" y="530" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">high occupancy to justify the thread count. Low occupancy indicates</text>
+  <text x="840" y="546" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">underutilization that would make the wall-time comparison unfair.</text>
+  <text x="840" y="568" font-family="monospace" font-size="10" fill="#808080">gate: mean_occupancy &gt;= 0.85 across all layers (both runners, same threads)</text>
+
+  <!-- 5b: Regression Gates -->
+  <rect x="816" y="594" width="760" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="816" y="594" width="4" height="130" rx="2" fill="#bc8cff"/>
+  <text x="840" y="618" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#bc8cff">REGRESSION GATES</text>
+  <text x="840" y="640" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Nightly parity gates run the matched 128K workload against llama.cpp</text>
+  <text x="840" y="656" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">and PyTorch references. Rolling compatibility gates track upstream</text>
+  <text x="840" y="672" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">llama.cpp changes. A performance regression &gt; 5% or any parity</text>
+  <text x="840" y="688" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">failure blocks the commit. The gate result is recorded in the test report.</text>
+  <text x="840" y="710" font-family="monospace" font-size="10" fill="#808080">gate: nightly_parity == PASS AND perf_regression &lt; 5% (rolling 7-day window)</text>
+
+  <!-- 5c: Fair Accelerator Comparison -->
+  <rect x="816" y="736" width="760" height="130" rx="8" fill="#323232" stroke="#454545" stroke-width="1"/>
+  <rect x="816" y="736" width="4" height="130" rx="2" fill="#bc8cff"/>
+  <text x="840" y="760" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#bc8cff">FAIR ACCELERATOR COMPARISON</text>
+  <text x="840" y="782" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Both runners must use the same CPU, same ISA flags detected, same</text>
+  <text x="840" y="798" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">compiler optimization level, and same memory topology. If one runner</text>
+  <text x="840" y="814" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">uses AVX-512 and the other AVX2, the comparison is invalid. The</text>
+  <text x="840" y="830" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">hardware evidence matrix must be identical for both runs.</text>
+  <text x="840" y="852" font-family="monospace" font-size="10" fill="#808080">gate: cpu_model == cpu_model AND isa_flags == isa_flags AND compiler == compiler</text>
+
+  <!-- 5d: Claim Boundary -->
+  <rect x="816" y="878" width="760" height="130" rx="8" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
+  <rect x="816" y="878" width="4" height="130" rx="2" fill="#ffb400"/>
+  <text x="840" y="902" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffb400">CLAIM BOUNDARY</text>
+  <text x="840" y="924" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">A speedup claim is valid ONLY when all six matched conditions hold AND</text>
+  <text x="840" y="940" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">all verification gates pass. The 1.28x and 1.32x figures above are</text>
+  <text x="840" y="956" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">claims. The 32.66 tok/s realistic-dossier figure is NOT a claim.</text>
+  <text x="840" y="972" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">Extrapolating to other models, quants, contexts, or hardware is</text>
+  <text x="840" y="988" font-family="Inter, sans-serif" font-size="11" fill="#b0b0b0">forbidden without a new matched measurement.</text>
+  <text x="840" y="1010" font-family="monospace" font-size="10" fill="#808080">rule: no claim without a new matched run + full gate pass</text>
+
+  <!-- Footer -->
+  <rect x="0" y="1024" width="1600" height="76" fill="#2a2a2a"/>
+  <rect x="0" y="1024" width="1600" height="1" fill="#454545"/>
+  <text x="24" y="1050" font-family="Inter, sans-serif" font-size="11" fill="#808080">C-Kernel-Engine | Matched CPU Performance and Parity at 128K Context</text>
+  <text x="24" y="1070" font-family="Inter, sans-serif" font-size="10" fill="#606060">Static SVG | No script, no external assets, no animation | Accessible title + description</text>
+  <text x="1576" y="1050" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="end">2026-08-16</text>
+  <text x="1576" y="1070" font-family="Inter, sans-serif" font-size="10" fill="#606060" text-anchor="end">viewBox 0 0 1600 1100</text>
+
+  <!-- Decorative: speedup bar visualization -->
+  <rect x="48" y="1038" width="200" height="12" rx="3" fill="#454545"/>
+  <rect x="48" y="1038" width="200" height="12" rx="3" fill="#454545" opacity="0.3"/>
+  <text x="256" y="1048" font-family="monospace" font-size="9" fill="#808080">llama.cpp 5362s</text>
+  <rect x="48" y="1056" width="156" height="12" rx="3" fill="#47b475"/>
+  <text x="212" y="1066" font-family="monospace" font-size="9" fill="#47b475">CKE baseline 4200s (1.28x)</text>
+  <rect x="48" y="1074" width="151" height="12" rx="3" fill="#47b475" opacity="0.8"/>
+  <text x="207" y="1084" font-family="monospace" font-size="9" fill="#47b475">CKE FP32-pool 4068s (1.32x)</text>
+</svg>

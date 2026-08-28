@@ -1,0 +1,314 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="svgTitle svgDesc">
+  <title id="svgTitle">RoPE at 128K: Position Across Recurrent and Full-Attention Layers</title>
+  <desc id="svgDesc">Diagram explaining rotary position embedding at 128K context: rotary dimension versus head dimension, theta base, Q and K rotation, grouped-query attention with four KV heads shared by twenty-four query heads, chunked-prefill position continuity, recurrent layers versus every-fourth full-attention layer, KV-cache addressing, numerical contracts, X-Ray validation, and failure modes including off-by-one, segment reset, wrong stride, and incompatible providers. Measured behavior is shown with solid borders; future work with dashed borders.</desc>
+
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="800" y="32" text-anchor="middle" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#1a1a1a">RoPE at 128K: Position Across Recurrent and Full-Attention Layers</text>
+  <text x="800" y="54" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#555">C-Kernel-Engine v8 circuit: 24 query heads, 4 KV heads (GQA 6:1), head_dim 128, rotary_dim 64, theta 10000, 128K max context</text>
+
+  <!-- ==================== EQUATION PANEL (top-left) ==================== -->
+  <rect x="20" y="70" width="540" height="260" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="35" y="92" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">Equation Panel — Rotary Position Embedding</text>
+  <line x1="35" y1="100" x2="545" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- theta definition -->
+  <text x="40" y="122" font-family="'JetBrains Mono', monospace" font-size="11" fill="#2a2a2a">theta_i  =  10000^( -2i / d_rot )</text>
+  <text x="40" y="140" font-family="system-ui, sans-serif" font-size="10" fill="#666">where d_rot = rotary_dim = 64 (32 pairs), i = 0..31</text>
+
+  <!-- Q rotation -->
+  <text x="40" y="166" font-family="'JetBrains Mono', monospace" font-size="11" fill="#1a5276">q_rot  =  q · cos(m·θ)  +  rotate_half(q) · sin(m·θ)</text>
+  <text x="40" y="184" font-family="system-ui, sans-serif" font-size="10" fill="#666">m = absolute position index (0 to 131071 for 128K)</text>
+
+  <!-- K rotation -->
+  <text x="40" y="210" font-family="'JetBrains Mono', monospace" font-size="11" fill="#1a5276">k_rot  =  k · cos(m·θ)  +  rotate_half(k) · sin(m·θ)</text>
+  <text x="40" y="228" font-family="system-ui, sans-serif" font-size="10" fill="#666">Same m for Q and K at the same token position</text>
+
+  <!-- rotate_half -->
+  <text x="40" y="254" font-family="'JetBrains Mono', monospace" font-size="11" fill="#2a2a2a">rotate_half(x) = [ -x[32:64],  x[0:32] ]</text>
+  <text x="40" y="272" font-family="system-ui, sans-serif" font-size="10" fill="#666">Splits 64-dim rotary vector into two 32-dim halves and negates the first</text>
+
+  <!-- Measured badge -->
+  <rect x="420" y="82" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="475" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== HEAD LAYOUT PANEL (mid-left) ==================== -->
+  <rect x="20" y="345" width="540" height="290" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="35" y="367" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">Head Layout — GQA 24 Query : 4 KV (6:1)</text>
+  <line x1="35" y1="375" x2="545" y2="375" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Query heads row -->
+  <text x="40" y="398" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">Query heads (24):</text>
+  <!-- 24 small rects for Q heads -->
+  <rect x="150" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="170" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="190" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="210" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="230" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="250" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="270" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="290" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="310" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="330" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="350" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="370" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="390" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="410" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="430" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="450" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="470" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="490" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="510" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="530" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="550" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="570" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="590" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <rect x="610" y="386" width="18" height="16" rx="2" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <!-- Group labels under Q heads -->
+  <text x="185" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G0</text>
+  <text x="265" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G1</text>
+  <text x="345" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G2</text>
+  <text x="425" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G3</text>
+  <text x="505" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G4</text>
+  <text x="585" y="414" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">G5</text>
+
+  <!-- KV heads row -->
+  <text x="40" y="440" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">KV heads (4):</text>
+  <rect x="150" y="428" width="80" height="16" rx="2" fill="#d5f5e3" stroke="#27ae60" stroke-width="1"/>
+  <text x="190" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#1e8449">KV-0</text>
+  <rect x="240" y="428" width="80" height="16" rx="2" fill="#d5f5e3" stroke="#27ae60" stroke-width="1"/>
+  <text x="280" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#1e8449">KV-1</text>
+  <rect x="330" y="428" width="80" height="16" rx="2" fill="#d5f5e3" stroke="#27ae60" stroke-width="1"/>
+  <text x="370" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#1e8449">KV-2</text>
+  <rect x="420" y="428" width="80" height="16" rx="2" fill="#d5f5e3" stroke="#27ae60" stroke-width="1"/>
+  <text x="460" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#1e8449">KV-3</text>
+
+  <!-- Arrows from Q groups to KV heads -->
+  <line x1="190" y1="416" x2="190" y2="426" stroke="#888" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+  <line x1="280" y1="416" x2="280" y2="426" stroke="#888" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+  <line x1="370" y1="416" x2="370" y2="426" stroke="#888" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+  <line x1="460" y1="416" x2="460" y2="426" stroke="#888" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+  <!-- Dimension annotations -->
+  <text x="40" y="468" font-family="system-ui, sans-serif" font-size="10" fill="#444">head_dim = 128 (per head)</text>
+  <text x="40" y="486" font-family="system-ui, sans-serif" font-size="10" fill="#444">rotary_dim = 64 (32 cos/sin pairs applied to first 64 dims)</text>
+  <text x="40" y="504" font-family="system-ui, sans-serif" font-size="10" fill="#444">Remaining 64 dims: passed through unrotated (identity)</text>
+
+  <!-- KV cache shape -->
+  <text x="40" y="530" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">KV cache per layer (full-attention only):</text>
+  <text x="40" y="548" font-family="'JetBrains Mono', monospace" font-size="10" fill="#2a2a2a">[4 heads, 131072 positions, 128 head_dim] × 2 (K and V)</text>
+  <text x="40" y="566" font-family="system-ui, sans-serif" font-size="10" fill="#666">= 4 × 131072 × 128 × 2 bytes × 2 = 268 MB per full-attention layer (BF16)</text>
+
+  <!-- Measured badge -->
+  <rect x="420" y="357" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="475" y="370" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== TIMELINE PANEL (top-right) ==================== -->
+  <rect x="580" y="70" width="1000" height="360" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="595" y="92" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">0 → 128K Timeline — Layer Types and Chunked-Prefill Position Continuity</text>
+  <line x1="595" y1="100" x2="1565" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Position axis -->
+  <line x1="620" y1="300" x2="1540" y2="300" stroke="#333" stroke-width="1.5"/>
+  <polygon points="1540,300 1534,297 1534,303" fill="#333"/>
+  <text x="1545" y="304" font-family="system-ui, sans-serif" font-size="10" fill="#333">position</text>
+
+  <!-- Tick marks -->
+  <line x1="620" y1="296" x2="620" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="620" y="318" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#555">0</text>
+  <line x1="850" y1="296" x2="850" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="850" y="318" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#555">32K</text>
+  <line x1="1080" y1="296" x2="1080" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="1080" y="318" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#555">64K</text>
+  <line x1="1310" y1="296" x2="1310" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="1310" y="318" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#555">96K</text>
+  <line x1="1540" y1="296" x2="1540" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="1540" y="318" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#555">128K</text>
+
+  <!-- Layer type bands (above axis) -->
+  <!-- Recurrent layers: most layers (green) -->
+  <rect x="620" y="130" width="920" height="22" rx="3" fill="#d5f5e3" stroke="#27ae60" stroke-width="0.8"/>
+  <text x="1080" y="145" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#1e8449">Recurrent layers (3/4 of layers) — bounded state, no full KV cache, position tracked internally</text>
+
+  <!-- Full-attention layers: every 4th (blue) -->
+  <rect x="620" y="160" width="920" height="22" rx="3" fill="#d6eaf8" stroke="#2980b9" stroke-width="0.8"/>
+  <text x="1080" y="175" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#1a5276">Full-attention layers (1/4 of layers) — RoPE applied to Q and K, KV cache grows with position</text>
+
+  <!-- Chunked prefill segments -->
+  <text x="620" y="205" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">Chunked prefill (position continuity across chunks):</text>
+
+  <!-- Chunk 1: 0 to 8K -->
+  <rect x="620" y="215" width="58" height="20" rx="2" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+  <text x="649" y="229" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#7d6608">C1: 0–8K</text>
+
+  <!-- Chunk 2: 8K to 16K -->
+  <rect x="680" y="215" width="58" height="20" rx="2" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+  <text x="709" y="229" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#7d6608">C2: 8K–16K</text>
+
+  <!-- Chunk 3: 16K to 24K -->
+  <rect x="740" y="215" width="58" height="20" rx="2" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+  <text x="769" y="229" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#7d6608">C3: 16K–24K</text>
+
+  <!-- Dots -->
+  <text x="810" y="229" font-family="system-ui, sans-serif" font-size="10" fill="#888">···</text>
+
+  <!-- Last chunk: 120K to 128K -->
+  <rect x="1480" y="215" width="58" height="20" rx="2" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+  <text x="1509" y="229" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#7d6608">Cn: 120K–128K</text>
+
+  <!-- Position continuity arrow -->
+  <line x1="620" y1="245" x2="1540" y2="245" stroke="#f39c12" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="1080" y="260" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#7d6608">Absolute position m is continuous across all chunks — no reset at chunk boundary</text>
+
+  <!-- KV cache growth curve (simplified) -->
+  <text x="620" y="280" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#2980b9">KV cache size (full-attention layers):</text>
+  <path d="M 620,295 Q 1080,295 1540,270" fill="none" stroke="#2980b9" stroke-width="1.2"/>
+  <text x="1500" y="265" font-family="system-ui, sans-serif" font-size="8" fill="#2980b9">grows linearly with m</text>
+
+  <!-- Measured badge -->
+  <rect x="1440" y="82" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="1495" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== KV-CACHE ADDRESSING (mid-right) ==================== -->
+  <rect x="580" y="445" width="1000" height="190" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="595" y="467" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">KV-Cache Addressing — Position to Slot Mapping</text>
+  <line x1="595" y1="475" x2="1565" y2="475" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Address formula -->
+  <text x="610" y="500" font-family="'JetBrains Mono', monospace" font-size="11" fill="#2a2a2a">slot_offset = m × stride  where  stride = num_kv_heads × head_dim = 4 × 128 = 512</text>
+  <text x="610" y="520" font-family="'JetBrains Mono', monospace" font-size="11" fill="#2a2a2a">byte_offset = slot_offset × 2  (BF16 = 2 bytes per element)</text>
+
+  <!-- Visual: cache slots -->
+  <text x="610" y="548" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">Cache layout (one full-attention layer, K tensor):</text>
+
+  <!-- Slot boxes -->
+  <rect x="610" y="556" width="60" height="18" rx="2" fill="#eaf2f8" stroke="#2980b9" stroke-width="0.8"/>
+  <text x="640" y="569" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#1a5276">m=0</text>
+  <rect x="674" y="556" width="60" height="18" rx="2" fill="#eaf2f8" stroke="#2980b9" stroke-width="0.8"/>
+  <text x="704" y="569" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#1a5276">m=1</text>
+  <rect x="738" y="556" width="60" height="18" rx="2" fill="#eaf2f8" stroke="#2980b9" stroke-width="0.8"/>
+  <text x="768" y="569" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#1a5276">m=2</text>
+  <text x="810" y="569" font-family="system-ui, sans-serif" font-size="10" fill="#888">···</text>
+  <rect x="1460" y="556" width="60" height="18" rx="2" fill="#eaf2f8" stroke="#2980b9" stroke-width="0.8"/>
+  <text x="1490" y="569" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#1a5276">m=131071</text>
+
+  <!-- Stride annotation -->
+  <line x1="670" y1="578" x2="734" y2="578" stroke="#e74c3c" stroke-width="1"/>
+  <line x1="670" y1="575" x2="670" y2="581" stroke="#e74c3c" stroke-width="1"/>
+  <line x1="734" y1="575" x2="734" y2="581" stroke="#e74c3c" stroke-width="1"/>
+  <text x="702" y="592" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#e74c3c">stride = 512 elements</text>
+
+  <!-- GQA note -->
+  <text x="610" y="615" font-family="system-ui, sans-serif" font-size="10" fill="#444">GQA: 6 query heads share 1 KV head. RoPE is applied per-head before the QK dot product.</text>
+  <text x="610" y="630" font-family="system-ui, sans-serif" font-size="10" fill="#444">Each KV head stores its own rotated K and V for all positions 0..m.</text>
+
+  <!-- Measured badge -->
+  <rect x="1440" y="457" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="1495" y="470" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== FAILURES PANEL (bottom-left) ==================== -->
+  <rect x="20" y="650" width="760" height="230" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="35" y="672" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">Failure Modes — X-Ray Detects First Divergence</text>
+  <line x1="35" y1="680" x2="765" y2="680" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Failure 1: Off-by-one -->
+  <rect x="35" y="692" width="350" height="44" rx="4" fill="#fdedec" stroke="#e74c3c" stroke-width="1"/>
+  <text x="45" y="708" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#922b21">1. Off-by-one position</text>
+  <text x="45" y="724" font-family="system-ui, sans-serif" font-size="9" fill="#641e16">m used instead of m+1 (or vice versa). X-Ray: first token logits diverge at layer 0, head 0.</text>
+
+  <!-- Failure 2: Segment reset -->
+  <rect x="400" y="692" width="365" height="44" rx="4" fill="#fdedec" stroke="#e74c3c" stroke-width="1"/>
+  <text x="410" y="708" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#922b21">2. Segment reset at chunk boundary</text>
+  <text x="410" y="724" font-family="system-ui, sans-serif" font-size="9" fill="#641e16">Position resets to 0 at chunk start. X-Ray: divergence at first token of chunk 2, all heads.</text>
+
+  <!-- Failure 3: Wrong stride -->
+  <rect x="35" y="744" width="350" height="44" rx="4" fill="#fdedec" stroke="#e74c3c" stroke-width="1"/>
+  <text x="45" y="760" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#922b21">3. Wrong KV-cache stride</text>
+  <text x="45" y="776" font-family="system-ui, sans-serif" font-size="9" fill="#641e16">stride = 128 instead of 512. X-Ray: KV read returns wrong head data; divergence at decode step 1.</text>
+
+  <!-- Failure 4: Incompatible providers -->
+  <rect x="400" y="744" width="365" height="44" rx="4" fill="#fdedec" stroke="#e74c3c" stroke-width="1"/>
+  <text x="410" y="760" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#922b21">4. Incompatible kernel-map providers</text>
+  <text x="410" y="776" font-family="system-ui, sans-serif" font-size="9" fill="#641e16">Resolver selects FP32 RoPE for BF16 circuit. X-Ray: dtype mismatch rejection logged; compile fails.</text>
+
+  <!-- X-Ray detection note -->
+  <text x="35" y="810" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">X-Ray workflow:</text>
+  <text x="35" y="826" font-family="system-ui, sans-serif" font-size="9" fill="#444">Sparse checkpoint → first failing layer → first failing head → first failing operation. Fix belongs in circuit, kernel map, or tested kernel — never a DSL special case.</text>
+
+  <!-- Measured badge -->
+  <rect x="620" y="662" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="675" y="675" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== NUMERICAL CONTRACTS + X-RAY (bottom-right) ==================== -->
+  <rect x="800" y="650" width="780" height="230" rx="6" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+  <text x="815" y="672" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#2a2a2a">Numerical Contracts and X-Ray Validation</text>
+  <line x1="815" y1="680" x2="1565" y2="680" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Contract items -->
+  <text x="820" y="700" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">Zero-tolerance contracts (measured):</text>
+  <text x="820" y="718" font-family="system-ui, sans-serif" font-size="9" fill="#444">• RoPE cos/sin tables: bit-exact match to scalar reference for m = 0..131071, all 32 pairs</text>
+  <text x="820" y="734" font-family="system-ui, sans-serif" font-size="9" fill="#444">• Q·K dot product: reduction order fixed (sequential over head_dim), no FMA reassociation</text>
+  <text x="820" y="750" font-family="system-ui, sans-serif" font-size="9" fill="#444">• KV store: append at position m, never overwrite; valid-token count tracked by append index</text>
+  <text x="820" y="766" font-family="system-ui, sans-serif" font-size="9" fill="#444">• GQA broadcast: 6 Q heads read same KV head; no cross-head contamination</text>
+
+  <!-- X-Ray validation -->
+  <text x="820" y="792" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#2a2a2a">X-Ray validation gates (measured):</text>
+  <text x="820" y="810" font-family="system-ui, sans-serif" font-size="9" fill="#444">• Leaf kernel: AVX-512 RoPE vs scalar FP32 reference — bit-exact on 128K positions</text>
+  <text x="820" y="826" font-family="system-ui, sans-serif" font-size="9" fill="#444">• Stitched layer: full-attention layer output vs llama.cpp at 4K, 32K, 128K context</text>
+  <text x="820" y="842" font-family="system-ui, sans-serif" font-size="9" fill="#444">• End-to-end: token replay parity vs llama.cpp GGUF at 128K, Q5_K_M quantization</text>
+  <text x="820" y="858" font-family="system-ui, sans-serif" font-size="9" fill="#444">• Nightly: rolling llama.cpp compatibility gate; divergence harness auto-attributes first failing op</text>
+
+  <!-- Measured badge -->
+  <rect x="1440" y="662" width="110" height="18" rx="9" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+  <text x="1495" y="675" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#1e8449">MEASURED</text>
+
+  <!-- ==================== FUTURE WORK PANEL (very bottom) ==================== -->
+  <rect x="20" y="895" width="1560" height="190" rx="6" fill="#ffffff" stroke="#999" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="35" y="917" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#555">Future Work — Not Yet Implemented (dashed border = planned)</text>
+  <line x1="35" y1="925" x2="1565" y2="925" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- Future item 1 -->
+  <text x="40" y="948" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#555">1. NTK-aware / YaRN scaling for 128K+ extrapolation</text>
+  <text x="40" y="964" font-family="system-ui, sans-serif" font-size="9" fill="#777">   theta base adjusted per frequency band; requires new kernel-map variant with explicit contract. Status: research design.</text>
+
+  <!-- Future item 2 -->
+  <text x="40" y="986" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#555">2. Distributed RoPE: head-by-context 2-D attention at 128K</text>
+  <text x="40" y="1002" font-family="system-ui, sans-serif" font-size="9" fill="#777">   Zip-fusion schedule: 3 context shards × 2 head groups; online-softmax merge of (m, l, o) statistics. Status: research design, not implemented.</text>
+
+  <!-- Future item 3 -->
+  <text x="40" y="1024" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#555">3. Memory-Tetris KV residency: evict cold positions from DRAM to NVMe</text>
+  <text x="40" y="1040" font-family="system-ui, sans-serif" font-size="9" fill="#777">   At 128K, KV cache per full-attention layer is 268 MB. Lifetime-aware slot reuse may stream cold positions. Status: research design.</text>
+
+  <!-- Future item 4 -->
+  <text x="40" y="1062" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#555">4. BF16 native RoPE on AMX-capable hardware</text>
+  <text x="40" y="1078" font-family="system-ui, sans-serif" font-size="9" fill="#777">   Current path: BF16 → FP32 → rotate → FP32 → BF16. AMX path: native BF16 cos/sin multiply. Status: planned, no results claimed.</text>
+
+  <!-- Future badge -->
+  <rect x="1440" y="907" width="120" height="18" rx="9" fill="#fef9e7" stroke="#f39c12" stroke-width="1"/>
+  <text x="1500" y="920" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#7d6608">FUTURE WORK</text>
+
+  <!-- ==================== ARROW MARKERS ==================== -->
+  <defs>
+    <marker id="arrowGray" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0,0 6,2.5 0,5" fill="#888"/>
+    </marker>
+    <marker id="arrowDark" markerWidth="7" markerHeight="6" refX="6" refY="3" orient="auto">
+      <polygon points="0,0 7,3 0,6" fill="#333"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+      <polygon points="0,0 6,2.5 0,5" fill="#e74c3c"/>
+    </marker>
+  </defs>
+
+  <!-- ==================== LEGEND (bottom-right corner, small) ==================== -->
+  <rect x="1200" y="1090" width="380" height="8" rx="2" fill="none"/>
+  <!-- Solid = measured, Dashed = future -->
+  <line x1="1210" y1="1094" x2="1250" y2="1094" stroke="#27ae60" stroke-width="2"/>
+  <text x="1255" y="1098" font-family="system-ui, sans-serif" font-size="8" fill="#555">Measured</text>
+  <line x1="1320" y1="1094" x2="1360" y2="1094" stroke="#999" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="1365" y="1098" font-family="system-ui, sans-serif" font-size="8" fill="#555">Future work</text>
+  <rect x="1440" y="1089" width="12" height="10" rx="2" fill="#fdedec" stroke="#e74c3c" stroke-width="0.8"/>
+  <text x="1458" y="1098" font-family="system-ui, sans-serif" font-size="8" fill="#555">Failure</text>
+</svg>
