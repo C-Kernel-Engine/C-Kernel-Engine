@@ -261,6 +261,35 @@ def test_quality_checks_reject_corruption_and_accept_structured_outputs() -> Non
     assert svg["pass"]
 
 
+def test_engineering_quality_warns_for_coherent_imperfect_artifacts() -> None:
+    coherent_but_incomplete = (
+        "Here is a coherent implementation plan with a complete explanation of the "
+        "input, output, vector loop, scalar tail, and numerical ordering constraints. "
+        "The requested source is intentionally omitted from this fixture."
+    )
+    code = runner.code_quality(coherent_but_incomplete)
+    assert code["coherence_pass"]
+    assert not code["pass"]
+    assert runner.engineering_quality_status(0, code, True, True) == "WARN"
+
+    malformed_svg = (
+        "The following diagram explains the vector lanes, scalar tail, memory flow, "
+        "and numerical ordering in a coherent form for human review. "
+        "<svg><title>RoPE pipeline</title><text>lane flow and scalar tail</svg>"
+    )
+    svg = runner.svg_quality(malformed_svg)
+    assert svg["coherence_pass"]
+    assert not svg["pass"]
+    assert runner.engineering_quality_status(0, svg, True, True) == "WARN"
+
+
+def test_engineering_quality_fails_corrupted_model_output() -> None:
+    corrupted = "g\ufffd\\uFFFD\x03" * 80
+    quality = runner.code_quality(corrupted)
+    assert not quality["coherence_pass"]
+    assert runner.engineering_quality_status(0, quality, True, True) == "FAIL"
+
+
 def test_engineering_quality_contract_is_paired_and_fail_closed() -> None:
     payload = runner.load_schema(
         ROOT / "version" / "v8" / "test_assets" / "long_context_quality_prompts.json",
