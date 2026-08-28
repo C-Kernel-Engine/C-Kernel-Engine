@@ -712,6 +712,40 @@ def materialize_quality_prompt(
     return text.replace("{{dependency_output}}", dependency)
 
 
+def engineering_output_coherence(text: str) -> dict[str, Any]:
+    """Reject corrupted/gibberish output without judging artifact perfection."""
+    printable = sum(character.isprintable() or character in "\n\r\t" for character in text)
+    ratio = printable / max(len(text), 1)
+    words = re.findall(r"[A-Za-z_][A-Za-z0-9_+-]*", text)
+    replacement_chars = text.count("\ufffd") + len(
+        re.findall(r"\\u[fF]{3}[dD]", text)
+    )
+    four_gram_counts = Counter(
+        tuple(words[index:index + 4]) for index in range(max(0, len(words) - 3))
+    )
+    repeated_four_gram = max(four_gram_counts.values(), default=0)
+    reasons = []
+    if len(text) < 128:
+        reasons.append(f"too_short:{len(text)}<128")
+    if len(words) < 8:
+        reasons.append(f"too_few_words:{len(words)}<8")
+    if ratio < 0.96:
+        reasons.append(f"printable_ratio:{ratio:.3f}<0.960")
+    if replacement_chars:
+        reasons.append(f"replacement_chars:{replacement_chars}>0")
+    if repeated_four_gram > 4:
+        reasons.append(f"repeated_4gram:{repeated_four_gram}>4")
+    return {
+        "pass": not reasons,
+        "characters": len(text),
+        "words": len(words),
+        "printable_ratio": ratio,
+        "replacement_chars": replacement_chars,
+        "repeated_4gram": repeated_four_gram,
+        "reasons": reasons,
+    }
+
+
 def code_quality(
     text: str,
     source_path: Path | None = None,
@@ -719,8 +753,8 @@ def code_quality(
     env: dict[str, str] | None = None,
     output_dir: Path | None = None,
 ) -> dict[str, Any]:
-    printable = sum(character.isprintable() or character in "\n\r\t" for character in text)
-    ratio = printable / max(len(text), 1)
+    coherence = engineering_output_coherence(text)
+    ratio = float(coherence["printable_ratio"])
     source = extract_c_source(text)
     contract = prompt or {}
     required = [str(value) for value in contract.get("required_fragments", [])]
@@ -728,6 +762,8 @@ def code_quality(
     result: dict[str, Any] = {
         "kind": str(contract.get("kind", "c_kernel.v1")),
         "pass": False,
+        "coherence_pass": coherence["pass"],
+        "coherence": coherence,
         "characters": len(text),
         "printable_ratio": ratio,
         "source_characters": len(source),
@@ -774,12 +810,34 @@ def svg_quality(text: str, prompt: dict[str, Any] | None = None) -> dict[str, An
     sys.path.insert(0, str(SCRIPT_DIR))
     from certify_text_prompt_parity_v8 import evaluate_quality_contract
     contract = prompt or {}
-    return evaluate_quality_contract(text, {
+    result = evaluate_quality_contract(text, {
         "kind": "standalone_svg.v1",
         "min_graphic_elements": int(contract.get("min_graphic_elements", 12 if prompt else 8)),
         "required_labels": contract.get("required_labels", []),
         "require_arrow_marker": bool(prompt),
     })
+    coherence = engineering_output_coherence(text)
+    result["coherence_pass"] = coherence["pass"]
+    result["coherence"] = coherence
+    return result
+
+
+def engineering_quality_status(
+    returncode: int,
+    quality: dict[str, Any],
+    prefill_consumption_verified: bool,
+    prompt_not_truncated: bool,
+) -> str:
+    if (
+        returncode != 0
+        or not bool(quality.get("coherence_pass"))
+        or not prefill_consumption_verified
+        or not prompt_not_truncated
+    ):
+        return "FAIL"
+    if bool(quality.get("pass")):
+        return "PASS"
+    return "WARN"
 
 
 def write_markdown(report: dict[str, Any], path: Path) -> None:
@@ -890,7 +948,11 @@ def write_quality_index(report: dict[str, Any], output_dir: Path) -> None:
         if prompt:
             links.append(f'<a href="{html.escape(prompt)}">prompt</a>')
         preview = ""
-        if status == "PASS" and artifact.lower().endswith(".svg"):
+        if (
+            status in {"PASS", "WARN"}
+            and artifact.lower().endswith(".svg")
+            and bool((row.get("quality") or {}).get("xml_parseable"))
+        ):
             preview = f'<img src="{html.escape(artifact)}" alt="Generated SIMD kernel diagram">'
         artifact_source = ""
         artifact_value = row.get("artifact_path")
@@ -965,7 +1027,7 @@ body{{margin:0;background:#f4f6f8;color:#17202a;font:15px/1.45 system-ui,sans-se
 h1{{font-size:30px;margin:0 0 8px}}.intro{{max-width:850px;color:#52606d;margin:0 0 26px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}}
 .result{{background:white;border:1px solid #d7dee5;border-radius:6px;padding:16px;min-width:0}}header{{display:flex;justify-content:space-between;gap:12px;align-items:start}}
 h2{{font-size:18px;margin:0}}header p{{margin:2px 0;color:#647381}}.status{{font-weight:700;font-size:12px;padding:3px 7px;border-radius:4px;background:#e8edf2}}
-.status.pass{{background:#dff4e6;color:#176b3a}}.status.fail{{background:#fde3e1;color:#9f2d27}}.facts{{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;color:#465461;font-size:13px}}
+.status.pass{{background:#dff4e6;color:#176b3a}}.status.warn{{background:#fff0c7;color:#7a5100}}.status.fail{{background:#fde3e1;color:#9f2d27}}.facts{{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;color:#465461;font-size:13px}}
 nav{{margin:10px 0}}a{{color:#075da8}}img{{display:block;width:100%;max-height:520px;object-fit:contain;border:1px solid #e1e6eb;background:white;margin-top:14px}}
 details{{margin-top:14px}}summary{{cursor:pointer;font-weight:650}}pre{{overflow:auto;max-height:520px;padding:12px;background:#111820;color:#e7edf3;border-radius:4px;font:12px/1.45 ui-monospace,monospace;white-space:pre}}
 </style></head><body><main><h1>CKE Engineering Quality Artifacts</h1>
@@ -1399,9 +1461,9 @@ def run_quality(
         )
         result = {
             "model_id": row["id"], "model": row["label"], "prompt_id": prompt_id,
-            "status": (
-                "PASS" if command_result["returncode"] == 0 and quality["pass"]
-                and prefill_consumption_verified and prompt_not_truncated else "FAIL"
+            "status": engineering_quality_status(
+                int(command_result["returncode"]), quality,
+                prefill_consumption_verified, prompt_not_truncated,
             ),
             "quality": quality, "timing": timing, "peak_rss_kib": command_result["peak_rss_kib"],
             "resource_usage": command_result["resource_usage"],
@@ -1634,7 +1696,7 @@ def main() -> int:
     required_quality_ids = {str(prompt["id"]) for prompt in quality_prompts}
     quality_ids_by_model: dict[str, set[str]] = {}
     for result in report.get("quality", []):
-        if result.get("status") not in {"PASS", "FAIL"}:
+        if result.get("status") not in {"PASS", "WARN", "FAIL"}:
             continue
         quality_ids_by_model.setdefault(str(result.get("model_id")), set()).add(
             str(result.get("prompt_id"))
