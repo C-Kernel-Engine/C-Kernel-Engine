@@ -12,6 +12,12 @@ SSE ``response.output_text.delta`` event. Responses keep an in-process store so
 the scaffold ``GET /responses/{id}`` surface resolves at runtime; conversation
 state remains the scaffold's in-memory store.
 
+**Single-flight**: only one ``generate`` request is processed at a time.
+Concurrent requests receive HTTP 429 (Too Many Requests) or an SSE
+``response.failed`` event with ``code: "session_busy"``.  The native C layer
+enforces this via ``pthread_mutex_trylock``; the Python server adds an
+additional Python-level guard for duck-typed sessions.
+
 The production host is a dedicated C or Rust server. This Python/ctypes module
 is a reference implementation of the same ABI binding.
 """
@@ -23,14 +29,16 @@ import ctypes
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
 import time
 import uuid
-from collections.abc import Sequence
+from collections import OrderedDict
+from collections.abc import Sequence, Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import ck_run_v8
 
@@ -60,6 +68,43 @@ _STOP_REASON_NAMES = {
     5: "runtime_error",
 }
 
+# --- Native session status codes -----------------------------------------------
+
+_SESSION_STATUS_NAMES: dict[int, str] = {
+    0: "ok",
+    -1: "invalid_argument",
+    -2: "abi",
+    -3: "load",
+    -4: "init",
+    -5: "capability",
+    -6: "busy",
+    -7: "runtime",
+    -8: "buffer_too_small",
+}
+
+
+class SessionError(RuntimeError):
+    """Base exception for native ck_session_v8 errors."""
+
+    def __init__(self, status: int, message: str):
+        self.status = status
+        self.status_name = _SESSION_STATUS_NAMES.get(status, f"unknown({status})")
+        super().__init__(message)
+
+
+class SessionBusyError(SessionError):
+    """Raised when the session already has an active generate request (status -6).
+
+    The server is single-flight: only one generate request is processed at a
+    time.  Concurrent requests receive HTTP 429 (Too Many Requests).
+    """
+
+
+_SESSION_STATUS_EXCEPTIONS: dict[int, type[SessionError]] = {
+    -6: SessionBusyError,
+}
+
+
 # Third-party and local schema imports are optional at module load so the CLI
 # (--help / pipeline) works even without the server extras. They must live at
 # module scope so FastAPI/Pydantic can resolve route annotations.
@@ -73,7 +118,7 @@ except ImportError:
     _FASTAPI_AVAILABLE = False
 
 try:
-    from server.schemas.common import ItemStatus, ResponseStatus
+    from server.schemas.common import ResponseStatus
     from server.schemas.content import ResponseOutputText
     from server.schemas.output_items import (
         ReasoningItem,
@@ -99,11 +144,11 @@ def log_error(msg: str) -> None:
     print(f"{C_RED}Error:{C_RESET} {msg}", file=sys.stderr)
 
 
-def _detect_threads() -> int:
+def _detect_threads() -> int | None:
     try:
         if hasattr(os, "sched_getaffinity"):
             return max(1, len(os.sched_getaffinity(0)))
-    except Exception:
+    except OSError:
         pass
     return max(1, os.cpu_count() or 1)
 
@@ -196,9 +241,9 @@ def _configure_abi(lib: Any, name: str) -> None:
 def _last_error(lib: Any, session: Any) -> str:
     try:
         value = lib.ck_session_v8_last_error(session)
-        return value.decode("utf-8", "replace") if value else "unknown error"
-    except Exception:
-        return "unknown error"
+        return value.decode("utf-8", "replace") if value else "Unknown error occured"
+    except Exception as e:
+        return f"Unknown error occured during session. Error -> {e}"
 
 
 def _configure_lib(lib: Any) -> None:
@@ -213,10 +258,19 @@ def _configure_lib(lib: Any) -> None:
 
 
 class SessionV8:
-    """ctypes binding for the session ABI (one process-local model load)."""
+    """ctypes binding for the session ABI (one process-local model load).
+
+    The native layer serialises concurrent ``ck_session_v8_generate`` calls via
+    a pthread mutex try-lock.  When the lock is held the C function returns
+    ``CK_SESSION_V8_ERROR_BUSY`` (-6), which surfaces as
+    :class:`SessionBusyError` in Python.
+    """
 
     CK_ABI_VERSION = 1
     CK_OK = 0
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
 
     @classmethod
     def open(
@@ -225,11 +279,10 @@ class SessionV8:
         *,
         context_length: int | None = None,
         num_threads: int | None = None,
-    ) -> "SessionV8":
+    ) -> SessionV8:
         work_dir = work_dir.resolve()
         for name in ("libmodel.so", "weights.bump", "weights_manifest.map"):
             if not (work_dir / name).is_file():
-                missing = work_dir / name
                 log_error(
                     f"missing runtime artifact {name} in {work_dir}\n"
                     f"  The v8 native loader requires the pipe-delimited "
@@ -265,7 +318,12 @@ class SessionV8:
                 f"  The v8 native loader parses the pipe-delimited weights_manifest.map "
                 f"(name|dtype|file_offset|size|runtime_offset); weights_manifest.json is not accepted."
             )
-            raise RuntimeError(f"ck_session_v8_open failed: {_last_error(lib, session)}")
+            msg = f"ck_session_v8_open failed ({_SESSION_STATUS_NAMES.get(status, f'status={status}')})"
+            native_msg = _last_error(lib, session)
+            if native_msg:
+                msg += f": {native_msg}"
+            exc_cls = _SESSION_STATUS_EXCEPTIONS.get(status, SessionError)
+            raise exc_cls(status, msg)
 
         self = cls.__new__(cls)
         self.lib = lib
@@ -326,9 +384,12 @@ class SessionV8:
             ctypes.byref(result),
         )
         if status != self.CK_OK:
-            raise RuntimeError(
-                f"ck_session_v8_generate failed: {_last_error(self.lib, self.session)}"
-            )
+            msg = f"ck_session_v8_generate failed ({_SESSION_STATUS_NAMES.get(status, f'status={status}')})"
+            native_msg = _last_error(self.lib, self.session)
+            if native_msg:
+                msg += f": {native_msg}"
+            exc_cls = _SESSION_STATUS_EXCEPTIONS.get(status, SessionError)
+            raise exc_cls(status, msg)
         return {
             "prompt_tokens": int(result.prompt_tokens),
             "generated_tokens": int(result.generated_tokens),
@@ -415,8 +476,8 @@ def _truncate_stop_markers(text: str, markers: Sequence[str]) -> str:
 
 # --- Thinking separation (text-generation only) -------------------------------
 
-_THINK_OPEN = " thinking"
-_THINK_CLOSE = " response"
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
 
 
 def _marker_index(lowered: str, marker: str) -> int:
@@ -461,21 +522,16 @@ def split_thinking(text: str) -> tuple[str, str]:
 class _StreamThinkSplitter:
     """Streaming counterpart of ``split_thinking`` for SSE routing.
 
-    Emits every pre-close token as ``("thinking", ...)`` immediately, holding
-    back only a short lookahead tail so a close marker split across chunk
-    boundaries is still detected. A leading open marker is stripped once so the
-    accumulated deltas join to exactly what ``split_thinking`` reports. On the
-    close marker the stream switches to ``("answer", ...)``. ``flush`` releases
-    any held-back tail; if the stream ends with no close marker the caller
-    reconciles the final snapshot (see ``stream_events``).
+    Before a marker is seen, text is buffered because it may be either a plain
+    answer or Qwen-style close-only reasoning. This avoids emitting reasoning
+    deltas that the completed response later reclassifies as answer text.
     """
 
     _KEEP = len(_THINK_CLOSE) + 2
 
     def __init__(self) -> None:
         self._look = ""
-        self._mode = "thinking"
-        self._open_stripped = False
+        self._mode = "undetermined"
         self._thinking_lstrip = True
         self._answer_lstrip = True
 
@@ -490,13 +546,26 @@ class _StreamThinkSplitter:
             return
 
         buf = self._look + chunk
-
-        if not self._open_stripped:
-            lowered = buf.lower()
-            open_idx = _marker_index(lowered, _THINK_OPEN)
-            if open_idx == 0 or (open_idx == 1 and buf.startswith("\n")):
+        if self._mode == "undetermined":
+            open_idx = _marker_index(buf.lower(), _THINK_OPEN)
+            close_idx = _marker_index(buf.lower(), _THINK_CLOSE)
+            if open_idx != -1 and (close_idx == -1 or open_idx < close_idx):
                 buf = buf[open_idx + len(_THINK_OPEN) :]
-                self._open_stripped = True
+                self._mode = "thinking"
+            elif close_idx != -1:
+                pre = buf[:close_idx].strip()
+                if pre:
+                    yield ("thinking", pre)
+                self._mode = "answer"
+                rest = buf[close_idx + len(_THINK_CLOSE) :].lstrip()
+                self._look = ""
+                if rest:
+                    self._answer_lstrip = False
+                    yield ("answer", rest)
+                return
+            else:
+                self._look = buf
+                return
 
         close_idx = _marker_index(buf.lower(), _THINK_CLOSE)
         if close_idx != -1:
@@ -538,12 +607,15 @@ class _StreamThinkSplitter:
             return
         text = self._look
         self._look = ""
+        if self._mode == "undetermined":
+            yield ("answer", text)
+            return
         if self._thinking_lstrip:
             text = text.lstrip()
             if not text:
                 return
             self._thinking_lstrip = False
-        if self._open_stripped:
+        if self._mode == "thinking":
             text = text.rstrip()
             if not text:
                 return
@@ -585,6 +657,161 @@ def _log_performance(model: str, perf: dict[str, Any] | None) -> None:
     print(f"{C_GRAY}{model} - {line}{C_RESET}", flush=True)
 
 
+# ---------------------------------------------------------------------------
+# Python-side chat contract loading and prompt formatting
+# ---------------------------------------------------------------------------
+
+_CIRCUITS_DIR = PROJECT_ROOT / "version" / "v8" / "circuits"
+
+def _load_builtin_chat_contract(
+    template_name: str | None,
+    *,
+    _seen: set[str] | None = None,
+) -> dict[str, Any] | None:
+    name = str(template_name or "").strip().lower()
+    if not name or not re.fullmatch(r"[a-z0-9_]+", name):
+        return None
+    seen = set() if _seen is None else _seen
+    if name in seen:
+        return None
+    seen.add(name)
+    path = _CIRCUITS_DIR / f"{name}.json"
+    if not path.exists():
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    contract_doc = doc.get("contract") if isinstance(doc.get("contract"), dict) else None
+    if isinstance(contract_doc, dict):
+        chat_contract = contract_doc.get("chat_contract")
+        if isinstance(chat_contract, dict):
+            return chat_contract
+
+    components = doc.get("components")
+    if not isinstance(components, dict):
+        return None
+    ordered_components = sorted(
+        (value for value in components.values() if isinstance(value, dict)),
+        key=lambda value: value.get("runtime_role") != "decoder",
+    )
+    for component in ordered_components:
+        circuit = component.get("circuit")
+        if isinstance(circuit, str):
+            inherited = _load_builtin_chat_contract(circuit, _seen=seen)
+            if inherited is not None:
+                return inherited
+    return None
+
+
+def _load_runtime_chat_contract(run_dir: Path) -> dict[str, Any] | None:
+    """Load the exact chat contract exported by the built runtime."""
+    manifest_path = Path(run_dir) / "weights_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"cannot load runtime chat contract from {manifest_path}: {exc}"
+        ) from exc
+
+    candidates: list[Any] = [manifest.get("chat_contract")]
+    config = manifest.get("config")
+    if isinstance(config, dict):
+        candidates.append(config.get("chat_contract"))
+    template = manifest.get("template")
+    if isinstance(template, dict):
+        template_contract = template.get("contract")
+        if isinstance(template_contract, dict):
+            candidates.append(template_contract.get("chat_contract"))
+
+    for contract in candidates:
+        if isinstance(contract, dict):
+            return dict(contract)
+    return None
+
+
+def _resolve_contract_thinking_overrides(
+    contract: dict[str, Any],
+    thinking_mode: str | None,
+) -> tuple[str, str]:
+    assistant_generation_prefix = str(contract.get("assistant_generation_prefix") or "")
+    last_user_prefix = str(contract.get("last_user_prefix") or "")
+    requested_mode = str(thinking_mode or "auto").strip().lower()
+    default_mode = str(contract.get("thinking_mode_default") or "").strip().lower()
+    resolved_mode = default_mode if requested_mode in {"", "auto"} else requested_mode
+
+    assistant_by_mode = contract.get("assistant_generation_prefix_by_thinking_mode")
+    if isinstance(assistant_by_mode, dict):
+        override = assistant_by_mode.get(resolved_mode)
+        if isinstance(override, str):
+            assistant_generation_prefix = override
+
+    last_user_prefix_by_mode = contract.get("last_user_prefix_by_thinking_mode")
+    if isinstance(last_user_prefix_by_mode, dict):
+        override = last_user_prefix_by_mode.get(resolved_mode)
+        if isinstance(override, str):
+            last_user_prefix = override
+
+    return assistant_generation_prefix, last_user_prefix
+
+
+def _format_prompt_with_chat_contract(
+    prompt: str,
+    contract: dict[str, Any] | None,
+    *,
+    thinking_mode: str = "auto",
+    system_prompt: str | None = None,
+) -> str:
+    if not isinstance(contract, dict):
+        return str(prompt or "")
+
+    role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
+    turn_prefix = str(contract.get("turn_prefix") or "")
+    turn_suffix = str(contract.get("turn_suffix") or "")
+    system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
+    system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
+    default_system_prompt = str(contract.get("default_system_prompt") or "")
+    inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
+    bos_prefix = str(contract.get("force_bos_text_if_tokenizer_add_bos_false") or "")
+    suppression_markers = [
+        str(marker).lower()
+        for marker in list(contract.get("last_user_prefix_suppression_markers") or [])
+        if str(marker or "").strip()
+    ]
+    assistant_generation_prefix, last_user_prefix = _resolve_contract_thinking_overrides(contract, thinking_mode)
+
+    user_text = str(prompt or "")
+    if last_user_prefix:
+        lowered = user_text.lower()
+        if last_user_prefix.lower() not in lowered and not any(marker in lowered for marker in suppression_markers):
+            user_text = f"{last_user_prefix}{user_text}"
+
+    system_text = str(system_prompt or "")
+    if not system_text and inject_default_system_prompt:
+        system_text = default_system_prompt
+
+    if system_text and system_prompt_mode == "prepend_first_user":
+        user_text = f"{system_text}{system_prompt_separator}{user_text}" if user_text else system_text
+        system_text = ""
+
+    def _render_turn(role: str, content: str) -> str:
+        label = str(role_labels.get(role) or role)
+        prefix = turn_prefix.replace("{role}", label)
+        return f"{prefix}{content}{turn_suffix}"
+
+    formatted = ""
+    if bos_prefix:
+        formatted += bos_prefix
+    if system_text and system_prompt_mode == "dedicated_turn":
+        formatted += _render_turn("system", system_text)
+    formatted += _render_turn("user", user_text)
+    formatted += assistant_generation_prefix
+    return formatted if formatted else user_text
+
+
 def create_app(
     session,
     *,
@@ -597,8 +824,14 @@ def create_app(
     stop_on_text: Sequence[str] = (),
     stop_at_eos: bool = False,
     flags: int = 0,
+    chat_contract: dict[str, Any] | None = None,
+    thinking_mode: str = "auto",
 ):
-    """Build the FastAPI app around a live session (real or injected fake)."""
+    """Build the FastAPI app around a live session (real or injected fake).
+
+    This server is single-flight: only one generate request is processed at a
+    time.  Concurrent requests receive HTTP 429 (Too Many Requests).
+    """
     if not _FASTAPI_AVAILABLE:
         raise ImportError(
             "fastapi is required for `serve`. Install server requirements:\n"
@@ -611,7 +844,10 @@ def create_app(
         )
 
     router = APIRouter()
-    response_store: dict[str, dict[str, Any]] = {}
+    response_store: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    response_store_lock = threading.Lock()
+    response_store_limit = 256
+    _flight_lock = threading.Lock()
 
     stop_markers = [str(m) for m in (stop_on_text or ()) if str(m)]
     all_stop_markers = list(stop_markers)
@@ -633,6 +869,52 @@ def create_app(
         if conv is not None:
             return {"id": conv.id}
         return None
+
+    def _validate_request(body) -> None:
+        if body.model != model:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model {body.model!r} is not loaded; available model: {model!r}",
+            )
+        if body.tools:
+            raise HTTPException(
+                status_code=501,
+                detail="Tool calling is not implemented by the CKE native session yet.",
+            )
+
+    def _store_response(response_id: str, response: dict[str, Any]) -> None:
+        with response_store_lock:
+            response_store[response_id] = response
+            response_store.move_to_end(response_id)
+            while len(response_store) > response_store_limit:
+                response_store.popitem(last=False)
+
+    def _prepare_request(body):
+        _validate_request(body)
+        prompt = _extract_prompt(body)
+        tok_limit = body.max_output_tokens if body.max_output_tokens is not None else max_tokens
+        temperature_eff = body.temperature if body.temperature is not None else temperature
+        top_p_eff = body.top_p if body.top_p is not None else top_p
+        effective_flags = flags
+
+        if chat_contract is not None:
+            if thinking_mode != "auto":
+                effective_thinking = thinking_mode
+            elif body.reasoning is not None:
+                effective_thinking = "visible"
+            else:
+                effective_thinking = "suppressed"
+            prompt = _format_prompt_with_chat_contract(
+                prompt,
+                chat_contract,
+                thinking_mode=effective_thinking,
+                system_prompt=body.instructions,
+            )
+            effective_flags |= CK_SESSION_REQUEST_RAW_PROMPT
+        elif isinstance(body.instructions, str):
+            prompt = f"{body.instructions}\n{prompt}".strip()
+
+        return prompt, tok_limit, temperature_eff, top_p_eff, effective_flags
 
     def build_response(
         body,
@@ -738,10 +1020,10 @@ def create_app(
         }
         if result is not None:
             resp["performance"] = _performance_profile(result)
-        response_store[response_id] = resp
+        _store_response(response_id, resp)
         return resp
 
-    def stream_events(body, prompt, *, max_tokens, temperature, top_p):
+    def stream_events(body, prompt, *, max_tokens, temperature, top_p, effective_flags=None):
         think_enabled = body.reasoning is not None
         response_id = f"resp_{uuid.uuid4().hex[:24]}"
         message_id = f"msg_{uuid.uuid4().hex[:24]}"
@@ -776,8 +1058,9 @@ def create_app(
         seq += 1
 
         complete: list[str] = []
-        events: "queue.Queue" = queue.Queue()
+        events: queue.Queue = queue.Queue()
         cancelled = threading.Event()
+        worker_finished = threading.Event()
         splitter = _StreamThinkSplitter() if think_enabled else None
 
         def on_token(_tid, text):
@@ -800,7 +1083,7 @@ def create_app(
                     temperature=temperature,
                     top_p=top_p,
                     on_token=on_token,
-                    flags=flags,
+                    flags=effective_flags if effective_flags is not None else flags,
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
                 )
@@ -809,11 +1092,17 @@ def create_app(
                         events.put(
                             ("reasoning_text" if state == "thinking" else "text", delta)
                         )
-                events.put(("done", result))
-            except Exception as exc:
-                events.put(("error", str(exc)))
+                terminal_event = ("done", result)
+            except SessionBusyError:
+                terminal_event = ("busy", "Session busy: another request is in progress.")
+            except Exception as e:
+                terminal_event = ("error", str(e))
+            finally:
+                worker_finished.set()
+            events.put(terminal_event)
 
-        threading.Thread(target=worker, daemon=True).start()
+        worker_thread = threading.Thread(target=worker, daemon=True)
+        worker_thread.start()
 
         reasoning_started = False
         message_started = False
@@ -824,194 +1113,236 @@ def create_app(
             seq += 1
             yield _sse(kind, data)
 
-        while True:
-            kind, payload = events.get()
-            if kind == "reasoning_text":
-                if not reasoning_started:
-                    yield from emit(
-                        "response.output_item.added",
-                        {
-                            "type": "response.output_item.added",
-                            "output_index": 0,
-                            "item": ReasoningItem(
-                                id=reasoning_item_id,
-                                status="in_progress",
-                                content=[],
-                                summary=[],
-                            ).model_dump(),
-                        },
-                    )
-                    reasoning_started = True
-                yield from emit(
-                    "response.reasoning_text.delta",
-                    {
-                        "type": "response.reasoning_text.delta",
-                        "item_id": reasoning_item_id,
-                        "output_index": 0,
-                        "content_index": 0,
-                        "delta": payload,
-                    },
-                )
-            elif kind == "text":
-                if not message_started:
-                    yield from emit(
-                        "response.output_item.added",
-                        {
-                            "type": "response.output_item.added",
-                            "output_index": 1 if reasoning_started else 0,
-                            "item": ResponseOutputMessage(
-                                id=message_id,
-                                content=[],
-                                role="assistant",
-                                status="in_progress",
-                            ).model_dump(),
-                        },
-                    )
-                    message_started = True
-                yield from emit(
-                    "response.output_text.delta",
-                    {
-                        "type": "response.output_text.delta",
-                        "item_id": message_id,
-                        "output_index": 1 if reasoning_started else 0,
-                        "content_index": 0,
-                        "delta": payload,
-                    },
-                )
-            elif kind == "done":
-                result = payload or {}
-                text = _truncate_stop_markers("".join(complete), all_stop_markers)
-                thinking = None
-                reasoning_tokens = 0
-                if think_enabled:
-                    thinking, text = split_thinking(text)
-                    thinking = thinking or None
-                    reasoning_tokens = len(thinking) // 4 if thinking else 0
-                input_tokens = int(result.get("prompt_tokens") or 0)
-                output_tokens = int(result.get("generated_tokens") or len(complete))
-                message_index = 1 if reasoning_started else 0
-
-                if reasoning_started:
-                    if thinking is not None:
+        try:
+            while True:
+                kind, payload = events.get()
+                if kind == "reasoning_text":
+                    if not reasoning_started:
                         yield from emit(
-                            "response.reasoning_text.done",
+                            "response.output_item.added",
                             {
-                                "type": "response.reasoning_text.done",
-                                "item_id": reasoning_item_id,
+                                "type": "response.output_item.added",
                                 "output_index": 0,
-                                "content_index": 0,
-                                "text": thinking,
+                                "item": ReasoningItem(
+                                    id=reasoning_item_id,
+                                    status="in_progress",
+                                    content=[],
+                                    summary=[],
+                                ).model_dump(),
                             },
                         )
+                        reasoning_started = True
+                    yield from emit(
+                        "response.reasoning_text.delta",
+                        {
+                            "type": "response.reasoning_text.delta",
+                            "item_id": reasoning_item_id,
+                            "output_index": 0,
+                            "content_index": 0,
+                            "delta": payload,
+                        },
+                    )
+                elif kind == "text":
+                    if not message_started:
+                        yield from emit(
+                            "response.output_item.added",
+                            {
+                                "type": "response.output_item.added",
+                                "output_index": 1 if reasoning_started else 0,
+                                "item": ResponseOutputMessage(
+                                    id=message_id,
+                                    content=[],
+                                    role="assistant",
+                                    status="in_progress",
+                                ).model_dump(),
+                            },
+                        )
+                        message_started = True
+                    yield from emit(
+                        "response.output_text.delta",
+                        {
+                            "type": "response.output_text.delta",
+                            "item_id": message_id,
+                            "output_index": 1 if reasoning_started else 0,
+                            "content_index": 0,
+                            "delta": payload,
+                        },
+                    )
+                elif kind == "done":
+                    result = payload or {}
+                    text = _truncate_stop_markers("".join(complete), all_stop_markers)
+                    thinking = None
+                    reasoning_tokens = 0
+                    if think_enabled:
+                        thinking, text = split_thinking(text)
+                        thinking = thinking or None
+                        reasoning_tokens = 0
+                    input_tokens = int(result.get("prompt_tokens") or 0)
+                    output_tokens = int(result.get("generated_tokens") or len(complete))
+                    message_index = 1 if reasoning_started else 0
+
+                    if reasoning_started:
+                        if thinking is not None:
+                            yield from emit(
+                                "response.reasoning_text.done",
+                                {
+                                    "type": "response.reasoning_text.done",
+                                    "item_id": reasoning_item_id,
+                                    "output_index": 0,
+                                    "content_index": 0,
+                                    "text": thinking,
+                                },
+                            )
+                        yield from emit(
+                            "response.output_item.done",
+                            {
+                                "type": "response.output_item.done",
+                                "output_index": 0,
+                                "item": ReasoningItem(
+                                    id=reasoning_item_id,
+                                    status="completed",
+                                    content=(
+                                        [ReasoningTextContent(text=thinking)]
+                                        if thinking is not None
+                                        else []
+                                    ),
+                                    summary=[],
+                                ).model_dump(),
+                            },
+                        )
+                    if not message_started:
+                        yield from emit(
+                            "response.output_item.added",
+                            {
+                                "type": "response.output_item.added",
+                                "output_index": message_index,
+                                "item": ResponseOutputMessage(
+                                    id=message_id,
+                                    content=[],
+                                    role="assistant",
+                                    status="in_progress",
+                                ).model_dump(),
+                            },
+                        )
+                    yield from emit(
+                        "response.output_text.done",
+                        {
+                            "type": "response.output_text.done",
+                            "item_id": message_id,
+                            "output_index": message_index,
+                            "content_index": 0,
+                            "text": text,
+                        },
+                    )
                     yield from emit(
                         "response.output_item.done",
                         {
                             "type": "response.output_item.done",
-                            "output_index": 0,
-                            "item": ReasoningItem(
-                                id=reasoning_item_id,
-                                status="completed",
-                                content=(
-                                    [ReasoningTextContent(text=thinking)]
-                                    if thinking is not None
-                                    else []
-                                ),
-                                summary=[],
-                            ).model_dump(),
-                        },
-                    )
-                if not message_started:
-                    yield from emit(
-                        "response.output_item.added",
-                        {
-                            "type": "response.output_item.added",
                             "output_index": message_index,
                             "item": ResponseOutputMessage(
                                 id=message_id,
-                                content=[],
+                                content=[ResponseOutputText(text=text)],
                                 role="assistant",
-                                status="in_progress",
+                                status="completed",
                             ).model_dump(),
                         },
                     )
-                yield from emit(
-                    "response.output_text.done",
-                    {
-                        "type": "response.output_text.done",
-                        "item_id": message_id,
-                        "output_index": message_index,
-                        "content_index": 0,
-                        "text": text,
-                    },
+                    final = build_response(
+                        body,
+                        response_id=response_id,
+                        message_id=message_id,
+                        created_at=created_at,
+                        completed_at=int(time.time()),
+                        status=ResponseStatus.completed,
+                        text=text,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        thinking=thinking,
+                        reasoning_tokens=reasoning_tokens,
+                        result=result,
+                        reasoning_item_id=reasoning_item_id,
+                        include_empty_reasoning=reasoning_started,
+                    )
+                    if stats:
+                        _log_performance(model, final.get("performance"))
+                    yield from emit(
+                        "response.completed",
+                        {"type": "response.completed", "response": final},
+                    )
+                    return
+                elif kind == "busy":
+                    final = build_response(
+                        body,
+                        response_id=response_id,
+                        message_id=message_id,
+                        created_at=created_at,
+                        completed_at=int(time.time()),
+                        status=ResponseStatus.failed,
+                        text="".join(complete),
+                        input_tokens=0,
+                        output_tokens=0,
+                        error={"code": "session_busy", "message": str(payload)},
+                    )
+                    yield from emit(
+                        "response.failed",
+                        {
+                            "type": "response.failed",
+                            "response": final,
+                            "error": {"code": "session_busy", "message": str(payload)},
+                        },
+                    )
+                    return
+                elif kind == "error":
+                    final = build_response(
+                        body,
+                        response_id=response_id,
+                        message_id=message_id,
+                        created_at=created_at,
+                        completed_at=int(time.time()),
+                        status=ResponseStatus.failed,
+                        text="".join(complete),
+                        input_tokens=0,
+                        output_tokens=len(complete),
+                        error={"code": "server_error", "message": str(payload)},
+                    )
+                    yield from emit(
+                        "response.failed",
+                        {
+                            "type": "response.failed",
+                            "response": final,
+                            "error": {"code": "server_error", "message": str(payload)},
+                        },
+                    )
+                    return
+        finally:
+            if not worker_finished.is_set():
+                cancelled.set()
+                session.cancel()
+                worker_thread.join(timeout=5.0)
+            if worker_finished.is_set():
+                _flight_lock.release()
+            else:
+                log_error(
+                    "generation worker did not stop after cancellation; "
+                    "keeping the single-flight guard locked to protect the native session"
                 )
-                yield from emit(
-                    "response.output_item.done",
-                    {
-                        "type": "response.output_item.done",
-                        "output_index": message_index,
-                        "item": ResponseOutputMessage(
-                            id=message_id,
-                            content=[ResponseOutputText(text=text)],
-                            role="assistant",
-                            status="completed",
-                        ).model_dump(),
-                    },
-                )
-                final = build_response(
-                    body,
-                    response_id=response_id,
-                    message_id=message_id,
-                    created_at=created_at,
-                    completed_at=int(time.time()),
-                    status=ResponseStatus.completed,
-                    text=text,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    thinking=thinking,
-                    reasoning_tokens=reasoning_tokens,
-                    result=result,
-                    reasoning_item_id=reasoning_item_id,
-                    include_empty_reasoning=reasoning_started,
-                )
-                if stats:
-                    _log_performance(model, final.get("performance"))
-                yield from emit(
-                    "response.completed",
-                    {"type": "response.completed", "response": final},
-                )
-                return
-            elif kind == "error":
-                final = build_response(
-                    body,
-                    response_id=response_id,
-                    message_id=message_id,
-                    created_at=created_at,
-                    completed_at=int(time.time()),
-                    status=ResponseStatus.failed,
-                    text="".join(complete),
-                    input_tokens=0,
-                    output_tokens=len(complete),
-                    error={"code": "server_error", "message": str(payload)},
-                )
-                yield from emit(
-                    "response.failed",
-                    {
-                        "type": "response.failed",
-                        "response": final,
-                        "error": {"code": "server_error", "message": str(payload)},
-                    },
-                )
-                return
 
     @router.post("/responses", response_model=None)
     def create_response(body: CreateResponseRequest):
-        prompt = _extract_prompt(body)
-        if body.instructions is not None and isinstance(body.instructions, str):
-            prompt = f"{body.instructions}\n{prompt}".strip()
-        tok_limit = body.max_output_tokens if body.max_output_tokens is not None else max_tokens
-        temperature_eff = body.temperature if body.temperature is not None else temperature
-        top_p_eff = body.top_p if body.top_p is not None else top_p
+        (
+            prompt,
+            tok_limit,
+            temperature_eff,
+            top_p_eff,
+            effective_flags,
+        ) = _prepare_request(body)
         think_enabled = body.reasoning is not None
+
+        if not _flight_lock.acquire(blocking=False):
+            raise HTTPException(
+                status_code=429,
+                detail="Session busy: another request is in progress. Retry later.",
+            )
 
         if body.stream:
             return StreamingResponse(
@@ -1021,29 +1352,39 @@ def create_app(
                     max_tokens=tok_limit,
                     temperature=temperature_eff,
                     top_p=top_p_eff,
+                    effective_flags=effective_flags,
                 ),
                 media_type="text/event-stream",
             )
 
         chunks: list[str] = []
-        result = session.generate(
-            None,
-            prompt,
-            max_tokens=tok_limit,
-            temperature=temperature_eff,
-            top_p=top_p_eff,
-            on_token=lambda _tid, text: chunks.append(text),
-            flags=flags,
-            stop_on_text=stop_markers,
-            stop_at_eos=stop_at_eos,
-        )
+        try:
+            try:
+                result = session.generate(
+                    None,
+                    prompt,
+                    max_tokens=tok_limit,
+                    temperature=temperature_eff,
+                    top_p=top_p_eff,
+                    on_token=lambda _tid, text: chunks.append(text),
+                    flags=effective_flags,
+                    stop_on_text=stop_markers,
+                    stop_at_eos=stop_at_eos,
+                )
+            except SessionBusyError:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Session busy: another request is in progress. Retry later.",
+                )
+        finally:
+            _flight_lock.release()
         text = _truncate_stop_markers("".join(chunks), all_stop_markers)
         thinking = None
         reasoning_tokens = 0
         if think_enabled:
             thinking, text = split_thinking(text)
             thinking = thinking or None
-            reasoning_tokens = len(thinking) // 4 if thinking else 0
+            reasoning_tokens = 0
         input_tokens = int(result.get("prompt_tokens") or 0)
         output_tokens = int(result.get("generated_tokens") or len(chunks))
         resp = build_response(
@@ -1066,18 +1407,24 @@ def create_app(
 
     @router.get("/responses/{response_id}")
     def get_response(response_id: str):
-        resp = response_store.get(response_id)
+        with response_store_lock:
+            resp = response_store.get(response_id)
         if not resp:
             raise HTTPException(status_code=404, detail="Response not found")
         return resp
 
     @router.post("/responses/{response_id}/cancel")
     def cancel_response(response_id: str):
-        if response_id not in response_store:
-            raise HTTPException(status_code=404, detail="Response not found")
+        with response_store_lock:
+            response = response_store.get(response_id)
+            if response is None:
+                raise HTTPException(status_code=404, detail="Response not found")
+            if response["status"] != ResponseStatus.in_progress:
+                raise HTTPException(status_code=409, detail="Response is not in progress")
         session.cancel()
-        response_store[response_id]["status"] = ResponseStatus.cancelled
-        return response_store[response_id]
+        with response_store_lock:
+            response["status"] = ResponseStatus.cancelled
+            return response
 
     @router.get("/health")
     def health():
@@ -1169,6 +1516,7 @@ def _build_runtime(
         [sys.executable, str(SCRIPTS_DIR / "ck_run_v8.py"), *args],
         cwd=str(PROJECT_ROOT),
         text=True,
+        check=False,
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -1204,6 +1552,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     stop = parser.add_argument_group("stop markers (honored via the token callback)")
     stop.add_argument("--stop-on-text", action="append", default=[], help="Stop generation when this decoded text marker appears (repeatable)")
     stop.add_argument("--stop-at-eos", action="store_true", help="Stop generation when '<eos>' appears in decoded text")
+
+    reasoning = parser.add_argument_group("reasoning / thinking mode")
+    reasoning.add_argument(
+        "--thinking-mode",
+        choices=["auto", "visible", "suppressed"],
+        default="auto",
+        help="Force thinking mode for all requests (default: auto; per-request reasoning field controls visibility)",
+    )
 
     display = parser.add_argument_group("metrics / visualizer")
     display.add_argument("--stats", action="store_true", default=True, help="Print per-request performance stats (default: on)")
@@ -1266,7 +1622,7 @@ def main(argv: list[str] | None = None) -> int:
     if ignored:
         log(
             "Warning: the native session ABI (ck_session_v8_generate) only supports "
-            f"temperature/top_p/max_tokens. Ignored until a native ABI extension exists: "
+            "temperature/top_p/max_tokens. Ignored until a native ABI extension exists: "
             + ", ".join(ignored),
             C_ORANGE,
         )
@@ -1276,6 +1632,17 @@ def main(argv: list[str] | None = None) -> int:
         run_dir,
         context_length=args.context_len,
     )
+
+    chat_contract = _load_runtime_chat_contract(run_dir)
+    if chat_contract is not None:
+        contract_name = str(chat_contract.get("name") or "runtime")
+        log(
+            f"Loaded chat contract {contract_name!r} from weights_manifest.json; "
+            "Python-side prompt formatting enabled"
+        )
+    else:
+        log("Runtime chat contract not found; using C-side format_chat", C_ORANGE)
+
     app = create_app(
         session,
         model=args.model_name,
@@ -1291,6 +1658,8 @@ def main(argv: list[str] | None = None) -> int:
             if (args.no_chat_template and args.allow_raw_prompt)
             else 0
         ),
+        chat_contract=chat_contract,
+        thinking_mode=args.thinking_mode,
     )
 
     try:

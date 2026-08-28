@@ -16,7 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / 
 import pytest
 from fastapi.testclient import TestClient
 
-from ck_serve_v8 import create_app
+from ck_serve_v8 import (
+    create_app,
+    SessionBusyError,
+    _load_builtin_chat_contract,
+    _load_runtime_chat_contract,
+    _format_prompt_with_chat_contract,
+    _resolve_contract_thinking_overrides,
+    CK_SESSION_REQUEST_RAW_PROMPT,
+)
 
 
 class FakeSession:
@@ -27,6 +35,8 @@ class FakeSession:
         self.timing = dict(timing or {})
         self.cancel_called = False
         self.close_called = False
+        self.last_flags: int = 0
+        self.last_user: str | None = None
 
     def generate(
         self,
@@ -41,6 +51,8 @@ class FakeSession:
         stop_on_text=(),
         stop_at_eos=False,
     ):
+        self.last_flags = flags
+        self.last_user = user
         for token_id, text in enumerate(self.chunks):
             on_token(token_id, text)
         result = {
@@ -56,6 +68,19 @@ class FakeSession:
 
     def close(self) -> None:
         self.close_called = True
+
+
+class FakeBusySession:
+    """Session that always reports busy (ERROR_BUSY = -6)."""
+
+    def generate(self, *args, **kwargs):
+        raise SessionBusyError(-6, "session already has an active request")
+
+    def cancel(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
 
 
 def make_client(chunks=("Hello", ",", "world", "!"), **app_kwargs):
@@ -141,15 +166,14 @@ def test_get_response_not_found():
     assert client.get("/v1/responses/nonexistent").status_code == 404
 
 
-def test_cancel_calls_session_cancel():
+def test_cancel_completed_response_is_rejected():
     client, session = make_client()
     created = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
     response_id = created.json()["id"]
 
     resp = client.post(f"/v1/responses/{response_id}/cancel")
-    assert resp.status_code == 200
-    assert session.cancel_called is True
-    assert resp.json()["status"] == "cancelled"
+    assert resp.status_code == 409
+    assert session.cancel_called is False
 
 
 def test_cancel_not_found():
@@ -187,7 +211,7 @@ def test_stream_deltas_match_generated_tokens():
 
 
 def test_non_stream_thinking_split():
-    client, _ = make_client(chunks=(" thinking", "\nLet me think", "\n response", "\n42"))
+    client, _ = make_client(chunks=("<think>", "\nLet me think", "\n</think>", "\n42"))
     resp = client.post(
         "/v1/responses",
         json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
@@ -202,7 +226,7 @@ def test_non_stream_thinking_split():
 
 
 def test_stream_thinking_split_emits_thinking_and_answer():
-    client, _ = make_client(chunks=(" thinking", "\nLet me think", "\n response", "\n42"))
+    client, _ = make_client(chunks=("<think>", "\nLet me think", "\n</think>", "\n42"))
     resp = client.post(
         "/v1/responses",
         json={
@@ -233,40 +257,6 @@ def test_stream_thinking_split_emits_thinking_and_answer():
     message = next(i for i in completed["output"] if i["type"] == "message")
     assert message["content"][0]["text"] == "42"
     assert completed["output_text"] == "42"
-
-
-def test_reasoning_field_enables_thinking_without_think_flag():
-    client, _ = make_client(chunks=(" thinking", "b", " response", "c"))
-    resp = client.post(
-        "/v1/responses",
-        json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
-    )
-    data = resp.json()
-    reasoning_item = next(i for i in data["output"] if i["type"] == "reasoning")
-    assert reasoning_item["content"][0]["text"] == "b"
-    message = next(i for i in data["output"] if i["type"] == "message")
-    assert message["content"][0]["text"] == "c"
-
-
-def test_think_off_keeps_current_behavior():
-    client, _ = make_client(chunks=(" thinking", "b"))
-    resp = client.post(
-        "/v1/responses", json={"model": "fake-model", "input": "hi", "stream": True}
-    )
-    assert "response.reasoning_text.delta" not in resp.text
-    assert "response.reasoning_text.done" not in resp.text
-    events = iter_sse(resp.text)
-    answer_deltas = [
-        payload["delta"]
-        for event, payload in events
-        if event == "response.output_text.delta"
-    ]
-    assert answer_deltas == [" thinking", "b"]
-    completed = next(
-        payload["response"] for event, payload in events if event == "response.completed"
-    )
-    assert "thinking" not in completed
-    assert completed["output"][0]["content"][0]["text"] == " thinkingb"
 
 
 def test_stream_response_id_is_stable_across_lifecycle():
@@ -323,29 +313,6 @@ def test_completed_response_echoes_standard_fields():
         "cached_tokens": 0,
     }
 
-
-def test_reasoning_tokens_reported_in_usage():
-    client, _ = make_client(chunks=(" think", "x", " response", " answer"))
-    resp = client.post(
-        "/v1/responses",
-        json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
-    )
-    data = resp.json()
-    assert data["usage"]["output_tokens_details"]["reasoning_tokens"] > 0
-
-
-def test_reasoning_enabled_but_no_thinking_markers_emits_single_message():
-    client, _ = make_client(chunks=("plain", " ", "answer"))
-    resp = client.post(
-        "/v1/responses",
-        json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
-    )
-    data = resp.json()
-    assert [i["type"] for i in data["output"]] == ["message"]
-    assert data["output"][0]["content"][0]["text"] == "plain answer"
-    assert data["output_text"] == "plain answer"
-
-
 def test_stream_reasoning_no_markers_reconciles_to_message():
     client, _ = make_client(chunks=("plain", " ", "answer"))
     resp = client.post(
@@ -366,10 +333,15 @@ def test_stream_reasoning_no_markers_reconciles_to_message():
     completed = next(
         payload["response"] for event, payload in events if event == "response.completed"
     )
-    assert "".join(reasoning_deltas) == "plain answer"
-    assert [i["type"] for i in completed["output"]] == ["reasoning", "message"]
-    assert completed["output"][0]["content"] == []
-    assert completed["output"][1]["content"][0]["text"] == "plain answer"
+    answer_deltas = [
+        payload["delta"]
+        for event, payload in events
+        if event == "response.output_text.delta"
+    ]
+    assert reasoning_deltas == []
+    assert "".join(answer_deltas) == "plain answer"
+    assert [i["type"] for i in completed["output"]] == ["message"]
+    assert completed["output"][0]["content"][0]["text"] == "plain answer"
     assert completed["output_text"] == "plain answer"
 
 
@@ -419,3 +391,283 @@ def test_stop_at_eos_appends_eos_marker():
     client, _ = make_client(chunks=("ok", "<eos>", " tail"), stop_at_eos=True)
     resp = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
     assert resp.json()["output"][0]["content"][0]["text"] == "ok"
+
+
+# --- Busy / single-flight tests -----------------------------------------------
+
+
+def _make_busy_client():
+    session = FakeBusySession()
+    return TestClient(create_app(session, model="busy-model"))
+
+
+def test_busy_non_stream_returns_429():
+    client = _make_busy_client()
+    resp = client.post("/v1/responses", json={"model": "busy-model", "input": "hi"})
+    assert resp.status_code == 429
+    assert resp.json()["detail"] == "Session busy: another request is in progress. Retry later."
+
+
+def test_busy_stream_returns_429():
+    """Concurrent streaming request gets 429 when the flight lock is held."""
+    import threading as _threading
+
+    lock_held = _threading.Event()
+    lock_release = _threading.Event()
+
+    class BlockingSession:
+        def generate(self, *a, **kw):
+            lock_held.set()
+            lock_release.wait(timeout=5)
+            return {"prompt_tokens": 0, "generated_tokens": 0, "stop_reason": 0}
+
+        def cancel(self):
+            pass
+
+        def close(self):
+            pass
+
+    session = BlockingSession()
+    app = create_app(session, model="busy-model")
+    client = TestClient(app, raise_server_exceptions=False)
+
+    # Acquire the flight lock to simulate an active request.
+    # We reach into the closure via the route handler's __wrapped__ or
+    # by creating a second app that shares the same lock.
+    # Instead, start a streaming request in a thread and wait for it to
+    # hold the lock, then fire a second request.
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        # First request: streaming, will block in generate()
+        first = pool.submit(
+            client.post,
+            "/v1/responses",
+            json={"model": "busy-model", "input": "hi", "stream": True},
+        )
+        # Wait for the worker thread to enter generate() and hold the lock
+        lock_held.wait(timeout=5)
+
+        # Second request: should get 429 because lock is held
+        resp = client.post(
+            "/v1/responses", json={"model": "busy-model", "input": "hi", "stream": True}
+        )
+        assert resp.status_code == 429
+        assert resp.json()["detail"] == "Session busy: another request is in progress. Retry later."
+
+        # Unblock the first request
+        lock_release.set()
+        first.result(timeout=5)
+
+
+# --- Chat contract / reasoning control tests ---------------------------------
+
+QWEN3_CONTRACT = _load_builtin_chat_contract("qwen3")
+assert QWEN3_CONTRACT is not None, "qwen3 circuit must exist for chat contract tests"
+
+
+def test_suppressed_thinking_skips_reasoning():
+    session = FakeSession(chunks=("answer",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            thinking_mode="auto",
+        )
+    )
+    resp = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
+    assert resp.status_code == 200
+    assert session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT
+    assert "/no_think" in (session.last_user or "")
+    data = resp.json()
+    assert data["output"][0]["content"][0]["text"] == "answer"
+
+
+def test_visible_thinking_preserves_markers():
+    session = FakeSession(chunks=("<think>\nthink\n</think>\nanswer",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            thinking_mode="auto",
+        )
+    )
+    resp = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
+    )
+    assert resp.status_code == 200
+    assert session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT
+    user = session.last_user or ""
+    assert "/no_think" not in user
+    assert "<|im_start|>assistant\n" in user
+
+
+def test_no_chat_contract_falls_back_to_c_path():
+    session = FakeSession(chunks=("answer",))
+    client = TestClient(
+        create_app(session, model="fake-model", chat_contract=None)
+    )
+    resp = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
+    assert resp.status_code == 200
+    assert not (session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT)
+
+
+def test_thinking_mode_overrides_body():
+    session = FakeSession(chunks=("answer",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            thinking_mode="suppressed",
+        )
+    )
+    resp = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "hi", "reasoning": {"effort": "medium"}},
+    )
+    assert resp.status_code == 200
+    assert session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT
+    assert "/no_think" in (session.last_user or "")
+
+
+def test_suppressed_thinking_stream():
+    session = FakeSession(chunks=("answer",))
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            thinking_mode="auto",
+        )
+    )
+    resp = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "hi", "stream": True},
+    )
+    assert resp.status_code == 200
+    events = iter_sse(resp.text)
+    thinking_deltas = [
+        payload["delta"]
+        for event, payload in events
+        if event == "response.reasoning_text.delta"
+    ]
+    assert thinking_deltas == []
+
+
+def test_load_builtin_chat_contract_returns_dict():
+    contract = _load_builtin_chat_contract("qwen3")
+    assert isinstance(contract, dict)
+    assert "assistant_generation_prefix" in contract
+    assert "thinking_mode_default" in contract
+
+
+def test_composite_circuit_inherits_decoder_chat_contract():
+    assert _load_builtin_chat_contract("qwen36vl") == _load_builtin_chat_contract("qwen35")
+
+
+def test_load_builtin_chat_contract_unknown_name():
+    assert _load_builtin_chat_contract("nonexistent") is None
+
+
+@pytest.mark.parametrize(
+    "circuit_name",
+    ["qwen35", "qwen38", "nemotron_h", "cohere2", "laguna"],
+)
+def test_runtime_manifest_chat_contract_is_authoritative(tmp_path, circuit_name):
+    expected = _load_builtin_chat_contract(circuit_name)
+    assert expected is not None
+    (tmp_path / "weights_manifest.json").write_text(
+        json.dumps({"chat_contract": expected}),
+        encoding="utf-8",
+    )
+
+    assert _load_runtime_chat_contract(tmp_path) == expected
+
+
+def test_runtime_manifest_contract_precedes_legacy_nested_copies(tmp_path):
+    expected = {"name": "root", "assistant_generation_prefix": "<root>"}
+    (tmp_path / "weights_manifest.json").write_text(
+        json.dumps(
+            {
+                "chat_contract": expected,
+                "config": {"chat_contract": {"name": "config"}},
+                "template": {
+                    "contract": {"chat_contract": {"name": "template"}}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert _load_runtime_chat_contract(tmp_path) == expected
+
+
+def test_runtime_manifest_chat_contract_missing(tmp_path):
+    assert _load_runtime_chat_contract(tmp_path) is None
+
+
+def test_resolve_contract_thinking_overrides_visible():
+    prefix, last_user = _resolve_contract_thinking_overrides(QWEN3_CONTRACT, "visible")
+    assert prefix == "<|im_start|>assistant\n"
+    assert last_user == ""
+
+
+def test_resolve_contract_thinking_overrides_suppressed():
+    prefix, last_user = _resolve_contract_thinking_overrides(QWEN3_CONTRACT, "suppressed")
+    assert "<think>" in prefix
+    assert "/no_think" in last_user
+
+
+def test_format_prompt_with_chat_contract_suppressed():
+    prompt = _format_prompt_with_chat_contract("hi", QWEN3_CONTRACT, thinking_mode="suppressed")
+    assert "/no_think" in prompt
+    assert "<think>" in prompt
+
+
+def test_format_prompt_with_chat_contract_visible():
+    prompt = _format_prompt_with_chat_contract("hi", QWEN3_CONTRACT, thinking_mode="visible")
+    assert "/no_think" not in prompt
+    assert "<|im_start|>assistant\n" in prompt
+
+
+def test_format_prompt_with_no_contract():
+    prompt = _format_prompt_with_chat_contract("hi", None, thinking_mode="visible")
+    assert prompt == "hi"
+
+
+def test_instructions_use_contract_system_turn():
+    session = FakeSession(chunks=("ok",))
+    client = TestClient(
+        create_app(session, model="fake-model", chat_contract=QWEN3_CONTRACT)
+    )
+    response = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "hi", "instructions": "be terse"},
+    )
+    assert response.status_code == 200
+    assert "<|im_start|>system\nbe terse<|im_end|>" in session.last_user
+
+
+def test_request_rejects_model_that_is_not_loaded():
+    client, _ = make_client()
+    response = client.post(
+        "/v1/responses", json={"model": "different-model", "input": "hi"}
+    )
+    assert response.status_code == 404
+
+
+def test_request_rejects_unimplemented_tools():
+    client, _ = make_client()
+    response = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "input": "hi",
+            "tools": [{"type": "function", "name": "lookup", "parameters": {}}],
+        },
+    )
+    assert response.status_code == 501

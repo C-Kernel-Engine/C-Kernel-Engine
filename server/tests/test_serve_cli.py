@@ -237,3 +237,27 @@ def test_build_runtime_raises_on_failure(monkeypatch):
             False,
             None,
         )
+
+
+def test_parser_thinking_mode_flag():
+    parser = _build_arg_parser()
+    ns = parser.parse_args([HF_MODEL, "--thinking-mode", "suppressed"])
+    assert ns.thinking_mode == "suppressed"
+
+
+def test_parser_thinking_mode_default():
+    parser = _build_arg_parser()
+    ns = parser.parse_args([HF_MODEL])
+    assert ns.thinking_mode == "auto"
+
+
+def test_parser_thinking_mode_visible():
+    parser = _build_arg_parser()
+    ns = parser.parse_args([HF_MODEL, "--thinking-mode", "visible"])
+    assert ns.thinking_mode == "visible"
+
+
+def test_parser_thinking_mode_invalid():
+    parser = _build_arg_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([HF_MODEL, "--thinking-mode", "invalid"])
