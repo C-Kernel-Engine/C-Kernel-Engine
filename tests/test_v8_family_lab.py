@@ -101,7 +101,15 @@ def test_html_report_surfaces_consumption_and_profile_evidence(tmp_path: Path) -
         "operation_profiles": [{
             "model_key": "m", "prompt_tokens": 128, "prompt_ms": 2,
             "profiled_ms": 1, "coverage_pct": 50, "top_operations": [],
+            "core_equivalents": 0.75, "worker_utilization_pct": 75.0,
             "selected_kernels": [{"kernel": "q5_fast"}],
+            "decode_ms": 3, "decode_profiled_ms": 2,
+            "decode_coverage_pct": 66.7, "decode_core_equivalents": 0.5,
+            "decode_worker_utilization_pct": 50.0,
+            "decode_top_operations": [{
+                "op": "decode_gemv", "time_ms": 2, "pct": 100,
+            }],
+            "decode_selected_kernels": [{"kernel": "decode_q5_fast"}],
             "threadpool": {"completion_wait_ms": 0.25},
         }],
         "system_profile_counters": [{
@@ -114,6 +122,9 @@ def test_html_report_surfaces_consumption_and_profile_evidence(tmp_path: Path) -
     rendered = output.read_text(encoding="utf-8")
     assert "abcdef012345" in rendered
     assert "q5_fast" in rendered
+    assert "decode_q5_fast" in rendered
+    assert "decode_gemv" in rendered
+    assert "Worker utilization" in rendered
     assert "0.25" in rendered
     assert "Matched hardware counters" in rendered
 
@@ -181,11 +192,20 @@ def test_operation_profiles_are_collected_from_artifacts(tmp_path: Path) -> None
     directory.mkdir(parents=True)
     (directory / "cke_ops.json").write_text(json.dumps({
         "results": [{
-            "run": {"prompt_ms": 20.0},
+            "run": {"prompt_ms": 20.0, "decode_ms": 8.0},
             "summary": {
                 "prefill_total_ms": 15.0,
                 "by_op": [{"op": "gemm", "time_ms": 10.0, "pct": 66.7}],
                 "by_kernel_op": [{"kernel": "gemm_fast", "op": "gemm", "time_ms": 10.0}],
+                "phases": {
+                    "decode": {
+                        "total_ms": 6.0,
+                        "core_equivalents": 3.0,
+                        "worker_utilization_pct": 75.0,
+                        "by_op": [{"op": "decode_gemv", "time_ms": 5.0}],
+                        "by_kernel_op": [{"kernel": "decode_fast"}],
+                    }
+                },
             },
         }]
     }), encoding="utf-8")
@@ -195,6 +215,9 @@ def test_operation_profiles_are_collected_from_artifacts(tmp_path: Path) -> None
     assert rows[0]["coverage_pct"] == 75.0
     assert rows[0]["top_operations"][0]["op"] == "gemm"
     assert rows[0]["selected_kernels"][0]["kernel"] == "gemm_fast"
+    assert rows[0]["decode_coverage_pct"] == 75.0
+    assert rows[0]["decode_core_equivalents"] == 3.0
+    assert rows[0]["decode_selected_kernels"][0]["kernel"] == "decode_fast"
 
 
 def test_perf_stat_counters_are_machine_readable(tmp_path: Path) -> None:

@@ -268,7 +268,7 @@ def profiler_plan(
             "--prompt",
             str(prompt),
             "--decode",
-            "1",
+            "4",
             "--threads",
             str(threads),
             "--context-len",
@@ -393,16 +393,41 @@ def collect_operation_profiles(plan: list[dict[str, Any]]) -> list[dict[str, Any
         result = results[0]
         run = result.get("run") or {}
         summary = result.get("summary") or {}
+        phases = summary.get("phases") or {}
+        prefill_phase = phases.get("prefill") or {}
+        decode_phase = phases.get("decode") or {}
         prompt_ms = float(run.get("prompt_ms") or 0)
+        decode_ms = float(run.get("decode_ms") or 0)
         profiled_ms = float(summary.get("prefill_total_ms") or 0)
+        decode_profiled_ms = float(decode_phase.get("total_ms") or 0)
         rows.append({
             "model_key": item["model_key"],
             "prompt_tokens": item["prompt_tokens"],
             "prompt_ms": prompt_ms,
             "profiled_ms": profiled_ms,
             "coverage_pct": 100.0 * profiled_ms / prompt_ms if prompt_ms else None,
+            "core_equivalents": prefill_phase.get(
+                "core_equivalents", summary.get("prefill_core_equivalents")
+            ),
+            "worker_utilization_pct": prefill_phase.get(
+                "worker_utilization_pct",
+                summary.get("prefill_worker_utilization_pct"),
+            ),
             "top_operations": (summary.get("by_op") or [])[:8],
             "selected_kernels": (summary.get("by_kernel_op") or [])[:12],
+            "decode_ms": decode_ms,
+            "decode_profiled_ms": decode_profiled_ms,
+            "decode_coverage_pct": (
+                100.0 * decode_profiled_ms / decode_ms if decode_ms else None
+            ),
+            "decode_core_equivalents": decode_phase.get("core_equivalents"),
+            "decode_worker_utilization_pct": decode_phase.get(
+                "worker_utilization_pct"
+            ),
+            "decode_top_operations": (decode_phase.get("by_op") or [])[:8],
+            "decode_selected_kernels": (
+                decode_phase.get("by_kernel_op") or []
+            )[:12],
             "threadpool": run.get("threadpool"),
             "source": str(path),
         })
@@ -516,25 +541,55 @@ def render_html(report: dict[str, Any], path: Path) -> None:
         )
     operation_body = []
     for item in report.get("operation_profiles", []):
-        operations = "<br>".join(
-            f"<code>{esc(op['op'])}</code> {float(op['time_ms']):.1f} ms ({float(op['pct']):.1f}%)"
-            for op in item["top_operations"]
-        )
-        coverage = item.get("coverage_pct")
-        kernels = "<br>".join(
-            f"<code>{esc(kernel['kernel'])}</code>"
-            for kernel in item.get("selected_kernels", [])[:6]
-        ) or "-"
         threadpool = item.get("threadpool") or {}
         completion_wait = threadpool.get("completion_wait_ms")
-        operation_body.append(
-            "<tr>"
-            f"<td>{esc(item['model_key'])}</td><td>{item['prompt_tokens']}</td>"
-            f"<td>{item['prompt_ms']:.1f}</td><td>{item['profiled_ms']:.1f}</td>"
-            f"<td>{esc(f'{coverage:.1f}%' if coverage is not None else '-')}</td>"
-            f"<td>{esc(f'{float(completion_wait):.2f}' if completion_wait is not None else '-')}</td>"
-            f"<td>{operations}</td><td>{kernels}</td></tr>"
-        )
+        phase_rows = [
+            {
+                "phase": "prefill", "wall_ms": item["prompt_ms"],
+                "profiled_ms": item["profiled_ms"],
+                "coverage_pct": item.get("coverage_pct"),
+                "core_equivalents": item.get("core_equivalents"),
+                "worker_utilization_pct": item.get("worker_utilization_pct"),
+                "operations": item["top_operations"],
+                "kernels": item.get("selected_kernels", []),
+            },
+            {
+                "phase": "decode", "wall_ms": item.get("decode_ms", 0.0),
+                "profiled_ms": item.get("decode_profiled_ms", 0.0),
+                "coverage_pct": item.get("decode_coverage_pct"),
+                "core_equivalents": item.get("decode_core_equivalents"),
+                "worker_utilization_pct": item.get(
+                    "decode_worker_utilization_pct"
+                ),
+                "operations": item.get("decode_top_operations", []),
+                "kernels": item.get("decode_selected_kernels", []),
+            },
+        ]
+        for phase_row in phase_rows:
+            operations = "<br>".join(
+                f"<code>{esc(op['op'])}</code> {float(op['time_ms']):.1f} ms "
+                f"({float(op['pct']):.1f}%)"
+                for op in phase_row["operations"]
+            ) or "-"
+            kernels = "<br>".join(
+                f"<code>{esc(kernel['kernel'])}</code>"
+                for kernel in phase_row["kernels"][:6]
+            ) or "-"
+            coverage = phase_row["coverage_pct"]
+            cores = phase_row["core_equivalents"]
+            utilization = phase_row["worker_utilization_pct"]
+            operation_body.append(
+                "<tr>"
+                f"<td>{esc(item['model_key'])}</td><td>{phase_row['phase']}</td>"
+                f"<td>{item['prompt_tokens']}</td>"
+                f"<td>{phase_row['wall_ms']:.1f}</td>"
+                f"<td>{phase_row['profiled_ms']:.1f}</td>"
+                f"<td>{esc(f'{coverage:.1f}%' if coverage is not None else '-')}</td>"
+                f"<td>{esc(f'{float(cores):.2f}' if cores is not None else '-')}</td>"
+                f"<td>{esc(f'{float(utilization):.1f}%' if utilization is not None else '-')}</td>"
+                f"<td>{esc(f'{float(completion_wait):.2f}' if completion_wait is not None else '-')}</td>"
+                f"<td>{operations}</td><td>{kernels}</td></tr>"
+            )
     system_body = []
     for item in report.get("system_profile_counters", []):
         cke = item.get("cke") or {}
@@ -572,7 +627,7 @@ details{{border:1px solid var(--line);margin:8px 0}}summary{{cursor:pointer;padd
 <h2>Slowest prefill case per model</h2><div class="metrics">{''.join(cards)}</div>
 <h2>Performance matrix</h2><div class="table"><table><thead><tr><th>Model</th><th>Quant</th><th>Prompt</th><th>CKE ms</th><th>llama ms</th><th>CKE/llama</th><th>CKE decode tok/s</th><th>llama decode tok/s</th><th>Consumed</th><th>Token hash</th></tr></thead><tbody>{''.join(perf_body)}</tbody></table></div>
 <h2>Prompt output comparison</h2>{''.join(prompt_body)}
-<h2>Operation attribution</h2><div class="table"><table><thead><tr><th>Model</th><th>Prompt</th><th>Wall ms</th><th>Profiled ms</th><th>Coverage</th><th>Completion wait ms</th><th>Top operations</th><th>Selected providers</th></tr></thead><tbody>{''.join(operation_body)}</tbody></table></div>
+<h2>Operation attribution</h2><div class="table"><table><thead><tr><th>Model</th><th>Phase</th><th>Prompt</th><th>Wall ms</th><th>Profiled ms</th><th>Coverage</th><th>Core equivalents</th><th>Worker utilization</th><th>Completion wait ms</th><th>Top operations</th><th>Selected providers</th></tr></thead><tbody>{''.join(operation_body)}</tbody></table></div>
 <h2>Matched hardware counters</h2><div class="table"><table><thead><tr><th>Model</th><th>Prompt</th><th>Counter</th><th>CKE</th><th>llama.cpp</th></tr></thead><tbody>{''.join(system_body)}</tbody></table></div>
 <h2>Profiler queue</h2><div class="table"><table><thead><tr><th>Model</th><th>Prompt</th><th>Ratio</th><th>Operation attribution command</th><th>Local evidence</th></tr></thead><tbody>{''.join(profile_body)}</tbody></table></div>
 <h2>IR and X-Ray artifacts</h2><div class="table"><table><thead><tr><th>Model</th><th>Local artifacts</th></tr></thead><tbody>{''.join(artifact_body)}</tbody></table></div>

@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,6 +62,62 @@ class V8ProfileOccupancyTests(unittest.TestCase):
         self.assertAlmostEqual(by_layer[0]["worker_utilization_pct"], 93.75)
         self.assertAlmostEqual(by_layer[3]["core_equivalents"], 12.0)
         self.assertAlmostEqual(by_layer[3]["worker_utilization_pct"], 75.0)
+
+    def test_summary_reports_decode_worker_utilization_by_token(self) -> None:
+        rows = [
+            {
+                "mode": "decode", "kernel": "attention", "op": "attention",
+                "layer": 0, "token_id": 1, "start_us": 10.0, "end_us": 110.0,
+                "time_us": 100.0, "cpu_time_us": 800.0,
+            },
+            {
+                "mode": "decode", "kernel": "mlp", "op": "mlp_down",
+                "layer": 0, "token_id": 1, "start_us": 120.0, "end_us": 170.0,
+                "time_us": 50.0, "cpu_time_us": 400.0,
+            },
+            {
+                "mode": "decode", "kernel": "attention", "op": "attention",
+                "layer": 0, "token_id": 2, "start_us": 200.0, "end_us": 300.0,
+                "time_us": 100.0, "cpu_time_us": 1600.0,
+            },
+        ]
+        summary = self.profile._summarize(rows, limit=10, threads=16)
+        decode = summary["phases"]["decode"]
+
+        self.assertEqual(decode["token_count"], 2)
+        self.assertAlmostEqual(decode["core_equivalents"], 11.2)
+        by_token = {row["token_id"]: row for row in decode["by_token"]}
+        self.assertAlmostEqual(by_token[1]["core_equivalents"], 8.0)
+        self.assertAlmostEqual(by_token[2]["core_equivalents"], 16.0)
+
+    def test_decode_transitions_do_not_cross_token_boundaries(self) -> None:
+        rows = [
+            {
+                "mode": "decode", "kernel": "last", "op": "logits", "layer": 3,
+                "token_id": 1, "start_us": 10.0, "end_us": 20.0,
+                "time_us": 10.0, "cpu_time_us": 10.0,
+            },
+            {
+                "mode": "decode", "kernel": "first", "op": "input_norm", "layer": 0,
+                "token_id": 2, "start_us": 100.0, "end_us": 110.0,
+                "time_us": 10.0, "cpu_time_us": 10.0,
+            },
+        ]
+        summary = self.profile._summarize(rows, limit=10, threads=16)
+
+        self.assertEqual(summary["phases"]["decode"]["by_transition"], [])
+
+    def test_required_phase_check_rejects_prefill_only_capture(self) -> None:
+        self.assertEqual(
+            self.profile._missing_profile_phases([{"mode": "prefill"}]),
+            ["decode"],
+        )
+        self.assertEqual(
+            self.profile._missing_profile_phases(
+                [{"mode": "prefill"}, {"mode": "decode"}]
+            ),
+            [],
+        )
 
     def test_summary_attributes_unprofiled_transition_gaps(self) -> None:
         rows = [
@@ -139,6 +197,21 @@ class V8ProfileOccupancyTests(unittest.TestCase):
             path.write_text("7, 11\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "2 IDs, but 3 were requested"):
                 self.profile._load_prompt_token_ids(path, limit=3)
+
+    def test_cli_rejects_budget_without_decode_forward(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable, str(PROFILE_SCRIPT),
+                "--models", "qwen2-0.5b-q4_k_m", "--prompt", "1",
+                "--decode", "1",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("at least 2", result.stderr)
 
 
 if __name__ == "__main__":

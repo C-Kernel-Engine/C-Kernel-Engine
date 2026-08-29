@@ -4237,7 +4237,7 @@ profile-v8-prefill-ops: ck-cli-v8
 		--models $${CK_V8_PROFILE_MODELS:-qwen35-0.8b-q4_k_m,nanbeige4.1-3b-q4_k_m,qwen2-0.5b-q4_k_m} \
 		--threads $${CK_NUM_THREADS:-12} \
 		--prompt $${CK_V8_PROFILE_PROMPT:-512} \
-		--decode $${CK_V8_PROFILE_DECODE:-1} \
+		--decode $${CK_V8_PROFILE_DECODE:-4} \
 		--context-len $${CK_V8_PROFILE_CONTEXT:-1024} \
 		$${CK_V8_PROFILE_REUSE:+--reuse-runtime} \
 		--json-out build/v8_prefill_ops_profile_t$${CK_NUM_THREADS:-12}_p$${CK_V8_PROFILE_PROMPT:-512}.json
@@ -4275,7 +4275,7 @@ profile-v8-prefill-ops-quick: ck-cli-v8
 		--models $${CK_V8_PROFILE_MODELS:-qwen35-0.8b-q4_k_m,nanbeige4.1-3b-q4_k_m,qwen2-0.5b-q4_k_m} \
 		--threads $${CK_NUM_THREADS:-12} \
 		--prompt $${CK_V8_PROFILE_PROMPT:-128} \
-		--decode $${CK_V8_PROFILE_DECODE:-1} \
+		--decode $${CK_V8_PROFILE_DECODE:-4} \
 		--context-len $${CK_V8_PROFILE_CONTEXT:-1024} \
 		--limit $${CK_V8_PROFILE_LIMIT:-10} \
 		$${CK_V8_PROFILE_REUSE:+--reuse-runtime} \

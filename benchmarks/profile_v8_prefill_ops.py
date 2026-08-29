@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Profile v8 prefill operator costs for cached GGUF runtimes.
+"""Profile v8 prefill and decode operator costs for cached GGUF runtimes.
 
 This uses the generated CK_PROFILE hooks, so runtimes must be compiled with
 ``ck_run_v8.py run ... --profile``. The script does that by default because a
@@ -250,6 +250,11 @@ def _group(rows: list[dict[str, Any]], keys: tuple[str, ...], *, limit: int) -> 
     return ranked[:limit]
 
 
+def _missing_profile_phases(rows: list[dict[str, Any]]) -> list[str]:
+    observed = {str(row.get("mode", "")) for row in rows}
+    return sorted({"prefill", "decode"} - observed)
+
+
 def _layer_topology(rows: list[dict[str, Any]]) -> str:
     terms = " ".join(
         f"{row.get('op', '')} {row.get('kernel', '')}" for row in rows
@@ -290,23 +295,29 @@ def _representative_layers(
     return list(selected.values())
 
 
-def _summarize(
-    rows: list[dict[str, Any]], *, limit: int, threads: int
+def _summarize_phase(
+    rows: list[dict[str, Any]], *, phase: str, limit: int, threads: int
 ) -> dict[str, Any]:
-    prefill = [r for r in rows if r.get("mode") == "prefill"]
-    total_us = sum(float(r["time_us"]) for r in prefill)
-    total_cpu_us = sum(float(r["cpu_time_us"]) for r in prefill)
-    by_op = _group(prefill, ("op",), limit=limit)
-    by_kernel = _group(prefill, ("kernel", "op"), limit=limit)
-    layer_count = len({int(row.get("layer", -1)) for row in prefill})
-    by_layer = _group(prefill, ("layer",), limit=max(limit, layer_count))
-    by_layer_op = _group(prefill, ("layer", "op"), limit=limit)
+    phase_rows = [r for r in rows if r.get("mode") == phase]
+    total_us = sum(float(r["time_us"]) for r in phase_rows)
+    total_cpu_us = sum(float(r["cpu_time_us"]) for r in phase_rows)
+    by_op = _group(phase_rows, ("op",), limit=limit)
+    by_kernel = _group(phase_rows, ("kernel", "op"), limit=limit)
+    layer_count = len({int(row.get("layer", -1)) for row in phase_rows})
+    token_count = len({int(row.get("token_id", 0)) for row in phase_rows})
+    by_layer = _group(phase_rows, ("layer",), limit=max(limit, layer_count))
+    by_layer_op = _group(phase_rows, ("layer", "op"), limit=limit)
+    by_token = _group(phase_rows, ("token_id",), limit=max(limit, token_count))
     transitions: dict[tuple[Any, ...], dict[str, Any]] = {}
     previous: dict[str, Any] | None = None
-    for row in prefill:
+    for row in phase_rows:
         start_us = float(row.get("start_us") or 0.0)
         previous_end_us = float(previous.get("end_us") or 0.0) if previous else 0.0
-        if previous is not None and start_us > 0.0 and previous_end_us > 0.0:
+        same_token = (
+            previous is not None
+            and int(previous.get("token_id", 0)) == int(row.get("token_id", 0))
+        )
+        if same_token and start_us > 0.0 and previous_end_us > 0.0:
             gap_us = max(0.0, start_us - previous_end_us)
             key = (
                 previous["layer"], previous.get("op", ""),
@@ -327,7 +338,7 @@ def _summarize(
     by_transition = sorted(
         transitions.values(), key=lambda row: float(row["gap_us"]), reverse=True
     )[:limit]
-    for table in (by_op, by_kernel, by_layer, by_layer_op):
+    for table in (by_op, by_kernel, by_layer, by_layer_op, by_token):
         for row in table:
             row["time_ms"] = row["time_us"] / 1000.0
             row["cpu_time_ms"] = row["cpu_time_us"] / 1000.0
@@ -338,25 +349,55 @@ def _summarize(
                 100.0 * row["core_equivalents"] / threads if threads > 0 else 0.0
             )
             row["pct"] = (100.0 * row["time_us"] / total_us) if total_us > 0 else 0.0
-    representatives = _representative_layers(prefill, by_layer)
+    representatives = _representative_layers(phase_rows, by_layer)
     return {
-        "prefill_total_us": total_us,
-        "prefill_total_ms": total_us / 1000.0,
-        "prefill_cpu_time_us": total_cpu_us,
-        "prefill_cpu_time_ms": total_cpu_us / 1000.0,
-        "prefill_core_equivalents": total_cpu_us / total_us if total_us > 0 else 0.0,
-        "prefill_worker_utilization_pct": (
+        "phase": phase,
+        "total_us": total_us,
+        "total_ms": total_us / 1000.0,
+        "cpu_time_us": total_cpu_us,
+        "cpu_time_ms": total_cpu_us / 1000.0,
+        "core_equivalents": total_cpu_us / total_us if total_us > 0 else 0.0,
+        "worker_utilization_pct": (
             100.0 * total_cpu_us / (total_us * threads)
             if total_us > 0 and threads > 0
             else 0.0
         ),
-        "prefill_entries": len(prefill),
+        "entries": len(phase_rows),
+        "token_count": token_count,
         "by_op": by_op,
         "by_kernel_op": by_kernel,
         "by_layer": by_layer,
         "by_layer_op": by_layer_op,
+        "by_token": by_token,
         "by_transition": by_transition,
         "representative_layers": representatives,
+    }
+
+
+def _summarize(
+    rows: list[dict[str, Any]], *, limit: int, threads: int
+) -> dict[str, Any]:
+    phases = {
+        phase: _summarize_phase(rows, phase=phase, limit=limit, threads=threads)
+        for phase in ("prefill", "decode")
+    }
+    prefill = phases["prefill"]
+    return {
+        "phases": phases,
+        # Preserve the original report surface for downstream readers.
+        "prefill_total_us": prefill["total_us"],
+        "prefill_total_ms": prefill["total_ms"],
+        "prefill_cpu_time_us": prefill["cpu_time_us"],
+        "prefill_cpu_time_ms": prefill["cpu_time_ms"],
+        "prefill_core_equivalents": prefill["core_equivalents"],
+        "prefill_worker_utilization_pct": prefill["worker_utilization_pct"],
+        "prefill_entries": prefill["entries"],
+        "by_op": prefill["by_op"],
+        "by_kernel_op": prefill["by_kernel_op"],
+        "by_layer": prefill["by_layer"],
+        "by_layer_op": prefill["by_layer_op"],
+        "by_transition": prefill["by_transition"],
+        "representative_layers": prefill["representative_layers"],
     }
 
 
@@ -396,7 +437,10 @@ def main() -> int:
         "--prompt-token-file", type=Path,
         help="JSON/CSV token IDs; the first --prompt IDs are consumed",
     )
-    parser.add_argument("--decode", type=int, default=1)
+    parser.add_argument(
+        "--decode", type=int, default=4,
+        help="Output token budget; values >=2 exercise at least one decode forward pass",
+    )
     parser.add_argument(
         "--threads", type=int, default=0,
         help="Worker count; 0 selects one allowed CPU per physical core",
@@ -421,6 +465,10 @@ def main() -> int:
         raise ValueError("--threads must be non-negative")
     if args.prompt <= 0:
         raise ValueError("--prompt must be positive")
+    if args.decode < 2:
+        raise ValueError(
+            "--decode must be at least 2 to profile a decode forward pass"
+        )
     prompt_token_ids = (
         _load_prompt_token_ids(args.prompt_token_file.expanduser(), limit=args.prompt)
         if args.prompt_token_file
@@ -529,6 +577,23 @@ def main() -> int:
             continue
 
         rows = _load_profile_rows(csv_path)
+        missing_phases = _missing_profile_phases(rows)
+        if missing_phases:
+            print(f"profile is missing required phases: {', '.join(missing_phases)}")
+            results.append(
+                {
+                    "id": model_id,
+                    "label": spec["label"],
+                    "quant": spec["quant"],
+                    "compile": compile_row,
+                    "run": run_row,
+                    "status": "fail",
+                    "reason": "missing_profile_phases",
+                    "missing_phases": missing_phases,
+                    "csv": str(csv_path),
+                }
+            )
+            continue
         summary = _summarize(rows, limit=args.limit, threads=args.threads)
         prompt_ms = float(run_row.get("prompt_ms") or 0.0)
         profile_ms = float(summary["prefill_total_ms"])
@@ -555,6 +620,48 @@ def main() -> int:
         )
         print("\nTop unprofiled transitions")
         for transition in summary["by_transition"]:
+            print(
+                f"  L{transition['from_layer']}:{transition['from_op']} -> "
+                f"L{transition['to_layer']}:{transition['to_op']}  "
+                f"total={transition['gap_us'] / 1000.0:.3f} ms  "
+                f"max={transition['max_gap_us'] / 1000.0:.3f} ms  "
+                f"count={transition['count']}"
+            )
+
+        decode_summary = summary["phases"]["decode"]
+        decode_ms = float(run_row.get("decode_ms") or 0.0)
+        decode_profile_ms = float(decode_summary["total_ms"])
+        decode_summary["runtime_ms"] = decode_ms
+        decode_summary["profile_coverage_pct"] = (
+            100.0 * decode_profile_ms / decode_ms if decode_ms > 0 else 0.0
+        )
+        decode_summary["unprofiled_or_runtime_ms"] = max(
+            0.0, decode_ms - decode_profile_ms
+        )
+        print(
+            f"\ndecode={decode_ms:.2f} ms ({run_row.get('decode_tok_s', 0):.1f} tok/s), "
+            f"profiled decode ops={decode_profile_ms:.2f} ms, "
+            f"occupancy={decode_summary['core_equivalents']:.2f}/{args.threads} cores "
+            f"({decode_summary['worker_utilization_pct']:.1f}%), "
+            f"coverage={decode_summary['profile_coverage_pct']:.1f}%"
+        )
+        _fmt_table("Top decode ops", decode_summary["by_op"], ("op",))
+        _fmt_table(
+            "Top decode kernel/op sites",
+            decode_summary["by_kernel_op"], ("kernel", "op"),
+        )
+        _fmt_table("Decode layers", decode_summary["by_layer"], ("layer",))
+        _fmt_table(
+            "Top decode layer/op sites",
+            decode_summary["by_layer_op"], ("layer", "op"),
+        )
+        _fmt_table("Decode tokens", decode_summary["by_token"], ("token_id",))
+        _fmt_table(
+            "Decode representative layer topologies",
+            decode_summary["representative_layers"], ("topology", "layer"),
+        )
+        print("\nTop decode transitions")
+        for transition in decode_summary["by_transition"]:
             print(
                 f"  L{transition['from_layer']}:{transition['from_op']} -> "
                 f"L{transition['to_layer']}:{transition['to_op']}  "
