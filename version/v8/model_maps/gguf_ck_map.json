@@ -33,6 +33,98 @@
       },
       "synthesize_layernorm_beta": true
     },
+    "cohere2moe": {
+      "template": "cohere2_moe",
+      "family": "cohere2_moe",
+      "conversion_family": "mapped_hybrid",
+      "layer_kind_config_key": "layer_kinds",
+      "metadata_map": {
+        "block_count": "cohere2moe.block_count",
+        "context_length": "cohere2moe.context_length",
+        "embedding_length": "cohere2moe.embedding_length",
+        "feed_forward_length": "cohere2moe.feed_forward_length",
+        "attention_head_count": "cohere2moe.attention.head_count",
+        "attention_head_count_kv": "cohere2moe.attention.head_count_kv",
+        "attention_key_length": "cohere2moe.attention.key_length",
+        "attention_value_length": "cohere2moe.attention.value_length",
+        "attention_layer_norm_epsilon": "cohere2moe.attention.layer_norm_epsilon",
+        "attention_sliding_window": "cohere2moe.attention.sliding_window",
+        "attention_sliding_window_pattern": "cohere2moe.attention.sliding_window_pattern",
+        "rope_freq_base": "cohere2moe.rope.freq_base",
+        "rope_dimension_count": "cohere2moe.rope.dimension_count",
+        "logit_scale": "cohere2moe.logit_scale",
+        "tie_word_embeddings": "cohere2moe.tie_word_embeddings",
+        "expert_count": "cohere2moe.expert_count",
+        "expert_used_count": "cohere2moe.expert_used_count",
+        "expert_feed_forward_length": "cohere2moe.expert_feed_forward_length",
+        "expert_weights_norm": "cohere2moe.expert_weights_norm",
+        "expert_gating_func": "cohere2moe.expert_gating_func",
+        "leading_dense_block_count": "cohere2moe.leading_dense_block_count"
+      },
+      "layer_kind_plan": {
+        "attention_pattern": [
+          "full_attention",
+          "sliding_attention",
+          "sliding_attention",
+          "sliding_attention"
+        ],
+        "leading_dense_block_count_metadata": "cohere2moe.leading_dense_block_count",
+        "leading_kind_format": "dense_{attention}",
+        "remaining_kind_format": "moe_{attention}"
+      },
+      "layer_kinds": {
+        "dense": {
+          "required_suffixes": [
+            "attn_norm.weight",
+            "attn_q.weight",
+            "attn_k.weight",
+            "attn_v.weight",
+            "attn_output.weight",
+            "ffn_gate.weight",
+            "ffn_up.weight",
+            "ffn_down.weight"
+          ]
+        },
+        "moe": {
+          "required_suffixes": [
+            "attn_norm.weight",
+            "attn_q.weight",
+            "attn_k.weight",
+            "attn_v.weight",
+            "attn_output.weight",
+            "ffn_gate_inp.weight",
+            "ffn_gate_exps.weight",
+            "ffn_up_exps.weight",
+            "ffn_down_exps.weight"
+          ]
+        }
+      },
+      "tensor_map": {
+        "token_embd.weight": "token_emb",
+        "output_norm.weight": "final_ln_weight",
+        "output.weight": "output.weight",
+        "blk.{L}.attn_norm.weight": "layer.{L}.ln1_gamma",
+        "blk.{L}.attn_q.weight": "layer.{L}.wq",
+        "blk.{L}.attn_k.weight": "layer.{L}.wk",
+        "blk.{L}.attn_v.weight": "layer.{L}.wv",
+        "blk.{L}.attn_output.weight": "layer.{L}.wo",
+        "blk.{L}.ffn_gate.weight": "layer.{L}.w1",
+        "blk.{L}.ffn_up.weight": "layer.{L}.w3",
+        "blk.{L}.ffn_down.weight": "layer.{L}.w2",
+        "blk.{L}.ffn_gate_inp.weight": "layer.{L}.moe_router",
+        "blk.{L}.ffn_gate_exps.weight": "layer.{L}.moe_expert_gate",
+        "blk.{L}.ffn_up_exps.weight": "layer.{L}.moe_expert_up",
+        "blk.{L}.ffn_down_exps.weight": "layer.{L}.moe_expert_down"
+      },
+      "synthetic_layer_tensors": [
+        {
+          "name": "layer.{L}.ln1_beta",
+          "dtype": "fp32",
+          "shape_config": "embed_dim",
+          "value": "zeros"
+        }
+      ]
+    },
     "qwen35": {
       "template": "qwen35",
       "family": "qwen35",

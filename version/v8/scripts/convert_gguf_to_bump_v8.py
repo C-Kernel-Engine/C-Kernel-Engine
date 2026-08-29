@@ -258,9 +258,47 @@ def gguf_ck_metadata_key(arch: str, logical_name: str) -> str:
     return str(value) if value else ""
 
 
-def gguf_ck_layer_kinds_from_map(arch: str, num_layers: int) -> list[str]:
-    """Expand a declarative repeating layer-kind pattern to the model depth."""
-    pattern = gguf_ck_arch_contract(arch).get("layer_kind_pattern") or []
+def gguf_ck_layer_kinds_from_map(
+    arch: str,
+    num_layers: int,
+    metadata: Optional[Dict[str, object]] = None,
+) -> list[str]:
+    """Expand declarative attention and block-kind patterns to model depth."""
+    contract = gguf_ck_arch_contract(arch)
+    plan = contract.get("layer_kind_plan") or {}
+    if plan:
+        if not isinstance(plan, dict):
+            raise GGUFError(f"{arch}: layer_kind_plan must be an object")
+        pattern = plan.get("attention_pattern") or []
+        if not isinstance(pattern, list) or not all(
+            isinstance(item, str) and item.strip() for item in pattern
+        ):
+            raise GGUFError(
+                f"{arch}: layer_kind_plan.attention_pattern must be a non-empty string list"
+            )
+        if int(num_layers) <= 0:
+            raise GGUFError(f"{arch}: cannot expand layer_kind_plan for {num_layers} layers")
+        leading_key = str(plan.get("leading_dense_block_count_metadata") or "")
+        leading_value = (metadata or {}).get(leading_key) if leading_key else 0
+        if isinstance(leading_value, bool) or not isinstance(leading_value, int):
+            raise GGUFError(
+                f"{arch}: {leading_key or 'leading block count'} must be integer metadata"
+            )
+        leading_count = int(leading_value)
+        if leading_count < 0 or leading_count > int(num_layers):
+            raise GGUFError(
+                f"{arch}: invalid leading dense block count {leading_count} for {num_layers} layers"
+            )
+        leading_format = str(plan.get("leading_kind_format") or "dense_{attention}")
+        remaining_format = str(plan.get("remaining_kind_format") or "{attention}")
+        kinds: list[str] = []
+        for layer in range(int(num_layers)):
+            attention = str(pattern[layer % len(pattern)])
+            kind_format = leading_format if layer < leading_count else remaining_format
+            kinds.append(kind_format.format(attention=attention))
+        return kinds
+
+    pattern = contract.get("layer_kind_pattern") or []
     if not pattern:
         return []
     if not isinstance(pattern, list) or not all(
@@ -5283,7 +5321,10 @@ def main() -> None:
                 f"extra_projection_tensors={extra_tensors}."
             )
 
-        if arch in {"nemotron_h", "nemotron_h_moe", "laguna"}:
+        mapped_conversion = str(
+            gguf_ck_arch_contract(arch).get("conversion_family") or ""
+        ) == "mapped_hybrid"
+        if arch in {"nemotron_h", "nemotron_h_moe", "laguna"} or mapped_conversion:
             nemotron_meta_prefix = "nemotron_h_moe" if arch == "nemotron_h_moe" else "nemotron_h"
             def nmeta(key: str) -> str:
                 return f"{nemotron_meta_prefix}.{key}"
@@ -5330,6 +5371,7 @@ def main() -> None:
             nemotron_plan: list[Dict[str, Any]] = []
             consumed_sources: set[str] = set()
             layer_kinds: list[str] = []
+            planned_layer_kinds = gguf_ck_layer_kinds_from_map(arch, num_layers, meta)
             layer_quant_summary: dict[str, dict[str, str]] = {}
 
             _add_mapped_entry(nemotron_plan, consumed_sources, "token_emb", "token_embd.weight")
@@ -5353,7 +5395,17 @@ def main() -> None:
                     if detail:
                         raise GGUFError(detail)
                     raise GGUFError(f"Layer {layer}: unsupported nemotron_h layer contract ({kind})")
-                layer_kind = kind[len("mapped_"):]
+                mapped_kind = kind[len("mapped_"):]
+                layer_kind = (
+                    planned_layer_kinds[layer]
+                    if planned_layer_kinds
+                    else mapped_kind
+                )
+                if planned_layer_kinds and not layer_kind.startswith(f"{mapped_kind}_"):
+                    raise GGUFError(
+                        f"Layer {layer}: tensor contract is {mapped_kind!r}, but the declarative "
+                        f"layer plan selected {layer_kind!r}"
+                    )
                 layer_kinds.append(layer_kind)
                 layer_key = f"layer.{layer}"
                 layer_quant_summary[layer_key] = {}
@@ -5367,6 +5419,40 @@ def main() -> None:
                     dst_name = str(dst_pattern).replace("{L}", str(layer))
                     info = _add_mapped_entry(nemotron_plan, consumed_sources, dst_name, src_name, layer_kind=layer_kind)
                     layer_quant_summary[layer_key][dst_name.split(".")[-1]] = ck_dtype_name(weight_dtype(info, dst_name)).lower()
+
+                synthetic_specs = contract.get("synthetic_layer_tensors") or []
+                if not isinstance(synthetic_specs, list):
+                    raise GGUFError(f"{arch}: synthetic_layer_tensors must be a list")
+                for spec in synthetic_specs:
+                    if not isinstance(spec, dict):
+                        raise GGUFError(f"{arch}: synthetic layer tensor must be an object")
+                    if str(spec.get("value") or "") != "zeros":
+                        raise GGUFError(
+                            f"{arch}: unsupported synthetic tensor value {spec.get('value')!r}"
+                        )
+                    if str(spec.get("dtype") or "") != "fp32":
+                        raise GGUFError(
+                            f"{arch}: only fp32 synthetic layer tensors are supported"
+                        )
+                    if str(spec.get("shape_config") or "") != "embed_dim":
+                        raise GGUFError(
+                            f"{arch}: synthetic tensor shape_config must be 'embed_dim'"
+                        )
+                    synthetic_name = str(spec.get("name") or "").replace("{L}", str(layer))
+                    if not synthetic_name:
+                        raise GGUFError(f"{arch}: synthetic layer tensor requires a name")
+                    nemotron_plan.append({
+                        "name": synthetic_name,
+                        "dtype": "fp32",
+                        "shape": [int(embed_dim)],
+                        "source_dtype": "synthetic",
+                        "source_name": "synthetic:zeros_fp32",
+                        "layer_kind": layer_kind,
+                        "_info": None,
+                        "_dtype_id": CK_DT_FP32,
+                        "_size": int(embed_dim) * 4,
+                        "synthetic": "zeros_fp32",
+                    })
 
                 if layer_kind == "mamba":
                     in_proj = tensors.get(f"blk.{layer}.ssm_in.weight")
@@ -5589,6 +5675,84 @@ def main() -> None:
                     "has_qk_norm": True,
                     "has_attention_biases": False,
                 }, "laguna")
+            elif arch == "cohere2moe":
+                runtime_arch = "cohere2_moe"
+                layer_sliding_window = [
+                    int(sliding_window or 0) if "sliding" in kind else 0
+                    for kind in layer_kinds
+                ]
+                layer_rope_kind = [
+                    "sliding" if "sliding" in kind else "none"
+                    for kind in layer_kinds
+                ]
+                layer_q_dim = [int(num_heads * head_dim)] * int(num_layers)
+                moe_intermediate_size = int(
+                    meta_int("cohere2moe.expert_feed_forward_length") or 0
+                )
+                n_routed_experts = int(meta_int("cohere2moe.expert_count") or 0)
+                experts_per_tok = int(meta_int("cohere2moe.expert_used_count") or 0)
+                nemotron_config = _inject_runtime_config_defaults({
+                    "model": runtime_arch,
+                    "arch": runtime_arch,
+                    "source_arch": arch,
+                    "model_type": runtime_arch,
+                    "embed_dim": int(embed_dim),
+                    "attn_out_dim": int(num_heads * head_dim),
+                    "num_layers": int(num_layers),
+                    "num_heads": int(num_heads),
+                    "num_kv_heads": int(num_kv_heads),
+                    "head_dim": int(head_dim),
+                    "v_head_dim": int(value_length_meta or head_dim),
+                    "intermediate_dim": int(intermediate),
+                    "intermediate_size": int(intermediate),
+                    "moe_intermediate_size": int(moe_intermediate_size),
+                    "moe_shared_expert_intermediate_size": 0,
+                    "n_routed_experts": int(n_routed_experts),
+                    "experts_per_tok": int(experts_per_tok),
+                    "num_experts_per_tok": int(experts_per_tok),
+                    "router_num_groups": 1,
+                    "router_topk_group": 1,
+                    "router_norm_topk_prob": bool(
+                        meta.get("cohere2moe.expert_weights_norm", False)
+                    ),
+                    "routed_scaling_factor": 1.0,
+                    "vocab_size": int(vocab_size),
+                    "max_seq_len": int(context_len),
+                    "context_length": int(context_len),
+                    "rope_theta": float(rope_theta),
+                    "rotary_dim": int(rotary_dim),
+                    "rms_eps": float(rms_eps) if rms_eps else 1e-5,
+                    "rms_norm_eps": float(rms_eps) if rms_eps else 1e-5,
+                    "tie_word_embeddings": bool(tie_word_embeddings),
+                    "logit_scale": float(
+                        meta_float("cohere2moe.logit_scale") or 1.0
+                    ),
+                    "layer_kinds": layer_kinds,
+                    "hybrid_block_pattern": layer_kinds[:],
+                    "layer_num_heads": [int(num_heads)] * int(num_layers),
+                    "layer_q_dim": layer_q_dim,
+                    "layer_attention_output_dim": [int(embed_dim)] * int(num_layers),
+                    "layer_q_head_dim": [int(head_dim)] * int(num_layers),
+                    "layer_k_head_dim": [int(head_dim)] * int(num_layers),
+                    "layer_v_head_dim": [int(value_length_meta or head_dim)] * int(num_layers),
+                    "layer_rotary_dim": [
+                        int(rotary_dim) if "sliding" in kind else 0
+                        for kind in layer_kinds
+                    ],
+                    "layer_sliding_window": layer_sliding_window,
+                    "layer_rope_kind": layer_rope_kind,
+                    "layer_kv_policy": ["attention_kv_cache"] * int(num_layers),
+                    "layer_attention_policy": [
+                        "sliding_attention" if "sliding" in kind else "full_attention"
+                        for kind in layer_kinds
+                    ],
+                    "layer_moe_policy": [
+                        "none" if kind.startswith("dense_") else "routed_swiglu"
+                        for kind in layer_kinds
+                    ],
+                    "has_qk_norm": False,
+                    "has_attention_biases": False,
+                }, runtime_arch)
             if tokenizer_contract:
                 nemotron_config["tokenizer_contract"] = tokenizer_contract
             chat_template = meta.get("tokenizer.chat_template")
