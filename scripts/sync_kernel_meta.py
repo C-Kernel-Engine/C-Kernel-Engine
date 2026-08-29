@@ -20,7 +20,7 @@ from collections import defaultdict
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent
-META_FILE = ROOT / "meta" / "kernel_meta.json"
+META_FILE = ROOT / "version" / "meta" / "kernel_meta.json"
 KERNEL_DIR = ROOT / "src" / "kernels"
 
 

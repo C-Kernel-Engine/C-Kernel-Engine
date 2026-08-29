@@ -2,7 +2,7 @@
 """
 Optimization Status Report Generator
 
-Reads meta/kernel_meta.json and generates reports showing:
+Reads version/meta/kernel_meta.json and generates reports showing:
 - Kernel implementation status by dtype
 - Optimization levels achieved
 - Inference/training optimization roadmap
@@ -27,7 +27,7 @@ from collections import defaultdict
 # Find meta directory
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent
-META_FILE = ROOT / "meta" / "kernel_meta.json"
+META_FILE = ROOT / "version" / "meta" / "kernel_meta.json"
 
 
 def load_meta():
