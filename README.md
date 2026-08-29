@@ -52,6 +52,12 @@ For an AI coding agent, this two-sentence prompt is sufficient:
 
 ### Run More Models Now
 
+CKE's current v8 inference surface spans **text, vision, and audio**. Text uses
+generated decoder runtimes, Qwen3-VL and Qwen3.6-VL add generated vision
+encoder/bridge paths, and Whisper Tiny, Base, and Small use generated FP32 audio
+frontend, encoder, and decoder runtimes. Each lane retains its own evidence and
+certification boundary.
+
 Text models use the same generated-runtime entry point. Replace `MODEL` with a
 public `hf://` artifact from the table or a local GGUF/safetensors directory:
 
