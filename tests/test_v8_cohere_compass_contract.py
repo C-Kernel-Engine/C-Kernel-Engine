@@ -175,6 +175,9 @@ class CohereCompassContractTests(unittest.TestCase):
         stitch = bridge._composition_bridge_contract(circuit)
         self.assertEqual(stitch["deepstack_injections"], 3)
         self.assertEqual(stitch["position_policy"], "mrope_2d")
+        self.assertEqual(stitch["image_begin_marker"], "<|VISION_START|>")
+        self.assertEqual(stitch["image_end_marker"], "<|VISION_END|>")
+        self.assertTrue(bridge._segment_text_has_bos_prefix("<BOS_TOKEN><|START_OF_TURN_TOKEN|>"))
 
     def test_runner_refresh_preserves_inherited_circuit_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -219,6 +222,113 @@ class CohereCompassContractTests(unittest.TestCase):
             self.assertEqual(
                 (output / "chat_template.jinja").read_text(encoding="utf-8"),
                 template,
+            )
+
+    def test_bridge_loads_provenance_complete_safetensors_decoder(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory)
+            manifest = {
+                "special_tokens": {"bos_token_id": 2, "eos_token_id": 3},
+                "template": build_ir_v8._load_builtin_template_doc(
+                    "cohere_compass_text"
+                ),
+            }
+            (runtime / "weights_manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            for name in (
+                "weights.bump",
+                "weights_manifest.map",
+                "libmodel.so",
+                "libckernel_engine.so",
+                "libckernel_tokenizer.so",
+                "tokenizer.json",
+            ):
+                (runtime / name).touch()
+            layout = {
+                "config": {
+                    "embed_dim": 16,
+                    "input_embed_dim": 64,
+                    "num_deepstack_layers": 3,
+                    "context_length": 2048,
+                    "vocab_size": 64,
+                }
+            }
+            for name in ("layout_prefill.json", "layout_decode.json"):
+                (runtime / name).write_text(json.dumps(layout), encoding="utf-8")
+
+            loaded = bridge._load_prebuilt_decoder_runtime(
+                runtime, required_context=1024
+            )
+
+            self.assertIsNone(loaded["gguf"])
+            self.assertEqual(loaded["embed_dim"], 16)
+            self.assertEqual(loaded["input_embed_dim"], 64)
+            self.assertEqual(loaded["num_deepstack_layers"], 3)
+            with self.assertRaisesRegex(RuntimeError, "context is too small"):
+                bridge._load_prebuilt_decoder_runtime(
+                    runtime, required_context=4096
+                )
+
+    def test_full_network_graph_reads_standard_prebuilt_call_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            encoder = root / "encoder"
+            decoder = root / "decoder"
+            encoder.mkdir()
+            decoder.mkdir()
+            empty_layout = {
+                "config": {"embed_dim": 16},
+                "memory": {
+                    "weights": {"size": 0, "entries": []},
+                    "activations": {"size": 0, "buffers": []},
+                },
+            }
+            (encoder / "ir1.json").write_text('{"ops": []}', encoding="utf-8")
+            (encoder / "call.json").write_text(
+                '{"operations": []}', encoding="utf-8"
+            )
+            (encoder / "layout.json").write_text(
+                json.dumps(empty_layout), encoding="utf-8"
+            )
+            (decoder / "ir1_prefill.json").write_text(
+                '{"ops": []}', encoding="utf-8"
+            )
+            prebuilt_call = decoder / "lowered_prefill_call.json"
+            prebuilt_call.write_text(
+                json.dumps(
+                    {
+                        "operations": [
+                            {
+                                "op_id": 0,
+                                "op": "embedding",
+                                "section": "header",
+                                "args": [],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (decoder / "layout_prefill.json").write_text(
+                json.dumps(empty_layout), encoding="utf-8"
+            )
+
+            graph = bridge._build_full_network_graph(
+                workdir=root,
+                bridge_report={"prefix_tokens": 0, "prefix_embed_dim": 16},
+                encoder_dir=encoder,
+                decoder_dir=decoder,
+            )
+
+            self.assertEqual(
+                graph["sources"]["decoder_call_prefill"], str(prebuilt_call)
+            )
+            self.assertTrue(
+                any(
+                    op.get("network_stage") == "decoder_prefill"
+                    for op in graph["call"]["operations"]
+                )
             )
 
     def test_text_mrope_builds_call_ready_prefill_and_decode(self) -> None:
