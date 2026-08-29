@@ -498,6 +498,22 @@ def _derive_position_grid_size(position_info: Any) -> int:
     return side if side * side == rows else rows
 
 
+def build_uniform_attention_width_plan(
+    *,
+    num_layers: int,
+    num_heads: int,
+    q_head_dim: int,
+    v_head_dim: int,
+) -> dict[str, Any]:
+    q_width = int(num_heads) * int(q_head_dim)
+    output_width = int(num_heads) * int(v_head_dim)
+    return {
+        "attn_out_dim": output_width,
+        "layer_q_dim": [q_width] * int(num_layers),
+        "layer_attention_output_dim": [output_width] * int(num_layers),
+    }
+
+
 def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
     arch_lc = str(arch or "").strip().lower()
 
@@ -5685,7 +5701,12 @@ def main() -> None:
                     "sliding" if "sliding" in kind else "none"
                     for kind in layer_kinds
                 ]
-                layer_q_dim = [int(num_heads * head_dim)] * int(num_layers)
+                attention_widths = build_uniform_attention_width_plan(
+                    num_layers=int(num_layers),
+                    num_heads=int(num_heads),
+                    q_head_dim=int(head_dim),
+                    v_head_dim=int(value_length_meta or head_dim),
+                )
                 moe_intermediate_size = int(
                     meta_int("cohere2moe.expert_feed_forward_length") or 0
                 )
@@ -5697,7 +5718,7 @@ def main() -> None:
                     "source_arch": arch,
                     "model_type": runtime_arch,
                     "embed_dim": int(embed_dim),
-                    "attn_out_dim": int(num_heads * head_dim),
+                    "attn_out_dim": attention_widths["attn_out_dim"],
                     "num_layers": int(num_layers),
                     "num_heads": int(num_heads),
                     "num_kv_heads": int(num_kv_heads),
@@ -5730,8 +5751,8 @@ def main() -> None:
                     "layer_kinds": layer_kinds,
                     "hybrid_block_pattern": layer_kinds[:],
                     "layer_num_heads": [int(num_heads)] * int(num_layers),
-                    "layer_q_dim": layer_q_dim,
-                    "layer_attention_output_dim": [int(embed_dim)] * int(num_layers),
+                    "layer_q_dim": attention_widths["layer_q_dim"],
+                    "layer_attention_output_dim": attention_widths["layer_attention_output_dim"],
                     "layer_q_head_dim": [int(head_dim)] * int(num_layers),
                     "layer_k_head_dim": [int(head_dim)] * int(num_layers),
                     "layer_v_head_dim": [int(value_length_meta or head_dim)] * int(num_layers),

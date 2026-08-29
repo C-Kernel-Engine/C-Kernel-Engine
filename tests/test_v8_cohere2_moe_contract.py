@@ -36,6 +36,7 @@ def _tiny_manifest() -> dict:
         offset += size
 
     hidden = 256
+    attention_width = 512
     dense_ff = 256
     expert_ff = 256
     experts = 8
@@ -43,10 +44,10 @@ def _tiny_manifest() -> dict:
     for layer in range(4):
         add(f"layer.{layer}.ln1_gamma", "fp32", [hidden])
         add(f"layer.{layer}.ln1_beta", "fp32", [hidden])
-        add(f"layer.{layer}.wq", "q8_0", [hidden, hidden])
+        add(f"layer.{layer}.wq", "q8_0", [attention_width, hidden])
         add(f"layer.{layer}.wk", "q8_0", [64, hidden])
         add(f"layer.{layer}.wv", "q8_0", [64, hidden])
-        add(f"layer.{layer}.wo", "q8_0", [hidden, hidden])
+        add(f"layer.{layer}.wo", "q8_0", [hidden, attention_width])
         if layer == 0:
             add(f"layer.{layer}.w1", "q8_0", [dense_ff, hidden])
             add(f"layer.{layer}.w3", "q8_0", [dense_ff, hidden])
@@ -76,8 +77,8 @@ def _tiny_manifest() -> dict:
         "arch": "cohere2_moe",
         "num_layers": 4,
         "embed_dim": hidden,
-        "attn_out_dim": hidden,
-        "num_heads": 4,
+        "attn_out_dim": attention_width,
+        "num_heads": 8,
         "num_kv_heads": 1,
         "head_dim": 64,
         "v_head_dim": 64,
@@ -165,6 +166,17 @@ class Cohere2MoeContractTests(unittest.TestCase):
             "layer.{L}.moe_expert_gate",
         )
 
+    def test_conversion_keeps_attention_output_width_distinct_from_hidden_width(self) -> None:
+        plan = converter.build_uniform_attention_width_plan(
+            num_layers=4,
+            num_heads=8,
+            q_head_dim=64,
+            v_head_dim=32,
+        )
+        self.assertEqual(plan["layer_q_dim"], [512] * 4)
+        self.assertEqual(plan["attn_out_dim"], 256)
+        self.assertEqual(plan["layer_attention_output_dim"], [256] * 4)
+
     def test_circuit_preserves_parallel_residual_and_rope_policy(self) -> None:
         circuit = build_ir_v8._load_builtin_template_doc("cohere2_moe")
         self.assertTrue(circuit["flags"]["parallel_attention_mlp"])
@@ -199,6 +211,48 @@ class Cohere2MoeContractTests(unittest.TestCase):
         self.assertIn("group_limited_topk_router", layer_one)
         self.assertIn("moe_swiglu_expert_mlp", layer_one)
         self.assertIn("rope_qk", layer_one)
+
+    def test_quantized_dense_prefix_consumes_planner_owned_q8_inputs(self) -> None:
+        manifest = _tiny_manifest()
+        registry = build_ir_v8.load_kernel_registry()
+        ir1 = build_ir_v8.build_ir1_direct(
+            manifest,
+            ROOT / "tests" / "cohere2_moe_manifest.synthetic.json",
+            mode="prefill",
+        )
+        lower1 = build_ir_v8.generate_ir_lower_1(ir1, registry, manifest, "prefill")
+        layout = build_ir_v8.generate_memory_layout(
+            lower1,
+            manifest,
+            registry,
+            mode="prefill",
+            context_len=8,
+        )
+        lower2 = build_ir_v8.generate_ir_lower_2(
+            lower1,
+            layout,
+            manifest,
+            registry,
+            mode="prefill",
+        )
+        call_ir = build_ir_v8.generate_ir_lower_3(lower2, "prefill")
+        layer_zero = {
+            op["op"]: op
+            for op in call_ir["operations"]
+            if op.get("layer") == 0
+        }
+
+        for op_name in ("out_proj", "mlp_gate_up", "mlp_down"):
+            op = layer_zero[op_name]
+            a_arg = next(arg for arg in op["args"] if arg["name"] == "A")
+            self.assertEqual(a_arg["buffer_ref"], "layer_input", op_name)
+
+        out_proj = layer_zero["out_proj"]
+        k_arg = next(arg for arg in out_proj["args"] if arg["name"] == "K")
+        self.assertEqual(k_arg["expr"], str(manifest["config"]["attn_out_dim"]))
+        out_quant = layer_zero["quantize_out_proj_input"]
+        quant_k = next(arg for arg in out_quant["args"] if arg["name"] == "k")
+        self.assertEqual(quant_k["expr"], str(manifest["config"]["attn_out_dim"]))
 
     def test_compiler_and_codegen_remain_model_name_free(self) -> None:
         for relative in (
