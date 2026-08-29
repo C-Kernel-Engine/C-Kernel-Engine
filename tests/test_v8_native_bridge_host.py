@@ -1598,6 +1598,36 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             )
             self.assertNotIn("Model does not have built-in tokenizer", combined)
 
+    def test_ck_cli_v8_reads_prompt_tokens_from_file(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_native_prompt_tokens_") as tmpdir:
+            tmp = Path(tmpdir)
+            so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(tmp)
+            token_path = tmp / "prompt_tokens.txt"
+            token_path.write_text("1\n2\n3\n4\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    str(CK_CLI_V8),
+                    "--lib",
+                    str(so_path),
+                    "--weights",
+                    str(bump_path),
+                    "--manifest",
+                    str(manifest_map),
+                    "--prompt-token-file",
+                    str(token_path),
+                    "--max-tokens",
+                    "1",
+                    "--quiet-output",
+                    "--no-timing",
+                ],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
     def test_generated_runtime_exports_circuit_chat_and_stop_contracts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_native_chat_contract_") as tmpdir:
             so_path, bump_path, manifest_map = _build_tiny_decoder_runtime(

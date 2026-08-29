@@ -35,6 +35,7 @@ def test_catalog_covers_promoted_long_context_families() -> None:
         "laguna_s_2_1",
         "laguna_xs_2_1",
         "cohere2_command_r7b",
+        "cohere_north_mini_code",
     }
 
 
@@ -562,3 +563,49 @@ def test_native_cli_has_no_fixed_32k_context_clamp_and_traces_logits() -> None:
     assert "CK_CLI_MAX_CONTEXT" not in source
     assert "first_logits_fnv1a64" in source
     assert "explicit prompt has %d tokens" in source
+    assert '"--prompt-token-file"' in source
+
+
+def test_capacity_runner_uses_prompt_token_file(monkeypatch, tmp_path: Path) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        trace_path = Path(command[command.index("--token-trace-json") + 1])
+        trace_path.write_text(
+            json.dumps({"prompt_tokens": 4, "first_logits_fnv1a64": "abcd"}),
+            encoding="utf-8",
+        )
+        return {
+            "returncode": 0,
+            "elapsed_seconds": 1.0,
+            "peak_rss_kib": 1024,
+            "resource_usage": {"average_cpu_cores": 2.0},
+            "utilization": {"sample_count": 1, "p10_active_cores": 2.0,
+                            "longest_low_utilization_seconds": 0.0},
+            "utilization_timeline_path": str(tmp_path / "utilization.json"),
+            "stdout_path": str(tmp_path / "stdout.txt"),
+            "stderr_path": str(tmp_path / "stderr.txt"),
+            "stdout": (
+                "prefill 4 tok 1.00 ms 4000.00 tok/s | "
+                "decode 1 tok 1.00 ms 1000.00 tok/s"
+            ),
+            "stderr": "",
+            "error": "",
+        }
+
+    monkeypatch.setattr(runner, "run_command", fake_run)
+    args = SimpleNamespace(
+        token_id=100, repetitions=2, ck_cli=tmp_path / "ck-cli",
+        decode_tokens=0, run_timeout=10, threads=2,
+        min_active_core_fraction=0.5,
+    )
+    result = runner.run_cke_perf(
+        tmp_path / "runtime", 4, args, os.environ.copy(), tmp_path / "evidence"
+    )
+
+    token_file = tmp_path / "evidence" / "prompt_tokens.txt"
+    assert token_file.read_text(encoding="utf-8") == "100\n" * 4
+    assert all("--prompt-token-file" in command for command in commands)
+    assert all("--prompt-tokens" not in command for command in commands)
+    assert result["status"] == "PASS"

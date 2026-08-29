@@ -355,6 +355,7 @@ typedef struct {
     bool require_generated_abi;
     const char *prompt_once;
     const char *prompt_tokens_csv;
+    const char *prompt_tokens_file;
     bool reject_prompt_token_truncation;
     const char *system_prompt;
     const char *token_trace_json_path;
@@ -5138,6 +5139,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  --prompt, -p TEXT       Run single prompt (non-interactive)\n");
     fprintf(stderr, "  -mli, --multiline-input Accept pasted multiline turns; submit with /send or /\n");
     fprintf(stderr, "  --prompt-tokens IDS     Comma-separated prompt token IDs for tokenizer-free runtimes\n");
+    fprintf(stderr, "  --prompt-token-file PATH  Read comma/whitespace-separated prompt token IDs from a file\n");
     fprintf(stderr, "  --token-trace-json PATH Write exact generated token IDs and timings atomically\n");
     fprintf(stderr, "  --system, -S TEXT       System prompt\n");
     fprintf(stderr, "  --max-tokens, -n N      Max tokens to generate (default: %d)\n", CK_CLI_DEFAULT_MAX_TOKENS);
@@ -5237,6 +5239,9 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
         } else if (!strcmp(arg, "--prompt-tokens") && i + 1 < argc) {
             opt->prompt_tokens_csv = argv[++i];
             opt->reject_prompt_token_truncation = true;
+        } else if (!strcmp(arg, "--prompt-token-file") && i + 1 < argc) {
+            opt->prompt_tokens_file = argv[++i];
+            opt->reject_prompt_token_truncation = true;
         } else if (!strcmp(arg, "--token-trace-json") && i + 1 < argc) {
             opt->token_trace_json_path = argv[++i];
         } else if ((!strcmp(arg, "--system") || !strcmp(arg, "-S")) && i + 1 < argc) {
@@ -5303,15 +5308,22 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
     }
 
     /* Auto-discover model if --model specified or model name given as positional arg */
-    if (opt->prompt_once && opt->prompt_tokens_csv) {
-        fprintf(stderr, "Error: use either --prompt or --prompt-tokens, not both\n");
+    if (opt->prompt_once && (opt->prompt_tokens_csv || opt->prompt_tokens_file)) {
+        fprintf(stderr, "Error: use either --prompt or an explicit prompt-token input, not both\n");
         return false;
     }
-    if (opt->bridge_report_path && (opt->prompt_once || opt->prompt_tokens_csv)) {
+    if (opt->prompt_tokens_csv && opt->prompt_tokens_file) {
+        fprintf(stderr, "Error: use either --prompt-tokens or --prompt-token-file, not both\n");
+        return false;
+    }
+    if (opt->bridge_report_path &&
+        (opt->prompt_once || opt->prompt_tokens_csv || opt->prompt_tokens_file)) {
         fprintf(stderr, "Error: use either --bridge-report or --prompt/--prompt-tokens, not both\n");
         return false;
     }
-    if (opt->audio_path && (opt->bridge_report_path || opt->prompt_once || opt->prompt_tokens_csv)) {
+    if (opt->audio_path &&
+        (opt->bridge_report_path || opt->prompt_once ||
+         opt->prompt_tokens_csv || opt->prompt_tokens_file)) {
         fprintf(stderr, "Error: --audio cannot be combined with bridge or text prompt inputs\n");
         return false;
     }
@@ -5874,7 +5886,8 @@ int main(int argc, char **argv) {
     const bool has_decode_tokenizer = api.has_tokenizer && api.has_tokenizer() && api.decode_tokens;
     const bool has_encode_tokenizer = api.encode_text &&
         ((api.can_encode_text && api.can_encode_text()) || (!api.can_encode_text && has_decode_tokenizer));
-    if (!has_encode_tokenizer && !opt.prompt_tokens_csv && !opt.bridge_report_path &&
+    if (!has_encode_tokenizer && !opt.prompt_tokens_csv && !opt.prompt_tokens_file &&
+        !opt.bridge_report_path &&
         !opt.audio_path && !opt.image_tensor_f32_path) {
         fprintf(stderr, "[Tokenizer] Model cannot encode raw text with the current tokenizer mode\n");
         fprintf(stderr, "            Use --prompt-tokens, or unset CK_DISABLE_FULL_BPE_TOKENIZER when native BPE encode is supported\n");
@@ -5955,15 +5968,28 @@ int main(int argc, char **argv) {
         run_rc = run_image_tensor_file(&api, &opt);
     } else if (opt.bridge_report_path) {
         run_rc = run_bridge_report(&api, &opt, opt.bridge_report_path);
-    } else if (opt.prompt_tokens_csv) {
+    } else if (opt.prompt_tokens_csv || opt.prompt_tokens_file) {
         int32_t *ids = NULL;
         int id_count = 0;
-        if (!parse_token_id_list(opt.prompt_tokens_csv, &ids, &id_count)) {
-            fprintf(stderr, "Error: failed to parse --prompt-tokens\n");
+        char *file_tokens = NULL;
+        const char *token_text = opt.prompt_tokens_csv;
+        if (opt.prompt_tokens_file &&
+            !read_file_text(opt.prompt_tokens_file, &file_tokens, NULL)) {
+            fprintf(stderr, "Error: failed to read --prompt-token-file '%s'\n",
+                    opt.prompt_tokens_file);
             if (api.free_fn) api.free_fn();
             if (api.handle) dlclose(api.handle);
             return 1;
         }
+        if (file_tokens) token_text = file_tokens;
+        if (!parse_token_id_list(token_text, &ids, &id_count)) {
+            fprintf(stderr, "Error: failed to parse explicit prompt tokens\n");
+            free(file_tokens);
+            if (api.free_fn) api.free_fn();
+            if (api.handle) dlclose(api.handle);
+            return 1;
+        }
+        free(file_tokens);
         run_rc = run_token_ids(&api, &opt, ids, id_count, id_count);
     } else if (opt.prompt_once) {
         run_rc = run_prompt(&api, &opt, opt.prompt_once);

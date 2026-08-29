@@ -1142,7 +1142,12 @@ def run_cke_perf(
     env: dict[str, str],
     evidence_dir: Path,
 ) -> dict[str, Any]:
-    token_csv = ",".join([str(args.token_id)] * context_tokens)
+    token_file = evidence_dir / "prompt_tokens.txt"
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    token_file.write_text(
+        (f"{int(args.token_id)}\n" * context_tokens),
+        encoding="utf-8",
+    )
     samples = []
     for repetition in range(args.repetitions):
         trace_path = evidence_dir / f"cke-{repetition + 1}.trace.json"
@@ -1151,7 +1156,7 @@ def run_cke_perf(
             "--lib", str(runtime_dir / "libmodel.so"),
             "--weights", str(runtime_dir / "weights.bump"),
             "--manifest", str(runtime_dir / "weights_manifest.map"),
-            "--prompt-tokens", token_csv,
+            "--prompt-token-file", str(token_file),
             "--max-tokens", str(args.decode_tokens + 1),
             "--context", str(context_tokens + args.decode_tokens + 8),
             "--temperature", "0",
