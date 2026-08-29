@@ -7,25 +7,25 @@ What works now:
   Python authors the project spec, then hands off to `ck_run_v7.py init/train`, refreshes `ir_report.html`, and regenerates `ir_hub.html`. Run-local `dataset_viewer.html` and `attention.json` stay conditional on dataset/tokenizer artifacts.
 - [python_module_api_tiny_lm_v7.py](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/examples/python_module_api_tiny_lm_v7.py)
   Builds a tiny `ck.models.qwen3_tiny(...)` transformer graph, compiles it through `ck.v7.compile(...)`, records compile/pass sidecars, and then uses the same existing v7 materialize/train/viewer flow.
-- [01_v7_experiment_story_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb)
+- [01_v7_experiment_story_walkthrough.ipynb](../../docs/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb)
   Presenter-oriented walkthrough of the spec02 -> spec19 training arc, with direct links into the numbered notebook lane and live demo commands.
-- [02_v7_python_authoring_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb)
+- [02_v7_python_authoring_quickstart.ipynb](../../docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb)
   Notebook walkthrough for materialize + train + viewer generation, including a run artifact dashboard that links out to the rest of the v7 artifact surface.
-- [03_v7_dsl_dataset_preparation.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb)
+- [03_v7_dsl_dataset_preparation.ipynb](../../docs/notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb)
   Notebook scaffold for split-aware SVG/DSL dataset prep: workspace inspection, artifact materialization, run-local staging, `dataset_viewer.html`, and training handoff commands.
-- [04_v7_python_authoring_artifact_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb)
+- [04_v7_python_authoring_artifact_walkthrough.ipynb](../../docs/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb)
   Notebook for inspecting the run-dir artifacts, generated-runtime handoff, and viewer outputs.
-- [05_v7_python_module_api_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb)
+- [05_v7_python_module_api_quickstart.ipynb](../../docs/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb)
   Notebook walkthrough for the thin `ck.nn` graph -> `ck.v7.compile(...)` adapter and the same existing v7 viewer surface.
-- [v7_training/README.md](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/README.md)
+- [v7_training/README.md](../../docs/notebooks/python_authoring/v7_training/README.md)
   Folder index for the ordered `01 -> 05` notebook flow.
 
 Starting the notebooks:
-- From the repo root, run `.venv/bin/jupyter lab notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb`.
-- To open the whole ordered folder in JupyterLab, run `.venv/bin/jupyter lab notebooks/python_authoring/v7_training/`.
-- If you prefer the classic UI, run `.venv/bin/jupyter notebook notebooks/python_authoring/v7_training/`.
+- From the repo root, run `.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb`.
+- To open the whole ordered folder in JupyterLab, run `.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/`.
+- If you prefer the classic UI, run `.venv/bin/jupyter notebook docs/notebooks/python_authoring/v7_training/`.
 - Open them from inside the repo checkout so repo-root detection works.
-- `notebooks/v7_training/` remains available as a compatibility alias for older launch commands.
+- `docs/notebooks/v7_training/` remains available as a compatibility alias for older launch commands.
 
 Example ladder to build next:
 - `linear_regression`

@@ -1,7 +1,7 @@
 # v7 Training Notebooks
 
-This ordered lane now lives under `notebooks/python_authoring/v7_training/`.
-Use `notebooks/v7_training/` only as a compatibility alias for older docs and launch commands.
+This ordered lane now lives under `docs/notebooks/python_authoring/v7_training/`.
+Use `docs/notebooks/v7_training/` only as a compatibility alias for older docs and launch commands.
 
 
 Use this folder as the ordered notebook lane for demos, onboarding, and live walkthroughs.
@@ -22,16 +22,16 @@ Recommended reading order:
 Launch examples from the repo root:
 
 ```bash
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
 ```
 
 If you want to browse them as a set:
 
 ```bash
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/
-.venv/bin/jupyter notebook notebooks/python_authoring/v7_training/
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/
+.venv/bin/jupyter notebook docs/notebooks/python_authoring/v7_training/
 ```
