@@ -4424,6 +4424,7 @@ def main() -> None:
         )
 
         rms_eps = meta_float(
+            contract_key("attention_layer_norm_rms_epsilon"),
             contract_key("attention_layer_norm_epsilon"),
             "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
             "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
@@ -5698,7 +5699,9 @@ def main() -> None:
                     for kind in layer_kinds
                 ]
                 layer_rope_kind = [
-                    "sliding" if "sliding" in kind else "none"
+                    "none" if kind == "moe_full_attention" else (
+                        "sliding" if "sliding" in kind else "full"
+                    )
                     for kind in layer_kinds
                 ]
                 attention_widths = build_uniform_attention_width_plan(
@@ -5757,8 +5760,8 @@ def main() -> None:
                     "layer_k_head_dim": [int(head_dim)] * int(num_layers),
                     "layer_v_head_dim": [int(value_length_meta or head_dim)] * int(num_layers),
                     "layer_rotary_dim": [
-                        int(rotary_dim) if "sliding" in kind else 0
-                        for kind in layer_kinds
+                        int(rotary_dim) if rope_kind != "none" else 0
+                        for rope_kind in layer_rope_kind
                     ],
                     "layer_sliding_window": layer_sliding_window,
                     "layer_rope_kind": layer_rope_kind,

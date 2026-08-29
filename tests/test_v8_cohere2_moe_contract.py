@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -43,7 +44,6 @@ def _tiny_manifest() -> dict:
     add("token_emb", "q8_0", [512, hidden])
     for layer in range(4):
         add(f"layer.{layer}.ln1_gamma", "fp32", [hidden])
-        add(f"layer.{layer}.ln1_beta", "fp32", [hidden])
         add(f"layer.{layer}.wq", "q8_0", [attention_width, hidden])
         add(f"layer.{layer}.wk", "q8_0", [64, hidden])
         add(f"layer.{layer}.wv", "q8_0", [64, hidden])
@@ -66,11 +66,10 @@ def _tiny_manifest() -> dict:
             )
             add(
                 f"layer.{layer}.moe_expert_down",
-                "q5_k",
+                "q6_k" if layer == 2 else "q5_k",
                 [experts, hidden, expert_ff],
             )
     add("final_ln_weight", "fp32", [hidden])
-    add("final_ln_bias", "fp32", [hidden])
 
     config = {
         "model": "cohere2_moe",
@@ -96,6 +95,8 @@ def _tiny_manifest() -> dict:
         "vocab_size": 512,
         "rope_theta": 50000.0,
         "rotary_dim": 64,
+        "rms_eps": 1e-6,
+        "rms_norm_eps": 1e-6,
         "sliding_window": 16,
         "logit_scale": 1.0,
         "layer_kinds": [
@@ -131,7 +132,7 @@ def _tiny_manifest() -> dict:
                     "moe_router": "fp32",
                     "moe_expert_gate": "q4_k",
                     "moe_expert_up": "q4_k",
-                    "moe_expert_down": "q5_k",
+                    "moe_expert_down": "q6_k" if layer == 2 else "q5_k",
                 }
                 for layer in range(1, 4)
             },
@@ -165,6 +166,10 @@ class Cohere2MoeContractTests(unittest.TestCase):
             contract["tensor_map"]["blk.{L}.ffn_gate_exps.weight"],
             "layer.{L}.moe_expert_gate",
         )
+        self.assertEqual(
+            contract["metadata_map"]["attention_layer_norm_rms_epsilon"],
+            "cohere2moe.attention.layer_norm_rms_epsilon",
+        )
 
     def test_conversion_keeps_attention_output_width_distinct_from_hidden_width(self) -> None:
         plan = converter.build_uniform_attention_width_plan(
@@ -180,8 +185,9 @@ class Cohere2MoeContractTests(unittest.TestCase):
     def test_circuit_preserves_parallel_residual_and_rope_policy(self) -> None:
         circuit = build_ir_v8._load_builtin_template_doc("cohere2_moe")
         self.assertTrue(circuit["flags"]["parallel_attention_mlp"])
+        self.assertEqual(circuit["contract"]["block_contract"]["norm_type"], "rmsnorm")
         kinds = circuit["block_types"]["decoder"]["body"]["ops_by_kind"]
-        self.assertNotIn("rope_qk", kinds["dense_full_attention"])
+        self.assertIn("rope_qk", kinds["dense_full_attention"])
         self.assertNotIn("rope_qk", kinds["moe_full_attention"])
         self.assertIn("rope_qk", kinds["moe_sliding_attention"])
         for kind, ops in kinds.items():
@@ -207,10 +213,25 @@ class Cohere2MoeContractTests(unittest.TestCase):
         layer_one = [op["op"] for op in operations if op.get("layer") == 1]
         self.assertIn("mlp_gate_up", layer_zero)
         self.assertNotIn("moe_router", layer_zero)
+        self.assertIn("rope_qk", layer_zero)
         self.assertIn("moe_router", layer_one)
         self.assertIn("group_limited_topk_router", layer_one)
         self.assertIn("moe_swiglu_expert_mlp", layer_one)
         self.assertIn("rope_qk", layer_one)
+
+        providers = {
+            op["layer"]: op["kernel"]
+            for op in operations
+            if op["op"] == "moe_swiglu_expert_mlp"
+        }
+        self.assertEqual(
+            providers,
+            {
+                1: "moe_swiglu_expert_forward_q4k_q5k",
+                2: "moe_swiglu_expert_forward_q4k_q6k",
+                3: "moe_swiglu_expert_forward_q4k_q5k",
+            },
+        )
 
     def test_quantized_dense_prefix_consumes_planner_owned_q8_inputs(self) -> None:
         manifest = _tiny_manifest()
@@ -251,8 +272,76 @@ class Cohere2MoeContractTests(unittest.TestCase):
         k_arg = next(arg for arg in out_proj["args"] if arg["name"] == "K")
         self.assertEqual(k_arg["expr"], str(manifest["config"]["attn_out_dim"]))
         out_quant = layer_zero["quantize_out_proj_input"]
+        quant_input = next(arg for arg in out_quant["args"] if arg["name"] == "x")
+        quant_output = next(arg for arg in out_quant["args"] if arg["name"] == "y")
+        self.assertEqual(quant_input["buffer_ref"], "attn_scratch")
+        self.assertEqual(quant_output["buffer_ref"], "layer_input")
+        self.assertNotEqual(quant_input["buffer_ref"], quant_output["buffer_ref"])
         quant_k = next(arg for arg in out_quant["args"] if arg["name"] == "k")
         self.assertEqual(quant_k["expr"], str(manifest["config"]["attn_out_dim"]))
+
+        down_quant = layer_zero["quantize_mlp_down_input"]
+        down_input = next(arg for arg in down_quant["args"] if arg["name"] == "x")
+        down_output = next(arg for arg in down_quant["args"] if arg["name"] == "y")
+        self.assertEqual(down_input["buffer_ref"], "mlp_scratch")
+        self.assertEqual(down_output["buffer_ref"], "layer_input")
+        self.assertNotEqual(down_input["buffer_ref"], down_output["buffer_ref"])
+
+    def test_decode_parallel_branch_has_a_live_attention_output(self) -> None:
+        manifest = _tiny_manifest()
+        registry = build_ir_v8.load_kernel_registry()
+        ir1 = build_ir_v8.build_ir1_direct(
+            manifest,
+            ROOT / "tests" / "cohere2_moe_manifest.synthetic.json",
+            mode="decode",
+        )
+        lower1 = build_ir_v8.generate_ir_lower_1(ir1, registry, manifest, "decode")
+        layout = build_ir_v8.generate_memory_layout(
+            lower1,
+            manifest,
+            registry,
+            mode="decode",
+            context_len=8,
+        )
+        lower2 = build_ir_v8.generate_ir_lower_2(
+            lower1,
+            layout,
+            manifest,
+            registry,
+            mode="decode",
+        )
+        call_ir = build_ir_v8.generate_ir_lower_3(lower2, "decode")
+        layer_zero = [op for op in call_ir["operations"] if op.get("layer") == 0]
+
+        out_proj = next(op for op in layer_zero if op["op"] == "out_proj")
+        out_arg = next(arg for arg in out_proj["args"] if arg["name"] == "y")
+        self.assertEqual(out_arg["buffer_ref"], "layer_output")
+
+        residuals = [op for op in layer_zero if op["op"] == "residual_add"]
+        attention_arg = next(arg for arg in residuals[-1]["args"] if arg["name"] == "b")
+        self.assertEqual(attention_arg["buffer_ref"], "layer_output")
+
+    def test_explicit_unwritten_branch_is_rejected_before_lowering(self) -> None:
+        manifest = _tiny_manifest()
+        manifest["template"] = copy.deepcopy(manifest["template"])
+        dense_ops = manifest["template"]["block_types"]["decoder"]["body"][
+            "ops_by_kind"
+        ]["dense_full_attention"]
+        out_proj = next(
+            item for item in dense_ops
+            if isinstance(item, dict) and item.get("op") == "out_proj"
+        )
+        out_proj["graph_slots"]["outputs"]["C"] = "misspelled_attention_output"
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "explicit graph input reads an uninitialized slot",
+        ):
+            build_ir_v8.build_ir1_direct(
+                manifest,
+                ROOT / "tests" / "cohere2_moe_manifest.synthetic.json",
+                mode="decode",
+            )
 
     def test_compiler_and_codegen_remain_model_name_free(self) -> None:
         for relative in (

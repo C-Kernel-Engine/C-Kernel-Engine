@@ -74,7 +74,7 @@
     "attention_contract": {
       "causal": true,
       "rope_layout": "split",
-      "rope_type": "rope_on_sliding_layers_only",
+      "rope_type": "rope_on_dense_prefix_and_sliding_layers",
       "qk_norm": false,
       "kv_layout": "layer_major_kv_cache",
       "attn_variant": "hybrid_sliding_attention",
@@ -82,7 +82,7 @@
       "sliding_window_config_key": "sliding_window"
     },
     "block_contract": {
-      "norm_type": "layernorm",
+      "norm_type": "rmsnorm",
       "body_type": "parallel_attention_dense_prefix_then_routed_moe",
       "activation": "swiglu",
       "dense_mlp_formula": "layernorm(x) -> gate/up -> SwiGLU -> down",
@@ -91,7 +91,7 @@
       "parallel_branches": ["attention", "mlp_or_moe"]
     },
     "logits_contract": {
-      "final_norm": "layernorm",
+      "final_norm": "rmsnorm",
       "lm_head": "weight_tying",
       "scale_config_key": "logit_scale",
       "logits_layout": "last"
@@ -104,7 +104,7 @@
     "runtime_invariants": {"required_call_args": {}}
   },
   "kernels": {
-    "layernorm": "layernorm_fp32_exact",
+    "rmsnorm": "rmsnorm_forward_llama_production",
     "rope_init": "rope_precompute_cache_llama_cpu",
     "rope_qk": "rope_forward_qk_pairwise",
     "rope_qk_decode": "rope_forward_qk_pairwise_llama_cpu",
@@ -113,7 +113,6 @@
     "attn_sliding": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
     "attn_sliding_decode": "attention_forward_decode_head_major_gqa_flash_sliding",
     "group_limited_topk_router": "group_limited_topk_router_sigmoid_f32",
-    "moe_swiglu_expert_mlp": "moe_swiglu_expert_forward_q4k_q5k",
     "final_logit_scale": "final_logit_scale_f32"
   },
   "sequence": ["decoder"],
@@ -128,22 +127,23 @@
         "ops_by_kind": {
           "dense_full_attention": [
             {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
-            {"op":"layernorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
             "qkv_proj",
+            "rope_qk",
             "attn",
-            {"op":"out_proj","graph_slots":{"inputs":{"A":"layer_input"},"outputs":{"C":"attention_output"}}},
-            {"op":"mlp_gate_up","graph_slots":{"inputs":{"A":"layer_input"},"outputs":{"C":"mlp_scratch"}}},
+            {"op":"out_proj","graph_slots":{"inputs":{"A":"attn_scratch"},"outputs":{"C":"attention_output"}}},
+            {"op":"mlp_gate_up","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
             "silu_mul",
-            {"op":"mlp_down","graph_slots":{"inputs":{"A":"layer_input"},"outputs":{"C":"main_stream"}}},
+            {"op":"mlp_down","graph_slots":{"inputs":{"A":"mlp_scratch"},"outputs":{"C":"main_stream"}}},
             {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_residual"},"outputs":{"out":"main_stream"}}},
             {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_output"},"outputs":{"out":"main_stream"}}}
           ],
           "moe_full_attention": [
             {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
-            {"op":"layernorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
             "qkv_proj",
             "attn",
-            {"op":"out_proj","graph_slots":{"inputs":{"A":"layer_input"},"outputs":{"C":"attention_output"}}},
+            {"op":"out_proj","graph_slots":{"inputs":{"A":"attn_scratch"},"outputs":{"C":"attention_output"}}},
             {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
             {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
             {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"main_stream"}}},
@@ -152,11 +152,11 @@
           ],
           "moe_sliding_attention": [
             {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
-            {"op":"layernorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"rmsnorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
             "qkv_proj",
             "rope_qk",
             "attn_sliding",
-            {"op":"out_proj","graph_slots":{"inputs":{"A":"layer_input"},"outputs":{"C":"attention_output"}}},
+            {"op":"out_proj","graph_slots":{"inputs":{"A":"attn_scratch"},"outputs":{"C":"attention_output"}}},
             {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
             {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
             {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"main_stream"}}},
@@ -165,7 +165,7 @@
           ]
         }
       },
-      "footer": ["layernorm", "weight_tying", "logits", "final_logit_scale"]
+      "footer": ["rmsnorm", "weight_tying", "logits", "final_logit_scale"]
     }
   }
 }
