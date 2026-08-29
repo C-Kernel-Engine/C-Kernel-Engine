@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / 
 
 import pytest
 
+import ck_serve_runtime_v8
 from ck_serve_v8 import _build_arg_parser, _build_runtime, main
 
 HF_MODEL = "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"
@@ -183,7 +184,7 @@ def test_build_runtime_constructs_ck_run_pipeline_command(monkeypatch):
         result = type("P", (), {"returncode": 0, "stderr": "", "stdout": ""})()
         return result
 
-    monkeypatch.setattr("ck_serve_v8.subprocess.run", fake_run)
+    monkeypatch.setattr("ck_serve_runtime_v8.subprocess.run", fake_run)
     run_dir = _build_runtime(
         HF_MODEL,
         Path("/tmp/run"),
@@ -220,7 +221,7 @@ def test_build_runtime_raises_on_failure(monkeypatch):
     def fake_run(cmd, **kwargs):
         return result
 
-    monkeypatch.setattr("ck_serve_v8.subprocess.run", fake_run)
+    monkeypatch.setattr("ck_serve_runtime_v8.subprocess.run", fake_run)
     with pytest.raises(RuntimeError, match="boom"):
         _build_runtime(
             HF_MODEL,
@@ -237,6 +238,14 @@ def test_build_runtime_raises_on_failure(monkeypatch):
             False,
             None,
         )
+
+
+def test_package_import_reuses_runtime_module():
+    from version.v8.scripts import ck_serve_runtime_v8 as package_runtime
+    from version.v8.scripts import ck_serve_v8 as package_server
+
+    assert package_server._build_runtime is package_runtime._build_runtime
+    assert package_server._resolve_run_dir is package_runtime._resolve_run_dir
 
 
 def test_parser_thinking_mode_flag():

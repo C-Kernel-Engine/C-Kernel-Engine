@@ -30,7 +30,6 @@ import json
 import os
 import queue
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -40,22 +39,30 @@ from collections.abc import Sequence, Callable
 from pathlib import Path
 from typing import Any
 
-import ck_run_v8
-
-
+# SCRIPTS_DIR/PROJECT_ROOT must be on sys.path before importing ck_* helpers
+# (supports both ``python version/v8/scripts/ck_serve_v8.py`` and
+# ``python -m version.v8.scripts.ck_serve_v8`` / pytest shims).
 SCRIPTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPTS_DIR.parents[2]
 BUILD_DIR = PROJECT_ROOT / "build"
 SESSION_LIB_PATH = BUILD_DIR / "libck_session_v8.so"
 
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+for _p in (str(SCRIPTS_DIR), str(PROJECT_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-C_GREEN = "\033[38;5;114m"
-C_ORANGE = "\033[38;5;208m"
-C_RED = "\033[38;5;203m"
-C_GRAY = "\033[38;5;242m"
-C_RESET = "\033[0m"
+if __package__:
+    from . import ck_serve_runtime_v8
+else:
+    import ck_serve_runtime_v8
+
+# Reuse color/logging constants from the runtime module so both entrypoints
+# share identical console styling.
+C_GREEN = ck_serve_runtime_v8.C_GREEN
+C_ORANGE = ck_serve_runtime_v8.C_ORANGE
+C_RED = ck_serve_runtime_v8.C_RED
+C_GRAY = ck_serve_runtime_v8.C_GRAY
+C_RESET = ck_serve_runtime_v8.C_RESET
 
 CK_SESSION_REQUEST_RAW_PROMPT = 1 << 0
 
@@ -133,18 +140,11 @@ except ImportError:
     _SCHEMAS_AVAILABLE = False
 
 
-def log(msg: str, color: str = "") -> None:
-    if color:
-        print(f"{color}{msg}{C_RESET}")
-    else:
-        print(msg)
+log = ck_serve_runtime_v8.log
+log_error = ck_serve_runtime_v8.log_error
 
 
-def log_error(msg: str) -> None:
-    print(f"{C_RED}Error:{C_RESET} {msg}", file=sys.stderr)
-
-
-def _detect_threads() -> int | None:
+def _detect_threads() -> int:
     try:
         if hasattr(os, "sched_getaffinity"):
             return max(1, len(os.sched_getaffinity(0)))
@@ -634,11 +634,19 @@ def _performance_profile(result: dict[str, Any]) -> dict[str, Any]:
         "prompt_tokens": prompt_tokens,
         "generated_tokens": generated_tokens,
         "prefill_ms": prefill_ms,
-        "prefill_ms_per_token": round(prefill_ms / prompt_tokens, 2) if prompt_tokens > 0 else 0.0,
-        "prefill_tokens_per_sec": round(1000 * prompt_tokens / prefill_ms, 2) if prefill_ms > 0 else 0.0,
+        "prefill_ms_per_token": round(prefill_ms / prompt_tokens, 2)
+        if prompt_tokens > 0
+        else 0.0,
+        "prefill_tokens_per_sec": round(1000 * prompt_tokens / prefill_ms, 2)
+        if prefill_ms > 0
+        else 0.0,
         "decode_ms": decode_ms,
-        "decode_ms_per_token": round(decode_ms / generated_tokens, 2) if generated_tokens > 0 else 0.0,
-        "decode_tokens_per_sec": round(1000 * generated_tokens / decode_ms, 2) if decode_ms > 0 else 0.0,
+        "decode_ms_per_token": round(decode_ms / generated_tokens, 2)
+        if generated_tokens > 0
+        else 0.0,
+        "decode_tokens_per_sec": round(1000 * generated_tokens / decode_ms, 2)
+        if decode_ms > 0
+        else 0.0,
         "total_ms": round(prefill_ms + decode_ms, 2),
         "stop_reason": _stop_reason_name(result.get("stop_reason")),
     }
@@ -663,6 +671,7 @@ def _log_performance(model: str, perf: dict[str, Any] | None) -> None:
 
 _CIRCUITS_DIR = PROJECT_ROOT / "version" / "v8" / "circuits"
 
+
 def _load_builtin_chat_contract(
     template_name: str | None,
     *,
@@ -683,7 +692,9 @@ def _load_builtin_chat_contract(
             doc = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    contract_doc = doc.get("contract") if isinstance(doc.get("contract"), dict) else None
+    contract_doc = (
+        doc.get("contract") if isinstance(doc.get("contract"), dict) else None
+    )
     if isinstance(contract_doc, dict):
         chat_contract = contract_doc.get("chat_contract")
         if isinstance(chat_contract, dict):
@@ -768,10 +779,16 @@ def _format_prompt_with_chat_contract(
     if not isinstance(contract, dict):
         return str(prompt or "")
 
-    role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
+    role_labels = (
+        contract.get("role_labels")
+        if isinstance(contract.get("role_labels"), dict)
+        else {}
+    )
     turn_prefix = str(contract.get("turn_prefix") or "")
     turn_suffix = str(contract.get("turn_suffix") or "")
-    system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
+    system_prompt_mode = (
+        str(contract.get("system_prompt_mode") or "disabled").strip().lower()
+    )
     system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
     default_system_prompt = str(contract.get("default_system_prompt") or "")
     inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
@@ -781,12 +798,16 @@ def _format_prompt_with_chat_contract(
         for marker in list(contract.get("last_user_prefix_suppression_markers") or [])
         if str(marker or "").strip()
     ]
-    assistant_generation_prefix, last_user_prefix = _resolve_contract_thinking_overrides(contract, thinking_mode)
+    assistant_generation_prefix, last_user_prefix = (
+        _resolve_contract_thinking_overrides(contract, thinking_mode)
+    )
 
     user_text = str(prompt or "")
     if last_user_prefix:
         lowered = user_text.lower()
-        if last_user_prefix.lower() not in lowered and not any(marker in lowered for marker in suppression_markers):
+        if last_user_prefix.lower() not in lowered and not any(
+            marker in lowered for marker in suppression_markers
+        ):
             user_text = f"{last_user_prefix}{user_text}"
 
     system_text = str(system_prompt or "")
@@ -794,7 +815,11 @@ def _format_prompt_with_chat_contract(
         system_text = default_system_prompt
 
     if system_text and system_prompt_mode == "prepend_first_user":
-        user_text = f"{system_text}{system_prompt_separator}{user_text}" if user_text else system_text
+        user_text = (
+            f"{system_text}{system_prompt_separator}{user_text}"
+            if user_text
+            else system_text
+        )
         system_text = ""
 
     def _render_turn(role: str, content: str) -> str:
@@ -892,8 +917,12 @@ def create_app(
     def _prepare_request(body):
         _validate_request(body)
         prompt = _extract_prompt(body)
-        tok_limit = body.max_output_tokens if body.max_output_tokens is not None else max_tokens
-        temperature_eff = body.temperature if body.temperature is not None else temperature
+        tok_limit = (
+            body.max_output_tokens if body.max_output_tokens is not None else max_tokens
+        )
+        temperature_eff = (
+            body.temperature if body.temperature is not None else temperature
+        )
         top_p_eff = body.top_p if body.top_p is not None else top_p
         effective_flags = flags
 
@@ -1023,7 +1052,9 @@ def create_app(
         _store_response(response_id, resp)
         return resp
 
-    def stream_events(body, prompt, *, max_tokens, temperature, top_p, effective_flags=None):
+    def stream_events(
+        body, prompt, *, max_tokens, temperature, top_p, effective_flags=None
+    ):
         think_enabled = body.reasoning is not None
         response_id = f"resp_{uuid.uuid4().hex[:24]}"
         message_id = f"msg_{uuid.uuid4().hex[:24]}"
@@ -1094,7 +1125,10 @@ def create_app(
                         )
                 terminal_event = ("done", result)
             except SessionBusyError:
-                terminal_event = ("busy", "Session busy: another request is in progress.")
+                terminal_event = (
+                    "busy",
+                    "Session busy: another request is in progress.",
+                )
             except Exception as e:
                 terminal_event = ("error", str(e))
             finally:
@@ -1420,7 +1454,9 @@ def create_app(
             if response is None:
                 raise HTTPException(status_code=404, detail="Response not found")
             if response["status"] != ResponseStatus.in_progress:
-                raise HTTPException(status_code=409, detail="Response is not in progress")
+                raise HTTPException(
+                    status_code=409, detail="Response is not in progress"
+                )
         session.cancel()
         with response_store_lock:
             response["status"] = ResponseStatus.cancelled
@@ -1444,86 +1480,16 @@ def create_app(
 
 
 # -----------------------------------------------------------------------------
-# CLI
+# CLI — runtime helpers re-exported from ck_serve_runtime_v8 (model-ready side)
 # -----------------------------------------------------------------------------
 
-
-def _ensure_native_session_lib() -> None:
-    if SESSION_LIB_PATH.is_file():
-        return
-    log("Building native session library (make ck-session-v8) ...")
-    subprocess.run(["make", "ck-session-v8"], cwd=str(PROJECT_ROOT), check=True)
-
-
-def _resolve_run_dir(model: str, run_dir: str | None) -> Path:
-    if run_dir:
-        return Path(run_dir).expanduser().resolve()
-    input_type, info = ck_run_v8.detect_input_type(model)
-    if input_type == "hf_gguf":
-        return ck_run_v8.CACHE_DIR / info["repo_id"].replace("/", "--")
-    if input_type == "hf_id":
-        return ck_run_v8.CACHE_DIR / info["model_id"].replace("/", "--")
-    return Path(info["path"])
-
-
-def _build_runtime(
-    model: str,
-    run_dir: Path,
-    ctx_len: int | None,
-    force_convert: bool,
-    force_compile: bool,
-    force_download: bool,
-    logits_layout: str | None,
-    chat_template: str | None,
-    no_chat_template: bool,
-    allow_raw_prompt: bool,
-    python_tokenizer: bool,
-    profile: bool,
-    gemm_schedule: str | None,
-) -> Path:
-    args = [
-        "run",
-        model,
-        "--run",
-        str(run_dir),
-        "--generate-only",
-    ]
-    if ctx_len:
-        args += ["--context-len", str(int(ctx_len))]
-    if force_convert:
-        args.append("--force-convert")
-    if force_compile:
-        args.append("--force-compile")
-    if force_download:
-        args.append("--force-download")
-    if logits_layout:
-        args.extend(["--logits-layout", logits_layout])
-    if no_chat_template:
-        args.append("--no-chat-template")
-    elif chat_template:
-        args.extend(["--chat-template", chat_template])
-    if allow_raw_prompt:
-        args.append("--allow-raw-prompt")
-    if python_tokenizer:
-        args.append("--python-tokenizer")
-    if profile:
-        args.append("--profile")
-    if gemm_schedule:
-        args.extend(["--gemm-schedule", gemm_schedule])
-
-    log("Building runtime via ck_run pipeline ...", C_ORANGE)
-    proc = subprocess.run(
-        [sys.executable, str(SCRIPTS_DIR / "ck_run_v8.py"), *args],
-        cwd=str(PROJECT_ROOT),
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            "ck_run pipeline failed to build the runtime.\n"
-            + (proc.stderr or proc.stdout or "").strip()
-        )
-    return run_dir
+# Server owns the HTTP/session lifecycle; artifact preparation (download →
+# convert → build IR → codegen → compile libmodel.so) lives in
+# ck_serve_runtime_v8. Re-export here for backward compat so
+# ``from ck_serve_v8 import _build_runtime`` keeps working.
+_ensure_native_session_lib = ck_serve_runtime_v8._ensure_native_session_lib
+_resolve_run_dir = ck_serve_runtime_v8._resolve_run_dir
+_build_runtime = ck_serve_runtime_v8._build_runtime
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -1535,23 +1501,76 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("model", help="GGUF source or pre-built runtime directory")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--model-name", default="ck-v8", help="Model string reported in responses")
-    parser.add_argument("--run", dest="run_dir", default=None, help="Explicit run directory")
-    parser.add_argument("--no-build", action="store_true", help="Skip building; require an existing run directory")
+    parser.add_argument(
+        "--model-name", default="ck-v8", help="Model string reported in responses"
+    )
+    parser.add_argument(
+        "--run", dest="run_dir", default=None, help="Explicit run directory"
+    )
+    parser.add_argument(
+        "--no-build",
+        action="store_true",
+        help="Skip building; require an existing run directory",
+    )
 
-    sampler = parser.add_argument_group("sampling (server-level defaults; request body overrides)")
-    sampler.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature")
-    sampler.add_argument("--top-p", type=float, default=1.0, help="Top-p nucleus sampling (default: 1.0)")
-    sampler.add_argument("--max-tokens", type=int, default=512, help="Default max output tokens when the request omits max_output_tokens")
-    sampler.add_argument("--top-k", type=int, default=None, help="Top-k sampling size (accepted for parity; NOT applied by the native ABI)")
-    sampler.add_argument("--min-p", type=float, default=None, help="Min-p filter as fraction of max prob (accepted for parity; NOT applied by the native ABI)")
-    sampler.add_argument("--repeat-penalty", type=float, default=None, help="Repeat penalty >1.0 reduces looping (accepted for parity; NOT applied by the native ABI)")
-    sampler.add_argument("--repeat-last-n", type=int, default=None, help="Window size for repeat penalty (accepted for parity; NOT applied by the native ABI)")
-    sampler.add_argument("--no-repeat-ngram-size", type=int, default=None, help="Block tokens that repeat an n-gram of this size (accepted for parity; NOT applied by the native ABI)")
+    sampler = parser.add_argument_group(
+        "sampling (server-level defaults; request body overrides)"
+    )
+    sampler.add_argument(
+        "--temperature", type=float, default=0.7, help="Sampling temperature"
+    )
+    sampler.add_argument(
+        "--top-p", type=float, default=1.0, help="Top-p nucleus sampling (default: 1.0)"
+    )
+    sampler.add_argument(
+        "--max-tokens",
+        type=int,
+        default=512,
+        help="Default max output tokens when the request omits max_output_tokens",
+    )
+    sampler.add_argument(
+        "--top-k",
+        type=int,
+        default=None,
+        help="Top-k sampling size (accepted for parity; NOT applied by the native ABI)",
+    )
+    sampler.add_argument(
+        "--min-p",
+        type=float,
+        default=None,
+        help="Min-p filter as fraction of max prob (accepted for parity; NOT applied by the native ABI)",
+    )
+    sampler.add_argument(
+        "--repeat-penalty",
+        type=float,
+        default=None,
+        help="Repeat penalty >1.0 reduces looping (accepted for parity; NOT applied by the native ABI)",
+    )
+    sampler.add_argument(
+        "--repeat-last-n",
+        type=int,
+        default=None,
+        help="Window size for repeat penalty (accepted for parity; NOT applied by the native ABI)",
+    )
+    sampler.add_argument(
+        "--no-repeat-ngram-size",
+        type=int,
+        default=None,
+        help="Block tokens that repeat an n-gram of this size (accepted for parity; NOT applied by the native ABI)",
+    )
 
     stop = parser.add_argument_group("stop markers (honored via the token callback)")
-    stop.add_argument("--stop-on-text", action="append", default=[], help="Stop generation when this decoded text marker appears (repeatable)")
-    stop.add_argument("--stop-at-eos", action="store_true", help="Stop generation when '<eos>' appears in decoded text")
+    stop.add_argument(
+        "--stop-on-text",
+        action="append",
+        default=[],
+        help="Stop generation when this decoded text marker appears (repeatable)",
+    )
+    stop.add_argument(
+        "--stop-at-eos",
+        action="store_true",
+        help="Stop generation when '<eos>' appears in decoded text",
+    )
 
     reasoning = parser.add_argument_group("reasoning / thinking mode")
     reasoning.add_argument(
@@ -1562,22 +1581,25 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
 
     display = parser.add_argument_group("metrics / visualizer")
-    display.add_argument("--stats", action="store_true", default=True, help="Print per-request performance stats (default: on)")
-    display.add_argument("--no-stats", action="store_false", dest="stats", help="Disable per-request performance stats")
-    display.add_argument("--no-viz", action="store_true", help="Disable the live HTML visualizer page at /viz")
+    display.add_argument(
+        "--stats",
+        action="store_true",
+        default=True,
+        help="Print per-request performance stats (default: on)",
+    )
+    display.add_argument(
+        "--no-stats",
+        action="store_false",
+        dest="stats",
+        help="Disable per-request performance stats",
+    )
+    display.add_argument(
+        "--no-viz",
+        action="store_true",
+        help="Disable the live HTML visualizer page at /viz",
+    )
 
-    build = parser.add_argument_group("build / tokenizer flags (mirrors cks-v8-run run)")
-    build.add_argument("--context-len", type=int, default=None)
-    build.add_argument("--logits-layout", choices=["auto", "last", "full"], default=None)
-    build.add_argument("--chat-template", default=None, help="Chat template to compile in")
-    build.add_argument("--no-chat-template", action="store_true")
-    build.add_argument("--allow-raw-prompt", action="store_true", help="Forward to the build; with --no-chat-template also set the RAW_PROMPT request flag")
-    build.add_argument("--python-tokenizer", action="store_true")
-    build.add_argument("--profile", action="store_true", help="Emit CK_PROFILE timing wrappers")
-    build.add_argument("--gemm-schedule", choices=("auto", "static", "dynamic"), default=None)
-    build.add_argument("--force-download", action="store_true")
-    build.add_argument("--force-convert", action="store_true")
-    build.add_argument("--force-compile", action="store_true")
+    ck_serve_runtime_v8.add_build_args(parser)
     return parser
 
 
@@ -1671,7 +1693,10 @@ def main(argv: list[str] | None = None) -> int:
             "  python3 -m pip install -r server/requirements.txt"
         ) from exc
 
-    log(f"Serving on http://{args.host}:{args.port}  (mode=live, inference=True)", C_GREEN)
+    log(
+        f"Serving on http://{args.host}:{args.port}  (mode=live, inference=True)",
+        C_GREEN,
+    )
     if not args.no_viz:
         log(f"Visualizer: http://{args.host}:{args.port}/viz", C_GREEN)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
