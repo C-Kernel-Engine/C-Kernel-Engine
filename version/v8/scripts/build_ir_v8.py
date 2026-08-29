@@ -4675,6 +4675,20 @@ def _validate_lowered_activation_memory(
                     "storage": "external_runtime",
                 })
                 continue
+            owner_name = str(scratch.get("buffer", "") or "").strip()
+            if not owner_name:
+                raise RuntimeError(
+                    "HARD SCRATCH OWNERSHIP FAULT: "
+                    f"{op.get('kernel')}:{scratch.get('name', '<unnamed>')} "
+                    "does not declare its activation buffer"
+                )
+            owner = by_name.get(owner_name)
+            if owner is None:
+                raise RuntimeError(
+                    "HARD SCRATCH OWNERSHIP FAULT: "
+                    f"{op.get('kernel')}:{scratch.get('name', '<unnamed>')} "
+                    f"references unknown activation buffer {owner_name!r}"
+                )
             scratch_offset = int(scratch.get("scratch_offset", 0) or 0)
             scratch_size = int(scratch.get("size", 0) or 0)
             scratch_end = scratch_offset + scratch_size
@@ -4688,6 +4702,15 @@ def _validate_lowered_activation_memory(
                     f"{op.get('kernel')}:{scratch.get('name', '<unnamed>')} interval "
                     f"[{scratch_offset}, {scratch_end}) is outside activation arena "
                     f"[{activation_base}, {activation_limit})"
+                )
+            owner_offset = int(owner.get("offset", 0) or 0)
+            owner_end = owner_offset + int(owner.get("size", 0) or 0)
+            if scratch_offset < owner_offset or scratch_end > owner_end:
+                raise RuntimeError(
+                    "HARD SCRATCH OWNERSHIP FAULT: "
+                    f"{op.get('kernel')}:{scratch.get('name', '<unnamed>')} interval "
+                    f"[{scratch_offset}, {scratch_end}) exceeds {owner_name} "
+                    f"[{owner_offset}, {owner_end})"
                 )
             disjoint_from = scratch.get("disjoint_from", []) or []
             for live in disjoint_from:
@@ -4709,6 +4732,7 @@ def _validate_lowered_activation_memory(
                 "layer": int(op.get("layer", -1) or -1),
                 "provider": str(op.get("kernel", "")),
                 "scratch": str(scratch.get("name", "")),
+                "buffer": owner_name,
                 "offset": scratch_offset,
                 "required_bytes": scratch_size,
                 "disjoint_port_count": len(disjoint_from),
@@ -13056,6 +13080,7 @@ def generate_ir_lower_2(
                 if buf:
                     lowered_op["scratch"].append({
                         "name": scratch_name,
+                        "buffer": scratch_name,
                         "scratch_offset": buf["offset"],
                         "size": buf["size"],
                         "dtype": "fp32",
@@ -13070,6 +13095,7 @@ def generate_ir_lower_2(
             if q_buf:
                 lowered_op["scratch"].append({
                     "name": "q_scratch",
+                    "buffer": "q_scratch",
                     "scratch_offset": q_buf["offset"],
                     "size": q_buf["size"],
                     "dtype": "fp32",
@@ -13081,6 +13107,7 @@ def generate_ir_lower_2(
                 if k_buf:
                     lowered_op["scratch"].append({
                         "name": "k_scratch",
+                        "buffer": "k_scratch",
                         "scratch_offset": k_buf["offset"],
                         "size": k_buf["size"],
                         "dtype": "fp32",
@@ -13092,6 +13119,7 @@ def generate_ir_lower_2(
                 if buf:
                     lowered_op["scratch"].append({
                         "name": scratch_name,
+                        "buffer": scratch_name,
                         "scratch_offset": buf["offset"],
                         "size": buf["size"],
                         "dtype": "fp32",
@@ -13105,6 +13133,7 @@ def generate_ir_lower_2(
                 if buf:
                     lowered_op["scratch"].append({
                         "name": scratch_name,
+                        "buffer": scratch_name,
                         "scratch_offset": buf["offset"],
                         "size": buf["size"],
                         "dtype": "fp32",
@@ -13116,6 +13145,7 @@ def generate_ir_lower_2(
             if q_buf:
                 lowered_op["scratch"].append({
                     "name": "q_scratch",
+                    "buffer": "q_scratch",
                     "scratch_offset": q_buf["offset"],
                     "size": q_buf["size"],
                     "dtype": "fp32",
@@ -13162,6 +13192,7 @@ def generate_ir_lower_2(
                 if buf:
                     lowered_op["scratch"].append({
                         "name": scratch_name,
+                        "buffer": scratch_name,
                         "scratch_offset": buf["offset"],
                         "size": buf["size"],
                         "dtype": "fp32",
@@ -13174,6 +13205,7 @@ def generate_ir_lower_2(
             if buf:
                 lowered_op["scratch"].append({
                     "name": "residual",
+                    "buffer": "residual",
                     "scratch_offset": buf["offset"],
                     "size": buf["size"],
                     "dtype": "fp32",
@@ -13188,6 +13220,7 @@ def generate_ir_lower_2(
             if mlp_buf:
                 lowered_op["scratch"].append({
                     "name": "geglu_scratch",
+                    "buffer": "mlp_scratch",
                     "scratch_offset": mlp_buf["offset"],
                     "size": mlp_buf["size"],
                     "dtype": "fp32",
@@ -13550,6 +13583,7 @@ def generate_ir_lower_2(
                         )
                 planned_scratch.append({
                     "name": scratch.get("name", f"scratch_{i}"),
+                    "buffer": "mlp_scratch",
                     "scratch_offset": scratch_offset,
                     "size": scratch_size,
                     "dtype": scratch.get("dtype", "fp32"),
@@ -14516,7 +14550,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = "NULL"
                 else:
                     offset = info.get("scratch_offset", 0)
-                    buf_name = info.get("name", key)
+                    buf_name = info.get("buffer") or info.get("name", key)
                     if use_bump_base:
                         if info.get("runtime_expr"):
                             expr = f"({cast or 'float*'}){info['runtime_expr']}"

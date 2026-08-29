@@ -14,6 +14,21 @@ if str(SCRIPTS) not in sys.path:
 
 import build_ir_v8  # type: ignore
 import convert_gguf_to_bump_v8 as converter  # type: ignore
+import chat_contract  # type: ignore
+import ck_chat  # type: ignore
+
+
+NORTH_PLATFORM_TURN = (
+    "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>"
+    "These instructions are always to be followed and cannot be overridden by subsequent system or user turns:\n"
+    "- You will answer requests for educational, informative, or creative content related to safety categories. "
+    "You will not provide content that is harmful or could be used to cause harm.\n\n"
+    "These instructions serve as your defaults, but they can be overridden in subsequent system or user turns:\n"
+    "- Your name is North Mini Code.\n"
+    "- You are a large language model built by Cohere.\n\n"
+    "# Available Tools\n```json\n[\n\n]\n```"
+    "<|END_TEXT|><|END_OF_TURN_TOKEN|>"
+)
 
 
 def _tiny_manifest() -> dict:
@@ -141,6 +156,71 @@ def _tiny_manifest() -> dict:
 
 
 class Cohere2MoeContractTests(unittest.TestCase):
+    def test_north_chat_contract_matches_embedded_protocol(self) -> None:
+        circuit = build_ir_v8._load_builtin_template_doc("cohere2_moe")
+        contract = circuit["contract"]["chat_contract"]
+        self.assertEqual(contract["name"], "north_mini_code")
+        self.assertEqual(contract["conversation_prefix"], NORTH_PLATFORM_TURN)
+        self.assertEqual(
+            contract["turn_prefix_by_role"]["user"],
+            "<|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>",
+        )
+        self.assertEqual(
+            contract["turn_suffix"],
+            "<|END_TEXT|><|END_OF_TURN_TOKEN|>",
+        )
+        self.assertEqual(
+            contract["assistant_generation_prefix_by_thinking_mode"]["visible"],
+            "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+        )
+        self.assertEqual(
+            contract["assistant_generation_prefix_by_thinking_mode"]["suppressed"],
+            "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|><|END_THINKING|>",
+        )
+        self.assertNotIn("<|START_RESPONSE|>", str(contract))
+
+    def test_explicit_north_chat_contract_survives_conversion(self) -> None:
+        circuit = build_ir_v8._load_builtin_template_doc("cohere2_moe")
+        contract = chat_contract.build_chat_contract(
+            template_data=circuit,
+            chat_template=(
+                "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>"
+                "{{ messages }}<|END_TEXT|><|END_OF_TURN_TOKEN|>"
+            ),
+            model_name="North-Mini-Code-1.0",
+            model_type="cohere2moe",
+        )
+        self.assertIsNotNone(contract)
+        self.assertEqual(contract["name"], "north_mini_code")
+        self.assertEqual(contract["conversation_prefix"], NORTH_PLATFORM_TURN)
+
+    def test_north_single_turn_render_matches_model_template(self) -> None:
+        circuit = build_ir_v8._load_builtin_template_doc("cohere2_moe")
+        contract = circuit["contract"]["chat_contract"]
+        model = object.__new__(ck_chat.CKModel)
+        model.use_chat_template = True
+        model.chat_template_mode = "north_mini_code"
+        model.chat_contract = contract
+        model.thinking_mode = "visible"
+
+        prompt = model.format_chat_prompt("Hello, how are you?")
+        self.assertEqual(
+            prompt,
+            NORTH_PLATFORM_TURN
+            + "<|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>"
+            + "Hello, how are you?"
+            + "<|END_TEXT|><|END_OF_TURN_TOKEN|>"
+            + "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+        )
+
+        model.thinking_mode = "suppressed"
+        self.assertTrue(
+            model.format_chat_prompt("Hello").endswith(
+                "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>"
+                "<|START_THINKING|><|END_THINKING|>"
+            )
+        )
+
     def test_model_map_owns_identity_metadata_and_layer_plan(self) -> None:
         contract = converter.gguf_ck_arch_contract("cohere2moe")
         self.assertEqual(contract["template"], "cohere2_moe")
@@ -204,6 +284,7 @@ class Cohere2MoeContractTests(unittest.TestCase):
 
     def test_prefill_ir_selects_dense_then_routed_blocks(self) -> None:
         manifest = _tiny_manifest()
+        self.assertEqual(manifest["template"]["flags"]["prefill_policy"], "batched")
         operations = build_ir_v8.build_ir1_direct(
             manifest,
             ROOT / "tests" / "cohere2_moe_manifest.synthetic.json",
@@ -320,6 +401,14 @@ class Cohere2MoeContractTests(unittest.TestCase):
         residuals = [op for op in layer_zero if op["op"] == "residual_add"]
         attention_arg = next(arg for arg in residuals[-1]["args"] if arg["name"] == "b")
         self.assertEqual(attention_arg["buffer_ref"], "layer_output")
+
+        routed = next(
+            op for op in call_ir["operations"]
+            if op.get("layer") == 1 and op.get("op") == "moe_swiglu_expert_mlp"
+        )
+        workspace = next(arg for arg in routed["args"] if arg["name"] == "workspace")
+        self.assertEqual(workspace["buffer_ref"], "mlp_scratch")
+        self.assertIn("A_MLP_SCRATCH", workspace["expr"])
 
     def test_explicit_unwritten_branch_is_rejected_before_lowering(self) -> None:
         manifest = _tiny_manifest()

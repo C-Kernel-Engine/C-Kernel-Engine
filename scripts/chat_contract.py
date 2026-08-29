@@ -297,11 +297,12 @@ def build_chat_contract(
     if isinstance(template_data, dict):
         template_name = str(template_data.get("name") or "")
 
-    contract = normalize_chat_contract(
+    declared_contract = normalize_chat_contract(
         (template_data or {}).get("contract", {}).get("chat_contract")
         if isinstance(template_data, dict)
         else None
     )
+    contract = declared_contract
 
     explicit_name = _infer_explicit_contract_name(
         chat_template=chat_template,
@@ -320,7 +321,7 @@ def build_chat_contract(
     if contract is None:
         return None
 
-    if explicit_name is None and not looks_like_instruction_chat_model(
+    if declared_contract is None and explicit_name is None and not looks_like_instruction_chat_model(
         chat_template=chat_template,
         finetune=finetune,
         model_name=model_name,

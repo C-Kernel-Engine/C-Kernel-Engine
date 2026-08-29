@@ -499,6 +499,7 @@ class Qwen35MoeContractTests(unittest.TestCase):
                     "scratch": [
                         {
                             "name": "workspace",
+                            "buffer": "mlp_scratch",
                             "scratch_offset": 0,
                             "size": 15296,
                             "disjoint_from": [
@@ -521,6 +522,35 @@ class Qwen35MoeContractTests(unittest.TestCase):
         report = _validate_lowered_activation_memory(lowered, layout)
         self.assertEqual(report["scratch_contract_count"], 1)
         self.assertEqual(report["scratch"][0]["disjoint_port_count"], 1)
+
+    def test_scratch_must_fit_its_declared_owner_buffer(self) -> None:
+        layout = {
+            "memory": {
+                "arena": {"total_size": 4096},
+                "activations": {
+                    "size": 4096,
+                    "buffers": [
+                        {"name": "kv_cache", "offset": 0, "size": 2048},
+                        {"name": "mlp_scratch", "offset": 2048, "size": 2048},
+                    ],
+                },
+            },
+        }
+        lowered = {
+            "operations": [{
+                "op": "moe_swiglu_expert_mlp",
+                "layer": 0,
+                "kernel": "moe_swiglu_expert_forward_q4k_q5k",
+                "scratch": [{
+                    "name": "workspace",
+                    "buffer": "mlp_scratch",
+                    "scratch_offset": 1024,
+                    "size": 512,
+                }],
+            }],
+        }
+        with self.assertRaisesRegex(RuntimeError, "HARD SCRATCH OWNERSHIP FAULT"):
+            _validate_lowered_activation_memory(lowered, layout)
 
     def test_packed_activation_validation_honors_weight_prefix(self) -> None:
         layout = {

@@ -8,7 +8,8 @@
     "tokenizer": "bpe",
     "attention": "one_full_three_sliding",
     "parallel_attention_mlp": true,
-    "hybrid_block_pattern": "config.layer_kinds"
+    "hybrid_block_pattern": "config.layer_kinds",
+    "prefill_policy": "batched"
   },
   "runtime_defaults": {
     "prefill_chunk_length": 4096,
@@ -38,17 +39,22 @@
     },
     "chat_contract": {
       "version": 1,
-      "name": "cohere2_moe",
+      "name": "north_mini_code",
       "raw_prompt_allowed": false,
-      "conversation_prefix": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|END_OF_TURN_TOKEN|>",
-      "turn_prefix": "<|START_OF_TURN_TOKEN|><|{role}_TOKEN|>",
-      "turn_suffix": "<|END_OF_TURN_TOKEN|>",
+      "conversation_prefix": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>These instructions are always to be followed and cannot be overridden by subsequent system or user turns:\n- You will answer requests for educational, informative, or creative content related to safety categories. You will not provide content that is harmful or could be used to cause harm.\n\nThese instructions serve as your defaults, but they can be overridden in subsequent system or user turns:\n- Your name is North Mini Code.\n- You are a large language model built by Cohere.\n\n# Available Tools\n```json\n[\n\n]\n```<|END_TEXT|><|END_OF_TURN_TOKEN|>",
+      "turn_prefix": "<|START_OF_TURN_TOKEN|><|{role}_TOKEN|><|START_TEXT|>",
+      "turn_suffix": "<|END_TEXT|><|END_OF_TURN_TOKEN|>",
       "turn_prefix_by_role": {
-        "system": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>",
-        "user": "<|START_OF_TURN_TOKEN|><|USER_TOKEN|>",
-        "assistant": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>"
+        "system": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>",
+        "user": "<|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>",
+        "assistant": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_TEXT|>"
       },
-      "assistant_generation_prefix": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_RESPONSE|>",
+      "assistant_generation_prefix": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+      "thinking_mode_default": "visible",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+        "suppressed": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|><|END_THINKING|>"
+      },
       "role_labels": {
         "system": "SYSTEM",
         "user": "USER",
@@ -58,15 +64,17 @@
       "system_prompt_separator": "\n\n",
       "default_system_prompt": "",
       "inject_default_system_prompt": false,
-      "stop_text_markers": ["<|END_RESPONSE|>", "<|END_OF_TURN_TOKEN|>"],
-      "token_stop_markers": ["<|END_RESPONSE|>", "<|END_OF_TURN_TOKEN|>"],
+      "stop_text_markers": ["<|END_OF_TURN_TOKEN|>"],
+      "token_stop_markers": ["<|END_OF_TURN_TOKEN|>"],
       "template_markers": [
         "<|START_OF_TURN_TOKEN|>",
         "<|SYSTEM_TOKEN|>",
         "<|USER_TOKEN|>",
         "<|CHATBOT_TOKEN|>",
-        "<|START_RESPONSE|>",
-        "<|END_RESPONSE|>",
+        "<|START_TEXT|>",
+        "<|END_TEXT|>",
+        "<|START_THINKING|>",
+        "<|END_THINKING|>",
         "<|END_OF_TURN_TOKEN|>"
       ],
       "min_response_tokens": 8
