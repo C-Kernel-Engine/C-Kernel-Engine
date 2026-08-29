@@ -6958,7 +6958,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
 
 <details open>
-    <summary>SwiGLU Activation (40)</summary>
+    <summary>SwiGLU Activation (44)</summary>
     <div class="accordion-content">
 
 
@@ -7064,6 +7064,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_expert_forward_q4k_q4k_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_expert_forward_q4k_q4k_parallel_workspace(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const void * expert_up, const void * expert_down, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_expert_forward_q4k_q4k_workspace</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -7128,6 +7138,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_expert_forward_q4k_q5k_workspace(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const void * expert_up, const void * expert_down, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_expert_forward_q4k_q6k_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_expert_forward_q4k_q6k_parallel_workspace(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const void * expert_up, const void * expert_down, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -7214,10 +7234,30 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_shared_forward_q4k_q4k_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_shared_forward_q4k_q4k_parallel_workspace(const float * hidden, const float * routed, const void * shared_gate, const void * shared_up, const void * shared_down, float * output, int rows, int hidden_dim, int intermediate_dim, void * workspace, size_t workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_shared_forward_q4k_q4k_workspace</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_shared_forward_q4k_q4k_workspace(const float * hidden, const float * routed, const void * shared_gate, const void * shared_up, const void * shared_down, float * output, int rows, int hidden_dim, int intermediate_dim, void * workspace, size_t workspace_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">moe_swiglu_shared_forward_q4k_q6k_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int moe_swiglu_shared_forward_q4k_q6k_parallel_workspace(const float * hidden, const float * routed, const void * shared_gate, const void * shared_up, const void * shared_down, float * output, int rows, int hidden_dim, int intermediate_dim, void * workspace, size_t workspace_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -8208,7 +8248,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1287)</summary>
+    <summary>Other Functions (1293)</summary>
     <div class="accordion-content">
 
 
@@ -11145,6 +11185,46 @@ hugepage_mode
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_q4k_mixed_parallel_work</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_moe_q4k_mixed_parallel_work(int ith, int nth, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_q4k_mixed_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_moe_q4k_mixed_parallel_workspace(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const void * expert_up, const void * expert_down, float * output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes, ck_moe_expert_workspace_fn serial_fn, ck_moe_down_kind_t down_kind)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_q4k_mixed_route_parallel</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_moe_q4k_mixed_route_parallel(const float * hidden, const int * indices, const float * routing_weights, const void * expert_gate, const void * expert_up, const void * expert_down, float * output, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void * workspace, size_t workspace_bytes, size_t workspace_stride, ck_threadpool_t * pool, ck_moe_down_kind_t down_kind)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_q4k_mixed_route_work</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_moe_q4k_mixed_route_work(int ith, int nth, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_q4k_q5k_bucket_work</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -11189,6 +11269,26 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_moe_q4k_q5k_route_work(int ith, int nth, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_shared_q4k_parallel_work</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_moe_shared_q4k_parallel_work(int ith, int nth, void * opaque)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_moe_shared_q4k_parallel_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_moe_shared_q4k_parallel_workspace(const float * hidden, const float * routed, const void * shared_gate, const void * shared_up, const void * shared_down, float * output, int rows, int hidden_dim, int intermediate_dim, void * workspace, size_t workspace_bytes, ck_moe_shared_workspace_fn serial_fn)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
