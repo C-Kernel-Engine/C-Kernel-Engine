@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine</title>
-    <meta name="description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <title>Qwen3.8 Generated Engineering Artifacts | C-Kernel-Engine</title>
+    <meta name="description" content="Seven standalone engineering infographics generated locally by Qwen3.8 27B running through CKE on one Ryzen CPU, with 128K generation provenance, SVG validation, and explicit certification boundaries.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
-    <meta property="og:title" content="CKE Throughput Unit: Bytes per Token Path | C-Kernel-Engine">
-    <meta property="og:description" content="The C-Kernel-Engine north-star throughput unit: aggregate active bytes cycled per second across weights, activations, KV cache, Linux runtime, and CPU clusters.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/qwen38-generated-artifacts.html">
+    <meta property="og:title" content="Qwen3.8 Generated Engineering Artifacts | C-Kernel-Engine">
+    <meta property="og:description" content="Seven standalone engineering infographics generated locally by Qwen3.8 27B running through CKE on one Ryzen CPU, with 128K generation provenance, SVG validation, and explicit certification boundaries.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/qwen38-generated-artifacts.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -908,9 +908,9 @@
             <a href="contributing.html" class="">Contribute</a>
             <a href="scaling.html" class="">Scaling</a>
             <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
-            <a href="cke-throughput-unit.html" class="active" style="color:var(--orange)">CKU</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger ">Architecture</span>
+                <span class="nav-trigger active">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -983,561 +983,133 @@
     <main>
 
 <style>
-@media (max-width: 640px) {
-    main pre { overflow-x: auto; }
-    main mjx-container[display="true"] { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
-}
+  .artifact-figure {
+    margin: 2rem 0 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+  .artifact-figure:first-of-type { border-top: 0; }
+  .artifact-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #fff;
+  }
+  .artifact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    margin: 0.7rem 0 0;
+  }
+  .artifact-actions code { overflow-wrap: anywhere; }
 </style>
 
-<h1>CKE Throughput Unit</h1>
+<h1>Qwen3.8 Generated Engineering Artifacts</h1>
 
-<div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
-    <h2 style="margin-top: 0; color: #ffb400;">The 1 PB/s North-Star Unit</h2>
-    <p style="font-size: 1.12em; line-height: 1.7;">
-        C-Kernel-Engine cares about a practical systems question:
-        <strong>how fast can the cumulative compute system cycle active model data to produce tokens?</strong>
-        FLOPS and TOPS are useful hardware numbers, but they do not directly answer whether a real model can move its weights, activations, KV cache, intermediate buffers, and network payloads quickly enough to generate the next token.
-    </p>
-    <p style="font-size: 1.12em; line-height: 1.7; margin-bottom: 0;">
-        The proposed CKE unit is aggregate bytes cycled per second across the full token path.
-        The north-star target is <strong>1 petabyte/sec</strong>, which is the same as <strong>1000 terabytes/sec</strong>, or <strong>1 terabyte every millisecond</strong>.
-    </p>
-    <p style="font-size: 1.08em; line-height: 1.7; margin-top: 1.2rem; margin-bottom: 0;">
-        The reference CKU is <strong>useful model-math byte throughput</strong>, not a copy-bandwidth score.
-        A DSA engine can move bytes, but CKU asks whether active weights, activations, and cache/state are
-        fed through GEMM/FMA/attention work to advance the model. The clean upper-bound reference is
-        full-context prefill, where active weights are cycled through mostly GEMM. Decode is a related but
-        different path: mostly GEMV plus KV/cache reads and writes.
-    </p>
+<p>These SVGs were generated end to end by the Qwen3.8 27B Q4_K_M runtime in CKE on one Ryzen 9 9950X3D CPU. They are retained both as useful engineering diagrams and as inspectable model-quality evidence: each artifact is standalone XML, contains no scripts or external references, and can be opened directly in a browser.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Evidence boundary</strong><br>
+    A valid, useful SVG is model-output evidence, not by itself a numerical or performance certification. Text and measurements inside each diagram reflect the dossier supplied to that generation. The <a href="model-kernel-matrix.html#card-qwen38">Model + Kernel Matrix</a>, X-Ray reports, and committed benchmark artifacts remain authoritative for promoted claims.
+  </div>
 </div>
 
-<div class="img-container svg-viewer" data-title="CKE Throughput Unit">
-    <img src="assets/cke-throughput-unit.svg" alt="CKE throughput unit: active bytes per token divided by token latency equals aggregate bytes cycled per second.">
-</div>
+<h2>Measured Generation Envelope</h2>
 
-<h2>The Unit</h2>
-
-<pre><code>CKU = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    CKU means <strong>C-Kernel throughput unit</strong>.
-    The unit is not just DRAM bandwidth from one socket and it is not just matrix FLOPS.
-    It is an end-to-end systems rate: how many bytes the runtime must touch, transform, cache, transmit, or reuse through useful model compute in order to produce tokens.
-    Plain copies are not enough; the bytes have to arrive in the right layout at the right kernel and participate in the model's math.
-    Depending on the model and phase, that can include:
-</p>
-
-<ul>
-    <li>active weights read for the token path</li>
-    <li>activation buffers and scratch buffers</li>
-    <li>KV cache reads and writes, or recurrent state updates for SSM-style models</li>
-    <li>prefill token blocks, decode token steps, and batching effects</li>
-    <li>NUMA traffic, cache movement, and inter-node communication</li>
-    <li>quantized layout conversion, repacking, and dequantization overhead</li>
-</ul>
-
-<h2>Not Just Weights</h2>
-
-<p>
-    A common shortcut is to say, "a 1 TB model at 1 ms/token needs 1 PB/s."
-    That is a useful intuition, but it is not the full CKU definition.
-    CKU is not only parameter bytes divided by token time.
-    It is the <strong>active byte path</strong> divided by token time.
-    The active byte path includes both the model data being read and the runtime
-    data being produced, consumed, stored, and moved while the token is generated.
-</p>
-
-<p>
-    In decode, weights are often the streaming bottleneck because many layers
-    repeatedly read projection and MLP weights for each new token.
-    In prefill, long prompts can make activation and KV/cache writes matter much
-    more because the system processes many token rows at once.
-    In training, activation saves, gradient writes, optimizer state, and backward
-    reads all become part of the active path.
-    In distributed execution, activation transfers, KV/state movement, gradient
-    exchange, and pipeline bubbles must be counted too.
-</p>
-
-<p>
-    This distinction matters because two runs with the same stored model size can
-    have very different CKU. A dense 1 GB model may touch nearly all weights on
-    every decode token. A sparse MoE model may store far more total weights but
-    only touch selected experts. A vision-language prefill run may move less
-    weight than expected but spend heavily on image-token activations and bridge
-    buffers. CKU asks what the system actually had to cycle for this token path.
-</p>
-
-<h2>Why 1 PB/s?</h2>
-
-<p>
-    A very large modern model can easily imply hundreds of gigabytes to terabytes of active weight and state movement across the token path, especially before accounting for prefill, KV cache, MoE routing, recurrent state, or distributed execution.
-    Quantization and MoE reduce the active bytes touched per token, but the optimization problem remains the same: the faster the system can cycle the active bytes, the faster it can produce useful output.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Active bytes per token</th>
-            <th>Token latency</th>
-            <th>Required aggregate rate</th>
-            <th>Implied token rate</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1 TB</td>
-            <td>1 second</td>
-            <td>1 TB/s</td>
-            <td>1 token/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>10 ms</td>
-            <td>100 TB/s</td>
-            <td>100 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>1 TB</td>
-            <td>1 ms</td>
-            <td>1 PB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-        <tr>
-            <td>100 GB</td>
-            <td>1 ms</td>
-            <td>100 TB/s</td>
-            <td>1000 tokens/sec</td>
-        </tr>
-    </tbody>
+<table class="table">
+  <thead>
+    <tr><th>Property</th><th>Measured result</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Runtime</td><td>Qwen3.8 27B Q4_K_M, CKE v8 generated C, 16 pinned physical cores</td></tr>
+    <tr><td>Long-context inputs</td><td>Six complete 131,072-token inputs; each stopped on the model EOS token</td></tr>
+    <tr><td>Generated output</td><td>7,998 to 16,950 tokens per long-context artifact</td></tr>
+    <tr><td>Prefill</td><td>32.37 to 32.71 tok/s across the six runs</td></tr>
+    <tr><td>Decode</td><td>1.36 to 1.41 tok/s across the six runs</td></tr>
+    <tr><td>Peak resident memory</td><td>Approximately 50.6 GiB</td></tr>
+    <tr><td>SIMD RoPE artifact</td><td>1,152-token prompt, 24,227-token answer, 3.1 tok/s decode, 15.02 average active cores</td></tr>
+    <tr><td>Numerical certification</td><td>Separate 4,000/4,000 full-vocabulary rows and 4,011 internal rows bit-exact to llama.cpp</td></tr>
+  </tbody>
 </table>
 
-<p>
-    This is why the 1 PB/s unit matters.
-    It turns a vague performance goal into a concrete systems target:
-    if the active token path is one terabyte and the target is one millisecond per token, the cumulative runtime has to behave like a one-petabyte-per-second machine.
-    That machine does not have to be one CPU.
-    It can be a coordinated set of CPU sockets, memory channels, NUMA domains, and Linux nodes.
-</p>
+<section class="artifact-figure">
+  <h2>Long-Context System Overview</h2>
+  <p>A single-page synthesis of the GGUF-to-generated-C pipeline, memory hierarchy, recurrent/full-attention schedule, ZIP research direction, Memory Tetris, planner-owned scratch, and X-Ray evidence.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CKE long-context system overview">
+    <img src="assets/qwen38-generated-system-overview.svg" alt="Generated overview of CKE long-context CPU inference">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-system-overview.svg" download>Download SVG</a><code>SHA-256 15df1242411b32a0...</code></p>
+</section>
 
-<p>
-    In CKE, this is intentionally anchored to the hardest clean reference:
-    <strong>full-context prefill over the active model path</strong>.
-    Prefill is mostly GEMM-shaped work over many token rows, so the system must
-    stream active weights, reuse activations, execute reductions, and write the
-    next layer state at high rate. Decode is measured too, but it is usually a
-    different shape: mostly GEMV over one or a few token rows, plus KV/cache
-    reads and writes. That is why CKU should report the phase and workload
-    shape, not only the headline byte rate.
-</p>
+<section class="artifact-figure">
+  <h2>RoPE Across a 128K Hybrid Context</h2>
+  <p>Visualizes absolute-position continuity through chunked prefill, the recurrent-to-full-attention cadence, grouped-query cache addressing, X-Ray failure modes, and planned long-context work.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated RoPE at 128K">
+    <img src="assets/qwen38-generated-rope-128k.svg" alt="Generated diagram of RoPE across recurrent and full-attention layers at 128K">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-rope-128k.svg" download>Download SVG</a><code>SHA-256 a692ea875c0dddbe...</code></p>
+</section>
 
-<h2>What Counts as Active Bytes?</h2>
+<section class="artifact-figure">
+  <h2>Qwen3.8 CPU Execution Path</h2>
+  <p>Connects the model circuit, quantized representations, SIMD path, deterministic output-range reductions, persistent workers, planner scratch, utilization, and follow-up optimization targets.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CPU optimization map">
+    <img src="assets/qwen38-generated-cpu-optimization.svg" alt="Generated Qwen3.8 CPU execution and optimization map">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-cpu-optimization.svg" download>Download SVG</a><code>SHA-256 7954e1212f7fe25b...</code></p>
+</section>
 
-<p>
-    Active bytes are the bytes that matter for the current token path.
-    They are not the total size of every file on disk and they are not necessarily the total parameter count of the model.
-    For a dense model, the active path may touch most weights every token.
-    For a Mixture-of-Experts model, only the selected experts are active.
-    For recurrent or SSM-style models, the KV-cache term may shrink or disappear for many layers, but recurrent state updates still count.
-</p>
+<section class="artifact-figure">
+  <h2>Theory of Constraints</h2>
+  <p>Shows the intended flow from NVMe through DRAM and cache to SIMD workers, contrasting exposed stop-and-go stalls with overlapped compute and memory work.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated theory-of-constraints flow">
+    <img src="assets/qwen38-generated-constraint-flow.svg" alt="Generated theory-of-constraints diagram for CPU AI">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-constraint-flow.svg" download>Download SVG</a><code>SHA-256 c376811abd8b6343...</code></p>
+</section>
 
-<p>
-    This makes CKU useful across model families.
-    A 5 TB model with quantization, MoE routing, and sparse activation may have a much smaller active-byte path per token than its full stored footprint.
-    CKE cares about the measured active path: which weights are actually read, which activations are produced, which cache/state buffers are updated, and which bytes cross sockets or nodes.
-</p>
+<section class="artifact-figure">
+  <h2>CKE and llama.cpp Comparison Discipline</h2>
+  <p>Documents the matched-run conditions, consumed-token hashes, full-logit checks, X-Ray localization, occupancy accounting, provider timing, and claim boundaries required for a fair comparison.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CKE and llama.cpp comparison discipline">
+    <img src="assets/qwen38-generated-cke-llamacpp-128k.svg" alt="Generated comparison framework for CKE and llama.cpp at 128K">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-cke-llamacpp-128k.svg" download>Download SVG</a><code>SHA-256 4f958d4811a1cafa...</code></p>
+</section>
 
-<h2>Lifecycle Envelope and Concurrency</h2>
+<section class="artifact-figure">
+  <h2>Core Saturation and Scheduling</h2>
+  <p>Turns the observed worker occupancy into a scheduling diagram: persistent threads, queue depth, barriers, deterministic reductions, tile ownership, and the decode imbalance that remains diagnostic rather than a final causal claim.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated core scheduling diagram">
+    <img src="assets/qwen38-generated-core-scheduling.svg" alt="Generated visualization of 16-core CKE scheduling">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-core-scheduling.svg" download>Download SVG</a><code>SHA-256 11d3067256e32229...</code></p>
+</section>
 
-<p>
-    CKU is first a <strong>single-stream lifecycle unit</strong>.
-    It asks what the runtime must cycle for one model instance serving one token
-    path at the model's intended operating envelope.
-    If a model advertises a 1 million token context length with an 8K embedding
-    dimension, the lifecycle envelope should include the memory behavior needed
-    to support that context: the active weights, the full KV/cache or recurrent
-    state footprint, the activations needed by prefill/decode, and the load/store
-    traffic required to keep the token path moving.
-</p>
+<section class="artifact-figure">
+  <h2>Split-Half FP32 RoPE SIMD</h2>
+  <p>A kernel-level diagram of validation, split-half layout, AVX2 lanes, operation order, in-place safety, scalar tail handling, and the no-allocation call contract.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated split-half FP32 RoPE SIMD diagram">
+    <img src="assets/qwen38-generated-rope-simd.svg" alt="Generated split-half FP32 RoPE AVX2 dataflow diagram">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-rope-simd.svg" download>Download SVG</a><code>SHA-256 57cd78c57efc79e9...</code></p>
+</section>
 
-<p>
-    That does not mean every CKU number automatically includes every concurrent
-    user. Concurrency is a separate service-level multiplier.
-    A single-user CKU report answers, "Can this system run one full-context model
-    stream at this token rate?"
-    A service report then asks, "How many such streams can the cluster run at the
-    same time, and what token rate does each user receive?"
-</p>
-
-<pre><code>single_user_cku = active_lifecycle_bytes_per_token / seconds_per_token
-
-service_cku     = single_user_cku * concurrent_streams
-
-per_user_rate   = total_generated_tokens_per_second / concurrent_streams</code></pre>
-
-<p>
-    For example, a cluster might target 1 token/sec for 1000 concurrent users on
-    a very large model. That is a different operating point from 1000 tokens/sec
-    for one user, even if both produce 1000 aggregate tokens/sec.
-    CKU should make both cases explicit: the active lifecycle bytes per user, the
-    concurrency count, the total aggregate byte rate, and the per-user token rate.
-</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Byte class</th>
-            <th>Examples</th>
-            <th>When it dominates</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Weights</td>
-            <td>Q/K/V projections, MLP gate/up/down, expert weights, output head</td>
-            <td>Decode and small-batch inference, especially dense models</td>
-        </tr>
-        <tr>
-            <td>Activations</td>
-            <td>Layer inputs/outputs, normalized streams, Q8 views, fused scratch</td>
-            <td>Prefill, vision/audio encoders, large token blocks, unfused paths</td>
-        </tr>
-        <tr>
-            <td>Cache and state</td>
-            <td>KV cache reads/writes, recurrent state, Mamba/DeltaNet state</td>
-            <td>Long context, recurrent models, decode with large history</td>
-        </tr>
-        <tr>
-            <td>Training state</td>
-            <td>Saved activations, gradients, optimizer moments, checkpoints</td>
-            <td>Backward pass, fine-tuning, long-context training</td>
-        </tr>
-        <tr>
-            <td>Communication</td>
-            <td>Pipeline activations, tensor-parallel shards, MPI/RDMA transfers</td>
-            <td>Multi-node inference/training and CPU clusters</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>Node Roofline Math</h2>
-
-<p>
-    CKU is not only a memory-bandwidth number and it is not only a FLOPS number.
-    A CPU node can only contribute the useful part of the slowest roof: memory
-    bandwidth, compute throughput, or network movement when the run is
-    distributed. This is why CKU belongs next to roofline analysis.
-</p>
-
-<div class="img-container svg-viewer" data-title="CKU Node Roofline Math">
-    <img src="assets/cke-node-roofline-math.svg" alt="CKU node roofline math: required service CKU divided by effective node CKU yields the number of CPU nodes needed.">
-</div>
-
-<pre><code>required_service_cku =
-    active_lifecycle_bytes_per_token
-  * tokens_per_second_per_user
-  * concurrent_streams
-
-node_memory_roof =
-    sockets
-  * memory_channels_per_socket
-  * transfer_rate_MTps
-  * 8 bytes_per_channel_transfer
-
-node_compute_roof_bytes =
-    useful_flops_per_second / arithmetic_intensity_flops_per_byte
-
-effective_node_cku =
-    min(node_memory_roof, node_compute_roof_bytes, node_network_roof)
-  * runtime_efficiency
-
-nodes_needed =
-    required_service_cku / effective_node_cku</code></pre>
-
-<p>
-    For DDR memory, a practical first-pass estimate is:
-    <code>channel_GBps = MT/s * 8 bytes / 1000</code>.
-    DDR5-6600 is about 52.8 GB/s per channel.
-    A 12-channel socket is therefore about 633.6 GB/s theoretical, and a
-    dual-socket system is about 1.27 TB/s theoretical before NUMA effects,
-    memory-controller efficiency, page placement, and OS noise.
-    At 8800 MT/s, the same 12-channel socket is about 844.8 GB/s, or about
-    1.69 TB/s for two sockets.
-</p>
-
-<p>
-    Compute has its own roof. For an AVX-512 FP32 FMA path, a rough dense-core
-    estimate is:
-    <code>cores * GHz * FMA_units_per_core * lanes_per_vector * 2 FLOPs_per_FMA</code>.
-    That estimate changes for BF16, INT8, AMX tile paths, VNNI, SVE, or Neon.
-    Quantized Q4/Q6 kernels are often limited by unpacking, metadata,
-    reductions, cache reuse, and memory traffic, so AMX is not automatically the
-    answer. In many CKE paths, AVX-512/VNNI-style layout work is the more direct
-    lever.
-</p>
-
-<p>
-    This also keeps the 1 PB/s north star honest. If a dual-socket CPU node can
-    deliver 1.2 TB/s of useful lifecycle movement, then 1 PB/s requires roughly
-    833 such nodes in the perfect case. At 60-70% useful efficiency, the number
-    is closer to 1200-1400 nodes. If quantization, MoE routing, locality, and
-    cache reuse reduce the active path to 100 GB/token at 100 tokens/sec, the
-    requirement becomes 10 TB/s, which is a very different cluster shape.
-</p>
-
-<p>
-    The CPU thesis is not that one socket beats an H100 at dense tensor math.
-    The thesis is that commodity capacity, many memory channels, many physical
-    cores, SIMD/matrix units, Linux tuning, MPI/RDMA placement, and generated C
-    scheduling can combine into a measurable aggregate byte machine. GPUs can
-    also reach enormous aggregate bandwidth, but a 1 TB resident model may need
-    many expensive HBM devices just for capacity before it even starts serving
-    traffic.
-</p>
-
-<h3>Refinement: Not All Bytes Cross All Roofs</h3>
-
-<p>
-    The single <code>min(memory, compute, network)</code> roof is the right first
-    approximation, but the <a href="distributed-cpu.html">zip schedule</a> shows
-    where it over-pessimizes: byte classes have different paths. A node may
-    process 18 MB of local weight bytes in a region while synchronizing only
-    16 KB at its boundary &mdash; <code>B_local ≠ B_network</code>. Applying the
-    network roof to all active bytes understates the node. The
-    <a href="constraint-model.html">CKE Constraint Model</a> therefore treats CKU
-    as a per-path vector and makes the token time a critical-path quantity:
-</p>
-
-<pre><code>cku_path = { cku_compute, cku_memory, cku_network, cku_storage }
-
-T_token = T_critical_path
-        = Σ_r [ max(T_compute,r, T_fresh_memory,r, T_exposed_storage,r)
-                + T_unhidden_sync,r ]
-
-cku = useful_active_path_bytes / T_token</code></pre>
-
-<p>
-    Read this way, CKU is the <strong>observable result of the scheduler</strong>:
-    the measurement the control loop tries to raise by moving whichever roof is
-    the active constraint &mdash; not a static property of the silicon.
-</p>
-
-<h2>Two CKUs: Potential and Realized</h2>
-
-<p>
-    Distributed CKE needs the unit to separate what the hardware <em>could</em> do from what the
-    system <em>does</em> do. <strong>Potential CKU</strong> sums independently measured node
-    capability; <strong>realized CKU</strong> is the useful path advanced per wall-clock second end
-    to end:
-</p>
-
-\[ CKU_{\text{potential}} = \sum_i CKU_i^{\text{isolated}}, \qquad CKU_{\text{realized}} = \frac{B_{\text{useful,total}}}{T_{\text{wall}}}, \qquad \eta_{\text{CKE}} = \frac{CKU_{\text{realized}}}{CKU_{\text{potential}}} \]
-
-<p>
-    The efficiency \(\eta_{\text{CKE}}\) is the metric the
-    <a href="distributed-cpu.html">distributed-CPU research</a> exists to raise. An illustrative
-    example (all numbers hypothetical): if one Ryzen advances 1 TB of useful model-path bytes in
-    600 s, it contributes \(1.67 \times 10^{-6}\) CKU; two perfectly scaling Ryzens would give
-    \(3.4 \times 10^{-6}\), but measured \(3.1 \times 10^{-6}\) is \(\eta \approx 91\%\); add a Xeon
-    measured in isolation at \(7 \times 10^{-6}\) and the ideal cluster is \(10.4 \times 10^{-6}\) &mdash;
-    a realized \(9.5 \times 10^{-6}\) is again \(\approx 91\%\). &ldquo;We combined CPUs with
-    different cores, caches, memory channels and ISA capabilities and retained 91% of their
-    independently measured useful throughput&rdquo; is a much sharper claim than any tok/s figure.
-</p>
-
-<div class="img-container svg-viewer" data-title="The CKU convergence diagram: potential versus realized CKU, the efficiency eta between them, and the constraint-map planner loop converging toward the 1 PB/s north star">
-    <img src="assets/cku-convergence.svg" alt="A convergence diagram. At top the north star: 1 CKU equals 1 petabyte per second of useful model-path rate, a convergence target not a per-node expectation. Two boxes below: Potential CKU, the sum of isolated node capabilities, and Realized CKU, useful bytes advanced per wall time end to end. Their ratio eta is the CKE scaling efficiency the research program drives toward one. Below, the constraint map with compute, DRAM, network and storage roofs; the slowest roof is the active constraint. The CKE planner shapes shards, tiles, placement, prefetch, overlap and synchronization against it — balancing completion time across nodes, not bytes — emits generated C, measures, and loops back into the next plan. A footer notes every optimization is a delta in the same unit and that eta has not been measured yet" style="width: 100%; max-width: 960px; margin: 0 auto; display: block;">
-</div>
-
-<h3>One public CKU; per-region rates are the planner's pricing</h3>
-
-<p>
-    The public metric stays singular &mdash; <strong>one CKU</strong>: useful model-path work
-    advanced per wall-clock second. What varies per region is not the metric but the
-    <em>price</em> a node pays to advance it. The same Ryzen can be DRAM/unpack-limited on a
-    decode region, compute-limited on a prefill region, bandwidth-limited on a KV scan, and
-    far faster on a cache-hot region. The planner profile is therefore a <strong>table of
-    internal rates</strong> &mdash; \(CKU_i^{\text{decode}}\), \(CKU_i^{\text{prefill}}\),
-    \(CKU_i^{\text{KV}}\), \(CKU_i^{\text{cache-hot}}\), \(CKU_i^{\text{reduction}}\), &hellip;
-    &mdash; used to price each generated region with the rate that matches its shape. Shard
-    assignment then synchronizes <em>completion time</em>, not bytes: choose \(s_i\) so
-    \(B_i / CKU_i \approx B_j / CKU_j\) for every participating node, and all lanes reach the
-    reduction boundary together &mdash; <strong>CKU synchronization</strong>. If the Xeon
-    contributes four times a Ryzen's rate for one kernel and a different ratio for another,
-    its share changes per region accordingly.
-</p>
-
-<p>
-    These per-region flavors are <strong>not separate headline metrics</strong>. CKE reports
-    one realized CKU, and X-Ray explains its composition &mdash; an illustrative breakdown,
-    not a measurement:
-</p>
-
-<pre><code>CKU realized:       0.000014          (illustrative, not measured)
-
-Execution composition:
-  Dense GEMM:       71%
-  Attention/state:  14%
-  synchronization:   6%
-  exposed DRAM:      7%
-  other:             2%</code></pre>
-
-<p>
-    The optimization objective is then always the same &mdash; <strong>increase realized
-    CKU</strong> &mdash; and the composition tells you where to work: dense GEMM slow
-    &rarr; arithmetic; exposed DRAM visible &rarr; staging and tiles; synchronization visible
-    &rarr; sharding; KV dominating &rarr; head/context sharding. No new fundamental metric
-    each time the bottleneck moves.
-</p>
-
-<h3>The Theory of Constraints underneath CKU</h3>
-
-<p>
-    Per region, the roofs give per-resource rates &mdash; say memory \(5 \times 10^{-6}\), arithmetic
-    \(3 \times 10^{-6}\), network \(20 \times 10^{-6}\) (hypothetical). Effective CKU is the minimum,
-    \(3 \times 10^{-6}\), and arithmetic is the constraint: do not buy a faster NIC, do not tune DRAM
-    first &mdash; elevate arithmetic. When arithmetic rises to \(8 \times 10^{-6}\), the minimum moves
-    to memory at \(5 \times 10^{-6}\), and the constraint has moved. That is the loop:
-</p>
-
-\[ \text{identify constraint} \rightarrow \text{elevate constraint} \rightarrow \text{recompute CKU} \rightarrow \text{repeat} \]
-
-<p>
-    and it makes the 1 PB/s north star a <strong>convergence target</strong> rather than a slogan:
-    every optimization &mdash; another node, more channels, a better kernel, more cache reuse, less
-    exposed stall &mdash; is a delta in the same unit, and the research question is whether
-    \(\eta_{\text{CKE}} \rightarrow 1\) as hardware is added. The
-    <a href="constraint-model.html">CKE Constraint Model</a> defines the clocks and the
-    exposed-stall vocabulary this loop runs on.
-</p>
-
-<h2>Memory Placement Is a Scheduling Problem</h2>
-
-<p>
-    Capacity and throughput cannot be separated from placement. Accelerator
-    systems often move selected activations, parameters, or optimizer state
-    from scarce HBM into host DRAM. CPU-native execution removes that specific
-    host-to-device boundary for CPU-resident state, but it does not remove data
-    movement. Cache fills, DRAM traffic, NUMA hops, network transfers, and
-    storage reads still have to be placed and scheduled against useful work.
-</p>
-
-<p>
-    NVIDIA's JAX host-offloading study provides a useful measured example. On
-    its DeepSeek-V3 671B configuration, optimized activation offloading with a
-    latency-hiding scheduler and pipelined copies reached 908.2 TFLOPs/s/device,
-    compared with 578.3 TFLOPs/s/device for no offload with activation
-    rematerialization. But host offloading without those scheduling mechanisms
-    reached only 541.6 TFLOPs/s/device. The placement policy created capacity;
-    overlap determined whether that capacity translated into throughput.
-</p>
-
-<p>
-    The same study reported a smaller but equally important result for Llama
-    3.1 405B: QKV offloading with latency hiding improved throughput by 2.9%,
-    while disabling latency hiding made the offloaded run slower than the
-    no-offload baseline. The 70.9 GiB host allocation represented QKV storage
-    across all layers, while scan-based backward execution needed only one
-    layer's QKV activations resident on the GPU at a time. This is a lifetime
-    and scheduling result, not a raw bandwidth claim.
-</p>
-
-<p>CKE should apply the same discipline to CPU nodes and clusters:</p>
+<h2>Validation Notes</h2>
 
 <ul>
-    <li><strong>Place by lifetime:</strong> keep the active layer, tile, KV/state window, or optimizer shard near the compute that consumes it.</li>
-    <li><strong>Overlap explicitly:</strong> prefetch the next tile or shard while the current kernel performs useful work.</li>
-    <li><strong>Budget staging memory:</strong> double buffers and prefetched data consume capacity even when they improve throughput.</li>
-    <li><strong>Measure exposed transfer time:</strong> a transfer hidden behind compute and the same transfer on the critical path have different performance consequences.</li>
-    <li><strong>Keep rematerialization in the comparison:</strong> recomputing an activation may cost less than moving it, depending on arithmetic intensity and topology.</li>
+  <li>All seven published files parse as XML, use an SVG root and viewBox, and contain no script or external reference.</li>
+  <li>Two earlier candidates were rejected because they were malformed XML; they are not published here.</li>
+  <li>The RoPE SIMD quality gate marked its run failed because two required literal labels used different wording. The resulting SVG itself is valid and retained for human review.</li>
+  <li>Generation quality, numerical parity, and performance remain three separate scorecard dimensions.</li>
 </ul>
-
-<pre><code>effective_step_time =
-    useful_compute_time
-  + exposed_memory_time
-  + exposed_network_time
-  + synchronization_time
-
-staging_capacity = resident_working_set + prefetched_buffers + in_flight_outputs</code></pre>
-
-<p>
-    This refines the CKU interpretation. Logical active bytes describe the
-    model state needed by the operation. Physical bytes include every movement
-    required by the chosen placement plan. A valid CKU report must state what
-    was resident, what was transferred or rematerialized, how much transfer was
-    overlapped, and which movement remained on the critical path.
-</p>
-
-<p>
-    Reference:
-    <a href="https://developer.nvidia.com/blog/reducing-high-bandwidth-memory-bottlenecks-in-jax-based-llm-training-with-host-offloading/" target="_blank" rel="noopener noreferrer">NVIDIA, Reducing High-Bandwidth Memory Bottlenecks in JAX-Based LLM Training with Host Offloading</a>.
-</p>
-
-<h2>What CKE Optimizes</h2>
-
-<p>
-    CKE does not optimize a single number in isolation.
-    It tries to organize the whole token path so useful bytes stay close to useful compute:
-</p>
-
-<ul>
-    <li><strong>Kernel layout:</strong> Q4/Q5/Q6/Q8 formats, packed layouts, SIMD-friendly loops, and shape-gated dispatch.</li>
-    <li><strong>Memory layout:</strong> contiguous bump files, planned activation buffers, cache-aligned sections, and deterministic offsets.</li>
-    <li><strong>Runtime scheduling:</strong> prefill vs decode kernels, persistent thread pools, batching, lifetime-aware placement, asynchronous prefetch, and pipeline staging.</li>
-    <li><strong>Linux tuning:</strong> CPU affinity, huge pages, NUMA placement, cache behavior, and perf/VTune/Advisor measurement.</li>
-    <li><strong>Cluster scaling:</strong> model/layer ownership, activation movement, gradient movement, MPI/RDMA paths, and topology-aware placement.</li>
-</ul>
-
-<h2>How to Measure It</h2>
-
-<p>
-    CKU is meant to be measured, not asserted.
-    A practical report should show the model, phase, context length, batch size, active-byte estimate, token latency, and the resulting aggregate rate.
-    The same run should also show CPU utilization, memory bandwidth, cache behavior, and network transfer if the run spans nodes.
-</p>
-
-<pre><code>active_bytes_per_token = weights_read_or_reused
-                       + activations_read_written
-                       + cache_or_state_read_written
-                       + scratch_and_layout_traffic
-                       + communication_read_written
-
-seconds_per_token      = measured_wall_time / generated_tokens
-
-CKU                    = active_bytes_per_token / seconds_per_token</code></pre>
-
-<p>
-    A stricter report can also split <em>logical active bytes</em> from
-    <em>physical traffic</em>.
-    Logical active bytes describe the model/runtime tensors that participate in
-    the token path. Physical traffic includes cache-line rereads, layout
-    conversion, write-allocate behavior, NUMA hops, and network retransfers.
-    CKE tracks the logical path first, then uses perf, VTune, Advisor, and
-    benchmark counters to find where physical traffic is higher than it should be.
-</p>
-
-<p>
-    This is the reason CKE keeps investing in visualizers, memory layouts, <a href="kernel-maps.html">kernel maps</a>, perf counters, VTune/Advisor profiles, and future MPI lanes.
-    The generated C code is only one part of the system.
-    The larger optimization problem is arranging the full data path so the machine spends less time waiting for bytes and more time turning those bytes into useful output.
-</p>
-
-<h2>Not a FLOPS Replacement</h2>
-
-<p>
-    FLOPS still matter. Matrix units still matter. SIMD still matters.
-    But for LLM inference and training, raw arithmetic throughput is only useful when the data reaches the execution units at the right time and in the right layout.
-    CKU is a complementary metric: it asks whether the whole system can cycle the bytes that the model actually needs.
-</p>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
-    <div>
-        <strong>This is a north-star systems unit, not a current laptop benchmark.</strong><br>
-        A single workstation is not expected to cycle 1 PB/s today. The point is to make the long-horizon optimization problem explicit: organize CPU kernels, memory hierarchy, Linux scheduling, and distributed nodes so aggregate active-byte throughput keeps rising.
-    </div>
-</div>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

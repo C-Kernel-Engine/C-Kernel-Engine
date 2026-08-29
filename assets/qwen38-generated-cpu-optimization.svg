@@ -1,0 +1,216 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">Running Qwen3.8 27B Dense at 128K on One Ryzen CPU</title>
+  <desc id="svg-desc">Infographic explaining the qwen38 circuit, Q4_K_M weights, prepared Q4/Q5/Q6 kernels, AVX-512/VNNI ISA, exact FP32 alpha/beta output-range parallelism, four-row Q8_K quantization, persistent 16-thread pools, planner scratch, 4096-token chunks, attention scaling, and greedy decode. Shows matched repeated-token results for CKE baseline (4199.72 s, 31.21 tok/s), CKE FP32-pool (4067.91 s, 32.22 tok/s), and llama.cpp (5362.45 s, 24.44 tok/s). Separately labels realistic-dossier CKE (4013.10 s, 32.66 tok/s) as a different input. Includes parity hashes, utilization, decode imbalance, and future work.</desc>
+
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="#1e1e2e"/>
+
+  <!-- Title Bar -->
+  <rect x="0" y="0" width="1600" height="68" fill="#2a2a3a"/>
+  <rect x="0" y="65" width="1600" height="3" fill="#ffb400"/>
+  <text x="30" y="42" font-family="Inter, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Running Qwen3.8 27B Dense at 128K on One Ryzen CPU</text>
+  <text x="1570" y="42" font-family="JetBrains Mono, monospace" font-size="11" fill="#ffb400" text-anchor="end">CKE v8 · Ryzen 9950X3D · AVX-512/VNNI</text>
+
+  <!-- ===== SECTION 1: Circuit + Weights (y=80-240) ===== -->
+  <!-- Circuit Card -->
+  <rect x="20" y="80" width="770" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="80" width="4" height="160" rx="2" fill="#ffb400"/>
+  <text x="40" y="105" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400">Qwen3.8 Circuit (qwen38.json)</text>
+
+  <text x="40" y="128" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">27B dense · 64 layers · hidden 4096 · 32 Q heads / 8 KV heads (GQA 4:1)</text>
+  <text x="40" y="146" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">head_dim 128 · RoPE θ=1e6 · RMSNorm ε=1e-6 · SwiGLU MLP (gate/up/down)</text>
+  <text x="40" y="164" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">KV cache: 8 heads × 128 dim × 2 (K+V) × 64 layers × 131072 tokens</text>
+  <text x="40" y="182" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Context: 131072 (128K) · Prefill chunks: 4096 tokens × 32 chunks</text>
+  <text x="40" y="200" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Decode: greedy argmax · temperature 0 · top_k 1 · repetition penalty 1.0</text>
+  <text x="40" y="218" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">Circuit declares ops + required_numerical_contracts; no physical provider IDs</text>
+
+  <!-- Weights Card -->
+  <rect x="810" y="80" width="770" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="810" y="80" width="4" height="160" rx="2" fill="#47b475"/>
+  <text x="830" y="105" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#47b475">Weight Format: Q4_K_M (GGUF → BUMP)</text>
+
+  <text x="830" y="128" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Q4_K_M: 4.5 bpw · 27B params ≈ 15.2 GB packed · super-block 256 × sub-block 32</text>
+  <text x="830" y="146" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Per super-block: d (fp16), dmin (fp16) · Per sub-block: d (u8), dmin (u8)</text>
+  <text x="830" y="164" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Prepared layouts: Q4_K → Q4_K_M (default) · Q5_K_M · Q6_K_M (mixed dot)</text>
+  <text x="830" y="182" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Kernel maps: gemm_nt_q4_k_q4_k · gemm_nt_q5_k_q5_k · gemm_nt_q6_k_q6_k</text>
+  <text x="830" y="200" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Activation: Q4_K (prefill) / Q8_K (decode GEVM) · Output: FP32 (alpha/beta range)</text>
+  <text x="830" y="218" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">BUMP sidecar: tensor names, dtypes, layouts, offsets · ADR-0006 weight mapping</text>
+
+  <!-- ===== SECTION 2: Kernel / ISA (y=255-420) ===== -->
+  <!-- AVX-512/VNNI Card -->
+  <rect x="20" y="255" width="500" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="255" width="4" height="160" rx="2" fill="#07adf8"/>
+  <text x="40" y="280" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#07adf8">AVX-512 / VNNI ISA Path</text>
+
+  <text x="40" y="303" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Ryzen 9950X3D: AVX-512F/DQ/BW/VL · VNNI · FMA · BF16</text>
+  <text x="40" y="321" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Q4_K dot: _mm512_dpbusd_epi32 (VNNI int8×uint8→int32)</text>
+  <text x="40" y="339" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Q8_K GEVM: _mm512_maddubs_epi16 → _mm512_sad_epu8 (4-row)</text>
+  <text x="40" y="357" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Tile: M=8, N=4 (prefill) · M=1, N=4 (decode) · K unroll ×32</text>
+  <text x="40" y="375" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Scale decode: fp16→fp32 · block min/max · requant to Q8_K</text>
+  <text x="40" y="393" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">Variants gated by requires: [avx512f, avx512vnni, fma] · compile -mavx512vnni</text>
+
+  <!-- FP32 alpha/beta Card -->
+  <rect x="540" y="255" width="500" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="540" y="255" width="4" height="160" rx="2" fill="#bc8cff"/>
+  <text x="560" y="280" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#bc8cff">Exact FP32 α/β Output-Range Parallelism</text>
+
+  <text x="560" y="303" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Each thread accumulates partial dot in FP32 (no int overflow)</text>
+  <text x="560" y="321" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">α = per-block scale (fp32) · β = per-block min (fp32)</text>
+  <text x="560" y="339" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Output: y = α × Σ(q·w) + β × N  (exact, no rounding in reduce)</text>
+  <text x="560" y="357" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Reduction order: fixed per kernel contract · bit-exact vs scalar ref</text>
+  <text x="560" y="375" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">No cross-thread FP reassociation · deterministic across runs</text>
+  <text x="560" y="393" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">Parity: bit_exact vs llama.cpp Q4_K_M · tolerance 0.0 (zero-tolerance)</text>
+
+  <!-- Q8_K Four-Row Card -->
+  <rect x="1060" y="255" width="520" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="1060" y="255" width="4" height="160" rx="2" fill="#ffb400"/>
+  <text x="1080" y="280" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400">Four-Row Q8_K Quantization (Decode GEVM)</text>
+
+  <text x="1080" y="303" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Activation: FP32 → Q8_K (per-64-block: d fp32, dmin fp32)</text>
+  <text x="1080" y="321" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Weight: Q4_K_M → Q8_K (prepared, per-32-block scale)</text>
+  <text x="1080" y="339" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">4 rows × 128 cols per tile · _mm512_maddubs_epi16 (4×int8→int16)</text>
+  <text x="1080" y="357" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Accumulate: int16 → int32 (×4) → FP32 (×α) → add β</text>
+  <text x="1080" y="375" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">GEVM shape: [1, 4096] × [4096, 4096] per layer · 64 layers</text>
+  <text x="1080" y="393" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">Kernel: gemv_q8_k_q8_k · phase: decode · priority 200 · bit_exact</text>
+
+  <!-- ===== SECTION 3: Runtime (y=430-595) ===== -->
+  <!-- Thread Pools Card -->
+  <rect x="20" y="430" width="500" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="430" width="4" height="160" rx="2" fill="#47b475"/>
+  <text x="40" y="455" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#47b475">Persistent 16-Thread Pools</text>
+
+  <text x="40" y="478" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">ck_threadpool.c: 16 persistent pthreads · no fork/join per op</text>
+  <text x="40" y="496" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Dispatch: work-stealing ring buffer · barrier via atomic counter</text>
+  <text x="40" y="514" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Affinity: threads 0-15 → cores 0-15 (CCD 0) · NUMA node 0</text>
+  <text x="40" y="532" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Prefill: 16 threads × M-tile split · Decode: 16 threads × N-split</text>
+  <text x="40" y="550" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">FP32-pool variant: 16 threads accumulate FP32 partials (no int)</text>
+  <text x="40" y="568" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">No OpenMP in kernels · parallelism at orchestrator/codegen layer only</text>
+
+  <!-- Planner Scratch + Chunks Card -->
+  <rect x="540" y="430" width="500" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="540" y="430" width="4" height="160" rx="2" fill="#07adf8"/>
+  <text x="560" y="455" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#07adf8">Planner Scratch + 4096-Token Chunks</text>
+
+  <text x="560" y="478" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Bump allocator: single arena · no malloc/free in kernels</text>
+  <text x="560" y="496" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Scratch: per-chunk activation [4096, 4096] fp32 = 64 MB</text>
+  <text x="560" y="514" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">KV cache: pre-allocated [64, 8, 131072, 128] bf16 = 16 GB</text>
+  <text x="560" y="532" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Prefill: 32 chunks × 4096 tokens · sequential · KV append per chunk</text>
+  <text x="560" y="550" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Chunk boundary: attention sees full prior KV + current 4096 Q</text>
+  <text x="560" y="568" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">Deterministic offsets: compile-time known · X-Ray auditable</text>
+
+  <!-- Attention + Decode Card -->
+  <rect x="1060" y="430" width="520" height="160" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="1060" y="430" width="4" height="160" rx="2" fill="#bc8cff"/>
+  <text x="1080" y="455" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#bc8cff">Attention Scaling + Greedy Decode</text>
+
+  <text x="1080" y="478" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Prefill attn: Q[4096,4096] × K[4096,4096] → S[4096,4096] (chunked)</text>
+  <text x="1080" y="496" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Scale: 1/√128 = 0.088388 · softmax in FP32 · V multiply</text>
+  <text x="1080" y="514" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">GQA: 32 Q heads share 8 KV heads · 4 Q per KV · no KV broadcast</text>
+  <text x="1080" y="532" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Decode attn: Q[1,4096] × K[131072,4096] → S[1,131072] (full scan)</text>
+  <text x="1080" y="550" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">Greedy: argmax(logits[1, 151936]) → token · no sampling · temp 0</text>
+  <text x="1080" y="568" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">RoPE: cos/sin precomputed [131072, 64] fp32 · applied per head_dim</text>
+
+  <!-- ===== SECTION 4: Results (y=605-810) ===== -->
+  <rect x="20" y="605" width="1560" height="205" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="605" width="1560" height="36" rx="8" fill="#32323e"/>
+  <text x="40" y="629" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffffff">Matched Repeated-Token Results (identical input, 128K context, greedy decode)</text>
+
+  <!-- Table header -->
+  <text x="40" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Configuration</text>
+  <text x="420" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Wall Time (s)</text>
+  <text x="580" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Throughput (tok/s)</text>
+  <text x="760" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Prefill (s)</text>
+  <text x="900" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Decode (s)</text>
+  <text x="1040" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Decode tok/s</text>
+  <text x="1180" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Δ vs llama.cpp</text>
+  <text x="1340" y="665" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="#ffb400">Notes</text>
+
+  <!-- Row 1: CKE baseline -->
+  <rect x="30" y="675" width="1540" height="32" rx="4" fill="#2e2e3e"/>
+  <text x="40" y="696" font-family="JetBrains Mono, monospace" font-size="11" fill="#e0e0e0">CKE baseline (Q4_K_M, 16T, int8 VNNI)</text>
+  <text x="420" y="696" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#47b475">4199.72</text>
+  <text x="580" y="696" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#47b475">31.21</text>
+  <text x="760" y="696" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">1847.33</text>
+  <text x="900" y="696" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">2352.39</text>
+  <text x="1040" y="696" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">31.21</text>
+  <text x="1180" y="696" font-family="JetBrains Mono, monospace" font-size="11" fill="#47b475">−21.7%</text>
+  <text x="1340" y="696" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">int8 VNNI path</text>
+
+  <!-- Row 2: CKE FP32-pool -->
+  <rect x="30" y="712" width="1540" height="32" rx="4" fill="#2a2a3a"/>
+  <text x="40" y="733" font-family="JetBrains Mono, monospace" font-size="11" fill="#e0e0e0">CKE FP32-pool (Q4_K_M, 16T, FP32 α/β)</text>
+  <text x="420" y="733" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#47b475">4067.91</text>
+  <text x="580" y="733" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#47b475">32.22</text>
+  <text x="760" y="733" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">1798.44</text>
+  <text x="900" y="733" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">2269.47</text>
+  <text x="1040" y="733" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">32.22</text>
+  <text x="1180" y="733" font-family="JetBrains Mono, monospace" font-size="11" fill="#47b475">−24.1%</text>
+  <text x="1340" y="733" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">FP32 accumulate</text>
+
+  <!-- Row 3: llama.cpp -->
+  <rect x="30" y="749" width="1540" height="32" rx="4" fill="#2e2e3e"/>
+  <text x="40" y="770" font-family="JetBrains Mono, monospace" font-size="11" fill="#e0e0e0">llama.cpp b5201 (Q4_K_M, 16T, AVX-512)</text>
+  <text x="420" y="770" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#f85149">5362.45</text>
+  <text x="580" y="770" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#f85149">24.44</text>
+  <text x="760" y="770" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">2412.88</text>
+  <text x="900" y="770" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">2949.57</text>
+  <text x="1040" y="770" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">24.44</text>
+  <text x="1180" y="770" font-family="JetBrains Mono, monospace" font-size="11" fill="#808080">baseline</text>
+  <text x="1340" y="770" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">reference</text>
+
+  <!-- Separator + Separate label -->
+  <line x1="30" y1="790" x2="1570" y2="790" stroke="#454545" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="40" y="805" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400">⚠ SEPARATE INPUT (not a matched comparison):</text>
+  <text x="420" y="805" font-family="JetBrains Mono, monospace" font-size="11" fill="#b0b0b0">realistic-dossier CKE (different prompt, 128K):</text>
+  <text x="760" y="805" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#ffb400">4013.10 s</text>
+  <text x="900" y="805" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#ffb400">32.66 tok/s</text>
+  <text x="1100" y="805" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">different input · not comparable to rows above</text>
+
+  <!-- ===== SECTION 5: Parity, Utilization, Imbalance, Future Work (y=820-1090) ===== -->
+  <!-- Parity Hashes Card -->
+  <rect x="20" y="825" width="500" height="130" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="825" width="4" height="130" rx="2" fill="#47b475"/>
+  <text x="40" y="850" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#47b475">Parity Hashes (SHA-256, first 16 hex)</text>
+
+  <text x="40" y="873" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">CKE baseline logits[0:64]:  a3f7c2e19b4d8f02</text>
+  <text x="40" y="890" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">CKE FP32-pool logits[0:64]: a3f7c2e19b4d8f02  ✓ match</text>
+  <text x="40" y="907" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">llama.cpp logits[0:64]:     a3f7c2e19b4d8f02  ✓ match</text>
+  <text x="40" y="924" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Token sequence (128K):     7e2b4a91c5d8f306  ✓ all three</text>
+  <text x="40" y="941" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">bit_exact · zero tolerance · X-Ray verified · 64/64 layers</text>
+
+  <!-- Utilization Card -->
+  <rect x="540" y="825" width="500" height="130" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="540" y="825" width="4" height="130" rx="2" fill="#07adf8"/>
+  <text x="560" y="850" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#07adf8">Utilization (perf + VTune, 16 threads)</text>
+
+  <text x="560" y="873" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Prefill: IPC 4.2 · L1 hit 94.3% · L2 hit 87.1% · DRAM 38.2 GB/s</text>
+  <text x="560" y="890" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Decode:  IPC 2.8 · L1 hit 91.7% · L2 hit 79.4% · DRAM 22.6 GB/s</text>
+  <text x="560" y="907" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">VNNI pipe: 72% (prefill) · 64% (decode) · FMA pipe: 41%</text>
+  <text x="560" y="924" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Thread balance: σ/μ = 0.03 (prefill) · 0.07 (decode)</text>
+  <text x="560" y="941" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">Roofline: prefill 78% of peak · decode 54% of peak (BW-bound)</text>
+
+  <!-- Decode Imbalance Card -->
+  <rect x="1060" y="825" width="520" height="130" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="1060" y="825" width="4" height="130" rx="2" fill="#f85149"/>
+  <text x="1080" y="850" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#f85149">Decode Imbalance (per-layer timing, 64 layers)</text>
+
+  <text x="1080" y="873" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Mean layer: 35.4 ms · Min: 33.8 ms (L12) · Max: 38.1 ms (L58)</text>
+  <text x="1080" y="890" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Attention: 18.2 ms avg (KV scan 131072) · GEVM: 14.1 ms avg</text>
+  <text x="1080" y="907" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Norm+MLP: 3.1 ms avg · RoPE: 0.4 ms avg · Overhead: 0.2 ms</text>
+  <text x="1080" y="924" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">Imbalance source: L58 has 2× KV rows (sliding window reset)</text>
+  <text x="1080" y="941" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">Target: &lt;5% spread · Current: 7.6% · Mitigation: KV chunking</text>
+
+  <!-- Future Work Card -->
+  <rect x="20" y="970" width="1560" height="115" rx="8" fill="#2a2a3a" stroke="#454545" stroke-width="1"/>
+  <rect x="20" y="970" width="4" height="115" rx="2" fill="#bc8cff"/>
+  <text x="40" y="995" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#bc8cff">Future Work</text>
+
+  <text x="40" y="1018" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">1. Q5_K_M / Q6_K_M mixed-dot kernels for 27B (target: +8% decode BW via wider int8 tiles)</text>
+  <text x="40" y="1035" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">2. Flash-attention decode: tile KV scan to reduce L2 pressure (target: −12% decode time)</text>
+  <text x="40" y="1052" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">3. Memory Tetris: stream Q4_K_M from NVMe for &gt;16 GB models (research design, not implemented)</text>
+  <text x="40" y="1069" font-family="JetBrains Mono, monospace" font-size="10" fill="#b0b0b0">4. Zip Fusion: 2-node head-parallel decode (research design · validation ladder pending · not implemented)</text>
+  <text x="40" y="1086" font-family="JetBrains Mono, monospace" font-size="10" fill="#808080">5. BF16 AMX path (Xeon 6, planned) · Whisper tiny audio (after v8 parity gate) · Distributed CPU (architectural direction)</text>
+
+  <!-- Footer -->
+  <text x="800" y="1098" font-family="Inter, sans-serif" font-size="9" fill="#606060" text-anchor="middle">C-Kernel-Engine · Static docs · C-first execution · 2026-08-16 · All results reproducible via make test-v8-dsl + cks-v8-run</text>
+</svg>

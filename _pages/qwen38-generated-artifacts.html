@@ -1,0 +1,131 @@
+<!-- TITLE: Qwen3.8 Generated Engineering Artifacts -->
+<!-- NAV: research -->
+
+<style>
+  .artifact-figure {
+    margin: 2rem 0 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+  .artifact-figure:first-of-type { border-top: 0; }
+  .artifact-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #fff;
+  }
+  .artifact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    margin: 0.7rem 0 0;
+  }
+  .artifact-actions code { overflow-wrap: anywhere; }
+</style>
+
+<h1>Qwen3.8 Generated Engineering Artifacts</h1>
+
+<p>These SVGs were generated end to end by the Qwen3.8 27B Q4_K_M runtime in CKE on one Ryzen 9 9950X3D CPU. They are retained both as useful engineering diagrams and as inspectable model-quality evidence: each artifact is standalone XML, contains no scripts or external references, and can be opened directly in a browser.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Evidence boundary</strong><br>
+    A valid, useful SVG is model-output evidence, not by itself a numerical or performance certification. Text and measurements inside each diagram reflect the dossier supplied to that generation. The <a href="model-kernel-matrix.html#card-qwen38">Model + Kernel Matrix</a>, X-Ray reports, and committed benchmark artifacts remain authoritative for promoted claims.
+  </div>
+</div>
+
+<h2>Measured Generation Envelope</h2>
+
+<table class="table">
+  <thead>
+    <tr><th>Property</th><th>Measured result</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Runtime</td><td>Qwen3.8 27B Q4_K_M, CKE v8 generated C, 16 pinned physical cores</td></tr>
+    <tr><td>Long-context inputs</td><td>Six complete 131,072-token inputs; each stopped on the model EOS token</td></tr>
+    <tr><td>Generated output</td><td>7,998 to 16,950 tokens per long-context artifact</td></tr>
+    <tr><td>Prefill</td><td>32.37 to 32.71 tok/s across the six runs</td></tr>
+    <tr><td>Decode</td><td>1.36 to 1.41 tok/s across the six runs</td></tr>
+    <tr><td>Peak resident memory</td><td>Approximately 50.6 GiB</td></tr>
+    <tr><td>SIMD RoPE artifact</td><td>1,152-token prompt, 24,227-token answer, 3.1 tok/s decode, 15.02 average active cores</td></tr>
+    <tr><td>Numerical certification</td><td>Separate 4,000/4,000 full-vocabulary rows and 4,011 internal rows bit-exact to llama.cpp</td></tr>
+  </tbody>
+</table>
+
+<section class="artifact-figure">
+  <h2>Long-Context System Overview</h2>
+  <p>A single-page synthesis of the GGUF-to-generated-C pipeline, memory hierarchy, recurrent/full-attention schedule, ZIP research direction, Memory Tetris, planner-owned scratch, and X-Ray evidence.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CKE long-context system overview">
+    <img src="assets/qwen38-generated-system-overview.svg" alt="Generated overview of CKE long-context CPU inference">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-system-overview.svg" download>Download SVG</a><code>SHA-256 15df1242411b32a0...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>RoPE Across a 128K Hybrid Context</h2>
+  <p>Visualizes absolute-position continuity through chunked prefill, the recurrent-to-full-attention cadence, grouped-query cache addressing, X-Ray failure modes, and planned long-context work.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated RoPE at 128K">
+    <img src="assets/qwen38-generated-rope-128k.svg" alt="Generated diagram of RoPE across recurrent and full-attention layers at 128K">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-rope-128k.svg" download>Download SVG</a><code>SHA-256 a692ea875c0dddbe...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>Qwen3.8 CPU Execution Path</h2>
+  <p>Connects the model circuit, quantized representations, SIMD path, deterministic output-range reductions, persistent workers, planner scratch, utilization, and follow-up optimization targets.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CPU optimization map">
+    <img src="assets/qwen38-generated-cpu-optimization.svg" alt="Generated Qwen3.8 CPU execution and optimization map">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-cpu-optimization.svg" download>Download SVG</a><code>SHA-256 7954e1212f7fe25b...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>Theory of Constraints</h2>
+  <p>Shows the intended flow from NVMe through DRAM and cache to SIMD workers, contrasting exposed stop-and-go stalls with overlapped compute and memory work.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated theory-of-constraints flow">
+    <img src="assets/qwen38-generated-constraint-flow.svg" alt="Generated theory-of-constraints diagram for CPU AI">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-constraint-flow.svg" download>Download SVG</a><code>SHA-256 c376811abd8b6343...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>CKE and llama.cpp Comparison Discipline</h2>
+  <p>Documents the matched-run conditions, consumed-token hashes, full-logit checks, X-Ray localization, occupancy accounting, provider timing, and claim boundaries required for a fair comparison.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated CKE and llama.cpp comparison discipline">
+    <img src="assets/qwen38-generated-cke-llamacpp-128k.svg" alt="Generated comparison framework for CKE and llama.cpp at 128K">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-cke-llamacpp-128k.svg" download>Download SVG</a><code>SHA-256 4f958d4811a1cafa...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>Core Saturation and Scheduling</h2>
+  <p>Turns the observed worker occupancy into a scheduling diagram: persistent threads, queue depth, barriers, deterministic reductions, tile ownership, and the decode imbalance that remains diagnostic rather than a final causal claim.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated core scheduling diagram">
+    <img src="assets/qwen38-generated-core-scheduling.svg" alt="Generated visualization of 16-core CKE scheduling">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-core-scheduling.svg" download>Download SVG</a><code>SHA-256 11d3067256e32229...</code></p>
+</section>
+
+<section class="artifact-figure">
+  <h2>Split-Half FP32 RoPE SIMD</h2>
+  <p>A kernel-level diagram of validation, split-half layout, AVX2 lanes, operation order, in-place safety, scalar tail handling, and the no-allocation call contract.</p>
+  <div class="img-container svg-viewer" data-title="Qwen3.8 generated split-half FP32 RoPE SIMD diagram">
+    <img src="assets/qwen38-generated-rope-simd.svg" alt="Generated split-half FP32 RoPE AVX2 dataflow diagram">
+  </div>
+  <p class="artifact-actions"><a href="assets/qwen38-generated-rope-simd.svg" download>Download SVG</a><code>SHA-256 57cd78c57efc79e9...</code></p>
+</section>
+
+<h2>Validation Notes</h2>
+
+<ul>
+  <li>All seven published files parse as XML, use an SVG root and viewBox, and contain no script or external reference.</li>
+  <li>Two earlier candidates were rejected because they were malformed XML; they are not published here.</li>
+  <li>The RoPE SIMD quality gate marked its run failed because two required literal labels used different wording. The resulting SVG itself is valid and retained for human review.</li>
+  <li>Generation quality, numerical parity, and performance remain three separate scorecard dimensions.</li>
+</ul>
