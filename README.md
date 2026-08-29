@@ -40,19 +40,54 @@ version/v8/scripts/cks-v8-run run \
 ```
 
 Use the same command with a local GGUF path or another supported Hugging Face
-artifact. High-memory safetensors and multimodal lanes have model-specific
-commands in the [v8 runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html).
+artifact. For inference, follow the
+[v8 runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html),
+which contains the model-specific text, high-memory safetensors, multimodal,
+long-context, and overnight commands. Running the compiler and contract test
+suites is not required to start using a supported model.
 
 For an AI coding agent, this two-sentence prompt is sufficient:
 
-> Read the CKE README, model and kernel matrix, v8 runbook, and the relevant circuit and kernel maps before running this model. Bring up `<model>` without adding model-name branches to the DSL, then report the exact command, commit, artifact and input hashes, quantization, context, detected ISA, peak RAM, prefill/decode throughput, and strongest reproducible parity boundary against llama.cpp or PyTorch; do not claim support beyond that evidence.
+> Read the CKE v8 runbook and use its documented command to run `<model>` for inference. Report the exact command, artifact, quantization, context length, detected ISA, and observed prefill/decode throughput; do not claim support beyond the evidence linked by the runbook.
 
-Run the compiler and contract gates before proposing a change:
+### Run More Models Now
+
+Text models use the same generated-runtime entry point. Replace `MODEL` with a
+public `hf://` artifact from the table or a local GGUF/safetensors directory:
 
 ```bash
-make test-v8-dsl
-make v7-kernel-parity-train
+version/v8/scripts/cks-v8-run run MODEL \
+  --context-len 2048 \
+  --prompt 'Give me a concise example of safe C code.' \
+  --max-tokens 256
 ```
+
+| Model lane | Artifact or command | Required or recommended options |
+|---|---|---|
+| Gemma3 270M IT | `hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf` | `--chat-template auto` |
+| **Gemma4 E4B IT** | `hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf` | `--chat-template gemma4 --temperature 0.0`; use `--max-tokens 1024` for a long coherence smoke |
+| Qwen2 0.5B Instruct | `hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf` | `--chat-template auto` |
+| Qwen3 0.6B | `hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf` | `--chat-template auto` |
+| Qwen3.5 0.8B | `hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf` | `--context-len 1034` |
+| Qwen3.5 35B-A3B | `/path/to/qwen3.5-35b-a3b-q4_k_m.gguf` | High-memory local artifact; follow the v8 runbook's Qwen long-context lane |
+| Qwen3.6 27B | `/path/to/qwen3.6-27b-q4_k_m.gguf` | High-memory local artifact; optimized prefill and its parity boundary are documented in the v8 runbook |
+| Qwen3.8 27B dense | `/path/to/qwen3.8-27b-q4_k_m.gguf` | High-memory local artifact; use the v8 runbook for 128K execution and artifact generation |
+| Nemotron Nano 9B v2 | `hf://bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF/nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf` | `--chat-template auto --temperature 0.0` |
+| GLM4 9B | `hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf` | `--chat-template glm4 --temperature 0.0` |
+| Nanbeige 4.1 3B / Llama-family | `hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf` | `--chat-template auto`; use `--python-tokenizer` when diagnosing an unfamiliar tokenizer |
+| Cohere2 Command R | `/path/to/command-r7b-q4_k_m.gguf` | `--chat-template auto --temperature 0.0` |
+| Laguna-XS 2.1 | `/path/to/Laguna-XS-2.1-Q4_K_M.gguf` | `--chat-template auto --thinking-mode suppressed --temperature 0.0` for the shortest smoke |
+| Kimi-VL A3B text decoder | `/path/to/moonshotai--Kimi-VL-A3B-Instruct` | `--chat-template kimi_vl`; current certified scope is text only |
+| Instella-MoE 16B-A3B | `/path/to/amd--Instella-MoE-16B-A3B-Think` | BF16 safetensors lane; use the exact local-artifact command in the v8 runbook |
+| GPT-2 / compatible Llama GGUF | `/path/to/model-or-run-directory` | Generic text entry point; use `--chat-template auto` unless the model is a raw continuation model |
+| Qwen3-VL 8B | `hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf` | Add the runbook's `--mmproj`, `--image-path`, and vision token options |
+| Qwen3.6-VL | Local decoder GGUF plus generated encoder runtime | Use the separate Qwen3.6-VL OCR command in the v8 runbook; a text-only command does not certify vision |
+| Whisper Tiny, Base, or Small | `version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav /path/to/audio.wav` | Audio uses the `audio` subcommand; see the v8 runbook for generated artifact directories and language/task options |
+
+Use `--force-convert --force-compile` when intentionally rebuilding a model.
+The [v8 runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html)
+is the source of truth for complete commands, artifact prerequisites, current
+limitations, vision/audio inputs, and long-context operation.
 
 ## Model Support and Evidence
 
@@ -188,7 +223,8 @@ Inspect the implementation directly:
 - [v8 kernel maps](version/v8/kernel_maps/) bind exact operations to executable capabilities.
 - [v8 compiler scripts](version/v8/scripts/) parse, validate, lower, and generate C.
 - [C kernels](src/kernels/) implement the numerical and performance primitives.
-- [v7 training](version/v7/) owns the current FP32 forward/backward path.
+- The [v7 training runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v7-runbook.html)
+  covers the current FP32 forward/backward path for supported training circuits.
 - [Tests](tests/) and [kernel unit tests](unittest/) preserve compiler, circuit, and numerical behavior.
 
 ## Current Scope
@@ -197,9 +233,9 @@ Inspect the implementation directly:
 |---|---|
 | v8 text inference | Active GGUF/safetensors conversion, generated runtimes, quantized prefill, KV-cached decode, and model-family regression lanes |
 | v8 vision inference | Qwen3-VL and related vision/compiler support under numerical-parity hardening with bounded first-divergence attribution |
-| v7 training | FP32 forward/backward, optimizer, gradient accumulation, and training-kernel parity are the authoritative training lane |
+| v7 training | FP32 forward/backward, optimizer, gradient accumulation, and training-kernel parity for supported circuits; not every inference kernel has a backprop implementation yet, and coverage is being expanded |
 | BF16 | Portable storage/rounding contracts are tested; native practical validation is resource-gated to AVX-512 BF16 or AMX-capable machines |
-| Audio | Whisper tiny/base inference is next after the v8 compiler and Qwen3-VL parity gates |
+| Audio | Generated FP32 Whisper Tiny, Base, and Small inference within the documented fixture and sequential-window scope |
 | Distributed CPU | Architectural direction and research target; not yet a completed production runtime |
 
 For the detailed support surface, see the [model and kernel matrix](https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html), [test report](https://c-kernel-engine.github.io/C-Kernel-Engine/test-report.html), and [roadmap](https://c-kernel-engine.github.io/C-Kernel-Engine/version-history.html).
