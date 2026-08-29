@@ -20,17 +20,17 @@
     {"name": "moe_expert_down", "dtype": "q4_k", "shape": ["E", "H", "I"], "layout": "expert_major_opaque_packed", "access": "read", "storage_class": "weight", "consumption": "required"}
   ],
   "outputs": [{"name": "output", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
-  "scratch": [{"name": "workspace", "dtype": "u8", "alignment": 64, "lifetime": "kernel_call", "size_resolution": "required", "size_bytes": "align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4)", "desc": "Planner-owned hidden quantization, gate/up, activation quantization, and expert output workspace."}],
+  "scratch": [{"name": "workspace", "dtype": "u8", "alignment": 64, "lifetime": "kernel_call", "size_resolution": "required", "size_bytes": "64 * (align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_k_row_bytes(I)) + align64(H * 4))", "desc": "Planner-owned per-worker hidden quantization, gate/up, activation quantization, and expert output workspaces for at most 64 persistent-pool workers."}],
   "dims": ["R", "H", "I", "E", "K"],
   "constraints": {"alignment": {"H": 256, "I": 256}},
-  "impl": {"function": "moe_swiglu_expert_forward_q4k_q4k_workspace", "c_declaration": "int moe_swiglu_expert_forward_q4k_q4k_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);", "sources": ["src/kernels/axpy_kernels.c", "src/kernels/gemm_kernels_q4k_q8k.c", "src/kernels/swiglu_kernels.c"]},
+  "impl": {"function": "moe_swiglu_expert_forward_q4k_q4k_parallel_workspace", "c_declaration": "int moe_swiglu_expert_forward_q4k_q4k_parallel_workspace(const float *hidden, const int *indices, const float *routing_weights, const void *expert_gate, const void *expert_up, const void *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k, void *workspace, size_t workspace_bytes);", "sources": ["src/kernels/axpy_kernels.c", "src/kernels/gemm_kernels_q4k_q8k.c", "src/kernels/swiglu_kernels.c"]},
   "implementation": {
     "isa_dispatch": "runtime",
     "threading": {
-      "runtime": "serial",
-      "work_partition": ["independent_rows"],
-      "dispatch": ["inline"],
-      "reduction_order_effect": "none"
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_rows", "independent_experts"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
+      "reduction_order_effect": "contract_defined"
     }
   },
   "call_abi": {"version": 1, "params": [
@@ -49,15 +49,15 @@
       "contract_id": "q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32",
       "status": "observed",
       "phases": ["prefill", "decode"],
-      "function": "moe_swiglu_expert_forward_q4k_q4k_workspace",
+      "function": "moe_swiglu_expert_forward_q4k_q4k_parallel_workspace",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "runtime",
         "threading": {
-          "runtime": "serial",
-          "work_partition": ["independent_rows"],
-          "dispatch": ["inline"],
-          "reduction_order_effect": "none"
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows", "independent_experts"],
+          "dispatch": ["ck_threadpool_dispatch_n"],
+          "reduction_order_effect": "contract_defined"
         }
       },
       "arithmetic": {

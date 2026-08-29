@@ -3434,6 +3434,38 @@ int moe_swiglu_expert_forward_q4k_q4k_workspace(
     void *workspace,
     size_t workspace_bytes);
 
+int moe_swiglu_expert_forward_q4k_q6k_parallel_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q4k_parallel_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
 int moe_swiglu_shared_forward_q4k_q6k_workspace(
     const float *hidden,
     const float *routed,
@@ -3448,6 +3480,32 @@ int moe_swiglu_shared_forward_q4k_q6k_workspace(
     size_t workspace_bytes);
 
 int moe_swiglu_shared_forward_q4k_q4k_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_shared_forward_q4k_q6k_parallel_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_shared_forward_q4k_q4k_parallel_workspace(
     const float *hidden,
     const float *routed,
     const void *shared_gate,

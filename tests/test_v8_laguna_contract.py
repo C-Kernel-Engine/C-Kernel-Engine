@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -17,6 +18,40 @@ import convert_gguf_to_bump_v8 as converter  # type: ignore
 
 
 class LagunaContractTests(unittest.TestCase):
+    def test_compact_moe_maps_own_parallel_execution_and_scratch(self) -> None:
+        maps = ROOT / "version" / "v8" / "kernel_maps"
+        expected = {
+            "moe_swiglu_expert_forward_q4k_q4k.json": (
+                "moe_swiglu_expert_forward_q4k_q4k_parallel_workspace",
+                ["independent_rows", "independent_experts"],
+            ),
+            "moe_swiglu_expert_forward_q4k_q6k.json": (
+                "moe_swiglu_expert_forward_q4k_q6k_parallel_workspace",
+                ["independent_rows", "independent_experts"],
+            ),
+            "moe_swiglu_shared_forward_q4k_q4k.json": (
+                "moe_swiglu_shared_forward_q4k_q4k_parallel_workspace",
+                ["independent_rows"],
+            ),
+            "moe_swiglu_shared_forward_q4k_q6k.json": (
+                "moe_swiglu_shared_forward_q4k_q6k_parallel_workspace",
+                ["independent_rows"],
+            ),
+        }
+        for filename, (function, partition) in expected.items():
+            with self.subTest(map=filename):
+                spec = json.loads((maps / filename).read_text(encoding="utf-8"))
+                self.assertEqual(spec["impl"]["function"], function)
+                self.assertEqual(
+                    spec["implementation"]["threading"]["runtime"],
+                    "ck_threadpool",
+                )
+                self.assertEqual(
+                    spec["implementation"]["threading"]["work_partition"],
+                    partition,
+                )
+                self.assertTrue(spec["scratch"][0]["size_bytes"].startswith("64 *"))
+
     def test_model_map_and_circuit_own_the_hybrid_graph(self) -> None:
         model_map = converter.load_gguf_ck_map()["architectures"]["laguna"]
         self.assertEqual(model_map["template"], "laguna")
