@@ -14,6 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import build_ir_v8  # type: ignore
+import ck_run_v8  # type: ignore
 import convert_safetensors_to_bump_v8 as converter  # type: ignore
 import run_multimodal_bridge_v8 as bridge  # type: ignore
 from tests.test_v8_cohere2_contract import _make_tiny_cohere2_manifest
@@ -143,6 +144,14 @@ class CohereCompassContractTests(unittest.TestCase):
         self.assertEqual(text["kernels"]["rope_qk_decode"], "mrope_qk_text_imrope")
         self.assertIn("decoder.mrope", text["required_numerical_contracts"])
         self.assertEqual(text["contract"]["block_contract"]["body_type"], "parallel_attention_swiglu")
+        self.assertEqual(
+            text["contract"]["chat_contract"]["assistant_generation_prefix"],
+            "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>",
+        )
+        self.assertEqual(
+            text["contract"]["chat_contract"]["force_bos_text_if_tokenizer_add_bos_false"],
+            "<BOS_TOKEN>",
+        )
         self.assertEqual(vision["name"], "cohere_compass_vision")
         self.assertEqual(vision["inherited_from"], "qwen3_vl_vision")
         self.assertEqual(vision["block_types"]["vision_encoder"]["branches"][0]["name"], "deepstack")
@@ -166,6 +175,51 @@ class CohereCompassContractTests(unittest.TestCase):
         stitch = bridge._composition_bridge_contract(circuit)
         self.assertEqual(stitch["deepstack_injections"], 3)
         self.assertEqual(stitch["position_policy"], "mrope_2d")
+
+    def test_runner_refresh_preserves_inherited_circuit_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "weights_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "config": {"model": "cohere_compass_text"},
+                        "template": {
+                            "name": "cohere_compass_text",
+                            "extends": "cohere2",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertTrue(ck_run_v8._refresh_manifest_circuit_snapshot(manifest_path))
+            refreshed = json.loads(manifest_path.read_text(encoding="utf-8"))["template"]
+            self.assertEqual(refreshed["inherited_from"], "cohere2")
+            self.assertEqual(
+                refreshed["contract"]["block_contract"]["body_type"],
+                "parallel_attention_swiglu",
+            )
+            self.assertEqual(
+                refreshed["contract"]["chat_contract"]["assistant_generation_prefix"],
+                "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>",
+            )
+
+    def test_runner_stages_checkpoint_chat_template(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkpoint = root / "checkpoint"
+            output = root / "runtime"
+            checkpoint.mkdir()
+            output.mkdir()
+            template = "{{ bos_token }}<|START_OF_TURN_TOKEN|>"
+            (checkpoint / "chat_template.jinja").write_text(template, encoding="utf-8")
+
+            ck_run_v8._stage_safetensors_tokenizer_assets(checkpoint, output)
+
+            self.assertEqual(
+                (output / "chat_template.jinja").read_text(encoding="utf-8"),
+                template,
+            )
 
     def test_text_mrope_builds_call_ready_prefill_and_decode(self) -> None:
         manifest = _make_tiny_cohere2_manifest()

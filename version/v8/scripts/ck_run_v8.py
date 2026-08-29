@@ -1139,6 +1139,7 @@ def _stage_safetensors_tokenizer_assets(checkpoint_dir: Path, output_dir: Path) 
         "tokenizer_config.json",
         "special_tokens_map.json",
         "generation_config.json",
+        "chat_template.jinja",
         "tiktoken.model",
         "tokenizer.model",
     ):
@@ -1154,6 +1155,7 @@ def _stage_safetensors_tokenizer_assets(checkpoint_dir: Path, output_dir: Path) 
             "tokenizer_config.json",
             "special_tokens_map.json",
             "generation_config.json",
+            "chat_template.jinja",
             "tiktoken.model",
             "tokenizer.model",
         ):
@@ -1351,7 +1353,9 @@ def _refresh_manifest_circuit_snapshot(manifest_path: Path) -> bool:
     circuit_path = V8_ROOT / "circuits" / f"{circuit_name}.json"
     if not circuit_path.is_file():
         return False
-    current = json.loads(circuit_path.read_text(encoding="utf-8"))
+    from build_ir_v8 import _load_builtin_template_doc
+
+    current = _load_builtin_template_doc(circuit_name)
     if not isinstance(current, dict):
         raise RuntimeError(f"versioned circuit is not a JSON object: {circuit_path}")
     if embedded == current:
