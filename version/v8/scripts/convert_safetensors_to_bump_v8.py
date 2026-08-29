@@ -1062,6 +1062,9 @@ def _refs_for_arch(arch: str, config: dict[str, Any], headers: dict[str, HeaderT
     mapped_refs = _refs_from_safetensors_contract(arch, config, headers)
     if mapped_refs is not None:
         return mapped_refs
+    tensor_mapper = str(_safetensors_arch_contract(arch).get("tensor_mapper") or "").strip().lower()
+    if tensor_mapper == "qwen3_vl_vision":
+        return _qwen3vl_vision_refs(config, headers)
     if arch == "gemma4_assistant":
         return _refs_from_safetensors_contract("gemma4_assistant", config, headers) or _llama_family_text_refs(config, headers)
     if arch == "gemma4":
@@ -1234,6 +1237,15 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
     base = _load_runtime_config_template(config_template)
     text = hf.get("text_config") if isinstance(hf.get("text_config"), dict) else hf
     cfg = dict(base)
+    arch_contract = _safetensors_arch_contract(arch)
+    contract_config = (
+        arch_contract.get("config")
+        if isinstance(arch_contract.get("config"), dict)
+        else {}
+    )
+    for key, value in contract_config.items():
+        cfg.setdefault(str(key), value)
+    config_builder = str(arch_contract.get("config_builder") or "").strip().lower()
     cfg.setdefault("model", arch)
     cfg.setdefault("model_type", arch)
     cfg.setdefault("num_layers", text.get("num_hidden_layers"))
@@ -1673,6 +1685,58 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         })
 
 
+    if config_builder == "cohere2_text":
+        sliding_rope = (
+            rope_parameters.get("sliding_attention")
+            if isinstance(rope_parameters.get("sliding_attention"), dict)
+            else {}
+        )
+        layer_kinds = [str(kind) for kind in (text.get("layer_types") or [])]
+        num_layers = int(cfg.get("num_layers") or 0)
+        if not layer_kinds and num_layers > 0:
+            layer_kinds = [
+                "full_attention" if (layer + 1) % 4 == 0 else "sliding_attention"
+                for layer in range(num_layers)
+            ]
+        if len(layer_kinds) != num_layers:
+            raise SystemExit(
+                f"{arch} layer_types has {len(layer_kinds)} entries for {num_layers} layers"
+            )
+        mrope = [int(value) for value in (sliding_rope.get("mrope_section") or [])]
+        head_dim = int(cfg.get("head_dim") or 0)
+        cfg.update({
+            "model": arch,
+            "arch": arch,
+            "model_type": arch,
+            "layer_kinds": layer_kinds,
+            "hybrid_block_pattern": layer_kinds[:],
+            "layer_attention_policy": layer_kinds[:],
+            "layer_mlp_policy": ["parallel_swiglu" for _ in layer_kinds],
+            "layer_kv_policy": ["attention_kv_cache" for _ in layer_kinds],
+            "intermediate_dim": int(cfg.get("intermediate_size") or 0),
+            "attn_out_dim": int(cfg.get("num_heads") or 0) * head_dim,
+            "rotary_dim": head_dim,
+            "max_seq_len": int(cfg.get("context_length") or 0),
+            "rms_eps": float(text.get("layer_norm_eps", cfg.get("rms_eps", 1e-5)) or 1e-5),
+            "rms_norm_eps": float(text.get("layer_norm_eps", cfg.get("rms_eps", 1e-5)) or 1e-5),
+            "sliding_window": int(text.get("sliding_window") or 0),
+            "logit_scale": float(text.get("logit_scale") or 1.0),
+            "rope_layout": "multi_section_1d",
+            "rope_param_mode": "per_layer_direct",
+            "rope_theta": float(sliding_rope.get("rope_theta") or 10000.0),
+            "rope_freq_base": float(sliding_rope.get("rope_theta") or 10000.0),
+            "has_attention_biases": bool(text.get("attention_bias", False)),
+            "has_qk_norm": False,
+            "prefill_policy": "batched",
+            "image_token_id": int(hf.get("image_token_id") or 0),
+            "video_token_id": int(hf.get("video_token_id") or 0),
+            "num_deepstack_layers": len((hf.get("vision_config") or {}).get("deepstack_visual_indexes") or []),
+        })
+        if mrope:
+            cfg["mrope_sections"] = mrope + ([0] if len(mrope) == 3 else [])
+            cfg["mrope_n_dims"] = head_dim or sum(mrope)
+            cfg["mrope_interleaved"] = bool(sliding_rope.get("mrope_interleaved", False))
+
     if arch == "qwen3vl":
         rope_scaling = text.get("rope_scaling") if isinstance(text.get("rope_scaling"), dict) else {}
         rope_params_effective = rope_scaling or rope_parameters
@@ -1711,7 +1775,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             cfg["mrope_n_dims"] = int(cfg.get("head_dim") or sum(int(v) for v in mrope))
             cfg["mrope_interleaved"] = bool(rope_params_effective.get("mrope_interleaved", False))
 
-    if arch == "qwen3_vl_vision":
+    if arch == "qwen3_vl_vision" or config_builder == "qwen3_vl_vision":
         vision = hf.get("vision_config") if isinstance(hf.get("vision_config"), dict) else {}
         headers = _load_safetensors_headers(model_dir)
         hidden = int(vision.get("hidden_size") or 0)
@@ -1751,9 +1815,9 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         else:
             vision_mrope_sections = [1, 1, 0, 0]
         cfg.update({
-            "model": "qwen3_vl_vision",
-            "arch": "qwen3_vl_vision",
-            "model_type": "qwen3_vl_vision",
+            "model": arch,
+            "arch": arch,
+            "model_type": arch,
             "num_layers": depth,
             "num_hidden_layers": depth,
             "embed_dim": hidden,
@@ -2326,7 +2390,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "qwen35", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "qwen35", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

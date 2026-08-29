@@ -866,6 +866,25 @@ def _load_builtin_template_doc(
     with open(path, "r", encoding="utf-8") as f:
         doc = json.load(f)
     _raise_on_forbidden_template_metadata(doc, source=str(path))
+    parent_name = str(doc.get("extends", "") or "").strip().lower()
+    if parent_name:
+        if not re.fullmatch(r"[a-z0-9_]+", parent_name):
+            raise RuntimeError(
+                f"HARD CIRCUIT INHERITANCE FAULT: {path} has invalid parent {parent_name!r}"
+            )
+        parent_doc = _load_builtin_template_doc(
+            parent_name,
+            _component_stack=(*_component_stack, name),
+        )
+        if parent_doc is None:
+            raise RuntimeError(
+                f"HARD CIRCUIT INHERITANCE FAULT: {path} references missing parent {parent_name!r}"
+            )
+        overrides = copy.deepcopy(doc)
+        overrides.pop("extends", None)
+        doc = _merge_template_defaults(parent_doc, overrides)
+        doc["inherited_from"] = parent_name
+        _raise_on_forbidden_template_metadata(doc, source=str(path))
     components = doc.get("components")
     if components is not None:
         if not isinstance(components, dict) or not components:
@@ -4659,6 +4678,7 @@ def _validate_lowered_activation_memory(
         previous_name = name
 
     write_contracts: List[Dict[str, Any]] = []
+    copy_write_contracts: List[Dict[str, Any]] = []
     scratch_contracts: List[Dict[str, Any]] = []
     external_runtime_scratch: List[Dict[str, Any]] = []
     operations = lowered_ir.get("operations", []) if isinstance(lowered_ir, dict) else []
@@ -4738,6 +4758,46 @@ def _validate_lowered_activation_memory(
                 "disjoint_port_count": len(disjoint_from),
             })
 
+        if op.get("op") == "residual_save":
+            params = op.get("params") or {}
+            required = int(params.get("_memcpy_bytes", 0) or 0)
+            output = (op.get("outputs") or {}).get("dst")
+            if required <= 0 or not isinstance(output, dict):
+                raise RuntimeError(
+                    f"HARD ACTIVATION EXTENT FAULT: residual_save layer={op.get('layer')} "
+                    "has no positive copy extent or concrete destination"
+                )
+            buffer_name = str(output.get("buffer", ""))
+            allocation = by_name.get(buffer_name)
+            if allocation is None:
+                raise RuntimeError(
+                    f"HARD ACTIVATION EXTENT FAULT: residual_save layer={op.get('layer')} "
+                    f"targets unknown buffer {buffer_name!r}"
+                )
+            allocation_offset = int(allocation.get("offset", 0) or 0)
+            output_offset = int(
+                output.get("activation_offset", allocation_offset) or allocation_offset
+            )
+            relative_offset = output_offset - allocation_offset
+            available = int(allocation.get("size", 0) or 0) - relative_offset
+            if relative_offset < 0 or required > available:
+                raise RuntimeError(
+                    f"HARD ACTIVATION EXTENT FAULT: residual_save layer={op.get('layer')} "
+                    f"provider={op.get('kernel')} writes {required} bytes to {buffer_name} "
+                    f"at relative offset {relative_offset}, but only {available} bytes are available"
+                )
+            copy_write_contracts.append(
+                {
+                    "op": "residual_save",
+                    "layer": int(op.get("layer", -1) or -1),
+                    "provider": str(op.get("kernel", "")),
+                    "buffer": buffer_name,
+                    "relative_offset": relative_offset,
+                    "required_bytes": required,
+                    "available_bytes": available,
+                }
+            )
+
         capability = op.get("resolved_codegen_capability") or {}
         if capability.get("operator_family") != "activation_quantization":
             continue
@@ -4815,11 +4875,12 @@ def _validate_lowered_activation_memory(
         "status": "PASS",
         "activation_buffer_count": len(buffers),
         "quantized_write_count": len(write_contracts),
+        "copy_write_count": len(copy_write_contracts),
         "scratch_contract_count": len(scratch_contracts),
         "external_runtime_scratch_count": len(external_runtime_scratch),
         "arena_bytes": activation_bytes,
         "arena_base": activation_base,
-        "writes": write_contracts,
+        "writes": copy_write_contracts + write_contracts,
         "scratch": scratch_contracts,
         "external_runtime_scratch": external_runtime_scratch,
     }
@@ -13435,6 +13496,16 @@ def generate_ir_lower_2(
 
         # Keep _m aligned with effective seq_len for token-major kernels.
         params["_m"] = params.get("seq_len", 1)
+        if op_type == "residual_save":
+            embed_dim = int(
+                params.get("embed_dim", config.get("embed_dim", config.get("hidden_size", 0)))
+                or 0
+            )
+            if embed_dim <= 0:
+                raise RuntimeError(
+                    "HARD MEMORY PLAN FAULT: residual_save requires a positive embed_dim"
+                )
+            params["_memcpy_bytes"] = int(params["seq_len"]) * embed_dim * 4
         if op_type in {
             "full_softmax_topk_router",
             "moe_swiglu_expert_mlp",

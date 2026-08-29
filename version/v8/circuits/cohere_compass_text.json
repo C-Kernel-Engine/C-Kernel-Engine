@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "name": "cohere_compass_text",
+  "family": "cohere_compass",
+  "extends": "cohere2",
+  "flags": {
+    "rope": "mrope"
+  },
+  "contract": {
+    "attention_contract": {
+      "causal": true,
+      "rope_layout": "multi_section_1d",
+      "rope_type": "mrope_on_sliding_layers_only",
+      "qk_norm": false,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "hybrid_sliding_attention",
+      "layer_kind_config_key": "layer_kinds",
+      "sliding_window_config_key": "sliding_window"
+    }
+  },
+  "kernels": {
+    "rope_qk": "mrope_qk_text_imrope",
+    "rope_qk_decode": "mrope_qk_text_imrope"
+  },
+  "required_numerical_contracts": {
+    "decoder.mrope": {
+      "op": "rope",
+      "template_ops": ["rope_qk"],
+      "phases": {
+        "prefill": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "The shared interleaved multi-section text M-RoPE provider is selected from the model-declared section layout."
+        },
+        "decode": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Decode uses the same map-owned interleaved section routing before cache append."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.mrope.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    }
+  }
+}

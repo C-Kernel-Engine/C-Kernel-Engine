@@ -667,6 +667,109 @@
       ],
       "notes": "The text decoder converts official sharded safetensors to BUMP and executes the explicit MLA/MoE circuit with the embedded TikToken chat protocol. Real-weight text smoke is coherent and repeatable; first-token and top-20 ranking match PyTorch. MoonViT encoder/projector lowering and the multimodal bridge remain unimplemented, and internal BF16 drift still requires longer-trajectory attribution."
     },
+    "cohere_compass_text": {
+      "template": "cohere_compass_text",
+      "family": "cohere_compass",
+      "aliases": [
+        "cohere_compass",
+        "CohereCompassForConditionalGeneration",
+        "CohereCompassTextForCausalLM"
+      ],
+      "status": "text_decoder_mapping",
+      "config_builder": "cohere2_text",
+      "config": {
+        "model": "cohere_compass_text",
+        "arch": "cohere_compass_text",
+        "model_type": "cohere_compass_text",
+        "prefill_policy": "batched",
+        "attention_variant": "hybrid_sliding_attention",
+        "artifact_scope": "decoder_only"
+      },
+      "ignored_source_tensors": [
+        {
+          "prefix": "model.visual.",
+          "reason": "vision_tower_not_in_decoder_artifact"
+        }
+      ],
+      "required_tensor_patterns": [
+        "model.language_model.embed_tokens.weight",
+        "model.language_model.layers.{L}.input_layernorm.weight",
+        "model.language_model.layers.{L}.self_attn.q_proj.weight",
+        "model.language_model.layers.{L}.self_attn.k_proj.weight",
+        "model.language_model.layers.{L}.self_attn.v_proj.weight",
+        "model.language_model.layers.{L}.self_attn.o_proj.weight",
+        "model.language_model.layers.{L}.mlp.gate_proj.weight",
+        "model.language_model.layers.{L}.mlp.up_proj.weight",
+        "model.language_model.layers.{L}.mlp.down_proj.weight",
+        "model.language_model.norm.weight"
+      ],
+      "tensor_refs": [
+        {"target": "token_emb", "sources": ["model.language_model.embed_tokens.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.ln1_gamma", "sources": ["model.language_model.layers.{L}.input_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.ln1_beta", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["embed_dim"]},
+        {"target": "layer.{L}.ln2_gamma", "sources": ["model.language_model.layers.{L}.input_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.ln2_beta", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["embed_dim"]},
+        {"target": "layer.{L}.wq", "sources": ["model.language_model.layers.{L}.self_attn.q_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.bq", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["q_dim"]},
+        {"target": "layer.{L}.wk", "sources": ["model.language_model.layers.{L}.self_attn.k_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.bk", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["kv_dim"]},
+        {"target": "layer.{L}.wv", "sources": ["model.language_model.layers.{L}.self_attn.v_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.bv", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["kv_dim"]},
+        {"target": "layer.{L}.wo", "sources": ["model.language_model.layers.{L}.self_attn.o_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.bo", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["embed_dim"]},
+        {"target": "layer.{L}.w1", "sources": ["model.language_model.layers.{L}.mlp.gate_proj.weight", "model.language_model.layers.{L}.mlp.up_proj.weight"], "combine": "concat", "role": "linear_weight"},
+        {"target": "layer.{L}.b1", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["2*intermediate_size"]},
+        {"target": "layer.{L}.w2", "sources": ["model.language_model.layers.{L}.mlp.down_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.b2", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["embed_dim"]},
+        {"target": "final_ln_weight", "sources": ["model.language_model.norm.weight"], "dtype": "fp32"},
+        {"target": "final_ln_bias", "fallback_synth": "zeros_fp32", "dtype": "fp32", "shape": ["embed_dim"]}
+      ],
+      "notes": "North Micro Vision text decoder. The map owns Cohere2 parallel attention/MLP semantics, sliding-only interleaved M-RoPE, tied logits, and vision-tensor exclusion."
+    },
+    "cohere_compass_vision": {
+      "template": "cohere_compass_vision",
+      "family": "cohere_compass",
+      "aliases": [
+        "CohereCompassVisionModel"
+      ],
+      "status": "vision_encoder_mapping",
+      "config_builder": "qwen3_vl_vision",
+      "tensor_mapper": "qwen3_vl_vision",
+      "config": {
+        "model": "cohere_compass_vision",
+        "arch": "cohere_compass_vision",
+        "model_type": "cohere_compass_vision",
+        "patch_frontend": "dual_patch_proj_sum",
+        "position_encoding": "absolute_2d",
+        "projector": "cohere_compass_merger",
+        "prefill_policy": "vision_encoder_only",
+        "artifact_scope": "encoder_only"
+      },
+      "ignored_source_tensors": [
+        {
+          "prefix": "model.language_model.",
+          "reason": "language_model_not_in_vision_artifact"
+        }
+      ],
+      "required_tensor_patterns": [
+        "model.visual.patch_embed.proj.weight",
+        "model.visual.patch_embed.proj.bias",
+        "model.visual.pos_embed.weight",
+        "model.visual.blocks.{L}.norm1.weight",
+        "model.visual.blocks.{L}.norm2.weight",
+        "model.visual.blocks.{L}.attn.qkv.weight",
+        "model.visual.blocks.{L}.attn.proj.weight",
+        "model.visual.blocks.{L}.mlp.linear_fc1.weight",
+        "model.visual.blocks.{L}.mlp.linear_fc2.weight",
+        "model.visual.merger.norm.weight",
+        "model.visual.merger.linear_fc1.weight",
+        "model.visual.merger.linear_fc2.weight",
+        "model.visual.deepstack_merger_list.*.norm.weight",
+        "model.visual.deepstack_merger_list.*.linear_fc1.weight",
+        "model.visual.deepstack_merger_list.*.linear_fc2.weight"
+      ],
+      "notes": "North Micro Vision uses the reusable Qwen3-VL-derived vision tensor ABI with its own circuit identity and Cohere Compass composition contract."
+    },
     "qwen3vl": {
       "template": "qwen3vl",
       "family": "qwen3_vl",

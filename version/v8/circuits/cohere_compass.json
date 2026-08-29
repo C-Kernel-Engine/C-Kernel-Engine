@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "name": "cohere_compass",
+  "family": "multimodal_composition",
+  "sequence": [
+    "vision_encoder",
+    "decoder"
+  ],
+  "components": {
+    "vision_encoder": {
+      "runtime_role": "encoder",
+      "circuit": "cohere_compass_vision",
+      "block": "vision_encoder",
+      "config_path": "component_configs.vision_encoder",
+      "config_requires": {
+        "num_deepstack_layers": 3,
+        "deepstack_layer_indices": [8, 16, 24]
+      },
+      "exports": {
+        "vision_embeddings": "vision_output"
+      }
+    },
+    "decoder": {
+      "runtime_role": "decoder",
+      "circuit": "cohere_compass_text",
+      "block": "decoder",
+      "config_path": "component_configs.decoder",
+      "imports": {
+        "visual_prefix": "embedded_input"
+      },
+      "exports": {
+        "chat_contract": "contract.chat_contract",
+        "tokenizer_contract": "contract.tokenizer_contract"
+      }
+    }
+  },
+  "stitch": [
+    {
+      "id": "vision_embeddings_to_decoder_prefix",
+      "from": "vision_encoder",
+      "to": "decoder",
+      "kind": "multimodal_prefix",
+      "op": "multimodal_prefix_stitch",
+      "from_output": "vision_embeddings",
+      "to_input": "visual_prefix",
+      "required_contract": {
+        "id": "cohere_compass_token_major_visual_prefix_mrope2d",
+        "vision_layout": "token_major",
+        "vision_storage": "fp32",
+        "decoder_input_layout": "token_major",
+        "position_policy": "mrope_2d",
+        "decode_policy": "causal_mixed_prefix",
+        "prefix_policy": "mixed_visual_text_prefill",
+        "prefill_batching": "unified_mixed",
+        "prefill_schedule": {
+          "segments": ["text_before", "visual", "text_after"],
+          "cache_transition": "single_pass",
+          "position_transition": "explicit_full_sequence",
+          "deepstack_injection": {
+            "kernel_id": "ck_residual_add_token_major_bf16_storage",
+            "contract_id": "residual_add_bf16_input_fp32_add_bf16_output",
+            "target": "visual_rows_after_decoder_layer",
+            "layers_from_config": "num_deepstack_layers"
+          },
+          "projection_row_group_boundaries": {
+            "policy": "restart_each_segment",
+            "operations": [
+              "qkv_proj",
+              "out_proj",
+              "mlp_gate_up",
+              "mlp_down"
+            ]
+          }
+        },
+        "cache_policy": "persistent_decoder_kv",
+        "generation_policy": "incremental_decode_after_prefill",
+        "runtime_policy": "decode_staged",
+        "grid_policy": "merged_hw",
+        "image_begin_marker": "<|vision_start|>",
+        "image_end_marker": "<|vision_end|>",
+        "deepstack_injections": 3,
+        "providers": {
+          "prefix_insert": {
+            "op": "multimodal_prefix_insert",
+            "kernel_id": "multimodal_prefix_insert_f32",
+            "operation_interface": "multimodal_prefix_insert.token_major.fp32.v1"
+          },
+          "position_builder": {
+            "op": "multimodal_position_builder",
+            "kernel_id": "multimodal_mrope_positions_2d",
+            "operation_interface": "multimodal_positions.mrope_2d.i32.v1"
+          },
+          "position_transform": {
+            "op": "rope",
+            "kernel_id": "mrope_qk_imrope_positions",
+            "operation_interface": "mrope.imrope_positions.fp32.v1"
+          }
+        },
+        "dimension_equality": [
+          {
+            "left": "vision_encoder.projector_out_dim",
+            "right": "decoder.embed_dim"
+          }
+        ]
+      }
+    }
+  ]
+}
