@@ -18,7 +18,7 @@
  *   - ck_attention_flash_decode_wrapper: Flash attention wrapper (use
  *     mega_fused_attention_prefill/avx instead)
  *   - ck_quantized_gemm: Dispatcher for Q4_K, Q5_0, Q5_1, Q6_K, Q8_0
- *     (use kernel_maps/KERNEL_REGISTRY.json + codegen instead)
+ *     (use version/v6.6/kernel_maps/KERNEL_REGISTRY.json + codegen instead)
  *
  * To remove completely:
  *   1. Delete this file
