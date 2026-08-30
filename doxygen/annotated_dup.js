@@ -1,6 +1,7 @@
 var annotated_dup =
 [
     [ "AffinityInfo", "structAffinityInfo.html", "structAffinityInfo" ],
+    [ "block_nvfp4", "structblock__nvfp4.html", "structblock__nvfp4" ],
     [ "block_q4_0", "structblock__q4__0.html", "structblock__q4__0" ],
     [ "block_q4_1", "structblock__q4__1.html", "structblock__q4__1" ],
     [ "block_q4_K", "structblock__q4__K.html", "structblock__q4__K" ],

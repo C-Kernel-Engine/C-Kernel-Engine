@@ -26,6 +26,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "gemm_kernels_amx.c", "gemm__kernels__amx_8c.html", "gemm__kernels__amx_8c" ],
     [ "gemm_kernels_bf16.c", "gemm__kernels__bf16_8c.html", "gemm__kernels__bf16_8c" ],
     [ "gemm_kernels_f16.c", "gemm__kernels__f16_8c.html", "gemm__kernels__f16_8c" ],
+    [ "gemm_kernels_nvfp4.c", "gemm__kernels__nvfp4_8c.html", "gemm__kernels__nvfp4_8c" ],
     [ "gemm_kernels_q4_0.c", "gemm__kernels__q4__0_8c.html", "gemm__kernels__q4__0_8c" ],
     [ "gemm_kernels_q4_1.c", "gemm__kernels__q4__1_8c.html", "gemm__kernels__q4__1_8c" ],
     [ "gemm_kernels_q4k.c", "gemm__kernels__q4k_8c.html", "gemm__kernels__q4k_8c" ],
