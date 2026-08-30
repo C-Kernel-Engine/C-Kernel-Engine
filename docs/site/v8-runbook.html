@@ -1049,6 +1049,12 @@
 .v8-path-table code {
     font-size: 0.8rem;
 }
+.v8-path-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
 .v8-note {
     color: var(--text-muted);
     font-size: 0.88rem;
@@ -1133,6 +1139,57 @@
         <strong>Boundary</strong><br>
         <code>v8</code> is the inference bring-up lane. Training workflows remain in <code>v7</code>.
     </div>
+</div>
+
+<h2 id="full-model-certification">What Full-Model Certification Means</h2>
+
+<div class="card card-green">
+    <p>
+        Full-model certification is not defined by an arbitrary answer length. A
+        100-token response, a 5K context, coherent prose, or one matching top-1
+        token can establish bring-up evidence, but none certifies the complete
+        model. CKE promotes evidence in three levels:
+    </p>
+    <table class="table">
+        <thead>
+            <tr><th>Level</th><th>Required evidence</th><th>What it does not prove</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Bring-up</td><td>Real weights convert, compile, and execute coherently through the intended runtime path.</td><td>Numerical agreement, advertised capacity, quality, or performance.</td></tr>
+            <tr><td>Full-model numerical</td><td>Exact tokenizer or processor inputs; complete tensor inventory; every executed layer kind and persistent-state transition compared with an independent oracle; final-logit agreement; and at least 128 deterministic decode steps under a declared exact or tolerance contract.</td><td>Maximum context, broad application quality, every ISA, or competitive speed.</td></tr>
+            <tr><td>Production</td><td>Full-model numerical evidence plus the advertised context or media envelope, repeatability, memory-plan safety, supported ISA coverage, application fixtures, and recorded performance.</td><td>Unmeasured hardware, quantizations, languages, or workloads.</td></tr>
+        </tbody>
+    </table>
+    <p>
+        The <a href="model-kernel-matrix.html">model and kernel matrix</a> records
+        the strongest level reached by each family. The
+        <a href="kernel-maps.html">kernel-map guide</a> explains how the selected
+        providers own their arithmetic and call ABI. The
+        <a href="xray.html">X-Ray guide</a> covers layer and operation comparison,
+        and <a href="v8-numerical-contracts.html">numerical contracts</a> defines
+        exact and tolerance-based provider evidence.
+    </p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Modality gates</h3>
+    <table class="table">
+        <thead>
+            <tr><th>Modality</th><th>Numerical gate</th><th>Capacity and quality gate</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Text</td><td>At least three fixed real prompts that exercise every declared layer kind; layer and state checkpoints through the full graph; complete first-step logits; and 128 deterministic decode steps against PyTorch or llama.cpp.</td><td>2K, 8K, and 32K are progression points. A model advertised for 64K, 128K, or 256K is not production-certified until matched runs reach that boundary with identical input IDs, checkpoint logits, KV/recurrent-state evidence, and stop reason. Code and SVG prompts measure application quality separately.</td></tr>
+            <tr><td>Vision</td><td>Official image processor and token IDs; encoder-layer checkpoints; projector/bridge output; decoder-layer and logit trajectory; at least one small, one native-resolution, and one multi-image X-Ray case.</td><td>The resumable 40-image corpus covers OCR, forms, tables, charts, handwriting, natural images, and varied geometry. Exact fields and visual-question outputs are quality gates, not substitutes for PyTorch numerical comparison.</td></tr>
+            <tr><td>Audio</td><td>Waveform decode/resample, frontend features, every encoder block, cross-attention context, decoder state/logits, and transcript tokens compared with an independent implementation.</td><td>Short and long public fixtures, silence/noise boundaries, and every claimed language/task mode. Real-time factor, peak memory, and core occupancy are recorded independently.</td></tr>
+        </tbody>
+    </table>
+    <p class="v8-note" style="margin-bottom: 0;">
+        Long-context comparison does not require storing every activation from
+        every token. It requires deterministic input hashes, complete provider
+        identity, selected layer/state checkpoints at fixed positions, final
+        logits, and a matched decode trajectory. Any first divergence can then be
+        expanded into a full operation-level X-Ray capture.
+    </p>
 </div>
 
 <h2 id="demo-readiness-nightly">Overnight Demo Readiness</h2>
@@ -1241,6 +1298,10 @@ python -m pip install -r version/v8/requirements.txt</pre>
             <tr><td>Kimi-VL A3B BF16 text decoder</td><td>Coherent and repeatable text E2E on Intel AVX2 and Ryzen AVX-512</td><td>First token and top-20 ranking match PyTorch; full-logit cosine 0.997696</td><td>Internal drift becomes material near layer 7; MoonViT bridge is not certified</td></tr>
             <tr><td>Laguna-XS 2.1 Q4_K_M</td><td>Coherent text E2E; all 684 mapped entries converted</td><td>Embedding and layer-0 RMSNorm are bit-exact; identical-input router replay preserves selected experts and routing weights within one ULP</td><td>The current llama.cpp Laguna loader omits the GGUF YaRN beta metadata; after oracle alignment, small attention/projection drift still changes a near-tied MoE route</td></tr>
             <tr><td>Cohere2 Command R Q4_K_M</td><td>GGUF Q4_K_M bring-up — 8-token llama.cpp replay agreement on Command R7B; long-trajectory parity pending</td><td>Tokenizer-free replay matches llama.cpp for the first 8 greedy positions</td><td>Long-trajectory parity and matched performance sweeps</td></tr>
+            <tr><td>Cohere North Mini Code 30B-A3B Q4_K_M</td><td>Coherent and repeatable text; two complete 131,072-token capacity runs</td><td>Identical input, first-logit, and output-token hashes across both CKE runs</td><td>Matched full-model oracle parity and practical long-code quality</td></tr>
+            <tr><td>Cohere North Micro Vision 2.4B</td><td>Real-image encoder, bridge, and decoder bring-up</td><td>Portable BF16 provider contracts; official PyTorch layer X-Ray remains follow-up work</td><td>Complete encoder/bridge/decoder parity and 40-image OCR quality</td></tr>
+            <tr><td>Cohere Transcribe 2B</td><td>Provider and exact 2,104-tensor inventory foundation; CKE conversion fails closed</td><td>Independent oracle exports frontend, all 48 encoder blocks, cross-attention, and decoder checkpoints</td><td>Assemble and certify the complete CKE audio trajectory</td></tr>
+            <tr><td>Cohere Command A+ 218B/25B-active W4A4</td><td>Experimental native NVFP4 real-weight text runtime; coherent short answer</td><td>675/675 required weights mapped, packed-row and leaf parity, bounded X-Ray</td><td>Full-model and long-context parity, vision, quality, and matched performance</td></tr>
         </tbody>
     </table>
 </div>
@@ -1966,6 +2027,7 @@ http://127.0.0.1:7021/ir_hub.html</pre>
             <p>The v8 viewer reuses the contract-tested tab model for staged data, tokenizer, vocabulary, quality, embeddings, and attention inspection.</p>
         </div>
     </div>
+    <div class="v8-path-scroll">
     <table class="table v8-path-table">
         <thead>
             <tr><th>Artifact</th><th>Purpose</th></tr>
@@ -1993,6 +2055,7 @@ http://127.0.0.1:7021/ir_hub.html</pre>
             </tr>
         </tbody>
     </table>
+    </div>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># Generate or refresh a v8 IR visualizer report for one run.
@@ -2313,7 +2376,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
             </div>
         </div>
     </footer>

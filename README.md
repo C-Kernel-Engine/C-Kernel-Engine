@@ -85,6 +85,7 @@ version/v8/scripts/cks-v8-run run MODEL \
 | Nanbeige 4.1 3B / Llama-family | `hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf` | `--chat-template auto`; use `--python-tokenizer` when diagnosing an unfamiliar tokenizer |
 | Cohere2 Command R | `/path/to/command-r7b-q4_k_m.gguf` | `--chat-template auto --temperature 0.0` |
 | Cohere North Mini Code | `/path/to/North-Mini-Code-1.0-UD-Q4_K_M.gguf` | `--chat-template auto --temperature 0.0`; high-memory MoE lane |
+| Cohere Command A+ 218B/25B-active | `/path/to/command-a-plus-05-2026-w4a4` | Experimental 160 GB-class NVFP4 safetensors lane; use the exact evidence boundary below before quoting support |
 | Laguna-XS 2.1 | `/path/to/Laguna-XS-2.1-Q4_K_M.gguf` | `--chat-template auto --thinking-mode suppressed --temperature 0.0` for the shortest smoke |
 | Kimi-VL A3B text decoder | `/path/to/moonshotai--Kimi-VL-A3B-Instruct` | `--chat-template kimi_vl`; current certified scope is text only |
 | Instella-MoE 16B-A3B | `/path/to/amd--Instella-MoE-16B-A3B-Think` | BF16 safetensors lane; use the exact local-artifact command in the v8 runbook |
@@ -105,6 +106,26 @@ trajectories, memory-planner capacity, multimodal certification, and performance
 The table records the strongest mainline evidence, not every circuit that happens
 to compile.
 
+The runnable table above includes both certified and bring-up lanes. CKE uses three
+evidence levels:
+
+- **Bring-up:** real weights convert, compile, and execute coherently. This is not
+  numerical certification.
+- **Full-model numerical certification:** tokenizer or processor inputs, every
+  executed layer and state transition, final logits, and a bounded decode
+  trajectory agree with an independent implementation under a declared exact or
+  tolerance contract. A 100-token smoke or one matching top-1 token is insufficient.
+- **Production certification:** full-model numerical certification plus the
+  advertised context or media envelope, repeatability, memory safety, supported
+  ISA coverage, application-quality fixtures, and recorded performance.
+
+The exact modality-specific gates are defined in the
+[v8 runbook](https://c-kernel-engine.github.io/C-Kernel-Engine/v8-runbook.html).
+The [kernel-map guide](https://c-kernel-engine.github.io/C-Kernel-Engine/kernel-maps.html)
+explains how every selected provider carries its numerical ownership, and the
+[model and kernel matrix](https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html)
+records the strongest evidence for each family.
+
 | Model family and tested artifact | Strongest current evidence | Longest demonstrated boundary | Published CPU/ISA evidence |
 |---|---|---:|---|
 | Qwen2 0.5B, Qwen3 0.6B, Gemma3 270M, Llama/Nanbeige 3B, GPT-2 | Coherent GGUF end-to-end nightly lanes | 1,024 tokens where recorded | Commodity x86 nightly lanes; provider selected from detected ISA |
@@ -118,6 +139,7 @@ to compile.
 | Kimi-VL A3B BF16 text decoder | Repeatable coherent text; first token and top-20 match PyTorch, cosine 0.997696 | 2,048 tokens | Intel AVX2 and Ryzen AVX-512 |
 | Cohere2 Command R7B Q4_K_M | First eight greedy positions agree with llama.cpp | 2,048-token runtime smoke | x86 runtime lane; long trajectory and matched performance open |
 | Cohere North Mini Code 30B-A3B Q4_K_M | Coherent, repeatable text plus identical first-logit hash and token sequence across two full-capacity runs | 131,072-token execution | Ryzen 9 9950X3D AVX-512/VNNI; average 71.35 tok/s prefill and 0.65 tok/s full-history decode |
+| Cohere Command A+ 218B/25B-active W4A4 | Native packed NVFP4 runtime maps 675/675 required weights, passes leaf parity, and produces coherent short text | 126-token prompt plus 32 decode steps | Ryzen 9 9950X3D short bring-up; full-model and long-context parity open |
 | Laguna-XS 2.1 Q4_K_M | Coherent text; exact embedding/RMSNorm and near-exact router replay | 2,048 tokens | Ryzen Zen 5 bring-up; diagnostic llama.cpp oracle |
 | Instella-MoE 16B-A3B BF16 | Top-1 PyTorch match and 0.99998 full-logit cosine at the tested checkpoint | 32-token checkpoint | x86 BF16 reference/runtime lane; quantized and long trajectories open |
 | Whisper Tiny, Base, and Small FP32 | Token-exact Hugging Face trajectory on public JFK fixtures | JFK fixture; 33-second Base long-form fixture | Generated x86 encoder/decoder runtime |
@@ -137,15 +159,21 @@ Hosted Embed, Rerank, and Parse services are outside CKE's local-weight runtime
 scope. The larger gated Command A and Aya checkpoints also require their own
 real-artifact evidence before promotion.
 
+No Cohere lane currently satisfies CKE's complete production-certification gate.
+The rows below deliberately distinguish real-weight bring-up, sampled numerical
+evidence, and blocked work from full-model certification.
+
 | Cohere lane | CKE status | Current evidence and boundary |
 |---|---|---|
 | Command R7B | Sampled numerical support | First eight greedy positions agree with llama.cpp; long-trajectory parity and matched performance remain open. |
 | North Mini Code 30B-A3B | Coherent E2E and 128K capacity | Q4_K_M text is coherent and repeatable. Two 131,072-token runs consumed the same hashed input and produced the same first-logit hash and token sequence; practical long-code quality remains a separate gate. |
 | North Micro Vision 2.4B | Real-image E2E; corpus certification in progress | A real image produced a coherent field answer through generated encoder, bridge, and decoder runtimes. The resumable 40-image OCR corpus is the promotion gate; llama.cpp does not currently provide the required Cohere Compass vision oracle. |
 | Cohere Transcribe 2B | Provider and oracle-checkpoint foundation | Audio frontend and Conformer primitives have numerical contracts, and the independent CrispASR lane exports all 48 Conformer boundaries plus decoder attention for X-Ray comparison. Full CKE encoder/decoder conversion, tokenizer integration, and an exact audio trajectory are not yet complete. |
-| Command A Vision and Aya Vision | Planned, not supported | Gated, high-memory checkpoints; no CKE real-weight E2E claim. |
-| Command A Translate and multilingual Aya text | Planned, not supported | Translation quality requires model access, tokenizer/protocol validation, and multilingual trajectory tests. |
-| Command A+ W4A4 | Planned final Cohere milestone | The published checkpoint uses an NVFP4-packed W4A4 path and a large MoE/vision topology that CKE has not certified. |
+| Command A+ 218B/25B-active W4A4 | Experimental real-weight text bring-up | The native packed NVFP4 runtime maps 675/675 required weights and produces coherent short text. Leaf parity and bounded X-Ray pass; full-model, long-context, vision, quality, and matched-performance certification remain open. |
+| Command A Vision 112B | Planned, not supported | Official 128K dense vision checkpoint; no CKE real-weight encoder, bridge, decoder, or OCR parity claim. |
+| Aya Vision 8B and 32B | Planned, not supported | SigLIP2 encoder plus Command R/Aya text backbones; no CKE real-weight multimodal trajectory claim. |
+| Command A Translate 111B | Planned, not supported | Official context is 8K input plus 8K output. Model access, tokenizer/protocol validation, full-model parity, and multilingual quality fixtures are required. |
+| Aya Expanse and Tiny Aya text | Planned, not supported | Multilingual text support requires exact tokenizer/protocol evidence and language-specific trajectory and quality tests. |
 
 The longer argument behind that direction is documented in [the CPU and smaller-model strategic bet](https://www.shivasnotes.com/blog/5878/Why-I-Stopped-Getting-High-on-the-Newer-AI-Models-And-Why-My-Strategic-Bet-Is-Still-Consistent-CPUs-Smaller-Models-and-Less-Compute-Will-Win) and the project origin story, [Unimporting PyTorch](https://www.shivasnotes.com/blog/5872/Unimporting-PyTorch-How-Constraint-and-Curiosity-Built-a-C-Kernel-Engine).
 

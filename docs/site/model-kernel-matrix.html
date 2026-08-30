@@ -1131,7 +1131,10 @@
     details.card-details[open] > summary { margin-bottom: 0.4rem; }
     details.card-details .model-command { margin-top: 0.5rem; }
 
-    .matrix-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .matrix-scroll {
+      width: 100%; max-width: 100%; overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .matrix-grid { min-width: 1120px; }
     .matrix-grid .row-head { position: sticky; left: 0; z-index: 1; box-shadow: 2px 0 0 #22313f; }
 
@@ -1573,6 +1576,14 @@
       earned — an eight-token replay agreement and a 4,096-token bit-exact trajectory are different claims, and the
       dots on the cards use the same classes.
     </p>
+    <p class="source-note">
+      None of these labels alone means production certification. CKE requires complete executed-graph and
+      deterministic decode evidence for <strong>full-model numerical certification</strong>, then separately gates
+      advertised context/media capacity, quality, ISA coverage, memory safety, repeatability, and performance.
+      See the <a href="v8-runbook.html#full-model-certification">v8 certification contract</a>, the
+      <a href="kernel-maps.html#model-family-ownership">model-family provider ownership rule</a>, and
+      <a href="xray.html">X-Ray workflow</a>.
+    </p>
     <div class="status-legend">
       <span class="sl-item"><span class="sl-dot st-traj"></span><span><strong>Trajectory exact</strong> — full token trajectory bit-exact against the oracle</span></span>
       <span class="sl-item"><span class="sl-dot st-num"></span><span><strong>Numerical sampled</strong> — oracle agreement at sampled checkpoints (first-token / top-k / cosine / prefix replay)</span></span>
@@ -1598,6 +1609,11 @@
           <tr><td class="cert-model">Nemotron Nano 9B v2</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>Q4_K_M coherent smoke; Mamba2 state-shape contracts</td><td>1,024</td><td>PyTorch parity lane</td><td>long-trajectory sweeps</td></tr>
           <tr><td class="cert-model">Kimi-VL A3B (text)</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>first-token + top-20 ranking match, cosine 0.997696; bit-identical repeat runs</td><td>2,048</td><td>PyTorch</td><td>MoonViT vision bridge; internal BF16 drift near layer 7</td></tr>
           <tr><td class="cert-model">Cohere2 Command R7B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>tokenizer-free replay matches llama.cpp for the first 8 greedy positions</td><td>2,048</td><td>llama.cpp</td><td>long-trajectory parity; performance sweeps</td></tr>
+          <tr><td class="cert-model">Cohere North Mini Code 30B-A3B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>two repeatable 131,072-token CKE capacity runs with identical first-logit and output-token hashes</td><td>131,072</td><td>CKE repeatability</td><td>matched full-model oracle parity; practical long-code quality</td></tr>
+          <tr><td class="cert-model">Cohere North Micro Vision 2.4B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>real-image encoder/bridge/decoder run; official PyTorch layer X-Ray remains follow-up work</td><td>real-image smoke</td><td>PyTorch required</td><td>complete encoder/bridge/decoder parity; 40-image OCR quality</td></tr>
+          <tr><td class="cert-model">Cohere Transcribe 2B</td><td><span class="cert-status st-contract">Contract-only</span></td><td>2,104-tensor inventory plus 52 independent oracle checkpoints; CKE conversion fails closed</td><td>&mdash;</td><td>CrispASR</td><td>assemble and certify CKE encoder, cross-attention, decoder, and tokenizer</td></tr>
+          <tr><td class="cert-model">Cohere Command A+ 218B/25B-active</td><td><span class="cert-status st-e2e">Coherent E2E</span> <span class="cert-status st-num">Numerical sampled</span></td><td>675/675 required weights mapped; native packed NVFP4 leaf parity; coherent short text</td><td>126 prompt + 32 decode</td><td>compressed-tensors formula + pinned leaf oracle</td><td>full-model/long-context parity, vision, quality, and matched performance</td></tr>
+          <tr><td class="cert-model">Command A Vision / Aya Vision / Translate</td><td><span class="cert-status st-contract">Not implemented</span></td><td>official artifacts identified; no CKE real-weight trajectory claim</td><td>&mdash;</td><td>PyTorch required</td><td>circuit/provider gap audit and complete bring-up</td></tr>
           <tr><td class="cert-model">Laguna-XS 2.1</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>bit-exact embedding + layer-0 RMSNorm; router replay within one ULP</td><td>2,048</td><td>llama.cpp (diagnostic)</td><td>long-trajectory parity not claimed (near-tied MoE route flips)</td></tr>
           <tr><td class="cert-model">Instella-MoE 16B-A3B</td><td><span class="cert-status st-num">Numerical sampled</span></td><td>full-logit cosine 0.99998 + top-1 match at a 32-token checkpoint</td><td>32-token checkpoint</td><td>PyTorch</td><td>quantized GGUF and long trajectories uncertified</td></tr>
           <tr><td class="cert-model">Llama / Nanbeige 3B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>nightly regression smoke</td><td>1,024</td><td>v8 nightly regression</td><td>&mdash;</td></tr>
@@ -3159,7 +3175,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
             </div>
         </div>
     </footer>
