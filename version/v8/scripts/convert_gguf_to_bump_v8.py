@@ -258,6 +258,92 @@ def gguf_ck_metadata_key(arch: str, logical_name: str) -> str:
     return str(value) if value else ""
 
 
+def gguf_ck_tensor_inventory_report(
+    arch: str,
+    metadata: Dict[str, object],
+    tensor_names: Sequence[str],
+) -> Dict[str, Any]:
+    """Validate an artifact tensor directory against a declarative model map."""
+    contract = gguf_ck_arch_contract(arch)
+    inventory = contract.get("tensor_inventory") or {}
+    if not inventory:
+        return {}
+    if not isinstance(inventory, dict):
+        raise GGUFError(f"{arch}: tensor_inventory must be an object")
+
+    required_global = inventory.get("required_global") or []
+    if not isinstance(required_global, list) or not all(
+        isinstance(name, str) and name for name in required_global
+    ):
+        raise GGUFError(f"{arch}: tensor_inventory.required_global must be a string list")
+
+    expected = set(required_global)
+    group_reports: list[Dict[str, Any]] = []
+    groups = inventory.get("layer_groups") or []
+    if not isinstance(groups, list):
+        raise GGUFError(f"{arch}: tensor_inventory.layer_groups must be a list")
+    for group in groups:
+        if not isinstance(group, dict):
+            raise GGUFError(f"{arch}: tensor inventory layer group must be an object")
+        name = str(group.get("name") or "")
+        count_key = str(group.get("count_metadata") or "")
+        prefix = str(group.get("prefix") or "")
+        suffixes = group.get("required_suffixes") or []
+        if not name or not count_key or "{L}" not in prefix:
+            raise GGUFError(
+                f"{arch}: tensor inventory groups require name, count_metadata, and a {{L}} prefix"
+            )
+        if not isinstance(suffixes, list) or not all(
+            isinstance(suffix, str) and suffix for suffix in suffixes
+        ):
+            raise GGUFError(
+                f"{arch}: tensor inventory group {name!r} requires string suffixes"
+            )
+        count_value = metadata.get(count_key)
+        if isinstance(count_value, bool) or not isinstance(count_value, (int, np.integer)):
+            raise GGUFError(f"{arch}: missing integer metadata {count_key!r}")
+        count = int(count_value)
+        if count < 0:
+            raise GGUFError(f"{arch}: invalid negative layer count for {count_key!r}")
+        group_expected = {
+            f"{prefix.format(L=layer)}{suffix}"
+            for layer in range(count)
+            for suffix in suffixes
+        }
+        expected.update(group_expected)
+        group_reports.append(
+            {
+                "name": name,
+                "layers": count,
+                "tensors_per_layer": len(suffixes),
+                "expected_tensors": len(group_expected),
+            }
+        )
+
+    actual = {str(name) for name in tensor_names}
+    missing = sorted(expected - actual)
+    undeclared = sorted(actual - expected)
+    return {
+        "status": "complete" if not missing and not undeclared else "incomplete",
+        "expected_tensors": len(expected),
+        "actual_tensors": len(actual),
+        "matched_tensors": len(expected & actual),
+        "missing_tensors": missing,
+        "undeclared_tensors": undeclared,
+        "layer_groups": group_reports,
+    }
+
+
+def gguf_ck_conversion_blocker(arch: str) -> str:
+    """Return a model-map-owned reason that full conversion must fail closed."""
+    contract = gguf_ck_arch_contract(arch)
+    status = str(contract.get("conversion_status") or "supported")
+    if status == "supported":
+        return ""
+    reason = str(contract.get("conversion_blocker") or "runtime conversion is not promoted")
+    return f"{arch}: conversion status is {status!r}: {reason}"
+
+
 def gguf_ck_layer_kinds_from_map(
     arch: str,
     num_layers: int,
@@ -2954,6 +3040,9 @@ def main() -> None:
 
         arch = str(meta.get("general.architecture", "llama"))
         artifact_contract = gguf_ck_artifact_contract(arch, meta)
+        conversion_blocker = gguf_ck_conversion_blocker(arch)
+        if conversion_blocker and not (args.inspect or args.list):
+            raise GGUFError(f"HARD MODEL CONTRACT FAULT: {conversion_blocker}")
 
         template_probe_arch = str(artifact_contract.get("template") or arch)
         if arch == "clip" and str(meta.get("clip.projector_type") or "").strip().lower() == "qwen3vl_merger":
@@ -2964,7 +3053,7 @@ def main() -> None:
         # Load template early to check for RoPE (determines if pos_emb is needed)
         template_data = None
         uses_rope = True  # Default: most modern models use RoPE
-        if args.bump_version == BUMP_VERSION_V5:
+        if args.bump_version == BUMP_VERSION_V5 and not conversion_blocker:
             try:
                 template_data = load_template_for_arch(template_probe_arch)
                 template_flags = template_data.get("flags", {})
@@ -3031,6 +3120,25 @@ def main() -> None:
                 if not info:
                     continue
                 print(f"  - {name}: {ggml_type_name(info.ggml_type)} dims={info.dims}")
+
+            inventory_report = gguf_ck_tensor_inventory_report(arch, meta, tensors.keys())
+            if inventory_report:
+                print("[gguf] declarative tensor inventory:")
+                print(
+                    "  - status="
+                    f"{inventory_report['status']} matched={inventory_report['matched_tensors']}/"
+                    f"{inventory_report['expected_tensors']} actual={inventory_report['actual_tensors']}"
+                )
+                for group in inventory_report["layer_groups"]:
+                    print(
+                        f"  - {group['name']}: layers={group['layers']} "
+                        f"tensors_per_layer={group['tensors_per_layer']} "
+                        f"expected={group['expected_tensors']}"
+                    )
+                for label in ("missing_tensors", "undeclared_tensors"):
+                    values = inventory_report[label]
+                    if values:
+                        print(f"  - {label}: {values[:10]}")
 
             if arch == "qwen35moe":
                 moe_audit = audit_qwen35moe_gguf_contract(tensors, meta)
