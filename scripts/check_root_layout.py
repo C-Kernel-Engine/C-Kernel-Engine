@@ -35,7 +35,6 @@ ALLOWED_DIRS = {
     ".github",
     "assets",
     "benchmarks",
-    "ckernel_engine",
     "docs",
     "include",
     "llama.cpp",

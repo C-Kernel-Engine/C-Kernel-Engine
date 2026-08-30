@@ -22,7 +22,7 @@ from ..v7.authoring import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 SUPPORTED_FAMILIES = {'qwen3', 'qwen35'}
 
 

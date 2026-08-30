@@ -40,7 +40,7 @@ make v7-gate
 
 ## Python Authoring Layer
 
-An experimental Python authoring layer now lives under `ckernel_engine.v7`.
+An experimental Python authoring layer now lives under `version/v7/ckernel_engine` (imported as `ckernel_engine.v7`).
 It is intentionally thin: Python owns model/template/data/tokenizer planning,
 then hands off to the existing `v7` pipeline for manifest creation, IR lowering,
 generated C runtime codegen, and train execution.
@@ -62,7 +62,7 @@ docs/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walk
 docs/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
 ```
 
-Launch the quickstart notebook from inside the repo checkout so it can detect `ckernel_engine/` and `version/v7/`.
+Launch the quickstart notebook from inside the repo checkout so it can detect `version/v7/ckernel_engine/`.
 
 ```bash
 .venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb

@@ -11,8 +11,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+V7_ROOT = Path(__file__).resolve().parents[1]
+if str(V7_ROOT) not in sys.path:
+    sys.path.insert(0, str(V7_ROOT))
 
 import ckernel_engine as ck  # noqa: E402
 

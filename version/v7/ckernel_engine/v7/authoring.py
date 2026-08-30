@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Optional, Sequence
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 CK_RUN_V7 = REPO_ROOT / "version" / "v7" / "scripts" / "ck_run_v7.py"
 OPEN_IR_VISUALIZER = REPO_ROOT / "version" / "v7" / "tools" / "open_ir_visualizer.py"
 OPEN_IR_HUB = REPO_ROOT / "version" / "v7" / "tools" / "open_ir_hub.py"
