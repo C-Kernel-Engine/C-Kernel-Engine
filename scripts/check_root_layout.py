@@ -33,7 +33,6 @@ ALLOWED_FILES = {
 ALLOWED_DIRS = {
     ".githooks",
     ".github",
-    "assets",
     "benchmarks",
     "ckernel_engine",
     "docs",
