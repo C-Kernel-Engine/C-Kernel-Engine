@@ -1345,6 +1345,8 @@ test-audio: $(LIB_AUDIO) $(LIB_ATTENTION) $(LIB_GELU)
 test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_audio_contract -v
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_audio_encoder_contract -v
+	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_cohere_transcribe_model_contract -v
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_benchmark.py
@@ -1388,6 +1390,27 @@ test-whisper-pytorch-e2e-auto:
 			--max-tokens "$${CK_WHISPER_MAX_TOKENS:-64}" \
 			--threads "$${CK_NUM_THREADS:-1}" \
 			--output "$${CK_WHISPER_PARITY_OUTPUT:-build/whisper-pytorch-parity.json}"; \
+	fi
+
+.PHONY: test-cohere-transcribe-oracle-auto
+test-cohere-transcribe-oracle-auto:
+	@if [ -z "$$CK_COHERE_TRANSCRIBE_ORACLE" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_MODEL" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_AUDIO" ]; then \
+		echo "SKIP: set CK_COHERE_TRANSCRIBE_ORACLE, CK_COHERE_TRANSCRIBE_MODEL, and CK_COHERE_TRANSCRIBE_AUDIO"; \
+	else \
+		attention_arg=""; \
+		if [ "$${CK_COHERE_TRANSCRIBE_DUMP_ATTN:-0}" = "1" ]; then \
+			attention_arg="--dump-attention"; \
+		fi; \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/certify_cohere_transcribe_oracle_v8.py \
+			--oracle-bin "$$CK_COHERE_TRANSCRIBE_ORACLE" \
+			--model "$$CK_COHERE_TRANSCRIBE_MODEL" \
+			--audio "$$CK_COHERE_TRANSCRIBE_AUDIO" \
+			--language "$${CK_COHERE_TRANSCRIBE_LANGUAGE:-en}" \
+			--threads "$${CK_NUM_THREADS:-1}" \
+			--output-dir "$${CK_COHERE_TRANSCRIBE_OUTPUT:-build/cohere-transcribe-oracle}" \
+			$$attention_arg; \
 	fi
 
 # Policy:
@@ -5509,7 +5532,7 @@ nightly-list:
 	@$(PYTHON) scripts/nightly_runner.py --list
 
 .PHONY: nightly nightly-quick nightly-json nightly-demo-readiness nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
-.PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto libckernel_audio.so
+.PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto test-cohere-transcribe-oracle-auto libckernel_audio.so
 
 # ============================================================================
 # Status Reports (reads from version/meta/kernel_meta.json)
