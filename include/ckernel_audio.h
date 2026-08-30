@@ -84,6 +84,19 @@ int audio_pad_or_truncate_f32(
     float *output,
     int output_frames);
 
+int audio_preemphasis_f32(
+    const float *input,
+    float *output,
+    int frames,
+    float coefficient);
+
+int audio_feature_normalize_per_feature_f32(
+    const float *input,
+    float *output,
+    int channels,
+    int frames,
+    float epsilon);
+
 int audio_stft_precompute_tables_f32(
     int n_fft,
     float *window,
@@ -106,6 +119,28 @@ int audio_stft_power_precomputed_f32(
     int hop_length,
     float *power,
     int n_frames);
+
+int audio_stft_power_centered_window_f32(
+    const float *samples,
+    int n_samples,
+    const float *window,
+    int window_length,
+    const float *cos_table,
+    const float *sin_table,
+    int n_fft,
+    int hop_length,
+    int reflect_padding,
+    float *power,
+    int n_frames);
+
+int audio_log_mel_time_major_f32(
+    const float *power,
+    const float *mel_filters,
+    float *log_mel,
+    int frames,
+    int bins,
+    int channels,
+    float epsilon);
 
 int audio_stft_power_fft400_f32(
     const float *samples,
@@ -130,6 +165,37 @@ int audio_conv1d_channel_major_f32(
     int stride,
     int padding,
     int output_frames);
+
+int audio_conv2d_whc_grouped_f32(
+    const float *input,
+    const float *weight,
+    const float *bias,
+    float *output,
+    int input_width,
+    int input_height,
+    int input_channels,
+    int output_channels,
+    int kernel_width,
+    int kernel_height,
+    int stride_width,
+    int stride_height,
+    int padding_width,
+    int padding_height,
+    int groups,
+    int output_width,
+    int output_height);
+
+int audio_glu_split_channel_major_f32(
+    const float *input,
+    float *output,
+    int channels,
+    int frames);
+
+int audio_relative_shift_f32(
+    const float *raw_scores,
+    float *scores,
+    int heads,
+    int query_frames);
 
 int audio_transpose_channel_to_token_f32(
     const float *input,

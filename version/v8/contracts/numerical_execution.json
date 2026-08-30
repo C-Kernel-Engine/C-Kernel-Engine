@@ -80,6 +80,28 @@
       "position_transform": null,
       "description": "Copies the available sample prefix exactly, truncates excess input, and zero-fills a short input to the circuit-declared sample extent."
     },
+    "audio_preemphasis_previous_sample_fp32": {
+      "operator_family": "audio_preemphasis",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "first_sample_identity_then_ascending_current_minus_coefficient_times_previous"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Preserves the first sample and applies y[t] = x[t] - coefficient*x[t-1] in ascending time order, including safe in-place evaluation."
+    },
+    "audio_feature_normalize_per_feature_sample_variance_fp32": {
+      "operator_family": "audio_feature_normalize",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "per_feature_ascending_fp64_mean_then_ascending_fp64_squared_difference_then_sample_variance_fp32_sqrt_then_epsilon_then_fp32_scale"},
+      "rounding": {"mode": "rne", "points": ["input_load", "reduction_update", "output_divide", "norm_sqrt", "denominator_add", "reciprocal", "normalization_scale", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "independent_columns", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Normalizes each time-major feature channel with a FP64 mean, Bessel-corrected sample variance, FP32 square root, and epsilon added to standard deviation outside the square root."
+    },
     "audio_stft_periodic_hann_tables_fp32": {
       "operator_family": "audio_stft_tables",
       "status": "validated",
@@ -101,6 +123,17 @@
       "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
       "position_transform": null,
       "description": "Centered periodic-Hann STFT power using explicit precomputed trigonometric tables and the same ascending-sample FMA order as the scalar direct reference."
+    },
+    "audio_stft_centered_explicit_window_direct_fp32": {
+      "operator_family": "audio_stft",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "center_pad_then_center_explicit_window_then_ascending_window_sample_real_imag_fma_then_power"},
+      "rounding": {"mode": "rne", "points": ["window_multiply", "fft_projection", "power_sum", "output_store"]},
+      "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Centered STFT power with a model-provided window shorter than or equal to the FFT width, explicit zero-or-reflect input padding, and direct ascending-sample FP32 projection."
     },
     "audio_stft_centered_hann_fft400_radix20_fp32": {
       "operator_family": "audio_stft",
@@ -135,6 +168,17 @@
       "position_transform": null,
       "description": "Projects a frame-major STFT power checkpoint through explicit Slaney Mel filters, then applies Whisper log10 clipping and normalization."
     },
+    "audio_log_mel_time_major_ln_add_epsilon_fp32": {
+      "operator_family": "audio_log_mel",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "frame_then_channel_then_ascending_bin_fma_then_natural_log_of_sum_plus_epsilon"},
+      "rounding": {"mode": "rne", "points": ["mel_projection", "denominator_add", "logarithm", "output_store"]},
+      "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Projects frame-major power through a model-provided Mel filter bank and stores time-major natural-log features using an explicit additive guard epsilon."
+    },
     "audio_whisper_global_log_mel_feature_window_fp32": {
       "operator_family": "audio_feature_window",
       "status": "validated",
@@ -156,6 +200,39 @@
       "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
       "position_transform": null,
       "description": "General channel-major FP32 Conv1D with explicit stride, symmetric zero padding, independent output-channel rows, bias-first accumulation, and deterministic channel/kernel traversal within each output."
+    },
+    "audio_conv2d_whc_grouped_ascending_fp32": {
+      "operator_family": "audio_conv2d",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "bias_then_ascending_input_channel_within_group_then_kernel_height_then_kernel_width_fma"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "output_store"]},
+      "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "output_tiles", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Grouped channel-major 2D convolution. Groups=1 selects ordinary convolution; groups=input_channels=output_channels selects depthwise convolution without changing the provider ABI."
+    },
+    "audio_glu_split_sigmoid_fp32": {
+      "operator_family": "audio_glu",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "split_channel_halves_then_value_times_sigmoid_gate"},
+      "rounding": {"mode": "rne", "points": ["input_load", "vector_exponential", "denominator_add", "reciprocal", "weighted_product", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "output_tiles", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Splits a packed channel-major tensor into equal value and gate halves and computes value*sigmoid(gate) independently for every channel/frame element."
+    },
+    "audio_relative_shift_transformer_xl_exact_fp32": {
+      "operator_family": "audio_relative_shift",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "for_each_head_and_query_copy_relative_index_t_minus_1_plus_key_minus_query"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "output_tiles", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Applies the Transformer-XL relative shift by copying raw[h,q,T-1+k-q] to scores[h,q,k] exactly, preserving the reference runtime's relative-position alignment."
     },
     "layout_channel_to_token_copy_fp32": {
       "operator_family": "layout_transform",

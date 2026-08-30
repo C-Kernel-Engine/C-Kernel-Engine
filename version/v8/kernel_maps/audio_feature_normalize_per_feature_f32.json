@@ -1,0 +1,35 @@
+{
+  "id": "audio_feature_normalize_per_feature_f32",
+  "op": "audio_feature_normalize",
+  "operation_interface": "audio_feature_normalize.time_major.sample_variance.fp32.v1",
+  "variant": "time_major_per_feature_sample_variance_eps_after_sqrt_fp32",
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["N_frames", "N_channels"], "layout": "time_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Time-major log-mel features"}],
+  "weights": [],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["N_frames", "N_channels"], "layout": "time_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Per-feature normalized log-mel features"}],
+  "scratch": [],
+  "dims": ["channels", "frames", "normalization_epsilon"],
+  "impl": {
+    "function": "audio_feature_normalize_per_feature_f32",
+    "c_declaration": "int audio_feature_normalize_per_feature_f32(const float *input, float *output, int channels, int frames, float epsilon);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_feature_normalize_per_feature_sample_variance_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_feature_normalize_per_feature_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["independent_columns"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp64", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "channels", "source": "dim:channels"},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "epsilon", "source": "dim:normalization_epsilon"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}

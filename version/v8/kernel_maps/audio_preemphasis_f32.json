@@ -1,0 +1,34 @@
+{
+  "id": "audio_preemphasis_f32",
+  "op": "audio_preemphasis",
+  "operation_interface": "audio_preemphasis.fp32.previous_sample.v1",
+  "variant": "first_sample_identity_previous_sample_fp32",
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["N_frames"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Input PCM samples"}],
+  "weights": [],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["N_frames"], "layout": "contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Pre-emphasized PCM samples"}],
+  "scratch": [],
+  "dims": ["frames", "preemphasis_coefficient"],
+  "impl": {
+    "function": "audio_preemphasis_f32",
+    "c_declaration": "int audio_preemphasis_f32(const float *input, float *output, int frames, float coefficient);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_preemphasis_previous_sample_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_preemphasis_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+    "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "coefficient", "source": "dim:preemphasis_coefficient"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}

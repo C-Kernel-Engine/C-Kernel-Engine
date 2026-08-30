@@ -1,0 +1,43 @@
+{
+  "id": "audio_log_mel_time_major_f32",
+  "op": "audio_log_mel",
+  "operation_interface": "audio_log_mel.time_major.natural_log_add_epsilon.fp32.v1",
+  "variant": "time_major_mel_projection_natural_log_add_epsilon_fp32",
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "power", "dtype": "fp32", "shape": ["N_frames", "N_bins"], "layout": "time_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Frame-major power spectrum"}
+  ],
+  "weights": [
+    {"name": "mel_filters", "dtype": "fp32", "shape": ["N_channels", "N_bins"], "layout": "row_major", "access": "read", "storage_class": "weight", "consumption": "required", "desc": "Model-provided Mel filter bank"}
+  ],
+  "outputs": [
+    {"name": "log_mel", "dtype": "fp32", "shape": ["N_frames", "N_channels"], "layout": "time_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Natural-log Mel features before normalization"}
+  ],
+  "scratch": [],
+  "dims": ["frames", "bins", "channels", "log_epsilon"],
+  "impl": {
+    "function": "audio_log_mel_time_major_f32",
+    "c_declaration": "int audio_log_mel_time_major_f32(const float *power, const float *mel_filters, float *log_mel, int frames, int bins, int channels, float epsilon);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_log_mel_time_major_ln_add_epsilon_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_log_mel_time_major_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "power", "source": "activation:power", "cast": "const float*", "ports": ["input:power"]},
+    {"name": "mel_filters", "source": "weight:mel_filters", "cast": "const float*", "ports": ["weight:mel_filters"]},
+    {"name": "log_mel", "source": "output:log_mel", "cast": "float*", "ports": ["output:log_mel"]},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "bins", "source": "dim:bins"},
+    {"name": "channels", "source": "dim:channels"},
+    {"name": "epsilon", "source": "dim:log_epsilon"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}
