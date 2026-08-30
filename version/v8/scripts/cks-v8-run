@@ -10,7 +10,7 @@ PRIMARY_VENV_PY=""
 if [[ "$GIT_COMMON_DIR" == */.git ]]; then
   PRIMARY_VENV_PY="${GIT_COMMON_DIR%/.git}/.venv/bin/python"
 fi
-REQS="$PROJECT_ROOT/requirements-v8.txt"
+REQS="$PROJECT_ROOT/version/v8/requirements.txt"
 SELECTED_PY=""
 
 requires_source_integrity() {
@@ -130,21 +130,21 @@ ensure_bootstrap() {
   echo "[v8] missing repo-local Python environment or required packages."
   echo "[v8] supported bootstrap:"
   echo "      python3 -m venv .venv"
-  echo "      .venv/bin/pip install -r requirements-v8.txt"
+  echo "      .venv/bin/pip install -r version/v8/requirements.txt"
 
   if [ ! -t 0 ]; then
     echo "[v8] non-interactive shell: refusing to auto-bootstrap."
     exit 1
   fi
 
-  printf "[v8] create .venv and install requirements-v8.txt now? [y/N] "
+  printf "[v8] create .venv and install version/v8/requirements.txt now? [y/N] "
   read -r answer
   case "${answer:-}" in
     y|Y|yes|YES)
       bootstrap_venv
       ;;
     *)
-      echo "[v8] bootstrap skipped. Install requirements-v8.txt and retry."
+      echo "[v8] bootstrap skipped. Install version/v8/requirements.txt and retry."
       exit 1
       ;;
   esac

@@ -24,9 +24,6 @@ ALLOWED_FILES = {
     "Makefile",
     "README.md",
     "RELEASE_NOTES.md",
-    "requirements-nightly-constraints.txt",
-    "requirements-v7.txt",
-    "requirements-v8.txt",
     "requirements.txt",
 }
 

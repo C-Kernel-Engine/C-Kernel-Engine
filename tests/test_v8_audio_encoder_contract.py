@@ -559,7 +559,7 @@ class AudioEncoderContractTests(unittest.TestCase):
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("pytest", requirements.splitlines())
         constraints = (
-            ROOT / "requirements-nightly-constraints.txt"
+            ROOT / ".github" / "requirements-nightly-constraints.txt"
         ).read_text(encoding="utf-8")
         self.assertIn("torch==2.12.1", constraints.splitlines())
         workflow = (
@@ -576,7 +576,7 @@ class AudioEncoderContractTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                "-c requirements-nightly-constraints.txt" in line
+                "-c .github/requirements-nightly-constraints.txt" in line
                 for line in dependency_installs
             ),
             "every nightly dependency install must use the pinned constraints file",

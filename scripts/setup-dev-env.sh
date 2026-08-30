@@ -68,11 +68,11 @@ fi
 echo "Installing Python requirements into .venv"
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
-if [ -f requirements-v8.txt ]; then
-  .venv/bin/python -m pip install -r requirements-v8.txt
+if [ -f version/v8/requirements.txt ]; then
+  .venv/bin/python -m pip install -r version/v8/requirements.txt
 fi
-if [ -f requirements-v7.txt ]; then
-  .venv/bin/python -m pip install -r requirements-v7.txt
+if [ -f version/v7/requirements.txt ]; then
+  .venv/bin/python -m pip install -r version/v7/requirements.txt
 fi
 
 ./scripts/setup-hooks.sh

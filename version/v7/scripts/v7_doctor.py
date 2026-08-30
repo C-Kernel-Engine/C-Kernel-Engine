@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v7.txt"
+REQUIREMENTS_PATH = PROJECT_ROOT / "version" / "v7" / "requirements.txt"
 VENV_PY = PROJECT_ROOT / ".venv" / "bin" / "python"
 USE_COLOR = sys.stdout.isatty()
 

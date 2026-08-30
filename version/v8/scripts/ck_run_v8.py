@@ -44,7 +44,7 @@ ROOT_SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 BUILD_DIR = PROJECT_ROOT / "build"
 KERNEL_MAPS_DIR = V8_ROOT / "kernel_maps"
 KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
-V8_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v8.txt"
+V8_REQUIREMENTS_PATH = PROJECT_ROOT / "version" / "v8" / "requirements.txt"
 V8_VISUALIZER_PATH = V8_ROOT / "tools" / "open_ir_visualizer_v8.py"
 REPO_VENV_PY = PROJECT_ROOT / ".venv" / "bin" / "python"
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "ck-engine-v8" / "models"
@@ -664,7 +664,7 @@ def _ensure_v8_python_requirements(command: Optional[str]) -> None:
     joined = ", ".join(missing)
     raise SystemExit(
         "Missing Python packages for v8 inference: "
-        f"{joined}\nUse version/v8/scripts/cks-v8-run or install requirements-v8.txt."
+        f"{joined}\nUse version/v8/scripts/cks-v8-run or install version/v8/requirements.txt."
     )
 
 
