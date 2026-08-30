@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" font-family="Consolas, Monaco, monospace" role="img" aria-labelledby="qptitle qpdesc">
+  <title id="qptitle">How CKE executes quantized formats</title>
+  <desc id="qpdesc">Pipeline from GGUF quantized weights through kernel-map provider selection to per-tile execution with FP32 accumulation, plus the parity, dispatch, and support-boundary contracts.</desc>
+  <defs>
+    <marker id="qparrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="680" fill="#0d1117"/>
+
+  <text x="600" y="42" fill="#c9d1d9" font-size="26" font-weight="bold" text-anchor="middle">How CKE Executes Quantized Weights</text>
+  <text x="600" y="66" fill="#8b949e" font-size="13" text-anchor="middle">from GGUF bytes to provider-selected kernels — the same path for every model family</text>
+
+  <!-- Step 1: artifact -->
+  <g>
+    <rect x="40" y="96" width="300" height="150" rx="10" fill="#161b22" stroke="#ffd700" stroke-opacity=".55"/>
+    <text x="190" y="126" fill="#ffd700" font-size="14" font-weight="bold" text-anchor="middle">1. MODEL ARTIFACT</text>
+    <text x="190" y="150" fill="#c9d1d9" font-size="12.5" text-anchor="middle">GGUF / SafeTensors</text>
+    <text x="190" y="170" fill="#8b949e" font-size="12" text-anchor="middle">Q4_K · Q5_K · Q6_K · Q8_0</text>
+    <text x="190" y="188" fill="#8b949e" font-size="12" text-anchor="middle">BF16 storage lanes</text>
+    <g transform="translate(70 202)">
+      <rect width="26" height="18" fill="#ffd700" opacity=".85"/><rect x="28" width="26" height="18" fill="#ff8c00" opacity=".85"/>
+      <rect x="56" width="58" height="18" fill="#f093fb" opacity=".8"/><rect x="116" width="118" height="18" fill="#58a6ff" opacity=".7"/>
+      <text x="13" y="13" font-size="9" fill="#0d1117" text-anchor="middle" font-weight="bold">d</text>
+      <text x="41" y="13" font-size="9" fill="#0d1117" text-anchor="middle" font-weight="bold">min</text>
+      <text x="85" y="13" font-size="9" fill="#0d1117" text-anchor="middle" font-weight="bold">scales</text>
+      <text x="175" y="13" font-size="9" fill="#0d1117" text-anchor="middle" font-weight="bold">4-bit weights (qs)</text>
+    </g>
+  </g>
+
+  <line x1="346" y1="171" x2="386" y2="171" stroke="#58a6ff" stroke-width="2" marker-end="url(#qparrow)"/>
+
+  <!-- Step 2: kernel map -->
+  <g>
+    <rect x="392" y="96" width="370" height="150" rx="10" fill="#161b22" stroke="#58a6ff" stroke-opacity=".55"/>
+    <text x="577" y="126" fill="#58a6ff" font-size="14" font-weight="bold" text-anchor="middle">2. KERNEL MAP + SELECTION</text>
+    <text x="577" y="150" fill="#c9d1d9" font-size="12.5" text-anchor="middle">logical op: matmul · gate_up · moe_expert</text>
+    <text x="577" y="170" fill="#8b949e" font-size="12" text-anchor="middle">numerical contract: q4_k x q8_k, FP32 accum</text>
+    <text x="577" y="188" fill="#8b949e" font-size="12" text-anchor="middle">shape · dtype · phase · ISA must all match</text>
+    <text x="577" y="212" fill="#3fb950" font-size="12" text-anchor="middle">production providers only — candidates never auto-select</text>
+    <text x="577" y="232" fill="#8b949e" font-size="11.5" text-anchor="middle">equal-priority ambiguity fails closed</text>
+  </g>
+
+  <line x1="768" y1="171" x2="808" y2="171" stroke="#58a6ff" stroke-width="2" marker-end="url(#qparrow)"/>
+
+  <!-- Step 3: provider -->
+  <g>
+    <rect x="814" y="96" width="346" height="150" rx="10" fill="#161b22" stroke="#3fb950" stroke-opacity=".55"/>
+    <text x="987" y="126" fill="#3fb950" font-size="14" font-weight="bold" text-anchor="middle">3. PROVIDER (C KERNEL)</text>
+    <text x="987" y="150" fill="#c9d1d9" font-size="12.5" text-anchor="middle">gemm_nt_q4_k_q8_k · gemv_q5_k</text>
+    <text x="987" y="170" fill="#c9d1d9" font-size="12.5" text-anchor="middle">gemm_nt_bf16 · moe_swiglu q4k x q5k</text>
+    <text x="987" y="194" fill="#8b949e" font-size="12" text-anchor="middle">ISA picked at build: AVX2 · AVX-VNNI · AVX-512</text>
+    <text x="987" y="214" fill="#8b949e" font-size="12" text-anchor="middle">persistent thread pool over token rows</text>
+  </g>
+
+  <!-- Execution pipeline band -->
+  <text x="40" y="292" fill="#8b949e" font-size="12" font-weight="bold" letter-spacing="2">EXECUTION PIPELINE (PER TILE)</text>
+  <g>
+    <rect x="40" y="306" width="230" height="96" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="155" y="336" fill="#c9d1d9" font-size="12.5" font-weight="bold" text-anchor="middle">Activations</text>
+    <text x="155" y="358" fill="#8b949e" font-size="12" text-anchor="middle">FP32 hidden state</text>
+    <text x="155" y="378" fill="#8b949e" font-size="12" text-anchor="middle">token-major rows</text>
+  </g>
+  <line x1="276" y1="354" x2="308" y2="354" stroke="#58a6ff" stroke-width="2" marker-end="url(#qparrow)"/>
+  <g>
+    <rect x="314" y="306" width="230" height="96" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="429" y="336" fill="#f093fb" font-size="12.5" font-weight="bold" text-anchor="middle">quantize_row_q8_k</text>
+    <text x="429" y="358" fill="#8b949e" font-size="12" text-anchor="middle">FP32 scale + bsums</text>
+    <text x="429" y="378" fill="#8b949e" font-size="12" text-anchor="middle">llama.cpp-exact rounding</text>
+  </g>
+  <line x1="550" y1="354" x2="582" y2="354" stroke="#58a6ff" stroke-width="2" marker-end="url(#qparrow)"/>
+  <g>
+    <rect x="588" y="306" width="280" height="96" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="728" y="336" fill="#58a6ff" font-size="12.5" font-weight="bold" text-anchor="middle">dequant-on-the-fly dot</text>
+    <text x="728" y="358" fill="#8b949e" font-size="12" text-anchor="middle">weight nibbles x int8 activations</text>
+    <text x="728" y="378" fill="#ffd700" font-size="12" text-anchor="middle">FP32 accumulation — contract-fixed order</text>
+  </g>
+  <line x1="874" y1="354" x2="906" y2="354" stroke="#58a6ff" stroke-width="2" marker-end="url(#qparrow)"/>
+  <g>
+    <rect x="912" y="306" width="248" height="96" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="1036" y="336" fill="#c9d1d9" font-size="12.5" font-weight="bold" text-anchor="middle">Output tile</text>
+
+    <text x="1036" y="358" fill="#8b949e" font-size="12" text-anchor="middle">FP32 or BF16 storage</text>
+    <text x="1036" y="378" fill="#8b949e" font-size="12" text-anchor="middle">+ bias · residual · norm</text>
+  </g>
+
+  <!-- Bottom contract cards -->
+  <text x="40" y="446" fill="#8b949e" font-size="12" font-weight="bold" letter-spacing="2">CONTRACTS THAT HOLD ACROSS ALL FORMATS</text>
+  <g font-size="12">
+    <rect x="40" y="460" width="270" height="104" rx="10" fill="#161b22" stroke="#3fb950" stroke-opacity=".5"/>
+    <text x="175" y="486" fill="#3fb950" font-size="12.5" font-weight="bold" text-anchor="middle">Bit-exact parity</text>
+    <text x="175" y="508" fill="#8b949e" text-anchor="middle">llama.cpp oracle gates;</text>
+    <text x="175" y="528" fill="#8b949e" text-anchor="middle">Q4_K dmin subtracts, never adds</text>
+    <rect x="330" y="460" width="270" height="104" rx="10" fill="#161b22" stroke="#58a6ff" stroke-opacity=".5"/>
+    <text x="465" y="486" fill="#58a6ff" font-size="12.5" font-weight="bold" text-anchor="middle">Per-tensor dispatch</text>
+    <text x="465" y="508" fill="#8b949e" text-anchor="middle">MoE experts mix formats:</text>
+    <text x="465" y="528" fill="#8b949e" text-anchor="middle">Q4_K x Q5_K, bucketed by shape</text>
+    <rect x="620" y="460" width="270" height="104" rx="10" fill="#161b22" stroke="#f093fb" stroke-opacity=".5"/>
+    <text x="755" y="486" fill="#f093fb" font-size="12.5" font-weight="bold" text-anchor="middle">BF16 storage lanes</text>
+    <text x="755" y="508" fill="#8b949e" text-anchor="middle">Kimi · Instella · Qwen3.6:</text>
+    <text x="755" y="528" fill="#8b949e" text-anchor="middle">BF16 in memory, FP32 math</text>
+    <rect x="910" y="460" width="250" height="104" rx="10" fill="#161b22" stroke="#f85149" stroke-opacity=".5"/>
+    <text x="1035" y="486" fill="#f85149" font-size="12.5" font-weight="bold" text-anchor="middle">Support boundary</text>
+    <text x="1035" y="508" fill="#8b949e" text-anchor="middle">no Q2_K · Q3_K · IQ imatrix —</text>
+    <text x="1035" y="528" fill="#8b949e" text-anchor="middle">untested formats fail closed</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="40" y1="600" x2="1160" y2="600" stroke="#30363d"/>
+  <text x="40" y="632" fill="#8b949e" font-size="12.5">Every resolved provider, contract, and rejection reason is recorded in the run's X-Ray trace — see kernel-maps.html and kernel-architecture.html.</text>
+  <text x="1160" y="632" fill="#58a6ff" font-size="12.5" text-anchor="end">c-kernel-engine.github.io/C-Kernel-Engine</text>
+</svg>

@@ -1,0 +1,50 @@
+{
+  "id": "audio_conv2d_whc_grouped_f32",
+  "op": "audio_conv2d",
+  "operation_interface": "audio_conv2d.whc.grouped.fp32.v1",
+  "variant": "whc_grouped_bias_ascending_reduction_fp32",
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["C_in", "H_in", "W_in"], "layout": "channel_height_width_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [
+    {"name": "weight", "dtype": "fp32", "shape": ["C_out", "C_in_per_group", "K_h", "K_w"], "layout": "output_input_height_width_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias", "dtype": "fp32", "shape": ["C_out"], "layout": "contiguous", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["C_out", "H_out", "W_out"], "layout": "channel_height_width_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["input_width", "input_height", "input_channels", "output_channels", "kernel_width", "kernel_height", "stride_width", "stride_height", "padding_width", "padding_height", "groups", "output_width", "output_height"],
+  "impl": {
+    "function": "audio_conv2d_whc_grouped_f32",
+    "c_declaration": "int audio_conv2d_whc_grouped_f32(const float *input, const float *weight, const float *bias, float *output, int input_width, int input_height, int input_channels, int output_channels, int kernel_width, int kernel_height, int stride_width, int stride_height, int padding_width, int padding_height, int groups, int output_width, int output_height);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_conv2d_whc_grouped_ascending_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_conv2d_whc_grouped_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "ck_threadpool", "work_partition": ["output_tiles"], "dispatch": ["ck_threadpool_parallel_for_n"], "reduction_order_effect": "none"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "weight", "source": "weight:weight", "cast": "const float*", "ports": ["weight:weight"]},
+    {"name": "bias", "source": "weight:bias", "cast": "const float*", "ports": ["weight:bias"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "input_width", "source": "dim:input_width"},
+    {"name": "input_height", "source": "dim:input_height"},
+    {"name": "input_channels", "source": "dim:input_channels"},
+    {"name": "output_channels", "source": "dim:output_channels"},
+    {"name": "kernel_width", "source": "dim:kernel_width"},
+    {"name": "kernel_height", "source": "dim:kernel_height"},
+    {"name": "stride_width", "source": "dim:stride_width"},
+    {"name": "stride_height", "source": "dim:stride_height"},
+    {"name": "padding_width", "source": "dim:padding_width"},
+    {"name": "padding_height", "source": "dim:padding_height"},
+    {"name": "groups", "source": "dim:groups"},
+    {"name": "output_width", "source": "dim:output_width"},
+    {"name": "output_height", "source": "dim:output_height"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}

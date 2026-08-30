@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Generate kernel registry C sources from kernel_maps/*.json."""
+"""Generate kernel registry C sources from version/v6.6/legacy_kernel_maps/*.json."""
 import json
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KERNEL_DIR = os.path.join(ROOT, "kernel_maps", "kernels")
-PLAN_PATH = os.path.join(ROOT, "kernel_maps", "decoder_layer_plan.json")
-PLAN_BWD_PATH = os.path.join(ROOT, "kernel_maps", "decoder_layer_plan_backward.json")
-GLOBAL_PATH = os.path.join(ROOT, "kernel_maps", "global_buffers.json")
+KERNEL_DIR = os.path.join(ROOT, "version", "v6.6", "legacy_kernel_maps", "kernels")
+PLAN_PATH = os.path.join(ROOT, "version", "v6.6", "legacy_kernel_maps", "decoder_layer_plan.json")
+PLAN_BWD_PATH = os.path.join(ROOT, "version", "v6.6", "legacy_kernel_maps", "decoder_layer_plan_backward.json")
+GLOBAL_PATH = os.path.join(ROOT, "version", "v6.6", "legacy_kernel_maps", "global_buffers.json")
 OUT_H = os.path.join(ROOT, "include", "ckernel_kernel_specs.h")
 OUT_C = os.path.join(ROOT, "src", "ckernel_kernel_specs.c")
 

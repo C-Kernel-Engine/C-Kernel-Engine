@@ -10,9 +10,9 @@ Current lanes:
 Primary launch path:
 
 ```bash
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/
 ```
 
 Compatibility note:
 
-- `notebooks/v7_training/` remains available as a compatibility alias so existing commands, demos, and links do not break while the notebook surface is being reorganized.
+- `docs/notebooks/v7_training/` remains available as a compatibility alias so existing commands, demos, and links do not break while the notebook surface is being reorganized.

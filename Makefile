@@ -616,7 +616,7 @@ IR_V2_DEMO := $(BUILD_DIR)/ck_ir_v2_demo
 IR_V2_SCRIPT := scripts/build_ir_v2.py
 IR_V4_SCRIPT := scripts/v4/build_ir_v4.py
 IR_V4_Q4K_SCRIPT := scripts/v4/build_ir_v4_q4k.py
-DEFAULT_CONFIG := default.config.json
+DEFAULT_CONFIG := version/v6.6/configs/default.config.json
 CONFIG ?= $(DEFAULT_CONFIG)
 OUT ?= $(BUILD_DIR)/generated_model.c
 IR ?=
@@ -5512,7 +5512,7 @@ nightly-list:
 .PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto libckernel_audio.so
 
 # ============================================================================
-# Status Reports (reads from meta/kernel_meta.json)
+# Status Reports (reads from version/meta/kernel_meta.json)
 # ============================================================================
 # Usage:
 #   make report        - Full comprehensive report (kernel status, roadmaps, tests)
@@ -5521,7 +5521,7 @@ nightly-list:
 #   make test-coverage - Show test file coverage
 #
 # To update the report:
-#   1. Edit meta/kernel_meta.json when you add/modify kernels
+#   1. Edit version/meta/kernel_meta.json when you add/modify kernels
 #   2. Update "opt_level" arrays when adding SIMD/blocking/parallel
 #   3. Run "make report" to see updated status
 #

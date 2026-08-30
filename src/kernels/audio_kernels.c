@@ -300,6 +300,73 @@ int audio_pad_or_truncate_f32(
     return copied;
 }
 
+int audio_preemphasis_f32(
+    const float *input,
+    float *output,
+    int frames,
+    float coefficient)
+{
+    if (input == NULL || output == NULL) {
+        return -1;
+    }
+    if (frames <= 0 || !isfinite(coefficient)) {
+        return -2;
+    }
+    if (input == output) {
+        for (int frame = frames - 1; frame > 0; --frame) {
+            output[frame] = input[frame] - coefficient * input[frame - 1];
+        }
+    } else {
+        output[0] = input[0];
+        for (int frame = 1; frame < frames; ++frame) {
+            output[frame] = input[frame] - coefficient * input[frame - 1];
+        }
+    }
+    return 0;
+}
+
+int audio_feature_normalize_per_feature_f32(
+    const float *input,
+    float *output,
+    int channels,
+    int frames,
+    float epsilon)
+{
+    if (input == NULL || output == NULL) {
+        return -1;
+    }
+    if (channels <= 0 || frames <= 0 || !isfinite(epsilon) || epsilon < 0.0f) {
+        return -2;
+    }
+    const int denominator = frames > 1 ? frames - 1 : 1;
+    for (int channel = 0; channel < channels; ++channel) {
+        double sum = 0.0;
+        double sum_squared_difference = 0.0;
+        for (int frame = 0; frame < frames; ++frame) {
+            sum += (double)input[(size_t)frame * channels + channel];
+        }
+        const double mean = sum / (double)frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            const double difference =
+                (double)input[(size_t)frame * channels + channel] - mean;
+            sum_squared_difference += difference * difference;
+        }
+        float standard_deviation = sqrtf(
+            (float)(sum_squared_difference / (double)denominator));
+        if (isnan(standard_deviation)) {
+            standard_deviation = 0.0f;
+        }
+        const float inverse_standard_deviation =
+            1.0f / (standard_deviation + epsilon);
+        for (int frame = 0; frame < frames; ++frame) {
+            const size_t index = (size_t)frame * channels + channel;
+            output[index] = (float)((double)input[index] - mean) *
+                inverse_standard_deviation;
+        }
+    }
+    return 0;
+}
+
 int audio_stft_precompute_tables_f32(
     int n_fft,
     float *window,
@@ -423,6 +490,91 @@ int audio_stft_power_precomputed_f32(
             }
             power[(size_t)frame * bins + bin] =
                 fmaf(real, real, imag * imag);
+        }
+    }
+    return 0;
+}
+
+int audio_stft_power_centered_window_f32(
+    const float *samples,
+    int n_samples,
+    const float *window,
+    int window_length,
+    const float *cos_table,
+    const float *sin_table,
+    int n_fft,
+    int hop_length,
+    int reflect_padding,
+    float *power,
+    int n_frames)
+{
+    if (samples == NULL || window == NULL || cos_table == NULL ||
+        sin_table == NULL || power == NULL) {
+        return -1;
+    }
+    if (n_samples <= 0 || window_length <= 0 || n_fft <= 0 ||
+        window_length > n_fft || (n_fft & 1) != 0 || hop_length <= 0 ||
+        n_frames <= 0 || (reflect_padding != 0 && reflect_padding != 1)) {
+        return -2;
+    }
+    if (n_frames != n_samples / hop_length + 1) {
+        return -3;
+    }
+
+    const int bins = n_fft / 2 + 1;
+    const int center = n_fft / 2;
+    const int window_start = (n_fft - window_length) / 2;
+    for (int frame = 0; frame < n_frames; ++frame) {
+        for (int bin = 0; bin < bins; ++bin) {
+            const float *cos_row = cos_table + (size_t)bin * n_fft;
+            const float *sin_row = sin_table + (size_t)bin * n_fft;
+            float real = 0.0f;
+            float imag = 0.0f;
+            for (int sample = 0; sample < window_length; ++sample) {
+                const int fft_sample = window_start + sample;
+                int source = frame * hop_length + fft_sample - center;
+                if (source < 0 || source >= n_samples) {
+                    if (!reflect_padding) {
+                        continue;
+                    }
+                    source = reflect_index(source, n_samples);
+                }
+                const float value = samples[source] * window[sample];
+                real = fmaf(value, cos_row[fft_sample], real);
+                imag = fmaf(value, sin_row[fft_sample], imag);
+            }
+            power[(size_t)frame * bins + bin] =
+                fmaf(real, real, imag * imag);
+        }
+    }
+    return 0;
+}
+
+int audio_log_mel_time_major_f32(
+    const float *power,
+    const float *mel_filters,
+    float *log_mel,
+    int frames,
+    int bins,
+    int channels,
+    float epsilon)
+{
+    if (power == NULL || mel_filters == NULL || log_mel == NULL) {
+        return -1;
+    }
+    if (frames <= 0 || bins <= 0 || channels <= 0 || epsilon <= 0.0f) {
+        return -2;
+    }
+    for (int frame = 0; frame < frames; ++frame) {
+        const float *spectrum = power + (size_t)frame * bins;
+        float *output = log_mel + (size_t)frame * channels;
+        for (int channel = 0; channel < channels; ++channel) {
+            const float *filter = mel_filters + (size_t)channel * bins;
+            float sum = 0.0f;
+            for (int bin = 0; bin < bins; ++bin) {
+                sum = fmaf(spectrum[bin], filter[bin], sum);
+            }
+            output[channel] = logf(sum + epsilon);
         }
     }
     return 0;
@@ -797,6 +949,257 @@ int audio_conv1d_channel_major_f32(
             pool, active, ck_audio_conv1d_channel_major_f32_work, &args);
     } else {
         ck_audio_conv1d_channel_major_f32_work(0, 1, &args);
+    }
+    return 0;
+}
+
+typedef struct {
+    const float *input;
+    const float *weight;
+    const float *bias;
+    float *output;
+    int input_width;
+    int input_height;
+    int input_channels;
+    int output_channels;
+    int kernel_width;
+    int kernel_height;
+    int stride_width;
+    int stride_height;
+    int padding_width;
+    int padding_height;
+    int groups;
+    int output_width;
+    int output_height;
+} ck_audio_conv2d_whc_f32_args_t;
+
+static void ck_audio_conv2d_whc_grouped_f32_range(
+    int begin,
+    int end,
+    void *opaque)
+{
+    const ck_audio_conv2d_whc_f32_args_t *args =
+        (const ck_audio_conv2d_whc_f32_args_t *)opaque;
+    const int outputs_per_channel = args->output_width * args->output_height;
+    const int input_channels_per_group = args->input_channels / args->groups;
+    const int output_channels_per_group = args->output_channels / args->groups;
+    for (int index = begin; index < end; ++index) {
+        const int output_channel = index / outputs_per_channel;
+        const int spatial = index - output_channel * outputs_per_channel;
+        const int output_y = spatial / args->output_width;
+        const int output_x = spatial - output_y * args->output_width;
+        const int group = output_channel / output_channels_per_group;
+        const int input_channel_begin = group * input_channels_per_group;
+        float sum = args->bias != NULL ? args->bias[output_channel] : 0.0f;
+        for (int input_channel_offset = 0;
+             input_channel_offset < input_channels_per_group;
+             ++input_channel_offset) {
+            const int input_channel = input_channel_begin + input_channel_offset;
+            for (int kernel_y = 0; kernel_y < args->kernel_height; ++kernel_y) {
+                const int input_y = output_y * args->stride_height + kernel_y -
+                    args->padding_height;
+                if (input_y < 0 || input_y >= args->input_height) {
+                    continue;
+                }
+                for (int kernel_x = 0; kernel_x < args->kernel_width; ++kernel_x) {
+                    const int input_x = output_x * args->stride_width + kernel_x -
+                        args->padding_width;
+                    if (input_x < 0 || input_x >= args->input_width) {
+                        continue;
+                    }
+                    const size_t input_index =
+                        ((size_t)input_channel * args->input_height + input_y) *
+                        args->input_width + input_x;
+                    const size_t weight_index =
+                        (((size_t)output_channel * input_channels_per_group +
+                          input_channel_offset) * args->kernel_height + kernel_y) *
+                        args->kernel_width + kernel_x;
+                    sum = fmaf(args->input[input_index], args->weight[weight_index], sum);
+                }
+            }
+        }
+        args->output[index] = sum;
+    }
+}
+
+int audio_conv2d_whc_grouped_f32(
+    const float *input,
+    const float *weight,
+    const float *bias,
+    float *output,
+    int input_width,
+    int input_height,
+    int input_channels,
+    int output_channels,
+    int kernel_width,
+    int kernel_height,
+    int stride_width,
+    int stride_height,
+    int padding_width,
+    int padding_height,
+    int groups,
+    int output_width,
+    int output_height)
+{
+    if (input == NULL || weight == NULL || output == NULL) {
+        return -1;
+    }
+    if (input_width <= 0 || input_height <= 0 || input_channels <= 0 ||
+        output_channels <= 0 || kernel_width <= 0 || kernel_height <= 0 ||
+        stride_width <= 0 || stride_height <= 0 || padding_width < 0 ||
+        padding_height < 0 || groups <= 0 || output_width <= 0 ||
+        output_height <= 0 || input_channels % groups != 0 ||
+        output_channels % groups != 0) {
+        return -2;
+    }
+    const int expected_width =
+        (input_width + 2 * padding_width - kernel_width) / stride_width + 1;
+    const int expected_height =
+        (input_height + 2 * padding_height - kernel_height) / stride_height + 1;
+    if (output_width != expected_width || output_height != expected_height) {
+        return -3;
+    }
+    ck_audio_conv2d_whc_f32_args_t args = {
+        .input = input,
+        .weight = weight,
+        .bias = bias,
+        .output = output,
+        .input_width = input_width,
+        .input_height = input_height,
+        .input_channels = input_channels,
+        .output_channels = output_channels,
+        .kernel_width = kernel_width,
+        .kernel_height = kernel_height,
+        .stride_width = stride_width,
+        .stride_height = stride_height,
+        .padding_width = padding_width,
+        .padding_height = padding_height,
+        .groups = groups,
+        .output_width = output_width,
+        .output_height = output_height,
+    };
+    const int output_elements = output_channels * output_height * output_width;
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > output_elements) {
+        active = output_elements;
+    }
+    if (pool != NULL && active > 1) {
+        const int grain = output_width > 0 ? output_width : 1;
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, output_elements, grain,
+            ck_audio_conv2d_whc_grouped_f32_range, &args);
+    } else {
+        ck_audio_conv2d_whc_grouped_f32_range(0, output_elements, &args);
+    }
+    return 0;
+}
+
+typedef struct {
+    const float *value;
+    const float *gate;
+    float *output;
+} ck_audio_glu_split_f32_args_t;
+
+static void ck_audio_glu_split_f32_range(int begin, int end, void *opaque)
+{
+    const ck_audio_glu_split_f32_args_t *args =
+        (const ck_audio_glu_split_f32_args_t *)opaque;
+    for (int index = begin; index < end; ++index) {
+        const float gate = args->gate[index];
+        const float sigmoid = 1.0f / (1.0f + expf(-gate));
+        args->output[index] = args->value[index] * sigmoid;
+    }
+}
+
+int audio_glu_split_channel_major_f32(
+    const float *input,
+    float *output,
+    int channels,
+    int frames)
+{
+    if (input == NULL || output == NULL) {
+        return -1;
+    }
+    if (channels <= 0 || frames <= 0) {
+        return -2;
+    }
+    const int elements = channels * frames;
+    ck_audio_glu_split_f32_args_t args = {
+        .value = input,
+        .gate = input + elements,
+        .output = output,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > elements) {
+        active = elements;
+    }
+    if (pool != NULL && active > 1) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, elements, 256,
+            ck_audio_glu_split_f32_range, &args);
+    } else {
+        ck_audio_glu_split_f32_range(0, elements, &args);
+    }
+    return 0;
+}
+
+typedef struct {
+    const float *raw_scores;
+    float *scores;
+    int query_frames;
+    int raw_key_frames;
+} ck_audio_relative_shift_f32_args_t;
+
+static void ck_audio_relative_shift_f32_range(
+    int begin, int end, void *opaque)
+{
+    const ck_audio_relative_shift_f32_args_t *args =
+        (const ck_audio_relative_shift_f32_args_t *)opaque;
+    const int frames = args->query_frames;
+    const int raw_frames = args->raw_key_frames;
+    for (int row = begin; row < end; ++row) {
+        const int query = row % frames;
+        const float *raw = args->raw_scores + (size_t)row * raw_frames;
+        float *output = args->scores + (size_t)row * frames;
+        const int origin = frames - 1 - query;
+        for (int key = 0; key < frames; ++key) {
+            output[key] = raw[origin + key];
+        }
+    }
+}
+
+int audio_relative_shift_f32(
+    const float *raw_scores,
+    float *scores,
+    int heads,
+    int query_frames)
+{
+    if (raw_scores == NULL || scores == NULL) {
+        return -1;
+    }
+    if (heads <= 0 || query_frames <= 0) {
+        return -2;
+    }
+    const int rows = heads * query_frames;
+    ck_audio_relative_shift_f32_args_t args = {
+        .raw_scores = raw_scores,
+        .scores = scores,
+        .query_frames = query_frames,
+        .raw_key_frames = 2 * query_frames - 1,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > rows) {
+        active = rows;
+    }
+    if (pool != NULL && active > 1) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, rows, 1,
+            ck_audio_relative_shift_f32_range, &args);
+    } else {
+        ck_audio_relative_shift_f32_range(0, rows, &args);
     }
     return 0;
 }

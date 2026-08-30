@@ -1,0 +1,34 @@
+{
+  "id": "audio_relative_shift_f32",
+  "op": "audio_relative_shift",
+  "operation_interface": "audio_relative_shift.transformer_xl.fp32.v1",
+  "variant": "transformer_xl_relative_index_copy_fp32",
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "raw_scores", "dtype": "fp32", "shape": ["H", "T", "2*T-1"], "layout": "head_query_relative_key_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [],
+  "outputs": [{"name": "scores", "dtype": "fp32", "shape": ["H", "T", "T"], "layout": "head_query_key_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["heads", "query_frames"],
+  "impl": {
+    "function": "audio_relative_shift_f32",
+    "c_declaration": "int audio_relative_shift_f32(const float *raw_scores, float *scores, int heads, int query_frames);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_relative_shift_transformer_xl_exact_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_relative_shift_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "ck_threadpool", "work_partition": ["output_tiles"], "dispatch": ["ck_threadpool_parallel_for_n"], "reduction_order_effect": "none"}},
+    "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "raw_scores", "source": "activation:raw_scores", "cast": "const float*", "ports": ["input:raw_scores"]},
+    {"name": "scores", "source": "output:scores", "cast": "float*", "ports": ["output:scores"]},
+    {"name": "heads", "source": "dim:heads"},
+    {"name": "query_frames", "source": "dim:query_frames"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}

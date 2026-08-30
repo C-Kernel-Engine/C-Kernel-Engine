@@ -68,6 +68,16 @@ lib.audio_stft_power_precomputed_f32.argtypes = [
     ctypes.c_int, ctypes.c_int, _FLOAT_P, ctypes.c_int,
 ]
 lib.audio_stft_power_precomputed_f32.restype = ctypes.c_int
+lib.audio_stft_power_centered_window_f32.argtypes = [
+    _FLOAT_P, ctypes.c_int, _FLOAT_P, ctypes.c_int, _FLOAT_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, _FLOAT_P, ctypes.c_int,
+]
+lib.audio_stft_power_centered_window_f32.restype = ctypes.c_int
+lib.audio_log_mel_time_major_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_float,
+]
+lib.audio_log_mel_time_major_f32.restype = ctypes.c_int
 lib.audio_whisper_stft_power_reference_f32.argtypes = [
     _FLOAT_P, ctypes.c_int, _FLOAT_P, ctypes.c_int,
 ]
@@ -78,6 +88,21 @@ lib.audio_conv1d_channel_major_f32.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_int,
 ]
 lib.audio_conv1d_channel_major_f32.restype = ctypes.c_int
+lib.audio_conv2d_whc_grouped_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_conv2d_whc_grouped_f32.restype = ctypes.c_int
+lib.audio_glu_split_channel_major_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_glu_split_channel_major_f32.restype = ctypes.c_int
+lib.audio_relative_shift_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_relative_shift_f32.restype = ctypes.c_int
 lib.audio_transpose_channel_to_token_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int,
 ]
@@ -124,6 +149,14 @@ lib.audio_pad_or_truncate_f32.argtypes = [
     _FLOAT_P, ctypes.c_int, _FLOAT_P, ctypes.c_int,
 ]
 lib.audio_pad_or_truncate_f32.restype = ctypes.c_int
+lib.audio_preemphasis_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_float,
+]
+lib.audio_preemphasis_f32.restype = ctypes.c_int
+lib.audio_feature_normalize_per_feature_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int, ctypes.c_float,
+]
+lib.audio_feature_normalize_per_feature_f32.restype = ctypes.c_int
 lib.audio_stft_power_fft400_f32.argtypes = [
     _FLOAT_P, ctypes.c_int, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, _FLOAT_P, ctypes.c_int, _FLOAT_P,
@@ -237,6 +270,52 @@ def check_pad_or_truncate() -> None:
     ) == truncated.size
     assert np.array_equal(truncated, source[:2])
     print("audio_pad_or_truncate max_diff=0 tol=0 [PASS]")
+
+
+def check_preemphasis() -> None:
+    source = np.array([0.25, -0.5, 1.0, 0.125, -0.75], dtype=np.float32)
+    coefficient = np.float32(0.97)
+    expected = source.copy()
+    expected[1:] = source[1:] - coefficient * source[:-1]
+
+    actual = np.empty_like(source)
+    assert lib.audio_preemphasis_f32(
+        _fptr(source), _fptr(actual), source.size, float(coefficient),
+    ) == 0
+    assert np.array_equal(actual, expected)
+
+    inplace = source.copy()
+    assert lib.audio_preemphasis_f32(
+        _fptr(inplace), _fptr(inplace), inplace.size, float(coefficient),
+    ) == 0
+    assert np.array_equal(inplace, expected)
+    print("audio_preemphasis max_diff=0 tol=0 [PASS]")
+
+
+def check_per_feature_normalization() -> None:
+    source = np.array(
+        [[1.0, 5.0, -2.0], [2.0, 5.0, 0.0], [4.0, 5.0, 6.0], [9.0, 5.0, 8.0]],
+        dtype=np.float32,
+    )
+    epsilon = np.float32(1.0e-5)
+    mean = source.astype(np.float64).mean(axis=0)
+    centered = source.astype(np.float64) - mean
+    variance = np.sum(centered * centered, axis=0) / (source.shape[0] - 1)
+    std = np.sqrt(variance.astype(np.float32), dtype=np.float32) + epsilon
+    expected = (centered.astype(np.float32) * (np.float32(1.0) / std)).astype(np.float32)
+
+    actual = np.empty_like(source)
+    assert lib.audio_feature_normalize_per_feature_f32(
+        _fptr(source), _fptr(actual), source.shape[1], source.shape[0], float(epsilon),
+    ) == 0
+    assert np.array_equal(actual, expected)
+
+    single = np.array([[3.0, -4.0]], dtype=np.float32)
+    assert lib.audio_feature_normalize_per_feature_f32(
+        _fptr(single), _fptr(single), 2, 1, float(epsilon),
+    ) == 0
+    assert np.array_equal(single, np.zeros_like(single))
+    print("audio_per_feature_normalization max_diff=0 tol=0 [PASS]")
 
 
 def check_resample() -> None:
@@ -380,6 +459,145 @@ def check_precomputed_stft() -> None:
         f"audio_stft_fft400_vs_direct max_diff={max_diff:.8e} tol=4.0e-04 [PASS] "
         f"rmse={rmse:.8e} rmse_tol=5.0e-05"
     )
+
+
+def check_centered_window_stft_and_log_mel() -> None:
+    n_fft = 16
+    window_length = 10
+    hop = 4
+    bins = n_fft // 2 + 1
+    samples = np.random.default_rng(512400).normal(0.0, 0.2, 33).astype(np.float32)
+    window = np.hanning(window_length + 1)[:-1].astype(np.float32)
+    frames = samples.size // hop + 1
+    table_window = np.empty(n_fft, dtype=np.float32)
+    cos_table = np.empty((bins, n_fft), dtype=np.float32)
+    sin_table = np.empty_like(cos_table)
+    assert lib.audio_stft_precompute_tables_f32(
+        n_fft, _fptr(table_window), _fptr(cos_table), _fptr(sin_table)
+    ) == 0
+
+    expected = np.empty((frames, bins), dtype=np.float32)
+    window_start = (n_fft - window_length) // 2
+    for frame in range(frames):
+        for frequency in range(bins):
+            real = np.float32(0.0)
+            imag = np.float32(0.0)
+            for sample in range(window_length):
+                fft_sample = window_start + sample
+                source = frame * hop + fft_sample - n_fft // 2
+                if source < 0 or source >= samples.size:
+                    continue
+                value = np.float32(samples[source] * window[sample])
+                real = np.float32(real + np.float32(value * cos_table[frequency, fft_sample]))
+                imag = np.float32(imag + np.float32(value * sin_table[frequency, fft_sample]))
+            expected[frame, frequency] = np.float32(real * real + imag * imag)
+
+    actual = np.empty_like(expected)
+    assert lib.audio_stft_power_centered_window_f32(
+        _fptr(samples), samples.size, _fptr(window), window_length,
+        _fptr(cos_table), _fptr(sin_table), n_fft, hop, 0,
+        _fptr(actual), frames,
+    ) == 0
+    max_diff = float(np.max(np.abs(actual - expected)))
+    assert max_diff <= 2.0e-6, max_diff
+
+    filters = np.random.default_rng(128257).uniform(0.0, 0.2, (3, bins)).astype(np.float32)
+    epsilon = np.float32(2.0 ** -24)
+    actual_mel = np.empty((frames, filters.shape[0]), dtype=np.float32)
+    assert lib.audio_log_mel_time_major_f32(
+        _fptr(actual), _fptr(filters), _fptr(actual_mel), frames, bins,
+        filters.shape[0], float(epsilon),
+    ) == 0
+    expected_mel = np.log(actual @ filters.T + epsilon).astype(np.float32)
+    mel_diff = float(np.max(np.abs(actual_mel - expected_mel)))
+    assert mel_diff <= 1.0e-6, mel_diff
+    print(
+        f"audio_centered_window_stft max_diff={max_diff:.8e} tol=2.0e-06 [PASS] "
+        f"log_mel_max_diff={mel_diff:.8e} tol=1.0e-06"
+    )
+
+
+def check_grouped_conv2d() -> None:
+    rng = np.random.default_rng(20260829)
+
+    def run_case(channels_in: int, channels_out: int, groups: int) -> float:
+        width, height = 7, 6
+        kernel_width = kernel_height = 3
+        stride_width = stride_height = 2
+        padding_width = padding_height = 1
+        output_width = (width + 2 * padding_width - kernel_width) // stride_width + 1
+        output_height = (height + 2 * padding_height - kernel_height) // stride_height + 1
+        input_value = rng.normal(0.0, 0.2, (channels_in, height, width)).astype(np.float32)
+        weight = rng.normal(
+            0.0, 0.1,
+            (channels_out, channels_in // groups, kernel_height, kernel_width),
+        ).astype(np.float32)
+        bias = rng.normal(0.0, 0.05, channels_out).astype(np.float32)
+        actual = np.empty((channels_out, output_height, output_width), dtype=np.float32)
+        assert lib.audio_conv2d_whc_grouped_f32(
+            _fptr(input_value), _fptr(weight), _fptr(bias), _fptr(actual),
+            width, height, channels_in, channels_out, kernel_width, kernel_height,
+            stride_width, stride_height, padding_width, padding_height, groups,
+            output_width, output_height,
+        ) == 0
+        expected = F.conv2d(
+            torch.from_numpy(input_value[None]), torch.from_numpy(weight),
+            torch.from_numpy(bias), stride=(stride_height, stride_width),
+            padding=(padding_height, padding_width), groups=groups,
+        ).numpy()[0]
+        difference = np.abs(actual - expected)
+        maximum = float(np.max(difference))
+        assert maximum <= 3.0e-7, maximum
+        return maximum
+
+    regular = run_case(3, 5, 1)
+    depthwise = run_case(4, 4, 4)
+    print(
+        "audio_grouped_conv2d "
+        f"regular_max_diff={regular:.8e} depthwise_max_diff={depthwise:.8e} "
+        "tol=3.0e-07 [PASS]"
+    )
+
+
+def check_split_glu() -> None:
+    rng = np.random.default_rng(20260830)
+    channels, frames = 1280, 37
+    packed = rng.normal(0.0, 0.7, (2 * channels, frames)).astype(np.float32)
+    actual = np.empty((channels, frames), dtype=np.float32)
+    assert lib.audio_glu_split_channel_major_f32(
+        _fptr(packed), _fptr(actual), channels, frames,
+    ) == 0
+    value = torch.from_numpy(packed[:channels])
+    gate = torch.from_numpy(packed[channels:])
+    expected = (value * torch.sigmoid(gate)).numpy()
+    difference = np.abs(actual - expected)
+    maximum = float(np.max(difference))
+    rmse = float(np.sqrt(np.mean(difference * difference)))
+    assert maximum <= 1.2e-7, maximum
+    assert rmse <= 2.0e-8, rmse
+    print(
+        "audio_split_glu "
+        f"max_diff={maximum:.8e} tol=1.2e-07 [PASS] "
+        f"rmse={rmse:.8e} rmse_tol=2.0e-08"
+    )
+
+
+def check_relative_shift() -> None:
+    heads, frames = 3, 11
+    raw_frames = 2 * frames - 1
+    raw = np.arange(heads * frames * raw_frames, dtype=np.float32).reshape(
+        heads, frames, raw_frames,
+    )
+    actual = np.empty((heads, frames, frames), dtype=np.float32)
+    assert lib.audio_relative_shift_f32(
+        _fptr(raw), _fptr(actual), heads, frames,
+    ) == 0
+    expected = np.empty_like(actual)
+    for query in range(frames):
+        for key in range(frames):
+            expected[:, query, key] = raw[:, query, frames - 1 + key - query]
+    assert np.array_equal(actual, expected)
+    print("audio_relative_shift exact_index_mapping [PASS]")
 
 
 def check_global_log_mel_window() -> None:
@@ -613,9 +831,15 @@ def main() -> None:
     check_wav_pcm16()
     check_pcm()
     check_pad_or_truncate()
+    check_preemphasis()
+    check_per_feature_normalization()
     check_resample()
     check_bandlimited_resample()
     check_precomputed_stft()
+    check_centered_window_stft_and_log_mel()
+    check_grouped_conv2d()
+    check_split_glu()
+    check_relative_shift()
     check_global_log_mel_window()
     _check_conv("audio_conv1d_whisper_stem1", 80, 384, 16, 1)
     _check_conv("audio_conv1d_whisper_stem2", 384, 384, 16, 2)
@@ -626,7 +850,7 @@ def main() -> None:
     _check_cross_attention("audio_cross_attention_unequal_small", 3, 5, 17, 8)
     _check_cross_attention("audio_cross_attention_whisper_decode", 6, 1, 1500, 64)
     check_tiled_f16kv_encoder_attention()
-    print("ALL TESTS PASSED (18/18)")
+    print("ALL TESTS PASSED (24/24)")
 
 
 if __name__ == "__main__":

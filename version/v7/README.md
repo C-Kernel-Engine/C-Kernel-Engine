@@ -55,20 +55,20 @@ python3 version/v7/examples/python_module_api_tiny_lm_v7.py --run-name py-module
 Notebook examples:
 
 ```bash
-notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb
-notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
-notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb
-notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb
-notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
+docs/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb
+docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
+docs/notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb
+docs/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb
+docs/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
 ```
 
 Launch the quickstart notebook from inside the repo checkout so it can detect `ckernel_engine/` and `version/v7/`.
 
 ```bash
-.venv/bin/jupyter lab notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
+.venv/bin/jupyter lab docs/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
 ```
 
-Compatibility alias: `notebooks/v7_training/` still points at the same lane so older demo commands keep working during the reorganization.
+Compatibility alias: `docs/notebooks/v7_training/` still points at the same lane so older demo commands keep working during the reorganization.
 
 The package entrypoint is:
 

@@ -167,7 +167,36 @@
 </a>
 
 <h1>Quantization Formats Visual Guide</h1>
-<p class="lead">Byte-level structure, headers, and dequantization math for all 8 supported formats</p>
+<p class="lead">Byte-level structure, headers, and dequantization math for the formats CKE executes</p>
+
+<div class="key-concepts" style="margin-top: 1rem;">
+    <h2>Where These Formats Run Today</h2>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+        <strong>v8 is the primary engine.</strong> All current model families — Gemma 3/4, Qwen 2 / 3 / 3.5 / 3.6 / 3.8, GLM-4,
+        Nemotron, Kimi, Cohere2, Laguna, Instella-MoE, Nanbeige, GPT-2, Qwen3-VL / Qwen3.6-VL vision, and Whisper audio —
+        run as v8 generated runtimes over the GGUF formats below plus first-class BF16 storage.
+        <strong>v7 remains the training lane</strong> (FP32 forward/backward); its quantized inference path is superseded by v8.
+        The byte layouts are identical in both engines because both are parity-gated against llama.cpp.
+    </p>
+    <div class="concept-grid" style="margin-top: 1rem;">
+        <div class="concept">
+            <h3>Dense GGUF lanes</h3>
+            <p>Q4_K_M, Q5_K_M, and Q8_0 checkpoints across Gemma, Qwen, GLM-4, Nemotron, and Nanbeige. Mixed dispatch: Q4_K/Q5_K/Q6_K weights with Q8_K or Q8_0 quantized activations.</p>
+        </div>
+        <div class="concept">
+            <h3>MoE mixed-quant dispatch</h3>
+            <p>Qwen3.5 35B-A3B and Instella-MoE route experts through mixed pairs — Q4_K x Q4_K, Q4_K x Q5_K (bucketed), Q4_K x Q6_K, Q5_0 / Q5_1 with Q8_0 — selected per tensor by the kernel maps.</p>
+        </div>
+        <div class="concept">
+            <h3>BF16 as a first-class dtype</h3>
+            <p>Kimi, Instella, and Qwen3.6 lanes run BF16 weights/KV with FP32 accumulation (AVX-512 BF16 / AMX where available, portable rounding elsewhere). Not a GGUF quant — a storage contract.</p>
+        </div>
+        <div class="concept">
+            <h3>Format support boundary</h3>
+            <p>Supported: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, Q6_K, Q8_K. Not supported: Q2_K, Q3_K, and the IQ imatrix family — the runbook's model table lists tested artifacts per family.</p>
+        </div>
+    </div>
+</div>
 
 <!-- Quick Reference Cards -->
 <div class="section-label">Simple Formats (32 weights/block)</div>
@@ -207,6 +236,11 @@
         <div class="details">144 bytes = 4+12 (header) + 256x4/8</div>
     </div>
     <div class="format-card">
+        <h3>Q5_K</h3>
+        <div class="bits">5.5 bits/weight</div>
+        <div class="details">176 bytes = 4+12 (header) + 32 (qh) + 256x4/8</div>
+    </div>
+    <div class="format-card">
         <h3>Q6_K</h3>
         <div class="bits">6.5625 bits/weight</div>
         <div class="details">210 bytes = 18 (header) + 256x6/8</div>
@@ -232,6 +266,35 @@
             <img src="assets/quantization-formats.svg" alt="C-Kernel-Engine Quantization Formats - Complete byte-level visualization" style="width: 100%; cursor: pointer;">
         </div>
         <p>Click image to open in fullscreen viewer with zoom and pan controls</p>
+    </div>
+</div>
+
+<!-- How CKE executes these formats -->
+<div class="infographic-container">
+    <div class="infographic-header">
+        <h2>How CKE Executes These Formats</h2>
+        <div class="infographic-actions">
+            <button onclick="svgViewer.open(1)">Open Viewer</button>
+            <button onclick="svgViewer.open(1); setTimeout(function(){svgViewer.fitWidth();}, 100);">Fit Width</button>
+        </div>
+    </div>
+    <div class="infographic-preview">
+        <div class="svg-viewer" data-title="How CKE Executes Quantized Weights">
+            <img src="assets/quant-execution-pipeline.svg" alt="Pipeline from GGUF quantized weights through kernel-map provider selection to per-tile execution with FP32 accumulation" style="width: 100%; cursor: pointer;">
+        </div>
+        <p>From GGUF bytes to provider-selected kernels: the same path for every model family. Click to open the fullscreen viewer.</p>
+    </div>
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--grey);">
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin:  0 0 0.75rem 0;">
+            The byte layouts above are the storage format; the diagram shows the execution contract. For the mechanism behind each step:
+        </p>
+        <ul style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.6rem; padding: 0; margin: 0; font-size: 0.95rem;">
+            <li><a href="kernel-maps.html" style="color: #00c7fd; text-decoration: none;">Kernel Maps</a> — provider metadata, numerical contracts, equivalence groups</li>
+            <li><a href="kernel-architecture.html" style="color: #00c7fd; text-decoration: none;">Kernel Architecture</a> — how maps, lowering, and codegen connect</li>
+            <li><a href="model-kernel-matrix.html" style="color: #00c7fd; text-decoration: none;">Model and Kernel Matrix</a> — which formats each family actually runs</li>
+            <li><a href="quantization.html" style="color: #00c7fd; text-decoration: none;">Quantization Deep Dive</a> — theory and dequantization math</li>
+            <li><a href="xray.html" style="color: #00c7fd; text-decoration: none;">X-Ray</a> — see which provider ran and why others were rejected</li>
+        </ul>
     </div>
 </div>
 
@@ -273,12 +336,14 @@
     </div>
 </div>
 
-<!-- Quant Summary (current v7 mixed-quant path) -->
+<!-- Quant Summary (current v8 mixed-quant path) -->
 <div class="container" style="margin-top: 2.5rem;">
-    <h2 style="color: var(--orange); margin-bottom: 0.75rem;">Quant Summary (current v7 mixed-quant path)</h2>
+    <h2 style="color: var(--orange); margin-bottom: 0.75rem;">Quant Summary (current v8 mixed-quant path)</h2>
     <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
-        These are the formats that matter in the current v7 inference path across Qwen, Gemma, and recent Llama/Nanbeige parity work.
-        The practical rule is not just "pick a small dtype", but "pick the weight format and activation contract that match the runtime kernel actually used."
+        These are the formats that matter in the v8 generated runtimes across Gemma, Qwen (dense, MoE, and hybrid DeltaNet),
+        GLM-4, Nemotron, Kimi, Cohere2, Laguna, Instella-MoE, Nanbeige, and the vision and audio lanes.
+        The practical rule is not just "pick a small dtype", but "pick the weight format and activation contract that match the runtime kernel actually selected by the kernel map."
+        The older v7 quantized inference path used the same byte formats; v7 is now the training lane.
     </p>
 
     <style>
@@ -386,7 +451,7 @@
             <div class="quant-row"><span>Use</span><span>Activation-side K-quant path</span></div>
             <div class="quant-row"><span>Strength</span><span>Matches ggml mixed-quant kernels</span></div>
             <div class="bitbar"><span style="width: 78%;"></span></div>
-            <div class="quant-note">Current v7 path for <code>quantize_row_q8_k -&gt; gemv_q4_k_q8_k</code> and <code>gemv_q6_k_q8_k</code>.</div>
+            <div class="quant-note">v8 path for <code>quantize_row_q8_k -&gt; gemv_q4_k_q8_k</code> and <code>gemv_q6_k_q8_k</code>; the same byte contract ran in v7.</div>
         </div>
         <div class="quant-card">
             <div class="quant-title">Q8_0 <span class="quant-tag">32‑block</span></div>
@@ -448,6 +513,8 @@
         <li><a href="quantization.html" style="color: #00c7fd; text-decoration: none;">Quantization Deep Dive</a> - Theory and implementation</li>
         <li><a href="quantization-visuals.html" style="color: #00c7fd; text-decoration: none;">Bit Manipulation Visuals</a> - Interactive SVG diagrams</li>
         <li><a href="kernels.html" style="color: #00c7fd; text-decoration: none;">Kernel Reference</a> - All GEMM kernels</li>
+        <li><a href="model-kernel-matrix.html" style="color: #00c7fd; text-decoration: none;">Model and Kernel Matrix</a> - per-family formats and evidence</li>
+        <li><a href="v8-runbook.html" style="color: #00c7fd; text-decoration: none;">v8 Runbook</a> - tested artifacts and commands</li>
         <li><a href="simd-architecture.html" style="color: #00c7fd; text-decoration: none;">SIMD Architecture</a> - AVX-512, VNNI, AMX</li>
     </ul>
 </div>

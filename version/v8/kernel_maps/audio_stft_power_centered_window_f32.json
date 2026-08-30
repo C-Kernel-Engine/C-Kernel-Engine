@@ -1,0 +1,49 @@
+{
+  "id": "audio_stft_power_centered_window_f32",
+  "op": "audio_stft",
+  "operation_interface": "audio_stft.centered.explicit_window.fp32.v1",
+  "variant": "centered_explicit_window_zero_or_reflect_padding_direct_dft_fp32",
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "samples", "dtype": "fp32", "shape": ["N_samples"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "Preprocessed PCM samples"}
+  ],
+  "weights": [
+    {"name": "window", "dtype": "fp32", "shape": ["N_window"], "layout": "contiguous", "access": "read", "storage_class": "weight", "consumption": "required", "desc": "Model-provided window centered within the FFT frame"},
+    {"name": "cos_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "prepared_weight", "consumption": "required", "desc": "Precomputed cosine table"},
+    {"name": "sin_table", "dtype": "fp32", "shape": ["N_bins", "N_fft"], "layout": "row_major", "access": "read", "storage_class": "prepared_weight", "consumption": "required", "desc": "Precomputed sine table"}
+  ],
+  "outputs": [
+    {"name": "power", "dtype": "fp32", "shape": ["N_frames", "N_bins"], "layout": "time_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "Frame-major power spectrum"}
+  ],
+  "scratch": [],
+  "dims": ["n_samples", "window_length", "n_fft", "hop_length", "reflect_padding", "n_frames"],
+  "impl": {
+    "function": "audio_stft_power_centered_window_f32",
+    "c_declaration": "int audio_stft_power_centered_window_f32(const float *samples, int n_samples, const float *window, int window_length, const float *cos_table, const float *sin_table, int n_fft, int hop_length, int reflect_padding, float *power, int n_frames);",
+    "sources": ["src/kernels/audio_kernels.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_stft_centered_explicit_window_direct_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_stft_power_centered_window_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "samples", "source": "activation:samples", "cast": "const float*", "ports": ["input:samples"]},
+    {"name": "n_samples", "source": "dim:n_samples"},
+    {"name": "window", "source": "weight:window", "cast": "const float*", "ports": ["weight:window"]},
+    {"name": "window_length", "source": "dim:window_length"},
+    {"name": "cos_table", "source": "weight:cos_table", "cast": "const float*", "ports": ["weight:cos_table"]},
+    {"name": "sin_table", "source": "weight:sin_table", "cast": "const float*", "ports": ["weight:sin_table"]},
+    {"name": "n_fft", "source": "dim:n_fft"},
+    {"name": "hop_length", "source": "dim:hop_length"},
+    {"name": "reflect_padding", "source": "dim:reflect_padding"},
+    {"name": "power", "source": "output:power", "cast": "float*", "ports": ["output:power"]},
+    {"name": "n_frames", "source": "dim:n_frames"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"]}
+}
