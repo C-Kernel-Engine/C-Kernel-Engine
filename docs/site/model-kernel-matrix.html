@@ -941,6 +941,8 @@
                         <a href="kernel-maps.html">Kernel Maps<small>Provider selection, ABI, migration</small></a>
                         <a href="kernel-architecture.html">v8 Kernel Architecture<small>Registry by op family, math</small></a>
                         <a href="architecture-variants.html">Architecture Variants<small>Laguna, Cohere2, Instella, Nemotron</small></a>
+                        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels<small>Bucketed prefill, mixed-quant experts</small></a>
+                        <a href="v8-cohere-kernels.html">Cohere Kernel Story<small>Reuse, BF16 vision, Transcribe audio</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Quantization</div>
@@ -1916,7 +1918,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity and matched performance sweeps remain future certification work</span></div>
       </div>
       <div class="source-note">
-        Bring-up note (PR #401): lowering honors the model-declared <code>logit_scale</code> via a <code>final_logit_scale_f32</code> footer op, and RoPE applies only to sliding layers per the exported contract. Contract test: <code>tests.test_v8_cohere2_contract</code>.
+        Bring-up note (PR #401): lowering honors the model-declared <code>logit_scale</code> via a <code>final_logit_scale_f32</code> footer op, and RoPE applies only to sliding layers per the exported contract. Contract test: <code>tests.test_v8_cohere2_contract</code>. Provider-level story: <a href="v8-cohere-kernels.html">Cohere Kernel Story</a>.
       </div>
       <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
@@ -1949,7 +1951,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long-trajectory parity not claimed — near-tied MoE route flips vs llama.cpp</span></div>
       </div>
       <div class="source-note">
-        Bring-up note (PR #404): ~20 prefill / 14 decode tok/s on the Ryzen node (bring-up measurement, not a certified benchmark). Known oracle gap: the external llama.cpp Laguna loader omits GGUF YaRN <code>beta_fast=64</code> (defaults 32). Softplus gate formula is observed, not yet oracle-validated. Contract test: <code>tests.test_v8_laguna_contract</code>.
+        Bring-up note (PR #404): ~20 prefill / 14 decode tok/s on the Ryzen node (bring-up measurement, not a certified benchmark). Known oracle gap: the external llama.cpp Laguna loader omits GGUF YaRN <code>beta_fast=64</code> (defaults 32). Softplus gate formula is observed, not yet oracle-validated. Contract test: <code>tests.test_v8_laguna_contract</code>. Expert kernels: <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>.
       </div>
       <details class="card-details"><summary>Commands &amp; runnable lanes</summary>
       <div class="model-command">
@@ -2725,8 +2727,11 @@ make build/libckernel_engine.so
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
     <p class="source-note" style="margin-top: 0.5rem;">
-      Counts and provider status live in <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (297 provider maps); the audit baseline is <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>.
+      Counts and provider status live in <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (308 provider maps); the audit baseline is <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>.
       For the math behind each kernel family see <a href="kernel-architecture.html">v8 Kernel Architecture</a>; for what each new model variant changed see <a href="architecture-variants.html">Architecture Variants</a>.
+      Provider-level deep dives: <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a> covers the Laguna
+      mixed-quant routed/shared experts and the Qwen3.5-MoE bucketed prefill; <a href="v8-cohere-kernels.html">Cohere
+      Kernel Story</a> covers the Cohere2 reuse bindings and the <code>final_logit_scale_f32</code> footer.
     </p>
   </div>
 
@@ -3159,7 +3164,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-26</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
             </div>
         </div>
     </footer>

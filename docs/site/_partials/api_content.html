@@ -60,7 +60,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_0(const void * weight_q5_0, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_0 x Q8_0 GEMM (batch matrix multiply)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_0 GEMM - batched matrix multiply with Q5_0 weights (32-element blocks)</p>
         </div>
 
 
@@ -70,7 +70,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_1(const void * weight_q5_1, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_1 x Q8_0 GEMM (batch matrix multiply)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_1 GEMM - batched matrix multiply with Q5_1 weights (32-element blocks)</p>
         </div>
 
 
@@ -80,7 +80,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q5_k(const void * weight_q5_k, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q5_K x Q8_K GEMM (batch matrix multiply)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q5_K GEMM - batched matrix multiply with Q5_K weights (256-element super-blocks)</p>
         </div>
 
 
@@ -90,7 +90,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q6_k(const void * weight_q6k, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q6_K x Q8_K GEMM (batch matrix multiply)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q6_K GEMM - batched matrix multiply with Q6_K weights.</p>
         </div>
 
 
@@ -100,7 +100,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_gemm_q8_0(const void * weight_q8_0, const float * input_f32, float * output, int rows, int cols, int n_tokens)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Test Q8_0 x Q8_0 GEMM (batch matrix multiply)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Q8_0 GEMM - batched matrix multiply with Q8_0 weights (32-element blocks)</p>
         </div>
 
 
@@ -1206,7 +1206,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void fused_rmsnorm_qkv_prefill(const float * x, const float * gamma, const float * Wq, const float * Wk, const float * Wv, float * Q, float * K, float * V, int seq_len, int hidden, int q_dim, int kv_dim, float eps, float * scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused RMSNorm + QKV projection for prefill (v3 optimized)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused RMSNorm + QKV projection for prefill.</p>
         </div>
 
 
@@ -1246,7 +1246,7 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t fused_rmsnorm_qkv_scratch_size(int hidden)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch size for fused prefill.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch buffer size for fused_rmsnorm_qkv_prefill.</p>
         </div>
 
 
@@ -1462,7 +1462,7 @@ test_parity.py::test_rmsnorm_parity</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void unfused_rmsnorm_qkv_prefill(const float * x, const float * gamma, const float * Wq, const float * Wk, const float * Wv, float * x_norm, float * Q, float * K, float * V, int seq_len, int hidden, int q_dim, int kv_dim, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Unfused version for comparison.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Unfused version for benchmarking comparison.</p>
         </div>
 
     </div>
@@ -2122,7 +2122,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void mega_fused_attention_decode(float * output, const float * input, const float * residual, const float * ln1_gamma, const float * wq, const float * bq, const float * wk, const float * bk, const float * wv, const float * bv, const float * wo, const float * bo, float * kv_cache_k, float * kv_cache_v, const float * rope_cos, const float * rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Mega-fused attention for decode mode (single token)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Full mega-fused attention for decode.</p>
         </div>
 
 
@@ -2350,7 +2350,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void fused_mlp_swiglu_prefill_bias(const float * x, const float * W_gate, const float * W_up, const float * W_down, const float * B_gate, const float * B_up, const float * B_down, float * output, int seq_len, int hidden, int intermediate, float * scratch)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused MLP for prefill with proper tiling.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Fused MLP (Gate + Up + SwiGLU + Down) for prefill with biases.</p>
         </div>
 
 
@@ -2380,7 +2380,7 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t fused_mlp_swiglu_scratch_size(int intermediate)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch size for fused MLP.</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Get scratch buffer size for fused_mlp_swiglu_prefill.</p>
         </div>
 
 
@@ -4437,7 +4437,7 @@ test_multi_layer_parity.py::TestMultiLayerParity::test_residual_add</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_ir_v2_serialize_json_with_plan</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_ir_v2_serialize_json_with_plan(const CKIRV2Graph * graph, const struct CKMemPlan * plan, const char * mode, int tokens_override, int base_context_window, const char * path)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -5487,7 +5487,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q5_0_q8_0(const void * weight_q5_0, const void * input_q8_0, float * output, int cols)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q5_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q5_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)</p>
         </div>
 
 
@@ -5497,7 +5497,7 @@ hugepage_mode
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_test_vec_dot_q8_0_q8_0(const void * weight_q8_0, const void * input_q8_0, float * output, int cols)</pre>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q8_0 x Q8_0 dot product test (takes pre-quantized Q8_0 input)</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Direct Q8_0 x Q8_0 dot product (takes pre-quantized Q8_0 input)</p>
         </div>
 
 
@@ -7726,7 +7726,7 @@ hugepage_mode
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">geglu_backward_fp32</code>
                 <span class="badge badge-blue" style="margin-left: 0.5rem;">Backward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void geglu_backward_fp32(const float * x, const float * d_out, float * d_x, int n_tokens, int dim)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void geglu_backward_fp32(const float * x, const float * d_out, float * d_x, int tokens, int dim)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">GeGLU backward pass (fp32) Testtest_geglu.py::TestGeGLU::test_geglu_backward_fp32</p>
         </div>
 
@@ -9758,7 +9758,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">parse_args</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">bool parse_args(int argc, char ** argv, CLIOptions * opt)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">CLIArgs parse_args(int argc, char ** argv)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -10038,7 +10038,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">print_usage</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void print_usage(const char * prog)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void print_usage(const char * argv0)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -10918,7 +10918,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">resolve_dim</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t resolve_dim(const CKModelConfig * cfg, const CKIRV2AlignInfo * align, CKDimKind kind, int tokens_override)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t resolve_dim(const CKModelConfig * cfg, const CKV2AlignInfo * align, CKDimKind kind)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -10928,7 +10928,7 @@ The IR graph structure (number of layers, op types)</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">resolve_shape_elems</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t resolve_shape_elems(const CKModelConfig * cfg, const CKIRV2AlignInfo * align, const CKDimToken * shape, int tokens_override)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t resolve_shape_elems(const CKModelConfig * cfg, const CKV2AlignInfo * align, const CKDimToken * shape)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 

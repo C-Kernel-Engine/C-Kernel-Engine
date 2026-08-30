@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantization Math Deep Dive | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
-    <meta name="robots" content="noindex,nofollow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/quantization-math-temp.html">
-    <meta property="og:title" content="Quantization Math Deep Dive | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Cohere Kernel Story: Reuse, BF16 Vision, and the Transcribe Audio Stack | C-Kernel-Engine</title>
+    <meta name="description" content="How the Cohere family lands in the CKE v8 kernel registry: Command R's single new kernel over a reused provider stack, North MoE with zero new kernels, the Compass BF16 vision frontend, and the Transcribe Conformer audio provider foundation with honest certification status.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-cohere-kernels.html">
+    <meta property="og:title" content="Cohere Kernel Story: Reuse, BF16 Vision, and the Transcribe Audio Stack | C-Kernel-Engine">
+    <meta property="og:description" content="How the Cohere family lands in the CKE v8 kernel registry: Command R's single new kernel over a reused provider stack, North MoE with zero new kernels, the Compass BF16 vision frontend, and the Transcribe Conformer audio provider foundation with honest certification status.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/quantization-math-temp.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-cohere-kernels.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -984,214 +984,441 @@
     </header>
     <main>
 
-<h1>Quantization Math Deep Dive</h1>
+<div class="container">
+  <h1>Cohere Kernel Story: Reuse, BF16 Vision, and the Transcribe Audio Stack</h1>
+  <p class="lead">
+    Four Cohere bring-ups, four different relationships to the kernel registry: Command R mostly
+    <em>composed</em> existing providers, North composed them entirely, North Micro Vision added a BF16 image
+    frontend, and Transcribe added a seven-provider audio foundation whose encoder is still not promoted. This
+    page walks the kernels each one touched &mdash; and is explicit about what is certified versus what is still
+    a provider foundation.
+  </p>
 
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
-    <div>
-        <strong>Understanding Q5_0 and Q8_0 Formats</strong><br>
-        This page explains how 5-bit and 8-bit quantization works, the AVX-512 vectorization strategy, and the bugs we fixed during development.
-    </div>
-</div>
+  <style>
+    .ck-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .ck-section h2 { margin: 0 0 0.5rem; color: var(--orange); }
+    .ck-section h3 { color: var(--text-primary); margin: 1.1rem 0 0.35rem; font-size: 1.05rem; }
+    .ck-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .ck-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .ck-card strong { color: var(--text-primary); }
+    .ck-card code { font-size: 0.78rem; }
+    .ck-math {
+      background: #0b1118;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cfe8ff;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+      line-height: 1.6;
+    }
+    .ck-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+    main code { overflow-wrap: anywhere; }
+    .ck-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 0.75rem; }
+    .ck-table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.84rem; }
+    .ck-table th, .ck-table td {
+      border: 1px solid var(--grey); padding: 0.45rem 0.6rem;
+      text-align: left; vertical-align: top; color: var(--text-secondary);
+    }
+    .ck-table th { color: var(--orange); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; background: #121a24; }
+    .ck-table td:first-child { font-weight: 600; color: var(--text-primary); }
+    .pill {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid; white-space: nowrap;
+    }
+    .pill.prod { color: #7fd4a3; border-color: #2f8d59; background: rgba(71,180,117,0.1); }
+    .pill.cand { color: #ffd38a; border-color: #b8860b; background: rgba(255,180,0,0.1); }
+    .pill.none { color: #b9b9b9; border-color: #555; background: rgba(158,158,158,0.08); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #ck-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ck-svg-overlay .ck-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ck-svg-overlay .ck-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ck-svg-overlay .ck-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ck-svg-overlay .ck-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ck-svg-overlay .ck-ov-stage img { max-width: none; height: auto; }
+  </style>
 
-<h2>Memory Layout: Block Structures</h2>
-
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q8_0 Block (34 bytes)</h3>
-        <pre><code>struct block_q8_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    int8_t qs[32];      // 32 bytes: 32 weights
-};  // Total: 34 bytes / 32 weights
-
-// Dequantization:
-weight[i] = qs[i] * d</code></pre>
-        <p><strong>Compression:</strong> 8.5 bits/weight (vs 32 for FP32)</p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Q5_0 Block (22 bytes)</h3>
-        <pre><code>struct block_q5_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    uint32_t qh[4];     // 4 bytes: 32 high bits
-    uint8_t qs[16];     // 16 bytes: packed nibbles
-};  // Total: 22 bytes / 32 weights
-
-// Each 5-bit weight = 4 bits from qs + 1 bit from qh</code></pre>
-        <p><strong>Compression:</strong> 5.5 bits/weight</p>
-    </div>
-</div>
-
-<h2>Q8_0 Dequantization (Simple)</h2>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Straightforward FP16 Scale</h3>
-    <p>Q8_0 is simple: each weight is just <code>qs[i] * d</code> where d is the FP16 scale.</p>
-    <pre><code>// Q8_0 dequantization
-for (int j = 0; j < 32; j++) {
-    float weight = d * (float)block->qs[j];
-}</code></pre>
-</div>
-
-<h2>Q5_0 Dequantization (Complex)</h2>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    </div>
-    <div>
-        <strong>The 5-Bit Challenge</strong><br>
-        Q5_0 stores each weight in two pieces: 4 bits in <code>qs[]</code> (packed) and 1 high bit in <code>qh[]</code>. These must be combined before use.
-    </div>
-</div>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Q5_0 Bit Mapping</h3>
-    <table>
-        <tr>
-            <th>Weight Index</th>
-            <th>qs Source</th>
-            <th>qh Bit</th>
-        </tr>
-        <tr>
-            <td>0-15 (first half)</td>
-            <td><code>qs[j] & 0x0F</code> (low nibble)</td>
-            <td>bit j (0-15)</td>
-        </tr>
-        <tr>
-            <td>16-31 (second half)</td>
-            <td><code>qs[j] >> 4</code> (high nibble)</td>
-            <td>bit j+16 (16-31)</td>
-        </tr>
-    </table>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Q5_0 Scalar Reference</h3>
-    <pre><code>// Q5_0 dequantization - scalar reference
-for (int j = 0; j < 16; j++) {
-    // First 16 weights: low nibbles + qh bits 0-15
-    uint8_t xh_0 = ((qh >> j) & 1) << 4;
-    int32_t x0 = ((qs[j] & 0x0F) | xh_0) - 16;
-
-    // Second 16 weights: high nibbles + qh bits 16-31
-    uint8_t xh_1 = ((qh >> (j + 16)) & 1) << 4;
-    int32_t x1 = ((qs[j] >> 4) | xh_1) - 16;
-
-    weight[j] = d * x0;
-    weight[j + 16] = d * x1;
-}</code></pre>
-</div>
-
-<h2>AVX-512 Bugs We Found & Fixed</h2>
-
-<div class="grid grid-2">
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #1: 16x Multiplier</h3>
-        <p>Result was exactly 16x too large!</p>
-        <pre><code>// BUGGY:
-acc = _mm512_add_ps(acc, _mm512_set1_ps(d * sumi));
-*s = _mm512_reduce_add_ps(acc);
-// _mm512_set1_ps broadcasts to 16 lanes, then sum = 16x!</code></pre>
-        <p><strong>Fix:</strong> Use scalar accumulator instead of vector broadcast.</p>
-    </div>
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #2: Wrong qh Bits</h3>
-        <p>Used bits 12-27 instead of bits 16-31!</p>
-        <pre><code>// BUGGY - used wrong bit range
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 27) & 1) << 4, ...,  // Wrong!
-    ((qh >> 12) & 1) << 4       // Wrong!
-);
-
-// FIXED - correct bit range 16-31
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 31) & 1) << 4, ...,  // Correct!
-    ((qh >> 16) & 1) << 4        // Correct!
-);</code></pre>
-    </div>
-</div>
-
-<h2>AVX-512 Vectorization Strategy</h2>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Processing 32 Weights in 2 Batches of 16</h3>
-    <pre><code>// AVX-512 vec_dot_q5_0_q8_0
-for (int ib = 0; ib < nb; ib++) {
-    // Load 16 packed bytes (32 nibbles)
-    __m128i qs = _mm_loadu_si128(x[ib].qs);
-
-    // First 16 weights
-    __m512i lo_nibbles = _mm512_cvtepu8_epi32(qs);
-    lo_nibbles = _mm512_and_epi32(lo_nibbles, mask_0f);
-    __m512i qh_lo = /* bits 0-15 of qh, shifted to bit 4 */;
-    __m512i q5_lo = _mm512_sub_epi32(_mm512_or_epi32(lo_nibbles, qh_lo), sixteen);
-
-    __m512i y32_lo = _mm512_cvtepi8_epi32(y[ib].qs[0:16]);
-    __m512i prod_lo = _mm512_mullo_epi32(q5_lo, y32_lo);
-
-    // Second 16 weights (similar, using high nibbles + qh bits 16-31)
-
-    int sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));
-    sumf += d * (float)sumi;
-}</code></pre>
-</div>
-
-<h2>Key AVX-512 Intrinsics Used</h2>
-
-<table>
-    <tr>
-        <th>Intrinsic</th>
-        <th>Operation</th>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepu8_epi32</code></td>
-        <td>Expand 16 bytes → 16 int32s (zero extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepi8_epi32</code></td>
-        <td>Expand 16 int8 → 16 int32s (sign extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_mullo_epi32</code></td>
-        <td>Multiply 16 pairs of int32s (saturating)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_reduce_add_epi32</code></td>
-        <td>Horizontal sum of all 16 lanes</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_set_epi32</code></td>
-        <td>Build vector from 16 scalar values</td>
-    </tr>
-</table>
-
-<h2>Quick Reference</h2>
-
-<div class="grid grid-2">
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Q8_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[i] = d × qs[i]
-        </p>
-    </div>
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q5_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[j] = d × ((nibble | (qh_bit &lt;&lt; 4)) - 16)
-        </p>
-    </div>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">vec_dot Computation</h3>
-    <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-        result = Σ (d_x × d_y × Σ (dequant_x[i] × y[i]))
+  <div class="ck-section">
+    <h2>1. Cohere2 Command R (PR #401): the reuse story</h2>
+    <p style="color: var(--text-secondary);">
+      Command R is structurally novel &mdash; a single shared pre-block LayerNorm feeds the attention and MLP
+      branches in parallel, layers alternate sliding and full attention 3:1, the LM head is weight-tied, and
+      per-tensor quant is mixed through the <code>weight_dtype_registry</code> (the weight policy simply ignores
+      the duplicate <code>ln2_*</code> tensors the checkpoint carries). Yet the circuit
+      <code>version/v8/circuits/cohere2.json</code> binds almost entirely to the existing Llama-family provider
+      stack:
     </p>
-    <p style="text-align: center; margin-top: 1rem;">
-        Sum over all blocks, where each block contributes: scale × integer_dot_product
+    <div class="ck-math">cohere2.json kernel bindings (all pre-existing except the last):
+  layernorm        = layernorm_fp32_exact
+  rope_init        = rope_precompute_cache_llama_cpu
+  rope_qk          = rope_forward_qk_pairwise (+ _llama_cpu decode variant)
+  attn             = attention_forward_causal_head_major_gqa_flash_strided
+  attn_sliding     = attention_forward_causal_head_major_gqa_flash_strided_sliding
+  attn_decode      = attention_forward_decode_head_major_gqa_flash[_sliding]
+  final_logit_scale = final_logit_scale_f32        &lt;-- the one new kernel</div>
+    <p style="color: var(--text-secondary);">
+      The single new provider is <code>final_logit_scale_f32</code>
+      (<code>src/kernels/logit_kernels.c:7</code>): an in-place FP32 <code>logits[i] *= logit_scale</code> footer
+      op, driven by GGUF metadata rather than a hardcoded constant. Everything else was already hardened for
+      other families.
     </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 430" width="100%" role="img" tabindex="0" data-svg-title="Cohere2 registry reuse map"
+         aria-label="Cohere2 registry reuse map: on the left, circuit nodes for layernorm, rope init, rope qk, prefill attention, sliding attention, decode attention, and the logits footer; on the right, the existing provider boxes they bind to, all drawn as reused providers in the standard palette except one highlighted box, final_logit_scale_f32, which is the only new kernel. A counter shows six reused bindings and one new provider."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .ck-new{fill:#323232;stroke:#07adf8;stroke-width:2;}
+        .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="ck-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="ck-band">cohere2.json circuit nodes</text>
+      <text x="560" y="36" class="ck-band">existing registry providers</text>
+
+      <g>
+        <rect class="ck-box" x="24" y="52" width="300" height="40" rx="8"/>
+        <text x="44" y="77" class="ck-sub">layernorm (shared pre-block)</text>
+        <rect class="ck-box" x="24" y="100" width="300" height="40" rx="8"/>
+        <text x="44" y="125" class="ck-sub">rope_init / rope_qk (sliding only)</text>
+        <rect class="ck-box" x="24" y="148" width="300" height="40" rx="8"/>
+        <text x="44" y="173" class="ck-sub">attn + attn_sliding (3:1)</text>
+        <rect class="ck-box" x="24" y="196" width="300" height="40" rx="8"/>
+        <text x="44" y="221" class="ck-sub">attn_decode (flash, sliding)</text>
+        <rect class="ck-new" x="24" y="244" width="300" height="40" rx="8"/>
+        <text x="44" y="269" class="ck-hi">final_logit_scale (footer)</text>
+      </g>
+
+      <g>
+        <rect class="ck-box" x="560" y="52" width="400" height="40" rx="8"/>
+        <text x="580" y="77" class="ck-sub">layernorm_fp32_exact</text>
+        <rect class="ck-box" x="560" y="100" width="400" height="40" rx="8"/>
+        <text x="580" y="125" class="ck-sub">rope_precompute_cache_llama_cpu / rope_forward_qk_pairwise</text>
+        <rect class="ck-box" x="560" y="148" width="400" height="40" rx="8"/>
+        <text x="580" y="173" class="ck-sub">attention_forward_causal_head_major_gqa_flash_strided[_sliding]</text>
+        <rect class="ck-box" x="560" y="196" width="400" height="40" rx="8"/>
+        <text x="580" y="221" class="ck-sub">attention_forward_decode_head_major_gqa_flash[_sliding]</text>
+        <rect class="ck-new" x="560" y="244" width="400" height="40" rx="8"/>
+        <text x="580" y="264" class="ck-hi">final_logit_scale_f32 (logit_kernels.c:7)</text>
+      </g>
+
+      <path d="M324,72 L556,72" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow)"/>
+      <path d="M324,120 L556,120" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow)"/>
+      <path d="M324,168 L556,168" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow)"/>
+      <path d="M324,216 L556,216" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow)"/>
+      <path d="M324,264 L556,264" fill="none" stroke="#07adf8" stroke-width="1.8" marker-end="url(#ck-arrow)"/>
+
+      <rect x="1000" y="52" width="156" height="110" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="1032" y="86" class="ck-good">6 reused</text>
+      <text x="1032" y="110" class="ck-hi">1 new</text>
+      <text x="1020" y="140" class="ck-sub">bindings</text>
+
+      <text x="24" y="340" class="ck-cap">Structural novelty (all contract-level, no new kernels): shared pre-block LayerNorm feeding both branches,</text>
+      <text x="24" y="360" class="ck-cap">3:1 sliding:full attention, weight-tied LM head, mixed per-tensor quant via weight_dtype_registry.</text>
+
+      <text x="24" y="396" class="ck-cap">Evidence (PR #401): Command R7B Q4_K_M - tokenizer-free replay matches llama.cpp for the first 8 greedy positions.</text>
+      <text x="24" y="418" class="ck-cap">Caveats: long-trajectory parity and performance sweeps pending; new model families mostly compose, rarely fork.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="ck-note">The block-structure diagram lives in
+      <a href="architecture-variants.html">Architecture Variants &mdash; Cohere2</a>; provider math in
+      <a href="kernel-architecture.html">kernel architecture &mdash; norms, footer ops</a>.</p>
+  </div>
+
+  <div class="ck-section">
+    <h2>2. Cohere North (MoE, PR #426): zero new C kernels</h2>
+    <p style="color: var(--text-secondary);">
+      North (North Mini Code, <code>cohere2_moe.json</code>) is a Cohere2-family MoE: alternating full/sliding
+      attention, a leading dense layer, sigmoid top-8 routing, tied embedding head. It required
+      <strong>no new C kernels at all</strong> &mdash; the circuit composes
+      <code>rmsnorm_forward_llama_production</code>, the pairwise RoPE pair, the flash attention family,
+      <code>group_limited_topk_router_sigmoid_f32</code>,
+      <code>moe_swiglu_expert_forward_q4k_q5k</code> (Q8/Q4_K/Q5_K expert providers from the manifest), and the
+      <code>final_logit_scale_f32</code> footer added for Command R. The expert kernels themselves are documented
+      in <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>; the declarative layer plan (no Cohere family
+      branches in lowering or codegen) was the actual work of PR #426.
+    </p>
+  </div>
+
+  <div class="ck-section">
+    <h2>3. North Micro Vision / Compass (PR #434): the BF16 frontend</h2>
+    <p style="color: var(--text-secondary);">
+      North Micro Vision keeps Cohere2 text semantics and adds a Qwen3-VL-derived vision tower, expressed as three
+      circuits &mdash; <code>cohere_compass.json</code> (stitch), <code>cohere_compass_text.json</code>,
+      <code>cohere_compass_vision.json</code> &mdash; with BF16 storage throughout. The kernel delta:
+    </p>
+    <div class="ck-grid">
+      <div class="ck-card"><strong><code>patch_projection_image_bf16_native_storage</code></strong><br>
+        <code>src/kernels/gemm_kernels_bf16.c:1835</code>. Thread-pooled image&rarr;patch embedding projection:
+        temporal-2 weight pair, merge-aligned patch grid, BF16 native storage end to end (no fp32 round-trip
+        between projection and encoder).</div>
+      <div class="ck-card"><strong><code>gelu_erf_bf16_storage</code></strong><br>
+        <code>src/kernels/gelu_kernels.c:609</code>. Exact-erf GELU (not the tanh approximation) on BF16-stored
+        activations &mdash; the vision tower's activation contract.</div>
+      <div class="ck-card"><strong>BF16 GEMV/GEMM parallel dispatch.</strong><br>
+        <code>gemv_bf16</code> gained <code>gemv_bf16_parallel_dispatch</code>
+        (<code>gemm_kernels_bf16.c:646</code>) &mdash; thread-pool row-partitioned BF16 GEMV for decode &mdash; and
+        <code>gemm_nt_bf16_bf16_storage</code> gained a parallel dispatch variant
+        (<code>gemm_kernels_bf16.c:1905</code>, +211 lines) with exact BF16 round-trip storage semantics: outputs
+        are rounded to BF16 exactly where the contract says they are.</div>
+    </div>
+    <p class="ck-note">
+      Evidence (PR #434): the official 577-tensor checkpoint header maps with zero unowned tensors; real-manifest
+      text prefill, text decode, and vision lowering emit zero call-ABI errors. Caveat: public compatibility is
+      not claimed until real-weight image and text generation are certified.
+    </p>
+  </div>
+
+  <div class="ck-section">
+    <h2>4. Cohere Transcribe (PRs #433, #436, #441): the audio stack</h2>
+    <div class="alert alert-warning" style="margin: 0.4rem 0 0.8rem;">
+      <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71 3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div style="min-width: 0;">
+        <strong>Status honesty.</strong> The seven providers below are a <strong>provider foundation</strong>: each
+        carries a kernel map, a map-owned call ABI, and a numerical execution contract, and each contract is
+        test-validated. None of them is a selection-managed production provider, no circuit consumes them yet,
+        and Cohere Transcribe end-to-end transcription is <em>not</em> certified. The Conformer encoder
+        attention, the cross-attention decoder, and the tokenizer are still blocked from promotion.
+      </div>
+    </div>
+    <p style="color: var(--text-secondary);">
+      All seven live in <code>src/kernels/audio_kernels.c</code> and form the Conformer frontend:
+    </p>
+    <div class="ck-table-wrap">
+      <table class="ck-table">
+        <thead><tr><th>Provider</th><th>Source</th><th>Contract</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><code>audio_preemphasis_f32</code></td><td><code>audio_kernels.c:303</code></td>
+            <td>pre-emphasis FIR filter, y[t] = x[t] - k*x[t-1]</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_stft_power_centered_window_f32</code></td><td><code>audio_kernels.c:498</code></td>
+            <td>centered, windowed STFT power spectrum</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_log_mel_time_major_f32</code></td><td><code>audio_kernels.c:553</code></td>
+            <td>log-mel filterbank energies, time-major layout</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_feature_normalize_per_feature_f32</code></td><td><code>audio_kernels.c:328</code></td>
+            <td>per-mel-bin mean/variance normalization</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_conv2d_whc_grouped_f32</code></td><td><code>audio_kernels.c:1025</code></td>
+            <td>grouped conv2d subsampling frontend (WHC layout)</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_glu_split_channel_major_f32</code></td><td><code>audio_kernels.c:1115</code></td>
+            <td>GLU split-gating after the frontend conv</td><td><span class="pill cand">provider foundation</span></td></tr>
+          <tr><td><code>audio_relative_shift_f32</code></td><td><code>audio_kernels.c:1173</code></td>
+            <td>relative-position shift for Conformer rel-pos attention (attn.pos_bias_u/v); exactly maps raw[h,q,T-1+k-q] to scores[h,q,k]</td><td><span class="pill cand">provider foundation</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color: var(--text-secondary); margin-top: 0.75rem;">
+      The model contract (PR #436) validates the real checkpoint generically: a cohere-transcribe GGUF is a
+      <strong>48-layer Conformer encoder</strong> (rel-pos attention, depthwise conv + batchnorm, GLU; 39 tensors
+      per block) plus an <strong>8-layer cross-attention decoder</strong> (26 tensors per block), 2,104 tensors
+      matched exactly &mdash; and conversion then emits an explicit <code>HARD MODEL CONTRACT FAULT</code> instead
+      of entering a partial runtime. PR #441 added the oracle harness
+      <code>version/v8/scripts/certify_cohere_transcribe_oracle_v8.py</code>, which captures stage-wise X-Ray dumps
+      so each frontend stage can be certified against the reference before the encoder is promoted.
+    </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Transcribe frontend pipeline with status badges"
+         aria-label="Cohere Transcribe frontend pipeline: waveform feeds pre-emphasis, then centered STFT power, then time-major log-mel, then per-feature normalize, then grouped conv2d subsampling, then GLU split gating; these seven stages carry contract-tested provider-foundation badges. The chain then reaches the 48-layer Conformer encoder and 8-layer cross-attention decoder, which carry blocked provider-foundation badges, meaning not promoted and no end-to-end certification."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="ck-arrow2" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="ck-band">Conformer frontend - seven new FP32 providers (src/kernels/audio_kernels.c)</text>
+
+      <g>
+        <rect class="ck-box" x="24" y="60" width="150" height="56" rx="10"/>
+        <text x="99" y="84" text-anchor="middle" class="ck-title" font-size="12">waveform</text>
+        <text x="99" y="102" text-anchor="middle" class="ck-sub">PCM input</text>
+
+        <rect class="ck-box" x="214" y="60" width="150" height="56" rx="10"/>
+        <text x="289" y="84" text-anchor="middle" class="ck-title" font-size="12">pre-emphasis</text>
+        <text x="289" y="102" text-anchor="middle" class="ck-sub">FIR y[t]=x[t]-k*x[t-1]</text>
+
+        <rect class="ck-box" x="404" y="60" width="150" height="56" rx="10"/>
+        <text x="479" y="84" text-anchor="middle" class="ck-title" font-size="12">STFT power</text>
+        <text x="479" y="102" text-anchor="middle" class="ck-sub">centered window</text>
+
+        <rect class="ck-box" x="594" y="60" width="150" height="56" rx="10"/>
+        <text x="669" y="84" text-anchor="middle" class="ck-title" font-size="12">log-mel</text>
+        <text x="669" y="102" text-anchor="middle" class="ck-sub">time-major</text>
+
+        <rect class="ck-box" x="784" y="60" width="170" height="56" rx="10"/>
+        <text x="869" y="84" text-anchor="middle" class="ck-title" font-size="12">per-feature norm</text>
+        <text x="869" y="102" text-anchor="middle" class="ck-sub">per-mel-bin mean/var</text>
+
+        <rect class="ck-box" x="994" y="60" width="162" height="56" rx="10"/>
+        <text x="1075" y="84" text-anchor="middle" class="ck-title" font-size="12">grouped conv2d</text>
+        <text x="1075" y="102" text-anchor="middle" class="ck-sub">subsample frontend</text>
+
+        <rect class="ck-box" x="404" y="168" width="150" height="56" rx="10"/>
+        <text x="479" y="192" text-anchor="middle" class="ck-title" font-size="12">GLU</text>
+        <text x="479" y="210" text-anchor="middle" class="ck-sub">split channel-major</text>
+
+        <rect class="ck-box" x="594" y="168" width="170" height="56" rx="10"/>
+        <text x="679" y="192" text-anchor="middle" class="ck-title" font-size="12">relative shift</text>
+        <text x="679" y="210" text-anchor="middle" class="ck-sub">rel-pos attn pos_bias_u/v</text>
+      </g>
+
+      <path d="M174,88 L210,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M364,88 L400,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M554,88 L590,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M744,88 L780,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M954,88 L990,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M1075,116 C1075,150 479,130 479,164" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+      <path d="M554,196 L590,196" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-arrow2)"/>
+
+      <!-- status badges -->
+      <rect x="214" y="126" width="742" height="26" rx="6" fill="#0b1118" stroke="#2f8d59" stroke-width="1"/>
+      <text x="585" y="144" text-anchor="middle" class="ck-good">contract-tested provider foundation (maps + ABI + numerical contracts)</text>
+      <rect x="404" y="234" width="360" height="26" rx="6" fill="#0b1118" stroke="#2f8d59" stroke-width="1"/>
+      <text x="584" y="252" text-anchor="middle" class="ck-good">relative shift exact: raw[h,q,T-1+k-q] -&gt; scores[h,q,k]</text>
+
+      <!-- encoder/decoder blocked -->
+      <rect x="24" y="292" width="560" height="66" rx="10" fill="#0b1118" stroke="#b8860b" stroke-width="1.2"/>
+      <text x="44" y="318" class="ck-warn">BLOCKED - 48-layer Conformer encoder (rel-pos attention, depthwise conv + batchnorm)</text>
+      <text x="44" y="340" class="ck-sub">encoder attention not promoted - stage-wise X-Ray oracle exists (PR #441)</text>
+
+      <rect x="624" y="292" width="532" height="66" rx="10" fill="#0b1118" stroke="#b8860b" stroke-width="1.2"/>
+      <text x="644" y="318" class="ck-warn">BLOCKED - 8-layer cross-attention decoder + tokenizer</text>
+      <text x="644" y="340" class="ck-sub">conversion emits HARD MODEL CONTRACT FAULT until promotion</text>
+
+      <path d="M764,196 C900,196 250,260 300,288" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ck-arrow2)"/>
+
+      <text x="24" y="392" class="ck-cap">Evidence (PRs #433, #436, #441): seven provider contracts validated; real GGUF inventory 2104/2104 tensors (48 encoder x 39, 8 decoder x 26); oracle harness captures stage-wise X-Ray dumps.</text>
+      <text x="24" y="412" class="ck-cap">Caveats: not a complete runtime - no CKE audio generation trajectory is certified; encoder attention, cross-attention, and decoder promotion remain open.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="ck-note">
+      The certified audio lane (Whisper, production) is a different stack:
+      <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> and
+      <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>.
+    </p>
+  </div>
+
+  <div class="ck-section">
+    <h2>5. The pattern</h2>
+    <p style="color: var(--text-secondary);">
+      Cohere is the cleanest demonstration of how the registry is supposed to absorb a new family: Command R
+      needed exactly one kernel, North needed zero, Compass needed a BF16 frontend, and only Transcribe &mdash; a
+      genuinely new modality with a Conformer frontend &mdash; needed a provider family. The cost of a new model
+      is proportional to its <em>contract</em> novelty, not its parameter count, and the fail-closed boundary
+      (provider foundation &rarr; certified runtime) is what keeps "we have the kernels" from being read as "we
+      run the model".
+    </p>
+    <p class="ck-note">
+      Related: <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>,
+      <a href="kernel-architecture.html">v8 Kernel Architecture</a>,
+      <a href="architecture-variants.html">Architecture Variants</a>,
+      <a href="model-kernel-matrix.html">Model + Kernel Matrix</a>.
+    </p>
+  </div>
+
+  <div id="ck-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="ck-ov-bar">
+      <span class="ck-ov-title" id="ck-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="ck-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="ck-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="ck-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="ck-ov-stage" id="ck-ov-stage"><img id="ck-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('ck-svg-overlay');
+      var stage = document.getElementById('ck-ov-stage');
+      var img = document.getElementById('ck-ov-img');
+      var title = document.getElementById('ck-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('ck-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('ck-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('ck-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('ck-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
 </div>
     </main>
 

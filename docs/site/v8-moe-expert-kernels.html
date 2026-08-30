@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantization Math Deep Dive | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
-    <meta name="robots" content="noindex,nofollow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/quantization-math-temp.html">
-    <meta property="og:title" content="Quantization Math Deep Dive | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts | C-Kernel-Engine</title>
+    <meta name="description" content="Kernel-by-kernel walk of the CKE v8 MoE expert providers: Qwen3.5-MoE bucketed expert prefill with VNNI weight preparation, Laguna mixed-quant Q4_K/Q4_K and Q4_K/Q6_K compact experts with parallel workspace variants, plus the Mamba2 parallel prefill and Q5_1 unpack-reuse throughput kernels.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-moe-expert-kernels.html">
+    <meta property="og:title" content="MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts | C-Kernel-Engine">
+    <meta property="og:description" content="Kernel-by-kernel walk of the CKE v8 MoE expert providers: Qwen3.5-MoE bucketed expert prefill with VNNI weight preparation, Laguna mixed-quant Q4_K/Q4_K and Q4_K/Q6_K compact experts with parallel workspace variants, plus the Mamba2 parallel prefill and Q5_1 unpack-reuse throughput kernels.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/quantization-math-temp.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-moe-expert-kernels.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -984,214 +984,527 @@
     </header>
     <main>
 
-<h1>Quantization Math Deep Dive</h1>
+<div class="container">
+  <h1>MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts</h1>
+  <p class="lead">
+    Six weeks of MoE kernel work, kernel by kernel: the shared router and expert building blocks, the
+    Qwen3.5-MoE grouped/bucketed expert prefill path (PR #376), the Laguna compact mixed-quant expert family
+    (PRs #404, #422), and two throughput-oriented provider enhancements that are not MoE but landed in the same
+    window (PRs #412, #330). Every provider ID below names a real map in
+    <code>version/v8/kernel_maps</code> and a function you can read in <code>src/kernels</code>.
+  </p>
 
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
-    <div>
-        <strong>Understanding Q5_0 and Q8_0 Formats</strong><br>
-        This page explains how 5-bit and 8-bit quantization works, the AVX-512 vectorization strategy, and the bugs we fixed during development.
-    </div>
-</div>
+  <style>
+    .mx-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .mx-section h2 { margin: 0 0 0.5rem; color: var(--orange); }
+    .mx-section h3 { color: var(--text-primary); margin: 1.1rem 0 0.35rem; font-size: 1.05rem; }
+    .mx-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .mx-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .mx-card strong { color: var(--text-primary); }
+    .mx-card code { font-size: 0.78rem; }
+    .mx-math {
+      background: #0b1118;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cfe8ff;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+      line-height: 1.6;
+    }
+    .mx-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+    main code { overflow-wrap: anywhere; }
+    .mx-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 0.75rem; }
+    .mx-table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.84rem; }
+    .mx-table th, .mx-table td {
+      border: 1px solid var(--grey); padding: 0.45rem 0.6rem;
+      text-align: left; vertical-align: top; color: var(--text-secondary);
+    }
+    .mx-table th { color: var(--orange); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; background: #121a24; }
+    .mx-table td:first-child { font-weight: 600; color: var(--text-primary); }
+    .pill {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid; white-space: nowrap;
+    }
+    .pill.prod { color: #7fd4a3; border-color: #2f8d59; background: rgba(71,180,117,0.1); }
+    .pill.cand { color: #ffd38a; border-color: #b8860b; background: rgba(255,180,0,0.1); }
+    .pill.none { color: #b9b9b9; border-color: #555; background: rgba(158,158,158,0.08); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #mx-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #mx-svg-overlay .mx-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #mx-svg-overlay .mx-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #mx-svg-overlay .mx-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #mx-svg-overlay .mx-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #mx-svg-overlay .mx-ov-stage img { max-width: none; height: auto; }
+  </style>
 
-<h2>Memory Layout: Block Structures</h2>
-
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q8_0 Block (34 bytes)</h3>
-        <pre><code>struct block_q8_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    int8_t qs[32];      // 32 bytes: 32 weights
-};  // Total: 34 bytes / 32 weights
-
-// Dequantization:
-weight[i] = qs[i] * d</code></pre>
-        <p><strong>Compression:</strong> 8.5 bits/weight (vs 32 for FP32)</p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Q5_0 Block (22 bytes)</h3>
-        <pre><code>struct block_q5_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    uint32_t qh[4];     // 4 bytes: 32 high bits
-    uint8_t qs[16];     // 16 bytes: packed nibbles
-};  // Total: 22 bytes / 32 weights
-
-// Each 5-bit weight = 4 bits from qs + 1 bit from qh</code></pre>
-        <p><strong>Compression:</strong> 5.5 bits/weight</p>
-    </div>
-</div>
-
-<h2>Q8_0 Dequantization (Simple)</h2>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Straightforward FP16 Scale</h3>
-    <p>Q8_0 is simple: each weight is just <code>qs[i] * d</code> where d is the FP16 scale.</p>
-    <pre><code>// Q8_0 dequantization
-for (int j = 0; j < 32; j++) {
-    float weight = d * (float)block->qs[j];
-}</code></pre>
-</div>
-
-<h2>Q5_0 Dequantization (Complex)</h2>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    </div>
-    <div>
-        <strong>The 5-Bit Challenge</strong><br>
-        Q5_0 stores each weight in two pieces: 4 bits in <code>qs[]</code> (packed) and 1 high bit in <code>qh[]</code>. These must be combined before use.
-    </div>
-</div>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Q5_0 Bit Mapping</h3>
-    <table>
-        <tr>
-            <th>Weight Index</th>
-            <th>qs Source</th>
-            <th>qh Bit</th>
-        </tr>
-        <tr>
-            <td>0-15 (first half)</td>
-            <td><code>qs[j] & 0x0F</code> (low nibble)</td>
-            <td>bit j (0-15)</td>
-        </tr>
-        <tr>
-            <td>16-31 (second half)</td>
-            <td><code>qs[j] >> 4</code> (high nibble)</td>
-            <td>bit j+16 (16-31)</td>
-        </tr>
-    </table>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Q5_0 Scalar Reference</h3>
-    <pre><code>// Q5_0 dequantization - scalar reference
-for (int j = 0; j < 16; j++) {
-    // First 16 weights: low nibbles + qh bits 0-15
-    uint8_t xh_0 = ((qh >> j) & 1) << 4;
-    int32_t x0 = ((qs[j] & 0x0F) | xh_0) - 16;
-
-    // Second 16 weights: high nibbles + qh bits 16-31
-    uint8_t xh_1 = ((qh >> (j + 16)) & 1) << 4;
-    int32_t x1 = ((qs[j] >> 4) | xh_1) - 16;
-
-    weight[j] = d * x0;
-    weight[j + 16] = d * x1;
-}</code></pre>
-</div>
-
-<h2>AVX-512 Bugs We Found & Fixed</h2>
-
-<div class="grid grid-2">
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #1: 16x Multiplier</h3>
-        <p>Result was exactly 16x too large!</p>
-        <pre><code>// BUGGY:
-acc = _mm512_add_ps(acc, _mm512_set1_ps(d * sumi));
-*s = _mm512_reduce_add_ps(acc);
-// _mm512_set1_ps broadcasts to 16 lanes, then sum = 16x!</code></pre>
-        <p><strong>Fix:</strong> Use scalar accumulator instead of vector broadcast.</p>
-    </div>
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #2: Wrong qh Bits</h3>
-        <p>Used bits 12-27 instead of bits 16-31!</p>
-        <pre><code>// BUGGY - used wrong bit range
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 27) & 1) << 4, ...,  // Wrong!
-    ((qh >> 12) & 1) << 4       // Wrong!
-);
-
-// FIXED - correct bit range 16-31
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 31) & 1) << 4, ...,  // Correct!
-    ((qh >> 16) & 1) << 4        // Correct!
-);</code></pre>
-    </div>
-</div>
-
-<h2>AVX-512 Vectorization Strategy</h2>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Processing 32 Weights in 2 Batches of 16</h3>
-    <pre><code>// AVX-512 vec_dot_q5_0_q8_0
-for (int ib = 0; ib < nb; ib++) {
-    // Load 16 packed bytes (32 nibbles)
-    __m128i qs = _mm_loadu_si128(x[ib].qs);
-
-    // First 16 weights
-    __m512i lo_nibbles = _mm512_cvtepu8_epi32(qs);
-    lo_nibbles = _mm512_and_epi32(lo_nibbles, mask_0f);
-    __m512i qh_lo = /* bits 0-15 of qh, shifted to bit 4 */;
-    __m512i q5_lo = _mm512_sub_epi32(_mm512_or_epi32(lo_nibbles, qh_lo), sixteen);
-
-    __m512i y32_lo = _mm512_cvtepi8_epi32(y[ib].qs[0:16]);
-    __m512i prod_lo = _mm512_mullo_epi32(q5_lo, y32_lo);
-
-    // Second 16 weights (similar, using high nibbles + qh bits 16-31)
-
-    int sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));
-    sumf += d * (float)sumi;
-}</code></pre>
-</div>
-
-<h2>Key AVX-512 Intrinsics Used</h2>
-
-<table>
-    <tr>
-        <th>Intrinsic</th>
-        <th>Operation</th>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepu8_epi32</code></td>
-        <td>Expand 16 bytes → 16 int32s (zero extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepi8_epi32</code></td>
-        <td>Expand 16 int8 → 16 int32s (sign extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_mullo_epi32</code></td>
-        <td>Multiply 16 pairs of int32s (saturating)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_reduce_add_epi32</code></td>
-        <td>Horizontal sum of all 16 lanes</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_set_epi32</code></td>
-        <td>Build vector from 16 scalar values</td>
-    </tr>
-</table>
-
-<h2>Quick Reference</h2>
-
-<div class="grid grid-2">
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Q8_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[i] = d × qs[i]
-        </p>
-    </div>
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q5_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[j] = d × ((nibble | (qh_bit &lt;&lt; 4)) - 16)
-        </p>
-    </div>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">vec_dot Computation</h3>
-    <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-        result = Σ (d_x × d_y × Σ (dequant_x[i] × y[i]))
+  <div class="mx-section">
+    <h2>1. The shared building blocks: routers and the SwiGLU expert shape</h2>
+    <p style="color: var(--text-secondary);">
+      Every MoE family in the registry is the same two pieces with different contracts: a <strong>router</strong>
+      that picks experts and weights per token, and an <strong>expert SwiGLU</strong> that computes
+      <code>down(silu(gate(x)) * up(x))</code> per routed expert and accumulates routing-weighted results in FP32.
+      The two router providers in <code>src/kernels/topk_kernels.c</code> are deliberately different numerical
+      contracts, not tuning variants:
     </p>
-    <p style="text-align: center; margin-top: 1rem;">
-        Sum over all blocks, where each block contributes: scale × integer_dot_product
+    <div class="mx-math">group_limited_topk_router_sigmoid_f32   (topk_kernels.c:728)
+  choice_scores   = sigmoid(logits) + correction_bias     # bias steers selection only
+  group_scores    = sum of top-2 choice_scores within each group
+  selected_groups = topk(group_scores, topk_group)
+  selected        = topk(choice_scores masked to selected_groups, k)
+  weights         = gather(raw_scores, selected)          # NOT the biased scores
+
+moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
+  p               = softmax(logits) over ALL experts      # full softmax first
+  selected        = topk(p, k)
+  weights         = p[selected] / max(sum(p[selected]), 6.103515625e-5)
+  weights        *= routed_scaling_factor</div>
+    <div class="mx-grid">
+      <div class="mx-card"><strong>Why two routers can never merge.</strong> The correction bias changes
+        <em>which</em> experts fire while leaving the weights gathered from raw scores; the llama router changes the
+        <em>weights themselves</em> (full-softmax then renormalize). Different token routings and different weights
+        are different numerical contracts, so they live in different equivalence groups and the resolver fails
+        closed rather than substituting one for the other.</div>
+      <div class="mx-card"><strong>The expert shape everything below shares.</strong> Routed experts read the
+        hidden state once per token, run gate/up projections, apply the ggml-compatible SwiGLU, run the down
+        projection, and add the result into the output row scaled by the routing weight. What varies per provider
+        is the <em>quant contract of each leg</em>: gate/up storage, down storage, activation quantization, and
+        reduction order.</div>
+    </div>
+    <p class="mx-note">
+      Registry-level router context: <a href="kernel-architecture.html">kernel architecture &mdash; MoE routers and
+      experts</a>. The router selection math above is verified against <code>topk_kernels.c</code>.
     </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>2. Qwen3.5-MoE: grouped and bucketed expert prefill (PR #376)</h2>
+    <p style="color: var(--text-secondary);">
+      Qwen3.5-35B-A3B is a 40-layer hybrid MoE with <strong>256 routed experts and top-8 routing</strong>, Q4_K
+      expert gate/up, Q5_K expert down, and a Q8_0 gated shared expert (real GGUF audit: 733 tensors). Naive
+      per-token dispatch pays T&times;k scattered expert calls and re-quantizes the hidden state for every
+      (token, expert) pair. The bucketed path turns that into one quantization pass plus contiguous per-expert
+      GEMM segments on the persistent thread pool.
+    </p>
+    <div class="mx-grid">
+      <div class="mx-card"><strong><code>moe_swiglu_expert_forward_q4k_q5k</code></strong>
+        <span class="pill prod">production</span> priority 200<br>
+        Routed experts: Q4_K gate/up, Q5_K down, Q8_K activations, routing-weighted FP32 accumulate.
+        Serial workspace at <code>src/kernels/axpy_kernels.c:578</code>, thread-pool
+        <code>_parallel_workspace</code> at <code>axpy_kernels.c:1105</code>. Equivalence group
+        <code>q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32</code>, phases [prefill, decode].</div>
+      <div class="mx-card"><strong><code>moe_swiglu_expert_forward_q4k_q5k_bucketed</code></strong>
+        <span class="pill cand">candidate</span> priority 210<br>
+        Same contract, grouped execution (<code>axpy_kernels.c:1951</code> +
+        <code>version/v8/src/ck_parallel_prefill_v8.c</code>): count-sort tokens by expert per top-k slot,
+        quantize the hidden state to Q8_K <strong>once</strong>, then run contiguous per-expert GEMM segments.
+        Priority 210 sits above the production non-bucketed provider at 200 &mdash; inside the same equivalence
+        group, so it can only ever replace that provider, never a different contract.</div>
+      <div class="mx-card"><strong><code>moe_swiglu_shared_forward_q8_0_gated</code></strong>
+        <span class="pill cand">candidate</span> priority 200<br>
+        Always-on shared expert in Q8_0 with a scalar sigmoid gate applied before the routed add
+        (<code>axpy_kernels.c:2174</code>, parallel at <code>:2285</code>). Equivalence group
+        <code>q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add</code>.</div>
+      <div class="mx-card"><strong>VNNI weight preparation leaf.</strong><br>
+        <code>gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4</code>
+        (<code>src/kernels/gemm_kernels_q4k_q8k_vnni.c:1123</code>) plus the map-owned prepare hook
+        <code>ck_moe_prepare_q4k_gate_up_vnni_x8</code>: AVX-VNNI &times;8-packed Q4_K gate/up weight layout,
+        built once at load time, so the bucketed segments run packed integer dot products instead of per-call
+        unpacking.</div>
+    </div>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 500" width="100%" role="img" tabindex="0" data-svg-title="Bucketed MoE expert prefill dataflow"
+         aria-label="Bucketed expert prefill dataflow: tokens with top-k routing weights are count-sorted by expert per top-k slot into contiguous per-expert row segments; the hidden state is quantized to Q8_K exactly once; packed VNNI GEMM segments run per expert on the thread pool; results are accumulated routing-weighted in FP32. A contrast panel shows naive per-token dispatch making T times k scattered expert calls and re-quantizing the hidden state per token-expert pair. A selection strip shows the serial provider at production priority 200 and the bucketed provider at candidate priority 210 inside the same equivalence group."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .mk-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .mk-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .mk-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .mk-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="mk-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">Bucketed expert prefill (moe_swiglu_expert_forward_q4k_q5k_bucketed)</text>
+
+      <rect class="mk-box" x="24" y="52" width="340" height="88" rx="10"/>
+      <text x="44" y="78" class="mk-title" font-size="13">tokens + top-k routing</text>
+      <text x="44" y="98" class="mk-sub">T tokens x k slots (Qwen3.5-MoE: top-8 of 256)</text>
+      <text x="44" y="118" class="mk-sub">router weights w[t,j] from sigmoid router</text>
+
+      <rect class="mk-box" x="424" y="52" width="340" height="88" rx="10"/>
+      <text x="444" y="78" class="mk-title" font-size="13">count-sort by expert</text>
+      <text x="444" y="98" class="mk-sub">per top-k slot: histogram then scatter</text>
+      <text x="444" y="118" class="mk-sub">planner-owned scratch - no malloc</text>
+
+      <rect class="mk-box" x="824" y="52" width="332" height="88" rx="10"/>
+      <text x="844" y="78" class="mk-title" font-size="13">per-expert contiguous segments</text>
+      <text x="844" y="98" class="mk-sub">expert e owns rows [off_e, off_e + cnt_e)</text>
+      <text x="844" y="118" class="mk-sub">dense row batching replaces scatter</text>
+
+      <rect class="mk-box" x="24" y="196" width="340" height="88" rx="10"/>
+      <text x="44" y="222" class="mk-title" font-size="13">quantize hidden ONCE</text>
+      <text x="44" y="242" class="mk-hi">hidden fp32 -&gt; Q8_K: one pass per token</text>
+      <text x="44" y="262" class="mk-sub">not one pass per (token, expert) pair</text>
+
+      <rect class="mk-box" x="424" y="196" width="340" height="88" rx="10"/>
+      <text x="444" y="222" class="mk-title" font-size="13">packed VNNI GEMM segments</text>
+      <text x="444" y="242" class="mk-sub">Q4_K gate/up x8-packed at load time</text>
+      <text x="444" y="262" class="mk-sub">thread pool runs expert row ranges</text>
+
+      <rect class="mk-box" x="824" y="196" width="332" height="88" rx="10"/>
+      <text x="844" y="222" class="mk-title" font-size="13">weighted FP32 accumulate</text>
+      <text x="844" y="242" class="mk-sub">out[t] += w[t,j] * expert(x_t)</text>
+      <text x="844" y="262" class="mk-sub">selected-slot reduction order preserved</text>
+
+      <path d="M364,96 L420,96" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M764,96 L820,96" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M990,140 C990,180 200,160 196,192" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M364,240 L420,240" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M764,240 L820,240" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+
+      <!-- naive contrast -->
+      <rect x="24" y="316" width="700" height="86" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="342" class="mk-warn">CONTRAST - naive per-token dispatch</text>
+      <text x="44" y="364" class="mk-sub">T x k scattered expert calls, one (token, expert) pair at a time</text>
+      <text x="44" y="384" class="mk-sub">hidden re-quantized per pair: T x k Q8_K passes instead of 1</text>
+
+      <!-- selection strip -->
+      <rect x="764" y="316" width="392" height="86" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="784" y="342" class="mk-good">production 200: ..._q4k_q5k (serial/parallel)</text>
+      <text x="784" y="364" class="mk-warn">candidate 210: ..._q4k_q5k_bucketed</text>
+      <text x="784" y="384" class="mk-sub">same equivalence_group - priority ranks within it</text>
+
+      <text x="24" y="446" class="mk-cap">Evidence (PR #376): 10-row routed-expert path 13.5 ms -&gt; 2.5 ms per layer, byte-exact; routed leaf 1.36x at 512 rows, 1.47x at 4096 rows; 4096-token model traffic 1.12 TB -&gt; 504 GB (62.5% fewer DRAM reads).</text>
+      <text x="24" y="468" class="mk-cap">Evidence (PR #376): 512-token P3 prefill at 35.35 tok/s with the same top-1 token as pinned llama.cpp; Q8_0 gated shared expert 10.572 s -&gt; 1.079 s at 4096 tokens on Ryzen 9950X3D.</text>
+      <text x="24" y="490" class="mk-cap">Caveats: bucketed + shared-gated providers are candidate (opt-in routes only); CKE is ~0.73x matched llama.cpp on this model - attention and recurrent projections still dominate the gap.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="mx-note">
+      The preparation hook is declared in the bucketed map itself
+      (<code>version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k_bucketed.json</code>), so weight layout is a
+      map-owned decision, not a model-name branch in codegen.
+    </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>3. Laguna: compact-MoE mixed-quant experts (PRs #404, #422)</h2>
+    <p style="color: var(--text-secondary);">
+      Laguna-XS 2.1 keeps routed and shared experts in mixed compact storage: Q4_K gate/up with either Q4_K or
+      Q6_K down. Activations are quantized fp32&rarr;Q8_K at the kernel boundary, the SwiGLU is the
+      ggml-compatible formulation, and the accumulate is routing-weighted FP32. PR #422 added the
+      <code>*_parallel_workspace</code> variants that dispatch rows (prefill) and experts (decode) over the
+      persistent thread pool &mdash; measured bit-exact against the serial providers.
+    </p>
+    <div class="mx-table-wrap">
+      <table class="mx-table">
+        <thead><tr><th>Provider</th><th>Source</th><th>Contract</th><th>Selection</th></tr></thead>
+        <tbody>
+          <tr><td><code>moe_swiglu_expert_forward_q4k_q4k</code></td>
+            <td><code>axpy_kernels.c:743</code> / parallel <code>:1461</code></td>
+            <td>Q4_K gate/up &times; Q8_K acts &rarr; ggml SwiGLU &rarr; Q4_K down &rarr; weighted FP32</td>
+            <td><span class="pill prod">production</span> 205, [prefill, decode], group <code>..._q4_k_q8_k_down_weighted_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_expert_forward_q4k_q6k</code></td>
+            <td><code>axpy_kernels.c:666</code> / parallel <code>:1438</code></td>
+            <td>same, Q6_K down</td>
+            <td><span class="pill prod">production</span> 205, group <code>..._q6_k_q8_k_down_weighted_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_shared_forward_q4k_q4k</code></td>
+            <td><code>axpy_kernels.c:877</code> / parallel <code>:1603</code></td>
+            <td>always-on shared expert, Q4_K down, no routing weight</td>
+            <td><span class="pill prod">production</span> 205, group <code>q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_shared_forward_q4k_q6k</code></td>
+            <td><code>axpy_kernels.c:820</code> / parallel <code>:1584</code></td>
+            <td>same, Q6_K down</td>
+            <td><span class="pill prod">production</span> 205, group <code>..._shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32</code></td></tr>
+          <tr><td><code>attn_gate_softplus_mul_forward</code></td>
+            <td><code>src/kernels/hybrid_attention_kernels.c:132</code></td>
+            <td>per-head softplus attention-output gate, head-major; linear branch above 20</td>
+            <td>declared by the circuit as <code>attention_gate_projection</code> + gate op</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color: var(--text-secondary); margin-top: 0.75rem;">
+      The circuit that binds them, <code>version/v8/circuits/laguna.json</code>: sigmoid router with correction
+      bias &rarr; top-8 routed SwiGLU plus shared SwiGLU; hybrid sliding/global attention with
+      <code>attention_gate_projection</code> and the softplus gate; a YaRN rope cache
+      (<code>yarn_rope_cache_contiguous_positions_f32</code>) on global layers; prefill chunk 4096.
+    </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 470" width="100%" role="img" tabindex="0" data-svg-title="Laguna mixed-quant expert dataflow"
+         aria-label="Laguna mixed-quant expert dataflow: Q4_K gate and up weights times Q8_K activations feed the ggml SwiGLU, then a Q4_K or Q6_K down projection times Q8_K activations, then routing-weighted FP32 accumulate. Below, two equivalence group panels sit side by side: the Q4_K down group and the Q6_K down group, each listing its routed and shared serial and parallel providers at production priority 205 for prefill and decode phases, with a note that priority never crosses equivalence groups."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="mk-arrow2" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">One dataflow, two quant contracts</text>
+
+      <rect class="mk-box" x="24" y="52" width="250" height="80" rx="10"/>
+      <text x="44" y="78" class="mk-title" font-size="13">Q4_K gate/up</text>
+      <text x="44" y="98" class="mk-sub">x Q8_K activations</text>
+      <text x="44" y="116" class="mk-sub">acts quantized once (fp32 -&gt; Q8_K)</text>
+
+      <rect class="mk-box" x="324" y="52" width="210" height="80" rx="10"/>
+      <text x="344" y="78" class="mk-title" font-size="13">ggml SwiGLU</text>
+      <text x="344" y="98" class="mk-sub">silu(gate) * up</text>
+      <text x="344" y="116" class="mk-sub">fp32 intermediate</text>
+
+      <rect class="mk-box" x="584" y="52" width="250" height="80" rx="10"/>
+      <text x="604" y="78" class="mk-title" font-size="13">Q4_K or Q6_K down</text>
+      <text x="604" y="98" class="mk-sub">x Q8_K activations</text>
+      <text x="604" y="116" class="mk-hi">down quant = the contract split</text>
+
+      <rect class="mk-box" x="884" y="52" width="272" height="80" rx="10"/>
+      <text x="904" y="78" class="mk-title" font-size="13">FP32 weighted accumulate</text>
+      <text x="904" y="98" class="mk-sub">out[t] += w[t,j] * expert_out</text>
+      <text x="904" y="116" class="mk-sub">shared expert: always-on, unweighted</text>
+
+      <path d="M274,92 L320,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+      <path d="M534,92 L580,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+      <path d="M834,92 L880,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+
+      <!-- equivalence groups -->
+      <rect x="24" y="172" width="556" height="170" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="198" class="mk-good">equivalence_group A (Q4_K down)</text>
+      <text x="44" y="220" class="mk-sub">q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32</text>
+      <text x="44" y="244" class="mk-sub">moe_swiglu_expert_forward_q4k_q4k            (:743)</text>
+      <text x="44" y="264" class="mk-sub">moe_swiglu_expert_forward_q4k_q4k_parallel_workspace  (:1461)</text>
+      <text x="44" y="284" class="mk-sub">moe_swiglu_shared_forward_q4k_q4k[_parallel_workspace]  (:877/:1603)</text>
+      <text x="44" y="310" class="mk-hi">production - priority 205 - phases [prefill, decode]</text>
+      <text x="44" y="330" class="mk-sub">parallel == serial, bit-exact (PR #422)</text>
+
+      <rect x="624" y="172" width="532" height="170" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="644" y="198" class="mk-good">equivalence_group B (Q6_K down)</text>
+      <text x="644" y="220" class="mk-sub">q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32</text>
+      <text x="644" y="244" class="mk-sub">moe_swiglu_expert_forward_q4k_q6k            (:666)</text>
+      <text x="644" y="264" class="mk-sub">moe_swiglu_expert_forward_q4k_q6k_parallel_workspace  (:1438)</text>
+      <text x="644" y="284" class="mk-sub">moe_swiglu_shared_forward_q4k_q6k[_parallel_workspace]  (:820/:1584)</text>
+      <text x="644" y="310" class="mk-hi">production - priority 205 - phases [prefill, decode]</text>
+      <text x="644" y="330" class="mk-sub">parallel == serial, bit-exact (PR #422)</text>
+
+      <rect x="24" y="362" width="1132" height="44" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="389" class="mk-warn">priority ranks providers INSIDE one equivalence group - a Q6_K-down provider can never be selected for a Q4_K-down contract (fail-closed)</text>
+
+      <text x="24" y="442" class="mk-cap">Evidence (PRs #404, #422): parallel providers bit-exact vs serial; Laguna 512-token prefill 23.29 s -&gt; 2.86 s (22.0 -&gt; 179.2 tok/s), occupancy 1.59 -&gt; 13.78 of 16 Ryzen 9950X3D cores; 8192-token prefill 138.3 tok/s.</text>
+      <text x="24" y="464" class="mk-cap">Caveats: router replay parity is within one ULP, not long-trajectory (near-tied route flips vs llama.cpp); the softplus gate formula is observed from the model, not oracle-validated.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="mx-note">
+      The structural view (layer kinds, split RoPE, gated GQA) is in
+      <a href="architecture-variants.html">Architecture Variants &mdash; Laguna</a>; this page covers the provider
+      layer only.
+    </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>4. Throughput kernels beyond MoE</h2>
+    <p style="color: var(--text-secondary);">
+      Two provider enhancements from the same window are not MoE, but they are the same engineering pattern:
+      find the serialization point, partition the independent dimension across the persistent thread pool, and
+      keep the numerical contract identical so selection stays honest.
+    </p>
+    <div class="mx-grid">
+      <div class="mx-card"><strong>Nemotron-H: parallel recurrent prefill (PR #412).</strong><br>
+        Mamba2 prefill alternated parallel projections with serial recurrent valleys.
+        <code>mamba2_conv1d_f32_parallel_dispatch</code> partitions the conv1d by independent channel ranges
+        (sequential fallback below 8 rows / 16 conv channels);
+        <code>mamba2_selective_scan_f32_parallel_dispatch</code> chunks by independent head ranges (fallback below
+        seq_len 8 / 2 heads). Kill switch: <code>CK_DISABLE_MAMBA2_PARALLEL_PREFILL</code>. The maps declare this
+        through a new <code>impl.variants[].parallel_head_ranges</code> metadata pattern (shape constraints
+        <code>T_min: 8</code>, <code>H_min: 2</code>, named serial fallback) instead of hardcoded thresholds in the
+        resolver.<br>
+        <span class="pill none">evidence</span> Ryzen 9950X3D 8K prefill: 252.0 s &rarr; 135.0 s (32.5 &rarr; 60.7
+        tok/s), 7.51 &rarr; 13.83 active cores, exact first-logit and token agreement. Caveat: llama.cpp remains
+        2.12&times; faster on this host.</div>
+      <div class="mx-card"><strong>Gemma3: Q5_1 unpack reuse (PR #330).</strong><br>
+        <code>gemm_nt_q5_1_q8_1_m4</code> (<code>src/kernels/gemm_kernels_q5_1_q8_1.c:365</code>) unpacks each Q5_1
+        weight block <em>once</em> and dots it against four pre-quantized Q8_1 activation rows with AVX2 VNNI
+        <code>dpbusd</code>, instead of re-unpacking per row. The map (<code>gemm_nt_q5_1</code>) is
+        <span class="pill prod">production</span> priority 200 with <strong>prefill-only</strong> phases &mdash;
+        decode keeps the per-row path.<br>
+        <span class="pill none">evidence</span> production-shape leaf 45.93 ms &rarr; 26.58 ms (1.73&times;);
+        end-to-end Gemma prefill improved 6.4% / 5.1% / 2.3% at 32 / 128 / 512 tokens with unchanged tolerances.
+        Caveat: the Q5_1 oracle is an observed 1e-4 contract, not bit-exact to the llama.cpp graph.</div>
+    </div>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 330" width="100%" role="img" tabindex="0" data-svg-title="Q5_1 unpack-once, dot four rows"
+         aria-label="Q5_1 m4 tile diagram: one Q5_1 weight block of 32 values is unpacked once into registers, then dotted via AVX2 VNNI dpbusd against four pre-quantized Q8_1 activation rows r0 through r3, producing four FP32 accumulators. A side panel lists the measured evidence: production-shape leaf 45.93 to 26.58 milliseconds, 1.73 times, and 2.3 to 6.4 percent end-to-end prefill gains, with selection restricted to the prefill phase."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="mk-arrow3" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">gemm_nt_q5_1_q8_1_m4 - unpack once, dot four rows</text>
+
+      <rect class="mk-box" x="24" y="60" width="240" height="76" rx="10"/>
+      <text x="44" y="86" class="mk-title" font-size="13">Q5_1 weight block</text>
+      <text x="44" y="106" class="mk-sub">32 values, one block scale</text>
+      <text x="44" y="124" class="mk-sub">K multiple of 32</text>
+
+      <rect class="mk-box" x="314" y="60" width="200" height="76" rx="10"/>
+      <text x="334" y="86" class="mk-title" font-size="13">unpack ONCE</text>
+      <text x="334" y="106" class="mk-hi">qs + qh -&gt; int8 registers</text>
+      <text x="334" y="124" class="mk-sub">amortized over 4 rows</text>
+
+      <g>
+        <rect class="mk-box" x="564" y="44" width="270" height="34" rx="8"/>
+        <text x="584" y="66" class="mk-sub">r0: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="84" width="270" height="34" rx="8"/>
+        <text x="584" y="106" class="mk-sub">r1: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="124" width="270" height="34" rx="8"/>
+        <text x="584" y="146" class="mk-sub">r2: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="164" width="270" height="34" rx="8"/>
+        <text x="584" y="186" class="mk-sub">r3: Q8_1 row - dpbusd dot</text>
+      </g>
+
+      <rect class="mk-box" x="884" y="60" width="272" height="76" rx="10"/>
+      <text x="904" y="86" class="mk-title" font-size="13">4 x FP32 accumulators</text>
+      <text x="904" y="106" class="mk-sub">ascending block reduction order</text>
+      <text x="904" y="124" class="mk-sub">same contract as serial Q5_1</text>
+
+      <path d="M264,98 L310,98" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,61" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,101" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,141" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,181" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M834,121 L880,104" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+
+      <rect x="24" y="216" width="1132" height="52" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="238" class="mk-good">selection: production, priority 200, phases [prefill] only - decode keeps the per-row provider</text>
+      <text x="44" y="258" class="mk-sub">equivalence_group q5_1_weight_q8_1_internal_fp32_output</text>
+
+      <text x="24" y="302" class="mk-cap">Evidence (PR #330): production-shape leaf 45.93 ms -&gt; 26.58 ms (1.73x); Gemma prefill +6.4% / +5.1% / +2.3% at 32 / 128 / 512 tokens.</text>
+      <text x="24" y="322" class="mk-cap">Caveats: Q5_1 is an observed 1e-4 oracle contract, not bit-exact; Gemma remains slower than llama.cpp end to end.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+  </div>
+
+  <div class="mx-section">
+    <h2>5. Why this matters</h2>
+    <p style="color: var(--text-secondary);">
+      Everything on this page is the same expert-GEMM pattern specialized per quant contract: Q4_K/Q5_K for
+      Qwen3.5-MoE, Q4_K/Q4_K and Q4_K/Q6_K for Laguna, Q8_0 for the gated shared expert. The performance work
+      &mdash; bucketing, weight preparation, parallel row/expert dispatch, unpack reuse &mdash; never changes the
+      arithmetic contract; it changes the schedule. Selection metadata is what keeps that honest: each quant
+      combination lives in its own <code>equivalence_group</code>, priority only ranks providers that already share
+      a contract, and anything unproven stays <code>candidate</code> behind opt-in routes. A faster provider can
+      therefore never silently change what the model computes &mdash; when in doubt, the resolver fails closed.
+    </p>
+    <p class="mx-note">
+      Related: <a href="kernel-architecture.html">v8 Kernel Architecture &mdash; MoE routers and experts</a>,
+      <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>,
+      <a href="architecture-variants.html">Architecture Variants</a>,
+      <a href="v8-cohere-kernels.html">Cohere Kernel Story</a> (North composes the Q4_K/Q5_K experts documented
+      here).
+    </p>
+  </div>
+
+  <div id="mx-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="mx-ov-bar">
+      <span class="mx-ov-title" id="mx-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="mx-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="mx-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="mx-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="mx-ov-stage" id="mx-ov-stage"><img id="mx-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('mx-svg-overlay');
+      var stage = document.getElementById('mx-ov-stage');
+      var img = document.getElementById('mx-ov-img');
+      var title = document.getElementById('mx-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('mx-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('mx-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('mx-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('mx-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
 </div>
     </main>
 
