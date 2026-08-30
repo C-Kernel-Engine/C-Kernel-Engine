@@ -2755,6 +2755,40 @@
       "position_transform": null,
       "description": "Observed compact Q8_0 shared SwiGLU composition with a separate FP32 sigmoid gate. The gated shared product is rounded before routed addition to retain graph-operation semantics."
     },
+    "nvfp4_q8_0_routed_swiglu_fp32": {
+      "operator_family": "moe_swiglu_expert",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "nvfp4", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "e2m1",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_0_then_native_packed_nvfp4_gate_up_with_e4m3_block_scales_then_swiglu_then_quantize_activation_q8_0_then_native_packed_nvfp4_down_then_selected_slot_order_weighted_sum"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "weight_scale", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "weighted_product", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "selected_slot_order"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed native packed NVFP4-weight/Q8_0-activation routed SwiGLU. The provider consumes E2M1 values and E4M3 block scales without expanding expert weights; direct packed dot products are checked against llama.cpp."
+    },
+    "nvfp4_q8_0_shared_swiglu_fp32": {
+      "operator_family": "moe_shared_swiglu",
+      "status": "observed",
+      "storage": {"input": "fp32", "weight": "nvfp4", "output": "fp32"},
+      "compute": {
+        "input": "int8",
+        "weight": "e2m1",
+        "accumulator": "fp32",
+        "contraction": "enabled",
+        "evaluation_order": "quantize_hidden_q8_0_then_native_packed_nvfp4_gate_up_with_e4m3_block_scales_then_swiglu_then_quantize_activation_q8_0_then_native_packed_nvfp4_down_then_model_declared_routed_shared_combination_scale"
+      },
+      "rounding": {"mode": "rne", "points": ["input_load", "weight_scale", "reduction_update", "activation_intermediate_store", "activation_intermediate_load", "vector_exponential", "weighted_product", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Observed native packed NVFP4-weight/Q8_0-activation shared SwiGLU with model-declared routed/shared sum or average semantics and no expanded weight copy."
+    },
     "q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32": {
       "operator_family": "moe_swiglu_expert",
       "status": "observed",

@@ -147,6 +147,7 @@ CK_DT_Q8_K = 10
 CK_DT_Q5_0 = 11
 CK_DT_Q5_1 = 12
 CK_DT_Q5_K = 13
+CK_DT_NVFP4 = 14
 
 _GGUF_CK_MAP_CACHE: Optional[Dict[str, Any]] = None
 

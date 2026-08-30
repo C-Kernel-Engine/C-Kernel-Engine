@@ -114,6 +114,54 @@ _Static_assert(sizeof(block_q8_0) == 34, "block_q8_0 ABI size changed");
 #endif
 
 /* ============================================================================
+ * NVFP4: NVIDIA E2M1 weights with two-level scaling
+ * - 64 weights per canonical storage block
+ * - Four unsigned E4M3 scales, one per 16 weights
+ * - Two E2M1 values packed per byte
+ * - A tensor/expert global scale remains a separate runtime operand
+ * ============================================================================ */
+
+#define QK_NVFP4 64
+#define QK_NVFP4_SUB 16
+
+typedef struct {
+    uint8_t d[QK_NVFP4 / QK_NVFP4_SUB];
+    uint8_t qs[QK_NVFP4 / 2];
+} block_nvfp4;
+
+#if defined(__cplusplus)
+static_assert(sizeof(block_nvfp4) == 36, "block_nvfp4 ABI size changed");
+#else
+_Static_assert(sizeof(block_nvfp4) == 36, "block_nvfp4 ABI size changed");
+#endif
+
+float ck_ue4m3_to_fp32(uint8_t value);
+void dequantize_row_nvfp4(const void *weights, float *output, int k,
+                          float weight_scale);
+void vec_dot_nvfp4_q8_0_ref(int n, float *output, const void *weights,
+                            const void *activations, float weight_scale);
+void vec_dot_nvfp4_q8_0(int n, float *output, const void *weights,
+                        const void *activations, float weight_scale);
+void gemv_nvfp4_q8_0(float *output, const void *weights,
+                     const float *weight_scales, const void *activations,
+                     int rows, int cols);
+size_t moe_swiglu_nvfp4_workspace_bytes(int hidden_dim, int intermediate_dim);
+int moe_swiglu_expert_forward_nvfp4_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const float *expert_gate_scales,
+    const void *expert_up, const float *expert_up_scales,
+    const void *expert_down, const float *expert_down_scales,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+int moe_swiglu_shared_forward_nvfp4_workspace(
+    const float *hidden, const float *routed,
+    const void *shared_gate, const float *shared_gate_scale,
+    const void *shared_up, const float *shared_up_scale,
+    const void *shared_down, const float *shared_down_scale,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    float combination_scale, void *workspace, size_t workspace_bytes);
+
+/* ============================================================================
  * Q4_K: K-Quant 4-bit with Nested Scales (Primary Target)
  * - 256 weights per super-block
  * - 8 sub-blocks of 32 weights each

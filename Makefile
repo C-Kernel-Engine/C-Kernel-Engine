@@ -504,6 +504,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/gemm_batch_int8.c \
 	           src/kernels/fused/fused_rmsnorm_linear.c \
 	           src/kernels/gemm_kernels_q8_0.c \
+	           src/kernels/gemm_kernels_nvfp4.c \
 	           src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
 	           src/kernels/gemv_omp.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
@@ -562,6 +563,7 @@ QUANT_COMMON_SRCS := src/kernels/dequant_kernels.c \
 	src/kernels/gemm_kernels_q6k.c \
 	src/kernels/gemm_kernels_q4k_q8k.c \
 	src/kernels/gemm_kernels_q8_0.c \
+	src/kernels/gemm_kernels_nvfp4.c \
 	src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
 	src/kernels/gemm_kernels_f16.c \
 	src/ckernel_strict.c \
@@ -4008,6 +4010,7 @@ test-v8-template-circuit-audit:
 .PHONY: test-numerical-contracts
 test-numerical-contracts: $(LIB)
 	@echo "Running v8 numerical contract validation..."
+	@$(PYTHON) unittest/test_nvfp4_q8_0.py
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-4m
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-8m
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-vnni-x8
@@ -4071,6 +4074,15 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) version/v8/scripts/resolve_attention_contracts_v8.py --circuit qwen3vl --operation decoder.attention.bf16_pytorch --phase decode --mode bringup --output build/v8/contracts/qwen3vl-bf16-decode.json >/dev/null
 	@echo "Resolved plans: build/v8/contracts/"
 
+.PHONY: test-v8-command-a-plus-nvfp4
+test-v8-command-a-plus-nvfp4: $(LIB)
+	@echo "Running Command A+ native NVFP4 and X-ray contracts..."
+	@$(PYTHON) unittest/test_nvfp4_q8_0.py
+	@$(PYTHON) -m pytest -q \
+		tests/test_v8_nvfp4_contract.py \
+		tests/test_v8_command_a_plus_contract.py \
+		tests/test_v8_command_a_plus_xray_contract.py
+
 .PHONY: certify-qwen35-text-parity
 certify-qwen35-text-parity:
 	@test -n "$${QWEN35_MODEL_DIR:-}" || { echo "QWEN35_MODEL_DIR is required"; exit 2; }
@@ -4124,6 +4136,7 @@ test-bf16-xray:
 	@$(PYTHON) -c 'import json; from jsonschema import Draft202012Validator; Draft202012Validator.check_schema(json.load(open("version/v8/schemas/xray_attention_sensitivity.schema.json", encoding="utf-8")))'
 	@$(PYTHON) tests/test_v8_numerical_execution_contracts.py
 	@$(PYTHON) tests/test_v8_xray_numerical_parity.py
+	@$(PYTHON) -m pytest -q tests/test_v8_command_a_plus_xray_contract.py
 	@$(PYTHON) tests/test_v8_xray_decoder_pytorch.py
 	@$(PYTHON) tests/test_v8_xray_attention_sensitivity.py
 	@$(PYTHON) tests/test_v8_xray_execution_state.py

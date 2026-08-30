@@ -4904,13 +4904,20 @@ def _kernel_scratch_size_bytes(
         return int(size_expression) if size_expression >= 0 else None
     if isinstance(size_expression, str) and size_expression.strip():
         symbols = {
-            "R": values.get("_m", values.get("seq_len")),
-            "H": values.get("embed_dim", values.get("hidden_size")),
-            "I": values.get(
-                "moe_intermediate_size", values.get("intermediate_size")
+            "R": values.get("R", values.get("_m", values.get("seq_len"))),
+            "H": values.get(
+                "H", values.get("embed_dim", values.get("hidden_size"))
             ),
-            "E": values.get("n_routed_experts", values.get("num_experts")),
-            "K": values.get("experts_per_tok", values.get("num_experts_per_tok")),
+            "I": values.get(
+                "I",
+                values.get("moe_intermediate_size", values.get("intermediate_size")),
+            ),
+            "E": values.get(
+                "E", values.get("n_routed_experts", values.get("num_experts"))
+            ),
+            "K": values.get(
+                "K", values.get("experts_per_tok", values.get("num_experts_per_tok"))
+            ),
         }
 
         def _row_bytes(extent: int, block_elements: int, block_bytes: int) -> int:
@@ -7736,8 +7743,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     "group_limited_topk_router": ["moe_router_bias"],
     "moe_relu2_expert_mlp": ["moe_expert_up", "moe_expert_down"],
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
-    "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_up", "moe_expert_down"],
-    "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
+    "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_gate_scale", "moe_expert_up", "moe_expert_up_scale", "moe_expert_down", "moe_expert_down_scale"],
+    "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_gate_scale", "moe_shared_up", "moe_shared_up_scale", "moe_shared_down", "moe_shared_down_scale"],
     "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
     "kv_a_proj": ["mla_kv_a_proj"],
@@ -10639,11 +10646,17 @@ WEIGHT_PATTERNS = {
     "moe_router": ["layer.{L}.moe_router"],
     "moe_router_bias": ["layer.{L}.moe_router_bias"],
     "moe_expert_gate": ["layer.{L}.moe_expert_gate", "layer.{L}.moe_expert.{E}.gate"],
+    "moe_expert_gate_scale": ["layer.{L}.moe_expert_gate_scale"],
     "moe_expert_up": ["layer.{L}.moe_expert_up", "layer.{L}.moe_expert.{E}.up"],
+    "moe_expert_up_scale": ["layer.{L}.moe_expert_up_scale"],
     "moe_expert_down": ["layer.{L}.moe_expert_down", "layer.{L}.moe_expert.{E}.down"],
+    "moe_expert_down_scale": ["layer.{L}.moe_expert_down_scale"],
     "moe_shared_gate": ["layer.{L}.moe_shared_gate"],
+    "moe_shared_gate_scale": ["layer.{L}.moe_shared_gate_scale"],
     "moe_shared_up": ["layer.{L}.moe_shared_up"],
+    "moe_shared_up_scale": ["layer.{L}.moe_shared_up_scale"],
     "moe_shared_down": ["layer.{L}.moe_shared_down"],
+    "moe_shared_down_scale": ["layer.{L}.moe_shared_down_scale"],
     "moe_shared_router": ["layer.{L}.moe_shared_router"],
 
     # Output projection
@@ -10827,8 +10840,8 @@ TEMPLATE_OP_WEIGHTS = {
     "group_limited_topk_router": ["moe_router_bias"],
     "moe_relu2_expert_mlp": ["moe_expert_up", "moe_expert_down"],
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
-    "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_up", "moe_expert_down"],
-    "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
+    "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_gate_scale", "moe_expert_up", "moe_expert_up_scale", "moe_expert_down", "moe_expert_down_scale"],
+    "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_gate_scale", "moe_shared_up", "moe_shared_up_scale", "moe_shared_down", "moe_shared_down_scale"],
     "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
     "kv_a_proj": ["mla_kv_a_proj"],

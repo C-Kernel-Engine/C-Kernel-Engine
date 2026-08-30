@@ -836,6 +836,12 @@ MAKE_TARGETS = {
         "target": "test-numerical-contracts",
         "timeout_sec": 300,
     },
+    "v8_command_a_plus_nvfp4": {
+        "name": "Command A+ Native NVFP4 / X-ray Contracts",
+        "category": "parity",
+        "target": "test-v8-command-a-plus-nvfp4",
+        "timeout_sec": 300,
+    },
     "v8_xray_contracts": {
         "name": "v8 Numerical X-ray Contracts",
         "category": "bf16",
@@ -1077,6 +1083,7 @@ NIGHTLY_PROFILES = {
         "v8_kernel_map_contracts",
         "v8_model_memory_plans",
         "v8_numerical_contracts",
+        "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",
         "v8_template_circuit_audit",
         "v8_architecture_contracts",

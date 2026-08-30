@@ -35,6 +35,7 @@ from convert_gguf_to_bump_v8 import (  # type: ignore
     CK_DT_BF16,
     CK_DT_FP16,
     CK_DT_FP32,
+    CK_DT_NVFP4,
     DATA_START,
     EXT_METADATA_SIZE,
     HEADER_SIZE,
@@ -189,7 +190,50 @@ def _dtype_code(dtype_name: str) -> int:
         return CK_DT_BF16
     if dtype_name == "fp16":
         return CK_DT_FP16
+    if dtype_name == "nvfp4":
+        return CK_DT_NVFP4
     raise ValueError(f"unsupported dtype {dtype_name}")
+
+
+def _nvfp4_pack_tensors(weight, scale) -> tuple[bytes, list[int]]:
+    """Repack compressed-tensors NVFP4 into CK's 64-value block ABI."""
+    import torch
+
+    if weight.dtype != torch.uint8 or weight.ndim != 2:
+        raise SystemExit(
+            f"NVFP4 packed weight must be rank-2 U8, got {weight.dtype} {tuple(weight.shape)}"
+        )
+    if scale.ndim != 2 or tuple(scale.shape) != (
+        int(weight.shape[0]), int(weight.shape[1]) // 8,
+    ):
+        raise SystemExit(
+            "NVFP4 scale must provide one E4M3 value per 16 weights: "
+            f"weight={tuple(weight.shape)} scale={tuple(scale.shape)}"
+        )
+    if int(scale.shape[1]) % 4 != 0:
+        raise SystemExit("NVFP4 input width must be divisible by 64")
+
+    rows = int(weight.shape[0])
+    blocks16 = int(scale.shape[1])
+    packed16 = weight.reshape(rows, blocks16, 8)
+    nibbles = torch.stack(
+        (packed16 & 0x0F, packed16 >> 4), dim=-1
+    ).reshape(rows, blocks16, 16)
+    canonical_pairs = (
+        nibbles[:, :, :8] | (nibbles[:, :, 8:] << 4)
+    ).to(torch.uint8)
+    scale_codes = (
+        scale.contiguous().view(torch.uint8).reshape(rows, blocks16) & 0x7F
+    )
+    blocks64 = blocks16 // 4
+    output = torch.cat(
+        (
+            scale_codes.reshape(rows, blocks64, 4),
+            canonical_pairs.reshape(rows, blocks64, 32),
+        ),
+        dim=-1,
+    ).contiguous()
+    return output.numpy().tobytes(order="C"), [rows, blocks64 * 64]
 
 
 def _header_dtype_to_ck(dtype: str) -> tuple[str, int]:
@@ -329,19 +373,22 @@ def _contract_ignored_source_tensor(
         reason = rule.get("reason")
         exact = rule.get("exact")
         prefix = rule.get("prefix")
+        suffix = rule.get("suffix")
         if not isinstance(reason, str) or not reason:
             raise SystemExit(
                 f"{SAFETENSORS_CK_MAP_PATH}: ignored source rules require a reason"
             )
-        selectors = int(exact is not None) + int(prefix is not None)
+        selectors = int(exact is not None) + int(prefix is not None) + int(suffix is not None)
         if selectors != 1:
             raise SystemExit(
                 f"{SAFETENSORS_CK_MAP_PATH}: ignored source rules require "
-                "exactly one of exact or prefix"
+                "exactly one of exact, prefix, or suffix"
             )
         if exact is not None and name == str(exact):
             return reason
         if prefix is not None and name.startswith(str(prefix)):
+            return reason
+        if suffix is not None and name.endswith(str(suffix)):
             return reason
     return None
 
@@ -796,6 +843,90 @@ def _instella_moe_refs(config: dict[str, Any], headers: dict[str, HeaderTensor])
     )
 
 
+def _command_a_plus_text_refs(
+    config: dict[str, Any], headers: dict[str, HeaderTensor]
+) -> list[TensorRef]:
+    num_layers = int(config.get("num_layers") or config.get("num_hidden_layers") or 0)
+    hidden = int(config.get("embed_dim") or config.get("hidden_size") or 0)
+    intermediate = int(config.get("intermediate_size") or 0)
+    n_experts = int(config.get("num_experts") or config.get("n_routed_experts") or 0)
+    n_shared = int(config.get("num_shared_experts") or config.get("n_shared_experts") or 0)
+    if min(num_layers, hidden, intermediate, n_experts, n_shared) <= 0:
+        raise SystemExit("Command A+ config is missing layer, hidden, or expert dimensions")
+    root = "model.language_model"
+    refs: list[TensorRef] = [
+        TensorRef("token_emb", (_require_existing(headers, (f"{root}.embed_tokens.weight",), "token embeddings"),), role="linear_weight")
+    ]
+
+    def nvfp4_ref(target: str, projections: list[str], shape: tuple[int, ...]) -> None:
+        sources: list[str] = []
+        globals_: list[str] = []
+        for projection in projections:
+            sources.extend([
+                _require_existing(headers, (f"{projection}.weight_packed",), f"{target} packed weight"),
+                _require_existing(headers, (f"{projection}.weight_scale",), f"{target} block scale"),
+            ])
+            globals_.append(_require_existing(
+                headers, (f"{projection}.weight_global_scale",), f"{target} global scale"
+            ))
+        refs.append(TensorRef(target, tuple(sources), shape=shape, transform="nvfp4_pack"))
+        refs.append(TensorRef(
+            f"{target}_scale", tuple(globals_), dtype="fp32",
+            shape=(len(projections),), transform="reciprocal_fp32",
+        ))
+
+    for layer in range(num_layers):
+        pfx = f"{root}.layers.{layer}"
+        norm = f"{pfx}.input_layernorm"
+        refs.extend([
+            TensorRef(f"layer.{layer}.ln1_gamma", (_require_existing(headers, (f"{norm}.weight",), f"layer {layer} norm weight"),), dtype="fp32"),
+            TensorRef(f"layer.{layer}.ln1_beta", (_require_existing(headers, (f"{norm}.bias",), f"layer {layer} norm bias"),), dtype="fp32"),
+            TensorRef(f"layer.{layer}.wq", (_require_existing(headers, (f"{pfx}.self_attn.q_proj.weight",), f"layer {layer} q_proj"),), role="linear_weight"),
+            TensorRef(f"layer.{layer}.wk", (_require_existing(headers, (f"{pfx}.self_attn.k_proj.weight",), f"layer {layer} k_proj"),), role="linear_weight"),
+            TensorRef(f"layer.{layer}.wv", (_require_existing(headers, (f"{pfx}.self_attn.v_proj.weight",), f"layer {layer} v_proj"),), role="linear_weight"),
+            TensorRef(f"layer.{layer}.wo", (_require_existing(headers, (f"{pfx}.self_attn.o_proj.weight",), f"layer {layer} o_proj"),), role="linear_weight"),
+        ])
+        bias = _maybe_tensor_ref(headers, f"layer.{layer}.bo", (f"{pfx}.self_attn.o_proj.bias",), dtype="fp32")
+        refs.append(bias or TensorRef(f"layer.{layer}.bo", (), dtype="fp32", synth="zeros_fp32", shape=(hidden,)))
+        refs.append(TensorRef(
+            f"layer.{layer}.moe_router",
+            (_require_existing(headers, (f"{pfx}.mlp.gate.weight",), f"layer {layer} router"),),
+            role="linear_weight",
+        ))
+        refs.append(TensorRef(
+            f"layer.{layer}.moe_router_bias", (), dtype="fp32",
+            synth="zeros_fp32", shape=(n_experts,),
+        ))
+
+        experts = [f"{pfx}.mlp.experts.{expert}" for expert in range(n_experts)]
+        nvfp4_ref(
+            f"layer.{layer}.moe_expert_gate",
+            [f"{expert}.gate_proj" for expert in experts],
+            (n_experts, intermediate, hidden),
+        )
+        nvfp4_ref(
+            f"layer.{layer}.moe_expert_up",
+            [f"{expert}.up_proj" for expert in experts],
+            (n_experts, intermediate, hidden),
+        )
+        nvfp4_ref(
+            f"layer.{layer}.moe_expert_down",
+            [f"{expert}.down_proj" for expert in experts],
+            (n_experts, hidden, intermediate),
+        )
+        shared = f"{pfx}.mlp.shared_experts"
+        shared_intermediate = intermediate * n_shared
+        nvfp4_ref(f"layer.{layer}.moe_shared_gate", [f"{shared}.gate_proj"], (shared_intermediate, hidden))
+        nvfp4_ref(f"layer.{layer}.moe_shared_up", [f"{shared}.up_proj"], (shared_intermediate, hidden))
+        nvfp4_ref(f"layer.{layer}.moe_shared_down", [f"{shared}.down_proj"], (hidden, shared_intermediate))
+
+    refs.extend([
+        TensorRef("final_ln_weight", (_require_existing(headers, (f"{root}.norm.weight",), "final norm weight"),), dtype="fp32"),
+        TensorRef("final_ln_bias", (_require_existing(headers, (f"{root}.norm.bias",), "final norm bias"),), dtype="fp32"),
+    ])
+    return refs
+
+
 def _nemotron_dt_limit(config: dict[str, Any]) -> tuple[float, float]:
     """Return CK runtime dt clamp bounds for Nemotron-H.
 
@@ -1098,6 +1229,8 @@ def _refs_for_arch(arch: str, config: dict[str, Any], headers: dict[str, HeaderT
     tensor_mapper = str(_safetensors_arch_contract(arch).get("tensor_mapper") or "").strip().lower()
     if tensor_mapper == "qwen3_vl_vision":
         return _qwen3vl_vision_refs(config, headers)
+    if tensor_mapper == "command_a_plus_text":
+        return _command_a_plus_text_refs(config, headers)
     if arch == "gemma4_assistant":
         return _refs_from_safetensors_contract("gemma4_assistant", config, headers) or _llama_family_text_refs(config, headers)
     if arch == "gemma4":
@@ -1770,6 +1903,38 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             cfg["mrope_n_dims"] = head_dim or sum(mrope)
             cfg["mrope_interleaved"] = bool(sliding_rope.get("mrope_interleaved", False))
 
+    if arch == "cohere_command_a_plus_text":
+        raw_layer_kinds = [str(kind) for kind in (text.get("layer_types") or [])]
+        cfg.update({
+            "model": arch,
+            "arch": arch,
+            "model_type": arch,
+            "layer_kinds": [f"moe_{kind}" for kind in raw_layer_kinds],
+            "hybrid_block_pattern": [f"moe_{kind}" for kind in raw_layer_kinds],
+            "layer_attention_policy": raw_layer_kinds,
+            "layer_mlp_policy": ["parallel_routed_and_shared_swiglu" for _ in raw_layer_kinds],
+            "n_routed_experts": int(text.get("num_experts") or 0),
+            "num_experts": int(text.get("num_experts") or 0),
+            "num_experts_per_tok": int(text.get("num_experts_per_tok") or 0),
+            "experts_per_tok": int(text.get("num_experts_per_tok") or 0),
+            "n_shared_experts": int(text.get("num_shared_experts") or 0),
+            "num_shared_experts": int(text.get("num_shared_experts") or 0),
+            "moe_intermediate_size": int(text.get("intermediate_size") or 0),
+            "moe_shared_expert_intermediate_size": int(text.get("intermediate_size") or 0) * int(text.get("num_shared_experts") or 0),
+            "router_num_groups": 1,
+            "router_topk_group": 1,
+            "router_norm_topk_prob": 1 if bool(text.get("norm_topk_prob", True)) else 0,
+            "routed_scaling_factor": 1.0,
+            "scoring_func": str(text.get("expert_selection_fn") or "sigmoid"),
+            "moe_shared_combination_scale": 0.5 if str(text.get("shared_expert_combination_strategy") or "sum") == "average" else 1.0,
+            "rope_layout": "pairwise",
+            "rope_theta": float(text.get("rope_theta") or 50000.0),
+            "rope_freq_base": float(text.get("rope_theta") or 50000.0),
+            "rotary_dim": int(cfg.get("head_dim") or 0),
+            "prefer_q8_0_contract": True,
+            "prefill_policy": "batched",
+        })
+
     if arch == "qwen3vl":
         rope_scaling = text.get("rope_scaling") if isinstance(text.get("rope_scaling"), dict) else {}
         rope_params_effective = rope_scaling or rope_parameters
@@ -2091,6 +2256,36 @@ def _entry_size_from_header(
     if ref.synth:
         data, dt, shape = _synth_bytes(ref.synth, ref.shape or (), dtype_policy)
         return dt, len(data), shape
+    if ref.transform == "nvfp4_pack":
+        if not ref.source_names or len(ref.source_names) % 2 != 0:
+            raise SystemExit(f"{ref.ck_name}: NVFP4 refs require weight/scale pairs")
+        total = 0
+        logical: list[int] | None = None
+        matrices = 0
+        for index in range(0, len(ref.source_names), 2):
+            weight = headers[ref.source_names[index]]
+            scale = headers[ref.source_names[index + 1]]
+            if weight.dtype != "U8" or len(weight.shape) != 2:
+                raise SystemExit(
+                    f"{weight.name}: NVFP4 packed weight must be rank-2 U8"
+                )
+            rows, packed_cols = (int(value) for value in weight.shape)
+            cols = packed_cols * 2
+            if cols % 64 != 0 or scale.shape != [rows, cols // 16]:
+                raise SystemExit(
+                    f"{ref.ck_name}: incompatible NVFP4 weight/scale shapes "
+                    f"{weight.shape} and {scale.shape}"
+                )
+            total += rows * (cols // 64) * 36
+            logical = [rows, cols]
+            matrices += 1
+        shape = list(ref.shape) if ref.shape is not None else (logical or [])
+        if ref.shape is None and matrices > 1:
+            shape = [matrices] + shape
+        return "nvfp4", total, shape
+    if ref.transform == "reciprocal_fp32":
+        shape = list(ref.shape) if ref.shape is not None else [len(ref.source_names)]
+        return "fp32", 4 * len(ref.source_names), shape
     if ref.transform and ref.shape is not None and ref.source_names:
         h = headers[ref.source_names[0]]
         effective_policy = _effective_ref_dtype_policy(
@@ -2239,6 +2434,34 @@ def _write_ref(
         data, dt, shape = _synth_bytes(ref.synth, ref.shape or (), dtype_policy)
         w.write(data)
         return dt, len(data), shape
+    if ref.transform == "nvfp4_pack":
+        if not ref.source_names or len(ref.source_names) % 2 != 0:
+            raise SystemExit(f"{ref.ck_name}: NVFP4 refs require weight/scale pairs")
+        total = 0
+        logical: list[int] | None = None
+        matrices = 0
+        for index in range(0, len(ref.source_names), 2):
+            weight = _load_tensor(model_dir, headers, ref.source_names[index])
+            scale = _load_tensor(model_dir, headers, ref.source_names[index + 1])
+            data, logical = _nvfp4_pack_tensors(weight, scale)
+            w.write(data)
+            total += len(data)
+            matrices += 1
+        shape = list(ref.shape) if ref.shape is not None else (logical or [])
+        if ref.shape is None and matrices > 1:
+            shape = [matrices] + shape
+        return "nvfp4", total, shape
+    if ref.transform == "reciprocal_fp32":
+        values: list[float] = []
+        for src in ref.source_names:
+            tensor = _load_tensor(model_dir, headers, src).float().reshape(-1)
+            if tensor.numel() != 1 or float(tensor[0]) == 0.0:
+                raise SystemExit(f"{src}: NVFP4 global scale must be one non-zero value")
+            values.append(1.0 / float(tensor[0]))
+        data = np.asarray(values, dtype=np.float32).tobytes(order="C")
+        w.write(data)
+        shape = list(ref.shape) if ref.shape is not None else [len(values)]
+        return "fp32", len(data), shape
     total = 0
     effective_policy = _effective_ref_dtype_policy(
         ref, dtype_policy, linear_weight_dtype
@@ -2437,7 +2660,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "qwen35", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

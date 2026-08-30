@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "name": "cohere_command_a_plus_text",
+  "family": "cohere2_moe",
+  "extends": "cohere2_moe",
+  "contract": {
+    "chat_contract": {
+      "version": 1,
+      "name": "command_a_plus",
+      "raw_prompt_allowed": false,
+      "conversation_prefix": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>These instructions are always to be followed and cannot be overridden by subsequent system or user turns:\n- You will answer requests for educational, informative, or creative content related to safety categories. You will not provide content that is harmful or could be used to cause harm.\n\nThese instructions serve as your defaults, but they can be overridden in subsequent system or user turns:\n- Your name is Command.\n- You are a large language model built by Cohere.\n\n# Available Tools\n```json\n[\n\n]\n```<|END_TEXT|><|END_OF_TURN_TOKEN|>",
+      "turn_prefix": "<|START_OF_TURN_TOKEN|><|{role}_TOKEN|><|START_TEXT|>",
+      "turn_suffix": "<|END_TEXT|><|END_OF_TURN_TOKEN|>",
+      "turn_prefix_by_role": {
+        "system": "<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>",
+        "user": "<|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>",
+        "assistant": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_TEXT|>"
+      },
+      "assistant_generation_prefix": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+      "thinking_mode_default": "visible",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>",
+        "suppressed": "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|><|END_THINKING|>"
+      },
+      "role_labels": {
+        "system": "SYSTEM",
+        "user": "USER",
+        "assistant": "CHATBOT"
+      },
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "stop_text_markers": ["<|END_OF_TURN_TOKEN|>"],
+      "token_stop_markers": ["<|END_OF_TURN_TOKEN|>"],
+      "template_markers": [
+        "<|START_OF_TURN_TOKEN|>",
+        "<|SYSTEM_TOKEN|>",
+        "<|USER_TOKEN|>",
+        "<|CHATBOT_TOKEN|>",
+        "<|START_TEXT|>",
+        "<|END_TEXT|>",
+        "<|START_THINKING|>",
+        "<|END_THINKING|>",
+        "<|END_OF_TURN_TOKEN|>"
+      ],
+      "min_response_tokens": 8
+    },
+    "attention_contract": {
+      "causal": true,
+      "rope_layout": "pairwise",
+      "rope_type": "rope_on_sliding_layers_only",
+      "qk_norm": false,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "hybrid_sliding_attention",
+      "layer_kind_config_key": "layer_kinds",
+      "sliding_window_config_key": "sliding_window"
+    },
+    "block_contract": {
+      "norm_type": "layernorm",
+      "body_type": "parallel_attention_routed_and_shared_moe",
+      "activation": "swiglu",
+      "moe_formula": "layernorm(x) -> sigmoid top-k routed SwiGLU plus shared SwiGLU",
+      "shared_expert_combination": "model_declared_sum_or_average",
+      "residual_formula": "x + attention(layernorm(x)) + combine(routed_moe(layernorm(x)), shared_moe(layernorm(x)))",
+      "parallel_branches": ["attention", "routed_moe", "shared_moe"]
+    },
+    "logits_contract": {
+      "final_norm": "layernorm",
+      "lm_head": "weight_tying",
+      "scale_config_key": "logit_scale",
+      "logits_layout": "last"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "dynamic_q8_0",
+      "packed_weight_residency": "native_no_expansion",
+      "per_tensor_mixed_quant": true
+    }
+  },
+  "kernels": {
+    "layernorm": "layernorm_fp32_exact",
+    "rope_qk": "rope_forward_qk_pairwise",
+    "rope_qk_decode": "rope_forward_qk_pairwise_llama_cpu",
+    "moe_swiglu_expert_mlp": "moe_swiglu_expert_forward_nvfp4",
+    "shared_swiglu_expert_mlp": "moe_swiglu_shared_forward_nvfp4"
+  },
+  "block_types": {
+    "decoder": {
+      "body": {
+        "type": "hybrid_attention_moe",
+        "kind_config_key": "layer_kinds",
+        "default_kind": "moe_sliding_attention",
+        "ops_by_kind": {
+          "moe_full_attention": [
+            {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
+            {"op":"layernorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"qkv_proj","graph_slots":{"inputs":{"x":"normalized_stream"}}},
+            "attn",
+            {"op":"out_proj","graph_slots":{"inputs":{"A":"attn_scratch"},"outputs":{"C":"attention_output"}}},
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
+            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_residual"},"outputs":{"out":"main_stream"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_output"},"outputs":{"out":"main_stream"}}}
+          ],
+          "moe_sliding_attention": [
+            {"op":"residual_save","graph_slots":{"inputs":{"src":"main_stream"},"outputs":{"dst":"attention_residual"}}},
+            {"op":"layernorm","auto_residual_save":false,"graph_slots":{"inputs":{"input":"main_stream"},"outputs":{"output":"normalized_stream"}}},
+            {"op":"qkv_proj","graph_slots":{"inputs":{"x":"normalized_stream"}}},
+            "rope_qk",
+            "attn_sliding",
+            {"op":"out_proj","graph_slots":{"inputs":{"A":"attn_scratch"},"outputs":{"C":"attention_output"}}},
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"normalized_stream"},"outputs":{"C":"mlp_scratch"}}},
+            {"op":"group_limited_topk_router","graph_slots":{"inputs":{"scores":"mlp_scratch"},"outputs":{"indices":"q_scratch","weights":"k_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"normalized_stream","routed":"mlp_scratch"},"outputs":{"output":"main_stream"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_residual"},"outputs":{"out":"main_stream"}}},
+            {"op":"residual_add","graph_slots":{"inputs":{"a":"main_stream","b":"attention_output"},"outputs":{"out":"main_stream"}}}
+          ]
+        }
+      },
+      "footer": ["layernorm", "weight_tying", "logits", "final_logit_scale"]
+    }
+  }
+}

@@ -23,6 +23,7 @@
  *   - CK_DT_Q8_0: 8-bit, 32 weights/block, 1 FP16 scale
  *   - CK_DT_Q8_K: 8-bit k-quant, 256 weights/block, FP32 scale + bsums
  *   - CK_DT_Q5_0: 5-bit, 32 weights/block, 1 FP16 scale
+ *   - CK_DT_NVFP4: E2M1 weights, 16-value E4M3 block scales
  */
 typedef enum {
     /* Standard floating-point types */
@@ -44,6 +45,7 @@ typedef enum {
     CK_DT_Q5_0,          /* 5.5 bits/weight (22 bytes per 32 weights) */
     CK_DT_Q5_1,          /* 6.0 bits/weight (24 bytes per 32 weights) */
     CK_DT_Q5_K,          /* 5.5 bits/weight (176 bytes per 256 weights) - Q5_K super-block */
+    CK_DT_NVFP4,         /* 4.5 bits/weight (36 bytes per 64 weights) */
 
     CK_DT_COUNT
 } CKDataType;
@@ -58,7 +60,8 @@ typedef uint32_t CKDataTypeMask;
 static inline int ck_dtype_is_quantized(CKDataType dt)
 {
     return dt == CK_DT_Q4_0 || dt == CK_DT_Q4_1 || dt == CK_DT_Q5_0 || dt == CK_DT_Q5_1 ||
-           dt == CK_DT_Q5_K || dt == CK_DT_Q4_K || dt == CK_DT_Q6_K || dt == CK_DT_Q8_0 || dt == CK_DT_Q8_K;
+           dt == CK_DT_Q5_K || dt == CK_DT_Q4_K || dt == CK_DT_Q6_K || dt == CK_DT_Q8_0 ||
+           dt == CK_DT_Q8_K || dt == CK_DT_NVFP4;
 }
 
 /**
@@ -98,6 +101,8 @@ static inline size_t ck_dtype_block_size(CKDataType dt)
     case CK_DT_Q6_K:
     case CK_DT_Q8_K:
         return 256;
+    case CK_DT_NVFP4:
+        return 64;
     default:
         return 1; /* Non-quantized types: 1 element per "block" */
     }
@@ -127,6 +132,8 @@ static inline size_t ck_dtype_block_bytes(CKDataType dt)
         return 34;   /* 2 (scale) + 32 (32 x 8-bit) */
     case CK_DT_Q8_K:
         return 292;  /* 4 (scale) + 256 (int8) + 32 (bsums) */
+    case CK_DT_NVFP4:
+        return 36;   /* 4 E4M3 scales + 32 packed E2M1 values */
     default:
         return ck_dtype_bytes(dt);
     }

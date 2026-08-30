@@ -770,6 +770,61 @@
       ],
       "notes": "North Micro Vision uses the reusable Qwen3-VL-derived vision tensor ABI with its own circuit identity and Cohere Compass composition contract."
     },
+    "cohere_command_a_plus_text": {
+      "template": "cohere_command_a_plus_text",
+      "family": "cohere2_moe",
+      "aliases": [
+        "cohere2_moe",
+        "Cohere2MoeForCausalLM"
+      ],
+      "status": "native_nvfp4_text_decoder_mapping",
+      "config_builder": "cohere2_text",
+      "tensor_mapper": "command_a_plus_text",
+      "config": {
+        "model": "cohere_command_a_plus_text",
+        "arch": "cohere_command_a_plus_text",
+        "model_type": "cohere_command_a_plus_text",
+        "artifact_scope": "decoder_only",
+        "prefill_policy": "batched"
+      },
+      "ignored_source_tensors": [
+        {
+          "prefix": "model.vision_tower.",
+          "reason": "vision_tower_not_in_decoder_artifact"
+        },
+        {
+          "prefix": "model.multi_modal_projector.",
+          "reason": "vision_projector_not_in_decoder_artifact"
+        },
+        {
+          "suffix": ".input_global_scale",
+          "reason": "native_cpu_provider_uses_dynamic_q8_0_activations"
+        },
+        {
+          "suffix": ".rotary_emb.inv_freq",
+          "reason": "rope_frequencies_derived_from_runtime_contract"
+        }
+      ],
+      "required_tensor_patterns": [
+        "model.language_model.embed_tokens.weight",
+        "model.language_model.layers.{L}.input_layernorm.weight",
+        "model.language_model.layers.{L}.input_layernorm.bias",
+        "model.language_model.layers.{L}.self_attn.q_proj.weight",
+        "model.language_model.layers.{L}.self_attn.k_proj.weight",
+        "model.language_model.layers.{L}.self_attn.v_proj.weight",
+        "model.language_model.layers.{L}.self_attn.o_proj.weight",
+        "model.language_model.layers.{L}.mlp.gate.weight",
+        "model.language_model.layers.{L}.mlp.experts.{E}.gate_proj.weight_packed",
+        "model.language_model.layers.{L}.mlp.experts.{E}.up_proj.weight_packed",
+        "model.language_model.layers.{L}.mlp.experts.{E}.down_proj.weight_packed",
+        "model.language_model.layers.{L}.mlp.shared_experts.gate_proj.weight_packed",
+        "model.language_model.layers.{L}.mlp.shared_experts.up_proj.weight_packed",
+        "model.language_model.layers.{L}.mlp.shared_experts.down_proj.weight_packed",
+        "model.language_model.norm.weight",
+        "model.language_model.norm.bias"
+      ],
+      "notes": "Command A+ decoder map. NVFP4 expert projections remain packed; attention, routing, embeddings, and LayerNorm tensors retain checkpoint precision."
+    },
     "qwen3vl": {
       "template": "qwen3vl",
       "family": "qwen3_vl",
