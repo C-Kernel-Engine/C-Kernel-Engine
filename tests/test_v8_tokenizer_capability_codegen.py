@@ -158,6 +158,24 @@ class TestV8TokenizerCapabilityCodegen(unittest.TestCase):
         self.assertIn("return (g_model && g_model->tokenizer) ? 1 : 0;", c_code)
         self.assertIn('printf("[Tokenizer] Registered special: %s -> %d\\n",', str(generated["init"]))
 
+    def test_bpe_codegen_applies_declared_pretokenizer_profile(self) -> None:
+        generated = build_ir_v8._generate_tokenizer_c_code(
+            "bpe",
+            vocab_size=256,
+            num_merges=0,
+            special_tokens={"add_bos_token": False, "add_eos_token": False},
+            tokenizer_contract={
+                "tokenizer_type": "bpe",
+                "pretokenizer": "unicode_split_isolated",
+            },
+        )
+        self.assertIsNotNone(generated)
+        init = str(generated["init"])
+        self.assertIn(
+            "cfg.pretokenizer = CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED;",
+            init,
+        )
+
     def test_sentencepiece_exports_text_encode_capability(self) -> None:
         generated = build_ir_v8._generate_tokenizer_c_code(
             "sentencepiece",

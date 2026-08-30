@@ -810,8 +810,43 @@ def inspect_tokenizer_json(path: str) -> dict[str, object]:
     model_type = _normalize_tokenizer_type_name(model.get("type"))
     return {
         "model_type": model_type,
+        "pretokenizer": _tokenizer_pretokenizer_profile(data),
         "path": str(path),
     }
+
+
+def _tokenizer_pretokenizer_profile(data: dict) -> Optional[str]:
+    """Classify reusable pretokenizer semantics without naming a model family."""
+    pre = data.get("pre_tokenizer")
+    if not isinstance(pre, dict) or pre.get("type") != "Sequence":
+        return None
+    rows = pre.get("pretokenizers")
+    if not isinstance(rows, list) or len(rows) < 2:
+        return None
+
+    split_patterns: list[str] = []
+    has_byte_level = False
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("type") == "ByteLevel" and row.get("use_regex") is False:
+            has_byte_level = True
+        if row.get("type") != "Split" or row.get("behavior") != "Isolated":
+            continue
+        pattern = row.get("pattern")
+        if isinstance(pattern, dict) and isinstance(pattern.get("Regex"), str):
+            split_patterns.append(pattern["Regex"])
+
+    # This profile isolates punctuation from adjacent words and emits number
+    # boundaries before byte-level BPE. It is used by multiple modern
+    # tokenizer.json checkpoints and is distinct from the GPT-2 regex policy.
+    if (
+        has_byte_level
+        and any("\\p{N}{1,3}" in pattern for pattern in split_patterns)
+        and any("\\p{Lu}" in pattern and "\\p{Ll}" in pattern for pattern in split_patterns)
+    ):
+        return "unicode_split_isolated"
+    return None
 
 
 def _apply_tokenizer_contract_overrides(template_data: dict, tokenizer_type: Optional[str]) -> dict:
@@ -4291,6 +4326,9 @@ def main() -> None:
                 "source": "tokenizer_json",
                 "path": str(tokenizer_json_path),
             }
+            pretokenizer = tokenizer_json_info.get("pretokenizer") if tokenizer_json_info else None
+            if isinstance(pretokenizer, str) and pretokenizer:
+                tokenizer_contract["pretokenizer"] = pretokenizer
             print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from tokenizer.json")
         else:
             # Try to extract tokenizer directly from GGUF metadata

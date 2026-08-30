@@ -2526,6 +2526,9 @@ def _tokenizer_payloads_from_json(model_dir: Path, vocab_size: int) -> tuple[lis
         "source": "tokenizer_json",
         "path": str(tok_path),
     }
+    pretokenizer = info.get("pretokenizer")
+    if isinstance(pretokenizer, str) and pretokenizer:
+        contract["pretokenizer"] = pretokenizer
     special = _special_tokens_from_tokenizer_config(model_dir, tok_type)
     return payloads, contract, special
 

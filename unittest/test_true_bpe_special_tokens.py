@@ -69,10 +69,26 @@ lib.ck_true_bpe_decode.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_in
 lib.ck_true_bpe_detect_space_style.restype = ctypes.c_int
 lib.ck_true_bpe_detect_space_style.argtypes = [ctypes.c_void_p]
 
+
+class CKBPEConfig(ctypes.Structure):
+    _fields_ = [
+        ("add_bos", ctypes.c_bool),
+        ("add_eos", ctypes.c_bool),
+        ("byte_fallback", ctypes.c_bool),
+        ("space_prefix_style", ctypes.c_int),
+        ("pretokenizer", ctypes.c_int),
+    ]
+
+
+lib.ck_true_bpe_set_config.restype = None
+lib.ck_true_bpe_set_config.argtypes = [ctypes.c_void_p, ctypes.POINTER(CKBPEConfig)]
+
 lib.ck_true_bpe_vocab_size.restype = ctypes.c_size_t
 lib.ck_true_bpe_vocab_size.argtypes = [ctypes.c_void_p]
 
 CK_SPACE_PREFIX_SPM = 2
+CK_SPACE_PREFIX_GPT2 = 1
+CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED = 1
 REQUIRE_HF_ORACLE = os.environ.get("CK_TOKENIZER_REQUIRE_HF_ORACLE") == "1"
 _HF_TOKENIZER = None
 
@@ -194,6 +210,31 @@ def test_late_spm_space_prefix_detection():
             return False
 
         print("PASS: Late SPM marker is detected and decoded as space")
+        return True
+    finally:
+        lib.ck_true_bpe_free(bpe)
+
+
+def test_unicode_isolated_pretokenizer_keeps_punctuation_out_of_word_merges():
+    print("\nTest: Unicode Isolated Pretokenizer Boundaries")
+    print("-" * 60)
+    bpe = lib.ck_true_bpe_create()
+    if not bpe:
+        return False
+    try:
+        for token, token_id in (("_", 0), ("a", 1), ("_a", 2)):
+            if lib.ck_true_bpe_add_token(bpe, token.encode("utf-8"), token_id, 0.0) != 0:
+                return False
+        if lib.ck_true_bpe_add_merge(bpe, 0, 1, 2, 0) != 0:
+            return False
+        cfg = CKBPEConfig(False, False, True, CK_SPACE_PREFIX_GPT2,
+                          CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED)
+        lib.ck_true_bpe_set_config(bpe, ctypes.byref(cfg))
+        ids = encode_c(bpe, "_a")
+        if ids != [0, 1]:
+            print(f"FAIL: Expected isolated '_' and 'a', got {ids}")
+            return False
+        print("PASS: Punctuation cannot merge across the declared split boundary")
         return True
     finally:
         lib.ck_true_bpe_free(bpe)
@@ -507,6 +548,7 @@ def main():
     results.append(("GPT-2 Byte Decoding", test_gpt2_byte_decoding()))
     results.append(("Exhaustive GPT-2 Byte Table", test_exhaustive_gpt2_byte_table()))
     results.append(("Late SPM Space Prefix Detection", test_late_spm_space_prefix_detection()))
+    results.append(("Unicode Isolated Pretokenizer", test_unicode_isolated_pretokenizer_keeps_punctuation_out_of_word_merges()))
     results.append(("Chat Template Encoding", test_chat_template_encoding()))
 
     # Summary

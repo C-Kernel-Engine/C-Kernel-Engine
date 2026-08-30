@@ -188,6 +188,49 @@ def _write_tiny_bpe_tokenizer(checkpoint: Path, vocab_size: int) -> None:
         encoding="utf-8",
     )
 
+
+def test_tokenizer_contract_preserves_unicode_isolated_split_profile(tmp_path: Path) -> None:
+    converter = _load_converter()
+    checkpoint = tmp_path / "tokenizer_profile"
+    checkpoint.mkdir()
+    _write_tiny_bpe_tokenizer(checkpoint, vocab_size=32)
+    path = checkpoint / "tokenizer.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["pre_tokenizer"] = {
+        "type": "Sequence",
+        "pretokenizers": [
+            {
+                "type": "Split",
+                "pattern": {"Regex": r"\d{1,3}(?=(?:\d{3})*\b)"},
+                "behavior": "Isolated",
+                "invert": False,
+            },
+            {
+                "type": "Split",
+                "pattern": {
+                    "Regex": r"[^\r\n\p{L}\p{N}]?[\p{Lu}]*[\p{Ll}]+|\p{N}{1,3}"
+                },
+                "behavior": "Isolated",
+                "invert": False,
+            },
+            {
+                "type": "ByteLevel",
+                "add_prefix_space": False,
+                "trim_offsets": True,
+                "use_regex": False,
+            },
+        ],
+    }
+    path.write_text(json.dumps(doc) + "\n", encoding="utf-8")
+
+    payloads, contract, _special = converter._tokenizer_payloads_from_json(
+        checkpoint, 32
+    )
+    assert payloads
+    assert contract is not None
+    assert contract["tokenizer_type"] == "bpe"
+    assert contract["pretokenizer"] == "unicode_split_isolated"
+
 def test_qwen3_safetensors_to_bump_smoke(tmp_path: Path) -> None:
     torch, st = _require_torch_safetensors()
     checkpoint = tmp_path / "qwen3"
@@ -275,6 +318,7 @@ def test_qwen3_safetensors_to_bump_smoke(tmp_path: Path) -> None:
     assert entries["vocab_merges"]["shape"] == [6]
     assert entries["vocab_merges"]["size"] == 24
     assert manifest["tokenizer_contract"]["tokenizer_type"] == "bpe"
+    assert "pretokenizer" not in manifest["tokenizer_contract"]
     assert manifest["config"]["tokenizer_contract"]["tokenizer_type"] == "bpe"
     assert manifest["special_tokens"]["bos_token"] == "<s>"
     assert manifest["special_tokens"]["bos_token_id"] == 1

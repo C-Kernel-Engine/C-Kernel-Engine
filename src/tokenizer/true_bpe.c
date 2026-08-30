@@ -398,6 +398,7 @@ CKTrueBPE *ck_true_bpe_create(void) {
     bpe->config.add_eos = false;
     bpe->config.byte_fallback = true;
     bpe->config.space_prefix_style = CK_SPACE_PREFIX_AUTO;
+    bpe->config.pretokenizer = CK_BPE_PRETOKENIZER_GPT2;
 
     return bpe;
 }
@@ -932,7 +933,8 @@ static bool is_bpe_punct(const char *s, int len) {
  *
  * Returns array of chunks (caller provides buffer).
  */
-static int gpt2_pretokenize(const char *text, int text_len, PretokChunk *chunks, int max_chunks) {
+static int gpt2_pretokenize(const char *text, int text_len, PretokChunk *chunks, int max_chunks,
+                            CKBPEPretokenizer pretokenizer) {
     int num_chunks = 0;
     int pos = 0;
 
@@ -951,7 +953,8 @@ static int gpt2_pretokenize(const char *text, int text_len, PretokChunk *chunks,
         if (is_bpe_letter(text + pos, char_len)) {
             /* Word without prefix */
             is_word = true;
-        } else if (is_word_prefix_char(text + pos, char_len) &&
+        } else if (pretokenizer == CK_BPE_PRETOKENIZER_GPT2 &&
+                   is_word_prefix_char(text + pos, char_len) &&
                    !is_gpt2_space(text + pos, text_len - pos)) {
             /* Check if punctuation is followed by a letter */
             int after = pos + char_len;
@@ -1340,7 +1343,8 @@ static int encode_text_segment(CKTrueBPE *bpe, const char *text, int text_len,
 
         /* Pretokenize */
         PretokChunk chunks[1024];
-        int num_chunks = gpt2_pretokenize(preprocessed, pp_len, chunks, 1024);
+        int num_chunks = gpt2_pretokenize(
+            preprocessed, pp_len, chunks, 1024, bpe->config.pretokenizer);
 
         /* Create reusable token list */
         CKBPETokenList *list = token_list_create(INITIAL_TOKEN_CAPACITY);

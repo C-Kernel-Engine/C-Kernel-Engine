@@ -2158,11 +2158,11 @@ OP_DATAFLOW = {
 #   3. Clean separation of concerns
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _resolve_tokenizer_type(
+def _resolve_tokenizer_contract(
     template: Dict[str, Any],
     config: Dict[str, Any],
     manifest: Dict[str, Any],
-) -> Optional[str]:
+) -> Dict[str, Any]:
     flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
     template_type = str(flags.get("tokenizer") or "").strip().lower()
 
@@ -2184,25 +2184,35 @@ def _resolve_tokenizer_type(
     if isinstance(explicit_contract, dict):
         explicit_type = str(explicit_contract.get("tokenizer_type") or "").strip().lower()
         if explicit_type:
-            return explicit_type
+            return copy.deepcopy(explicit_contract)
 
     special_tokens = manifest.get("special_tokens", {}) if isinstance(manifest.get("special_tokens"), dict) else {}
     tok_model = str(special_tokens.get("tokenizer_model") or "").strip().lower()
     if tok_model in {"bpe", "gpt2"}:
-        return "bpe"
+        return {"tokenizer_type": "bpe"}
     if tok_model in {"wordpiece"}:
-        return "wordpiece"
+        return {"tokenizer_type": "wordpiece"}
     if tok_model in {"llama", "sentencepiece", "spm"}:
-        return "sentencepiece"
+        return {"tokenizer_type": "sentencepiece"}
 
-    return template_type or None
+    return {"tokenizer_type": template_type} if template_type else {}
+
+
+def _resolve_tokenizer_type(
+    template: Dict[str, Any],
+    config: Dict[str, Any],
+    manifest: Dict[str, Any],
+) -> Optional[str]:
+    contract = _resolve_tokenizer_contract(template, config, manifest)
+    return str(contract.get("tokenizer_type") or "").strip().lower() or None
 
 
 def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges: int,
                                special_tokens: Optional[Dict] = None,
                                model_type: Optional[str] = None,
                                template_name: Optional[str] = None,
-                               chat_contract: Optional[Dict[str, Any]] = None) -> Optional[Dict]:
+                               chat_contract: Optional[Dict[str, Any]] = None,
+                               tokenizer_contract: Optional[Dict[str, Any]] = None) -> Optional[Dict]:
     """
     Generate tokenizer-specific C code based on tokenizer type from template.
 
@@ -2245,7 +2255,11 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
             bpe_contract_lines.append(
                 "            " + (str(pad_id) if pad_id is not None else "-1") + ");"
             )
-        if add_bos is not None or add_eos is not None:
+        pretokenizer = str((tokenizer_contract or {}).get("pretokenizer") or "").strip().lower()
+        if add_bos is not None or add_eos is not None or pretokenizer:
+            pretokenizer_enum = {
+                "unicode_split_isolated": "CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED",
+            }.get(pretokenizer, "CK_BPE_PRETOKENIZER_GPT2")
             bpe_contract_lines.extend(
                 [
                     "        {",
@@ -2254,6 +2268,7 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
                     f"            cfg.add_eos = {'true' if add_eos else 'false'};",
                     "            cfg.byte_fallback = true;",
                     "            cfg.space_prefix_style = CK_SPACE_PREFIX_AUTO;",
+                    f"            cfg.pretokenizer = {pretokenizer_enum};",
                     "            ck_true_bpe_set_config(g_model->tokenizer, &cfg);",
                     "        }",
                 ]
@@ -2789,7 +2804,8 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     # ═══════════════════════════════════════════════════════════
     # Prefer the explicit tokenizer contract emitted during conversion. Falling
     # back to template flags keeps older manifests working.
-    tokenizer_type = _resolve_tokenizer_type(template, config, manifest)
+    tokenizer_contract = _resolve_tokenizer_contract(template, config, manifest)
+    tokenizer_type = str(tokenizer_contract.get("tokenizer_type") or "").strip().lower() or None
 
     # Check if vocab data is in manifest (entries list, not weights dict)
     entries = manifest.get("entries", [])
@@ -2829,6 +2845,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
             config.get("model_type"),
             template.get("name"),
             explicit_chat_contract,
+            tokenizer_contract,
         )
 
         if c_code:

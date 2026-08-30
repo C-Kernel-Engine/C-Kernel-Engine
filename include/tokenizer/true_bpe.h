@@ -49,12 +49,19 @@ typedef enum {
     CK_SPACE_PREFIX_ASCII = 3    /* ASCII identity mode: no UTF-8/byte remap */
 } CKSpacePrefixStyle;
 
+/* Pretokenization policy declared by tokenizer.json. */
+typedef enum {
+    CK_BPE_PRETOKENIZER_GPT2 = 0,
+    CK_BPE_PRETOKENIZER_UNICODE_SPLIT_ISOLATED = 1
+} CKBPEPretokenizer;
+
 /* True BPE configuration */
 typedef struct {
     bool add_bos;                    /* Add beginning-of-sequence token */
     bool add_eos;                    /* Add end-of-sequence token */
     bool byte_fallback;              /* Fall back to byte tokens for unknown chars */
     CKSpacePrefixStyle space_prefix_style;  /* Space prefix style (Ġ vs ▁) */
+    CKBPEPretokenizer pretokenizer;  /* Boundary policy applied before BPE merges */
 } CKBPEConfig;
 
 /* Opaque tokenizer handle */
