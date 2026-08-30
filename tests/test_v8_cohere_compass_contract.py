@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 import tempfile
@@ -364,6 +365,32 @@ class CohereCompassContractTests(unittest.TestCase):
                 bridge._load_prebuilt_decoder_runtime(
                     runtime, required_context=4096
                 )
+
+    def test_bridge_preflights_decoder_context_before_encoder_execution(self) -> None:
+        planned_bridge = {"embed_dim": 8192, "used_nbytes": 8240 * 8192 * 4}
+        with mock.patch.object(bridge, "_load_layout", return_value={}), mock.patch.object(
+            bridge, "_load_activation_offsets", return_value={}
+        ), mock.patch.object(
+            bridge, "resolve_vision_bridge_contract", return_value=planned_bridge
+        ):
+            prefix_tokens = bridge._planned_encoder_prefix_tokens(
+                {"layout_path": Path("layout.json")}
+            )
+
+        self.assertEqual(prefix_tokens, 8240)
+        required_context = bridge._derive_decoder_context_len(
+            prompt_token_count=462,
+            prefix_tokens=prefix_tokens,
+            requested=8192,
+            slack_tokens=3072,
+        )
+        self.assertEqual(required_context, 8702)
+
+        main_source = inspect.getsource(bridge.main)
+        self.assertLess(
+            main_source.index("decoder context preflight"),
+            main_source.index("encoder execution start"),
+        )
 
     def test_full_network_graph_reads_standard_prebuilt_call_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

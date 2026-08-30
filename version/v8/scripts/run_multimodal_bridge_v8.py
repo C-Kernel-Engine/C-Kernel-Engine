@@ -3022,6 +3022,27 @@ def _load_prebuilt_decoder_runtime(
     }
 
 
+def _planned_encoder_prefix_tokens(runtime: dict[str, Any]) -> int:
+    """Derive the encoder payload size from its generated layout."""
+    layout_path = Path(runtime["layout_path"])
+    layout = _load_layout(layout_path)
+    offsets = _load_activation_offsets(layout_path)
+    bridge = resolve_vision_bridge_contract(
+        layout,
+        offsets,
+        prefer_total_output=True,
+    )
+    embed_dim = int(bridge.get("embed_dim", 0) or 0)
+    output_nbytes = int(bridge.get("used_nbytes", 0) or 0)
+    row_nbytes = embed_dim * ctypes.sizeof(ctypes.c_float)
+    if embed_dim <= 0 or output_nbytes <= 0 or output_nbytes % row_nbytes:
+        raise RuntimeError(
+            "invalid planned encoder bridge output: "
+            f"output_nbytes={output_nbytes} embed_dim={embed_dim}"
+        )
+    return output_nbytes // row_nbytes
+
+
 def _load_prebuilt_decoder_tokenizer(runtime_dir: Path) -> _TokenizerJSONAdapter:
     runtime_dir = runtime_dir.resolve()
     manifest_path = runtime_dir / "weights_manifest.json"
@@ -4301,6 +4322,28 @@ def main(argv: list[str] | None = None) -> int:
         timings["encoder_prepare_ms"] = encoder_prepare_elapsed * 1000.0
         _log_progress(f"encoder runtime prepare done elapsed={encoder_prepare_elapsed:.2f}s")
 
+    preflight_decoder_runtime: dict[str, Any] | None = None
+    if encoder_runtime is not None and args.decoder_runtime is not None:
+        planned_prefix_tokens = max(
+            _planned_encoder_prefix_tokens(encoder_runtime),
+            max(0, int(args.synthetic_prefix_tokens)),
+        )
+        planned_decoder_context = _derive_decoder_context_len(
+            prompt_token_count=total_text_prompt_tokens,
+            prefix_tokens=planned_prefix_tokens,
+            requested=args.decoder_context_len,
+            slack_tokens=max(16, int(args.max_tokens or 0)),
+        )
+        _log_progress(
+            "decoder context preflight "
+            f"runtime={args.decoder_runtime.resolve()} "
+            f"required={planned_decoder_context} prefix_budget={planned_prefix_tokens}"
+        )
+        preflight_decoder_runtime = _load_prebuilt_decoder_runtime(
+            args.decoder_runtime,
+            required_context=planned_decoder_context,
+        )
+
     if encoder_runtime is not None:
         _log_progress("encoder execution start")
         encoder_exec_t0 = time.perf_counter()
@@ -4348,10 +4391,17 @@ def main(argv: list[str] | None = None) -> int:
                 )
             decoder_runtime_overrides.update(declared_decoder_config)
     if args.decoder_runtime is not None:
-        decoder_runtime = _load_prebuilt_decoder_runtime(
-            args.decoder_runtime,
-            required_context=decoder_context_len,
-        )
+        if (
+            preflight_decoder_runtime is not None
+            and int(preflight_decoder_runtime.get("context_length", 0) or 0)
+            >= decoder_context_len
+        ):
+            decoder_runtime = preflight_decoder_runtime
+        else:
+            decoder_runtime = _load_prebuilt_decoder_runtime(
+                args.decoder_runtime,
+                required_context=decoder_context_len,
+            )
     else:
         decoder_runtime = _prepare_decoder_runtime(
             args.decoder_gguf.resolve(),
