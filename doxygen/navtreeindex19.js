@@ -1,5 +1,14 @@
 var NAVTREEINDEX19 =
 {
+"structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,9,5],
+"structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,9,2],
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,9,3],
+"structCacheTopology.html":[1,0,10],
+"structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,10,1],
+"structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,10,2],
+"structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,10,0],
+"structGEMMParams.html":[1,0,68],
+"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,68,1],
 "structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,68,3],
 "structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,68,2],
 "structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,68,0],
@@ -240,14 +249,5 @@ var NAVTREEINDEX19 =
 "system__topology_8c.html":[2,0,1,28],
 "system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,28,19],
 "system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,28,9],
-"system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,28,15],
-"system__topology_8c.html#a34a4d2fcf0318c8d64e4ff73e1f2e6e5":[2,0,1,28,1],
-"system__topology_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,28,0],
-"system__topology_8c.html#a3e80c10682d58f63c4fa70b98e6a7dfb":[2,0,1,28,18],
-"system__topology_8c.html#a3fd4135ab056f548986d55e3864316f2":[2,0,1,28,11],
-"system__topology_8c.html#a4367943c7d4c62e0865d1171252a6b84":[2,0,1,28,14],
-"system__topology_8c.html#a5c4ea4dba04078e4897ec47d6f4bc425":[2,0,1,28,3],
-"system__topology_8c.html#a6636cf43268c0d06f3ded702846014ec":[2,0,1,28,4],
-"system__topology_8c.html#a685baee571576af254de8ea2cd9eaed8":[2,0,1,28,23],
-"system__topology_8c.html#a6a740276441a137e33d3b11888bfd2da":[2,0,1,28,13]
+"system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,28,15]
 };

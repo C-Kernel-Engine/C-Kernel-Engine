@@ -12,7 +12,9 @@ var gemm__kernels__bf16_8c =
     [ "ck_gemm_bf16_native_work", "gemm__kernels__bf16_8c.html#ab32643e4416889fd1d220f85a0298591", null ],
     [ "ck_gemm_nt_bf16_exact_rows", "gemm__kernels__bf16_8c.html#ab46e965339ef66d5b5a8a67ee06a6b6c", null ],
     [ "ck_gemm_nt_bf16_storage_exact_rows", "gemm__kernels__bf16_8c.html#ad1bda245e4c4035d51f91eac6d2f6e30", null ],
+    [ "ck_gemv_bf16_rows", "gemm__kernels__bf16_8c.html#a39b7d75fac2a3dc95aab02841e736548", null ],
     [ "ck_min_i", "gemm__kernels__bf16_8c.html#aa17196850ccde558e4940c65151fb5b7", null ],
+    [ "ck_patch_projection_bf16_native_work", "gemm__kernels__bf16_8c.html#ad9d88fc55cd3f14301d56b554ecc6584", null ],
     [ "gemm_backward_bf16_mixed", "gemm__kernels__bf16_8c.html#ac5d7318c45a162932cc6b2aa9f1ee463", null ],
     [ "gemm_bf16_fp32out", "gemm__kernels__bf16_8c.html#a8647bb8c6a9a965a92e1c98330f237af", null ],
     [ "gemm_blocked_serial_bf16", "gemm__kernels__bf16_8c.html#a9020b3311acc4db83cc7243b3d13d439", null ],
@@ -31,6 +33,9 @@ var gemm__kernels__bf16_8c =
     [ "gemm_nt_bf16_row_range", "gemm__kernels__bf16_8c.html#af29a9b897c559e22184b29911fe16511", null ],
     [ "gemm_tn_bf16", "gemm__kernels__bf16_8c.html#a2184db7c1d029252c677e9bc0c71d80d", null ],
     [ "gemv_bf16", "gemm__kernels__bf16_8c.html#aafd2b9c7cd0a9cf473d4f893c9534b21", null ],
+    [ "gemv_bf16_parallel_dispatch", "gemm__kernels__bf16_8c.html#accd4e7d1302e55bbeb0fa96b055aaad1", null ],
+    [ "gemv_bf16_row_range", "gemm__kernels__bf16_8c.html#ac6d24a090541644c636c58f663d289de", null ],
     [ "patch_projection_bf16_pytorch_onednn_conv3d_storage", "gemm__kernels__bf16_8c.html#a84bf92ba128e9b09a507865bb9c9fda7", null ],
+    [ "patch_projection_image_bf16_native_storage", "gemm__kernels__bf16_8c.html#a925fbe4ea85752b93170e03a231d0c98", null ],
     [ "patch_projection_image_bf16_pytorch_onednn_conv3d_storage", "gemm__kernels__bf16_8c.html#adf6bd63a63f6f7d2bf1ef80b2c687ab2", null ]
 ];

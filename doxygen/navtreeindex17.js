@@ -1,5 +1,14 @@
 var NAVTREEINDEX17 =
 {
+"structCKLayerForwardParamsQ4K.html#a716869dbb8759abc3d3d236ba7482383":[1,0,34,34],
+"structCKLayerForwardParamsQ4K.html#a755532817e588edf60f4f9cf86f52f07":[1,0,34,24],
+"structCKLayerForwardParamsQ4K.html#a7871fd5d96ccc288a12c6e08415c82dc":[1,0,34,13],
+"structCKLayerForwardParamsQ4K.html#a7ae4c7affb31c2e7a6ad09688e56ba42":[1,0,34,31],
+"structCKLayerForwardParamsQ4K.html#a7b17e1545dee689697df5da4751de3ea":[1,0,34,38],
+"structCKLayerForwardParamsQ4K.html#a7ea6e14a98a47d72837f92f2a5601566":[1,0,34,19],
+"structCKLayerForwardParamsQ4K.html#a882236cfb15923ee4962013a53f893a0":[1,0,34,7],
+"structCKLayerForwardParamsQ4K.html#a8f8ca9f6b17918a424041cc9003229e9":[1,0,34,14],
+"structCKLayerForwardParamsQ4K.html#a976fb97749625cdc0f8e16e690c5e5a0":[1,0,34,36],
 "structCKLayerForwardParamsQ4K.html#a9b6d571cb8120f8b62ca87a176edb0f2":[1,0,34,35],
 "structCKLayerForwardParamsQ4K.html#aaaba47dd4ef07fdb1a6662a88c2014cb":[1,0,34,8],
 "structCKLayerForwardParamsQ4K.html#aac37dcd8276a700a4a0123a4f3af8dc3":[1,0,34,26],
@@ -240,14 +249,5 @@ var NAVTREEINDEX17 =
 "structCKModelConfig.html#a29e2840f627ec455aca6820f5f671999":[1,0,47,7],
 "structCKModelConfig.html#a2da9b0b988ccf3b7117a611da5984d34":[1,0,47,5],
 "structCKModelConfig.html#a3be18cb0e7b29fa1449ac753beeca7db":[1,0,47,0],
-"structCKModelConfig.html#a3e5c8e6d2da07805365ec6b4db29b9ea":[1,0,47,9],
-"structCKModelConfig.html#a47a1c1e684f06184220bc13087dda0ff":[1,0,47,2],
-"structCKModelConfig.html#a4ee532eb7546fdf393220affe68d6e64":[1,0,47,16],
-"structCKModelConfig.html#a5d3ef4cd4a7f401a8f6cca7bab276869":[1,0,47,8],
-"structCKModelConfig.html#a754dcfd82ab5195c2c13ba88c1b8d252":[1,0,47,6],
-"structCKModelConfig.html#a8260b38867febb60f03ccad62b6cd7ea":[1,0,47,17],
-"structCKModelConfig.html#a902b19335449fa61c1e532d9999aa342":[1,0,47,10],
-"structCKModelConfig.html#a907585baeae2d601dcbf41a59785852e":[1,0,47,12],
-"structCKModelConfig.html#a97a73a9bfbe5b159083d6048c9cc4712":[1,0,47,3],
-"structCKModelConfig.html#ab06cae54dbee02ac43cc9bbf81c5e22f":[1,0,47,14]
+"structCKModelConfig.html#a3e5c8e6d2da07805365ec6b4db29b9ea":[1,0,47,9]
 };

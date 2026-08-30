@@ -1,5 +1,14 @@
 var NAVTREEINDEX11 =
 {
+"gemm__kernels__f16_8c.html#a7687c3ecdb1194e9bcbd60d1f1dc6e1c":[2,0,1,1,25,31],
+"gemm__kernels__f16_8c.html#a79733b07823fbb4057d46a8f680bcdd4":[2,0,1,1,25,8],
+"gemm__kernels__f16_8c.html#a7e63ec41c0a9f9b175d7d29cf9210f55":[2,0,1,1,25,5],
+"gemm__kernels__f16_8c.html#a89e7cd92f3f92241b3656d67883c61b5":[2,0,1,1,25,36],
+"gemm__kernels__f16_8c.html#a8e8d797ca395b68ae5da18399ae5a3c5":[2,0,1,1,25,4],
+"gemm__kernels__f16_8c.html#a9388bc1e31c430befcde26ec5a572100":[2,0,1,1,25,39],
+"gemm__kernels__f16_8c.html#a9949dfeff8c086bd3a3d2b37c8f35ca8":[2,0,1,1,25,15],
+"gemm__kernels__f16_8c.html#a9f52b13af5bcce83f3fa398a563b444e":[2,0,1,1,25,14],
+"gemm__kernels__f16_8c.html#a9fc75051c21c79e9003feed5cfbe32a9":[2,0,1,1,25,6],
 "gemm__kernels__f16_8c.html#aa2629275daf9039538cad58cd5bfdb7c":[2,0,1,1,25,25],
 "gemm__kernels__f16_8c.html#aa60afe7cf8782f139254aed8f421c0e7":[2,0,1,1,25,12],
 "gemm__kernels__f16_8c.html#aa90aa3f5afd8c4f0d889b7ba0c89396d":[2,0,1,1,25,9],
@@ -240,14 +249,5 @@ var NAVTREEINDEX11 =
 "gemm__kernels__q5__k_8c.html#a7d97db74bd955fdebfb0564fc33b6eaf":[2,0,1,1,39,16],
 "gemm__kernels__q5__k_8c.html#a97d5f32d99bfce1027e26f89ef4d09de":[2,0,1,1,39,4],
 "gemm__kernels__q5__k_8c.html#a9f70d4a7653a179018a1583a10d33c97":[2,0,1,1,39,0],
-"gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698":[2,0,1,1,39,13],
-"gemm__kernels__q5__k_8c.html#aa42d4abdad51556e030da79dd53fb5f0":[2,0,1,1,39,11],
-"gemm__kernels__q5__k_8c.html#aab121e92f0792fcfc1de07cea6cd5e0d":[2,0,1,1,39,12],
-"gemm__kernels__q5__k_8c.html#aaff0e20a1ba7d0fb69911995c0347431":[2,0,1,1,39,6],
-"gemm__kernels__q5__k_8c.html#ab7421a7835c15bf10a2ea016fb114383":[2,0,1,1,39,20],
-"gemm__kernels__q5__k_8c.html#ab79f02085140f8d858ae1ab0ef6f58fe":[2,0,1,1,39,3],
-"gemm__kernels__q5__k_8c.html#acbf9397ded137f5585b51b93c94522ef":[2,0,1,1,39,23],
-"gemm__kernels__q5__k_8c.html#ade3e51af530aef1d7883f755b978920e":[2,0,1,1,39,8],
-"gemm__kernels__q5__k_8c.html#ae35b341df2c29c2ffd3d6312ad0efccf":[2,0,1,1,39,10],
-"gemm__kernels__q5__k_8c.html#af1ba72d73c6d788f686bfc12a60281a4":[2,0,1,1,39,7]
+"gemm__kernels__q5__k_8c.html#aa165bcff171b4bc4877ac5d604ddb698":[2,0,1,1,39,13]
 };
