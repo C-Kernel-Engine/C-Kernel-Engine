@@ -2661,6 +2661,15 @@ QWEN3VL_BF16_PRIVATE_THREADS ?= 24
 QWEN3VL_BF16_PRIVATE_MAX_NEW_TOKENS ?= 64
 QWEN3VL_BF16_PRIVATE_REQUIRED_IMAGES ?= 40
 QWEN3VL_BF16_PRIVATE_ARGS ?=
+COHERE_COMPASS_PRIVATE_OCR_MANIFEST ?= $(CK_QWEN3VL_OCR_MANIFEST)
+COHERE_COMPASS_PRIVATE_OCR_DECODER_RUNTIME ?= $(CK_COHERE_COMPASS_DECODER_RUNTIME)
+COHERE_COMPASS_PRIVATE_OCR_ENCODER_RUNTIME ?= $(CK_COHERE_COMPASS_ENCODER_RUNTIME)
+COHERE_COMPASS_PRIVATE_OCR_OUTPUT ?= $(HOME)/.cache/ck-engine-v8/private/cohere-compass-ocr
+COHERE_COMPASS_PRIVATE_OCR_THREADS ?= 16
+COHERE_COMPASS_PRIVATE_OCR_CONTEXT ?= 2048
+COHERE_COMPASS_PRIVATE_OCR_MAX_NEW_TOKENS ?= 896
+COHERE_COMPASS_PRIVATE_OCR_REQUIRED_IMAGES ?= 40
+COHERE_COMPASS_PRIVATE_OCR_ARGS ?=
 V8_QWEN3VL_STITCHED_DECODER ?= $(V8_QWEN3VL_LOCAL_MODEL)
 V8_QWEN3VL_STITCHED_MMPROJ ?= $(V8_QWEN3VL_LOCAL_MMPROJ)
 V8_QWEN3VL_STITCHED_IMAGE ?= ocr/1 81.jpg
@@ -2724,6 +2733,33 @@ test-qwen36vl-private-corpus-parity-auto:
 
 .PHONY: test-qwen-vl-private-corpus-parity-auto
 test-qwen-vl-private-corpus-parity-auto: test-qwen3vl-private-corpus-parity-auto test-qwen36vl-private-corpus-parity-auto
+
+.PHONY: test-cohere-compass-private-ocr-auto
+test-cohere-compass-private-ocr-auto:
+	@if [ -z "$(COHERE_COMPASS_PRIVATE_OCR_MANIFEST)" ]; then \
+		echo "SKIP: private Cohere Compass OCR corpus is not configured on this runner"; \
+	else \
+		test -f "$(COHERE_COMPASS_PRIVATE_OCR_MANIFEST)" || { echo "ERROR: private OCR manifest is missing"; exit 2; }; \
+		test -d "$(COHERE_COMPASS_PRIVATE_OCR_DECODER_RUNTIME)" || { echo "ERROR: Cohere decoder runtime is missing"; exit 2; }; \
+		test -d "$(COHERE_COMPASS_PRIVATE_OCR_ENCODER_RUNTIME)" || { echo "ERROR: Cohere encoder runtime is missing"; exit 2; }; \
+		$(PYTHON) version/v8/scripts/certify_multimodal_ocr_corpus_v8.py \
+			--manifest "$(COHERE_COMPASS_PRIVATE_OCR_MANIFEST)" \
+			--decoder-runtime "$(COHERE_COMPASS_PRIVATE_OCR_DECODER_RUNTIME)" \
+			--encoder-runtime "$(COHERE_COMPASS_PRIVATE_OCR_ENCODER_RUNTIME)" \
+			--composition-circuit cohere_compass \
+			--adapter-id cohere_compass \
+			--model-label "Cohere North Micro Vision" \
+			--output-dir "$(COHERE_COMPASS_PRIVATE_OCR_OUTPUT)" \
+			--threads "$(COHERE_COMPASS_PRIVATE_OCR_THREADS)" \
+			--context-len "$(COHERE_COMPASS_PRIVATE_OCR_CONTEXT)" \
+			--max-new-tokens "$(COHERE_COMPASS_PRIVATE_OCR_MAX_NEW_TOKENS)" \
+			--require-images "$(COHERE_COMPASS_PRIVATE_OCR_REQUIRED_IMAGES)" \
+			--adapt-encoder-geometry \
+			--oracle-id llama.cpp \
+			--oracle-status unsupported \
+			--oracle-note "installed llama.cpp has no Cohere Compass vision frontend" \
+			--continue-on-failure $(COHERE_COMPASS_PRIVATE_OCR_ARGS); \
+	fi
 
 .PHONY: test-qwen3vl-bf16-private-corpus-parity-auto
 test-qwen3vl-bf16-private-corpus-parity-auto:

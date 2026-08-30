@@ -1840,6 +1840,17 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
                 preproc = json.loads(preproc_path.read_text(encoding="utf-8"))
             except Exception:
                 preproc = {}
+        preproc_size = preproc.get("size") if isinstance(preproc.get("size"), dict) else {}
+        image_min_pixels = int(
+            preproc.get("min_pixels")
+            or preproc_size.get("shortest_edge")
+            or 0
+        )
+        image_max_pixels = int(
+            preproc.get("max_pixels")
+            or preproc_size.get("longest_edge")
+            or 0
+        )
         if head_dim > 0:
             axis_pairs = max(1, head_dim // 4)
             # Vision M-RoPE has two spatial axes. Keep the four-slot ABI, but
@@ -1895,9 +1906,11 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "num_deepstack_layers": len(deepstack_layers),
             "image_mean": [float(v) for v in preproc.get("image_mean", [0.48145466, 0.4578275, 0.40821073])[:3]],
             "image_std": [float(v) for v in preproc.get("image_std", [0.26862954, 0.26130258, 0.27577711])[:3]],
-            "image_min_pixels": int(preproc.get("min_pixels") or 0),
-            "image_max_pixels": int(preproc.get("max_pixels") or 0),
-            "preproc_image_size": int(preproc.get("size", {}).get("shortest_edge", 0) or 0) if isinstance(preproc.get("size"), dict) else 0,
+            "image_min_pixels": image_min_pixels,
+            "image_max_pixels": image_max_pixels,
+            "preproc_image_size": int(preproc_size.get("shortest_edge", 0) or 0),
+            "image_resize_factor": int(patch_size * merge),
+            "image_resize_preserve_aspect": not bool(preproc.get("default_to_square", True)),
             "rope_layout": "multi_section_2d",
             "vision_mrope_sections": vision_mrope_sections,
             "vision_mrope_n_dims": max(1, int(head_dim)),

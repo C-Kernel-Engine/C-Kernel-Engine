@@ -1261,16 +1261,11 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
         batching = str(
             prefill_requires.get("execution.prefill_batching", "") or ""
         ).strip()
-        if schedules is not None:
-            if not isinstance(schedules, dict) or not batching or batching not in schedules:
-                raise RuntimeError(
-                    "HARD CONTRACT FAULT: multimodal bridge cannot resolve the active "
-                    f"prefill batching contract {batching!r} in "
-                    f"manifest:{template_name or '<embedded>'}."
-                )
-            resolved_schedule = copy.deepcopy(schedules[batching])
+
+        def resolve_prefill_transforms(schedule: Dict[str, Any]) -> None:
+            registry = load_kernel_registry()
             for transform_name in ("position_transform", "deepstack_injection"):
-                transform = resolved_schedule.get(transform_name)
+                transform = schedule.get(transform_name)
                 if transform is None:
                     continue
                 if not isinstance(transform, dict):
@@ -1284,7 +1279,6 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
                         f"HARD CONTRACT FAULT: mixed-prefill {transform_name} requires exact "
                         "kernel_id and contract_id."
                     )
-                registry = load_kernel_registry()
                 matches = [
                     kernel for kernel in registry.get("kernels", [])
                     if isinstance(kernel, dict) and kernel.get("id") == kernel_id
@@ -1316,8 +1310,20 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
                         f"kernel implementation disagree for {kernel_id!r}."
                     )
                 transform["resolved_function"] = function
+
+        if schedules is not None:
+            if not isinstance(schedules, dict) or not batching or batching not in schedules:
+                raise RuntimeError(
+                    "HARD CONTRACT FAULT: multimodal bridge cannot resolve the active "
+                    f"prefill batching contract {batching!r} in "
+                    f"manifest:{template_name or '<embedded>'}."
+                )
+            resolved_schedule = copy.deepcopy(schedules[batching])
+            resolve_prefill_transforms(resolved_schedule)
             resolved_bridge["prefill_schedule"] = resolved_schedule
             resolved_bridge["prefill_batching"] = batching
+        elif isinstance(resolved_bridge.get("prefill_schedule"), dict):
+            resolve_prefill_transforms(resolved_bridge["prefill_schedule"])
         hydrated_config["multimodal_bridge_contract"] = resolved_bridge
     manifest["config"] = hydrated_config
     return manifest

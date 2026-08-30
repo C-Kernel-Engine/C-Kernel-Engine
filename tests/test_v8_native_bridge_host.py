@@ -548,6 +548,30 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             "non_causal_visual_chunk",
         )
 
+    def test_composition_policy_outranks_encoder_standalone_fallback(self) -> None:
+        encoder_report = {
+            "prefix_position_policy": "linear",
+            "prefix_decode_policy": "causal_mixed_prefix",
+        }
+        self.assertEqual(
+            bridge_runner_v8._resolved_encoder_prefix_policy(
+                encoder_report,
+                "prefix_position_policy",
+                "mrope_2d",
+                composition_owned=True,
+            ),
+            "mrope_2d",
+        )
+        self.assertEqual(
+            bridge_runner_v8._resolved_encoder_prefix_policy(
+                encoder_report,
+                "prefix_position_policy",
+                "mrope_2d",
+                composition_owned=False,
+            ),
+            "linear",
+        )
+
     def test_vision_prefix_policy_prefers_template_bridge_contract(self) -> None:
         layout_cfg = {
             "model": "qwen3_vl_vision",

@@ -33,6 +33,47 @@
       "attn_variant": "hybrid_sliding_attention",
       "layer_kind_config_key": "layer_kinds",
       "sliding_window_config_key": "sliding_window"
+    },
+    "multimodal_bridge": {
+      "prefix_policy": "mixed_visual_text_prefill",
+      "generation_policy": "incremental_decode_after_prefill",
+      "position_policy": "mrope_2d",
+      "decode_policy": "causal_mixed_prefix",
+      "cache_policy": "persistent_decoder_kv",
+      "runtime_policy": "decode_staged",
+      "prefill_batching": "unified_mixed",
+      "prefill_schedule": {
+        "segments": ["text_before", "visual", "text_after"],
+        "cache_transition": "single_pass",
+        "position_transition": "explicit_full_sequence",
+        "deepstack_injection": {
+          "kernel_id": "ck_residual_add_token_major_bf16_storage",
+          "contract_id": "residual_add_bf16_input_fp32_add_bf16_output",
+          "target": "visual_rows_after_decoder_layer",
+          "layers_from_config": "num_deepstack_layers"
+        },
+        "projection_row_group_boundaries": {
+          "policy": "restart_each_segment",
+          "operations": ["qkv_proj", "out_proj", "mlp_gate_up", "mlp_down"]
+        }
+      },
+      "providers": {
+        "prefix_insert": {
+          "op": "multimodal_prefix_insert",
+          "kernel_id": "multimodal_prefix_insert_f32",
+          "operation_interface": "multimodal_prefix_insert.token_major.fp32.v1"
+        },
+        "position_builder": {
+          "op": "multimodal_position_builder",
+          "kernel_id": "multimodal_mrope_positions_2d",
+          "operation_interface": "multimodal_positions.mrope_2d.i32.v1"
+        },
+        "position_transform": {
+          "op": "rope",
+          "kernel_id": "mrope_qk_imrope_positions",
+          "operation_interface": "mrope.imrope_positions.fp32.v1"
+        }
+      }
     }
   },
   "kernels": {

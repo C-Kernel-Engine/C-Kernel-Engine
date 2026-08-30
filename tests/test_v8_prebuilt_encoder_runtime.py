@@ -70,6 +70,16 @@ def test_explicit_composition_accepts_encoder_gguf() -> None:
     )
 
 
+def test_explicit_composition_accepts_explicit_synthetic_prefix() -> None:
+    bridge = _load_module()
+    bridge._validate_composition_encoder_source(
+        {"name": "qwen36vl"},
+        encoder_gguf=None,
+        encoder_runtime=None,
+        synthetic_prefix_tokens=128,
+    )
+
+
 def test_explicit_composition_rejects_missing_encoder_source() -> None:
     bridge = _load_module()
     try:

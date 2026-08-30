@@ -173,10 +173,18 @@ def _validate_composition_encoder_source(
     *,
     encoder_gguf: Path | None,
     encoder_runtime: Path | None,
+    synthetic_prefix_tokens: int = 0,
 ) -> None:
-    if circuit is not None and encoder_gguf is None and encoder_runtime is None:
+    if (
+        circuit is not None
+        and encoder_gguf is None
+        and encoder_runtime is None
+        and synthetic_prefix_tokens <= 0
+    ):
         raise RuntimeError(
-            "explicit multimodal composition requires --encoder-gguf or --encoder-runtime"
+            "explicit multimodal composition requires --encoder-gguf or "
+            "--encoder-runtime, unless an explicit --synthetic-prefix-tokens "
+            "diagnostic is requested"
         )
 
 
@@ -317,6 +325,18 @@ def _local_prefix_text_pos_for_policy(
     if policy == "mrope_2d" and grid_x > 0 and grid_y > 0:
         return max(int(grid_x), int(grid_y))
     return max(0, int(prefix_tokens))
+
+
+def _resolved_encoder_prefix_policy(
+    encoder_report: dict[str, Any],
+    report_key: str,
+    declared_policy: str,
+    *,
+    composition_owned: bool,
+) -> str:
+    if composition_owned:
+        return declared_policy
+    return str(encoder_report.get(report_key, declared_policy) or declared_policy)
 
 
 def _parse_activation_preference_overrides(values: list[str] | None) -> dict[str, str]:
@@ -2045,6 +2065,73 @@ def _qwen3vl_geometry_overrides(
     }
 
 
+def _cohere_compass_geometry_overrides(
+    config: dict[str, Any], image_path: Path
+) -> dict[str, Any]:
+    source_width, source_height = _image_source_size(image_path)
+    patch_size = int(config.get("patch_size", 0) or 0)
+    merge_size = int(config.get("spatial_merge_size", 2) or 2)
+    align_size = int(config.get("image_resize_factor", 0) or patch_size * merge_size)
+    min_pixels = int(config.get("image_min_pixels", 0) or 0)
+    max_pixels = int(config.get("image_max_pixels", 0) or 0)
+    if patch_size <= 0 or merge_size <= 0 or align_size <= 0:
+        raise RuntimeError(
+            "invalid Cohere Compass patch/merge geometry: "
+            f"patch={patch_size} merge={merge_size} factor={align_size}"
+        )
+    if min_pixels <= 0 or max_pixels <= 0:
+        raise RuntimeError(
+            "Cohere Compass runtime is missing native resize bounds; "
+            "reconvert it from the checkpoint preprocessor_config.json"
+        )
+    aspect_ratio = max(source_width, source_height) / float(
+        min(source_width, source_height)
+    )
+    if aspect_ratio > 200.0:
+        raise RuntimeError(
+            f"Cohere Compass image aspect ratio must not exceed 200, got {aspect_ratio}"
+        )
+    image_width, image_height = _calc_qwen_vl_smart_resize(
+        source_width,
+        source_height,
+        align_size,
+        min_pixels,
+        max_pixels,
+    )
+    vision_grid_w = image_width // patch_size
+    vision_grid_h = image_height // patch_size
+    if image_width % patch_size or image_height % patch_size:
+        raise RuntimeError(
+            "Cohere Compass smart resize produced a non-patch-aligned image: "
+            f"{image_width}x{image_height} patch={patch_size}"
+        )
+    if vision_grid_w % merge_size or vision_grid_h % merge_size:
+        raise RuntimeError(
+            "Cohere Compass patch grid is not merge-aligned: "
+            f"{vision_grid_w}x{vision_grid_h} merge={merge_size}"
+        )
+    merge_factor = merge_size * merge_size
+    vision_num_patches = vision_grid_w * vision_grid_h
+    return {
+        "image_width": int(image_width),
+        "image_height": int(image_height),
+        "vision_grid_w": int(vision_grid_w),
+        "vision_grid_h": int(vision_grid_h),
+        "vision_num_patches": int(vision_num_patches),
+        "vision_merged_tokens": int(vision_num_patches // merge_factor),
+        "context_length": int(vision_num_patches),
+        "max_seq_len": int(vision_num_patches),
+        "merged_grid_x": int(vision_grid_w // merge_size),
+        "merged_grid_y": int(vision_grid_h // merge_size),
+        "image_source_width": int(source_width),
+        "image_source_height": int(source_height),
+        "image_min_pixels": int(min_pixels),
+        "image_max_pixels": int(max_pixels),
+        "image_resize_factor": int(align_size),
+        "image_resize_preserve_aspect": True,
+    }
+
+
 def _gemma4_geometry_overrides(config: dict[str, Any], image_path: Path) -> dict[str, Any]:
     source_width, source_height = _image_source_size(image_path)
     patch_size = int(config.get("patch_size", 0) or 0)
@@ -2504,6 +2591,120 @@ def _load_prebuilt_encoder_runtime(runtime_dir: Path) -> dict[str, Any]:
         "so_path": libraries[0],
         "engine_so": required["engine_so"],
         "embed_dim": int(config.get("embed_dim", 0) or 0),
+    }
+
+
+def _prepare_prebuilt_encoder_geometry_runtime(
+    runtime_dir: Path,
+    cache_root: Path,
+    image_path: Path,
+) -> dict[str, Any]:
+    source = _load_prebuilt_encoder_runtime(runtime_dir)
+    source_manifest_path = runtime_dir.resolve() / "weights_manifest.json"
+    if not source_manifest_path.is_file():
+        raise RuntimeError(
+            "geometry-adapted encoder runtime requires weights_manifest.json: "
+            f"{source_manifest_path}"
+        )
+    manifest = _json_read(source_manifest_path)
+    if not isinstance(manifest, dict):
+        raise RuntimeError(f"invalid encoder manifest: {source_manifest_path}")
+    config = dict(manifest.get("config", {}) or {})
+    encoder_model = str(config.get("model", config.get("arch", ""))).lower()
+    if encoder_model != "cohere_compass_vision":
+        raise RuntimeError(
+            "prebuilt geometry adaptation currently supports only the declared "
+            f"Cohere Compass native-resolution contract, got {encoder_model!r}"
+        )
+    config.update(_cohere_compass_geometry_overrides(config, image_path))
+    geometry_identity = {
+        "source_manifest_sha256": hashlib.sha256(
+            source_manifest_path.read_bytes()
+        ).hexdigest(),
+        "image_width": int(config["image_width"]),
+        "image_height": int(config["image_height"]),
+        "vision_num_patches": int(config["vision_num_patches"]),
+    }
+    cache_key = hashlib.sha256(
+        json.dumps(geometry_identity, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    output_dir = cache_root.resolve() / (
+        f"{encoder_model}-{config['image_width']}x{config['image_height']}-{cache_key}"
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest["config"] = config
+    manifest_path = output_dir / "weights_manifest.json"
+    config_path = output_dir / "config.json"
+    _json_write(manifest_path, manifest)
+    _json_write(config_path, config)
+
+    weights_bump = output_dir / "weights.bump"
+    if not weights_bump.exists():
+        weights_bump.symlink_to(Path(source["weights_bump"]).resolve())
+    ir1_path = output_dir / "ir1.json"
+    layout_path = output_dir / "layout.json"
+    lowered_path = output_dir / "lowered.json"
+    call_path = output_dir / "call.json"
+    manifest_map = output_dir / "weights_manifest.map"
+    c_path = output_dir / "encoder_v8.c"
+    so_path = output_dir / "libencoder_v8.so"
+    stamp_path = output_dir / "geometry_runtime.json"
+    reusable = all(
+        path.is_file()
+        for path in (ir1_path, layout_path, lowered_path, call_path, manifest_map, c_path)
+    )
+    if _json_read(stamp_path) != geometry_identity or not reusable:
+        rc = build_ir_v8.main(
+            [
+                "--manifest",
+                str(manifest_path),
+                "--mode",
+                "prefill",
+                "--output",
+                str(ir1_path),
+                "--layout-output",
+                str(layout_path),
+                "--lowered-output",
+                str(lowered_path),
+                "--call-output",
+                str(call_path),
+                "--manifest-map-output",
+                str(manifest_map),
+            ]
+        )
+        if rc != 0:
+            raise RuntimeError(f"geometry-adapted encoder IR build failed with rc={rc}")
+        old_argv = sys.argv[:]
+        try:
+            sys.argv = [
+                str(SCRIPT_DIR / "codegen_v8.py"),
+                "--ir",
+                str(call_path),
+                "--layout",
+                str(layout_path),
+                "--output",
+                str(c_path),
+            ]
+            codegen_rc = codegen_v8.main()
+        finally:
+            sys.argv = old_argv
+        if codegen_rc != 0:
+            raise RuntimeError(
+                f"geometry-adapted encoder codegen failed with rc={codegen_rc}"
+            )
+        _json_write(stamp_path, geometry_identity)
+    _compile_generated_model(c_path, so_path)
+    engine_so = so_path.parent / "libckernel_engine.so"
+    layout = _load_layout(layout_path)
+    return {
+        "gguf": None,
+        "runtime_dir": output_dir,
+        "weights_bump": weights_bump,
+        "manifest_map": manifest_map,
+        "layout_path": layout_path,
+        "so_path": so_path,
+        "engine_so": engine_so,
+        "embed_dim": int(layout.get("config", {}).get("embed_dim", 0) or 0),
     }
 
 
@@ -3867,6 +4068,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional provenance-complete prebuilt vision encoder runtime directory",
     )
     ap.add_argument(
+        "--encoder-geometry-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Recompile a geometry-specific prebuilt encoder layout in this shared cache; "
+            "currently used by native-resolution Cohere Compass vision runtimes"
+        ),
+    )
+    ap.add_argument(
         "--composition-circuit",
         default=None,
         help=(
@@ -3960,6 +4170,7 @@ def main(argv: list[str] | None = None) -> int:
         composition_circuit,
         encoder_gguf=args.encoder_gguf,
         encoder_runtime=args.encoder_runtime,
+        synthetic_prefix_tokens=args.synthetic_prefix_tokens,
     )
     if composition_circuit is not None:
         chat_contract = _composition_exported_contract(composition_circuit, "chat_contract")
@@ -4061,7 +4272,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.encoder_runtime is not None:
         _log_progress(f"encoder runtime load start dir={args.encoder_runtime.resolve()}")
         encoder_prep_t0 = time.perf_counter()
-        encoder_runtime = _load_prebuilt_encoder_runtime(args.encoder_runtime)
+        if args.encoder_geometry_cache_dir is not None:
+            if args.image_path is None:
+                ap.error("--encoder-geometry-cache-dir requires --image-path")
+            encoder_runtime = _prepare_prebuilt_encoder_geometry_runtime(
+                args.encoder_runtime,
+                args.encoder_geometry_cache_dir,
+                args.image_path.resolve(),
+            )
+        else:
+            encoder_runtime = _load_prebuilt_encoder_runtime(args.encoder_runtime)
         encoder_prepare_elapsed = time.perf_counter() - encoder_prep_t0
         timings["encoder_prepare_ms"] = encoder_prepare_elapsed * 1000.0
         _log_progress(f"encoder runtime load done elapsed={encoder_prepare_elapsed:.2f}s")
@@ -4160,14 +4380,21 @@ def main(argv: list[str] | None = None) -> int:
     composition_evidence: dict[str, Any] | None = None
     if composition_circuit is not None:
         if encoder_runtime is None:
-            raise RuntimeError("explicit multimodal composition did not produce an encoder runtime")
-        encoder_layout = _load_layout(Path(encoder_runtime["layout_path"]))
-        decoder_layout = _load_layout(Path(decoder_runtime["decode_layout_path"]))
-        composition_evidence = _validate_composition_runtime(
-            composition_circuit,
-            encoder_config=dict(encoder_layout.get("config", {}) or {}),
-            decoder_config=dict(decoder_layout.get("config", {}) or {}),
-        )
+            if args.synthetic_prefix_tokens <= 0:
+                raise RuntimeError("explicit multimodal composition did not produce an encoder runtime")
+            composition_evidence = {
+                "name": str(composition_circuit.get("name") or ""),
+                "synthetic_prefix_diagnostic": True,
+                "encoder_runtime_validated": False,
+            }
+        else:
+            encoder_layout = _load_layout(Path(encoder_runtime["layout_path"]))
+            decoder_layout = _load_layout(Path(decoder_runtime["decode_layout_path"]))
+            composition_evidence = _validate_composition_runtime(
+                composition_circuit,
+                encoder_config=dict(encoder_layout.get("config", {}) or {}),
+                decoder_config=dict(decoder_layout.get("config", {}) or {}),
+            )
 
     prefix_embed_dim = int(decoder_runtime["embed_dim"])
     if encoder_report is not None:
@@ -4181,9 +4408,20 @@ def main(argv: list[str] | None = None) -> int:
             grid_x = int(encoder_report.get("prefix_grid_x", 0) or 0)
             grid_y = int(encoder_report.get("prefix_grid_y", 0) or 0)
             if grid_x > 0 and grid_y > 0:
-                policy = str(encoder_report.get("prefix_position_policy", prefix_position_policy) or prefix_position_policy)
+                composition_owned = composition_circuit is not None
+                policy = _resolved_encoder_prefix_policy(
+                    encoder_report,
+                    "prefix_position_policy",
+                    prefix_position_policy,
+                    composition_owned=composition_owned,
+                )
                 prefix_position_policy = policy
-                prefix_decode_policy = str(encoder_report.get("prefix_decode_policy", prefix_decode_policy) or prefix_decode_policy)
+                prefix_decode_policy = _resolved_encoder_prefix_policy(
+                    encoder_report,
+                    "prefix_decode_policy",
+                    prefix_decode_policy,
+                    composition_owned=composition_owned,
+                )
                 if policy == "mrope_2d":
                     prefix_grid = (grid_x, grid_y)
                 default_local_text_pos = _local_prefix_text_pos_for_policy(
@@ -4192,9 +4430,12 @@ def main(argv: list[str] | None = None) -> int:
                     grid_x,
                     grid_y,
                 )
-                local_prefix_text_pos = int(
-                    encoder_report.get("prefix_text_pos", default_local_text_pos) or default_local_text_pos
-                )
+                local_prefix_text_pos = default_local_text_pos
+                if not composition_owned:
+                    local_prefix_text_pos = int(
+                        encoder_report.get("prefix_text_pos", default_local_text_pos)
+                        or default_local_text_pos
+                    )
                 prefix_text_pos = len(prompt_prefix_token_ids) + local_prefix_text_pos
         else:
             dim_mismatch = {

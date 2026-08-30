@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +37,76 @@ class CohereCompassContractTests(unittest.TestCase):
         vision = converter._safetensors_arch_contract("cohere_compass_vision")
         self.assertEqual(text["config_builder"], "cohere2_text")
         self.assertEqual(vision["tensor_mapper"], "qwen3_vl_vision")
+
+    def test_vision_config_retains_native_resize_bounds(self) -> None:
+        model_config = {
+            "model_type": "cohere_compass",
+            "text_config": {"vocab_size": 64, "hidden_size": 16},
+            "vision_config": {
+                "hidden_size": 8,
+                "num_attention_heads": 2,
+                "num_hidden_layers": 1,
+                "patch_size": 16,
+                "spatial_merge_size": 2,
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config.json").write_text(
+                json.dumps(model_config), encoding="utf-8"
+            )
+            (root / "preprocessor_config.json").write_text(
+                json.dumps(
+                    {
+                        "default_to_square": False,
+                        "patch_size": 16,
+                        "merge_size": 2,
+                        "size": {
+                            "shortest_edge": 65_536,
+                            "longest_edge": 16_777_216,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            headers = {
+                "model.visual.pos_embed.weight": _header(
+                    "model.visual.pos_embed.weight", [2304, 8]
+                )
+            }
+            with mock.patch.object(
+                converter, "_load_safetensors_headers", return_value=headers
+            ):
+                config = converter._build_config(
+                    root, "cohere_compass_vision", None
+                )
+
+        self.assertEqual(config["image_min_pixels"], 65_536)
+        self.assertEqual(config["image_max_pixels"], 16_777_216)
+        self.assertEqual(config["image_resize_factor"], 32)
+        self.assertTrue(config["image_resize_preserve_aspect"])
+
+    def test_native_geometry_matches_official_smart_resize(self) -> None:
+        config = {
+            "patch_size": 16,
+            "spatial_merge_size": 2,
+            "image_resize_factor": 32,
+            "image_min_pixels": 65_536,
+            "image_max_pixels": 16_777_216,
+        }
+        with mock.patch.object(
+            bridge, "_image_source_size", return_value=(2200, 1700)
+        ):
+            geometry = bridge._cohere_compass_geometry_overrides(
+                config, Path("form.jpg")
+            )
+
+        self.assertEqual(geometry["image_width"], 2208)
+        self.assertEqual(geometry["image_height"], 1696)
+        self.assertEqual(geometry["vision_grid_w"], 138)
+        self.assertEqual(geometry["vision_grid_h"], 106)
+        self.assertEqual(geometry["vision_num_patches"], 14_628)
+        self.assertEqual(geometry["vision_merged_tokens"], 3_657)
 
     def test_text_config_preserves_hybrid_attention_and_interleaved_mrope(self) -> None:
         model_config = {
@@ -178,6 +249,30 @@ class CohereCompassContractTests(unittest.TestCase):
         self.assertEqual(stitch["image_begin_marker"], "<|VISION_START|>")
         self.assertEqual(stitch["image_end_marker"], "<|VISION_END|>")
         self.assertTrue(bridge._segment_text_has_bos_prefix("<BOS_TOKEN><|START_OF_TURN_TOKEN|>"))
+
+    def test_text_component_hydrates_composition_bridge_for_codegen(self) -> None:
+        manifest = {
+            "config": {
+                "model": "cohere_compass_text",
+                "embed_dim": 2048,
+                "num_deepstack_layers": 3,
+            },
+            "template": build_ir_v8._load_builtin_template_doc("cohere_compass_text"),
+        }
+
+        hydrated = build_ir_v8._hydrate_manifest_template(manifest)
+        contract = hydrated["config"]["multimodal_bridge_contract"]
+
+        self.assertEqual(contract["position_policy"], "mrope_2d")
+        self.assertEqual(contract["prefill_batching"], "unified_mixed")
+        self.assertEqual(
+            contract["prefill_schedule"]["deepstack_injection"]["resolved_function"],
+            "ck_residual_add_token_major_bf16_storage",
+        )
+        self.assertEqual(
+            contract["providers"]["position_transform"]["resolved_function"],
+            "mrope_qk_imrope_positions",
+        )
 
     def test_runner_refresh_preserves_inherited_circuit_contracts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
