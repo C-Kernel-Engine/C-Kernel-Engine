@@ -448,6 +448,75 @@ void position_embeddings_add_tiled_2d_align_corners_bf16(float *x,
     }
 }
 
+/*
+ * Mixed-precision position interpolation used by runtimes that retain the
+ * learned table in BF16 but form interpolation products and their reduction
+ * in FP32. Only the completed position vector and residual output cross BF16
+ * storage boundaries. The distinct provider keeps this arithmetic contract
+ * independent from the all-BF16 interpolation path above.
+ */
+void position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16(
+    float *x,
+    const float *position_embd,
+    int grid_h,
+    int grid_w,
+    int embed_dim,
+    int merge_size,
+    int source_grid_size)
+{
+    if (x == NULL || position_embd == NULL || grid_h <= 0 || grid_w <= 0 ||
+        embed_dim <= 0 || merge_size <= 0 || source_grid_size <= 0) {
+        return;
+    }
+
+    for (int tok = 0; tok < grid_h * grid_w; ++tok) {
+        const int row_major = tile_order_index_2d(tok, grid_h, grid_w, merge_size);
+        const int dst_y = row_major / grid_w;
+        const int dst_x = row_major % grid_w;
+        const float src_y = grid_h > 1
+            ? (float)dst_y * (float)(source_grid_size - 1) / (float)(grid_h - 1)
+            : 0.0f;
+        const float src_x = grid_w > 1
+            ? (float)dst_x * (float)(source_grid_size - 1) / (float)(grid_w - 1)
+            : 0.0f;
+        const int y0 = (int)src_y;
+        const int x0 = (int)src_x;
+        const int y1 = y0 + 1 < source_grid_size ? y0 + 1 : y0;
+        const int x1 = x0 + 1 < source_grid_size ? x0 + 1 : x0;
+        const float y_distance0 = fabsf(src_y - (float)y0);
+        const float y_distance1 = fabsf(src_y - (float)y0 - 1.0f);
+        const float x_distance0 = fabsf(src_x - (float)x0);
+        const float x_distance1 = fabsf(src_x - (float)x0 - 1.0f);
+        const float wy0 = fmaxf(1.0f - y_distance0, 0.0f);
+        const float wy1 = fmaxf(1.0f - y_distance1, 0.0f);
+        const float wx0 = fmaxf(1.0f - x_distance0, 0.0f);
+        const float wx1 = fmaxf(1.0f - x_distance1, 0.0f);
+        const float w00 = wy0 * wx0;
+        const float w01 = wy0 * wx1;
+        const float w10 = wy1 * wx0;
+        const float w11 = wy1 * wx1;
+        const float *p00 = position_embd + ((size_t)y0 * source_grid_size + x0) * embed_dim;
+        const float *p01 = position_embd + ((size_t)y0 * source_grid_size + x1) * embed_dim;
+        const float *p10 = position_embd + ((size_t)y1 * source_grid_size + x0) * embed_dim;
+        const float *p11 = position_embd + ((size_t)y1 * source_grid_size + x1) * embed_dim;
+        float *dst = x + (size_t)tok * embed_dim;
+
+        for (int d = 0; d < embed_dim; ++d) {
+            /* Materialize products before the reduction, as torch.sum does. */
+            volatile float v00 = p00[d] * w00;
+            volatile float v01 = p01[d] * w01;
+            volatile float v10 = p10[d] * w10;
+            volatile float v11 = p11[d] * w11;
+            volatile float pos01 = v00 + v01;
+            volatile float pos012 = pos01 + v10;
+            const float pos = pos012 + v11;
+            const float pos_bf16 = bf16_to_float(float_to_bf16(pos));
+            const float hidden = bf16_to_float(float_to_bf16(dst[d]));
+            dst[d] = bf16_to_float(float_to_bf16(hidden + pos_bf16));
+        }
+    }
+}
+
 /**
  * Build merged 2D vision position IDs in the layout expected by vision M-RoPE.
  *

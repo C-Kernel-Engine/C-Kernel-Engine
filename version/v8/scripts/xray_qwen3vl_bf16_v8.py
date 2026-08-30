@@ -17,7 +17,7 @@ import xray_numerical_parity_v8 as xray
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
-CAPTURE_SCRIPT = SCRIPT_DIR / "compare_qwen3vl_bf16_vision_hidden_v8.py"
+DEFAULT_CAPTURE_SCRIPT = SCRIPT_DIR / "compare_qwen3vl_bf16_vision_hidden_v8.py"
 DEFAULT_PROFILE = SCRIPT_DIR.parent / "parity_profiles" / "qwen3vl_pytorch_bf16_v1.json"
 
 
@@ -64,7 +64,7 @@ def _apply_observed_storage(manifest: Dict[str, Any], observed_storage: Dict[str
 
 def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path) -> Path:
     cmd = [
-        sys.executable, str(CAPTURE_SCRIPT),
+        sys.executable, str(args.capture_script),
         "--checkpoint", str(args.checkpoint),
         "--runtime-dir", str(args.runtime_dir),
         "--weights-bump", str(args.weights_bump),
@@ -72,6 +72,8 @@ def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path
         "--out-dir", str(round_dir / "capture"),
         "--threads", str(args.threads),
         "--attn-implementation", args.attn_implementation,
+        "--architecture", args.architecture,
+        "--model-so-name", args.model_so_name,
     ]
     if args.torch_prefix:
         cmd.extend(["--torch-prefix", str(args.torch_prefix)])
@@ -145,11 +147,11 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         tensor_report = xray.load_json(tensor_report_path)
         ck_manifest = manifest_builder.build_manifest(
             backend="ck", call_ir=call_ir, tensor_report=tensor_report,
-            model="qwen3vl", source=str(args.runtime_dir), phase="prefill", requested=set(active),
+            model=args.model, source=str(args.runtime_dir), phase="prefill", requested=set(active),
         )
         torch_manifest = manifest_builder.build_manifest(
             backend="pytorch", call_ir=call_ir, tensor_report=tensor_report,
-            model="qwen3vl", source=str(args.checkpoint), phase="prefill",
+            model=args.model, source=str(args.checkpoint), phase="prefill",
             storage_dtype_override=observed_storage["default"], requested=set(active),
         )
         _apply_observed_storage(torch_manifest, observed_storage)
@@ -205,6 +207,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ck-import-layer", type=int)
     parser.add_argument("--ck-import-checkpoint", choices=("layer_input", "after_attn"), default="layer_input")
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
+    parser.add_argument("--capture-script", type=Path, default=DEFAULT_CAPTURE_SCRIPT)
+    parser.add_argument("--model", default="qwen3vl")
+    parser.add_argument("--architecture", choices=("qwen3vl", "cohere_compass"), default="qwen3vl")
+    parser.add_argument("--model-so-name", default="libqwen3vl_bf16_encoder_v8.so")
     parser.add_argument("--ranking-report", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("build/xray/qwen3vl_bf16"))
     parser.add_argument("--threads", type=int, default=int(os.environ.get("CK_NUM_THREADS", "20")))

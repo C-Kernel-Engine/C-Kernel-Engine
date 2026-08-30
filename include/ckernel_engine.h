@@ -4753,6 +4753,14 @@ void embedding_forward_bf16_fp32(const int32_t *token_ids,
 	                                                         int embed_dim,
 	                                                         int merge_size,
 	                                                         int source_grid_size);
+	void position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16(
+	    float *x,
+	    const float *position_embd,
+	    int grid_h,
+	    int grid_w,
+	    int embed_dim,
+	    int merge_size,
+	    int source_grid_size);
 	void position_embeddings_add_gemma4v_xy(float *x,
 	                                       const float *position_embd,
 	                                       int grid_h,

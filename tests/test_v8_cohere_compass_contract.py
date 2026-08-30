@@ -225,6 +225,15 @@ class CohereCompassContractTests(unittest.TestCase):
         )
         self.assertEqual(vision["name"], "cohere_compass_vision")
         self.assertEqual(vision["inherited_from"], "qwen3_vl_vision")
+        self.assertEqual(
+            vision["kernels"]["position_embeddings"],
+            "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+        )
+        self.assertEqual(
+            vision["required_numerical_contracts"]["vision.frontend.position"]
+            ["phases"]["prefill"]["contract_id"],
+            "bf16_table_fp32_tiled_2d_align_corners_bf16_residual",
+        )
         self.assertEqual(vision["block_types"]["vision_encoder"]["branches"][0]["name"], "deepstack")
         self.assertEqual(
             composition["resolved_components"]["decoder"]["circuit"],

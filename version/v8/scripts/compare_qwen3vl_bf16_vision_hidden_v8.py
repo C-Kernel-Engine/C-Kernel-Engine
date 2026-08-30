@@ -48,17 +48,28 @@ def _metrics(ref: np.ndarray, got: np.ndarray) -> dict[str, float | bool]:
     }
 
 
-def _load_visual_model(checkpoint: Path, attn_implementation: str):
+def _load_visual_model(checkpoint: Path, attn_implementation: str, architecture: str):
     import torch
     from safetensors.torch import load_file
-    from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLVisionConfig
-    from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
+
+    if architecture == "cohere_compass":
+        from transformers.models.cohere_compass.configuration_cohere_compass import CohereCompassVisionConfig
+        from transformers.models.cohere_compass.modeling_cohere_compass import CohereCompassVisionModel
+
+        config_type = CohereCompassVisionConfig
+        model_type = CohereCompassVisionModel
+    else:
+        from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLVisionConfig
+        from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
+
+        config_type = Qwen3VLVisionConfig
+        model_type = Qwen3VLVisionModel
 
     cfg = json.loads((checkpoint / "config.json").read_text(encoding="utf-8"))
-    vision_cfg = Qwen3VLVisionConfig(**cfg["vision_config"])
+    vision_cfg = config_type(**cfg["vision_config"])
     if attn_implementation != "auto":
         vision_cfg._attn_implementation = attn_implementation
-    model = Qwen3VLVisionModel(vision_cfg)
+    model = model_type(vision_cfg)
     inv_freq_fp32 = model.rotary_pos_emb.inv_freq.detach().clone().float()
     model.to(dtype=torch.bfloat16)
     # Hugging Face's full Qwen3-VL BF16 loader keeps the rotary frequency
@@ -66,9 +77,13 @@ def _load_visual_model(checkpoint: Path, attn_implementation: str):
     # prefix by enough to produce false CK-vs-PyTorch attribution failures.
     model.rotary_pos_emb.register_buffer("inv_freq", inv_freq_fp32, persistent=False)
 
-    index = json.loads((checkpoint / "model.safetensors.index.json").read_text(encoding="utf-8"))
-    weight_map = index["weight_map"]
-    needed_files = sorted({fname for key, fname in weight_map.items() if key.startswith("model.visual.")})
+    index_path = checkpoint / "model.safetensors.index.json"
+    if index_path.is_file():
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        weight_map = index["weight_map"]
+        needed_files = sorted({fname for key, fname in weight_map.items() if key.startswith("model.visual.")})
+    else:
+        needed_files = ["model.safetensors"]
     state: dict[str, torch.Tensor] = {}
     for fname in needed_files:
         tensors = load_file(str(checkpoint / fname), device="cpu")
@@ -89,6 +104,15 @@ def _parse_selector(selector: str) -> tuple[str, int | None]:
     return name, int(layer_s)
 
 
+def _ck_semantic_selector(selector: str) -> tuple[str, int | None]:
+    name, layer = _parse_selector(selector)
+    if name != "layer_input" or layer is None:
+        return name, layer
+    if layer == 0:
+        return "vision_position_embeddings", None
+    return "layer_out", layer - 1
+
+
 def _torch_captures(
     checkpoint: Path,
     image: Path,
@@ -96,17 +120,25 @@ def _torch_captures(
     out_dir: Path,
     attn_implementation: str,
     selectors: list[str],
+    architecture: str,
 ) -> dict[str, Any]:
     import torch
     from PIL import Image
     from transformers import AutoProcessor
-    from transformers.models.qwen3_vl.modeling_qwen3_vl import (
-        ALL_ATTENTION_FUNCTIONS,
-        apply_rotary_pos_emb_vision,
-        eager_attention_forward,
-    )
+    if architecture == "cohere_compass":
+        from transformers.models.cohere_compass.modeling_cohere_compass import (
+            ALL_ATTENTION_FUNCTIONS,
+            apply_rotary_pos_emb_vision,
+            eager_attention_forward,
+        )
+    else:
+        from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+            ALL_ATTENTION_FUNCTIONS,
+            apply_rotary_pos_emb_vision,
+            eager_attention_forward,
+        )
 
-    model = _load_visual_model(checkpoint, attn_implementation)
+    model = _load_visual_model(checkpoint, attn_implementation, architecture)
     captures: dict[str, torch.Tensor] = {}
     parsed = [_parse_selector(sel) for sel in selectors]
     frontend_wanted = {name for name, layer in parsed if layer is None}
@@ -118,6 +150,9 @@ def _torch_captures(
     handles: list[Any] = []
     original_mlp_forwards: list[tuple[Any, Any]] = []
     original_attn_forwards: list[tuple[Any, Any]] = []
+
+    class _CaptureComplete(RuntimeError):
+        pass
 
     if "vision_spatial_merge" in frontend_wanted:
         def capture_spatial_merge(_module, _inputs, output):
@@ -147,6 +182,11 @@ def _torch_captures(
     def make_norm1_hook(layer: int):
         def hook(_module, _inputs, output):
             captures[f"ln1@{layer}"] = output.detach().cpu().float()
+        return hook
+
+    def make_layer_input_hook(layer: int):
+        def hook(_module, inputs):
+            captures[f"layer_input@{layer}"] = inputs[0].detach().cpu().float()
         return hook
 
     def make_attn_forward(attn: Any, layer: int, original_forward: Any):
@@ -212,7 +252,12 @@ def _torch_captures(
 
             attention_interface = eager_attention_forward
             if attn.config._attn_implementation != "eager":
-                attention_interface = ALL_ATTENTION_FUNCTIONS[attn.config._attn_implementation]
+                if hasattr(ALL_ATTENTION_FUNCTIONS, "get_interface"):
+                    attention_interface = ALL_ATTENTION_FUNCTIONS.get_interface(
+                        attn.config._attn_implementation, eager_attention_forward
+                    )
+                else:
+                    attention_interface = ALL_ATTENTION_FUNCTIONS[attn.config._attn_implementation]
 
             if attn.config._attn_implementation == "flash_attention_2":
                 max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
@@ -274,6 +319,11 @@ def _torch_captures(
             captures[f"layer_out@{layer}"] = output.detach().cpu().float()
         return hook
 
+    def make_stop_hook():
+        def hook(_module, _inputs, _output):
+            raise _CaptureComplete
+        return hook
+
     def make_norm2_pre_hook(layer: int):
         def hook(_module, inputs):
             captures[f"after_attn@{layer}"] = inputs[0].detach().cpu().float()
@@ -301,10 +351,23 @@ def _torch_captures(
             return original_forward(hidden_state)
         return mlp_forward
 
+    downstream_frontend = {
+        "vision_spatial_merge",
+        "vision_projector_fc1",
+        "vision_projector_gelu",
+        "vision_projector_out",
+        "vision_output",
+    }
+    stop_after_layer = None
+    if wanted_by_layer and not (frontend_wanted & downstream_frontend) and torch_prefix is None:
+        stop_after_layer = max(wanted_by_layer)
+
     for layer, wanted in wanted_by_layer.items():
         if layer < 0 or layer >= len(model.blocks):
             raise ValueError(f"selector layer {layer} out of range for {len(model.blocks)} vision blocks")
         block = model.blocks[layer]
+        if "layer_input" in wanted:
+            handles.append(block.register_forward_pre_hook(make_layer_input_hook(layer)))
         if "ln1" in wanted:
             handles.append(block.norm1.register_forward_hook(make_norm1_hook(layer)))
         if {"qkv_packed", "q_proj", "k_proj", "v_proj", "rope_q", "rope_k", "attn_out_head_major", "out_proj"} & wanted:
@@ -321,30 +384,58 @@ def _torch_captures(
             original_forward = block.mlp.forward
             original_mlp_forwards.append((block.mlp, original_forward))
             block.mlp.forward = make_mlp_forward(block, layer, original_forward)  # type: ignore[method-assign]
+        if layer == stop_after_layer:
+            handles.append(block.register_forward_hook(make_stop_hook()))
 
     processor = AutoProcessor.from_pretrained(str(checkpoint), local_files_only=True)
     image_obj = Image.open(image).convert("RGB")
-    proc = processor.image_processor(
-        images=image_obj,
-        return_tensors="pt",
-        min_pixels=1,
-        max_pixels=1048576,
-    )
+    processor_kwargs: dict[str, Any] = {}
+    if architecture == "qwen3vl":
+        processor_kwargs.update(min_pixels=1, max_pixels=1048576)
+    proc = processor.image_processor(images=image_obj, return_tensors="pt", **processor_kwargs)
     pixel_values = proc["pixel_values"].to(dtype=torch.bfloat16)
     grid = proc["image_grid_thw"]
+    frontend_only = {
+        "vision_patch_sum",
+        "vision_patch_bias",
+        "vision_patch_projection",
+        "vision_position_embeddings",
+    }
+    needs_model_forward = any(layer is not None for _name, layer in parsed) or bool(
+        frontend_wanted - frontend_only
+    )
+    final = None
+    deepstack: list[torch.Tensor] = []
 
     try:
         with torch.no_grad():
-            if {"vision_patch_sum", "vision_patch_bias", "vision_position_embeddings"} & frontend_wanted:
+            if {
+                "vision_patch_sum",
+                "vision_patch_bias",
+                "vision_patch_projection",
+                "vision_position_embeddings",
+            } & frontend_wanted:
                 patch_sum = model.patch_embed(pixel_values)
                 if "vision_patch_sum" in frontend_wanted:
                     captures["vision_patch_sum"] = patch_sum.detach().cpu().float()
                 if "vision_patch_bias" in frontend_wanted:
                     captures["vision_patch_bias"] = patch_sum.detach().cpu().float()
+                if "vision_patch_projection" in frontend_wanted:
+                    captures["vision_patch_projection"] = patch_sum.detach().cpu().float()
                 if "vision_position_embeddings" in frontend_wanted:
                     pos_embeds = model.fast_pos_embed_interpolate(grid)
                     captures["vision_position_embeddings"] = (patch_sum + pos_embeds).detach().cpu().float()
-            final, deepstack = model(pixel_values, grid_thw=grid)
+            if needs_model_forward:
+                try:
+                    model_output = model(pixel_values, grid_thw=grid)
+                except _CaptureComplete:
+                    model_output = None
+                if model_output is not None:
+                    if architecture == "cohere_compass":
+                        final = model_output.pooler_output
+                        deepstack = model_output.deepstack_features
+                    else:
+                        final, deepstack = model_output
     finally:
         for mlp, original_forward in original_mlp_forwards:
             mlp.forward = original_forward  # type: ignore[method-assign]
@@ -354,10 +445,14 @@ def _torch_captures(
             handle.remove()
 
     if "vision_output" in frontend_wanted:
+        if final is None:
+            raise RuntimeError("vision_output requested without running the vision model")
         captures["vision_output"] = torch.cat([final, *deepstack], dim=-1).detach().cpu().float()
 
     prefix_orders: dict[str, dict[str, float]] = {}
     if torch_prefix is not None and torch_prefix.exists():
+        if final is None:
+            raise RuntimeError("--torch-prefix requires a full vision-model capture")
         ref_prefix = np.fromfile(torch_prefix, dtype=np.float32)
         candidates = {
             "final_then_deep": torch.cat([final, *deepstack], dim=-1),
@@ -382,6 +477,7 @@ def _torch_captures(
         tensor_meta[name] = {"path": str(path), "shape": list(arr.shape)}
 
     return {
+        "architecture": architecture,
         "pixel_values_shape": list(pixel_values.shape),
         "grid_thw": grid.tolist(),
         "prefix_order_metrics": prefix_orders,
@@ -467,7 +563,14 @@ def _qwen3vl_processor_pixels_to_planar(
     return planar.reshape(-1).astype(np.float32, copy=False).tolist()
 
 
-def _load_qwen3vl_processor_planar(checkpoint: Path, image: Path, *, height: int, width: int) -> list[float]:
+def _load_processor_planar(
+    checkpoint: Path,
+    image: Path,
+    *,
+    height: int,
+    width: int,
+    architecture: str,
+) -> list[float]:
     import torch
     from PIL import Image
     from transformers import AutoProcessor
@@ -480,12 +583,10 @@ def _load_qwen3vl_processor_planar(checkpoint: Path, image: Path, *, height: int
 
     processor = AutoProcessor.from_pretrained(str(checkpoint), local_files_only=True)
     image_obj = Image.open(image).convert("RGB")
-    proc = processor.image_processor(
-        images=image_obj,
-        return_tensors="pt",
-        min_pixels=1,
-        max_pixels=1048576,
-    )
+    processor_kwargs: dict[str, Any] = {}
+    if architecture == "qwen3vl":
+        processor_kwargs.update(min_pixels=1, max_pixels=1048576)
+    proc = processor.image_processor(images=image_obj, return_tensors="pt", **processor_kwargs)
     pixel_values = proc["pixel_values"].detach().to(dtype=torch.float32).cpu().numpy()
     grid = [int(x) for x in proc["image_grid_thw"][0].tolist()]
     return _qwen3vl_processor_pixels_to_planar(
@@ -501,29 +602,61 @@ def _load_qwen3vl_processor_planar(checkpoint: Path, image: Path, *, height: int
 def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> np.ndarray:
     runtime_dir = args.runtime_dir.resolve()
     cfg = json.loads((runtime_dir / "config.json").read_text(encoding="utf-8"))
-    planar_image = _load_qwen3vl_processor_planar(
+    planar_image = _load_processor_planar(
         args.checkpoint.resolve(),
         args.image.resolve(),
         height=int(cfg["image_height"]),
         width=int(cfg["image_width"]),
+        architecture=args.architecture,
     )
     restore_import_path = os.environ.get("CK_DEBUG_IMPORT_HIDDEN")
     restore_import_checkpoint = os.environ.get("CK_DEBUG_IMPORT_CHECKPOINT")
     restore_import_layer = os.environ.get("CK_DEBUG_IMPORT_LAYER")
+    restore_stop_op = os.environ.get("CK_STOP_OP")
+    requested_name, _ = _parse_selector(selector)
+    semantic_name, semantic_layer = _ck_semantic_selector(selector)
+    call_ir = json.loads((runtime_dir / "call.json").read_text(encoding="utf-8"))
+    stop_op = None
+    stop_buffer_ref = None
+    for operation in call_ir.get("operations", []):
+        for checkpoint in operation.get("semantic_checkpoints", []):
+            checkpoint_layer = int(checkpoint.get("layer", -1))
+            if str(checkpoint.get("tensor")) == semantic_name and (
+                semantic_layer is None or checkpoint_layer == semantic_layer
+            ):
+                output_refs = {
+                    str(argument["buffer_ref"])
+                    for argument in operation.get("args", [])
+                    if str(argument.get("source", "")).startswith("output:")
+                    and argument.get("buffer_ref")
+                }
+                if len(output_refs) == 1:
+                    stop_op = int(operation["idx"])
+                    stop_buffer_ref = next(iter(output_refs))
+                break
+        if stop_op is not None:
+            break
+    if stop_op is not None:
+        os.environ["CK_STOP_OP"] = str(stop_op)
+    numeric_output_name = stop_buffer_ref or selector
     if args.ck_import_layer_input is not None:
         os.environ["CK_DEBUG_IMPORT_HIDDEN"] = str(args.ck_import_layer_input.resolve())
         os.environ["CK_DEBUG_IMPORT_CHECKPOINT"] = str(args.ck_import_checkpoint)
         os.environ["CK_DEBUG_IMPORT_LAYER"] = str(args.ck_import_layer)
     try:
         data = numeric._run_generated_encoder(
-            model_so=runtime_dir / "libqwen3vl_bf16_encoder_v8.so",
+            model_so=runtime_dir / args.model_so_name,
             weights_bump=args.weights_bump.resolve(),
             manifest_map=runtime_dir / "weights_manifest.map",
             layout_path=runtime_dir / "layout.json",
             planar_image=planar_image,
-            output_name=selector,
+            output_name=numeric_output_name,
         )
     finally:
+        if restore_stop_op is None:
+            os.environ.pop("CK_STOP_OP", None)
+        else:
+            os.environ["CK_STOP_OP"] = restore_stop_op
         if args.ck_import_layer_input is not None:
             if restore_import_path is None:
                 os.environ.pop("CK_DEBUG_IMPORT_HIDDEN", None)
@@ -565,6 +698,8 @@ def _run_ck_selector_isolated(args: argparse.Namespace, selector: str, output: P
         "--out-dir", str(args.out_dir),
         "--threads", str(args.threads),
         "--attn-implementation", str(args.attn_implementation),
+        "--architecture", str(args.architecture),
+        "--model-so-name", str(args.model_so_name),
         "--ck-worker-selector", selector,
         "--ck-worker-output", str(output),
     ]
@@ -597,6 +732,8 @@ def _run_torch_captures_isolated(args: argparse.Namespace, selectors: list[str])
         "--out-dir", str(args.out_dir),
         "--threads", str(args.threads),
         "--attn-implementation", str(args.attn_implementation),
+        "--architecture", str(args.architecture),
+        "--model-so-name", str(args.model_so_name),
         "--skip-ck",
     ]
     if args.torch_prefix is not None:
@@ -618,7 +755,7 @@ def _run_torch_captures_isolated(args: argparse.Namespace, selectors: list[str])
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Compare Qwen3-VL BF16 vision hidden tensors against CK hidden exports.")
+    ap = argparse.ArgumentParser(description="Compare BF16 vision hidden tensors against CK hidden exports.")
     ap.add_argument("--checkpoint", type=Path, required=True)
     ap.add_argument("--runtime-dir", type=Path, required=True)
     ap.add_argument("--weights-bump", type=Path, required=True)
@@ -633,6 +770,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--threads", type=int, default=int(os.environ.get("CK_NUM_THREADS", "20") or "20"))
     ap.add_argument("--attn-implementation", choices=("auto", "eager", "sdpa"), default="auto")
+    ap.add_argument("--architecture", choices=("qwen3vl", "cohere_compass"), default="qwen3vl")
+    ap.add_argument("--model-so-name", default="libqwen3vl_bf16_encoder_v8.so")
     ap.add_argument("--ck-import-layer-input", type=Path, help="Inject an exact FP32 tensor before a CK layer's first residual save")
     ap.add_argument("--ck-import-layer", type=int, help="Layer index for --ck-import-layer-input")
     ap.add_argument("--ck-import-checkpoint", choices=("layer_input", "after_attn"), default="layer_input")
@@ -671,6 +810,7 @@ def main(argv: list[str] | None = None) -> int:
             args.out_dir,
             args.attn_implementation,
             selectors,
+            args.architecture,
         )
     else:
         torch_report = _run_torch_captures_isolated(args, selectors)
@@ -715,6 +855,7 @@ def main(argv: list[str] | None = None) -> int:
         "image": str(args.image),
         "selectors": selectors,
         "attn_implementation": args.attn_implementation,
+        "architecture": args.architecture,
         "timings_sec": {
             "torch": t_torch - t0,
             "total": time.perf_counter() - t0,

@@ -2616,6 +2616,12 @@ def _prepare_prebuilt_encoder_geometry_runtime(
             "prebuilt geometry adaptation currently supports only the declared "
             f"Cohere Compass native-resolution contract, got {encoder_model!r}"
         )
+    circuit = build_ir_v8._load_builtin_template_doc(encoder_model)
+    if not isinstance(circuit, dict):
+        raise RuntimeError(
+            f"geometry-adapted encoder circuit is unavailable: {encoder_model!r}"
+        )
+    manifest["template"] = circuit
     config.update(_cohere_compass_geometry_overrides(config, image_path))
     geometry_identity = {
         "source_manifest_sha256": hashlib.sha256(
@@ -2624,6 +2630,9 @@ def _prepare_prebuilt_encoder_geometry_runtime(
         "image_width": int(config["image_width"]),
         "image_height": int(config["image_height"]),
         "vision_num_patches": int(config["vision_num_patches"]),
+        "circuit_sha256": hashlib.sha256(
+            json.dumps(circuit, sort_keys=True).encode("utf-8")
+        ).hexdigest(),
     }
     cache_key = hashlib.sha256(
         json.dumps(geometry_identity, sort_keys=True).encode("utf-8")

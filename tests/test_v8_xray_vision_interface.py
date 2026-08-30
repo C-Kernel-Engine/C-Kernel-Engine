@@ -14,6 +14,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "version" / "v8" / "scripts"
 PROFILE = ROOT / "version" / "v8" / "parity_profiles" / "qwen3vl_llamacpp_q8_v1.json"
+COHERE_PROFILE = ROOT / "version" / "v8" / "parity_profiles" / "cohere_compass_pytorch_bf16_v1.json"
 
 
 def load_module(name: str, path: Path):
@@ -31,6 +32,10 @@ if str(SCRIPTS) not in sys.path:
 frontend = load_module("xray_vision_parity_v8_test", SCRIPTS / "xray_vision_parity_v8.py")
 llama = load_module("xray_qwen3vl_llamacpp_v8_test", SCRIPTS / "xray_qwen3vl_llamacpp_v8.py")
 xray = load_module("xray_numerical_parity_v8_test_interface", SCRIPTS / "xray_numerical_parity_v8.py")
+torch_compare = load_module(
+    "compare_qwen3vl_bf16_vision_hidden_v8_test_interface",
+    SCRIPTS / "compare_qwen3vl_bf16_vision_hidden_v8.py",
+)
 
 
 class XRayVisionInterfaceTests(unittest.TestCase):
@@ -46,10 +51,35 @@ class XRayVisionInterfaceTests(unittest.TestCase):
         self.assertEqual(result, 0)
         adapter.assert_called_once_with(["--checkpoint", "model"])
 
+    def test_frontend_dispatches_cohere_compass_pytorch(self) -> None:
+        with mock.patch.object(frontend.cohere_pytorch_adapter, "main", return_value=0) as adapter:
+            result = frontend.dispatch(
+                ["--model", "cohere_compass", "--backend", "pytorch", "--checkpoint", "model"]
+            )
+        self.assertEqual(result, 0)
+        adapter.assert_called_once_with(["--checkpoint", "model"])
+
     def test_llama_profile_is_schema_valid(self) -> None:
         profile = xray.load_json(PROFILE)
         xray.validate(profile, xray.PROFILE_SCHEMA, "llama profile")
         self.assertEqual(profile["backend"], "llamacpp")
+
+    def test_cohere_compass_profile_is_schema_valid(self) -> None:
+        profile = xray.load_json(COHERE_PROFILE)
+        xray.validate(profile, xray.PROFILE_SCHEMA, "Cohere Compass profile")
+        self.assertEqual(profile["backend"], "pytorch")
+        self.assertEqual(profile["observed_storage"]["default"], "bf16")
+
+    def test_layer_input_selector_resolves_to_its_declared_producer(self) -> None:
+        self.assertEqual(
+            torch_compare._ck_semantic_selector("layer_input@0"),
+            ("vision_position_embeddings", None),
+        )
+        self.assertEqual(
+            torch_compare._ck_semantic_selector("layer_input@9"),
+            ("layer_out", 8),
+        )
+        self.assertEqual(torch_compare._ck_semantic_selector("q_proj@3"), ("q_proj", 3))
 
     def test_legacy_results_are_reordered_by_semantic_circuit_position(self) -> None:
         profile = xray.load_json(PROFILE)

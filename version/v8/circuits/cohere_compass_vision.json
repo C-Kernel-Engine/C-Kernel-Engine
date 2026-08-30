@@ -10,5 +10,19 @@
       "output": "vision_embeddings",
       "projector": "cohere_compass_merger"
     }
+  },
+  "kernels": {
+    "position_embeddings": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16"
+  },
+  "required_numerical_contracts": {
+    "vision.frontend.position": {
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_table_fp32_tiled_2d_align_corners_bf16_residual",
+          "validation": "validated",
+          "evidence": "unittest/bf16/test_vision_position_fp32_interp_bf16.py and Cohere Compass official PyTorch X-Ray at native 2208x1696 geometry"
+        }
+      }
+    }
   }
 }

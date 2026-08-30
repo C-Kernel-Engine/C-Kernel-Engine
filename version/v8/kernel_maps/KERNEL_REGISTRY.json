@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 310,
+      "total": 311,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -78,7 +78,7 @@
         "optimizer": 4,
         "partial_rope_concat": 3,
         "patch_projection": 2,
-        "position_embeddings": 6,
+        "position_embeddings": 7,
         "position_ids": 1,
         "projector_prep": 1,
         "q_norm": 1,
@@ -38570,6 +38570,167 @@
       },
       "name": "position_embeddings_add_tiled_2d_align_corners_bf16",
       "_source_file": "position_embeddings_add_tiled_2d_align_corners_bf16.json"
+    },
+    {
+      "id": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+      "op": "position_embeddings",
+      "operation_interface": "position_embeddings.tiled_2d.bf16_table_fp32_interp.v1",
+      "variant": "absolute_learned_inplace_tiled_2d_align_corners_bf16_table_fp32_interp",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "desc": "FP32 ABI carrying BF16-rounded token-major values"
+        }
+      ],
+      "weights": [
+        {
+          "name": "pos_emb",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "E"
+          ],
+          "layout": "row_major_contiguous",
+          "access": "read",
+          "storage_class": "parameter",
+          "consumption": "required",
+          "desc": "FP32 ABI carrying BF16 learned position values"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "alias_of": "input:x",
+          "desc": "FP32 ABI carrying BF16-rounded residual output"
+        }
+      ],
+      "dims": [
+        "grid_h",
+        "grid_w",
+        "embed_dim",
+        "merge_size",
+        "source_grid_size"
+      ],
+      "impl": {
+        "function": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+        "c_declaration": "void position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16(float *x, const float *position_embd, int grid_h, int grid_w, int embed_dim, int merge_size, int source_grid_size);",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "bf16_table_fp32_tiled_2d_align_corners_bf16_residual",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "x",
+            "source": "output:x",
+            "cast": "float*",
+            "ports": [
+              "input:x",
+              "output:x"
+            ]
+          },
+          {
+            "name": "position_embd",
+            "source": "weight:pos_emb",
+            "cast": "const float*",
+            "ports": [
+              "weight:pos_emb"
+            ]
+          },
+          {
+            "name": "grid_h",
+            "source": "dim:vision_grid_h"
+          },
+          {
+            "name": "grid_w",
+            "source": "dim:vision_grid_w"
+          },
+          {
+            "name": "embed_dim",
+            "source": "dim:embed_dim"
+          },
+          {
+            "name": "merge_size",
+            "source": "dim:merge_size"
+          },
+          {
+            "name": "source_grid_size",
+            "source": "dim:source_grid_size"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/bf16/test_vision_position_fp32_interp_bf16.py"
+        ],
+        "production_shapes": [
+          "grid=106x138,D=1152"
+        ],
+        "oracle": "Official PyTorch Cohere Compass BF16 table with FP32 interpolation and BF16 residual boundaries"
+      },
+      "notes": "Mixed-precision align-corners interpolation selected by the circuit numerical contract; no model-name dispatch is present in the compiler.",
+      "name": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+      "_source_file": "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16.json"
     },
     {
       "id": "q_norm_forward",

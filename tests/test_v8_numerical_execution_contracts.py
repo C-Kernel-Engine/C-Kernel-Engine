@@ -13,6 +13,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "version" / "v8" / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+import build_ir_v8  # type: ignore
+
 SCRIPT = ROOT / "version" / "v8" / "scripts" / "resolve_numerical_execution_contracts_v8.py"
 SPEC = importlib.util.spec_from_file_location("resolve_numerical_execution_contracts_v8", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -573,15 +578,15 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 310)
+        self.assertEqual(report["counts"]["kernel_maps"], 311)
         self.assertEqual(report["counts"]["physical_layout_maps"], 6)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 116)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 65)
+        self.assertEqual(report["counts"]["resolver_governed_maps"], 117)
+        self.assertEqual(report["counts"]["interface_hardened_maps"], 66)
         self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 65
+            report["counts"]["interface_abi_crossvalidated_maps"], 66
         )
         self.assertEqual(report["counts"]["contract_pending_maps"], 51)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 183)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 184)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 34)
         self.assertEqual(report["counts"]["selection_managed_maps"], 75)
         self.assertEqual(report["selection"]["legacy_selection_if_statements"], 67)
@@ -694,6 +699,27 @@ class NumericalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             plan["kernel"]["function"],
             "position_embeddings_add_tiled_2d_align_corners_bf16",
+        )
+
+    def test_cohere_position_contract_resolves_mixed_precision_kernel(self):
+        circuit_doc = build_ir_v8._load_builtin_template_doc(
+            "cohere_compass_vision"
+        )
+        plan = resolver.resolve_contract(
+            circuit_doc,
+            self.contracts,
+            self.kernels,
+            "vision.frontend.position",
+            "prefill",
+            mode="production",
+        )
+        self.assertEqual(
+            plan["contract"]["id"],
+            "bf16_table_fp32_tiled_2d_align_corners_bf16_residual",
+        )
+        self.assertEqual(
+            plan["kernel"]["id"],
+            "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
         )
 
     def test_fp32_position_contract_resolves_exact_kernel_and_evaluation_order(self):

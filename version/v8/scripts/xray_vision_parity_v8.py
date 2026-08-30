@@ -9,11 +9,13 @@ from typing import Sequence
 
 import xray_qwen3vl_bf16_v8 as pytorch_adapter
 import xray_qwen3vl_llamacpp_v8 as llamacpp_adapter
+import xray_cohere_compass_bf16_v8 as cohere_pytorch_adapter
 
 
 BACKENDS = {
-    "llamacpp": llamacpp_adapter,
-    "pytorch": pytorch_adapter,
+    ("qwen3vl", "llamacpp"): llamacpp_adapter,
+    ("qwen3vl", "pytorch"): pytorch_adapter,
+    ("cohere_compass", "pytorch"): cohere_pytorch_adapter,
 }
 
 
@@ -26,14 +28,17 @@ def _parser() -> argparse.ArgumentParser:
         ),
         add_help=False,
     )
-    parser.add_argument("--backend", choices=tuple(BACKENDS), required=True)
+    parser.add_argument("--model", choices=("qwen3vl", "cohere_compass"), default="qwen3vl")
+    parser.add_argument("--backend", choices=("llamacpp", "pytorch"), required=True)
     parser.add_argument("-h", "--help", action="store_true")
     return parser
 
 
 def dispatch(argv: Sequence[str] | None = None) -> int:
     args, remaining = _parser().parse_known_args(list(argv) if argv is not None else None)
-    adapter = BACKENDS[args.backend]
+    adapter = BACKENDS.get((args.model, args.backend))
+    if adapter is None:
+        _parser().error(f"backend {args.backend!r} is not available for model {args.model!r}")
     if args.help:
         remaining = ["--help", *remaining]
     return int(adapter.main(remaining))
