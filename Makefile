@@ -4764,10 +4764,7 @@ help:
 	@echo "  make bench_gemm       GEMM benchmarks (Native/MKL/PyTorch)"
 	@echo ""
 	@echo "Interactive Tools:"
-	@echo "  make ck-chat          Build interactive CLI (C-based)"
 	@echo "  make ck-server        Build streaming HTTP server (C-based)"
-	@echo "  make ck-chat-py       Run interactive chat (Python + C inference)"
-	@echo "  make ck-server-py     Run streaming server (Python + C inference)"
 	@echo ""
 	@echo "  make clean            Remove all built libraries"
 
@@ -4965,10 +4962,9 @@ litmus-test:
 # ============================================================================
 
 CK_TOKENIZER := src/ck_tokenizer.c
-CK_MAIN := tools/ck_main.c
 CK_SERVER := tools/ck_server.c
 CK_CLI := tools/ck.c
-CK_CLI_V4 := tools/ck_v4.c
+CK_CLI_V4 := version/v6.6/tools/ck_v4.c
 CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
@@ -5343,25 +5339,12 @@ ifndef MODEL
 endif
 	@$(BUILD_DIR)/ck run $(MODEL) --generate-only --verbose
 
-$(BUILD_DIR)/ck_main: $(BUILD_DIR) $(CK_MAIN) $(CK_TOKENIZER) include/ck_tokenizer.h
-	$(CC) $(CFLAGS) -o $@ $(CK_MAIN) $(CK_TOKENIZER) -lm
-
 $(BUILD_DIR)/ck_server: $(BUILD_DIR) $(CK_SERVER)
 	$(CC) $(CFLAGS) -o $@ $(CK_SERVER) -lpthread
-
-ck-chat: $(BUILD_DIR)/ck_main
-	@echo "Interactive CLI built: $(BUILD_DIR)/ck_main"
-	@echo "Usage: ./$(BUILD_DIR)/ck_main --help"
 
 ck-server: $(BUILD_DIR)/ck_server
 	@echo "Server built: $(BUILD_DIR)/ck_server"
 	@echo "Usage: ./$(BUILD_DIR)/ck_server --port 8080"
-
-ck-chat-py:
-	$(PYTHON) $(PYTHONFLAGS) tools/ck_chat.py --model-dir $(SMOLLM_MODEL_DIR) --context $(SMOLLM_CONTEXT)
-
-ck-server-py:
-	$(PYTHON) $(PYTHONFLAGS) tools/ck_server.py --model-dir $(SMOLLM_MODEL_DIR) --context $(SMOLLM_CONTEXT)
 
 # ============================================================================
 # System Configuration and Topology
@@ -5566,7 +5549,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants llamacpp-parity-stitched llamacpp-parity-full-stitched showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-nightly v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-advisor profile-v7-cachegrind profile-v7-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-server generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants llamacpp-parity-stitched llamacpp-parity-full-stitched showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-nightly v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-advisor profile-v7-cachegrind profile-v7-full
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
