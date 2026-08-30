@@ -36,6 +36,10 @@ torch_compare = load_module(
     "compare_qwen3vl_bf16_vision_hidden_v8_test_interface",
     SCRIPTS / "compare_qwen3vl_bf16_vision_hidden_v8.py",
 )
+torch_adapter = load_module(
+    "xray_qwen3vl_bf16_v8_test_interface",
+    SCRIPTS / "xray_qwen3vl_bf16_v8.py",
+)
 
 
 class XRayVisionInterfaceTests(unittest.TestCase):
@@ -69,6 +73,39 @@ class XRayVisionInterfaceTests(unittest.TestCase):
         xray.validate(profile, xray.PROFILE_SCHEMA, "Cohere Compass profile")
         self.assertEqual(profile["backend"], "pytorch")
         self.assertEqual(profile["observed_storage"]["default"], "bf16")
+        self.assertIn(
+            "vision.layer.16.output->vision.layer.24.output",
+            profile["interval_expansions"],
+        )
+        self.assertIn(
+            "vision.layer.24.output->vision.layer.26.output",
+            profile["interval_expansions"],
+        )
+
+    def test_pytorch_capture_uses_isolated_oracle_runtime(self) -> None:
+        args = argparse.Namespace(
+            oracle_python="/opt/oracle/bin/python",
+            oracle_pythonpath=[Path("/opt/transformers/src"), Path("/opt/oracle/deps")],
+            capture_script=Path("capture.py"),
+            checkpoint=Path("checkpoint"),
+            runtime_dir=Path("runtime"),
+            weights_bump=Path("weights.bump"),
+            image=Path("image.jpg"),
+            threads=16,
+            attn_implementation="sdpa",
+            architecture="cohere_compass",
+            model_so_name="libencoder_v8.so",
+        )
+        command = torch_adapter._capture_command(args, [], Path("round"))
+        with mock.patch.dict(os.environ, {"PYTHONPATH": "/existing"}, clear=False):
+            environment = torch_adapter._capture_environment(args)
+
+        self.assertEqual(command[0], "/opt/oracle/bin/python")
+        self.assertEqual(
+            environment["PYTHONPATH"],
+            os.pathsep.join(["/opt/transformers/src", "/opt/oracle/deps", "/existing"]),
+        )
+        self.assertEqual(environment["OMP_NUM_THREADS"], "16")
 
     def test_layer_input_selector_resolves_to_its_declared_producer(self) -> None:
         self.assertEqual(

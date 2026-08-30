@@ -65,6 +65,76 @@ class MultimodalOcrCorpusCertificationTest(unittest.TestCase):
         self.assertEqual(rows[0]["id"], "sample")
         self.assertEqual(rows[0]["truth"], {"name": "Ada"})
 
+    def test_manifest_pins_media_and_truth_and_owns_case_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image = root / "sample.jpg"
+            truth = root / "sample.json"
+            image.write_bytes(b"image")
+            truth.write_text('{"name":"Ada"}\n', encoding="utf-8")
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "samples": [
+                            {
+                                "id": "sample",
+                                "inputs": [
+                                    {"path": image.name, "sha256": MODULE._sha256_file(image)}
+                                ],
+                                "groundTruth": [
+                                    {"path": truth.name, "sha256": MODULE._sha256_file(truth)}
+                                ],
+                                "prompt": "Return JSON only.",
+                                "comparison": {"max_new_tokens": 4096},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rows = MODULE._load_samples(manifest)
+
+        self.assertEqual(rows[0]["prompt"], "Return JSON only.")
+        self.assertEqual(MODULE._max_new_tokens(128, rows[0]), 4096)
+
+    def test_manifest_rejects_drift_from_pinned_image_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "sample.jpg").write_bytes(b"image")
+            (root / "sample.json").write_text('{"name":"Ada"}\n', encoding="utf-8")
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "samples": [
+                            {
+                                "inputs": [{"path": "sample.jpg", "sha256": "0" * 64}],
+                                "groundTruth": [{"path": "sample.json"}],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "image SHA-256 mismatch"):
+                MODULE._load_samples(manifest)
+
+    def test_case_prompt_overrides_template_without_model_specific_logic(self) -> None:
+        self.assertEqual(
+            MODULE._build_prompt("Fields: {fields}", {"name": "Ada"}, "Shared OCR prompt"),
+            "Shared OCR prompt",
+        )
+
+    def test_case_config_records_the_resolved_generation_budget(self) -> None:
+        sample = {
+            "index": 1,
+            "image_sha256": "image-hash",
+            "truth_sha256": "truth-hash",
+        }
+        config = MODULE._case_config("global-hash", sample, "prompt", 4096)
+        self.assertEqual(config["max_new_tokens"], 4096)
+
     def test_public_row_redacts_private_content(self) -> None:
         private = {
             "image_index": 1,
@@ -94,6 +164,16 @@ class MultimodalOcrCorpusCertificationTest(unittest.TestCase):
         self.assertIn("--oracle-id llama.cpp", makefile)
         self.assertIn("--oracle-status unsupported", makefile)
         self.assertIn("--adapt-encoder-geometry", makefile)
+
+    def test_shared_private_manifest_drives_all_vision_family_lanes(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("V8_PRIVATE_VISION_CORPUS_MANIFEST", makefile)
+        self.assertIn("test-cohere-compass-private-pytorch-ocr-auto", makefile)
+        self.assertIn("test-cohere-compass-private-token-parity-auto", makefile)
+        self.assertIn("test-v8-private-vision-corpus-auto:", makefile)
+        self.assertIn("certify_cohere_compass_pytorch_ocr_v8.py", makefile)
+        self.assertIn("compare_multimodal_corpus_runs_v8.py", makefile)
+        self.assertIn("COHERE_COMPASS_PRIVATE_OCR_CONTEXT ?= 8192", makefile)
 
     def test_bridge_command_uses_shared_geometry_cache_when_requested(self) -> None:
         args = SimpleNamespace(

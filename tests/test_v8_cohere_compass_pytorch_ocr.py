@@ -37,6 +37,18 @@ class CohereCompassPytorchOcrTests(unittest.TestCase):
         self.assertTrue(identity["config_sha256"])
         self.assertTrue(all(entry["sha256"] for entry in identity["weight_files"]))
 
+    def test_stop_reason_distinguishes_eos_from_generation_cap(self) -> None:
+        self.assertEqual(MODULE._stop_reason([1, 2], 8, {2}), "stop_token")
+        self.assertEqual(MODULE._stop_reason([1, 2], 2, {9}), "max_tokens")
+        self.assertEqual(MODULE._stop_reason([1], 8, {9}), "generation_complete")
+
+    def test_oracle_results_use_private_directory_permissions(self) -> None:
+        source = (SCRIPTS / "certify_cohere_compass_pytorch_ocr_v8.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("output_dir.chmod(0o700)", source)
+        self.assertIn("case_dir.chmod(0o700)", source)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

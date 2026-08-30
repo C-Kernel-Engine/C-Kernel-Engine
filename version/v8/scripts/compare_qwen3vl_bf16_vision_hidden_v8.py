@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import os
+import resource
 import subprocess
 import sys
 import time
@@ -46,6 +47,11 @@ def _metrics(ref: np.ndarray, got: np.ndarray) -> dict[str, float | bool]:
         "cosine": 1.0 if byte_exact else (float(np.dot(ref.reshape(-1), got.reshape(-1)) / denom) if denom > 0.0 else 0.0),
         "byte_exact": byte_exact,
     }
+
+
+def _child_cpu_seconds() -> float:
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return float(usage.ru_utime + usage.ru_stime)
 
 
 def _load_visual_model(checkpoint: Path, attn_implementation: str, architecture: str):
@@ -424,7 +430,9 @@ def _torch_captures(
                     captures["vision_patch_projection"] = patch_sum.detach().cpu().float()
                 if "vision_position_embeddings" in frontend_wanted:
                     pos_embeds = model.fast_pos_embed_interpolate(grid)
-                    captures["vision_position_embeddings"] = (patch_sum + pos_embeds).detach().cpu().float()
+                    captures["vision_position_embeddings"] = (
+                        patch_sum + pos_embeds.to(patch_sum.dtype)
+                    ).detach().cpu().float()
             if needs_model_forward:
                 try:
                     model_output = model(pixel_values, grid_thw=grid)
@@ -599,7 +607,39 @@ def _load_processor_planar(
     )
 
 
-def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> np.ndarray:
+def _literal_call_arg(operation: dict[str, Any], name: str) -> int | None:
+    for argument in operation.get("args", []):
+        if str(argument.get("name", "")).lower() != name.lower():
+            continue
+        expression = str(argument.get("expr", "")).strip()
+        try:
+            value = int(expression, 0)
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+    return None
+
+
+def _operation_output_elements(operation: dict[str, Any]) -> int | None:
+    """Return the logical output extent declared by a supported call ABI."""
+    rows = _literal_call_arg(operation, "M")
+    columns = _literal_call_arg(operation, "N")
+    if rows is not None and columns is not None:
+        return rows * columns
+    for name in ("n", "num_elements", "elements"):
+        elements = _literal_call_arg(operation, name)
+        if elements is not None:
+            return elements
+    return None
+
+
+def _run_ck_selector(
+    args: argparse.Namespace,
+    selector: str,
+    numeric: Any,
+    *,
+    expected_elements: int | None = None,
+) -> np.ndarray:
     runtime_dir = args.runtime_dir.resolve()
     cfg = json.loads((runtime_dir / "config.json").read_text(encoding="utf-8"))
     planar_image = _load_processor_planar(
@@ -618,6 +658,7 @@ def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> n
     call_ir = json.loads((runtime_dir / "call.json").read_text(encoding="utf-8"))
     stop_op = None
     stop_buffer_ref = None
+    stop_operation = None
     for operation in call_ir.get("operations", []):
         for checkpoint in operation.get("semantic_checkpoints", []):
             checkpoint_layer = int(checkpoint.get("layer", -1))
@@ -633,6 +674,7 @@ def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> n
                 if len(output_refs) == 1:
                     stop_op = int(operation["idx"])
                     stop_buffer_ref = next(iter(output_refs))
+                    stop_operation = operation
                 break
         if stop_op is not None:
             break
@@ -671,8 +713,28 @@ def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> n
             else:
                 os.environ["CK_DEBUG_IMPORT_CHECKPOINT"] = restore_import_checkpoint
     result = _array_to_np(data)
+    if expected_elements is not None and result.size != expected_elements:
+        if result.size < expected_elements:
+            raise RuntimeError(
+                f"CK checkpoint {selector!r} contains {result.size} elements; "
+                f"the oracle declares {expected_elements}"
+            )
+        logical_elements = _operation_output_elements(stop_operation or {})
+        if logical_elements != expected_elements:
+            raise RuntimeError(
+                f"CK checkpoint {selector!r} exposes allocation capacity ({result.size} elements), "
+                f"but its logical extent cannot be proven: call_ir={logical_elements!r}, "
+                f"oracle={expected_elements}"
+            )
+        result = result[:expected_elements].copy()
     base_name, _ = _parse_selector(selector)
-    head_major_names = {"q_proj", "k_proj", "v_proj", "rope_q", "rope_k", "attn_out_head_major"}
+    # The lower-level encoder reader canonicalizes every exported head-major
+    # tensor to the flattened order consumed by the next operation. Projection
+    # and RoPE oracles are explicitly captured as [head, token, channel], so
+    # restore those here. The PyTorch attention interface is captured in its
+    # projection-consumption order; restoring it again would undo the required
+    # CK attention transpose and create a false layout divergence.
+    head_major_names = {"q_proj", "k_proj", "v_proj", "rope_q", "rope_k"}
     if base_name in head_major_names:
         head_dim = int(cfg.get("head_dim") or cfg.get("aligned_head_dim") or 0)
         if base_name in {"q_proj", "rope_q", "attn_out_head_major"}:
@@ -686,7 +748,13 @@ def _run_ck_selector(args: argparse.Namespace, selector: str, numeric: Any) -> n
     return result
 
 
-def _run_ck_selector_isolated(args: argparse.Namespace, selector: str, output: Path) -> np.ndarray:
+def _run_ck_selector_isolated(
+    args: argparse.Namespace,
+    selector: str,
+    output: Path,
+    *,
+    expected_elements: int | None = None,
+) -> np.ndarray:
     """Capture one model-sized CK checkpoint in a fresh process."""
     cmd = [
         sys.executable,
@@ -699,10 +767,12 @@ def _run_ck_selector_isolated(args: argparse.Namespace, selector: str, output: P
         "--threads", str(args.threads),
         "--attn-implementation", str(args.attn_implementation),
         "--architecture", str(args.architecture),
-        "--model-so-name", str(args.model_so_name),
+        "--model-so-name", str(getattr(args, "model_so_name", "libqwen3vl_bf16_encoder_v8.so")),
         "--ck-worker-selector", selector,
         "--ck-worker-output", str(output),
     ]
+    if expected_elements is not None:
+        cmd.extend(["--ck-worker-elements", str(expected_elements)])
     if args.ck_import_layer_input is not None:
         cmd.extend([
             "--ck-import-layer-input", str(args.ck_import_layer_input),
@@ -784,6 +854,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--final-max-abs", type=float, default=None)
     ap.add_argument("--ck-worker-selector", help=argparse.SUPPRESS)
     ap.add_argument("--ck-worker-output", type=Path, help=argparse.SUPPRESS)
+    ap.add_argument("--ck-worker-elements", type=int, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if (args.ck_import_layer_input is None) != (args.ck_import_layer is None):
         ap.error("--ck-import-layer-input and --ck-import-layer must be provided together")
@@ -795,7 +866,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.ck_worker_output is None:
             ap.error("--ck-worker-output is required with --ck-worker-selector")
         numeric = _import_numeric_parity()
-        captured = _run_ck_selector(args, args.ck_worker_selector, numeric)
+        captured = _run_ck_selector(
+            args,
+            args.ck_worker_selector,
+            numeric,
+            expected_elements=args.ck_worker_elements,
+        )
         args.ck_worker_output.parent.mkdir(parents=True, exist_ok=True)
         captured.tofile(args.ck_worker_output)
         return 0
@@ -823,13 +899,35 @@ def main(argv: list[str] | None = None) -> int:
         for selector in selectors:
             print(f"[ck] {selector}", flush=True)
             ck_path = ck_dir / f"{selector.replace('@', '_layer_')}.f32"
-            ck = _run_ck_selector_isolated(args, selector, ck_path)
-            torch_path = Path(torch_report["tensors"][selector]["path"])
+            torch_tensor = torch_report["tensors"][selector]
+            torch_shape = [int(value) for value in torch_tensor["shape"]]
+            expected_elements = math.prod(torch_shape)
+            cpu_before = _child_cpu_seconds()
+            wall_before = time.perf_counter()
+            ck = _run_ck_selector_isolated(
+                args,
+                selector,
+                ck_path,
+                expected_elements=expected_elements,
+            )
+            ck_wall_sec = time.perf_counter() - wall_before
+            ck_cpu_sec = _child_cpu_seconds() - cpu_before
+            average_cores = ck_cpu_sec / ck_wall_sec if ck_wall_sec > 0.0 else 0.0
+            torch_path = Path(torch_tensor["path"])
             ref = np.fromfile(torch_path, dtype=np.float32)
             rows[selector] = {
                 "ck_path": str(ck_path),
                 "torch_path": str(torch_path),
-                "shape": list(ck.shape),
+                "shape": torch_shape,
+                "performance": {
+                    "scope": "cumulative_from_encoder_entry",
+                    "wall_sec": ck_wall_sec,
+                    "cpu_sec": ck_cpu_sec,
+                    "average_core_equivalents": average_cores,
+                    "configured_threads": int(args.threads),
+                    "thread_utilization_ratio": average_cores / float(args.threads),
+                    "idle_core_seconds": max(0.0, float(args.threads) * ck_wall_sec - ck_cpu_sec),
+                },
                 **_metrics(ref, ck),
             }
 
@@ -848,6 +946,17 @@ def main(argv: list[str] | None = None) -> int:
         if selector == "vision_output" and args.final_max_abs is not None and float(metrics["max_abs"]) > args.final_max_abs:
             failures.append(f"{selector}: final max_abs {metrics['max_abs']:.9f} > {args.final_max_abs:.9f}")
 
+    performance_debt = sorted(
+        (
+            {
+                "selector": selector,
+                **metrics["performance"],
+            }
+            for selector, metrics in rows.items()
+        ),
+        key=lambda row: float(row["idle_core_seconds"]),
+        reverse=True,
+    )
     report = {
         "checkpoint": str(args.checkpoint),
         "runtime_dir": str(args.runtime_dir),
@@ -862,6 +971,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "torch": torch_report,
         "comparisons": rows,
+        "performance_debt": performance_debt,
         "thresholds": {
             "min_cosine": args.min_cosine,
             "max_rmse": args.max_rmse,

@@ -62,9 +62,13 @@ def _apply_observed_storage(manifest: Dict[str, Any], observed_storage: Dict[str
         checkpoint["storage_dtype"] = str(overrides.get(checkpoint_id, default))
 
 
-def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path) -> Path:
-    cmd = [
-        sys.executable, str(args.capture_script),
+def _capture_command(
+    args: argparse.Namespace,
+    selectors: list[str],
+    round_dir: Path,
+) -> list[str]:
+    return [
+        str(args.oracle_python), str(args.capture_script),
         "--checkpoint", str(args.checkpoint),
         "--runtime-dir", str(args.runtime_dir),
         "--weights-bump", str(args.weights_bump),
@@ -75,6 +79,22 @@ def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path
         "--architecture", args.architecture,
         "--model-so-name", args.model_so_name,
     ]
+
+
+def _capture_environment(args: argparse.Namespace) -> dict[str, str]:
+    env = os.environ.copy()
+    env["CK_NUM_THREADS"] = str(args.threads)
+    env["OMP_NUM_THREADS"] = str(args.threads)
+    python_paths = [str(path) for path in args.oracle_pythonpath]
+    if env.get("PYTHONPATH"):
+        python_paths.append(env["PYTHONPATH"])
+    if python_paths:
+        env["PYTHONPATH"] = os.pathsep.join(python_paths)
+    return env
+
+
+def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path) -> Path:
+    cmd = _capture_command(args, selectors, round_dir)
     if args.torch_prefix:
         cmd.extend(["--torch-prefix", str(args.torch_prefix)])
     if args.ck_import_layer_input is not None:
@@ -85,9 +105,7 @@ def _run_capture(args: argparse.Namespace, selectors: list[str], round_dir: Path
         ])
     for selector in selectors:
         cmd.extend(["--selector", selector])
-    env = os.environ.copy()
-    env["CK_NUM_THREADS"] = str(args.threads)
-    env["OMP_NUM_THREADS"] = str(args.threads)
+    env = _capture_environment(args)
     log_path = round_dir / "capture.log"
     round_dir.mkdir(parents=True, exist_ok=True)
     with log_path.open("wb") as log:
@@ -189,6 +207,10 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         "schema": "cke.xray_orchestration_report", "schema_version": 1,
         "status": final_report["status"] if final_report else "error",
         "rounds": rounds, "preflight": None, "final_report": final_report,
+        "oracle_runtime": {
+            "python": str(args.oracle_python),
+            "pythonpath": [str(path) for path in args.oracle_pythonpath],
+        },
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "xray_summary.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -208,6 +230,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ck-import-checkpoint", choices=("layer_input", "after_attn"), default="layer_input")
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
     parser.add_argument("--capture-script", type=Path, default=DEFAULT_CAPTURE_SCRIPT)
+    parser.add_argument(
+        "--oracle-python",
+        default=sys.executable,
+        help="Python executable for the isolated PyTorch capture process",
+    )
+    parser.add_argument(
+        "--oracle-pythonpath",
+        type=Path,
+        action="append",
+        default=[],
+        help="Prepend a source checkout or dependency directory to the oracle PYTHONPATH",
+    )
     parser.add_argument("--model", default="qwen3vl")
     parser.add_argument("--architecture", choices=("qwen3vl", "cohere_compass"), default="qwen3vl")
     parser.add_argument("--model-so-name", default="libqwen3vl_bf16_encoder_v8.so")

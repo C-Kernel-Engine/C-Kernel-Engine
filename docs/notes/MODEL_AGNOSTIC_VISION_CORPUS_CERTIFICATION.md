@@ -174,6 +174,37 @@ The generic runner must never guess that a decoder accepts an image because an
    vision is a useful next family because it exercises a different image
    frontend and prompt contract.
 
+## Shared Campaign Command
+
+The private campaign uses one manifest for every configured model lane:
+
+```bash
+make test-v8-private-vision-corpus-auto \
+  V8_PRIVATE_VISION_CORPUS_MANIFEST=/private/ocr/manifest.json \
+  V8_PRIVATE_VISION_CORPUS_REQUIRED_IMAGES=40
+```
+
+The aggregate target preserves separate evidence classes. Qwen3-VL and
+Qwen3.6-VL retain exact same-model oracle parity. Cohere runs the same corpus
+through both CKE and the pinned PyTorch reference, then reports task quality
+separately from X-Ray tensor parity. A five-image, hash-pinned manifest is the
+promotion gate before the complete forty-image corpus. Private images,
+ground truth, prompts, and generated text remain outside the repository.
+
+## Performance Debt Evidence
+
+Correctness and performance are separate gates, but the same X-Ray run must
+retain enough evidence to prioritize optimization. Each isolated CKE
+checkpoint records wall time, child CPU time, average core equivalents,
+configured threads, thread-utilization ratio, and idle core-seconds. Reports
+rank cumulative checkpoint runs by lost core-seconds under
+`performance_debt`. A rank identifies the interval requiring provider-level
+measurement; it does not by itself assign all cumulative time to the selected
+kernel. This makes a serial bridge, projector, or attention interval visible
+without weakening its numerical threshold. Comparisons across commits are
+valid only when model, image, geometry, ISA, thread count, and checkpoint
+selector are unchanged.
+
 ## Required Tests
 
 Add portable tests for:

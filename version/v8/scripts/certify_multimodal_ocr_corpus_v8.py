@@ -83,18 +83,45 @@ def _load_samples(manifest_path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"sample {index} must have exactly one ground-truth JSON input")
         image = _resolve_file(manifest_path.parent, inputs[0].get("path"), "image")
         truth_path = _resolve_file(manifest_path.parent, truths[0].get("path"), "ground truth")
+        image_sha256 = _sha256_file(image)
+        truth_sha256 = _sha256_file(truth_path)
+        pinned_image_sha256 = inputs[0].get("sha256")
+        pinned_truth_sha256 = truths[0].get("sha256")
+        if pinned_image_sha256 is not None and pinned_image_sha256 != image_sha256:
+            raise ValueError(
+                f"sample {index} image SHA-256 mismatch: "
+                f"expected {pinned_image_sha256}, got {image_sha256}"
+            )
+        if pinned_truth_sha256 is not None and pinned_truth_sha256 != truth_sha256:
+            raise ValueError(
+                f"sample {index} ground-truth SHA-256 mismatch: "
+                f"expected {pinned_truth_sha256}, got {truth_sha256}"
+            )
         truth = json.loads(truth_path.read_text(encoding="utf-8"))
         if not isinstance(truth, dict):
             raise ValueError(f"sample {index} ground truth must be a JSON object")
+        prompt = sample.get("prompt")
+        if prompt is not None and (not isinstance(prompt, str) or not prompt.strip()):
+            raise ValueError(f"sample {index} prompt must be a non-empty string")
+        comparison = sample.get("comparison") or {}
+        if not isinstance(comparison, dict):
+            raise ValueError(f"sample {index} comparison must be an object")
+        max_new_tokens = comparison.get("max_new_tokens")
+        if max_new_tokens is not None and (
+            not isinstance(max_new_tokens, int) or isinstance(max_new_tokens, bool) or max_new_tokens <= 0
+        ):
+            raise ValueError(f"sample {index} comparison.max_new_tokens must be positive")
         rows.append(
             {
                 "index": index,
                 "id": str(sample.get("id") or f"case-{index:03d}"),
                 "image": image,
-                "image_sha256": _sha256_file(image),
+                "image_sha256": image_sha256,
                 "truth_path": truth_path,
-                "truth_sha256": _sha256_file(truth_path),
+                "truth_sha256": truth_sha256,
                 "truth": truth,
+                "prompt": prompt,
+                "comparison": comparison,
             }
         )
     return rows
@@ -200,9 +227,19 @@ def _runtime_identity(path: Path) -> dict[str, Any]:
     return {"path": str(path), "files": files}
 
 
-def _build_prompt(template: str, truth: dict[str, Any]) -> str:
+def _build_prompt(
+    template: str,
+    truth: dict[str, Any],
+    sample_prompt: str | None = None,
+) -> str:
+    if sample_prompt is not None:
+        return sample_prompt
     fields = ", ".join(sorted(truth))
     return template.format(fields=fields)
+
+
+def _max_new_tokens(default: int, sample: dict[str, Any]) -> int:
+    return int(sample.get("comparison", {}).get("max_new_tokens", default))
 
 
 def _bridge_command(
@@ -233,7 +270,7 @@ def _bridge_command(
         "--decoder-context-len",
         str(args.context_len),
         "--max-tokens",
-        str(args.max_new_tokens),
+        str(_max_new_tokens(args.max_new_tokens, sample)),
         "--temperature",
         "0",
         "--top-p",
@@ -275,13 +312,19 @@ def _run(command: list[str], log_path: Path, env: dict[str, str]) -> float:
     return elapsed
 
 
-def _case_config(global_hash: str, sample: dict[str, Any], prompt: str) -> dict[str, Any]:
+def _case_config(
+    global_hash: str,
+    sample: dict[str, Any],
+    prompt: str,
+    max_new_tokens: int,
+) -> dict[str, Any]:
     return {
         "global_config_sha256": global_hash,
         "image_index": sample["index"],
         "image_sha256": sample["image_sha256"],
         "truth_sha256": sample["truth_sha256"],
         "prompt_sha256": _sha256_bytes(prompt.encode("utf-8")),
+        "max_new_tokens": max_new_tokens,
     }
 
 
@@ -308,12 +351,15 @@ def _public_row(case: dict[str, Any]) -> dict[str, Any]:
             "generated_tokens",
             "timings",
             "metrics",
+            "repeatability",
         )
+        if key in case
     }
 
 
 def _aggregate(rows: list[dict[str, Any]], requested: int) -> dict[str, Any]:
     completed = [row for row in rows if row.get("status") == "complete"]
+    repeated = [row for row in completed if isinstance(row.get("repeatability"), dict)]
     expected = sum(int(row["metrics"]["expected_fields"]) for row in completed)
     exact = sum(int(row["metrics"]["exact_fields"]) for row in completed)
     nonempty_expected = sum(int(row["metrics"]["nonempty_expected_fields"]) for row in completed)
@@ -331,6 +377,8 @@ def _aggregate(rows: list[dict[str, Any]], requested: int) -> dict[str, Any]:
         "nonempty_field_accuracy": nonempty_exact / nonempty_expected if nonempty_expected else 0.0,
         "total_wall_sec": sum(float(row["timings"].get("wall_sec", 0.0)) for row in completed),
         "generated_tokens": sum(int(row.get("generated_tokens", 0)) for row in completed),
+        "repeatability_cases": len(repeated),
+        "repeatable_cases": sum(bool(row["repeatability"].get("exact")) for row in repeated),
     }
 
 
@@ -414,8 +462,9 @@ def main(argv: list[str] | None = None) -> int:
         case_dir = output_dir / f"image{sample['index']:02d}"
         case_dir.mkdir(parents=True, exist_ok=True)
         case_dir.chmod(0o700)
-        prompt = _build_prompt(args.prompt_template, sample["truth"])
-        case_config = _case_config(global_hash, sample, prompt)
+        prompt = _build_prompt(args.prompt_template, sample["truth"], sample["prompt"])
+        max_new_tokens = _max_new_tokens(args.max_new_tokens, sample)
+        case_config = _case_config(global_hash, sample, prompt, max_new_tokens)
         case_result = case_dir / "case_result.json"
         resumed = None if args.force_rerun else _load_resumed(case_result, case_config)
         if resumed is not None:
@@ -451,6 +500,7 @@ def main(argv: list[str] | None = None) -> int:
                 "parsed_output": parsed,
                 "output_sha256": _sha256_bytes(generated_text.encode("utf-8")),
                 "token_trace_sha256": _sha256_json(generated_tokens),
+                "generated_token_ids": generated_tokens,
                 "generated_tokens": len(generated_tokens),
                 "stop_reason": report.get("generation_stop_reason"),
                 "timings": timings,
