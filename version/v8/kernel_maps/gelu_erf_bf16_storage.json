@@ -1,0 +1,79 @@
+{
+  "id": "gelu_erf_bf16_storage",
+  "op": "gelu",
+  "operation_interface": "gelu.fp32_bf16_values_inplace.v1",
+  "variant": "portable_libm_erf_bf16_storage",
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-valued FP32 input/output buffer"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "layout": "contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alias_of": "input:x",
+      "desc": "BF16-rounded output in the input buffer"
+    }
+  ],
+  "dims": ["N"],
+  "impl": {
+    "function": "gelu_erf_bf16_storage",
+    "c_declaration": "void gelu_erf_bf16_storage(float *data, size_t n);",
+    "sources": ["src/kernels/gelu_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/bf16/test_gelu_erf_storage_bf16.py"]
+  },
+  "notes": "Portable exact-form GELU over BF16 storage using FP64 libm erf and BF16 RNE output. This provider has no PyTorch/SLEEF dependency.",
+  "numerical_capabilities": [
+    {
+      "contract_id": "gelu_erf_bf16_storage",
+      "status": "validated",
+      "phases": ["prefill"],
+      "function": "gelu_erf_bf16_storage",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": ["serial"],
+          "dispatch": ["inline"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"cast": "float*", "name": "data", "source": "output:out", "ports": ["input:x", "output:out"]},
+      {"name": "n", "source": "dim:gelu_elems"}
+    ]
+  }
+}

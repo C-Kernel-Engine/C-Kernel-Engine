@@ -606,6 +606,19 @@ void gelu_pytorch_tanh_bf16_storage(float *data, size_t n)
     }
 }
 
+void gelu_erf_bf16_storage(float *data, size_t n)
+{
+    const double inv_sqrt_2 = 0.707106781186547524400844362104849039;
+    ck_gelu_math_f64_fn reference_erf = ck_gelu_system_erf();
+    for (size_t i = 0; i < n; ++i) {
+        const float x = bf16_to_float(float_to_bf16(data[i]));
+        const double scaled = (double)x * inv_sqrt_2;
+        const double erf_value = reference_erf ? reference_erf(scaled) : erf(scaled);
+        const float output = (float)(0.5 * (double)x * (1.0 + erf_value));
+        data[i] = bf16_to_float(float_to_bf16(output));
+    }
+}
+
 #if defined(__AVX512F__)
 typedef __m512 (*ck_sleef_expf16_fn)(__m512);
 static ck_sleef_expf16_fn ck_pytorch_sleef_expf16 = NULL;

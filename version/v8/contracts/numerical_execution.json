@@ -2223,6 +2223,42 @@
       "position_transform": null,
       "description": "Standalone scalar ERF GELU over FP32 storage using FP64 libm evaluation and one FP32 output rounding. PyTorch comparison is observed separately because framework vector transcendental implementations vary by build and ISA."
     },
+    "gelu_erf_bf16_storage": {
+      "operator_family": "gelu",
+      "status": "validated",
+      "storage": {
+        "input": "bf16",
+        "weight": "fp32",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "bf16",
+        "weight": "fp32",
+        "accumulator": "fp64",
+        "evaluation_order": "bf16_input_then_fp64_libm_erf_then_fp32_cast"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "input_load",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "serial",
+        "split_strategy": "serial",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Portable exact-form GELU over BF16 storage using FP64 libm erf, one FP32 cast, and BF16 RNE output storage."
+    },
     "gelu_pytorch_erf_sleef_bf16_storage": {
       "operator_family": "gelu",
       "status": "validated",
@@ -2399,6 +2435,39 @@
       },
       "position_transform": null,
       "description": "PyTorch BF16 temporal patch Conv3D parity contract. The two temporal weight planes and duplicated image frame are reduced by oneDNN as one convolution before BF16 output storage.",
+      "operator_family": "gemm"
+    },
+    "patch_projection_bf16_native_pair_dot_storage": {
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "bf16_rne",
+        "weight": "bf16",
+        "accumulator": "fp32",
+        "evaluation_order": "native_pair_dot_or_ascending_scalar"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "output_store"]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "contract_defined_chunks",
+        "partial_accumulator": "fp32",
+        "merge_order": "implementation_defined"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Native temporal patch projection with BF16 weights, BF16-rounded image values, FP32 accumulation, independent patch partitioning, and BF16 RNE output storage. AVX-512 BF16 hosts use paired dot products; portable hosts use ascending scalar accumulation under the same native, non-oracle profile.",
       "operator_family": "gemm"
     },
     "bf16_weight_bf16_input_shape_safe_prefill_bf16_output": {

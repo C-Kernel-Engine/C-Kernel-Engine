@@ -20,8 +20,8 @@
   "dims": ["M", "K"],
   "constraints": {},
   "impl": {
-    "function": "gemv_bf16",
-    "c_declaration": "void gemv_bf16(float *y, const void *W, const float *x, int M, int K);",
+    "function": "gemv_bf16_parallel_dispatch",
+    "c_declaration": "void gemv_bf16_parallel_dispatch(float *y, const void *W, const float *x, int M, int K);",
     "sources": ["src/kernels/gemm_kernels_bf16.c"]
   },
   "modes": {"inference": true, "training": false, "backward": false},
@@ -30,14 +30,14 @@
       "contract_id": "bf16_weight_bf16_input_fp32_dot_fp32_output",
       "status": "observed",
       "phases": ["decode"],
-      "function": "gemv_bf16",
+      "function": "gemv_bf16_parallel_dispatch",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows"],
-          "dispatch": ["inline"],
+          "dispatch": ["ck_threadpool_parallel_for_n"],
           "reduction_order_effect": "none"
         }
       },

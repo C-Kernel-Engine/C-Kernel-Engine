@@ -597,18 +597,18 @@ void gemm_bf16_fp32out(const uint16_t *A,
  * to a BF16 PyTorch model than multiplying full FP32 activations by BF16
  * weights, while still avoiding a separate activation-conversion buffer.
  * ========================================================================== */
-void gemv_bf16(float *y,
-               const void *W,
-               const float *x,
-               int M, int K)
+static void gemv_bf16_row_range(float *y,
+                                const uint16_t *w,
+                                const float *x,
+                                int M, int K,
+                                int row_begin, int row_end)
 {
-    const uint16_t *w = (const uint16_t *)W;
-    if (!y || !w || !x || M <= 0 || K <= 0) {
+    if (!y || !w || !x || M <= 0 || K <= 0 ||
+        row_begin < 0 || row_begin >= row_end || row_end > M) {
         return;
     }
 
-#pragma omp parallel for schedule(static) if(M > 16)
-    for (int i = 0; i < M; ++i) {
+    for (int i = row_begin; i < row_end; ++i) {
         const uint16_t *w_row = w + (size_t)i * (size_t)K;
         float sum = 0.0f;
         for (int k = 0; k < K; ++k) {
@@ -617,6 +617,53 @@ void gemv_bf16(float *y,
         }
         y[i] = sum;
     }
+}
+
+void gemv_bf16(float *y,
+               const void *W,
+               const float *x,
+               int M, int K)
+{
+    gemv_bf16_row_range(
+        y, (const uint16_t *)W, x, M, K, 0, M);
+}
+
+typedef struct {
+    float *y;
+    const uint16_t *w;
+    const float *x;
+    int M;
+    int K;
+} ck_gemv_bf16_args_t;
+
+static void ck_gemv_bf16_rows(int begin, int end, void *opaque)
+{
+    const ck_gemv_bf16_args_t *args = (const ck_gemv_bf16_args_t *)opaque;
+    gemv_bf16_row_range(
+        args->y, args->w, args->x, args->M, args->K, begin, end);
+}
+
+void gemv_bf16_parallel_dispatch(float *y,
+                                 const void *W,
+                                 const float *x,
+                                 int M, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)K <= 65536) {
+        gemv_bf16(y, W, x, M, K);
+        return;
+    }
+
+    ck_gemv_bf16_args_t args = {
+        .y = y, .w = (const uint16_t *)W, .x = x, .M = M, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemv_bf16_rows, &args);
 }
 
 void gemm_nt_bf16_row_range(const float *A,
@@ -1680,6 +1727,154 @@ void patch_projection_image_bf16_pytorch_onednn_conv3d_storage(
                     "patch projection was selected without USE_ONEDNN=1\n");
     abort();
 #endif
+}
+
+typedef struct {
+    const float *image;
+    const uint16_t *weights_t0;
+    const uint16_t *weights_t1;
+    const float *bias;
+    float *output;
+    int channels;
+    int image_h;
+    int image_w;
+    int patch_size;
+    int out_channels;
+    int merge_size;
+    int grid_w;
+    int batch;
+} ck_patch_projection_bf16_native_args_t;
+
+static void ck_patch_projection_bf16_native_work(
+    int ith, int nth, void *opaque)
+{
+    ck_patch_projection_bf16_native_args_t *args =
+        (ck_patch_projection_bf16_native_args_t *)opaque;
+    const int begin = args->batch * ith / nth;
+    const int end = args->batch * (ith + 1) / nth;
+    const int patch_area = args->patch_size * args->patch_size;
+    const int half_k = args->channels * patch_area;
+    const int tiles_per_row = args->grid_w / args->merge_size;
+    const int tile_area = args->merge_size * args->merge_size;
+
+    for (int tok = begin; tok < end; ++tok) {
+        const int tile = tok / tile_area;
+        const int within = tok % tile_area;
+        const int patch_y =
+            (tile / tiles_per_row) * args->merge_size + within / args->merge_size;
+        const int patch_x =
+            (tile % tiles_per_row) * args->merge_size + within % args->merge_size;
+        for (int n = 0; n < args->out_channels; ++n) {
+            float sum = args->bias
+                ? bf16_to_float(float_to_bf16(args->bias[n]))
+                : 0.0f;
+#if defined(__AVX512BF16__) && defined(__AVX512VL__)
+            if (args->patch_size == 16) {
+                __m256 acc = _mm256_setzero_ps();
+                for (int c = 0; c < args->channels; ++c) {
+                    for (int t = 0; t < 2; ++t) {
+                        const uint16_t *weights = t == 0
+                            ? args->weights_t0 : args->weights_t1;
+                        const uint16_t *weight_plane = weights +
+                            (size_t)n * (size_t)half_k +
+                            (size_t)c * (size_t)patch_area;
+                        for (int py = 0; py < 16; ++py) {
+                            const float *src = args->image +
+                                ((size_t)c * (size_t)args->image_h +
+                                 (size_t)(patch_y * 16 + py)) *
+                                    (size_t)args->image_w +
+                                (size_t)(patch_x * 16);
+                            const __m256bh image_bf16 = _mm256_cvtne2ps_pbh(
+                                _mm256_loadu_ps(src + 8), _mm256_loadu_ps(src));
+                            const __m256bh weight_bf16 = (__m256bh)_mm256_loadu_si256(
+                                (const __m256i *)(weight_plane + (size_t)py * 16u));
+                            acc = _mm256_dpbf16_ps(acc, image_bf16, weight_bf16);
+                        }
+                    }
+                }
+                float lanes[8];
+                _mm256_storeu_ps(lanes, acc);
+                const float sum01 = lanes[0] + lanes[1];
+                const float sum23 = lanes[2] + lanes[3];
+                const float sum45 = lanes[4] + lanes[5];
+                const float sum67 = lanes[6] + lanes[7];
+                sum += (sum01 + sum23) + (sum45 + sum67);
+            } else
+#endif
+            {
+                for (int c = 0; c < args->channels; ++c) {
+                    for (int t = 0; t < 2; ++t) {
+                        const uint16_t *weights = t == 0
+                            ? args->weights_t0 : args->weights_t1;
+                        const uint16_t *weight_plane = weights +
+                            (size_t)n * (size_t)half_k +
+                            (size_t)c * (size_t)patch_area;
+                        for (int py = 0; py < args->patch_size; ++py) {
+                            const float *src = args->image +
+                                ((size_t)c * (size_t)args->image_h +
+                                 (size_t)(patch_y * args->patch_size + py)) *
+                                    (size_t)args->image_w +
+                                (size_t)(patch_x * args->patch_size);
+                            for (int px = 0; px < args->patch_size; ++px) {
+                                const float value = bf16_to_float(float_to_bf16(src[px]));
+                                const float weight = bf16_to_float(
+                                    weight_plane[(size_t)py *
+                                        (size_t)args->patch_size + (size_t)px]);
+                                sum += value * weight;
+                            }
+                        }
+                    }
+                }
+            }
+            args->output[(size_t)tok * (size_t)args->out_channels + (size_t)n] =
+                bf16_to_float(float_to_bf16(sum));
+        }
+    }
+}
+
+void patch_projection_image_bf16_native_storage(
+    const float *image, const void *weights_t0, const void *weights_t1,
+    const float *bias, float *output, int channels, int image_h, int image_w,
+    int patch_size, int out_channels, int merge_size)
+{
+    if (!image || !weights_t0 || !weights_t1 || !output || channels <= 0 ||
+        image_h <= 0 || image_w <= 0 || patch_size <= 0 || out_channels <= 0 ||
+        merge_size <= 0 || image_h % patch_size != 0 ||
+        image_w % patch_size != 0) {
+        fprintf(stderr, "HARD KERNEL CONTRACT FAULT: invalid native BF16 image patch projection\n");
+        abort();
+    }
+    const int grid_h = image_h / patch_size;
+    const int grid_w = image_w / patch_size;
+    if (grid_h % merge_size != 0 || grid_w % merge_size != 0) {
+        fprintf(stderr, "HARD KERNEL CONTRACT FAULT: native BF16 patch grid is not merge aligned\n");
+        abort();
+    }
+    ck_patch_projection_bf16_native_args_t args = {
+        .image = image,
+        .weights_t0 = (const uint16_t *)weights_t0,
+        .weights_t1 = (const uint16_t *)weights_t1,
+        .bias = bias,
+        .output = output,
+        .channels = channels,
+        .image_h = image_h,
+        .image_w = image_w,
+        .patch_size = patch_size,
+        .out_channels = out_channels,
+        .merge_size = merge_size,
+        .grid_w = grid_w,
+        .batch = grid_h * grid_w,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > args.batch) active = args.batch;
+    if (active > 24) active = 24;
+    if (pool && active > 1) {
+        ck_threadpool_dispatch_n(
+            pool, active, ck_patch_projection_bf16_native_work, &args);
+    } else {
+        ck_patch_projection_bf16_native_work(0, 1, &args);
+    }
 }
 
 void gemm_nt_bf16_bf16_storage_row_range(const float *A,

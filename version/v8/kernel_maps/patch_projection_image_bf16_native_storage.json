@@ -1,0 +1,76 @@
+{
+  "id": "patch_projection_image_bf16_native_storage",
+  "op": "patch_projection",
+  "operation_interface": "patch_projection.image_temporal2.bf16_storage.v1",
+  "variant": "image_temporal2_bf16_native_pair_dot",
+  "quant": {"weight": "bf16", "activation": "fp32", "output": "bf16"},
+  "inputs": [
+    {"name": "image", "dtype": "fp32", "shape": ["C", "H", "W"], "layout": "channel_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [
+    {"name": "weights_t0", "dtype": "bf16", "shape": ["N", "C", "P", "P"], "layout": "output_channel_major_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "weights_t1", "dtype": "bf16", "shape": ["N", "C", "P", "P"], "layout": "output_channel_major_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "layout": "contiguous", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["H/P*W/P", "N"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "BF16 values expanded to FP32 storage"}
+  ],
+  "scratch": [],
+  "dims": ["C", "H", "W", "P", "N", "MERGE"],
+  "constraints": {"temporal_patch_size": 2},
+  "impl": {
+    "function": "patch_projection_image_bf16_native_storage",
+    "c_declaration": "void patch_projection_image_bf16_native_storage(const float *image, const void *weights_t0, const void *weights_t1, const float *bias, float *output, int channels, int image_h, int image_w, int patch_size, int out_channels, int merge_size);",
+    "sources": ["src/kernels/gemm_kernels_bf16.c"],
+    "variants": [
+      {"name": "avx512_bf16", "requires": ["avx512_bf16", "avx512vl"], "compile_flags": ["-mavx512bf16", "-mavx512vl"]},
+      {"name": "portable_scalar", "requires": [], "compile_flags": []}
+    ]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "patch_projection_bf16_native_pair_dot_storage",
+      "status": "validated",
+      "phases": ["prefill"],
+      "function": "patch_projection_image_bf16_native_storage",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows"],
+          "dispatch": ["ck_threadpool_dispatch_n"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "implementation_defined",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "tests": {
+    "unit": ["unittest/bf16/test_patch_projection_native_bf16.py"],
+    "conversion": ["tests/test_v8_safetensors_to_bump.py"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"cast": "const float*", "name": "image", "source": "activation:image", "ports": ["input:image"]},
+      {"name": "weights_t0", "source": "weight:patch_emb", "ports": ["weight:weights_t0"]},
+      {"name": "weights_t1", "source": "weight:patch_emb_aux", "ports": ["weight:weights_t1"]},
+      {"cast": "const float*", "name": "bias", "source": "weight_f:patch_bias", "ports": ["weight:bias"]},
+      {"cast": "float*", "name": "output", "source": "output:y", "ports": ["output:output"]},
+      {"name": "channels", "source": "dim:vision_channels"},
+      {"name": "image_h", "source": "dim:image_height"},
+      {"name": "image_w", "source": "dim:image_width"},
+      {"name": "patch_size", "source": "dim:patch_size"},
+      {"name": "out_channels", "source": "dim:embed_dim"},
+      {"name": "merge_size", "source": "dim:spatial_merge_size"}
+    ]
+  }
+}

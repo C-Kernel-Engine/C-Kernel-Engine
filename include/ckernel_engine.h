@@ -244,6 +244,10 @@ void gemv_bf16(float *y,
                const void *W,
                const float *x,
                int M, int K);
+void gemv_bf16_parallel_dispatch(float *y,
+                                 const void *W,
+                                 const float *x,
+                                 int M, int K);
 
 void gemm_nt_bf16(const float *A,
                   const void *B,
@@ -313,6 +317,11 @@ void patch_projection_bf16_pytorch_onednn_conv3d_storage(
     int batch, int out_channels, int in_channels, int temporal,
     int patch_h, int patch_w);
 void patch_projection_image_bf16_pytorch_onednn_conv3d_storage(
+    const float *image, const void *weights_t0, const void *weights_t1,
+    const float *bias, float *output, int channels, int image_h, int image_w,
+    int patch_size, int out_channels, int merge_size);
+
+void patch_projection_image_bf16_native_storage(
     const float *image, const void *weights_t0, const void *weights_t1,
     const float *bias, float *output, int channels, int image_h, int image_w,
     int patch_size, int out_channels, int merge_size);
@@ -1362,6 +1371,7 @@ void gelu_pytorch_erf_f32_inplace(float *data, size_t n);
 // GGML-compatible GELU forward matching llama.cpp's FP16 table semantics.
 void gelu_ggml_inplace(float *data, size_t n);
 void gelu_pytorch_tanh_bf16_storage(float *data, size_t n);
+void gelu_erf_bf16_storage(float *data, size_t n);
 void gelu_pytorch_erf_sleef_bf16_storage(float *data, size_t n);
 
 // GELU backward using tanh-based derivative (vectorized, uses fast tanh approx).

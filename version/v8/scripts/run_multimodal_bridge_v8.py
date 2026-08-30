@@ -114,6 +114,60 @@ def _load_explicit_composition_circuit(name: str | None) -> dict[str, Any] | Non
     return circuit
 
 
+def _prebuilt_runtime_template_name(runtime_dir: Path) -> str:
+    manifest_path = runtime_dir.resolve() / "weights_manifest.json"
+    if not manifest_path.is_file():
+        return ""
+    manifest = _json_read(manifest_path)
+    template = manifest.get("template") if isinstance(manifest, dict) else None
+    if not isinstance(template, dict):
+        return ""
+    return str(template.get("name") or "").strip().lower()
+
+
+def _infer_prebuilt_composition_circuit(
+    *,
+    encoder_runtime: Path | None,
+    decoder_runtime: Path | None,
+) -> dict[str, Any] | None:
+    if encoder_runtime is None or decoder_runtime is None:
+        return None
+    runtime_templates = {
+        "encoder": _prebuilt_runtime_template_name(encoder_runtime),
+        "decoder": _prebuilt_runtime_template_name(decoder_runtime),
+    }
+    if not all(runtime_templates.values()):
+        return None
+
+    matches: list[dict[str, Any]] = []
+    circuits_dir = SCRIPT_DIR.parent / "circuits"
+    for path in sorted(circuits_dir.glob("*.json")):
+        raw = _json_read(path)
+        if str(raw.get("family") or "").strip().lower() != "multimodal_composition":
+            continue
+        candidate = _load_explicit_composition_circuit(path.stem)
+        if candidate is None:
+            continue
+        component_templates: dict[str, str] = {}
+        for ref in dict(candidate.get("resolved_components") or {}).values():
+            if not isinstance(ref, dict):
+                continue
+            role = str(ref.get("runtime_role") or "").strip().lower()
+            circuit = str(ref.get("circuit") or "").strip().lower()
+            if role in runtime_templates and circuit:
+                component_templates[role] = circuit
+        if component_templates == runtime_templates:
+            matches.append(candidate)
+
+    if len(matches) > 1:
+        names = sorted(str(candidate.get("name") or "") for candidate in matches)
+        raise RuntimeError(
+            "prebuilt encoder/decoder runtimes match multiple multimodal compositions: "
+            + ", ".join(names)
+        )
+    return matches[0] if matches else None
+
+
 def _validate_composition_encoder_source(
     circuit: dict[str, Any] | None,
     *,
@@ -3892,6 +3946,16 @@ def main(argv: list[str] | None = None) -> int:
         tokenizer = GGUFTokenizer.from_gguf(str(args.decoder_gguf.resolve()))
     chat_template_mode = "none" if args.no_chat_template else args.chat_template
     composition_circuit = _load_explicit_composition_circuit(args.composition_circuit)
+    if composition_circuit is None:
+        composition_circuit = _infer_prebuilt_composition_circuit(
+            encoder_runtime=args.encoder_runtime,
+            decoder_runtime=args.decoder_runtime,
+        )
+        if composition_circuit is not None:
+            _log_progress(
+                "composition circuit auto-resolved "
+                f"name={composition_circuit.get('name')}"
+            )
     _validate_composition_encoder_source(
         composition_circuit,
         encoder_gguf=args.encoder_gguf,

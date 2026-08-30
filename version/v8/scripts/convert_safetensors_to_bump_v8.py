@@ -279,6 +279,39 @@ def _apply_linear_weight_runtime_config(
         config[key] = value
 
 
+def _apply_vision_numerics_profile(
+    config: dict[str, Any], arch: str, profile: str
+) -> None:
+    if arch not in {"qwen3_vl_vision", "cohere_compass_vision"}:
+        if profile != "pytorch_exact":
+            raise SystemExit(
+                f"--vision-numerics={profile} is only valid for a vision encoder"
+            )
+        return
+    if profile == "pytorch_exact":
+        config["vision_patch_frontend"] = "integrated_temporal2"
+        config["vision_patch_projection_reduction_policy"] = (
+            "pytorch_onednn_conv3d_exact"
+        )
+        config["vision_mrope_reduction_policy"] = "pytorch_mkl_exact"
+        config["vision_layernorm_reduction_policy"] = "pytorch_welford_exact"
+        config["vision_projection_reduction_policy"] = (
+            "pytorch_onednn_brgemm_exact"
+        )
+        config["vision_attention_reduction_policy"] = "pytorch_amx_exact"
+        config["vision_projector_activation_reduction_policy"] = (
+            "pytorch_sleef_exact"
+        )
+        return
+    config["vision_patch_frontend"] = "integrated_temporal2"
+    config["vision_patch_projection_reduction_policy"] = "native_pair_dot"
+    config["vision_mrope_reduction_policy"] = "portable_fp32_reference"
+    config["vision_layernorm_reduction_policy"] = "pytorch_welford_exact"
+    config["vision_projection_reduction_policy"] = "native_pair_dot"
+    config["vision_attention_reduction_policy"] = "portable_tiled_sdpa"
+    config["vision_projector_activation_reduction_policy"] = "portable_libm_erf"
+
+
 def _contract_ignored_source_tensor(
     contract: dict[str, Any], name: str
 ) -> str | None:
@@ -1869,6 +1902,7 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "vision_mrope_sections": vision_mrope_sections,
             "vision_mrope_n_dims": max(1, int(head_dim)),
             "vision_patch_projection_reduction_policy": "pytorch_onednn_conv3d_exact",
+            "vision_patch_frontend": "integrated_temporal2",
             "vision_mrope_storage_boundary": "bf16",
             "vision_mrope_reduction_policy": "pytorch_mkl_exact",
             "vision_layernorm_storage_boundary": "bf16",
@@ -2394,6 +2428,15 @@ def main() -> int:
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(
+        "--vision-numerics",
+        default="pytorch_exact",
+        choices=["pytorch_exact", "native"],
+        help=(
+            "vision reduction profile: PyTorch oneDNN/MKL/AMX exact, or "
+            "portable CKE native providers"
+        ),
+    )
+    ap.add_argument(
         "--linear-weight-dtype",
         default="preserve",
         choices=["preserve", "fp16", "bf16", "fp32"],
@@ -2419,6 +2462,7 @@ def main() -> int:
     _apply_linear_weight_runtime_config(
         config, _safetensors_arch_contract(arch), args.linear_weight_dtype
     )
+    _apply_vision_numerics_profile(config, arch, args.vision_numerics)
     refs = _refs_for_arch(arch, config, headers)
     if str(config.get("artifact_scope") or "") == "encoder_only":
         tokenizer_payloads, tokenizer_contract, special_tokens = [], None, {}

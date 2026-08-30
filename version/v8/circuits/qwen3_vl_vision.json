@@ -180,6 +180,28 @@
         "axis_names": ["token", "channel"]
       }
     },
+    "vision.frontend.patch_projection.native": {
+      "op": "patch_projection",
+      "template_ops": ["patch_projection_image"],
+      "selector": {
+        "config_equals": {
+          "vision_patch_projection_reduction_policy": "native_pair_dot"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "patch_projection_bf16_native_pair_dot_storage",
+          "validation": "validated",
+          "evidence": "unittest/bf16/test_patch_projection_native_bf16.py"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.frontend.patch_projection.output",
+        "producer": "patch_projection_image",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
     "vision.frontend.position.fp32": {
       "op": "position_embeddings",
       "template_ops": [
@@ -498,6 +520,9 @@
       "selector": {
         "config_equals": {
           "vision_attention_storage_boundary": "bf16"
+        },
+        "config_not_equals": {
+          "vision_attention_reduction_policy": "portable_tiled_sdpa"
         }
       },
       "phases": {
@@ -516,6 +541,29 @@
           "token",
           "channel"
         ]
+      }
+    },
+    "vision.layer.attention.portable": {
+      "op": "attention",
+      "template_ops": ["attn"],
+      "selector": {
+        "config_equals": {
+          "vision_attention_storage_boundary": "bf16",
+          "vision_attention_reduction_policy": "portable_tiled_sdpa"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "attention_bf16_sdpa_tiled512_bf16_prob_fp32_accum_bf16_output",
+          "validation": "validated",
+          "evidence": "unittest/bf16/test_attention_storage_contract_bf16.py"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.layer.{layer}.attention.output",
+        "producer": "attn",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
       }
     },
     "vision.layer.out_projection": {
@@ -756,6 +804,9 @@
       "selector": {
         "config_equals": {
           "vision_activation_storage_boundary": "bf16"
+        },
+        "config_not_equals": {
+          "vision_projector_activation_reduction_policy": "portable_libm_erf"
         }
       },
       "phases": {
@@ -763,6 +814,36 @@
           "contract_id": "gelu_pytorch_erf_sleef_bf16_storage",
           "validation": "validated",
           "evidence": "unittest/bf16/test_gelu_pytorch_erf_sleef_storage_bf16.py"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.projector.activation",
+        "producer": "projector_gelu",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
+    "vision.projector.activation.portable_libm_erf": {
+      "operation_interface": "gelu.fp32_bf16_values_inplace.v1",
+      "op": "gelu",
+      "template_ops": [
+        "projector_gelu",
+        "branch_gelu"
+      ],
+      "selector": {
+        "config_equals": {
+          "vision_activation_storage_boundary": "bf16",
+          "vision_projector_activation_reduction_policy": "portable_libm_erf"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gelu_erf_bf16_storage",
+          "validation": "validated",
+          "evidence": "unittest/bf16/test_gelu_erf_storage_bf16.py"
         }
       },
       "checkpoint": {
@@ -785,10 +866,8 @@
       ],
       "selector": {
         "config_equals": {
-          "vision_projection_storage_boundary": "bf16"
-        },
-        "config_not_equals": {
-          "vision_projection_reduction_policy": "pytorch_onednn_brgemm_exact"
+          "vision_projection_storage_boundary": "bf16",
+          "vision_projection_reduction_policy": "native_amx_tile32"
         }
       },
       "phases": {
@@ -796,6 +875,37 @@
           "contract_id": "bf16_weight_bf16_input_amx_tile32_dot_bf16_output",
           "validation": "validated",
           "evidence": "unittest/bf16/test_qwen3vl_performance_sweep_bf16.py"
+        }
+      },
+      "checkpoint": {
+        "id": "vision.projector.projection",
+        "producer": "projector_projection",
+        "logical_layout": "token_major",
+        "axis_names": [
+          "token",
+          "channel"
+        ]
+      }
+    },
+    "vision.projector.projection.native": {
+      "op": "gemm",
+      "template_ops": [
+        "branch_fc1",
+        "branch_fc2",
+        "projector_fc1",
+        "projector_fc2"
+      ],
+      "selector": {
+        "config_equals": {
+          "vision_projection_storage_boundary": "bf16",
+          "vision_projection_reduction_policy": "native_pair_dot"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_native_pair_dot_bf16_output",
+          "validation": "validated",
+          "evidence": "unittest/bf16/test_gemm_storage_contract_bf16.py"
         }
       },
       "checkpoint": {
@@ -849,8 +959,8 @@
         "template_op_id": "patch_bias",
         "op": "patch_bias_add",
         "when": {
-          "config_key": "vision_patch_projection_reduction_policy",
-          "not_equals": "pytorch_onednn_conv3d_exact"
+          "config_key": "vision_patch_frontend",
+          "not_equals": "integrated_temporal2"
         },
         "checkpoints": [
           {
@@ -866,13 +976,13 @@
           }
         ]
       },
-      "frontend.patch_projection_exact": {
+      "frontend.patch_projection_integrated": {
         "section": "header",
         "template_op_id": "patch_projection_image",
         "op": "patch_projection_image",
         "when": {
-          "config_key": "vision_patch_projection_reduction_policy",
-          "equals": "pytorch_onednn_conv3d_exact"
+          "config_key": "vision_patch_frontend",
+          "equals": "integrated_temporal2"
         },
         "checkpoints": [
           {
@@ -1232,40 +1342,40 @@
           "id": "patch_projection_image",
           "op": "patch_projection_image",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "equals": "integrated_temporal2"
           }
         },
         {
           "id": "patchify",
           "op": "patchify",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "not_equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "not_equals": "integrated_temporal2"
           }
         },
         {
           "id": "patch_proj",
           "op": "patch_proj",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "not_equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "not_equals": "integrated_temporal2"
           }
         },
         {
           "id": "patch_proj_aux",
           "op": "patch_proj_aux",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "not_equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "not_equals": "integrated_temporal2"
           }
         },
         {
           "id": "patch_sum",
           "op": "add_stream",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "not_equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "not_equals": "integrated_temporal2"
           },
           "params": {
             "merge_size_from_config": "spatial_merge_size"
@@ -1275,8 +1385,8 @@
           "id": "patch_bias",
           "op": "patch_bias_add",
           "when": {
-            "config_key": "vision_patch_projection_reduction_policy",
-            "not_equals": "pytorch_onednn_conv3d_exact"
+            "config_key": "vision_patch_frontend",
+            "not_equals": "integrated_temporal2"
           }
         },
         {

@@ -89,6 +89,41 @@ def test_contract_selection_does_not_depend_on_audio_architecture_name() -> None
         converter._SAFETENSORS_CK_MAP_CACHE = original
 
 
+def test_vision_numerics_profiles_are_explicit() -> None:
+    converter = _load_converter()
+
+    exact: dict[str, object] = {}
+    converter._apply_vision_numerics_profile(
+        exact, "cohere_compass_vision", "pytorch_exact"
+    )
+    assert exact == {
+        "vision_patch_frontend": "integrated_temporal2",
+        "vision_patch_projection_reduction_policy": "pytorch_onednn_conv3d_exact",
+        "vision_mrope_reduction_policy": "pytorch_mkl_exact",
+        "vision_layernorm_reduction_policy": "pytorch_welford_exact",
+        "vision_projection_reduction_policy": "pytorch_onednn_brgemm_exact",
+        "vision_attention_reduction_policy": "pytorch_amx_exact",
+        "vision_projector_activation_reduction_policy": "pytorch_sleef_exact",
+    }
+
+    native: dict[str, object] = {}
+    converter._apply_vision_numerics_profile(
+        native, "cohere_compass_vision", "native"
+    )
+    assert native == {
+        "vision_patch_frontend": "integrated_temporal2",
+        "vision_patch_projection_reduction_policy": "native_pair_dot",
+        "vision_mrope_reduction_policy": "portable_fp32_reference",
+        "vision_layernorm_reduction_policy": "pytorch_welford_exact",
+        "vision_projection_reduction_policy": "native_pair_dot",
+        "vision_attention_reduction_policy": "portable_tiled_sdpa",
+        "vision_projector_activation_reduction_policy": "portable_libm_erf",
+    }
+
+    with pytest.raises(SystemExit, match="only valid for a vision encoder"):
+        converter._apply_vision_numerics_profile({}, "qwen3", "native")
+
+
 def _require_torch_safetensors() -> tuple[object, object]:
     torch = pytest.importorskip("torch")
     st = pytest.importorskip("safetensors.torch")
@@ -2140,3 +2175,53 @@ def test_qwen3vl_safetensors_vision_maps_temporal_patch_split(tmp_path: Path) ->
     assert "gemm_nt_bf16(" not in generated
     assert "gemm_naive_parallel(" not in generated
     assert "gemm_blocked_serial(" not in generated
+
+    native_manifest = json.loads(
+        (out / "weights_manifest.json").read_text(encoding="utf-8")
+    )
+    converter = _load_converter()
+    converter._apply_vision_numerics_profile(
+        native_manifest["config"], "qwen3_vl_vision", "native"
+    )
+    native_manifest_path = out / "weights_manifest_native.json"
+    native_manifest_path.write_text(
+        json.dumps(native_manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    native_lowered = out / "lowered_vision_native.json"
+    native_call = out / "lowered_vision_native_call.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(build_ir),
+            "--manifest",
+            str(native_manifest_path),
+            "--mode",
+            "prefill",
+            "--output",
+            str(out / "ir1_vision_native.json"),
+            "--layout-output",
+            str(out / "layout_vision_native.json"),
+            "--lowered-output",
+            str(native_lowered),
+            "--call-output",
+            str(native_call),
+            "--context-len",
+            "4",
+        ],
+        check=True,
+    )
+    native_calls = json.loads(native_call.read_text(encoding="utf-8"))["operations"]
+    native_functions = {op.get("function") for op in native_calls}
+    assert "patch_projection_image_bf16_native_storage" in native_functions
+    assert "mrope_qk_vision_bf16_storage" in native_functions
+    assert "gemm_nt_bf16_native_bf16_storage" in native_functions
+    assert (
+        "attention_forward_full_head_major_gqa_sdpa_bf16_storage"
+        in native_functions
+    )
+    assert "gelu_erf_bf16_storage" in native_functions
+    assert not any(
+        function
+        and any(marker in function for marker in ("onednn", "mkl", "amx", "sleef"))
+        for function in native_functions
+    )

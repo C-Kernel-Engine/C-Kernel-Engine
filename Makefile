@@ -3962,10 +3962,13 @@ test-numerical-contracts: $(LIB)
 	@$(PYTHON) unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py
 	@$(PYTHON) unittest/bf16/test_qk_norm_pytorch_storage_bf16.py
 	@$(PYTHON) unittest/bf16/test_gemm_storage_contract_bf16.py
+	@$(PYTHON) unittest/bf16/test_gemv_parallel_bf16.py
+	@$(PYTHON) unittest/bf16/test_patch_projection_native_bf16.py
 	@$(PYTHON) unittest/bf16/test_attention_storage_contract_bf16.py
 	@$(PYTHON) unittest/bf16/test_attention_decode_gqa_pytorch_math_bf16.py
 	@$(PYTHON) unittest/bf16/test_residual_storage_contract_bf16.py
 	@$(PYTHON) unittest/bf16/test_gelu_pytorch_tanh_storage_bf16.py
+	@$(PYTHON) unittest/bf16/test_gelu_erf_storage_bf16.py
 	@$(PYTHON) unittest/test_rmsnorm_numerical_contract.py
 	@$(PYTHON) unittest/test_rmsnorm_strided.py
 	@$(PYTHON) unittest/test_nemotron_router.py

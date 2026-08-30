@@ -584,6 +584,53 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(qwen_bridge["decode_policy"], "causal_mixed_prefix")
         self.assertEqual(qwen_bridge["grid_policy"], "merged_hw")
 
+    def test_prebuilt_runtime_pair_infers_declared_composition(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_comp_runtime_") as tmpdir:
+            root = Path(tmpdir)
+            encoder = root / "encoder"
+            decoder = root / "decoder"
+            encoder.mkdir()
+            decoder.mkdir()
+            (encoder / "weights_manifest.json").write_text(
+                json.dumps({"template": {"name": "cohere_compass_vision"}}),
+                encoding="utf-8",
+            )
+            (decoder / "weights_manifest.json").write_text(
+                json.dumps({"template": {"name": "cohere_compass_text"}}),
+                encoding="utf-8",
+            )
+
+            circuit = bridge_runner_v8._infer_prebuilt_composition_circuit(
+                encoder_runtime=encoder,
+                decoder_runtime=decoder,
+            )
+
+        self.assertIsNotNone(circuit)
+        self.assertEqual(circuit["name"], "cohere_compass")
+
+    def test_unknown_prebuilt_runtime_pair_keeps_safe_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_comp_runtime_unknown_") as tmpdir:
+            root = Path(tmpdir)
+            encoder = root / "encoder"
+            decoder = root / "decoder"
+            encoder.mkdir()
+            decoder.mkdir()
+            (encoder / "weights_manifest.json").write_text(
+                json.dumps({"template": {"name": "unknown_vision"}}),
+                encoding="utf-8",
+            )
+            (decoder / "weights_manifest.json").write_text(
+                json.dumps({"template": {"name": "unknown_text"}}),
+                encoding="utf-8",
+            )
+
+            circuit = bridge_runner_v8._infer_prebuilt_composition_circuit(
+                encoder_runtime=encoder,
+                decoder_runtime=decoder,
+            )
+
+        self.assertIsNone(circuit)
+
     def test_gemma4_vision_patch_projection_uses_fp16_weight_kernel(self) -> None:
         gemma = build_ir_v8._load_builtin_template_doc("gemma4_vision")
         self.assertIsNotNone(gemma)
