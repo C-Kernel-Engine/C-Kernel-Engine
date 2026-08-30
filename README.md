@@ -84,11 +84,12 @@ version/v8/scripts/cks-v8-run run MODEL \
 | GLM4 9B | `hf://unsloth/GLM-4-9B-0414-GGUF/GLM-4-9B-0414-Q4_K_M.gguf` | `--chat-template glm4 --temperature 0.0` |
 | Nanbeige 4.1 3B / Llama-family | `hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf` | `--chat-template auto`; use `--python-tokenizer` when diagnosing an unfamiliar tokenizer |
 | Cohere2 Command R | `/path/to/command-r7b-q4_k_m.gguf` | `--chat-template auto --temperature 0.0` |
+| Cohere North Mini Code | `/path/to/North-Mini-Code-1.0-UD-Q4_K_M.gguf` | `--chat-template auto --temperature 0.0`; high-memory MoE lane |
 | Laguna-XS 2.1 | `/path/to/Laguna-XS-2.1-Q4_K_M.gguf` | `--chat-template auto --thinking-mode suppressed --temperature 0.0` for the shortest smoke |
 | Kimi-VL A3B text decoder | `/path/to/moonshotai--Kimi-VL-A3B-Instruct` | `--chat-template kimi_vl`; current certified scope is text only |
 | Instella-MoE 16B-A3B | `/path/to/amd--Instella-MoE-16B-A3B-Think` | BF16 safetensors lane; use the exact local-artifact command in the v8 runbook |
 | GPT-2 / compatible Llama GGUF | `/path/to/model-or-run-directory` | Generic text entry point; use `--chat-template auto` unless the model is a raw continuation model |
-| Qwen3-VL 8B | `hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf` | Add the runbook's `--mmproj`, `--image-path`, and vision token options |
+| Qwen3-VL 8B | `hf://unsloth/Qwen3-VL-8B-Instruct-GGUF/Qwen3-VL-8B-Instruct-Q4_K_M.gguf` | Add the runbook's `--mmproj`, `--image-path`, and vision token options |
 | Qwen3.6-VL | Local decoder GGUF plus generated encoder runtime | Use the separate Qwen3.6-VL OCR command in the v8 runbook; a text-only command does not certify vision |
 | Whisper Tiny, Base, or Small | `version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav /path/to/audio.wav` | Audio uses the `audio` subcommand; see the v8 runbook for generated artifact directories and language/task options |
 
@@ -116,6 +117,7 @@ to compile.
 | GLM4 9B and Nemotron Nano 9B v2 Q4_K_M | Coherent end-to-end text; partial-RoPE/FP16-KV and Mamba2 contracts respectively | 1,024 tokens | x86 runtime and parity lanes |
 | Kimi-VL A3B BF16 text decoder | Repeatable coherent text; first token and top-20 match PyTorch, cosine 0.997696 | 2,048 tokens | Intel AVX2 and Ryzen AVX-512 |
 | Cohere2 Command R7B Q4_K_M | First eight greedy positions agree with llama.cpp | 2,048-token runtime smoke | x86 runtime lane; long trajectory and matched performance open |
+| Cohere North Mini Code 30B-A3B Q4_K_M | Coherent, repeatable text plus identical first-logit hash and token sequence across two full-capacity runs | 131,072-token execution | Ryzen 9 9950X3D AVX-512/VNNI; average 71.35 tok/s prefill and 0.65 tok/s full-history decode |
 | Laguna-XS 2.1 Q4_K_M | Coherent text; exact embedding/RMSNorm and near-exact router replay | 2,048 tokens | Ryzen Zen 5 bring-up; diagnostic llama.cpp oracle |
 | Instella-MoE 16B-A3B BF16 | Top-1 PyTorch match and 0.99998 full-logit cosine at the tested checkpoint | 32-token checkpoint | x86 BF16 reference/runtime lane; quantized and long trajectories open |
 | Whisper Tiny, Base, and Small FP32 | Token-exact Hugging Face trajectory on public JFK fixtures | JFK fixture; 33-second Base long-form fixture | Generated x86 encoder/decoder runtime |
@@ -126,6 +128,24 @@ contains per-family commands, formats, open boundaries, and evidence classes. Th
 contains long-context, OCR, audio, engineering-quality, and overnight readiness
 commands. Hardware coverage never implies that every model and quantization passed
 on every listed ISA; consult the linked report before quoting a result.
+
+### Cohere Portfolio Status
+
+CKE follows Cohere's downloadable model families without treating every model on
+the [Cohere overview](https://cohere.com/models-overview) as locally supported.
+Hosted Embed, Rerank, and Parse services are outside CKE's local-weight runtime
+scope. The larger gated Command A and Aya checkpoints also require their own
+real-artifact evidence before promotion.
+
+| Cohere lane | CKE status | Current evidence and boundary |
+|---|---|---|
+| Command R7B | Sampled numerical support | First eight greedy positions agree with llama.cpp; long-trajectory parity and matched performance remain open. |
+| North Mini Code 30B-A3B | Coherent E2E and 128K capacity | Q4_K_M text is coherent and repeatable. Two 131,072-token runs consumed the same hashed input and produced the same first-logit hash and token sequence; practical long-code quality remains a separate gate. |
+| North Micro Vision 2.4B | Active bring-up in [PR #434](https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/434) | A real image produced a coherent field answer through generated encoder, bridge, and decoder runtimes. The resumable 40-image OCR corpus is the promotion gate. |
+| Cohere Transcribe 2B | Provider foundation in [PR #433](https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/433) | Audio frontend and Conformer primitives have numerical contracts. Full CKE encoder/decoder conversion, tokenizer integration, and an exact audio trajectory are not yet complete. |
+| Command A Vision and Aya Vision | Planned, not supported | Gated, high-memory checkpoints; no CKE real-weight E2E claim. |
+| Command A Translate and multilingual Aya text | Planned, not supported | Translation quality requires model access, tokenizer/protocol validation, and multilingual trajectory tests. |
+| Command A+ W4A4 | Planned final Cohere milestone | The published checkpoint uses an NVFP4-packed W4A4 path and a large MoE/vision topology that CKE has not certified. |
 
 The longer argument behind that direction is documented in [the CPU and smaller-model strategic bet](https://www.shivasnotes.com/blog/5878/Why-I-Stopped-Getting-High-on-the-Newer-AI-Models-And-Why-My-Strategic-Bet-Is-Still-Consistent-CPUs-Smaller-Models-and-Less-Compute-Will-Win) and the project origin story, [Unimporting PyTorch](https://www.shivasnotes.com/blog/5872/Unimporting-PyTorch-How-Constraint-and-Curiosity-Built-a-C-Kernel-Engine).
 
