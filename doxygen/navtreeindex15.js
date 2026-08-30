@@ -1,5 +1,10 @@
 var NAVTREEINDEX15 =
 {
+"recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61":[2,0,1,1,73,2],
+"recurrent__split__kernels_8c.html#a53ca38835096b418b4a2089db9a24b40":[2,0,1,1,73,1],
+"recurrent__split__kernels_8c.html#a9525efb4fcb62c7c88e7f4bc369ca1b8":[2,0,1,1,73,4],
+"recurrent__split__kernels_8c.html#adc53b91db62ed02dfdfee0b9d086b9e2":[2,0,1,1,73,3],
+"recurrent__split__kernels_8c_source.html":[2,0,1,1,73],
 "recurrent__state__kernels_8c.html":[2,0,1,1,74],
 "recurrent__state__kernels_8c.html#a293da8c98ad512706fa5ea77b842d8c2":[2,0,1,1,74,0],
 "recurrent__state__kernels_8c.html#a55ef0ed9f1f51ca4910e3f7457054044":[2,0,1,1,74,3],
@@ -244,10 +249,5 @@ var NAVTREEINDEX15 =
 "structAffinityInfo.html#a905e3d4bab481748227b9b65665a82fa":[1,0,0,0],
 "structAffinityInfo.html#aa8aceed4896f9d850b42199624e74f02":[1,0,0,2],
 "structAffinityInfo.html#ac336f376702b1b1724111b291c9fac84":[1,0,0,4],
-"structAffinityInfo.html#ad7c543698d7fa66a65b006a8e16e5368":[1,0,0,1],
-"structAffinityInfo.html#aed549054fb9376cc874f3d8d710d1e89":[1,0,0,5],
-"structCKAudioWavInfo.html":[1,0,15],
-"structCKAudioWavInfo.html#a028e31e0ebfd2ddaa941c841b5a4df90":[1,0,15,5],
-"structCKAudioWavInfo.html#a056e487f230f8cd625dec984e79711dd":[1,0,15,6],
-"structCKAudioWavInfo.html#a5977de925aa541e28ce598ac6005dc19":[1,0,15,1]
+"structAffinityInfo.html#ad7c543698d7fa66a65b006a8e16e5368":[1,0,0,1]
 };

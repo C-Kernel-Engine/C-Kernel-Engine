@@ -404,7 +404,7 @@ var searchData=
   ['gpt2_5fbyte_5fis_5fidentity_401',['gpt2_byte_is_identity',['../true__bpe_8c.html#a0789466d184924de5d95ef2725aacb2c',1,'true_bpe.c']]],
   ['gpt2_5fbyte_5fto_5fcodepoint_402',['gpt2_byte_to_codepoint',['../true__bpe_8c.html#ae446b8e119964098b74ab368f7616fdd',1,'true_bpe.c']]],
   ['gpt2_5fcodepoint_5fto_5fbyte_403',['gpt2_codepoint_to_byte',['../true__bpe_8c.html#adbdd1e399e5cf10ba8353d21ffabdad5',1,'true_bpe.c']]],
-  ['gpt2_5fpretokenize_404',['gpt2_pretokenize',['../true__bpe_8c.html#a75677b0ab168d7bf958f8d1b258f016a',1,'true_bpe.c']]],
+  ['gpt2_5fpretokenize_404',['gpt2_pretokenize',['../true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c',1,'true_bpe.c']]],
   ['grad_5fbytes_405',['grad_bytes',['../structCKModel.html#a5e10579eb6d5d28cabce344d328b3c7a',1,'CKModel']]],
   ['grad_5fend_406',['grad_end',['../structCKLayerGradOffsets.html#ad3dcd4463deb7947578383f61a5800d9',1,'CKLayerGradOffsets::grad_end'],['../structCKFooterGradOffsets.html#a1033308e389797d86251b87a79781bae',1,'CKFooterGradOffsets::grad_end']]],
   ['grad_5fstart_407',['grad_start',['../structCKFooterGradOffsets.html#ae9169fef93e53c932b9f4728d8cb6e30',1,'CKFooterGradOffsets::grad_start'],['../structCKLayerGradOffsets.html#a6272144a177f1aa0fd8a3ff88a84c88b',1,'CKLayerGradOffsets::grad_start']]],

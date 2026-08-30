@@ -941,6 +941,8 @@
                         <a href="kernel-maps.html">Kernel Maps<small>Provider selection, ABI, migration</small></a>
                         <a href="kernel-architecture.html">v8 Kernel Architecture<small>Registry by op family, math</small></a>
                         <a href="architecture-variants.html">Architecture Variants<small>Laguna, Cohere2, Instella, Nemotron</small></a>
+                        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels<small>Bucketed prefill, mixed-quant experts</small></a>
+                        <a href="v8-cohere-kernels.html">Cohere Kernel Story<small>Reuse, BF16 vision, Transcribe audio</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Quantization</div>
@@ -1054,6 +1056,12 @@
       <div class="av-card"><strong>Whisper.</strong> The generated audio frontend and encoder–decoder pair:
         <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> and
         <a href="v8-whisper-tiny.html">Whisper end to end</a>.</div>
+      <div class="av-card"><strong>Laguna / Qwen3.5-MoE experts.</strong> The provider-level walk of the
+        bucketed expert prefill and the mixed-quant compact experts:
+        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>.</div>
+      <div class="av-card"><strong>Cohere family.</strong> Command R provider reuse, North MoE composition,
+        Compass BF16 vision, and the Transcribe audio foundation:
+        <a href="v8-cohere-kernels.html">Cohere Kernel Story</a>.</div>
     </div>
   </div>
 
@@ -1129,7 +1137,9 @@
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
     <p class="av-note">Provider math: <a href="kernel-architecture.html">kernel architecture — attention gates, MoE
-      routers, RoPE</a>. Operator lane: <a href="v8-runbook.html">v8 runbook</a>.</p>
+      routers, RoPE</a>. Operator lane: <a href="v8-runbook.html">v8 runbook</a>. Kernel-level walk of the
+      mixed-quant routed/shared experts and the parallel workspace variants:
+      <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>.</p>
   </div>
 
   <div class="av-section">
@@ -1178,7 +1188,8 @@
     </div>
     <p class="av-note">The shared norm makes the parallel branches a contract, not a fusion decision: both branches
       must consume the identical normed tensor, which the circuit declares and the memory plan shares. Provider math:
-      <a href="kernel-architecture.html">kernel architecture — norms, footer ops</a>.</p>
+      <a href="kernel-architecture.html">kernel architecture — norms, footer ops</a>. The provider-level reuse story
+      (one new kernel, six reused bindings): <a href="v8-cohere-kernels.html">Cohere Kernel Story</a>.</p>
   </div>
 
   <div class="av-section">
@@ -1263,6 +1274,13 @@
     <p class="av-note">Mamba2 update math and the decode contract:
       <a href="concepts.html">concepts — Nemotron-H hybrid circuit</a>; provider list:
       <a href="kernel-architecture.html">kernel architecture — recurrent/SSM</a>.</p>
+    <p class="av-note"><strong>Throughput follow-up (PR #412):</strong> recurrent prefill is no longer serial —
+      <code>mamba2_conv1d_f32_parallel_dispatch</code> partitions the conv by independent channel ranges and
+      <code>mamba2_selective_scan_f32_parallel_dispatch</code> chunks by independent head ranges, with map-owned
+      shape constraints (<code>impl.variants[].parallel_head_ranges</code>: T&ge;8, H&ge;2), a named sequential
+      fallback, and the <code>CK_DISABLE_MAMBA2_PARALLEL_PREFILL</code> kill switch. Measured 1.87&times; on
+      8K-token Nemotron prefill with exact output agreement; provider-level detail in
+      <a href="v8-moe-expert-kernels.html">MoE Expert Kernels — Throughput kernels beyond MoE</a>.</p>
   </div>
 
   <div id="av-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">

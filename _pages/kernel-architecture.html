@@ -6,7 +6,7 @@
   <p class="lead">
     The v8 engine keeps every kernel behind a <strong>provider map</strong>: a JSON document in
     <code>version/v8/kernel_maps/</code> that names the operation, the numerical contract, the port layout, the C
-    call ABI, and the selection metadata. The registry currently holds <strong>297 provider maps across 108
+    call ABI, and the selection metadata. The registry currently holds <strong>308 provider maps across 113
     operations</strong>. Circuits choose <em>what</em> runs — a logical operation with a numerical contract; the maps
     decide <em>which physical kernel</em> satisfies it on this host.
   </p>
@@ -95,14 +95,14 @@
   <div class="ka-section">
     <h2>Registry at a Glance</h2>
     <p style="color: var(--text-secondary); margin-top: 0.4rem;">
-      297 provider maps, 108 logical operations. Attention dominates because every dtype &times; phase &times;
+      308 provider maps, 113 logical operations. Attention dominates because every dtype &times; phase &times;
       layout combination is a separate physical provider with its own contract; the long tail is singleton
       operations such as <code>final_logit_scale</code> or <code>attn_gate_softplus_mul</code> that exist because one
       model family needed exactly that arithmetic.
     </p>
     <div class="svg-expand">
     <svg viewBox="0 0 1180 470" width="100%" role="img" tabindex="0" data-svg-title="v8 kernel registry — providers per operation family"
-         aria-label="Bar chart of v8 kernel registry providers per operation family: attention 31, gemm 22, rope 17, gemv 14, audio 12, rmsnorm 10, embedding 7, gated deltanet 7, moe swiglu experts 7, gelu 6, sliding attention 6, position embeddings 6, then smaller families and about 55 singleton operations, totalling 297 providers across 108 ops."
+         aria-label="Bar chart of v8 kernel registry providers per operation family: attention 32, gemm 22, rope 17, gemv 14, audio 20, rmsnorm 10, embedding 7, gated deltanet 7, moe swiglu experts 7, gelu 7, sliding attention 7, position embeddings 6, then smaller families and about 67 singleton operations, totalling 308 providers across 113 ops."
          style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <style>
         .ka-bar{fill:#263242;}
@@ -114,48 +114,52 @@
       </style>
       <!-- bars: value 1 = 26px, x from 260 -->
       <g>
-        <text x="24"  y="50"  class="ka-bar-lab">attention</text>            <rect class="ka-bar-hi" x="260" y="36"  width="806" height="20" rx="4"/><text x="1076" y="51" class="ka-bar-val">31</text>
+        <text x="24"  y="50"  class="ka-bar-lab">attention</text>            <rect class="ka-bar-hi" x="260" y="36"  width="832" height="20" rx="4"/><text x="1102" y="51" class="ka-bar-val">32</text>
         <text x="24"  y="80"  class="ka-bar-lab">gemm</text>                 <rect class="ka-bar-hi" x="260" y="66"  width="572" height="20" rx="4"/><text x="842"  y="81" class="ka-bar-val">22</text>
         <text x="24"  y="110" class="ka-bar-lab">rope</text>                 <rect class="ka-bar"    x="260" y="96"  width="442" height="20" rx="4"/><text x="712"  y="111" class="ka-bar-val">17</text>
         <text x="24"  y="140" class="ka-bar-lab">gemv</text>                 <rect class="ka-bar"    x="260" y="126" width="364" height="20" rx="4"/><text x="634"  y="141" class="ka-bar-val">14</text>
-        <text x="24"  y="170" class="ka-bar-lab">audio frontend</text>       <rect class="ka-bar"    x="260" y="156" width="312" height="20" rx="4"/><text x="582"  y="171" class="ka-bar-val">12</text>
+        <text x="24"  y="170" class="ka-bar-lab">audio frontend</text>       <rect class="ka-bar"    x="260" y="156" width="520" height="20" rx="4"/><text x="790"  y="171" class="ka-bar-val">20</text>
         <text x="24"  y="200" class="ka-bar-lab">rmsnorm</text>              <rect class="ka-bar"    x="260" y="186" width="260" height="20" rx="4"/><text x="530"  y="201" class="ka-bar-val">10</text>
         <text x="24"  y="230" class="ka-bar-lab">embedding</text>            <rect class="ka-bar"    x="260" y="216" width="182" height="20" rx="4"/><text x="452"  y="231" class="ka-bar-val">7</text>
         <text x="24"  y="260" class="ka-bar-lab">gated_deltanet</text>       <rect class="ka-bar"    x="260" y="246" width="182" height="20" rx="4"/><text x="452"  y="261" class="ka-bar-val">7</text>
         <text x="24"  y="290" class="ka-bar-lab">moe_swiglu_expert</text>    <rect class="ka-bar"    x="260" y="276" width="182" height="20" rx="4"/><text x="452"  y="291" class="ka-bar-val">7</text>
-        <text x="24"  y="320" class="ka-bar-lab">attention_sliding</text>    <rect class="ka-bar"    x="260" y="306" width="156" height="20" rx="4"/><text x="426"  y="321" class="ka-bar-val">6</text>
-        <text x="24"  y="350" class="ka-bar-lab">gelu</text>                 <rect class="ka-bar"    x="260" y="336" width="156" height="20" rx="4"/><text x="426"  y="351" class="ka-bar-val">6</text>
+        <text x="24"  y="320" class="ka-bar-lab">attention_sliding</text>    <rect class="ka-bar"    x="260" y="306" width="182" height="20" rx="4"/><text x="452"  y="321" class="ka-bar-val">7</text>
+        <text x="24"  y="350" class="ka-bar-lab">gelu</text>                 <rect class="ka-bar"    x="260" y="336" width="182" height="20" rx="4"/><text x="452"  y="351" class="ka-bar-val">7</text>
         <text x="24"  y="380" class="ka-bar-lab">position_embeddings</text>  <rect class="ka-bar"    x="260" y="366" width="156" height="20" rx="4"/><text x="426"  y="381" class="ka-bar-val">6</text>
-        <text x="24"  y="410" class="ka-bar-lab">&#8776;55 singleton ops</text> <rect class="ka-bar" x="260" y="396" width="520" height="20" rx="4" opacity="0.55"/><text x="790" y="411" class="ka-bar-val">55 &times; 1</text>
+        <text x="24"  y="410" class="ka-bar-lab">&#8776;67 singleton ops</text> <rect class="ka-bar" x="260" y="396" width="520" height="20" rx="4" opacity="0.55"/><text x="790" y="411" class="ka-bar-val">67 &times; 1</text>
       </g>
       <line class="ka-axis" x1="260" y1="30" x2="260" y2="424"/>
-      <text x="24" y="452" class="ka-cap">297 provider maps · 108 operations · version/v8/kernel_maps/KERNEL_REGISTRY.json</text>
+      <text x="24" y="452" class="ka-cap">308 provider maps · 113 operations · version/v8/kernel_maps/KERNEL_REGISTRY.json</text>
     </svg>
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
     <div class="ka-grid">
       <div class="ka-card"><strong>Selection status.</strong>
-        <span class="pill prod">production &times;64</span>
-        <span class="pill cand">candidate &times;5</span>
-        <span class="pill none">legacy (unmarked) &times;228</span><br>
+        <span class="pill prod">production &times;69</span>
+        <span class="pill cand">candidate &times;4</span>
+        <span class="pill none">legacy (unmarked) &times;235</span><br>
         The schema also defines <code>diagnostic</code> and <code>deprecated</code>; no current map uses them.
         Explicit <code>candidate</code> providers resolve only behind explicit opt-in routes (for example
         <code>production_when_prepared</code> weight layouts), and equal-priority production ambiguity fails
-        closed instead of guessing. The 228 unmarked maps are implicit <code>legacy</code> providers: they
+        closed instead of guessing. The 235 unmarked maps are implicit <code>legacy</code> providers: they
         remain eligible as compatibility fallbacks and rank below production &mdash; migration debt, not
         unreachable providers.
       </div>
-      <div class="ka-card"><strong>The five candidates today.</strong><br>
-        <code>moe_softmax_topk_router_llama_f32</code>, <code>moe_swiglu_expert_forward_q4k_q5k</code>,
+      <div class="ka-card"><strong>The four candidates today.</strong><br>
+        <code>moe_softmax_topk_router_llama_f32</code>,
         <code>moe_swiglu_expert_forward_q4k_q5k_bucketed</code>,
         <code>moe_swiglu_shared_forward_q8_0_gated</code>,
         <code>farskip_swiglu_shared_combine_bf16</code> — each waits for measured evidence before promotion.
+        (<code>moe_swiglu_expert_forward_q4k_q5k</code> was promoted to production at priority 200; the bucketed
+        variant remains candidate at 210.)
       </div>
       <div class="ka-card"><strong>Where the numbers live.</strong><br>
         <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> is regenerated by <code>ck_run_v8.py</code>
         (never hand-edited). The migration ratchet is
         <code>version/v8/contracts/kernel_interface_migration_baseline.json</code>, enforced by
-        <code>audit_kernel_map_interfaces_v8.py --check</code> in CI. See
+        <code>audit_kernel_map_interfaces_v8.py --check</code> in CI. Current audit census: hardened 63,
+        interface_abi 63, map_abi 181, selection_managed 73, contract_pending 51, legacy 188, legacy_interface 34,
+        legacy_if 67, op_if 33 (of 308 maps). See
         <a href="kernel-maps.html">Kernel Maps and Provider Selection</a> for the map schema itself.
       </div>
     </div>
@@ -171,7 +175,7 @@
     </p>
     <div class="svg-expand">
     <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Provider selection filter chain"
-         aria-label="Provider selection filter chain: all 297 providers enter; compatibility filters remove wrong dtype, layout, phase, ISA, shape and ABI matches; the status filter removes explicit candidate, diagnostic and deprecated providers from automatic selection while unmarked maps stay eligible as legacy fallbacks ranked below production; equivalence grouping keeps only providers with the same numerical contract; priority ranks what remains; ties fail closed."
+         aria-label="Provider selection filter chain: all 308 providers enter; compatibility filters remove wrong dtype, layout, phase, ISA, shape and ABI matches; the status filter removes explicit candidate, diagnostic and deprecated providers from automatic selection while unmarked maps stay eligible as legacy fallbacks ranked below production; equivalence grouping keeps only providers with the same numerical contract; priority ranks what remains; ties fail closed."
          style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <style>
         .fs-stage{fill:#323232;stroke:#454545;stroke-width:1.4;}
@@ -189,7 +193,7 @@
       <g>
         <rect class="fs-stage" x="24"  y="60" width="170" height="70" rx="12"/>
         <text x="44" y="88"  class="fs-title">All providers</text>
-        <text x="44" y="110" class="fs-sub">297 maps · 108 ops</text>
+        <text x="44" y="110" class="fs-sub">308 maps · 113 ops</text>
 
         <rect class="fs-stage" x="244" y="60" width="200" height="70" rx="12"/>
         <text x="264" y="88"  class="fs-title">1 · Compatibility</text>
@@ -221,7 +225,7 @@
       <text x="264" y="190" class="fs-drop">&#10007; decode provider in prefill phase</text>
       <text x="264" y="210" class="fs-drop">&#10007; AVX-512 kernel on an SSE host</text>
       <text x="514" y="170" class="fs-drop">&#10007; candidate / diagnostic / deprecated</text>
-      <text x="514" y="190" class="fs-drop">&#183; unmarked &rarr; legacy fallback below production (228)</text>
+      <text x="514" y="190" class="fs-drop">&#183; unmarked &rarr; legacy fallback below production (235)</text>
       <text x="764" y="170" class="fs-drop">&#10007; online-softmax flash vs exact full-score</text>
       <text x="764" y="190" class="fs-drop">&#10007; grouped vs serial reduction order</text>
       <text x="1014" y="170" class="fs-drop">&#10007; equal priority, same group</text>
@@ -367,7 +371,7 @@ attention:      softmax(q·kᵀ/√qk_head_dim)·v over cache_len valid rows, kv
           <tr><td>Q8_0 / Q5_x / Q4_0/1</td><td><code>gemm_nt_q8_0*</code>, <code>gemm_nt_q5_*</code>, <code>gemv_*</code></td>
             <td>Plus fused GEMV with online quant + bias (<code>gemv_fused_q5_0_bias</code>, <code>gemv_fused_q8_0_bias</code>).</td></tr>
           <tr><td>BF16 / F16</td><td><code>gemm_nt_bf16[_native|_amx|_pytorch_onednn_brgemm]</code>, <code>gemm_nt_f16[_clipped]</code></td>
-            <td>AMX and oneDNN BRGEMM routes for Xeon; BF16 storage contracts for the PyTorch parity lanes.</td></tr>
+            <td>AMX and oneDNN BRGEMM routes for Xeon; BF16 storage contracts for the PyTorch parity lanes. The Cohere Compass BF16 frontend added <code>gemv_bf16_parallel_dispatch</code> (thread-pool row-partitioned decode GEMV) and a parallel <code>gemm_nt_bf16_bf16_storage</code> variant with exact BF16 round-trip storage.</td></tr>
           <tr><td>Exact FP32</td><td><code>gemm_nt_fp32_exact</code>, <code>gemm_nt_f32_llama_production</code></td>
             <td>The exact parallel row providers (<code>ck_parallel_prefill_v8.c</code>) that the Qwen3.6/3.8 long-prefill lanes use when parity outranks speed.</td></tr>
           <tr><td>Head-major projection</td><td><code>qkv_projection</code>, <code>attention_projection</code></td>
@@ -397,9 +401,12 @@ if norm_topk_prob: weights /= Σweights + 1e-20;  weights ×= routed_scaling_fac
         <span class="pill cand">candidate</span>.</div>
       <div class="ka-card"><strong>Experts.</strong> ReLU2 (<code>moe_relu2_expert_*</code>) for Nemotron-H;
         SwiGLU routed + shared (<code>moe_swiglu_expert_*</code>, <code>moe_swiglu_shared_*</code>) for Kimi /
-        Instella / Laguna. Production quant contracts: q4k_q4k and q4k_q6k; q4k_q5k(+bucketed) and q8_0_gated are
-        <span class="pill cand">candidate</span>. FarSkip shared-combine
-        (<code>farskip_swiglu_shared_combine_bf16</code>) is <span class="pill cand">candidate</span>.</div>
+        Instella / Laguna. Production quant contracts: q4k_q5k (priority 200), q4k_q4k and q4k_q6k (priority 205,
+        with <code>*_parallel_workspace</code> thread-pool variants from PR #422); the bucketed grouped-prefill
+        variant (priority 210) and q8_0_gated shared are <span class="pill cand">candidate</span>. FarSkip
+        shared-combine (<code>farskip_swiglu_shared_combine_bf16</code>) is
+        <span class="pill cand">candidate</span>. Kernel-by-kernel walk:
+        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a>.</div>
       <div class="ka-card"><strong>Why correction bias is load-balancing, not math.</strong> The bias shifts
         <em>which</em> experts fire; the weights are gathered from the raw scores, so a biased router and an
         unbiased one produce different token routings — they are different numerical contracts and can never share
@@ -490,12 +497,20 @@ Mamba2 (per head, per state element):
   <div class="ka-section">
     <h2>Audio, vision, and training</h2>
     <div class="ka-grid">
-      <div class="ka-card"><strong>Audio frontend (12).</strong> WAV/PCM decode → resample (linear or windowed-sinc)
-        → pad/truncate → STFT power → Slaney mel → log-mel → conv stem → transpose. FP32 throughout; walkthrough in
-        <a href="concepts.html#audio-frontend">concepts — audio frontend</a> and
-        <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>.</div>
+      <div class="ka-card"><strong>Audio frontend (20).</strong> Whisper lane: WAV/PCM decode → resample (linear
+        or windowed-sinc) → pad/truncate → STFT power → Slaney mel → log-mel → conv stem → transpose. The Cohere
+        Transcribe foundation (PR #433) adds seven more FP32 providers — <code>audio_preemphasis_f32</code>,
+        <code>audio_stft_power_centered_window_f32</code>, <code>audio_log_mel_time_major_f32</code>,
+        <code>audio_feature_normalize_per_feature_f32</code>, <code>audio_conv2d_whc_grouped_f32</code>,
+        <code>audio_glu_split_channel_major_f32</code>, <code>audio_relative_shift_f32</code> — contract-tested but
+        not selection-managed. FP32 throughout; walkthrough in
+        <a href="concepts.html#audio-frontend">concepts — audio frontend</a>,
+        <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>, and
+        <a href="v8-cohere-kernels.html">Cohere Kernel Story — Transcribe</a>.</div>
       <div class="ka-card"><strong>Vision.</strong> <code>im2patch</code>, BF16 patch projection (oneDNN conv3d
-        storage), spatial merge (2&times;2 / tiled / average-pool), 2D position ids, multimodal prefix insert.
+        storage, plus <code>patch_projection_image_bf16_native_storage</code> — thread-pooled, temporal-2 weight
+        pair, merge-aligned grid, BF16 native storage for Cohere Compass), spatial merge (2&times;2 / tiled /
+        average-pool), 2D position ids, multimodal prefix insert.
         Deep dive: <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>.</div>
       <div class="ka-card"><strong>Training.</strong> Backward providers mirror the forward contracts
         (attention, rmsnorm, qk_norm, rope, embedding, gemm, MoE experts, DeltaNet, recurrent family), plus
@@ -513,6 +528,10 @@ Mamba2 (per head, per state element):
         these providers, with evidence-specific certification status.</div>
       <div class="ka-card"><a href="architecture-variants.html">Architecture Variants</a> — what each contract-novel
         family (Laguna, Cohere2, Instella, Nemotron-H) forced the registry to grow.</div>
+      <div class="ka-card"><a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a> — grouped/bucketed expert
+        prefill, mixed-quant compact experts, and the throughput kernels beyond MoE.</div>
+      <div class="ka-card"><a href="v8-cohere-kernels.html">Cohere Kernel Story</a> — provider reuse for Command R
+        and North, the BF16 Compass vision frontend, and the Transcribe audio foundation.</div>
       <div class="ka-card"><a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> — how numerical
         contracts are declared and gated.</div>
     </div>

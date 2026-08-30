@@ -35,7 +35,7 @@ var true__bpe_8c =
     [ "gpt2_byte_is_identity", "true__bpe_8c.html#a0789466d184924de5d95ef2725aacb2c", null ],
     [ "gpt2_byte_to_codepoint", "true__bpe_8c.html#ae446b8e119964098b74ab368f7616fdd", null ],
     [ "gpt2_codepoint_to_byte", "true__bpe_8c.html#adbdd1e399e5cf10ba8353d21ffabdad5", null ],
-    [ "gpt2_pretokenize", "true__bpe_8c.html#a75677b0ab168d7bf958f8d1b258f016a", null ],
+    [ "gpt2_pretokenize", "true__bpe_8c.html#a09465c383cd23828e94d37fdbccd498c", null ],
     [ "init_tokens_from_text", "true__bpe_8c.html#a658fd44fe4b1abd5a95855fdb35775bf", null ],
     [ "is_bpe_digit", "true__bpe_8c.html#a6f0f624284b853f714b83338e9b07b74", null ],
     [ "is_bpe_letter", "true__bpe_8c.html#a60316458b2abb5dd6096fa9862df8da2", null ],

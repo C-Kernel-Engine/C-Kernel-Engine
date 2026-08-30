@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts | C-Kernel-Engine</title>
+    <meta name="description" content="Kernel-by-kernel walk of the CKE v8 MoE expert providers: Qwen3.5-MoE bucketed expert prefill with VNNI weight preparation, Laguna mixed-quant Q4_K/Q4_K and Q4_K/Q6_K compact experts with parallel workspace variants, plus the Mamba2 parallel prefill and Q5_1 unpack-reuse throughput kernels.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-moe-expert-kernels.html">
+    <meta property="og:title" content="MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts | C-Kernel-Engine">
+    <meta property="og:description" content="Kernel-by-kernel walk of the CKE v8 MoE expert providers: Qwen3.5-MoE bucketed expert prefill with VNNI weight preparation, Laguna mixed-quant Q4_K/Q4_K and Q4_K/Q6_K compact experts with parallel workspace variants, plus the Mamba2 parallel prefill and Q5_1 unpack-reuse throughput kernels.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-moe-expert-kernels.html">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active,
+        .nav-dropdown > .nav-trigger.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            width: min(1180px, calc(100vw - 2rem));
+            min-width: 0;
+            max-height: calc(100vh - 90px);
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem 1.25rem;
+            left: auto;
+            right: 0;
+            overflow-y: auto;
+            transform: translateY(-10px);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .mega-menu .menu-shortcuts a {
+            padding: 0.55rem 0.75rem;
+            background: rgba(255, 180, 0, 0.055);
+            border: 1px solid rgba(255, 180, 0, 0.18);
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            box-sizing: border-box;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu.mega-menu {
+                display: block;
+                width: 100%;
+                min-width: 0;
+                max-height: 0;
+                padding: 0.5rem;
+                left: auto;
+                right: auto;
+                overflow: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu.mega-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu.mega-menu {
+                max-height: 70vh;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .mega-menu .menu-shortcuts {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="contributing.html" class="">Contribute</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
+            <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger ">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                        <div class="menu-shortcuts">
+                            <a href="pytorch-parity.html">PyTorch Parity<small>Numerical evidence</small></a>
+                            <a href="research.html">Research<small>Current investigations</small></a>
+                            <a href="decisions.html">Architecture Decisions<small>ADRs and tradeoffs</small></a>
+                            <a href="api.html">API &amp; Source Docs<small>Reference and Doxygen</small></a>
+                        </div>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                        <a href="kernel-maps.html">Kernel Maps<small>Provider selection, ABI, migration</small></a>
+                        <a href="kernel-architecture.html">v8 Kernel Architecture<small>Registry by op family, math</small></a>
+                        <a href="architecture-variants.html">Architecture Variants<small>Laguna, Cohere2, Instella, Nemotron</small></a>
+                        <a href="v8-moe-expert-kernels.html">MoE Expert Kernels<small>Bucketed prefill, mixed-quant experts</small></a>
+                        <a href="v8-cohere-kernels.html">Cohere Kernel Story<small>Reuse, BF16 vision, Transcribe audio</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>VTune, Advisor, roofline, parity gates</small></a>
+                        <a href="cke-throughput-unit.html">CKE Throughput Unit<small>PB/s active-byte target</small></a>
+                        <a href="gemma4-speculative-pair.html">Gemma4 Speculative Pair<small>Backbone + MTP drafter circuit</small></a>
+                        <a href="v8-mla-kimi.html">v8 MLA / Kimi<small>Explicit decode cache contract</small></a>
+                        <a href="v8-whisper-tiny.html">Whisper Tiny E2E<small>Audio encoder/decoder circuits</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology<small>CPU-node performance runbook</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="divergence-harness.html">Stitched Divergence Harness<small>llama.cpp/PyTorch tensor attribution</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="">Versions</a>
+        </nav>
+    </header>
+    <main>
+
+<div class="container">
+  <h1>MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts</h1>
+  <p class="lead">
+    Six weeks of MoE kernel work, kernel by kernel: the shared router and expert building blocks, the
+    Qwen3.5-MoE grouped/bucketed expert prefill path (PR #376), the Laguna compact mixed-quant expert family
+    (PRs #404, #422), and two throughput-oriented provider enhancements that are not MoE but landed in the same
+    window (PRs #412, #330). Every provider ID below names a real map in
+    <code>version/v8/kernel_maps</code> and a function you can read in <code>src/kernels</code>.
+  </p>
+
+  <style>
+    .mx-section {
+      margin-top: 2rem;
+      background: #0f151c;
+      border: 1px solid #22313f;
+      border-radius: 12px;
+      padding: 1.2rem;
+    }
+    .mx-section h2 { margin: 0 0 0.5rem; color: var(--orange); }
+    .mx-section h3 { color: var(--text-primary); margin: 1.1rem 0 0.35rem; font-size: 1.05rem; }
+    .mx-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .mx-card {
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 10px;
+      padding: 0.85rem 0.95rem;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .mx-card strong { color: var(--text-primary); }
+    .mx-card code { font-size: 0.78rem; }
+    .mx-math {
+      background: #0b1118;
+      border: 1px solid #263242;
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cfe8ff;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+      line-height: 1.6;
+    }
+    .mx-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+    main code { overflow-wrap: anywhere; }
+    .mx-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 0.75rem; }
+    .mx-table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.84rem; }
+    .mx-table th, .mx-table td {
+      border: 1px solid var(--grey); padding: 0.45rem 0.6rem;
+      text-align: left; vertical-align: top; color: var(--text-secondary);
+    }
+    .mx-table th { color: var(--orange); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; background: #121a24; }
+    .mx-table td:first-child { font-weight: 600; color: var(--text-primary); }
+    .pill {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid; white-space: nowrap;
+    }
+    .pill.prod { color: #7fd4a3; border-color: #2f8d59; background: rgba(71,180,117,0.1); }
+    .pill.cand { color: #ffd38a; border-color: #b8860b; background: rgba(255,180,0,0.1); }
+    .pill.none { color: #b9b9b9; border-color: #555; background: rgba(158,158,158,0.08); }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #mx-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #mx-svg-overlay .mx-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #mx-svg-overlay .mx-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #mx-svg-overlay .mx-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #mx-svg-overlay .mx-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #mx-svg-overlay .mx-ov-stage img { max-width: none; height: auto; }
+  </style>
+
+  <div class="mx-section">
+    <h2>1. The shared building blocks: routers and the SwiGLU expert shape</h2>
+    <p style="color: var(--text-secondary);">
+      Every MoE family in the registry is the same two pieces with different contracts: a <strong>router</strong>
+      that picks experts and weights per token, and an <strong>expert SwiGLU</strong> that computes
+      <code>down(silu(gate(x)) * up(x))</code> per routed expert and accumulates routing-weighted results in FP32.
+      The two router providers in <code>src/kernels/topk_kernels.c</code> are deliberately different numerical
+      contracts, not tuning variants:
+    </p>
+    <div class="mx-math">group_limited_topk_router_sigmoid_f32   (topk_kernels.c:728)
+  choice_scores   = sigmoid(logits) + correction_bias     # bias steers selection only
+  group_scores    = sum of top-2 choice_scores within each group
+  selected_groups = topk(group_scores, topk_group)
+  selected        = topk(choice_scores masked to selected_groups, k)
+  weights         = gather(raw_scores, selected)          # NOT the biased scores
+
+moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
+  p               = softmax(logits) over ALL experts      # full softmax first
+  selected        = topk(p, k)
+  weights         = p[selected] / max(sum(p[selected]), 6.103515625e-5)
+  weights        *= routed_scaling_factor</div>
+    <div class="mx-grid">
+      <div class="mx-card"><strong>Why two routers can never merge.</strong> The correction bias changes
+        <em>which</em> experts fire while leaving the weights gathered from raw scores; the llama router changes the
+        <em>weights themselves</em> (full-softmax then renormalize). Different token routings and different weights
+        are different numerical contracts, so they live in different equivalence groups and the resolver fails
+        closed rather than substituting one for the other.</div>
+      <div class="mx-card"><strong>The expert shape everything below shares.</strong> Routed experts read the
+        hidden state once per token, run gate/up projections, apply the ggml-compatible SwiGLU, run the down
+        projection, and add the result into the output row scaled by the routing weight. What varies per provider
+        is the <em>quant contract of each leg</em>: gate/up storage, down storage, activation quantization, and
+        reduction order.</div>
+    </div>
+    <p class="mx-note">
+      Registry-level router context: <a href="kernel-architecture.html">kernel architecture &mdash; MoE routers and
+      experts</a>. The router selection math above is verified against <code>topk_kernels.c</code>.
+    </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>2. Qwen3.5-MoE: grouped and bucketed expert prefill (PR #376)</h2>
+    <p style="color: var(--text-secondary);">
+      Qwen3.5-35B-A3B is a 40-layer hybrid MoE with <strong>256 routed experts and top-8 routing</strong>, Q4_K
+      expert gate/up, Q5_K expert down, and a Q8_0 gated shared expert (real GGUF audit: 733 tensors). Naive
+      per-token dispatch pays T&times;k scattered expert calls and re-quantizes the hidden state for every
+      (token, expert) pair. The bucketed path turns that into one quantization pass plus contiguous per-expert
+      GEMM segments on the persistent thread pool.
+    </p>
+    <div class="mx-grid">
+      <div class="mx-card"><strong><code>moe_swiglu_expert_forward_q4k_q5k</code></strong>
+        <span class="pill prod">production</span> priority 200<br>
+        Routed experts: Q4_K gate/up, Q5_K down, Q8_K activations, routing-weighted FP32 accumulate.
+        Serial workspace at <code>src/kernels/axpy_kernels.c:578</code>, thread-pool
+        <code>_parallel_workspace</code> at <code>axpy_kernels.c:1105</code>. Equivalence group
+        <code>q4_k_q8_k_gate_up_ggml_swiglu_q5_k_q8_k_down_weighted_fp32</code>, phases [prefill, decode].</div>
+      <div class="mx-card"><strong><code>moe_swiglu_expert_forward_q4k_q5k_bucketed</code></strong>
+        <span class="pill cand">candidate</span> priority 210<br>
+        Same contract, grouped execution (<code>axpy_kernels.c:1951</code> +
+        <code>version/v8/src/ck_parallel_prefill_v8.c</code>): count-sort tokens by expert per top-k slot,
+        quantize the hidden state to Q8_K <strong>once</strong>, then run contiguous per-expert GEMM segments.
+        Priority 210 sits above the production non-bucketed provider at 200 &mdash; inside the same equivalence
+        group, so it can only ever replace that provider, never a different contract.</div>
+      <div class="mx-card"><strong><code>moe_swiglu_shared_forward_q8_0_gated</code></strong>
+        <span class="pill cand">candidate</span> priority 200<br>
+        Always-on shared expert in Q8_0 with a scalar sigmoid gate applied before the routed add
+        (<code>axpy_kernels.c:2174</code>, parallel at <code>:2285</code>). Equivalence group
+        <code>q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add</code>.</div>
+      <div class="mx-card"><strong>VNNI weight preparation leaf.</strong><br>
+        <code>gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4</code>
+        (<code>src/kernels/gemm_kernels_q4k_q8k_vnni.c:1123</code>) plus the map-owned prepare hook
+        <code>ck_moe_prepare_q4k_gate_up_vnni_x8</code>: AVX-VNNI &times;8-packed Q4_K gate/up weight layout,
+        built once at load time, so the bucketed segments run packed integer dot products instead of per-call
+        unpacking.</div>
+    </div>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 500" width="100%" role="img" tabindex="0" data-svg-title="Bucketed MoE expert prefill dataflow"
+         aria-label="Bucketed expert prefill dataflow: tokens with top-k routing weights are count-sorted by expert per top-k slot into contiguous per-expert row segments; the hidden state is quantized to Q8_K exactly once; packed VNNI GEMM segments run per expert on the thread pool; results are accumulated routing-weighted in FP32. A contrast panel shows naive per-token dispatch making T times k scattered expert calls and re-quantizing the hidden state per token-expert pair. A selection strip shows the serial provider at production priority 200 and the bucketed provider at candidate priority 210 inside the same equivalence group."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .mk-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .mk-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .mk-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .mk-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+        .mk-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="mk-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">Bucketed expert prefill (moe_swiglu_expert_forward_q4k_q5k_bucketed)</text>
+
+      <rect class="mk-box" x="24" y="52" width="340" height="88" rx="10"/>
+      <text x="44" y="78" class="mk-title" font-size="13">tokens + top-k routing</text>
+      <text x="44" y="98" class="mk-sub">T tokens x k slots (Qwen3.5-MoE: top-8 of 256)</text>
+      <text x="44" y="118" class="mk-sub">router weights w[t,j] from sigmoid router</text>
+
+      <rect class="mk-box" x="424" y="52" width="340" height="88" rx="10"/>
+      <text x="444" y="78" class="mk-title" font-size="13">count-sort by expert</text>
+      <text x="444" y="98" class="mk-sub">per top-k slot: histogram then scatter</text>
+      <text x="444" y="118" class="mk-sub">planner-owned scratch - no malloc</text>
+
+      <rect class="mk-box" x="824" y="52" width="332" height="88" rx="10"/>
+      <text x="844" y="78" class="mk-title" font-size="13">per-expert contiguous segments</text>
+      <text x="844" y="98" class="mk-sub">expert e owns rows [off_e, off_e + cnt_e)</text>
+      <text x="844" y="118" class="mk-sub">dense row batching replaces scatter</text>
+
+      <rect class="mk-box" x="24" y="196" width="340" height="88" rx="10"/>
+      <text x="44" y="222" class="mk-title" font-size="13">quantize hidden ONCE</text>
+      <text x="44" y="242" class="mk-hi">hidden fp32 -&gt; Q8_K: one pass per token</text>
+      <text x="44" y="262" class="mk-sub">not one pass per (token, expert) pair</text>
+
+      <rect class="mk-box" x="424" y="196" width="340" height="88" rx="10"/>
+      <text x="444" y="222" class="mk-title" font-size="13">packed VNNI GEMM segments</text>
+      <text x="444" y="242" class="mk-sub">Q4_K gate/up x8-packed at load time</text>
+      <text x="444" y="262" class="mk-sub">thread pool runs expert row ranges</text>
+
+      <rect class="mk-box" x="824" y="196" width="332" height="88" rx="10"/>
+      <text x="844" y="222" class="mk-title" font-size="13">weighted FP32 accumulate</text>
+      <text x="844" y="242" class="mk-sub">out[t] += w[t,j] * expert(x_t)</text>
+      <text x="844" y="262" class="mk-sub">selected-slot reduction order preserved</text>
+
+      <path d="M364,96 L420,96" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M764,96 L820,96" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M990,140 C990,180 200,160 196,192" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M364,240 L420,240" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+      <path d="M764,240 L820,240" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow)"/>
+
+      <!-- naive contrast -->
+      <rect x="24" y="316" width="700" height="86" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="342" class="mk-warn">CONTRAST - naive per-token dispatch</text>
+      <text x="44" y="364" class="mk-sub">T x k scattered expert calls, one (token, expert) pair at a time</text>
+      <text x="44" y="384" class="mk-sub">hidden re-quantized per pair: T x k Q8_K passes instead of 1</text>
+
+      <!-- selection strip -->
+      <rect x="764" y="316" width="392" height="86" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="784" y="342" class="mk-good">production 200: ..._q4k_q5k (serial/parallel)</text>
+      <text x="784" y="364" class="mk-warn">candidate 210: ..._q4k_q5k_bucketed</text>
+      <text x="784" y="384" class="mk-sub">same equivalence_group - priority ranks within it</text>
+
+      <text x="24" y="446" class="mk-cap">Evidence (PR #376): 10-row routed-expert path 13.5 ms -&gt; 2.5 ms per layer, byte-exact; routed leaf 1.36x at 512 rows, 1.47x at 4096 rows; 4096-token model traffic 1.12 TB -&gt; 504 GB (62.5% fewer DRAM reads).</text>
+      <text x="24" y="468" class="mk-cap">Evidence (PR #376): 512-token P3 prefill at 35.35 tok/s with the same top-1 token as pinned llama.cpp; Q8_0 gated shared expert 10.572 s -&gt; 1.079 s at 4096 tokens on Ryzen 9950X3D.</text>
+      <text x="24" y="490" class="mk-cap">Caveats: bucketed + shared-gated providers are candidate (opt-in routes only); CKE is ~0.73x matched llama.cpp on this model - attention and recurrent projections still dominate the gap.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="mx-note">
+      The preparation hook is declared in the bucketed map itself
+      (<code>version/v8/kernel_maps/moe_swiglu_expert_forward_q4k_q5k_bucketed.json</code>), so weight layout is a
+      map-owned decision, not a model-name branch in codegen.
+    </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>3. Laguna: compact-MoE mixed-quant experts (PRs #404, #422)</h2>
+    <p style="color: var(--text-secondary);">
+      Laguna-XS 2.1 keeps routed and shared experts in mixed compact storage: Q4_K gate/up with either Q4_K or
+      Q6_K down. Activations are quantized fp32&rarr;Q8_K at the kernel boundary, the SwiGLU is the
+      ggml-compatible formulation, and the accumulate is routing-weighted FP32. PR #422 added the
+      <code>*_parallel_workspace</code> variants that dispatch rows (prefill) and experts (decode) over the
+      persistent thread pool &mdash; measured bit-exact against the serial providers.
+    </p>
+    <div class="mx-table-wrap">
+      <table class="mx-table">
+        <thead><tr><th>Provider</th><th>Source</th><th>Contract</th><th>Selection</th></tr></thead>
+        <tbody>
+          <tr><td><code>moe_swiglu_expert_forward_q4k_q4k</code></td>
+            <td><code>axpy_kernels.c:743</code> / parallel <code>:1461</code></td>
+            <td>Q4_K gate/up &times; Q8_K acts &rarr; ggml SwiGLU &rarr; Q4_K down &rarr; weighted FP32</td>
+            <td><span class="pill prod">production</span> 205, [prefill, decode], group <code>..._q4_k_q8_k_down_weighted_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_expert_forward_q4k_q6k</code></td>
+            <td><code>axpy_kernels.c:666</code> / parallel <code>:1438</code></td>
+            <td>same, Q6_K down</td>
+            <td><span class="pill prod">production</span> 205, group <code>..._q6_k_q8_k_down_weighted_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_shared_forward_q4k_q4k</code></td>
+            <td><code>axpy_kernels.c:877</code> / parallel <code>:1603</code></td>
+            <td>always-on shared expert, Q4_K down, no routing weight</td>
+            <td><span class="pill prod">production</span> 205, group <code>q4_k_q8_k_shared_gate_up_ggml_swiglu_q4_k_q8_k_down_fp32</code></td></tr>
+          <tr><td><code>moe_swiglu_shared_forward_q4k_q6k</code></td>
+            <td><code>axpy_kernels.c:820</code> / parallel <code>:1584</code></td>
+            <td>same, Q6_K down</td>
+            <td><span class="pill prod">production</span> 205, group <code>..._shared_gate_up_ggml_swiglu_q6_k_q8_k_down_fp32</code></td></tr>
+          <tr><td><code>attn_gate_softplus_mul_forward</code></td>
+            <td><code>src/kernels/hybrid_attention_kernels.c:132</code></td>
+            <td>per-head softplus attention-output gate, head-major; linear branch above 20</td>
+            <td>declared by the circuit as <code>attention_gate_projection</code> + gate op</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color: var(--text-secondary); margin-top: 0.75rem;">
+      The circuit that binds them, <code>version/v8/circuits/laguna.json</code>: sigmoid router with correction
+      bias &rarr; top-8 routed SwiGLU plus shared SwiGLU; hybrid sliding/global attention with
+      <code>attention_gate_projection</code> and the softplus gate; a YaRN rope cache
+      (<code>yarn_rope_cache_contiguous_positions_f32</code>) on global layers; prefill chunk 4096.
+    </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 470" width="100%" role="img" tabindex="0" data-svg-title="Laguna mixed-quant expert dataflow"
+         aria-label="Laguna mixed-quant expert dataflow: Q4_K gate and up weights times Q8_K activations feed the ggml SwiGLU, then a Q4_K or Q6_K down projection times Q8_K activations, then routing-weighted FP32 accumulate. Below, two equivalence group panels sit side by side: the Q4_K down group and the Q6_K down group, each listing its routed and shared serial and parallel providers at production priority 205 for prefill and decode phases, with a note that priority never crosses equivalence groups."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="mk-arrow2" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">One dataflow, two quant contracts</text>
+
+      <rect class="mk-box" x="24" y="52" width="250" height="80" rx="10"/>
+      <text x="44" y="78" class="mk-title" font-size="13">Q4_K gate/up</text>
+      <text x="44" y="98" class="mk-sub">x Q8_K activations</text>
+      <text x="44" y="116" class="mk-sub">acts quantized once (fp32 -&gt; Q8_K)</text>
+
+      <rect class="mk-box" x="324" y="52" width="210" height="80" rx="10"/>
+      <text x="344" y="78" class="mk-title" font-size="13">ggml SwiGLU</text>
+      <text x="344" y="98" class="mk-sub">silu(gate) * up</text>
+      <text x="344" y="116" class="mk-sub">fp32 intermediate</text>
+
+      <rect class="mk-box" x="584" y="52" width="250" height="80" rx="10"/>
+      <text x="604" y="78" class="mk-title" font-size="13">Q4_K or Q6_K down</text>
+      <text x="604" y="98" class="mk-sub">x Q8_K activations</text>
+      <text x="604" y="116" class="mk-hi">down quant = the contract split</text>
+
+      <rect class="mk-box" x="884" y="52" width="272" height="80" rx="10"/>
+      <text x="904" y="78" class="mk-title" font-size="13">FP32 weighted accumulate</text>
+      <text x="904" y="98" class="mk-sub">out[t] += w[t,j] * expert_out</text>
+      <text x="904" y="116" class="mk-sub">shared expert: always-on, unweighted</text>
+
+      <path d="M274,92 L320,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+      <path d="M534,92 L580,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+      <path d="M834,92 L880,92" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow2)"/>
+
+      <!-- equivalence groups -->
+      <rect x="24" y="172" width="556" height="170" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="198" class="mk-good">equivalence_group A (Q4_K down)</text>
+      <text x="44" y="220" class="mk-sub">q4_k_q8_k_gate_up_ggml_swiglu_q4_k_q8_k_down_weighted_fp32</text>
+      <text x="44" y="244" class="mk-sub">moe_swiglu_expert_forward_q4k_q4k            (:743)</text>
+      <text x="44" y="264" class="mk-sub">moe_swiglu_expert_forward_q4k_q4k_parallel_workspace  (:1461)</text>
+      <text x="44" y="284" class="mk-sub">moe_swiglu_shared_forward_q4k_q4k[_parallel_workspace]  (:877/:1603)</text>
+      <text x="44" y="310" class="mk-hi">production - priority 205 - phases [prefill, decode]</text>
+      <text x="44" y="330" class="mk-sub">parallel == serial, bit-exact (PR #422)</text>
+
+      <rect x="624" y="172" width="532" height="170" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="644" y="198" class="mk-good">equivalence_group B (Q6_K down)</text>
+      <text x="644" y="220" class="mk-sub">q4_k_q8_k_gate_up_ggml_swiglu_q6_k_q8_k_down_weighted_fp32</text>
+      <text x="644" y="244" class="mk-sub">moe_swiglu_expert_forward_q4k_q6k            (:666)</text>
+      <text x="644" y="264" class="mk-sub">moe_swiglu_expert_forward_q4k_q6k_parallel_workspace  (:1438)</text>
+      <text x="644" y="284" class="mk-sub">moe_swiglu_shared_forward_q4k_q6k[_parallel_workspace]  (:820/:1584)</text>
+      <text x="644" y="310" class="mk-hi">production - priority 205 - phases [prefill, decode]</text>
+      <text x="644" y="330" class="mk-sub">parallel == serial, bit-exact (PR #422)</text>
+
+      <rect x="24" y="362" width="1132" height="44" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="389" class="mk-warn">priority ranks providers INSIDE one equivalence group - a Q6_K-down provider can never be selected for a Q4_K-down contract (fail-closed)</text>
+
+      <text x="24" y="442" class="mk-cap">Evidence (PRs #404, #422): parallel providers bit-exact vs serial; Laguna 512-token prefill 23.29 s -&gt; 2.86 s (22.0 -&gt; 179.2 tok/s), occupancy 1.59 -&gt; 13.78 of 16 Ryzen 9950X3D cores; 8192-token prefill 138.3 tok/s.</text>
+      <text x="24" y="464" class="mk-cap">Caveats: router replay parity is within one ULP, not long-trajectory (near-tied route flips vs llama.cpp); the softplus gate formula is observed from the model, not oracle-validated.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <p class="mx-note">
+      The structural view (layer kinds, split RoPE, gated GQA) is in
+      <a href="architecture-variants.html">Architecture Variants &mdash; Laguna</a>; this page covers the provider
+      layer only.
+    </p>
+  </div>
+
+  <div class="mx-section">
+    <h2>4. Throughput kernels beyond MoE</h2>
+    <p style="color: var(--text-secondary);">
+      Two provider enhancements from the same window are not MoE, but they are the same engineering pattern:
+      find the serialization point, partition the independent dimension across the persistent thread pool, and
+      keep the numerical contract identical so selection stays honest.
+    </p>
+    <div class="mx-grid">
+      <div class="mx-card"><strong>Nemotron-H: parallel recurrent prefill (PR #412).</strong><br>
+        Mamba2 prefill alternated parallel projections with serial recurrent valleys.
+        <code>mamba2_conv1d_f32_parallel_dispatch</code> partitions the conv1d by independent channel ranges
+        (sequential fallback below 8 rows / 16 conv channels);
+        <code>mamba2_selective_scan_f32_parallel_dispatch</code> chunks by independent head ranges (fallback below
+        seq_len 8 / 2 heads). Kill switch: <code>CK_DISABLE_MAMBA2_PARALLEL_PREFILL</code>. The maps declare this
+        through a new <code>impl.variants[].parallel_head_ranges</code> metadata pattern (shape constraints
+        <code>T_min: 8</code>, <code>H_min: 2</code>, named serial fallback) instead of hardcoded thresholds in the
+        resolver.<br>
+        <span class="pill none">evidence</span> Ryzen 9950X3D 8K prefill: 252.0 s &rarr; 135.0 s (32.5 &rarr; 60.7
+        tok/s), 7.51 &rarr; 13.83 active cores, exact first-logit and token agreement. Caveat: llama.cpp remains
+        2.12&times; faster on this host.</div>
+      <div class="mx-card"><strong>Gemma3: Q5_1 unpack reuse (PR #330).</strong><br>
+        <code>gemm_nt_q5_1_q8_1_m4</code> (<code>src/kernels/gemm_kernels_q5_1_q8_1.c:365</code>) unpacks each Q5_1
+        weight block <em>once</em> and dots it against four pre-quantized Q8_1 activation rows with AVX2 VNNI
+        <code>dpbusd</code>, instead of re-unpacking per row. The map (<code>gemm_nt_q5_1</code>) is
+        <span class="pill prod">production</span> priority 200 with <strong>prefill-only</strong> phases &mdash;
+        decode keeps the per-row path.<br>
+        <span class="pill none">evidence</span> production-shape leaf 45.93 ms &rarr; 26.58 ms (1.73&times;);
+        end-to-end Gemma prefill improved 6.4% / 5.1% / 2.3% at 32 / 128 / 512 tokens with unchanged tolerances.
+        Caveat: the Q5_1 oracle is an observed 1e-4 contract, not bit-exact to the llama.cpp graph.</div>
+    </div>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 330" width="100%" role="img" tabindex="0" data-svg-title="Q5_1 unpack-once, dot four rows"
+         aria-label="Q5_1 m4 tile diagram: one Q5_1 weight block of 32 values is unpacked once into registers, then dotted via AVX2 VNNI dpbusd against four pre-quantized Q8_1 activation rows r0 through r3, producing four FP32 accumulators. A side panel lists the measured evidence: production-shape leaf 45.93 to 26.58 milliseconds, 1.73 times, and 2.3 to 6.4 percent end-to-end prefill gains, with selection restricted to the prefill phase."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="mk-arrow3" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="36" class="mk-band">gemm_nt_q5_1_q8_1_m4 - unpack once, dot four rows</text>
+
+      <rect class="mk-box" x="24" y="60" width="240" height="76" rx="10"/>
+      <text x="44" y="86" class="mk-title" font-size="13">Q5_1 weight block</text>
+      <text x="44" y="106" class="mk-sub">32 values, one block scale</text>
+      <text x="44" y="124" class="mk-sub">K multiple of 32</text>
+
+      <rect class="mk-box" x="314" y="60" width="200" height="76" rx="10"/>
+      <text x="334" y="86" class="mk-title" font-size="13">unpack ONCE</text>
+      <text x="334" y="106" class="mk-hi">qs + qh -&gt; int8 registers</text>
+      <text x="334" y="124" class="mk-sub">amortized over 4 rows</text>
+
+      <g>
+        <rect class="mk-box" x="564" y="44" width="270" height="34" rx="8"/>
+        <text x="584" y="66" class="mk-sub">r0: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="84" width="270" height="34" rx="8"/>
+        <text x="584" y="106" class="mk-sub">r1: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="124" width="270" height="34" rx="8"/>
+        <text x="584" y="146" class="mk-sub">r2: Q8_1 row - dpbusd dot</text>
+        <rect class="mk-box" x="564" y="164" width="270" height="34" rx="8"/>
+        <text x="584" y="186" class="mk-sub">r3: Q8_1 row - dpbusd dot</text>
+      </g>
+
+      <rect class="mk-box" x="884" y="60" width="272" height="76" rx="10"/>
+      <text x="904" y="86" class="mk-title" font-size="13">4 x FP32 accumulators</text>
+      <text x="904" y="106" class="mk-sub">ascending block reduction order</text>
+      <text x="904" y="124" class="mk-sub">same contract as serial Q5_1</text>
+
+      <path d="M264,98 L310,98" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,61" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,101" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,141" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M514,98 L560,181" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+      <path d="M834,121 L880,104" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#mk-arrow3)"/>
+
+      <rect x="24" y="216" width="1132" height="52" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="238" class="mk-good">selection: production, priority 200, phases [prefill] only - decode keeps the per-row provider</text>
+      <text x="44" y="258" class="mk-sub">equivalence_group q5_1_weight_q8_1_internal_fp32_output</text>
+
+      <text x="24" y="302" class="mk-cap">Evidence (PR #330): production-shape leaf 45.93 ms -&gt; 26.58 ms (1.73x); Gemma prefill +6.4% / +5.1% / +2.3% at 32 / 128 / 512 tokens.</text>
+      <text x="24" y="322" class="mk-cap">Caveats: Q5_1 is an observed 1e-4 oracle contract, not bit-exact; Gemma remains slower than llama.cpp end to end.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+  </div>
+
+  <div class="mx-section">
+    <h2>5. Why this matters</h2>
+    <p style="color: var(--text-secondary);">
+      Everything on this page is the same expert-GEMM pattern specialized per quant contract: Q4_K/Q5_K for
+      Qwen3.5-MoE, Q4_K/Q4_K and Q4_K/Q6_K for Laguna, Q8_0 for the gated shared expert. The performance work
+      &mdash; bucketing, weight preparation, parallel row/expert dispatch, unpack reuse &mdash; never changes the
+      arithmetic contract; it changes the schedule. Selection metadata is what keeps that honest: each quant
+      combination lives in its own <code>equivalence_group</code>, priority only ranks providers that already share
+      a contract, and anything unproven stays <code>candidate</code> behind opt-in routes. A faster provider can
+      therefore never silently change what the model computes &mdash; when in doubt, the resolver fails closed.
+    </p>
+    <p class="mx-note">
+      Related: <a href="kernel-architecture.html">v8 Kernel Architecture &mdash; MoE routers and experts</a>,
+      <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>,
+      <a href="architecture-variants.html">Architecture Variants</a>,
+      <a href="v8-cohere-kernels.html">Cohere Kernel Story</a> (North composes the Q4_K/Q5_K experts documented
+      here).
+    </p>
+  </div>
+
+  <div id="mx-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="mx-ov-bar">
+      <span class="mx-ov-title" id="mx-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="mx-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="mx-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="mx-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="mx-ov-stage" id="mx-ov-stage"><img id="mx-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('mx-svg-overlay');
+      var stage = document.getElementById('mx-ov-stage');
+      var img = document.getElementById('mx-ov-img');
+      var title = document.getElementById('mx-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('mx-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('mx-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('mx-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('mx-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="contributing.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Contributor Path</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">ShivasNotes</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://www.shivasnotes.com/work-with-us" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Work With Us</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antshiv.com/" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antshiv.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

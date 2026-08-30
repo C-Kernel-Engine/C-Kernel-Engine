@@ -17,13 +17,14 @@ var searchData=
   ['pos_5fembed_5foutput_14',['pos_embed_output',['../structCKHeaderOffsets.html#a2a082e03809f5e60dc469836ec86e553',1,'CKHeaderOffsets']]],
   ['pos_5fembed_5fweight_15',['pos_embed_weight',['../structCKHeaderOffsets.html#a5869de8e522fdd1b310d75bd8eb849bb',1,'CKHeaderOffsets']]],
   ['prefill_5ftime_5fms_16',['prefill_time_ms',['../structCKSessionGenerateResultV8.html#a9ff7d949dd1f59d271c022434f27d7fd',1,'CKSessionGenerateResultV8']]],
-  ['primary_5finput_5fdim_17',['primary_input_dim',['../structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950',1,'CKModelRuntimeDescriptorV8']]],
-  ['primary_5finput_5ftokens_18',['primary_input_tokens',['../structCKModelRuntimeDescriptorV8.html#af0560f7439030c528a9b3364bef4b79e',1,'CKModelRuntimeDescriptorV8']]],
-  ['priority_19',['priority',['../structCKTrieNode.html#aace4764a43a80b9f2039dd91fb50c649',1,'CKTrieNode::priority'],['../structRecommendation.html#a2dea715a398d739605559094647c11eb',1,'Recommendation::priority'],['../structCKMergeRule.html#af89e288682de3079e22683c57b629d4c',1,'CKMergeRule::priority'],['../true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04',1,'priority:&#160;true_bpe.h']]],
-  ['producer_20',['producer',['../structCKInputRef.html#a952a97cab88682ffb36027b353492e6f',1,'CKInputRef']]],
-  ['proj_5fout_21',['proj_out',['../structCKLayerOffsets.html#ad4bc2b7cea35add011aa22e48f10f99c',1,'CKLayerOffsets']]],
-  ['proj_5foutput_22',['proj_output',['../structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd',1,'CKLayerOffsets']]],
-  ['proj_5fscratch_23',['proj_scratch',['../structCKLayerForwardParams.html#a1d16cc6fe19fb9e3b934eccba86c35b0',1,'CKLayerForwardParams::proj_scratch'],['../structCKLayerForwardParamsQ4K.html#ac6fb5da685cc15ae713f5760f2c05c41',1,'CKLayerForwardParamsQ4K::proj_scratch'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aec3c1fdb6f46df1440b88a7182693a1d',1,'QWEN2_0_5B_DECODELayerOffsets::proj_scratch']]],
-  ['proj_5ftmp_24',['proj_tmp',['../structCKLayerForwardParams.html#a1fa5c8ae6f1c35f1edd9041c6007731d',1,'CKLayerForwardParams::proj_tmp'],['../structCKLayerForwardParamsQ4K.html#a66da64885aa1cf87cb9e687ad7fcd34b',1,'CKLayerForwardParamsQ4K::proj_tmp'],['../structQWEN2__0__5B__DECODELayerOffsets.html#a346ac8ddf3a96db669d95275d9d9636b',1,'QWEN2_0_5B_DECODELayerOffsets::proj_tmp']]],
-  ['prompt_5ftokens_25',['prompt_tokens',['../structCKSessionGenerateResultV8.html#a79e9f14728cb1bd52f788517ca9058f5',1,'CKSessionGenerateResultV8']]]
+  ['pretokenizer_17',['pretokenizer',['../structCKBPEConfig.html#ab6d9b2ee3a8b5f532432a50c0613354c',1,'CKBPEConfig']]],
+  ['primary_5finput_5fdim_18',['primary_input_dim',['../structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950',1,'CKModelRuntimeDescriptorV8']]],
+  ['primary_5finput_5ftokens_19',['primary_input_tokens',['../structCKModelRuntimeDescriptorV8.html#af0560f7439030c528a9b3364bef4b79e',1,'CKModelRuntimeDescriptorV8']]],
+  ['priority_20',['priority',['../structCKTrieNode.html#aace4764a43a80b9f2039dd91fb50c649',1,'CKTrieNode::priority'],['../structRecommendation.html#a2dea715a398d739605559094647c11eb',1,'Recommendation::priority'],['../structCKMergeRule.html#af89e288682de3079e22683c57b629d4c',1,'CKMergeRule::priority'],['../true__bpe_8h.html#a328f69c6aefebd48ef10a1c553458d04',1,'priority:&#160;true_bpe.h']]],
+  ['producer_21',['producer',['../structCKInputRef.html#a952a97cab88682ffb36027b353492e6f',1,'CKInputRef']]],
+  ['proj_5fout_22',['proj_out',['../structCKLayerOffsets.html#ad4bc2b7cea35add011aa22e48f10f99c',1,'CKLayerOffsets']]],
+  ['proj_5foutput_23',['proj_output',['../structCKLayerOffsets.html#a4b9708d80f644d75e1fcbb65b08263fd',1,'CKLayerOffsets']]],
+  ['proj_5fscratch_24',['proj_scratch',['../structCKLayerForwardParams.html#a1d16cc6fe19fb9e3b934eccba86c35b0',1,'CKLayerForwardParams::proj_scratch'],['../structCKLayerForwardParamsQ4K.html#ac6fb5da685cc15ae713f5760f2c05c41',1,'CKLayerForwardParamsQ4K::proj_scratch'],['../structQWEN2__0__5B__DECODELayerOffsets.html#aec3c1fdb6f46df1440b88a7182693a1d',1,'QWEN2_0_5B_DECODELayerOffsets::proj_scratch']]],
+  ['proj_5ftmp_25',['proj_tmp',['../structCKLayerForwardParams.html#a1fa5c8ae6f1c35f1edd9041c6007731d',1,'CKLayerForwardParams::proj_tmp'],['../structCKLayerForwardParamsQ4K.html#a66da64885aa1cf87cb9e687ad7fcd34b',1,'CKLayerForwardParamsQ4K::proj_tmp'],['../structQWEN2__0__5B__DECODELayerOffsets.html#a346ac8ddf3a96db669d95275d9d9636b',1,'QWEN2_0_5B_DECODELayerOffsets::proj_tmp']]],
+  ['prompt_5ftokens_26',['prompt_tokens',['../structCKSessionGenerateResultV8.html#a79e9f14728cb1bd52f788517ca9058f5',1,'CKSessionGenerateResultV8']]]
 ];

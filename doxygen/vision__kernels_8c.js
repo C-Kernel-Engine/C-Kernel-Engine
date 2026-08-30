@@ -15,6 +15,7 @@ var vision__kernels_8c =
     [ "position_embeddings_add_tiled_2d", "vision__kernels_8c.html#a38fa089663c3300b061508567cd18462", null ],
     [ "position_embeddings_add_tiled_2d_align_corners", "vision__kernels_8c.html#a185b544229ceca002348fd021e310715", null ],
     [ "position_embeddings_add_tiled_2d_align_corners_bf16", "vision__kernels_8c.html#a4a280c920122a804828475fb09571052", null ],
+    [ "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16", "vision__kernels_8c.html#a582a57a33df53c96cb5fa07a62d135bc", null ],
     [ "rowwise_bias_add", "vision__kernels_8c.html#ae9b2c5016959bd797ba2729965604e64", null ],
     [ "spatial_average_pool_contiguous", "vision__kernels_8c.html#abb267c5e63943557c83c193b2bd637fd", null ],
     [ "spatial_merge_2x2", "vision__kernels_8c.html#a1194f9a80360eff26f4ce83c3e74411a", null ],

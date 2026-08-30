@@ -422,6 +422,7 @@ var ckernel__engine_8h =
     [ "position_embeddings_add_tiled_2d", "ckernel__engine_8h.html#a38fa089663c3300b061508567cd18462", null ],
     [ "position_embeddings_add_tiled_2d_align_corners", "ckernel__engine_8h.html#a185b544229ceca002348fd021e310715", null ],
     [ "position_embeddings_add_tiled_2d_align_corners_bf16", "ckernel__engine_8h.html#a4a280c920122a804828475fb09571052", null ],
+    [ "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16", "ckernel__engine_8h.html#a582a57a33df53c96cb5fa07a62d135bc", null ],
     [ "q_norm_forward", "ckernel__engine_8h.html#aa2928cdac0b208401493b0b4ba405785", null ],
     [ "qk_norm_backward", "ckernel__engine_8h.html#a65aaed2762fb5c6959701a6f6971ea08", null ],
     [ "qk_norm_backward_last_isa", "ckernel__engine_8h.html#ac094b4db531cfe6007a2a579eea9fa2e", null ],
