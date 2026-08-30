@@ -1,5 +1,15 @@
 var NAVTREEINDEX2 =
 {
+"ck__cli__v6_86_8c.html#a138c7e8ee052a2f3979f8ced1b4b6ccb":[2,0,1,7,2,15],
+"ck__cli__v6_86_8c.html#a16085d1da9b31df6fbb71b1d3920dfd7":[2,0,1,7,2,25],
+"ck__cli__v6_86_8c.html#a163436a1ce42f486b26d7c1e4f38153a":[2,0,1,7,2,46],
+"ck__cli__v6_86_8c.html#a16be228cb1a2d80e89e2fd465baaf2a3":[2,0,1,7,2,51],
+"ck__cli__v6_86_8c.html#a18de181b172a24502c52605bcfd4907c":[2,0,1,7,2,32],
+"ck__cli__v6_86_8c.html#a268b869c9b68d62c6605f97ae19e63a1":[2,0,1,7,2,11],
+"ck__cli__v6_86_8c.html#a2a400977993ef84fbec92ffc3fab04df":[2,0,1,7,2,18],
+"ck__cli__v6_86_8c.html#a305e4958320cfdbcb6d9c24cafd2a1d8":[2,0,1,7,2,48],
+"ck__cli__v6_86_8c.html#a3294ea6b6f4fa8399aaf7a0e4d68ccae":[2,0,1,7,2,35],
+"ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227ab":[2,0,1,7,2,21],
 "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba952735d1d53b9fdca9d27427834ee0a6":[2,0,1,7,2,21,2],
 "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba9801cffbb08d45bb81a3937b66ef1351":[2,0,1,7,2,21,4],
 "ck__cli__v6_86_8c.html#a34a49339011ec90768afdb73eee227aba9cc46c02a6757992f62a7dec2f848e07":[2,0,1,7,2,21,1],
@@ -239,15 +249,5 @@ var NAVTREEINDEX2 =
 "ck__parity__api_8c.html#ae5f78ab1af3e1f44d57f284cfe068ed3":[2,0,1,11,3],
 "ck__parity__api_8c.html#ae6b6e7d7848157d54ba75f661fe9ca39":[2,0,1,11,20],
 "ck__parity__api_8c.html#aea5f7a52ed3f21e0c6795766cfb28751":[2,0,1,11,75],
-"ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030":[2,0,1,11,43],
-"ck__parity__api_8c.html#af5e77e21034b56a01b56dc25809fef8a":[2,0,1,11,62],
-"ck__parity__api_8c.html#af6f9c6f77b75d2ac115ba325fd0d618b":[2,0,1,11,61],
-"ck__parity__api_8c.html#afa96b526d228d061c98b81d813c9093a":[2,0,1,11,19],
-"ck__parity__api_8c.html#afaf7b52e33b5c9d303467c28a61f4fce":[2,0,1,11,38],
-"ck__parity__api_8c.html#afb09a29d3caada83d9e84efed6209fec":[2,0,1,11,22],
-"ck__parity__api_8c_source.html":[2,0,1,11],
-"ck__parity__api_8h.html":[2,0,0,7],
-"ck__parity__api_8h.html#a0294dd45ee3d2fd2f25f2e586b1b9311":[2,0,0,7,28],
-"ck__parity__api_8h.html#a0a5804528e46690c47e5054e6d59d82a":[2,0,0,7,17],
-"ck__parity__api_8h.html#a12d459a543e9e2753fe5f6d0f70f1c7b":[2,0,0,7,9]
+"ck__parity__api_8c.html#af2d02981687e405f123c38e442a53030":[2,0,1,11,43]
 };

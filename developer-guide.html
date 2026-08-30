@@ -1490,8 +1490,12 @@ $ firefox build/flamegraph.svg</pre>
 void my_kernel_forward(float *out, const float *in, int N) { ... }
 void my_kernel_backward(float *dx, const float *dy, int N) { ... }</pre>
         </li>
-        <li><strong>Add to <a href="kernel-maps.html">kernel map</a></strong> in <code>kernel_maps/kernels/</code>
-            <pre>// kernel_maps/kernels/my_kernel.json
+        <li><strong>Add to a <a href="kernel-maps.html">kernel map</a></strong> in <code>version/v8/kernel_maps/</code> (current provider-selection format)
+            <pre>// version/v8/kernel_maps/my_kernel.json — see kernel-maps.html for the
+// v8 provider schema (ports, ABI, selection metadata)</pre>
+            The legacy v6/v7 training lane instead uses <code>version/v6.6/legacy_kernel_maps/kernels/</code>
+            with the older forward/backward binding format:
+            <pre>// version/v6.6/legacy_kernel_maps/kernels/my_kernel.json
 {
   "name": "my_kernel",
   "forward": "my_kernel_forward",
@@ -1499,7 +1503,7 @@ void my_kernel_backward(float *dx, const float *dy, int N) { ... }</pre>
   "sources": ["src/kernels/my_kernel.c"]
 }</pre>
         </li>
-        <li><strong>Regenerate specs</strong>
+        <li><strong>Regenerate specs</strong> (legacy lane only)
             <pre>make gen-specs</pre>
         </li>
         <li><strong>Write Python test</strong> in <code>unittest/</code>
