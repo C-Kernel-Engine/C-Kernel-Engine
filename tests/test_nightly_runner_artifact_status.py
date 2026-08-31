@@ -195,6 +195,7 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         expected = {
             "v8_regression_fast",
             "v8_audio_contracts",
+            "v8_cohere_laguna_contracts",
             "v8_qwen3vl_vision_smoke",
             "v8_gemma4_vision_smoke",
             "qwen3vl_private_corpus_parity",

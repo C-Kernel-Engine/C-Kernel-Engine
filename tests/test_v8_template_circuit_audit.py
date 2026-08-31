@@ -126,7 +126,9 @@ class TemplateCircuitAuditTests(unittest.TestCase):
         self.assertIn("decoder.body:mla_dense_mlp[3].kv_a_proj.x=layer_input", explicit)
         self.assertIn("decoder.body:mla_dense_mlp[5].kv_lora_decompress.compressed_kv=compressed_kv_normed", explicit)
         self.assertIn("decoder.body:mla_dense_mlp[6].partial_rope_concat.q_packed=q_scratch", explicit)
-        self.assertIn("decoder.body:mla_dense_mlp[7].mla_attention.query=q_scratch", explicit)
+        self.assertIn("decoder.body:mla_dense_mlp[7].mla_attention.q=q_scratch", explicit)
+        self.assertIn("decoder.body:mla_dense_mlp[7].mla_attention.k=k_scratch", explicit)
+        self.assertIn("decoder.body:mla_dense_mlp[7].mla_attention.v=v_scratch", explicit)
         self.assertIn("decoder.body:mla_moe[14].moe_swiglu_expert_mlp.routing_weights=k_scratch", explicit)
         self.assertIn("decoder.body:mla_moe[15].shared_swiglu_expert_mlp.routed=mlp_scratch", explicit)
         self.assertIn("decoder.footer[2].logits.x=main_stream", explicit)
@@ -141,7 +143,7 @@ class TemplateCircuitAuditTests(unittest.TestCase):
                 _op(2, 0, "block_rmsnorm", {"input": {"from_op": 0, "slot": "main_stream"}}, {"output": {"slot": "layer_input", "dtype": "fp32"}}),
                 _op(3, 0, "q_proj", {"x": {"from_op": 2, "slot": "layer_input"}}, {"y": {"slot": "q_proj", "dtype": "fp32"}}),
                 _op(4, 0, "kv_a_proj", {"x": {"from_op": 2, "slot": "layer_input"}}, {"y": {"slot": "compressed_kv", "dtype": "fp32"}}),
-                _op(5, 0, "kv_a_layernorm", {"x": {"from_op": 4, "slot": "compressed_kv"}}, {"y": {"slot": "compressed_kv_normed", "dtype": "fp32"}}),
+                _op(5, 0, "kv_a_layernorm", {"input": {"from_op": 4, "slot": "compressed_kv"}}, {"y": {"slot": "compressed_kv_normed", "dtype": "fp32"}}),
                 _op(6, 0, "kv_lora_decompress", {"compressed_kv": {"from_op": 4, "slot": "compressed_kv"}}, {"k_nope": {"slot": "k_nope"}, "value": {"slot": "mla_value"}}),
             ]
         }
@@ -157,10 +159,10 @@ class TemplateCircuitAuditTests(unittest.TestCase):
                 _op(2, 0, "block_rmsnorm", {"input": {"from_op": 0, "slot": "main_stream"}}, {"output": {"slot": "layer_input", "dtype": "fp32"}}),
                 _op(3, 0, "q_proj", {"x": {"from_op": 2, "slot": "layer_input"}}, {"y": {"slot": "q_proj", "dtype": "fp32"}}),
                 _op(4, 0, "kv_a_proj", {"x": {"from_op": 2, "slot": "layer_input"}}, {"y": {"slot": "compressed_kv", "dtype": "fp32"}}),
-                _op(5, 0, "kv_a_layernorm", {"x": {"from_op": 4, "slot": "compressed_kv"}}, {"y": {"slot": "compressed_kv_normed", "dtype": "fp32"}}),
+                _op(5, 0, "kv_a_layernorm", {"input": {"from_op": 4, "slot": "compressed_kv"}}, {"y": {"slot": "compressed_kv_normed", "dtype": "fp32"}}),
                 _op(6, 0, "kv_lora_decompress", {"compressed_kv": {"from_op": 5, "slot": "compressed_kv_normed"}}, {"k_nope": {"slot": "k_nope"}, "value": {"slot": "mla_value"}}),
                 _op(7, 0, "partial_rope_concat", {"q_packed": {"from_op": 3, "slot": "q_scratch"}, "k_nope": {"from_op": 6, "slot": "k_nope"}, "k_pe": {"from_op": 4, "slot": "compressed_kv"}}, {"query": {"slot": "q_scratch"}, "key": {"slot": "k_scratch"}}),
-                _op(8, 0, "mla_attention", {"query": {"from_op": 7, "slot": "q_scratch"}, "key": {"from_op": 7, "slot": "k_scratch"}, "value": {"from_op": 6, "slot": "v_scratch"}}, {"out": {"slot": "attn_scratch"}}),
+                _op(8, 0, "mla_attention", {"q": {"from_op": 7, "slot": "q_scratch"}, "k": {"from_op": 7, "slot": "k_scratch"}, "v": {"from_op": 6, "slot": "v_scratch"}}, {"out": {"slot": "attn_scratch"}}),
             ]
         }
         self.assertEqual(audit.audit_ir1(ir), [])

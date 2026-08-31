@@ -45,6 +45,25 @@ class V8DSLNightlyRegistrationTests(unittest.TestCase):
         self.assertEqual(yarn_fp32.category, "kernels")
         self.assertEqual(yarn_bf16.category, "bf16")
 
+    def test_cohere_and_laguna_contracts_are_a_visible_nightly_row(self) -> None:
+        entry = nightly.MAKE_TARGETS.get("v8_cohere_laguna_contracts")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["name"], "Cohere/Laguna Compiler/Circuit Contracts")
+        self.assertEqual(entry["category"], "inference")
+        self.assertEqual(entry["target"], "test-v8-cohere-laguna-contracts")
+        self.assertIn("v8_cohere_laguna_contracts", nightly.NIGHTLY_PROFILES["demo-readiness"])
+
+    def test_cohere_and_laguna_numerical_providers_are_in_the_nightly_gate(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        for test_file in (
+            "unittest/test_moe_swiglu_q4k_mixed_parallel.py",
+            "unittest/test_attn_gate_softplus_mul.py",
+            "tests/test_v8_rope_split_direct_parallel.py",
+            "unittest/bf16/test_vision_position_fp32_interp_bf16.py",
+        ):
+            with self.subTest(test_file=test_file):
+                self.assertIn(f"@$(PYTHON) {test_file}", makefile)
+
     def test_full_dsl_gate_dependencies_are_explicit_nightly_rows(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         match = re.search(r"^test-v8-dsl:\s+([^\n]+)$", makefile, re.MULTILINE)

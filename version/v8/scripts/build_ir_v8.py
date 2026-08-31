@@ -9003,16 +9003,24 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         kernel_id = ir_op.get("kernel")
         input_override = _input_slot_override_for_kernel(op_type, kernel_id)
         graph_slots = ir_op.get("graph_slots", {}) if isinstance(ir_op.get("graph_slots"), dict) else {}
-        explicit_input_override = _canonical_graph_slot_overrides(
-            op_type,
-            "inputs",
-            graph_slots.get("inputs") if isinstance(graph_slots.get("inputs"), dict) else {},
-        )
-        explicit_output_override = _canonical_graph_slot_overrides(
-            op_type,
-            "outputs",
-            graph_slots.get("outputs") if isinstance(graph_slots.get("outputs"), dict) else {},
-        )
+        interface_validation = ir_op.get("interface_validation")
+        if (
+            isinstance(interface_validation, dict)
+            and interface_validation.get("status") == "validated"
+        ):
+            explicit_input_override = dict(interface_validation.get("inputs", {}))
+            explicit_output_override = dict(interface_validation.get("outputs", {}))
+        else:
+            explicit_input_override = _canonical_graph_slot_overrides(
+                op_type,
+                "inputs",
+                graph_slots.get("inputs") if isinstance(graph_slots.get("inputs"), dict) else {},
+            )
+            explicit_output_override = _canonical_graph_slot_overrides(
+                op_type,
+                "outputs",
+                graph_slots.get("outputs") if isinstance(graph_slots.get("outputs"), dict) else {},
+            )
         # Template graph_slots describe the semantic producer/consumer edge.
         # Kernel activation dtype decides the physical view of that edge. For
         # example GLM4 q_proj semantically consumes main_stream, but a Q4_K x
@@ -9035,7 +9043,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 # Otherwise the semantic slot can bypass the planner-owned Q8
                 # workspace, or force an inserted quantizer to read and write
                 # that workspace in place.
-                interface_validation = ir_op.get("interface_validation")
                 if (
                     explicit_input_override
                     and kernel_act != "fp32"

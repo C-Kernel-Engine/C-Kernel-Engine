@@ -31905,6 +31905,16 @@
           }
         }
       ],
+      "tests": {
+        "parity": [
+          {
+            "kind": "cke_reference",
+            "command": "python unittest/test_moe_swiglu_q4k_mixed_parallel.py",
+            "tolerance": "bit_exact",
+            "notes": "The persistent-threadpool provider must match the serial compact Q4_K-down provider exactly."
+          }
+        ]
+      },
       "notes": "Compact mixed-quant routed SwiGLU provider. It preserves selected-slot merge order and allocates no kernel-local heap memory.",
       "name": "moe_swiglu_expert_forward_q4k_q4k",
       "_source_file": "moe_swiglu_expert_forward_q4k_q4k.json"
@@ -32857,6 +32867,16 @@
           }
         }
       ],
+      "tests": {
+        "parity": [
+          {
+            "kind": "cke_reference",
+            "command": "python unittest/test_moe_swiglu_q4k_mixed_parallel.py",
+            "tolerance": "bit_exact",
+            "notes": "The persistent-threadpool provider must match the serial compact Q6_K-down provider exactly."
+          }
+        ]
+      },
       "notes": "Compact mixed-quant routed SwiGLU provider. It preserves selected-slot merge order and allocates no kernel-local heap memory.",
       "name": "moe_swiglu_expert_forward_q4k_q6k",
       "_source_file": "moe_swiglu_expert_forward_q4k_q6k.json"
@@ -47778,7 +47798,8 @@
       },
       "tests": {
         "unit": [
-          "unittest/test_rope.py"
+          "unittest/test_rope.py",
+          "tests/test_v8_rope_split_direct_parallel.py"
         ],
         "parity": [
           {

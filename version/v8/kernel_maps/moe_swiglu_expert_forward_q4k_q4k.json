@@ -69,5 +69,15 @@
       }
     }
   ],
+  "tests": {
+    "parity": [
+      {
+        "kind": "cke_reference",
+        "command": "python unittest/test_moe_swiglu_q4k_mixed_parallel.py",
+        "tolerance": "bit_exact",
+        "notes": "The persistent-threadpool provider must match the serial compact Q4_K-down provider exactly."
+      }
+    ]
+  },
   "notes": "Compact mixed-quant routed SwiGLU provider. It preserves selected-slot merge order and allocates no kernel-local heap memory."
 }

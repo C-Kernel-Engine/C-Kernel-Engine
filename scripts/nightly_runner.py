@@ -836,6 +836,12 @@ MAKE_TARGETS = {
         "target": "test-numerical-contracts",
         "timeout_sec": 300,
     },
+    "v8_cohere_laguna_contracts": {
+        "name": "Cohere/Laguna Compiler/Circuit Contracts",
+        "category": "inference",
+        "target": "test-v8-cohere-laguna-contracts",
+        "timeout_sec": 300,
+    },
     "v8_command_a_plus_nvfp4": {
         "name": "Command A+ Native NVFP4 / X-ray Contracts",
         "category": "parity",
@@ -1083,6 +1089,7 @@ NIGHTLY_PROFILES = {
         "v8_kernel_map_contracts",
         "v8_model_memory_plans",
         "v8_numerical_contracts",
+        "v8_cohere_laguna_contracts",
         "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",
         "v8_template_circuit_audit",

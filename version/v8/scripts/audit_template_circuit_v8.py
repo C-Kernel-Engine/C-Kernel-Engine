@@ -46,7 +46,7 @@ CRITICAL_TEMPLATE_INPUTS: dict[str, tuple[str, ...]] = {
     "kv_a_layernorm": ("input",),
     "kv_lora_decompress": ("compressed_kv",),
     "partial_rope_concat": ("q_packed", "k_nope", "k_pe"),
-    "mla_attention": ("query", "key", "value"),
+    "mla_attention": ("q", "k", "v"),
     "mlp_gate_up": ("x",),
     "moe_swiglu_expert_mlp": ("hidden", "indices", "routing_weights"),
     "shared_swiglu_expert_mlp": ("hidden", "routed"),
@@ -295,7 +295,7 @@ def audit_ir1(ir1: dict[str, Any]) -> list[str]:
             _same_producer(errors, kv_a, "x", norm, f"{label} MLA kv_a")
             _slot(errors, kv_a, "x", "layer_input", f"{label} MLA kv_a")
         if kv_norm is not None and kv_a is not None:
-            _same_producer(errors, kv_norm, "x", kv_a, f"{label} MLA kv_a norm")
+            _same_producer(errors, kv_norm, "input", kv_a, f"{label} MLA kv_a norm")
         if kv_decomp is not None and kv_norm is not None:
             _same_producer(errors, kv_decomp, "compressed_kv", kv_norm, f"{label} MLA kv decompress")
         if partial is not None:
@@ -307,10 +307,10 @@ def audit_ir1(ir1: dict[str, Any]) -> list[str]:
                 _same_producer(errors, partial, "k_pe", kv_a, f"{label} MLA partial rope")
         if mla is not None:
             if partial is not None:
-                _same_producer(errors, mla, "query", partial, f"{label} MLA attention")
-                _same_producer(errors, mla, "key", partial, f"{label} MLA attention")
+                _same_producer(errors, mla, "q", partial, f"{label} MLA attention")
+                _same_producer(errors, mla, "k", partial, f"{label} MLA attention")
             if kv_decomp is not None:
-                _same_producer(errors, mla, "value", kv_decomp, f"{label} MLA attention")
+                _same_producer(errors, mla, "v", kv_decomp, f"{label} MLA attention")
         rope = by.get((layer, "rope_qk"))
         if rope is not None:
             if q is not None:

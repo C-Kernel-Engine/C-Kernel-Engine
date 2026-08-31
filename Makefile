@@ -1605,6 +1605,16 @@ test-v8-xeon-family-contracts:
 		tests.test_v8_template_circuit_audit \
 		-v
 
+.PHONY: test-v8-cohere-laguna-contracts
+test-v8-cohere-laguna-contracts:
+	@echo "Running Cohere and Laguna compiler/circuit contracts..."
+	@$(PYTHON) -m unittest \
+		tests.test_v8_cohere2_contract \
+		tests.test_v8_cohere2_moe_contract \
+		tests.test_v8_cohere_compass_contract \
+		tests.test_v8_laguna_contract \
+		-v
+
 test-v8-model-smoke: test-v8-template-circuit-audit v8-regression-fast test-v8-qwen36-highmem test-v8-gemma4-highmem test-v8-nemotron9-highmem test-v8-glm4-highmem test-v8-kimi-highmem
 
 test-v8-xeon-highmem: test-v8-xeon-family-contracts test-v8-qwen36-highmem test-v8-gemma4-highmem test-v8-nemotron9-highmem test-v8-glm4-highmem test-v8-kimi-highmem
@@ -4060,6 +4070,10 @@ test-v8-template-circuit-audit:
 test-numerical-contracts: $(LIB)
 	@echo "Running v8 numerical contract validation..."
 	@$(PYTHON) unittest/test_nvfp4_q8_0.py
+	@$(PYTHON) unittest/test_moe_swiglu_q4k_mixed_parallel.py
+	@$(PYTHON) unittest/test_attn_gate_softplus_mul.py
+	@$(PYTHON) tests/test_v8_rope_split_direct_parallel.py
+	@$(PYTHON) unittest/bf16/test_vision_position_fp32_interp_bf16.py
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-4m
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-8m
 	@$(MAKE) --no-print-directory test-q4k-exact-prefill-vnni-x8

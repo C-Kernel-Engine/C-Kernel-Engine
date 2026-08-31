@@ -77,12 +77,12 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
         self.assertIn("test-qwen36vl-private-corpus-parity-auto:", makefile)
         self.assertIn("--model-profile qwen36vl", makefile)
         self.assertIn(
-            "QWEN36VL_PRIVATE_CORPUS_MANIFEST ?= $(CK_QWEN36VL_OCR_MANIFEST)",
+            "V8_PRIVATE_VISION_CORPUS_MANIFEST ?= $(CK_QWEN3VL_OCR_MANIFEST)",
             makefile,
         )
-        self.assertNotIn(
+        self.assertIn(
             "QWEN36VL_PRIVATE_CORPUS_MANIFEST ?= "
-            "$(if $(CK_QWEN36VL_OCR_MANIFEST)",
+            "$(V8_PRIVATE_VISION_CORPUS_MANIFEST)",
             makefile,
         )
         self.assertIn(
