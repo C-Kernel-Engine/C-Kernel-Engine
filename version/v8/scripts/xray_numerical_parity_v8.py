@@ -197,7 +197,43 @@ XRAY_FIX_PROGRESSION = {
 }
 
 
-def _metrics(reference: np.ndarray, actual: np.ndarray, axes: list[str]) -> Dict[str, Any]:
+def _max_bf16_ulp_distance(
+    reference: np.ndarray,
+    actual: np.ndarray,
+    *,
+    abs_floor: float,
+) -> int | None:
+    ref32 = np.asarray(reference, dtype=np.float32)
+    got32 = np.asarray(actual, dtype=np.float32)
+    if not np.isfinite(ref32).all() or not np.isfinite(got32).all():
+        return None
+    material = np.abs(got32 - ref32) >= float(abs_floor)
+    if not np.any(material):
+        return 0
+    ref_bits32 = ref32.view(np.uint32)
+    got_bits32 = got32.view(np.uint32)
+    if (
+        np.any(ref_bits32[material] & np.uint32(0xFFFF))
+        or np.any(got_bits32[material] & np.uint32(0xFFFF))
+    ):
+        return None
+    ref_bits = (ref_bits32[material] >> np.uint32(16)).astype(np.uint16)
+    got_bits = (got_bits32[material] >> np.uint32(16)).astype(np.uint16)
+
+    def ordered(bits: np.ndarray) -> np.ndarray:
+        magnitude = (bits & np.uint16(0x7FFF)).astype(np.int32)
+        return np.where(bits & np.uint16(0x8000), 0x8000 - magnitude, 0x8000 + magnitude)
+
+    return int(np.max(np.abs(ordered(ref_bits) - ordered(got_bits))))
+
+
+def _metrics(
+    reference: np.ndarray,
+    actual: np.ndarray,
+    axes: list[str],
+    *,
+    bf16_abs_floor: float | None = None,
+) -> Dict[str, Any]:
     if reference.shape != actual.shape:
         raise XRayError(f"canonical tensor shape mismatch: {reference.shape} != {actual.shape}")
     ref64 = reference.astype(np.float64, copy=False)
@@ -223,6 +259,11 @@ def _metrics(reference: np.ndarray, actual: np.ndarray, axes: list[str]) -> Dict
         "total_elements": total_elements,
         "exact_ratio": exact_elements / total_elements if total_elements else 1.0,
         "byte_exact": exact_elements == total_elements,
+        "bf16_abs_floor": bf16_abs_floor,
+        "max_bf16_ulp_over_abs_floor": (
+            _max_bf16_ulp_distance(reference, actual, abs_floor=bf16_abs_floor)
+            if bf16_abs_floor is not None else None
+        ),
     }
 
 
@@ -236,8 +277,18 @@ def _metric_status(metrics: Dict[str, Any], threshold: Dict[str, Any]) -> tuple[
         failures.append("rmse")
     if metrics["relative_rmse"] > threshold["relative_rmse_max"]:
         failures.append("relative_rmse")
-    if metrics["max_abs"] > threshold["max_abs_max"]:
-        failures.append("max_abs")
+    max_bf16_ulp = threshold.get("max_bf16_ulp_max")
+    if max_bf16_ulp is None:
+        if metrics["max_abs"] > threshold["max_abs_max"]:
+            failures.append("max_abs")
+    else:
+        safety_max = float(threshold.get("max_abs_safety_max", threshold["max_abs_max"]))
+        if metrics["max_abs"] > safety_max:
+            failures.append("max_abs_safety")
+        if metrics.get("max_bf16_ulp_over_abs_floor") is None:
+            failures.append("bf16_ulp_unavailable")
+        elif metrics["max_bf16_ulp_over_abs_floor"] > max_bf16_ulp:
+            failures.append("max_bf16_ulp")
     return ("fail" if failures else "pass"), failures
 
 
@@ -356,7 +407,6 @@ def compare_manifests(
             try:
                 ref = _load_tensor(right)
                 got = _load_tensor(left)
-                metrics = _metrics(ref, got, left["axis_names"])
             except (XRayError, ValueError) as exc:
                 row = {"checkpoint_id": checkpoint_id, "status": "fail", "classification": "DIAGNOSTIC_EXPORT_MAPPING", "detail": str(exc)}
                 rows.append(row)
@@ -367,6 +417,15 @@ def compare_manifests(
             if threshold is None:
                 row = {"checkpoint_id": checkpoint_id, "status": "fail", "classification": "MISSING_TOLERANCE_PROFILE", "dtype": threshold_key}
             else:
+                metrics = _metrics(
+                    ref,
+                    got,
+                    left["axis_names"],
+                    bf16_abs_floor=(
+                        float(threshold["max_abs_max"])
+                        if threshold.get("max_bf16_ulp_max") is not None else None
+                    ),
+                )
                 status, failed_metrics = _metric_status(metrics, threshold)
                 classification = "NONFINITE_OUTPUT" if "nonfinite" in failed_metrics else ("KERNEL_IMPLEMENTATION_DIVERGENCE" if status == "fail" else "MATCH")
                 row = {

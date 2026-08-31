@@ -33,6 +33,87 @@ def digest(path: Path) -> str:
 
 
 class XRayNumericalParityTests(unittest.TestCase):
+    def test_bf16_ulp_threshold_tracks_representable_steps(self):
+        threshold = {
+            "cosine_min": 0.99,
+            "rmse_max": 2.0,
+            "relative_rmse_max": 1.0,
+            "max_abs_max": 0.25,
+            "max_bf16_ulp_max": 1,
+            "max_abs_safety_max": 16.0,
+            "finite_required": True,
+        }
+        one_ulp = xray._metrics(
+            np.array([-71.0], dtype=np.float32),
+            np.array([-70.5], dtype=np.float32),
+            ["channel"],
+            bf16_abs_floor=0.25,
+        )
+        two_ulp = xray._metrics(
+            np.array([-71.0], dtype=np.float32),
+            np.array([-70.0], dtype=np.float32),
+            ["channel"],
+            bf16_abs_floor=0.25,
+        )
+        self.assertEqual(one_ulp["max_bf16_ulp_over_abs_floor"], 1)
+        self.assertEqual(xray._metric_status(one_ulp, threshold), ("pass", []))
+        self.assertEqual(two_ulp["max_bf16_ulp_over_abs_floor"], 2)
+        self.assertEqual(xray._metric_status(two_ulp, threshold), ("fail", ["max_bf16_ulp"]))
+
+    def test_bf16_ulp_threshold_ignores_subfloor_sign_crossing(self):
+        metrics = xray._metrics(
+            np.array([-0.00123], dtype=np.float32),
+            np.array([0.00123], dtype=np.float32),
+            ["channel"],
+            bf16_abs_floor=0.25,
+        )
+        self.assertLess(metrics["max_abs"], 0.25)
+        self.assertEqual(metrics["max_bf16_ulp_over_abs_floor"], 0)
+
+    def test_bf16_ulp_threshold_includes_error_equal_to_floor(self):
+        threshold = {
+            "cosine_min": -1.0,
+            "rmse_max": 1.0,
+            "relative_rmse_max": 1.0,
+            "max_abs_max": 0.25,
+            "max_bf16_ulp_max": 2,
+            "max_abs_safety_max": 16.0,
+            "finite_required": True,
+        }
+        metrics = xray._metrics(
+            np.array([-0.2578125], dtype=np.float32),
+            np.array([-0.5078125], dtype=np.float32),
+            ["channel"],
+            bf16_abs_floor=0.25,
+        )
+        self.assertEqual(metrics["max_abs"], 0.25)
+        self.assertGreater(metrics["max_bf16_ulp_over_abs_floor"], 2)
+        self.assertEqual(
+            xray._metric_status(metrics, threshold),
+            ("fail", ["max_bf16_ulp"]),
+        )
+
+    def test_bf16_ulp_threshold_retains_absolute_safety_ceiling(self):
+        threshold = {
+            "cosine_min": -1.0,
+            "rmse_max": 100.0,
+            "relative_rmse_max": 100.0,
+            "max_abs_max": 0.25,
+            "max_bf16_ulp_max": 128,
+            "max_abs_safety_max": 16.0,
+            "finite_required": True,
+        }
+        metrics = xray._metrics(
+            np.array([256.0], dtype=np.float32),
+            np.array([274.0], dtype=np.float32),
+            ["channel"],
+            bf16_abs_floor=0.25,
+        )
+        self.assertEqual(
+            xray._metric_status(metrics, threshold),
+            ("fail", ["max_abs_safety"]),
+        )
+
     def test_nightly_xray_gate_runs_capture_neutrality_contracts(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         target = makefile.split("test-bf16-xray:", 1)[1].split(
