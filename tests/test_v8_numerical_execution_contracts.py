@@ -589,8 +589,8 @@ class NumericalExecutionContractTests(unittest.TestCase):
         self.assertEqual(report["counts"]["map_owned_call_abi"], 184)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 34)
         self.assertEqual(report["counts"]["selection_managed_maps"], 75)
-        self.assertEqual(report["selection"]["legacy_selection_if_statements"], 67)
-        self.assertEqual(report["selection"]["operation_specific_if_statements"], 33)
+        self.assertEqual(report["selection"]["legacy_selection_if_statements"], 62)
+        self.assertEqual(report["selection"]["operation_specific_if_statements"], 29)
 
     def test_yarn_init_contracts_resolve_exact_storage_providers(self):
         expected = {

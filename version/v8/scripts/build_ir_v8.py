@@ -6517,6 +6517,37 @@ def _require_phase_kernel_mapping(
     return kernel_id
 
 
+# Ops whose provider must be declared by the circuit's kernel bindings.
+# The compiler keeps no default provider for these; resolution fails closed
+# when the binding is absent.
+CIRCUIT_BOUND_PROVIDER_OPS = (
+    "partial_rope_concat",
+    "mla_kv_cache_store",
+    "mla_kv_cache_batch_store",
+    "kv_a_layernorm",
+    "kv_lora_decompress",
+)
+
+
+def _require_circuit_kernel_mapping(
+    template_kernels: Dict[str, Any],
+    operation: str,
+    *,
+    circuit_name: str = "",
+) -> str:
+    """Return an exact circuit-owned provider binding or fail closed."""
+    kernel_id = str(template_kernels.get(operation, "") or "").strip()
+    if not kernel_id:
+        circuit = str(circuit_name or "").strip() or "<unnamed>"
+        raise RuntimeError(
+            "HARD KERNEL RESOLUTION FAULT: "
+            f"{operation} requires an exact circuit kernel mapping; "
+            f"circuit {circuit!r} must declare \"{operation}\" in its "
+            "\"kernels\" bindings."
+        )
+    return kernel_id
+
+
 def _attention_contract_is_causal(template: Dict[str, Any], config: Dict[str, Any]) -> bool:
     contract = template.get("contract", {}) if isinstance(template.get("contract"), dict) else {}
     attention_contract = contract.get("attention_contract", {}) if isinstance(contract.get("attention_contract"), dict) else {}
@@ -7952,6 +7983,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 raise RuntimeError(f"HARD KERNEL RESOLUTION FAULT: {op} requires an exact circuit kernel mapping.")
             return [override]
 
+        if op in CIRCUIT_BOUND_PROVIDER_OPS:
+            kernel_id = _require_circuit_kernel_mapping(
+                template_kernels,
+                op,
+                circuit_name=str(template.get("name", "") or ""),
+            )
+            if kernel_id not in registry_by_id:
+                raise RuntimeError(
+                    "HARD KERNEL RESOLUTION FAULT: "
+                    f"circuit kernel mapping for {op} names an unknown provider {kernel_id!r}."
+                )
+            return [kernel_id]
+
         if op in ("attn_shared_kv", "attn_sliding_shared_kv"):
             if op == "attn_sliding_shared_kv":
                 mode_key = f"attn_sliding_shared_kv_{mode}"
@@ -8014,12 +8058,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # a q8_0 weight requirement and fail to bind kernels such as Gemma4 V RMSNorm.
         if op == "residual_save":
             return ["memcpy"]
-        if op == "partial_rope_concat":
-            return ["deepseek_mla_partial_rope_concat_packed_f32"]
-        if op == "mla_kv_cache_batch_store":
-            return ["deepseek_mla_kv_cache_batch_store_f32"]
-        if op == "mla_kv_cache_store":
-            return ["deepseek_mla_kv_cache_store_f32"]
         if op == "mla_attention":
             return [_require_phase_kernel_mapping(template_kernels, op, mode)]
         if op in {"v_norm", "projector_prep", "group_limited_topk_router", "mamba_in_proj_split"}:
@@ -8045,15 +8083,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             # was from ckernel_orchestration.c which is not used in v7.
             # Fall through to standard matmul handling below.
 
-            if op == "kv_a_layernorm":
-                return ["rmsnorm_forward_kv_lora"]
-            if op == "kv_lora_decompress":
-                kv_b_dtype = str(layer_quant.get("mla_kv_b_proj", "")).lower()
-                if isinstance(weight_info, list) and weight_info:
-                    kv_b_dtype = str(weight_info[0].get("dtype", kv_b_dtype)).lower()
-                if kv_b_dtype == "bf16":
-                    return ["deepseek_mla_kv_decompress_bf16"]
-                return ["deepseek_mla_kv_decompress_f32"]
             if op == "moe_swiglu_expert_mlp":
                 return [resolve_swiglu_moe_provider(
                     registry,
@@ -9838,6 +9867,7 @@ def generate_ir_lower_1(
     config = manifest.get("config", {})
     logits_layout = _resolve_logits_layout(config, mode)
     template = manifest.get("template", {}) if isinstance(manifest.get("template"), dict) else {}
+    template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
     template_contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     attention_contract = template_contract.get("attention_contract") if isinstance(template_contract.get("attention_contract"), dict) else {}
     decode_cache_contract = attention_contract.get("decode_cache_contract") if isinstance(attention_contract.get("decode_cache_contract"), dict) else {}
@@ -10188,11 +10218,21 @@ def generate_ir_lower_1(
 
     def _make_mla_kv_store_op(anchor_op: Dict[str, Any], *, batch: bool) -> Dict[str, Any]:
         layer = int(anchor_op["layer"])
-        function = "deepseek_mla_kv_cache_batch_store_f32" if batch else "deepseek_mla_kv_cache_store_f32"
+        store_op = "mla_kv_cache_batch_store" if batch else "mla_kv_cache_store"
+        function = _require_circuit_kernel_mapping(
+            template_kernels,
+            store_op,
+            circuit_name=str(template.get("name", "") or ""),
+        )
+        if function not in kernel_map_index:
+            raise RuntimeError(
+                "HARD KERNEL RESOLUTION FAULT: "
+                f"circuit kernel mapping for {store_op} names an unknown provider {function!r}."
+            )
         return {
             "idx": len(final_ops),  # Will be renumbered
             "kernel": function,
-            "op": "mla_kv_cache_batch_store" if batch else "mla_kv_cache_store",
+            "op": store_op,
             "layer": layer,
             "section": anchor_op["section"],
             "function": function,
