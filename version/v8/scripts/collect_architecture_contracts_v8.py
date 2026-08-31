@@ -115,6 +115,52 @@ def _safe_template_report(audit: Any, name: str) -> dict[str, Any]:
     }
 
 
+NOVELTY_ARTIFACT = ROOT / "version/v8/.cache/reports/model_novelty_latest.json"
+
+
+def _model_novelty_section() -> dict[str, Any] | None:
+    """Include the advisory model novelty report when a cached artifact exists.
+
+    The artifact is produced out of band, for example:
+        python3 version/v8/scripts/report_model_novelty_v8.py \
+            --base <sha> --head <sha> \
+            --json-out version/v8/.cache/reports/model_novelty_latest.json
+    The report is advisory only: it never gates and never flips this
+    dashboard to warn/fail. When the artifact is absent the section is
+    omitted entirely rather than fabricated.
+    """
+    if not NOVELTY_ARTIFACT.exists():
+        return None
+    try:
+        payload = json.loads(NOVELTY_ARTIFACT.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    core = payload.get("core_compiler") or {}
+    core_files = int(core.get("files") or 0)
+    details = (
+        f"ADVISORY git-range novelty snapshot ({payload.get('base')}..{payload.get('head')}): "
+        f"{core_files} core-compiler file(s) changed (target trend: zero); "
+        f"{(payload.get('totals') or {}).get('files', 0)} file(s) total."
+    )
+    return {
+        "id": "model_novelty",
+        "label": "Model Novelty (Advisory)",
+        "status": "pass",
+        "checks_passed": 1,
+        "checks_failed": 0,
+        "warnings": 0,
+        "details": details,
+        "rows": [
+            {
+                "metric": "core_compiler_files_changed",
+                "value": core_files,
+                "target_trend": core.get("target_trend", "zero"),
+                "advisory": True,
+            }
+        ],
+    }
+
+
 def _status_from_counts(failed: int, warnings: int) -> str:
     if failed:
         return "fail"
@@ -199,6 +245,10 @@ def build_report() -> dict[str, Any]:
             "rows": MODEL_COVERAGE,
         },
     ]
+
+    novelty_section = _model_novelty_section()
+    if novelty_section is not None:
+        sections.append(novelty_section)
 
     failed = sum(1 for section in sections if section["status"] == "fail")
     warnings = sum(int(section.get("warnings") or 0) for section in sections)

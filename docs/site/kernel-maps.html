@@ -1129,6 +1129,41 @@ main code{overflow-wrap:anywhere}
   or performance claims are considered.
 </div>
 
+<h3 id="novelty-metric">Measuring Bring-Up Novelty</h3>
+
+<p>
+    The scaling rule above is measurable. The advisory script
+    <code>version/v8/scripts/report_model_novelty_v8.py</code> answers one
+    question: when a new model family is brought up, how much code changes
+    <em>outside</em> its circuit, tensor map, genuinely new kernels, and
+    evidence fixtures?
+</p>
+
+<p>
+    In git-range mode (<code>--base SHA --head SHA</code>) it classifies every
+    changed file into ownership buckets &mdash; circuit JSON, model/tensor
+    maps, kernel maps, kernel C source, core compiler, converters,
+    tests/evidence, docs, other &mdash; and reports per-bucket file counts and
+    line deltas. The <strong>core-compiler bucket</strong> (DSL lowering, code
+    generators, memory planner) is THE metric: its target trend is
+    <strong>zero</strong>. A bring-up that lands entirely in its circuit,
+    maps, kernels, and evidence is one where the architecture absorbed the
+    family for free. In circuit mode (<code>--circuit NAME</code>) it reports
+    the operations a circuit uses, how many are shared with other circuits
+    versus unique to it, the providers bound, and their tracked status.
+    Missing metadata is reported as an explicit <code>null</code> with a
+    "not tracked yet" note; the report never fabricates numbers.
+</p>
+
+<p>
+    The report is <strong>advisory only</strong>: it is not a CI gate, does
+    not enforce <code>dsl_policy.json</code> caps, and never fails the tree.
+    When a snapshot is written to
+    <code>version/v8/.cache/reports/model_novelty_latest.json</code>, the
+    architecture-contract dashboard surfaces it as a purely informational
+    section.
+</p>
+
 <h2 id="anatomy">Anatomy of a Kernel Map</h2>
 
 <p>
@@ -2110,7 +2145,7 @@ migration ratchet tracks.</p>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-31</p>
             </div>
         </div>
     </footer>
