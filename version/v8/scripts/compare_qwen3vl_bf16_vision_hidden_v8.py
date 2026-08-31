@@ -609,7 +609,7 @@ def _load_processor_planar(
 
 def _literal_call_arg(operation: dict[str, Any], name: str) -> int | None:
     for argument in operation.get("args", []):
-        if str(argument.get("name", "")).lower() != name.lower():
+        if str(argument.get("name", "")) != name:
             continue
         expression = str(argument.get("expr", "")).strip()
         try:
@@ -920,7 +920,7 @@ def main(argv: list[str] | None = None) -> int:
                 "torch_path": str(torch_path),
                 "shape": torch_shape,
                 "performance": {
-                    "scope": "cumulative_from_encoder_entry",
+                    "scope": "isolated_process_through_checkpoint",
                     "wall_sec": ck_wall_sec,
                     "cpu_sec": ck_cpu_sec,
                     "average_core_equivalents": average_cores,

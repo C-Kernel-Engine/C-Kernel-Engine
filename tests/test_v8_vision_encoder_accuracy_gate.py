@@ -91,6 +91,9 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
         }
         self.assertEqual(module._operation_output_elements(operation), 3657 * 2048)
         self.assertIsNone(module._operation_output_elements({"args": [{"name": "M", "expr": "rows"}]}))
+        self.assertIsNone(
+            module._operation_output_elements({"args": [{"name": "N", "expr": "2048"}]})
+        )
 
     def test_elementwise_checkpoint_extent_comes_from_call_abi(self) -> None:
         spec = importlib.util.spec_from_file_location(
@@ -171,6 +174,13 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
                 )
             np.testing.assert_array_equal(captured, np.arange(4, dtype=np.float32))
             self.assertNotIn("CK_STOP_OP", __import__("os").environ)
+
+    def test_performance_scope_does_not_claim_kernel_only_measurement(self) -> None:
+        script = (
+            ROOT / "version/v8/scripts/compare_qwen3vl_bf16_vision_hidden_v8.py"
+        ).read_text()
+        self.assertIn('"scope": "isolated_process_through_checkpoint"', script)
+        self.assertNotIn('"scope": "cumulative_from_encoder_entry"', script)
 
     def test_torch_checkpoint_capture_releases_model_before_ck_workers(self) -> None:
         spec = importlib.util.spec_from_file_location(
