@@ -473,6 +473,70 @@ class AudioEncoderContractTests(unittest.TestCase):
                 call_args = {arg["name"]: arg for arg in call["args"]}
                 self.assertEqual(call_args["A"]["buffer_ref"], "embedded_input")
 
+    def test_projection_input_requires_an_exact_circuit_declaration(self):
+        manifest = _make_audio_encoder_manifest()
+        body = manifest["template"]["block_types"]["audio_encoder"]["body"]["ops"]
+        q_proj = next(row for row in body if row.get("op") == "q_proj")
+        del q_proj["graph_slots"]["inputs"]["A"]
+
+        with self.assertRaisesRegex(RuntimeError, "omits required input ports"):
+            build_ir.build_ir1_direct(
+                manifest,
+                ROOT / "tests" / "audio_encoder_manifest.synthetic.json",
+                mode="prefill",
+            )
+
+    def test_every_projection_circuit_declares_semantic_input(self):
+        projection_ops = {
+            "q_proj",
+            "q_gate_proj",
+            "k_proj",
+            "v_proj",
+            "recurrent_qkv_proj",
+            "recurrent_gate_proj",
+            "recurrent_alpha_proj",
+            "recurrent_beta_proj",
+            "mamba_in_proj",
+        }
+
+        for circuit_path in sorted((V8 / "circuits").glob("*.json")):
+            circuit = resolver.load_json(circuit_path)
+            defaults = {}
+            parent = circuit.get("extends")
+            if parent:
+                parent_doc = resolver.load_json(V8 / "circuits" / f"{parent}.json")
+                defaults.update(parent_doc.get("projection_inputs", {}))
+            defaults.update(circuit.get("projection_inputs", {}))
+
+            def inspect(value):
+                if isinstance(value, dict):
+                    op = value.get("op")
+                    if op in projection_ops:
+                        local = value.get("graph_slots", {}).get("inputs", {})
+                        declared = local or defaults.get(op, {})
+                        self.assertTrue(
+                            declared,
+                            f"{circuit_path.name}: {op} must declare an input port",
+                        )
+                    for nested in value.values():
+                        inspect(nested)
+                elif isinstance(value, list):
+                    for nested in value:
+                        if isinstance(nested, str) and nested in projection_ops:
+                            self.assertTrue(
+                                defaults.get(nested, {}).get("x"),
+                                f"{circuit_path.name}: {nested} must declare semantic input x",
+                            )
+                        if nested == "qkv_proj":
+                            for split_op in ("q_proj", "k_proj", "v_proj"):
+                                self.assertTrue(
+                                    defaults.get(split_op, {}).get("x"),
+                                    f"{circuit_path.name}: qkv_proj must declare {split_op}",
+                                )
+                        inspect(nested)
+
+            inspect(circuit)
+
     def test_encoder_only_codegen_contract_is_capability_scoped_and_fail_closed(self):
         manifest = _make_audio_encoder_manifest()
         config = copy.deepcopy(manifest["config"])

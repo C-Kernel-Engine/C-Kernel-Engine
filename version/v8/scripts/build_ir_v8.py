@@ -12417,55 +12417,82 @@ def generate_ir_lower_2(
             # gemv_q5_k consumes FP32 activations, while layer_input is also reused
             # as the Q8 scratch for quantize_input_0 on this layout.
             needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
-            default_buf_name = "layer_input" if needs_q8_input else "embedded_input"
-            default_buf = activation_buffers.get(default_buf_name)
 
-            for input_name, input_info in ir_op.get("inputs", {}).items():
-                # Skip weight inputs
-                if input_name in ir_op.get("weights", {}):
-                    continue
-
-                # Use the planner/declared dataflow slot for both Q8 and FP32/BF16
-                # paths.  Older code forced FP32 kernels back to embedded_input,
-                # bypassing block_rmsnorm for safetensors models.
-                dataflow_name = {"A": "x", "x_q8": "x", "x": "x", "input": "x"}.get(input_name, input_name)
-                exact_slot = _get_declared_dataflow_slot(
-                    ir_op, "inputs", input_name, input_name
+            # Projection activation ports are circuit ABI, not aliases to infer.
+            # A provider-bound instance can declare A while a provider-independent
+            # circuit declares semantic x. Lowering consumes that exact declaration;
+            # ports such as B remain governed by the weight-binding contract.
+            graph_slots = ir_op.get("graph_slots", {})
+            graph_inputs = (
+                graph_slots.get("inputs", {})
+                if isinstance(graph_slots, dict)
+                else {}
+            )
+            projection_inputs = template_doc.get("projection_inputs", {})
+            if not isinstance(projection_inputs, dict):
+                projection_inputs = {}
+            circuit_projection_inputs = projection_inputs.get(op_type, {})
+            if not isinstance(circuit_projection_inputs, dict):
+                circuit_projection_inputs = {}
+            declared_inputs = graph_inputs or circuit_projection_inputs
+            if not declared_inputs:
+                raise RuntimeError(
+                    "HARD CIRCUIT DATAFLOW FAULT: "
+                    f"circuit={template_doc.get('name', '<embedded>')} "
+                    f"op={op_type} layer={ir_op.get('layer', '<none>')} "
+                    "must declare an exact projection input"
                 )
-                if exact_slot:
-                    planned = get_planned_buffer(op_id, "inputs", input_name)
-                    declared_slot = exact_slot
-                else:
-                    planned = get_planned_buffer(op_id, "inputs", dataflow_name)
-                    if not planned:
-                        planned = get_planned_buffer(op_id, "inputs", input_name)
-                    declared_slot = _get_declared_dataflow_slot(
-                        ir_op, "inputs", dataflow_name, input_name
-                    )
-                if planned:
-                    planner_buf = planned.get("buffer", default_buf_name)
-                    buf_name = _resolve_logical_buffer_name(
-                        planner_buf,
-                        declared_slot or input_info.get("slot"),
-                        activation_buffers,
-                        buffer_name_map,
-                    )
-                    if not needs_q8_input and buf_name == "main_stream_q8":
-                        buf_name = "embedded_input"
-                    buf = activation_buffers.get(buf_name)
-                else:
-                    buf_name = default_buf_name
-                    buf = default_buf
+            for input_name, exact_slot in declared_inputs.items():
+                input_info = ir_op.get("inputs", {}).get(input_name, {})
 
-                if buf:
-                    # Set dtype based on kernel's activation requirement (q8_0 for Q8 kernels, fp32 for FP32 kernels)
-                    act_dtype = "q8_0" if needs_q8_input else "fp32"
-                    lowered_op["activations"][input_name] = {
-                        "buffer": buf_name,
-                        "activation_offset": buf["offset"],
-                        "dtype": input_info.get("dtype", act_dtype),
-                        "ptr_expr": f"activations + {buf['offset']}",
-                    }
+                # Projection ports are circuit ABI, not aliases to infer. In
+                # September 2026, mapping Whisper's declared A port through the
+                # legacy x alias selected an uninitialized main_stream_q8 buffer
+                # and reduced a real transcript to "The". Missing declarations
+                # now fail here so DSL cleanup cannot silently rewire a model.
+                planned = get_planned_buffer(op_id, "inputs", input_name)
+                if not planned:
+                    raise RuntimeError(
+                        "HARD CIRCUIT DATAFLOW FAULT: "
+                        f"circuit={template_doc.get('name', '<embedded>')} "
+                        f"op={op_type} layer={ir_op.get('layer', '<none>')} "
+                        f"planner did not bind exact input port {input_name!r} "
+                        f"to declared slot {exact_slot!r}"
+                    )
+                planner_buf = planned.get("buffer")
+                if not planner_buf:
+                    raise RuntimeError(
+                        "HARD CIRCUIT DATAFLOW FAULT: "
+                        f"circuit={template_doc.get('name', '<embedded>')} "
+                        f"op={op_type} layer={ir_op.get('layer', '<none>')} "
+                        f"planner returned no buffer for exact input port {input_name!r}"
+                    )
+                buf_name = _resolve_logical_buffer_name(
+                    planner_buf,
+                    exact_slot,
+                    activation_buffers,
+                    buffer_name_map,
+                )
+                if not needs_q8_input and buf_name == "main_stream_q8":
+                    buf_name = "embedded_input"
+                buf = activation_buffers.get(buf_name)
+                if not buf:
+                    raise RuntimeError(
+                        "HARD CIRCUIT DATAFLOW FAULT: "
+                        f"circuit={template_doc.get('name', '<embedded>')} "
+                        f"op={op_type} layer={ir_op.get('layer', '<none>')} "
+                        f"declared input port {input_name!r} resolved to unallocated "
+                        f"buffer {buf_name!r}"
+                    )
+
+                # Set dtype based on kernel's activation requirement (q8_0 for Q8 kernels, fp32 for FP32 kernels)
+                act_dtype = "q8_0" if needs_q8_input else "fp32"
+                lowered_op["activations"][input_name] = {
+                    "buffer": buf_name,
+                    "activation_offset": buf["offset"],
+                    "dtype": input_info.get("dtype", act_dtype),
+                    "ptr_expr": f"activations + {buf['offset']}",
+                }
             # Q writes to the template-declared output slot. Standard attention
             # uses q_scratch; Kimi/DeepSeek MLA keeps packed [q_nope|q_pe]
             # in q_scratch for the packed partial-RoPE helper.
