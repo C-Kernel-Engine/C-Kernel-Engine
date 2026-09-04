@@ -673,13 +673,23 @@ class TestV8PrefillCodegen(unittest.TestCase):
                 emitted = codegen_prefill_v8.emit_prefill_op(op, 1, {"embed_dim": 1024})
                 self.assertIn(expected, emitted)
 
-    def test_fp16_cache_batch_copy_targets_physical_cache_before_attention(self) -> None:
+    def test_registered_fp16_cache_batch_store_uses_physical_call_arguments(self) -> None:
         op = {
-            "function": "kv_cache_batch_copy",
-            "op": "kv_cache_batch_copy",
+            "function": "kv_cache_store_batch_f16",
+            "op": "kv_cache_store_batch_f16",
             "layer": 3,
             "section": "body",
-            "args": [],
+            "args": [
+                {"name": "kv_cache_k", "source": "runtime:kv_cache_k_layer_f16", "expr": "K_CACHE"},
+                {"name": "kv_cache_v", "source": "runtime:kv_cache_v_layer_f16", "expr": "V_CACHE"},
+                {"name": "k", "source": "activation:k_src", "expr": "K_SCRATCH"},
+                {"name": "v", "source": "activation:v_src", "expr": "V_SCRATCH"},
+                {"name": "start_pos", "source": "runtime:prefill_start_pos", "expr": "model->pos"},
+                {"name": "num_tokens", "source": "dim:seq_len", "expr": "1034"},
+                {"name": "num_kv_heads", "source": "dim:num_kv_heads", "expr": "8"},
+                {"name": "head_dim", "source": "dim:head_dim", "expr": "64"},
+                {"name": "max_seq_len", "source": "dim:max_seq_len", "expr": "1034"},
+            ],
         }
 
         emitted = codegen_prefill_v8.emit_prefill_op(
@@ -693,11 +703,13 @@ class TestV8PrefillCodegen(unittest.TestCase):
             },
         )
 
-        self.assertIn("uint16_t *kv_cache = (uint16_t*)model->kv_cache_f16;", emitted)
-        self.assertIn("ck_fp32_to_fp16_soft(ks[d])", emitted)
-        self.assertIn("ck_fp32_to_fp16_soft(vs[d])", emitted)
-        self.assertIn("(size_t)prefill_start_pos", emitted)
-        self.assertNotIn("memcpy(", emitted)
+        self.assertIn("kv_cache_store_batch_f16(", emitted)
+        self.assertIn("K_CACHE", emitted)
+        self.assertIn("V_CACHE", emitted)
+        self.assertIn("K_SCRATCH", emitted)
+        self.assertIn("V_SCRATCH", emitted)
+        self.assertIn("prefill_start_pos", emitted)
+        self.assertIn("num_tokens", emitted)
 
     def test_recurrent_prefill_seq_len_args_use_runtime_num_tokens(self) -> None:
         op = {

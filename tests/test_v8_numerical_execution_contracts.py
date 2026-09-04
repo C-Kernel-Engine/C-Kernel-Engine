@@ -578,18 +578,18 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 311)
+        self.assertEqual(report["counts"]["kernel_maps"], 346)
         self.assertEqual(report["counts"]["physical_layout_maps"], 6)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 117)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 66)
+        self.assertEqual(report["counts"]["resolver_governed_maps"], 131)
+        self.assertEqual(report["counts"]["interface_hardened_maps"], 82)
         self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 66
+            report["counts"]["interface_abi_crossvalidated_maps"], 82
         )
-        self.assertEqual(report["counts"]["contract_pending_maps"], 51)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 184)
-        self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 34)
-        self.assertEqual(report["counts"]["selection_managed_maps"], 75)
-        self.assertEqual(report["selection"]["legacy_selection_if_statements"], 62)
+        self.assertEqual(report["counts"]["contract_pending_maps"], 49)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 219)
+        self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 55)
+        self.assertEqual(report["counts"]["selection_managed_maps"], 86)
+        self.assertEqual(report["selection"]["legacy_selection_if_statements"], 61)
         self.assertEqual(report["selection"]["operation_specific_if_statements"], 29)
 
     def test_yarn_init_contracts_resolve_exact_storage_providers(self):
@@ -1224,9 +1224,10 @@ class NumericalExecutionContractTests(unittest.TestCase):
                 self.assertEqual(plan["kernel"]["function"], kernel_id)
                 self.assertEqual(
                     plan["contract"]["semantics"]["compute"]["evaluation_order"],
-                    "ascending_token_grouped_qk_repeat_interleave_group_equals_"
-                    "head_div_heads_per_group_then_avx2_state_update_then_bf16_"
-                    "output_store",
+                    "ascending_token_grouped_qk_repeat_interleave_then_mkl_vml_"
+                    "exp_then_materialized_multiply_pytorch_cpu_vectorized_outer_"
+                    "cascade_sum_then_materialized_state_outer_product_add_then_"
+                    "bf16_output_store",
                 )
 
     def test_qwen35_circuit_resolves_pytorch_bf16_recurrent_qk_l2(self):

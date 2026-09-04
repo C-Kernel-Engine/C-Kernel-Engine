@@ -78,6 +78,15 @@ void rmsnorm_forward_pytorch_bf16_storage(const float *input,
                                           int d_model,
                                           int aligned_embed_dim,
                                           float eps);
+void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
+                                          const float *input,
+                                          const float *gamma,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps);
 
 void rmsnorm_backward(const float *d_output,
                       const float *input,
@@ -365,6 +374,23 @@ void qk_norm_forward_pytorch_bf16_storage(float *q, float *k,
         q, q_gamma, q, NULL,
         num_heads * num_tokens, head_dim, head_dim, eps);
     rmsnorm_forward_pytorch_bf16_storage(
+        k, k_gamma, k, NULL,
+        num_kv_heads * num_tokens, head_dim, head_dim, eps);
+}
+
+void qk_norm_forward_qwen4_pytorch_bf16_storage(float *q, float *k,
+                                                const float *q_gamma,
+                                                const float *k_gamma,
+                                                int num_heads,
+                                                int num_kv_heads,
+                                                int num_tokens,
+                                                int head_dim,
+                                                float eps)
+{
+    rmsnorm_forward_qwen3next_pytorch_bf16_storage(
+        q, q_gamma, q, NULL,
+        num_heads * num_tokens, head_dim, head_dim, eps);
+    rmsnorm_forward_qwen3next_pytorch_bf16_storage(
         k, k_gamma, k, NULL,
         num_kv_heads * num_tokens, head_dim, head_dim, eps);
 }

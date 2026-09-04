@@ -93,7 +93,7 @@ def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
             "transpose_cross_q_to_head_major",
             "transpose_cross_kv_to_head_major",
             "transpose_cross_attn_out_to_token_major",
-            "kv_cache_batch_copy",
+            "kv_cache_store_batch_f32",
             "kv_cache_store_batch_bf16",
             "kv_cache_store_batch_f16",
         }:
@@ -352,98 +352,6 @@ def emit_prefill_op(
         {embed_dim}
     );
     ck_debug_export_hidden(model, -1, "logits", (const float*){output_expr}, VOCAB_SIZE);{dump_code}"""
-
-    if op_type == "kv_cache_batch_copy":
-        # Copy K/V from scratch (head-major after transpose) to KV cache
-        # Scratch layout: [num_kv_heads, num_tokens, head_dim] (compact, head-major)
-        # KV cache layout: [num_kv_heads, max_seq_len, head_dim] (with stride, head-major)
-        layer = op.get("layer", 0)
-        num_kv_heads = op.get("_num_kv_heads", config.get("num_kv_heads", 2))
-        head_dim = op.get("_head_dim", config.get("head_dim", 64))
-        context_len = config.get("context_len", config.get("context_length", 1024))
-        decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
-        decode_uses_fp16_kv = decode_kv_cache_dtype in {"fp16", "f16"}
-        k_offsets = config.get("layer_k_cache_offset") or []
-        v_offsets = config.get("layer_v_cache_offset") or []
-        compact_kv_layout = bool(k_offsets or v_offsets)
-        if (
-            isinstance(k_offsets, list)
-            and layer < len(k_offsets)
-            and k_offsets[layer] is not None
-            and int(k_offsets[layer]) >= 0
-        ):
-            k_base_expr = f"kv_cache + ({int(k_offsets[layer])}ULL*cache_stride)"
-        else:
-            if compact_kv_layout:
-                raise RuntimeError(
-                    f"kv_cache_batch_copy layer {layer} does not own compact K storage"
-                )
-            k_base_expr = f"kv_cache + (1ULL*({layer}*2)*Hkv*cache_stride*D)"
-        if (
-            isinstance(v_offsets, list)
-            and layer < len(v_offsets)
-            and v_offsets[layer] is not None
-            and int(v_offsets[layer]) >= 0
-        ):
-            v_base_expr = f"kv_cache + ({int(v_offsets[layer])}ULL*cache_stride)"
-        else:
-            if compact_kv_layout:
-                raise RuntimeError(
-                    f"kv_cache_batch_copy layer {layer} does not own compact V storage"
-                )
-            v_base_expr = f"kv_cache + (1ULL*({layer}*2+1)*Hkv*cache_stride*D)"
-        if decode_uses_fp16_kv:
-            return f"""    /* Op {seq_idx}: kv_cache_batch_copy layer={layer} */
-    /* Copy K/V from head-major scratch to FP16 KV cache for subsequent decode */
-    {{
-        const int Hkv = {num_kv_heads};
-        const int D = {head_dim};
-        const int cache_stride = {context_len};
-        float *k_scratch = (float*)(model->bump + A_K_SCRATCH);
-        float *v_scratch = (float*)(model->bump + A_V_SCRATCH);
-        uint16_t *kv_cache = (uint16_t*)model->kv_cache_f16;
-        for (int h = 0; h < Hkv; h++) {{
-            uint16_t *k_dst = {k_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D;
-            uint16_t *v_dst = {v_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D;
-            const float *k_src = k_scratch + h*num_tokens*D;
-            const float *v_src = v_scratch + h*num_tokens*D;
-            for (int t = 0; t < num_tokens; ++t) {{
-                uint16_t *kd = k_dst + (size_t)t*D;
-                uint16_t *vd = v_dst + (size_t)t*D;
-                const float *ks = k_src + (size_t)t*D;
-                const float *vs = v_src + (size_t)t*D;
-                for (int d = 0; d < D; ++d) {{
-                    kd[d] = ck_fp32_to_fp16_soft(ks[d]);
-                    vd[d] = ck_fp32_to_fp16_soft(vs[d]);
-                }}
-            }}
-        }}
-    }}"""
-        return f"""    /* Op {seq_idx}: kv_cache_batch_copy layer={layer} */
-    /* Copy K/V from head-major scratch to KV cache for subsequent decode */
-    {{
-        const int Hkv = {num_kv_heads};
-        const int D = {head_dim};
-        const int cache_stride = {context_len};
-        float *k_scratch = (float*)(model->bump + A_K_SCRATCH);
-        float *v_scratch = (float*)(model->bump + A_V_SCRATCH);
-        float *kv_cache = (float*)model->kv_cache;
-        for (int h = 0; h < Hkv; h++) {{
-            /* K: copy from scratch[h, 0:num_tokens, :] to cache[h, 0:num_tokens, :] */
-            /* Scratch is compact: stride = num_tokens, Cache has stride = cache_stride */
-            memcpy(
-                {k_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D,
-                k_scratch + h*num_tokens*D,
-                (size_t)num_tokens * D * sizeof(float)
-            );
-            /* V: copy from scratch[h, 0:num_tokens, :] to cache[h, 0:num_tokens, :] */
-            memcpy(
-                {v_base_expr} + ((size_t)h*cache_stride + (size_t)prefill_start_pos)*D,
-                v_scratch + h*num_tokens*D,
-                (size_t)num_tokens * D * sizeof(float)
-            );
-        }}
-    }}"""
 
     # Handle transpose_kv_to_head_major: convert from [T, Hkv*D] to [Hkv, T, D]
     if op_type == "transpose_cross_q_to_head_major":
@@ -1352,13 +1260,13 @@ def emit_prefill_op(
         )
         _emit_head_major_last(_hidden_arg("q"), "rope_q", _hidden_arg("num_heads") or "NUM_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
         _emit_head_major_last(_hidden_arg("k"), "rope_k", _hidden_arg("num_kv_heads") or "NUM_KV_HEADS", _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM")
-    elif op_type == "attn":
+    elif op_type in ("attn", "qsa_attention"):
         _emit_hidden_full(
             _hidden_arg("out_token", "output", "out", "c", "y"),
             "attn_pregate",
             _hidden_mul(
                 _hidden_arg("rows", "num_tokens") or "num_tokens",
-                _hidden_arg("num_heads") or "NUM_HEADS",
+                _hidden_arg("num_heads", "query_heads") or "NUM_HEADS",
                 _hidden_arg("aligned_head_dim", "head_dim") or "HEAD_DIM",
             ),
         )
@@ -1426,7 +1334,7 @@ def emit_prefill_op(
         _emit_hidden_last(_hidden_arg("output", "out", "x", "y"), "post_ffn_norm", "EMBED_DIM")
     elif op_type == "moe_router":
         width = _hidden_arg("N", "n", "n_experts") or "N_ROUTED_EXPERTS"
-        output = _hidden_arg("C", "output", "out")
+        output = _hidden_arg("C", "output", "out", "y")
         _emit_hidden_full(output, "moe_router_logits", _hidden_mul("num_tokens", width))
         _emit_hidden_last(output, "moe_router_logits", width)
     elif op_type in ("group_limited_topk_router", "full_softmax_topk_router"):
@@ -1440,7 +1348,7 @@ def emit_prefill_op(
             )
         _emit_hidden_full(weights, "moe_routing_weights", _hidden_mul("num_tokens", width))
         _emit_hidden_last(weights, "moe_routing_weights", width)
-    elif op_type == "moe_swiglu_expert_mlp":
+    elif op_type in ("moe_swiglu_expert_mlp", "moe_swiglu_packed_expert_mlp"):
         output = _hidden_arg("output", "out")
         _emit_hidden_full(output, "moe_routed_output", _hidden_mul("num_tokens", "EMBED_DIM"))
         _emit_hidden_last(output, "moe_routed_output", "EMBED_DIM")

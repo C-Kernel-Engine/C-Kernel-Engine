@@ -45,6 +45,11 @@ class V8DSLNightlyRegistrationTests(unittest.TestCase):
         self.assertEqual(yarn_fp32.category, "kernels")
         self.assertEqual(yarn_bf16.category, "bf16")
 
+    def test_flash_numerical_providers_have_a_nightly_target(self) -> None:
+        entry = nightly.MAKE_TARGETS["v8_qwen38_flash_contracts"]
+        self.assertEqual(entry["category"], "parity")
+        self.assertEqual(entry["target"], "test-v8-qwen38-flash-contracts")
+
     def test_cohere_and_laguna_contracts_are_a_visible_nightly_row(self) -> None:
         entry = nightly.MAKE_TARGETS.get("v8_cohere_laguna_contracts")
         self.assertIsNotNone(entry)

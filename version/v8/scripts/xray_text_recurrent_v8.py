@@ -4,6 +4,7 @@ from __future__ import annotations
 """Schedule-preserving X-ray attribution for recurrent text decoders."""
 
 import argparse
+import hashlib
 import json
 import multiprocessing
 import os
@@ -17,8 +18,127 @@ from compare_first_token_logits_v8 import load_ck_logits_segmented
 from decoder_first_token_parity_v8 import _run_llama_capture
 
 
+V8_ROOT = Path(__file__).resolve().parents[1]
+KERNEL_MAPS_DIR = V8_ROOT / "kernel_maps"
+RUNTIME_STAMP_NAME = ".ck_runtime_bundle.json"
+RUNTIME_BUNDLE_SCHEMA = "ck-v8-runtime-bundle-v2"
+RUNTIME_OUTPUT_NAMES = (
+    "libmodel.so",
+    "libckernel_engine.so",
+    "libckernel_tokenizer.so",
+)
+SUPPORTED_RECURRENT_STATE_LAYOUTS = {
+    "head_key_value_contiguous",
+    "head_value_key_contiguous",
+}
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_runtime_provenance(model_dir: Path) -> dict[str, Any]:
+    """Fail closed when X-Ray's runtime binaries are not one stamped bundle."""
+    model_dir = model_dir.resolve()
+    stamp_path = model_dir / RUNTIME_STAMP_NAME
+    if not stamp_path.is_file():
+        raise RuntimeError(
+            "X-Ray runtime provenance check failed: missing "
+            f"{stamp_path}; rebuild through ck_run_v8.py before capture"
+        )
+    try:
+        stamp = json.loads(stamp_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"X-Ray runtime provenance check failed: unreadable {stamp_path}: {exc}"
+        ) from exc
+
+    inputs = stamp.get("inputs")
+    outputs = stamp.get("outputs")
+    if not isinstance(inputs, dict) or not isinstance(outputs, dict):
+        raise RuntimeError(
+            "X-Ray runtime provenance check failed: runtime stamp must contain "
+            f"object-valued inputs and outputs: {stamp_path}"
+        )
+    schema = inputs.get("schema")
+    if schema != RUNTIME_BUNDLE_SCHEMA:
+        raise RuntimeError(
+            "X-Ray runtime provenance check failed: unsupported runtime stamp "
+            f"schema {schema!r}; expected {RUNTIME_BUNDLE_SCHEMA!r}: {stamp_path}"
+        )
+
+    accepted: dict[str, dict[str, Any]] = {}
+    for name in RUNTIME_OUTPUT_NAMES:
+        expected = outputs.get(name)
+        if not isinstance(expected, dict):
+            raise RuntimeError(
+                "X-Ray runtime provenance check failed: stamp has no identity for "
+                f"{name}: {stamp_path}"
+            )
+        path = model_dir / name
+        if not path.is_file():
+            raise RuntimeError(
+                f"X-Ray runtime provenance check failed: missing runtime binary {path}"
+            )
+        actual_size = path.stat().st_size
+        actual_sha256 = _sha256_file(path)
+        expected_size = expected.get("size")
+        expected_sha256 = expected.get("sha256")
+        if actual_size != expected_size or actual_sha256 != expected_sha256:
+            raise RuntimeError(
+                "X-Ray runtime provenance check failed: runtime binary does not "
+                f"match its stamp: {path} "
+                f"(stamped size={expected_size}, sha256={expected_sha256}; "
+                f"actual size={actual_size}, sha256={actual_sha256}); rebuild "
+                "through ck_run_v8.py before capture"
+            )
+        accepted[name] = {
+            "path": str(path),
+            "size": actual_size,
+            "sha256": actual_sha256,
+        }
+
+    linked = inputs.get("linked_libraries")
+    if not isinstance(linked, dict):
+        raise RuntimeError(
+            "X-Ray runtime provenance check failed: stamp has no linked_libraries "
+            f"contract: {stamp_path}"
+        )
+    for link_name, output_name in (
+        ("engine", "libckernel_engine.so"),
+        ("tokenizer", "libckernel_tokenizer.so"),
+    ):
+        linked_identity = linked.get(link_name)
+        linked_sha256 = (
+            linked_identity.get("sha256")
+            if isinstance(linked_identity, dict)
+            else None
+        )
+        runtime_sha256 = accepted[output_name]["sha256"]
+        if linked_sha256 != runtime_sha256:
+            raise RuntimeError(
+                "X-Ray runtime provenance check failed: generated model was linked "
+                f"against {link_name} sha256={linked_sha256}, but the runtime "
+                f"contains {output_name} sha256={runtime_sha256}: {stamp_path}"
+            )
+
+    return {
+        "status": "verified",
+        "schema": schema,
+        "stamp": str(stamp_path),
+        "outputs": accepted,
+    }
+
+
 BOUNDARIES = (
     "attn_norm",
+    "attn_hyper_norm",
+    "attn_hyper_gate",
+    "attn_mixed_input",
     "linear_attn_qkv_mixed",
     "z",
     "conv_output_raw",
@@ -49,6 +169,15 @@ BOUNDARIES = (
     "mlp_up",
     "mlp_swiglu",
     "mlp_down",
+    "after_attn_hyper",
+    "mlp_hyper_norm",
+    "mlp_hyper_gate",
+    "mlp_mixed_input",
+    "moe_router_logits",
+    "moe_routing_weights",
+    "moe_routed_output",
+    "moe_combined_output",
+    "layer_out_hyper",
     "layer_out",
 )
 
@@ -76,6 +205,46 @@ RECURRENT_BOUNDARIES = (
     "layer_out",
 )
 
+HYPER_MOE_RECURRENT_BOUNDARIES = (
+    "attn_hyper_norm",
+    "attn_hyper_gate",
+    "attn_mixed_input",
+    "linear_attn_qkv_mixed",
+    "z",
+    "conv_output_raw",
+    "conv_output_silu",
+    "q_conv_predelta",
+    "k_conv_predelta",
+    "alpha",
+    "gate",
+    "beta",
+    "new_state",
+    "attn_output",
+    "final_output",
+    "linear_attn_out",
+    "after_attn_hyper",
+    "mlp_hyper_norm",
+    "mlp_hyper_gate",
+    "mlp_mixed_input",
+    "moe_router_logits",
+    "moe_routing_weights",
+    "moe_routed_output",
+    "moe_combined_output",
+    "layer_out_hyper",
+)
+
+PLE_HYPER_MOE_RECURRENT_BOUNDARIES = (
+    "ple_key_projected",
+    "ple_value_projected",
+    "ple_key_normed",
+    "ple_query_normed",
+    "ple_gated_value",
+    "ple_conv_normed",
+    "ple_conv_out",
+    "ple_layer_out",
+    *HYPER_MOE_RECURRENT_BOUNDARIES,
+)
+
 FULL_ATTENTION_BOUNDARIES = (
     "attn_norm",
     "q_proj",
@@ -98,10 +267,48 @@ FULL_ATTENTION_BOUNDARIES = (
     "layer_out",
 )
 
+HYPER_MOE_ATTENTION_BOUNDARIES = (
+    "attn_hyper_norm",
+    "attn_hyper_gate",
+    "attn_mixed_input",
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "qk_norm_q",
+    "qk_norm_k",
+    "rope_q",
+    "rope_k",
+    "attn_gate",
+    "attn_pregate",
+    "attn_out",
+    "out_proj",
+    "after_attn_hyper",
+    "mlp_hyper_norm",
+    "mlp_hyper_gate",
+    "mlp_mixed_input",
+    "moe_router_logits",
+    "moe_routing_weights",
+    "moe_routed_output",
+    "moe_combined_output",
+    "layer_out_hyper",
+)
+
 # CKE checkpoint labels describe circuit edges; llama.cpp labels describe graph
 # nodes. Keep that vocabulary translation explicit instead of teaching either
 # backend to guess the other backend's names.
 ORACLE_BOUNDARY_NAMES = {
+    "attn_hyper_norm": "hc_norm",
+    "attn_hyper_gate": "hc_gate",
+    "attn_mixed_input": "hc_mixed",
+    "after_attn_hyper": "hc_combine",
+    "mlp_hyper_norm": "hc_norm",
+    "mlp_hyper_gate": "hc_gate",
+    "mlp_mixed_input": "hc_mixed",
+    "moe_router_logits": "ffn_moe_logits",
+    "moe_routing_weights": "ffn_moe_weights_norm",
+    "moe_routed_output": "ffn_moe_out",
+    "moe_combined_output": "ffn_out",
+    "layer_out_hyper": "l_last",
     "q_proj": "Qcur_full",
     "k_proj": "Kcur",
     "v_proj": "Vcur",
@@ -125,11 +332,18 @@ ORACLE_BOUNDARY_NAMES = {
 ORACLE_BOUNDARY_OCCURRENCES = {
     # Qwen3.5 emits Kcur once after projection and again after RoPE.
     "rope_k": 1,
+    "mlp_hyper_norm": 1,
+    "mlp_hyper_gate": 1,
+    "mlp_mixed_input": 1,
+}
+
+CK_BOUNDARY_NAMES = {
+    "layer_out_hyper": "layer_out",
 }
 
 
 def ck_capture_names(boundaries: Sequence[str]) -> tuple[str, ...]:
-    names = list(boundaries)
+    names = [CK_BOUNDARY_NAMES.get(name, name) for name in boundaries]
     if "mlp_gate" in names or "mlp_up" in names:
         names.append("mlp_gate_up")
     return tuple(dict.fromkeys(names))
@@ -146,10 +360,118 @@ def boundaries_for_layer(config: dict[str, Any], layer: int) -> tuple[str, ...]:
         )
     kind = str(layer_kinds[layer])
     if kind == "recurrent":
+        if int(config.get("hc_count", 1)) > 1 and int(
+            config.get("num_experts", 0)
+        ) > 0:
+            ple_owner_layers = config.get("ple_owner_layers", [])
+            if isinstance(ple_owner_layers, list) and layer in {
+                int(owner) for owner in ple_owner_layers
+            }:
+                return PLE_HYPER_MOE_RECURRENT_BOUNDARIES
+            return HYPER_MOE_RECURRENT_BOUNDARIES
         return RECURRENT_BOUNDARIES
     if kind == "full_attention":
         return FULL_ATTENTION_BOUNDARIES
+    if kind == "sparse_attention":
+        if int(config.get("hc_count", 1)) > 1 and int(
+            config.get("num_experts", 0)
+        ) > 0:
+            return HYPER_MOE_ATTENTION_BOUNDARIES
+        return FULL_ATTENTION_BOUNDARIES
     raise ValueError(f"unsupported X-ray layer kind at layer {layer}: {kind}")
+
+
+def recurrent_state_layout_from_selected_provider(
+    model_dir: Path,
+    config: dict[str, Any],
+    layer: int,
+    *,
+    kernel_maps_dir: Path = KERNEL_MAPS_DIR,
+) -> tuple[str, dict[str, str]]:
+    call_path = model_dir / "lowered_decode_call.json"
+    if not call_path.is_file():
+        layout = str(
+            config.get(
+                "recurrent_state_physical_layout",
+                "head_key_value_contiguous",
+            )
+        )
+        if layout not in SUPPORTED_RECURRENT_STATE_LAYOUTS:
+            raise ValueError(
+                "unsupported recurrent_state_physical_layout: "
+                f"{layout!r}"
+            )
+        return layout, {"source": "config"}
+
+    lowered_call = json.loads(call_path.read_text(encoding="utf-8"))
+    operations = lowered_call.get("operations")
+    if not isinstance(operations, list):
+        raise ValueError(f"call-ready IR has no operations list: {call_path}")
+    candidates = [
+        operation
+        for operation in operations
+        if operation.get("layer") == layer
+        and operation.get("op") == "recurrent_core"
+    ]
+    if len(candidates) != 1:
+        raise ValueError(
+            "recurrent X-Ray requires exactly one selected recurrent_core "
+            f"provider for layer {layer}, found {len(candidates)}"
+        )
+
+    selected = candidates[0]
+    call_abi = selected.get("call_abi")
+    if not isinstance(call_abi, dict) or call_abi.get("owner") != "kernel_map":
+        raise ValueError(
+            "selected recurrent_core provider must have a kernel-map-owned call ABI"
+        )
+    kernel_id = str(call_abi.get("kernel_id", ""))
+    source_file = str(call_abi.get("source_file", ""))
+    if not kernel_id or not source_file or Path(source_file).name != source_file:
+        raise ValueError("selected recurrent_core provider has invalid kernel-map identity")
+    map_path = kernel_maps_dir / source_file
+    if not map_path.is_file():
+        raise ValueError(f"selected recurrent_core kernel map is missing: {map_path}")
+
+    kernel_map = json.loads(map_path.read_text(encoding="utf-8"))
+    if kernel_map.get("id") != kernel_id:
+        raise ValueError(
+            "selected recurrent_core kernel-map identity mismatch: "
+            f"call ABI {kernel_id!r}, map {kernel_map.get('id')!r}"
+        )
+    if kernel_map.get("op") != "gated_deltanet":
+        raise ValueError(
+            "selected recurrent_core provider has incompatible operation class: "
+            f"{kernel_map.get('op')!r}"
+        )
+    function = str(selected.get("function", ""))
+    if kernel_map.get("impl", {}).get("function") != function:
+        raise ValueError(
+            "selected recurrent_core implementation mismatch: "
+            f"call IR {function!r}, map {kernel_map.get('impl', {}).get('function')!r}"
+        )
+
+    state_in = next(
+        (item for item in kernel_map.get("inputs", []) if item.get("name") == "state_in"),
+        None,
+    )
+    state_out = next(
+        (item for item in kernel_map.get("outputs", []) if item.get("name") == "state_out"),
+        None,
+    )
+    input_layout = state_in.get("layout") if isinstance(state_in, dict) else None
+    output_layout = state_out.get("layout") if isinstance(state_out, dict) else None
+    if input_layout != output_layout or output_layout not in SUPPORTED_RECURRENT_STATE_LAYOUTS:
+        raise ValueError(
+            "selected recurrent_core provider must declare matching supported "
+            f"state layouts, got input={input_layout!r}, output={output_layout!r}"
+        )
+    return str(output_layout), {
+        "source": "selected_kernel_map",
+        "kernel_id": kernel_id,
+        "function": function,
+        "source_file": source_file,
+    }
 
 
 @contextmanager
@@ -243,7 +565,7 @@ def classify(
         if (
             row.get("boundary") == "linear_attn_qkv_mixed"
             and previous
-            and previous.get("boundary") == "attn_norm"
+            and previous.get("boundary") in {"attn_norm", "attn_mixed_input"}
             and previous.get("status") == "exact"
         ):
             classification = "PROJECTION_PROVIDER_MISMATCH"
@@ -309,12 +631,42 @@ def _load_ck_row(
     attention_heads: int = 0,
     attention_kv_heads: int = 0,
 ) -> np.ndarray:
+    physical_name = CK_BOUNDARY_NAMES.get(name, name)
     if ck_prefill_mode == "hybrid" and logical_token < prompt_tokens:
-        path = root / f"tok_{0:04d}_layer_{layer:03d}_{name}.f32"
+        token_path = root / (
+            f"tok_{logical_token:04d}_layer_{layer:03d}_{physical_name}.f32"
+        )
+        if token_path.is_file():
+            token_data = np.fromfile(token_path, dtype=np.float32)
+            if name == "new_state":
+                if logical_token != prompt_tokens - 1 or token_data.size != expected_count:
+                    raise ValueError(
+                        "batched CK recurrent state is available only after the final prompt row"
+                    )
+                return token_data
+            if token_data.size == expected_count:
+                return token_data
+            if logical_token != 0:
+                raise ValueError(
+                    f"token-scoped batched CK extent mismatch for {name}: "
+                    f"{token_data.size} != {expected_count}"
+                )
+
+        path = root / f"tok_{0:04d}_layer_{layer:03d}_{physical_name}.f32"
         if not path.is_file() and name in {"mlp_gate", "mlp_up"}:
-            combined_path = root / f"tok_{0:04d}_layer_{layer:03d}_mlp_gate_up.f32"
+            token_combined_path = root / (
+                f"tok_{logical_token:04d}_layer_{layer:03d}_mlp_gate_up.f32"
+            )
+            combined_path = (
+                token_combined_path
+                if token_combined_path.is_file()
+                else root / f"tok_{0:04d}_layer_{layer:03d}_mlp_gate_up.f32"
+            )
             combined = np.fromfile(combined_path, dtype=np.float32)
             combined_width = 2 * expected_count
+            if combined.size == combined_width:
+                offset = 0 if name == "mlp_gate" else expected_count
+                return combined[offset : offset + expected_count]
             if combined.size != prompt_tokens * combined_width:
                 raise ValueError(
                     "batched CK fused gate/up extent mismatch: "
@@ -344,7 +696,9 @@ def _load_ck_row(
             head_dim = expected_count // head_major_heads
             return data.reshape(head_major_heads, prompt_tokens, head_dim).transpose(1, 0, 2)[logical_token].reshape(-1)
         return data.reshape(prompt_tokens, expected_count)[logical_token]
-    path = root / f"tok_{logical_token:04d}_layer_{layer:03d}_{name}.f32"
+    path = root / (
+        f"tok_{logical_token:04d}_layer_{layer:03d}_{physical_name}.f32"
+    )
     data = np.fromfile(path, dtype=np.float32)
     if data.size != expected_count:
         raise ValueError(f"CK extent mismatch for {name}: {data.size} != {expected_count}")
@@ -494,6 +848,60 @@ def _run_isolated_ck_capture(
         )
 
 
+def _validate_reused_oracle_capture(
+    oracle_root: Path,
+    boundaries: Sequence[str],
+    layer: int,
+    physical_token: int,
+) -> Path:
+    for boundary in boundaries:
+        name = ORACLE_BOUNDARY_NAMES.get(boundary, boundary)
+        occurrence = ORACLE_BOUNDARY_OCCURRENCES.get(boundary, 0)
+        checkpoint = oracle_root / (
+            f"{name}-{layer}-token-{physical_token:06d}-occ-{occurrence:03d}.bin"
+        )
+        if checkpoint.is_file() and checkpoint.stat().st_size > 0:
+            return checkpoint
+    raise ValueError(
+        "--reuse-oracle-capture requested but no requested checkpoint exists "
+        f"for layer {layer}, token {physical_token}: {oracle_root}"
+    )
+
+
+def _validate_reused_ck_capture(
+    ck_root: Path,
+    boundaries: Sequence[str],
+    layer: int,
+    logical_token: int,
+) -> Path:
+    for boundary in ck_capture_names(boundaries):
+        checkpoint = ck_root / (
+            f"tok_{logical_token:04d}_layer_{layer:03d}_{boundary}.f32"
+        )
+        if checkpoint.is_file() and checkpoint.stat().st_size > 0:
+            return checkpoint
+    raise ValueError(
+        "--reuse-ck-capture requested but no requested checkpoint exists "
+        f"for layer {layer}, token {logical_token}: {ck_root}"
+    )
+
+
+def _reject_existing_ck_capture(
+    ck_root: Path,
+    boundaries: Sequence[str],
+    layer: int,
+) -> None:
+    for boundary in ck_capture_names(boundaries):
+        matches = tuple(
+            ck_root.glob(f"tok_*_layer_{layer:03d}_{boundary}.f32")
+        )
+        if matches:
+            raise ValueError(
+                "fresh CK capture requested but a checkpoint already exists; "
+                f"use a new capture root or --reuse-ck-capture: {matches[0]}"
+            )
+
+
 def capture_and_analyze(
     model_dir: Path,
     gguf: Path,
@@ -504,7 +912,9 @@ def capture_and_analyze(
     threads: int,
     ck_prefill_mode: str = "sequential",
     reuse_ck_capture: bool = False,
+    reuse_oracle_capture: bool = False,
 ) -> dict[str, Any]:
+    runtime_provenance = validate_runtime_provenance(model_dir)
     source = json.loads(parity_report.read_text(encoding="utf-8"))
     config = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))
     state_size = int(config.get("ssm_state_size", 0))
@@ -518,19 +928,21 @@ def capture_and_analyze(
         raise ValueError("model config must declare a positive key/value head count")
     boundaries = boundaries_for_layer(config, layer)
     physical_ck_boundaries = ck_capture_names(boundaries)
-    recurrent_state_physical_layout = str(
-        config.get(
-            "recurrent_state_physical_layout", "head_key_value_contiguous"
+    if "new_state" in boundaries:
+        (
+            recurrent_state_physical_layout,
+            recurrent_state_layout_provenance,
+        ) = recurrent_state_layout_from_selected_provider(
+            model_dir,
+            config,
+            layer,
         )
-    )
-    if recurrent_state_physical_layout not in {
-        "head_key_value_contiguous",
-        "head_value_key_contiguous",
-    }:
-        raise ValueError(
-            "unsupported recurrent_state_physical_layout: "
-            f"{recurrent_state_physical_layout!r}"
-        )
+    else:
+        recurrent_state_physical_layout = "head_key_value_contiguous"
+        recurrent_state_layout_provenance = {
+            "source": "not_applicable",
+            "reason": "selected layer has no recurrent-state boundary",
+        }
     prompt = [int(token) for token in source["initial_tokens"]]
     full_prefix = [int(token) for token in source["final_prefix"]]
     if full_prefix[: len(prompt)] != prompt:
@@ -544,12 +956,9 @@ def capture_and_analyze(
     )
 
     if reuse_ck_capture:
-        expected = ck_root / f"tok_{0:04d}_layer_{layer:03d}_attn_norm.f32"
-        if not expected.is_file() or expected.stat().st_size <= 0:
-            raise ValueError(
-                f"--reuse-ck-capture requested but checkpoint is missing: {expected}"
-            )
+        _validate_reused_ck_capture(ck_root, boundaries, layer, 0)
     else:
+        _reject_existing_ck_capture(ck_root, boundaries, layer)
         _run_isolated_ck_capture(
             model_dir,
             prompt,
@@ -562,18 +971,32 @@ def capture_and_analyze(
             },
         )
 
-    llama = _run_llama_capture(
-        gguf,
-        generated,
-        ctx_len,
-        20,
-        threads,
-        tokens_before=prompt,
-        prefix_decode_mode="batched",
-        decode_mode="sequential",
-        dump_dir=oracle_root,
-        dump_names=oracle_names,
-    )
+    if reuse_oracle_capture:
+        _validate_reused_oracle_capture(
+            oracle_root,
+            boundaries,
+            layer,
+            len(prompt) - 1,
+        )
+        llama_meta = {
+            "token_count_before": len(prompt),
+            "token_count_after": len(full_prefix),
+            "decode_mode": "sequential",
+        }
+    else:
+        llama = _run_llama_capture(
+            gguf,
+            generated,
+            ctx_len,
+            20,
+            threads,
+            tokens_before=prompt,
+            prefix_decode_mode="batched",
+            decode_mode="sequential",
+            dump_dir=oracle_root,
+            dump_names=oracle_names,
+        )
+        llama_meta = llama["meta"]
     report = analyze_capture(
         ck_root, oracle_root, len(prompt), len(full_prefix), layer, state_size,
         ck_prefill_mode=ck_prefill_mode,
@@ -586,12 +1009,15 @@ def capture_and_analyze(
     report["requested_boundaries"] = list(boundaries)
     report["ck_capture_boundaries"] = list(physical_ck_boundaries)
     report["recurrent_state_physical_layout"] = recurrent_state_physical_layout
+    report["recurrent_state_layout_provenance"] = recurrent_state_layout_provenance
     report["source_parity_report"] = str(parity_report)
     report["capture_root"] = str(capture_root)
+    report["runtime_provenance"] = runtime_provenance
     report["llama_capture"] = {
-        "token_count_before": int(llama["meta"].get("token_count_before", -1)),
-        "token_count_after": int(llama["meta"].get("token_count_after", -1)),
-        "decode_mode": str(llama["meta"].get("decode_mode", "")),
+        "token_count_before": int(llama_meta.get("token_count_before", -1)),
+        "token_count_after": int(llama_meta.get("token_count_after", -1)),
+        "decode_mode": str(llama_meta.get("decode_mode", "")),
+        "reused": bool(reuse_oracle_capture),
     }
     return report
 
@@ -612,12 +1038,18 @@ def main() -> int:
         action="store_true",
         help="Reuse an existing CK capture and run only the llama oracle plus analysis.",
     )
+    ap.add_argument(
+        "--reuse-oracle-capture",
+        action="store_true",
+        help="Reuse an existing llama capture and run only CK plus analysis.",
+    )
     args = ap.parse_args()
     report = capture_and_analyze(
         args.model_dir.resolve(), args.gguf.resolve(), args.parity_report.resolve(),
         args.capture_root.resolve(), int(args.layer), int(args.ctx_len), int(args.threads),
         str(args.ck_prefill_mode),
         bool(args.reuse_ck_capture),
+        bool(args.reuse_oracle_capture),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

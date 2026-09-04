@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
+import json
 import sys
 import tempfile
 import unittest
@@ -20,6 +22,70 @@ SPEC.loader.exec_module(XRAY)
 
 
 class TextRecurrentXRayTests(unittest.TestCase):
+    @staticmethod
+    def _write_runtime_bundle(root: Path, *, linked_engine_hash: str | None = None) -> None:
+        outputs = {}
+        for name, payload in (
+            ("libmodel.so", b"model-runtime"),
+            ("libckernel_engine.so", b"engine-runtime"),
+            ("libckernel_tokenizer.so", b"tokenizer-runtime"),
+        ):
+            path = root / name
+            path.write_bytes(payload)
+            outputs[name] = {
+                "path": str(path),
+                "size": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        stamp = {
+            "inputs": {
+                "schema": XRAY.RUNTIME_BUNDLE_SCHEMA,
+                "linked_libraries": {
+                    "engine": {
+                        "sha256": linked_engine_hash
+                        or outputs["libckernel_engine.so"]["sha256"]
+                    },
+                    "tokenizer": {
+                        "sha256": outputs["libckernel_tokenizer.so"]["sha256"]
+                    },
+                },
+            },
+            "outputs": outputs,
+        }
+        (root / XRAY.RUNTIME_STAMP_NAME).write_text(
+            json.dumps(stamp), encoding="utf-8"
+        )
+
+    def test_runtime_provenance_accepts_one_stamped_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_runtime_bundle(root)
+
+            result = XRAY.validate_runtime_provenance(root)
+
+            self.assertEqual(result["status"], "verified")
+            self.assertEqual(
+                result["outputs"]["libmodel.so"]["sha256"],
+                hashlib.sha256(b"model-runtime").hexdigest(),
+            )
+
+    def test_runtime_provenance_rejects_replaced_model_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_runtime_bundle(root)
+            (root / "libmodel.so").write_bytes(b"manually-recompiled-model")
+
+            with self.assertRaisesRegex(RuntimeError, "does not match its stamp"):
+                XRAY.validate_runtime_provenance(root)
+
+    def test_runtime_provenance_rejects_unpaired_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_runtime_bundle(root, linked_engine_hash="0" * 64)
+
+            with self.assertRaisesRegex(RuntimeError, "was linked against engine"):
+                XRAY.validate_runtime_provenance(root)
+
     def test_boundary_selection_follows_layer_kind(self) -> None:
         config = {"layer_kinds": ["recurrent", "full_attention"]}
         recurrent = XRAY.boundaries_for_layer(config, 0)
@@ -31,6 +97,131 @@ class TextRecurrentXRayTests(unittest.TestCase):
         self.assertNotIn("new_state", attention)
         self.assertIn("layer_out", recurrent)
         self.assertIn("layer_out", attention)
+
+    def test_hyper_moe_recurrent_profile_uses_declared_topology(self) -> None:
+        boundaries = XRAY.boundaries_for_layer(
+            {
+                "arch": "future_hyper_moe",
+                "hc_count": 4,
+                "num_experts": 512,
+                "layer_kinds": ["recurrent"],
+            },
+            0,
+        )
+        self.assertEqual(
+            boundaries[:3],
+            (
+                "attn_hyper_norm",
+                "attn_hyper_gate",
+                "attn_mixed_input",
+            ),
+        )
+        self.assertNotIn("attn_norm", boundaries)
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["attn_hyper_norm"],
+            "hc_norm",
+        )
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["attn_hyper_gate"],
+            "hc_gate",
+        )
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["attn_mixed_input"],
+            "hc_mixed",
+        )
+        self.assertIn("after_attn_hyper", boundaries)
+        self.assertIn("mlp_mixed_input", boundaries)
+        self.assertIn("moe_router_logits", boundaries)
+        self.assertIn("moe_routing_weights", boundaries)
+        self.assertIn("moe_routed_output", boundaries)
+        self.assertIn("moe_combined_output", boundaries)
+        self.assertIn("layer_out_hyper", boundaries)
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_OCCURRENCES["mlp_mixed_input"], 1
+        )
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["layer_out_hyper"], "l_last"
+        )
+        self.assertNotIn("layer_out_hyper", XRAY.ORACLE_BOUNDARY_OCCURRENCES)
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["moe_router_logits"],
+            "ffn_moe_logits",
+        )
+        self.assertEqual(
+            XRAY.ORACLE_BOUNDARY_NAMES["moe_routing_weights"],
+            "ffn_moe_weights_norm",
+        )
+        self.assertEqual(
+            XRAY.ck_capture_names(("layer_out_hyper",)), ("layer_out",)
+        )
+
+    def test_ple_hyper_moe_profile_observes_ple_before_hyper_mix(self) -> None:
+        boundaries = XRAY.boundaries_for_layer(
+            {
+                "hc_count": 4,
+                "num_experts": 512,
+                "layer_kinds": ["recurrent", "recurrent"],
+                "ple_owner_layers": [1],
+            },
+            1,
+        )
+        self.assertEqual(
+            boundaries[:8],
+            (
+                "ple_key_projected",
+                "ple_value_projected",
+                "ple_key_normed",
+                "ple_query_normed",
+                "ple_gated_value",
+                "ple_conv_normed",
+                "ple_conv_out",
+                "ple_layer_out",
+            ),
+        )
+        self.assertEqual(boundaries[8], "attn_hyper_norm")
+
+    def test_ple_profile_is_not_applied_to_other_recurrent_layers(self) -> None:
+        boundaries = XRAY.boundaries_for_layer(
+            {
+                "hc_count": 4,
+                "num_experts": 512,
+                "layer_kinds": ["recurrent", "recurrent"],
+                "ple_owner_layers": [1],
+            },
+            0,
+        )
+        self.assertNotIn("ple_gated_value", boundaries)
+
+    def test_sparse_attention_profile_observes_hyper_attention_and_moe(self) -> None:
+        boundaries = XRAY.boundaries_for_layer(
+            {
+                "hc_count": 4,
+                "num_experts": 512,
+                "layer_kinds": ["sparse_attention"],
+            },
+            0,
+        )
+        self.assertEqual(
+            boundaries[:3],
+            (
+                "attn_hyper_norm",
+                "attn_hyper_gate",
+                "attn_mixed_input",
+            ),
+        )
+        self.assertIn("q_proj", boundaries)
+        self.assertIn("rope_q", boundaries)
+        self.assertIn("attn_pregate", boundaries)
+        self.assertIn("moe_routing_weights", boundaries)
+        self.assertIn("layer_out_hyper", boundaries)
+        self.assertNotIn("new_state", boundaries)
+
+    def test_sparse_attention_without_hyper_moe_uses_attention_profile(self) -> None:
+        boundaries = XRAY.boundaries_for_layer(
+            {"layer_kinds": ["sparse_attention"]},
+            0,
+        )
+        self.assertEqual(boundaries, XRAY.FULL_ATTENTION_BOUNDARIES)
 
     def test_boundary_selection_rejects_unknown_or_missing_layer_kind(self) -> None:
         with self.assertRaisesRegex(ValueError, "layer_kinds"):
@@ -82,13 +273,14 @@ class TextRecurrentXRayTests(unittest.TestCase):
             root = Path(td)
             model = root / "model"
             model.mkdir()
+            self._write_runtime_bundle(model)
             (model / "config.json").write_text(
                 '{"ssm_state_size": 4, "num_heads": 2, "num_kv_heads": 1, '
                 '"layer_kinds": ["recurrent"]}'
             )
             parity = root / "parity.json"
             parity.write_text('{"initial_tokens": [1], "final_prefix": [1]}')
-            with self.assertRaisesRegex(ValueError, "checkpoint is missing"):
+            with self.assertRaisesRegex(ValueError, "no requested checkpoint"):
                 XRAY.capture_and_analyze(
                     model,
                     root / "model.gguf",
@@ -100,6 +292,117 @@ class TextRecurrentXRayTests(unittest.TestCase):
                     "hybrid",
                     True,
                 )
+
+    def test_reuse_ck_capture_accepts_profile_specific_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            checkpoint = root / "tok_0000_layer_000_attn_mixed_input.f32"
+            checkpoint.write_bytes(b"\x00\x00\x00\x00")
+            self.assertEqual(
+                XRAY._validate_reused_ck_capture(
+                    root,
+                    ("attn_hyper_norm", "attn_mixed_input"),
+                    layer=0,
+                    logical_token=0,
+                ),
+                checkpoint,
+            )
+
+    def test_fresh_ck_capture_rejects_stale_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            checkpoint = root / "tok_0000_layer_003_attn_mixed_input.f32"
+            checkpoint.write_bytes(b"\x00\x00\x00\x00")
+            with self.assertRaisesRegex(ValueError, "checkpoint already exists"):
+                XRAY._reject_existing_ck_capture(
+                    root,
+                    ("attn_hyper_norm", "attn_mixed_input"),
+                    layer=3,
+                )
+
+    def test_fresh_ck_capture_accepts_unrelated_layer_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tok_0000_layer_002_attn_mixed_input.f32").write_bytes(
+                b"\x00\x00\x00\x00"
+            )
+            XRAY._reject_existing_ck_capture(
+                root,
+                ("attn_hyper_norm", "attn_mixed_input"),
+                layer=3,
+            )
+
+    def test_reuse_oracle_capture_requires_requested_layer_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with self.assertRaisesRegex(ValueError, "no requested checkpoint"):
+                XRAY._validate_reused_oracle_capture(
+                    root,
+                    ("linear_attn_qkv_mixed",),
+                    layer=3,
+                    physical_token=7,
+                )
+
+            checkpoint = (
+                root / "linear_attn_qkv_mixed-3-token-000007-occ-000.bin"
+            )
+            checkpoint.write_bytes(b"\x00\x00\x00\x00")
+            self.assertEqual(
+                XRAY._validate_reused_oracle_capture(
+                    root,
+                    ("linear_attn_qkv_mixed",),
+                    layer=3,
+                    physical_token=7,
+                ),
+                checkpoint,
+            )
+
+    def test_reuse_oracle_capture_skips_llama_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            model = root / "model"
+            model.mkdir()
+            self._write_runtime_bundle(model)
+            (model / "config.json").write_text(
+                '{"ssm_state_size": 4, "num_heads": 2, "num_kv_heads": 1, '
+                '"layer_kinds": ["recurrent"]}'
+            )
+            parity = root / "parity.json"
+            parity.write_text('{"initial_tokens": [1], "final_prefix": [1]}')
+            ck_root = root / "captures" / "ck"
+            ck_root.mkdir(parents=True)
+            (ck_root / "tok_0000_layer_000_attn_norm.f32").write_bytes(
+                b"\x00\x00\x00\x00"
+            )
+            oracle_root = root / "captures" / "llama"
+            oracle_root.mkdir()
+            (
+                oracle_root
+                / "linear_attn_qkv_mixed-0-token-000000-occ-000.bin"
+            ).write_bytes(b"\x00\x00\x00\x00")
+
+            with mock.patch.object(
+                XRAY, "_run_llama_capture"
+            ) as run_llama, mock.patch.object(
+                XRAY,
+                "analyze_capture",
+                return_value={"first_divergence": None},
+            ):
+                report = XRAY.capture_and_analyze(
+                    model,
+                    root / "model.gguf",
+                    parity,
+                    root / "captures",
+                    0,
+                    16,
+                    1,
+                    "hybrid",
+                    True,
+                    True,
+                )
+
+            run_llama.assert_not_called()
+            self.assertTrue(report["llama_capture"]["reused"])
 
     def test_named_axis_state_transform_prevents_flat_layout_false_positive(self) -> None:
         ck = np.arange(2 * 128 * 128, dtype=np.float32).reshape(2, 128, 128)
@@ -132,6 +435,102 @@ class TextRecurrentXRayTests(unittest.TestCase):
                 recurrent_state_physical_layout="ambiguous",
             )
 
+    def test_selected_provider_owns_recurrent_state_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            model = root / "model"
+            maps = root / "maps"
+            model.mkdir()
+            maps.mkdir()
+            (model / "lowered_decode_call.json").write_text(
+                json.dumps({
+                    "operations": [{
+                        "layer": 0,
+                        "op": "recurrent_core",
+                        "function": "grouped_forward",
+                        "call_abi": {
+                            "owner": "kernel_map",
+                            "kernel_id": "grouped",
+                            "source_file": "grouped.json",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            (maps / "grouped.json").write_text(
+                json.dumps({
+                    "id": "grouped",
+                    "op": "gated_deltanet",
+                    "inputs": [{
+                        "name": "state_in",
+                        "layout": "head_value_key_contiguous",
+                    }],
+                    "outputs": [{
+                        "name": "state_out",
+                        "layout": "head_value_key_contiguous",
+                    }],
+                    "impl": {"function": "grouped_forward"},
+                }),
+                encoding="utf-8",
+            )
+
+            layout, provenance = XRAY.recurrent_state_layout_from_selected_provider(
+                model,
+                {"recurrent_state_physical_layout": "head_key_value_contiguous"},
+                0,
+                kernel_maps_dir=maps,
+            )
+
+            self.assertEqual(layout, "head_value_key_contiguous")
+            self.assertEqual(provenance["kernel_id"], "grouped")
+
+    def test_selected_provider_layout_validation_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            model = root / "model"
+            maps = root / "maps"
+            model.mkdir()
+            maps.mkdir()
+            (model / "lowered_decode_call.json").write_text(
+                json.dumps({
+                    "operations": [{
+                        "layer": 0,
+                        "op": "recurrent_core",
+                        "function": "wrong_forward",
+                        "call_abi": {
+                            "owner": "kernel_map",
+                            "kernel_id": "wrong",
+                            "source_file": "wrong.json",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            (maps / "wrong.json").write_text(
+                json.dumps({
+                    "id": "wrong",
+                    "op": "memcpy",
+                    "inputs": [{
+                        "name": "state_in",
+                        "layout": "head_value_key_contiguous",
+                    }],
+                    "outputs": [{
+                        "name": "state_out",
+                        "layout": "head_value_key_contiguous",
+                    }],
+                    "impl": {"function": "wrong_forward"},
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "incompatible operation class"):
+                XRAY.recurrent_state_layout_from_selected_provider(
+                    model,
+                    {},
+                    0,
+                    kernel_maps_dir=maps,
+                )
+
     def test_exact_input_then_projection_difference_is_provider_mismatch(self) -> None:
         schedules = {"ck": "sequential_decode", "oracle_prefix": "batched", "oracle_decode": "sequential"}
         rows = [
@@ -141,6 +540,16 @@ class TextRecurrentXRayTests(unittest.TestCase):
         result = XRAY.classify(rows, schedules)
         self.assertEqual(result["classification"], "PROJECTION_PROVIDER_MISMATCH")
         self.assertEqual(result["previous_exact_boundary"], "attn_norm")
+
+    def test_exact_hyper_mixed_input_then_projection_difference_is_provider_mismatch(self) -> None:
+        schedules = {"ck": "sequential_decode", "oracle_prefix": "batched", "oracle_decode": "sequential"}
+        rows = [
+            {"logical_token": 0, "layer": 0, "boundary": "attn_mixed_input", "status": "exact"},
+            {"logical_token": 0, "layer": 0, "boundary": "linear_attn_qkv_mixed", "status": "different", "max_abs_diff": 0.0047},
+        ]
+        result = XRAY.classify(rows, schedules)
+        self.assertEqual(result["classification"], "PROJECTION_PROVIDER_MISMATCH")
+        self.assertEqual(result["previous_exact_boundary"], "attn_mixed_input")
 
     def test_missing_checkpoint_does_not_hide_previous_exact_boundary(self) -> None:
         schedules = {"ck": "sequential_decode", "oracle_prefix": "batched", "oracle_decode": "sequential"}
@@ -198,6 +607,29 @@ class TextRecurrentXRayTests(unittest.TestCase):
             row = XRAY._load_ck_row(root, "z", 0, 2, 3, 4, "hybrid")
             np.testing.assert_array_equal(row, values[2])
 
+    def test_hybrid_ck_prompt_rows_prefer_token_scoped_granular_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            expected = np.arange(4, dtype=np.float32) + 20
+            expected.tofile(root / "tok_0002_layer_000_z.f32")
+            np.arange(12, dtype=np.float32).tofile(
+                root / "tok_0000_layer_000_z.f32"
+            )
+
+            row = XRAY._load_ck_row(root, "z", 0, 2, 3, 4, "hybrid")
+
+            np.testing.assert_array_equal(row, expected)
+
+    def test_hybrid_ck_token_scoped_extent_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            np.arange(3, dtype=np.float32).tofile(
+                root / "tok_0002_layer_000_z.f32"
+            )
+
+            with self.assertRaisesRegex(ValueError, "token-scoped batched CK extent"):
+                XRAY._load_ck_row(root, "z", 0, 2, 3, 4, "hybrid")
+
     def test_hybrid_ck_gate_and_up_rows_are_reconstructed_from_fused_capture(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -209,6 +641,18 @@ class TextRecurrentXRayTests(unittest.TestCase):
 
             np.testing.assert_array_equal(gate, values[1, :4])
             np.testing.assert_array_equal(up, values[1, 4:])
+
+    def test_hybrid_ck_gate_and_up_use_token_scoped_fused_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            values = np.arange(8, dtype=np.float32)
+            values.tofile(root / "tok_0001_layer_000_mlp_gate_up.f32")
+
+            gate = XRAY._load_ck_row(root, "mlp_gate", 0, 1, 3, 4, "hybrid")
+            up = XRAY._load_ck_row(root, "mlp_up", 0, 1, 3, 4, "hybrid")
+
+            np.testing.assert_array_equal(gate, values[:4])
+            np.testing.assert_array_equal(up, values[4:])
 
     def test_hybrid_ck_fused_gate_up_extent_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as td:

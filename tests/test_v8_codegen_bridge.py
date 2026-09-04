@@ -221,6 +221,12 @@ def _make_qwen3vl_decoder_manifest() -> dict:
 
 
 class V8CodegenBridgeTests(unittest.TestCase):
+    def test_explicit_batched_prefill_contract_overrides_safe_decode_default(self) -> None:
+        decode = {"config": {"prefill_policy": "sequential_decode"}}
+        prefill = {"config": {"prefill_policy": "batched"}}
+
+        self.assertTrue(codegen_v8._uses_generated_batched_prefill(decode, prefill))
+
     def test_sequential_decode_policy_omits_unused_batched_prefill(self) -> None:
         manifest = _make_qwen3_decoder_manifest()
         manifest["config"]["prefill_policy"] = "sequential_decode"
@@ -721,7 +727,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertIn("ck_multimodal_prefill_deepstack_add(model, 0, num_tokens);", text)
             self.assertIn("else if (debug_mlp_down_fp32 && ck_debug_mlp_down_fp32_input != NULL) {", text)
             self.assertIn("gemm_nt_q6_k(\n            ck_debug_mlp_down_fp32_input,", text)
-            self.assertIn("gemm_nt_q6_k_q8_k(\n            (const void*)(model->bump + A_LAYER_INPUT),", text)
+            self.assertIn("gemm_nt_q6_k_q8_k(\n            (const void*)(model->bump + A_MAIN_STREAM_Q8),", text)
             self.assertIn('const char *bridge_fp32_env = getenv("CK_V8_MULTIMODAL_PREFILL_FP32");', text)
             self.assertIn("int bridge_force_fp32 = bridge_fp32_env ? (atoi(bridge_fp32_env) != 0) : 0;", text)
             self.assertIn("if (ck_multimodal_prefill_bridge_is_active() && bridge_force_fp32) {", text)

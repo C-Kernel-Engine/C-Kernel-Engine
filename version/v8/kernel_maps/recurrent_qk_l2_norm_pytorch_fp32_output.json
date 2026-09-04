@@ -1,0 +1,52 @@
+{
+  "id": "recurrent_qk_l2_norm_pytorch_fp32_output",
+  "op": "recurrent_qk_l2_norm",
+  "operation_interface": "recurrent_qk_l2_norm.fp32_inplace.v1",
+  "variant": "pytorch_fp32_vector_reduce",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["R", "Q"], "layout": "token_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["R", "K"], "layout": "token_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["R", "Q"], "layout": "token_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:q"},
+    {"name": "k", "dtype": "fp32", "shape": ["R", "K"], "layout": "token_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:k"}
+  ],
+  "scratch": [],
+  "dims": ["R", "Q", "K", "D"],
+  "params": [{"name": "eps", "dtype": "float32"}],
+  "impl": {
+    "function": "recurrent_qk_l2_norm_pytorch_fp32_output",
+    "c_declaration": "void recurrent_qk_l2_norm_pytorch_fp32_output(float *q, float *k, int rows, int q_dim, int k_dim, int head_dim, float eps);",
+    "sources": ["src/kernels/recurrent_qk_norm_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f"], "compile_flags": ["-mavx512f"]},
+      {"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}
+    ]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "recurrent_qk_l2_pytorch_fp32_reduce_fp32_output",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "recurrent_qk_l2_norm_pytorch_fp32_output",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {"runtime": "serial", "work_partition": ["independent_rows", "independent_heads"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+    },
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "hierarchical_cascade", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "q", "source": "activation:q", "cast": "float*", "ports": ["input:q", "output:q"]},
+    {"name": "k", "source": "activation:k", "cast": "float*", "ports": ["input:k", "output:k"]},
+    {"name": "rows", "source": "runtime:seq_len"},
+    {"name": "q_dim", "source": "dim:q_dim"},
+    {"name": "k_dim", "source": "dim:k_dim"},
+    {"name": "head_dim", "source": "dim:recurrent_head_dim"},
+    {"name": "eps", "source": "dim:rms_eps"}
+  ]},
+  "tests": {"parity": ["PyTorch CPU FP32 l2norm at Qwen4-Exp compact Q/K head width 128."]}
+}

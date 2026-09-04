@@ -158,7 +158,14 @@
         "ops_by_kind": {
           "mamba": [
             "block_rmsnorm",
-            "mamba_in_proj",
+            {
+              "op": "mamba_in_proj",
+              "graph_slots": {
+                "inputs": {
+                  "x": "layer_input"
+                }
+              }
+            },
             "mamba_in_proj_split",
             "mamba_conv1d_silu",
             "mamba_dt_softplus",
@@ -169,16 +176,44 @@
           ],
           "attention": [
             "block_rmsnorm",
-            "q_proj",
-            "k_proj",
-            "v_proj",
+            {
+              "op": "q_proj",
+              "graph_slots": {
+                "inputs": {
+                  "x": "layer_input"
+                }
+              }
+            },
+            {
+              "op": "k_proj",
+              "graph_slots": {
+                "inputs": {
+                  "x": "layer_input"
+                }
+              }
+            },
+            {
+              "op": "v_proj",
+              "graph_slots": {
+                "inputs": {
+                  "x": "layer_input"
+                }
+              }
+            },
             "attn",
             "out_proj",
             "residual_add"
           ],
           "mlp": [
             "block_rmsnorm",
-            "mlp_up",
+            {
+              "op": "mlp_up",
+              "graph_slots": {
+                "inputs": {
+                  "x": "layer_input"
+                }
+              }
+            },
             "relu2",
             "mlp_down",
             "residual_add"

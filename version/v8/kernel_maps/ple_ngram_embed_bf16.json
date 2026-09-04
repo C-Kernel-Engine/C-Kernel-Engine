@@ -1,0 +1,50 @@
+{
+  "id": "ple_ngram_embed_bf16",
+  "op": "ple_ngram_embed",
+  "operation_interface": "ple.ngram_embedding.bf16.v1",
+  "variant": "bf16_storage",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "bf16", "activation": "i32", "output": "bf16"},
+  "inputs": [
+    {"name":"token_ids","dtype":"i32","shape":["R"],"layout":"contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"token_state_in","dtype":"fp32","shape":["N-1"],"layout":"contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights": [
+    {"name":"embedding","dtype":"bf16","shape":["V","E"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"layer_multipliers","dtype":"i64","shape":["N"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"head_offsets","dtype":"i64","shape":["G"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"head_vocab_sizes","dtype":"i64","shape":["G"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name":"embedding_output","dtype":"fp32","shape":["R","G*E"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"},
+    {"name":"token_state_out","dtype":"fp32","shape":["N-1"],"layout":"contiguous","access":"write","storage_class":"activation","consumption":"required"}
+  ],
+  "scratch": [],
+  "dims": ["R","N","P","E","G","V"],
+  "params": ["eos_token_id"],
+  "parallelization": {"supported":["row"],"preferred":{"prefill":"row","decode":"row"},"strategies":[{"name":"row","partition_dim":"R","param_style":"range","range":{"min_chunk":1}}]},
+  "impl": {
+    "function":"qwen4_ple_ngram_embed_bf16",
+    "c_declaration":"void qwen4_ple_ngram_embed_bf16(const int32_t *token_ids, const uint16_t *embedding, const int64_t *layer_multipliers, const int64_t *head_offsets, const int64_t *head_vocab_sizes, float *output, const float *token_state_in, float *token_state_out, int rows, int ngram_size, int heads_per_ngram, int head_dim, int eos_token_id, int position);",
+    "sources":["src/kernels/qwen4_exp_kernels.c"],
+    "variants":[{"name":"reference","requires":[],"compile_flags":[]}]
+  },
+  "call_abi": {"version":1,"params":[
+    {"name":"token_ids","source":"activation:token_ids","cast":"const int32_t*","ports":["input:token_ids"]},
+    {"name":"embedding","source":"weight:embedding","cast":"const uint16_t*","ports":["weight:embedding"]},
+    {"name":"layer_multipliers","source":"weight:layer_multipliers","cast":"const int64_t*","ports":["weight:layer_multipliers"]},
+    {"name":"head_offsets","source":"weight:head_offsets","cast":"const int64_t*","ports":["weight:head_offsets"]},
+    {"name":"head_vocab_sizes","source":"weight:head_vocab_sizes","cast":"const int64_t*","ports":["weight:head_vocab_sizes"]},
+    {"name":"output","source":"output:embedding_output","cast":"float*","ports":["output:embedding_output"]},
+    {"name":"token_state_in","source":"activation:token_state_in","cast":"const float*","ports":["input:token_state_in"]},
+    {"name":"token_state_out","source":"output:token_state_out","cast":"float*","ports":["output:token_state_out"]},
+    {"name":"rows","source":"runtime:seq_len"},
+    {"name":"ngram_size","source":"dim:ngram_size"},
+    {"name":"heads_per_ngram","source":"dim:heads_per_ngram"},
+    {"name":"head_dim","source":"dim:ple_ngram_head_dim"},
+    {"name":"eos_token_id","source":"dim:ple_eos_token_id"},
+    {"name":"position","source":"runtime:pos"}
+  ]},
+  "tests": {"unit":["unittest/test_qwen4_exp_ple_bf16.py"],"parity":[{"kind":"pytorch","command":".venv/bin/python unittest/test_qwen4_exp_ple_bf16.py","tolerance":"bf16_exact"}]}
+}

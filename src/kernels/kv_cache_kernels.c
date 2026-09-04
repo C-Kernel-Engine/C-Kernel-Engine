@@ -220,6 +220,38 @@ void kv_cache_store_bf16(uint16_t *__restrict kv_cache_k,
     }
 }
 
+void kv_cache_store_batch_f32(float *__restrict kv_cache_k,
+                              float *__restrict kv_cache_v,
+                              const float *__restrict k,
+                              const float *__restrict v,
+                              int start_pos,
+                              int num_tokens,
+                              int num_kv_heads,
+                              int head_dim,
+                              int max_seq_len)
+{
+    if (!kv_cache_k || !kv_cache_v || !k || !v ||
+        start_pos < 0 || num_tokens <= 0 || num_kv_heads <= 0 ||
+        head_dim <= 0 || max_seq_len <= 0 ||
+        start_pos > max_seq_len - num_tokens) {
+        return;
+    }
+
+    const size_t compact_head_stride = (size_t)num_tokens * (size_t)head_dim;
+    const size_t cache_head_stride = (size_t)max_seq_len * (size_t)head_dim;
+    const size_t token_bytes = (size_t)num_tokens * (size_t)head_dim * sizeof(float);
+    for (int h = 0; h < num_kv_heads; ++h) {
+        const float *k_head = k + (size_t)h * compact_head_stride;
+        const float *v_head = v + (size_t)h * compact_head_stride;
+        float *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride
+                            + (size_t)start_pos * (size_t)head_dim;
+        float *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride
+                            + (size_t)start_pos * (size_t)head_dim;
+        memcpy(k_head_cache, k_head, token_bytes);
+        memcpy(v_head_cache, v_head, token_bytes);
+    }
+}
+
 void kv_cache_store_batch_f16(uint16_t *__restrict kv_cache_k,
                               uint16_t *__restrict kv_cache_v,
                               const float *__restrict k,

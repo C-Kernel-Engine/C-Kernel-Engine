@@ -1,0 +1,46 @@
+{
+  "id":"moe_swiglu_packed_expert_forward_bf16",
+  "op":"moe_swiglu_packed_expert_mlp",
+  "operation_interface":"moe.swiglu_packed_expert.bf16.v1",
+  "contract_schema_version":1,
+  "variant":"packed_gate_up_bf16_weight_fp32_activation",
+  "modes":{"inference":true,"training":false,"backward":false},
+  "quant":{"weight":"bf16","activation":"fp32","output":"fp32"},
+  "inputs":[
+    {"name":"hidden","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"indices","dtype":"i32","shape":["R","K"],"layout":"token_expert_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"routing_weights","dtype":"fp32","shape":["R","K"],"layout":"token_expert_contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights":[
+    {"name":"expert_gate_up","dtype":"bf16","shape":["E","2*I","H"],"layout":"expert_row_major_contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"expert_down","dtype":"bf16","shape":["E","H","I"],"layout":"expert_row_major_contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "outputs":[{"name":"output","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}],
+  "scratch":[],
+  "dims":["R","H","I","E","K"],
+  "parallelization":{"supported":["serial"],"preferred":{"prefill":"serial","decode":"serial"}},
+  "implementation":{
+    "isa_dispatch":"scalar",
+    "threading":{
+      "runtime":"serial",
+      "work_partition":["serial"],
+      "dispatch":["inline"],
+      "reduction_order_effect":"none"
+    }
+  },
+  "impl":{"function":"moe_swiglu_packed_expert_forward_bf16","c_declaration":"void moe_swiglu_packed_expert_forward_bf16(const float *hidden, const int *indices, const float *routing_weights, const uint16_t *expert_gate_up, const uint16_t *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k);","sources":["src/kernels/axpy_kernels.c"]},
+  "call_abi":{"version":1,"params":[
+    {"name":"hidden","source":"activation:hidden","cast":"const float*","ports":["input:hidden"]},
+    {"name":"indices","source":"activation:indices","cast":"const int*","ports":["input:indices"]},
+    {"name":"routing_weights","source":"activation:routing_weights","cast":"const float*","ports":["input:routing_weights"]},
+    {"name":"expert_gate_up","source":"weight:moe_expert_gate_up","cast":"const uint16_t*","ports":["weight:expert_gate_up"]},
+    {"name":"expert_down","source":"weight:moe_expert_down","cast":"const uint16_t*","ports":["weight:expert_down"]},
+    {"name":"output","source":"output:output","cast":"float*","ports":["output:output"]},
+    {"name":"rows","source":"dim:_m"},
+    {"name":"hidden_dim","source":"dim:embed_dim"},
+    {"name":"intermediate_dim","source":"dim:moe_intermediate_size"},
+    {"name":"n_experts","source":"dim:n_routed_experts"},
+    {"name":"top_k","source":"dim:num_experts_per_tok"}
+  ]},
+  "tests":{"unit":["unittest/test_qwen4_exp_packed_moe_bf16.py"],"parity":[{"kind":"pytorch","command":".venv/bin/python unittest/test_qwen4_exp_packed_moe_bf16.py","tolerance":"fp32_reference"}]}
+}

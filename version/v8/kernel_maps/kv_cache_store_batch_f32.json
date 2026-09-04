@@ -1,0 +1,95 @@
+{
+  "id": "kv_cache_store_batch_f32",
+  "op": "kv_cache_store_batch_f32",
+  "operation_interface": "kv_cache_store_batch.fp32.head_major.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "kv_cache_store_batch.fp32.head_major.v1",
+    "phases": ["prefill"]
+  },
+  "variant": "head_major_batch_fp32_cache",
+  "contract_schema_version": 1,
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "none"
+    }
+  },
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "k_src",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "layout": "head_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "K token block after RoPE"
+    },
+    {
+      "name": "v_src",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "layout": "head_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "V token block"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "kv_cache_k",
+      "dtype": "fp32",
+      "shape": ["KV", "S_max", "D"],
+      "layout": "head_major_contiguous",
+      "access": "read_write",
+      "storage_class": "state",
+      "consumption": "required",
+      "desc": "FP32 K cache for the owning attention layer"
+    },
+    {
+      "name": "kv_cache_v",
+      "dtype": "fp32",
+      "shape": ["KV", "S_max", "D"],
+      "layout": "head_major_contiguous",
+      "access": "read_write",
+      "storage_class": "state",
+      "consumption": "required",
+      "desc": "FP32 V cache for the owning attention layer"
+    }
+  ],
+  "dims": ["num_tokens", "num_kv_heads", "head_dim", "max_seq_len", "KV", "T", "S_max", "D"],
+  "constraints": {
+    "notes": "The append interval [start_pos, start_pos + num_tokens) must fit within S_max."
+  },
+  "impl": {
+    "function": "kv_cache_store_batch_f32",
+    "c_declaration": "void kv_cache_store_batch_f32(float *kv_cache_k, float *kv_cache_v, const float *k, const float *v, int start_pos, int num_tokens, int num_kv_heads, int head_dim, int max_seq_len);",
+    "sources": ["src/kernels/kv_cache_kernels.c"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "kv_cache_k", "source": "runtime:kv_cache_k_layer", "cast": "float*", "ports": ["output:kv_cache_k"]},
+      {"name": "kv_cache_v", "source": "runtime:kv_cache_v_layer", "cast": "float*", "ports": ["output:kv_cache_v"]},
+      {"name": "k", "source": "activation:k_src", "cast": "const float*", "ports": ["input:k_src"]},
+      {"name": "v", "source": "activation:v_src", "cast": "const float*", "ports": ["input:v_src"]},
+      {"name": "start_pos", "source": "runtime:prefill_start_pos"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "max_seq_len", "source": "dim:max_seq_len"}
+    ]
+  },
+  "notes": "Store a compact head-major prefill token block into the resolved physical FP32 KV cache."
+}

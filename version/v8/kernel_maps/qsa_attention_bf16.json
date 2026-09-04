@@ -1,0 +1,38 @@
+{
+  "id":"qsa_attention_bf16",
+  "op":"qsa_attention",
+  "operation_interface":"qsa.sparse_attention.bf16.v1",
+  "variant":"sparse_masked_pytorch_cpu_flash_bf16_cache",
+  "modes":{"inference":true,"training":false,"backward":false},
+  "quant":{"activation":"bf16_rounded_fp32_view","kv_cache":"bf16","score":"fp32","probability":"bf16","output":"bf16","reduction":"pytorch_cpu_flash_512"},
+  "inputs":[
+    {"name":"query","dtype":"fp32","shape":["R","H","D"],"layout":"token_head_dim_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"key_cache","dtype":"bf16","shape":["HKV","T","D"],"layout":"head_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"value_cache","dtype":"bf16","shape":["HKV","T","D"],"layout":"head_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"selected_indices","dtype":"fp32","shape":["R","SW"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights":[],
+  "activations":[],
+  "outputs":[{"name":"output","dtype":"fp32","shape":["R","H","D"],"layout":"token_head_dim_contiguous","access":"write","storage_class":"activation","consumption":"required"}],
+  "scratch":[{"name":"score_scratch","dtype":"fp32","shape":["SW"],"layout":"contiguous","access":"read_write","storage_class":"scratch","consumption":"required"}],
+  "dims":["R","H","HKV","D","SW","T"],
+  "params":["position"],
+  "parallelization":{"supported":["query_head"],"preferred":{"prefill":"query_head","decode":"query_head"}},
+  "impl":{"function":"attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract","c_declaration":"void attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract(const float *query, const uint16_t *key_cache, const uint16_t *value_cache, const float *selected_indices, float *output, float *score_scratch, int rows, int query_heads, int kv_heads, int head_dim, int selection_width, int context_length, int position);","sources":["src/kernels/attention_kernels.c"],"variants":[{"name":"pytorch_cpu_flash_avx512","requires":["avx512f"],"compile_flags":["-mavx512f"]}]},
+  "call_abi":{"version":1,"params":[
+    {"name":"query","source":"activation:query","cast":"const float*","ports":["input:query"]},
+    {"name":"key_cache","source":"runtime:kv_cache_k_layer_u16","cast":"const uint16_t*","ports":["input:key_cache"]},
+    {"name":"value_cache","source":"runtime:kv_cache_v_layer_u16","cast":"const uint16_t*","ports":["input:value_cache"]},
+    {"name":"selected_indices","source":"activation:selected_indices","cast":"const float*","ports":["input:selected_indices"]},
+    {"name":"output","source":"output:output","cast":"float*","ports":["output:output"]},
+    {"name":"score_scratch","source":"scratch:score_scratch","cast":"float*"},
+    {"name":"rows","source":"runtime:seq_len"},
+    {"name":"query_heads","source":"dim:num_heads"},
+    {"name":"kv_heads","source":"dim:num_kv_heads"},
+    {"name":"head_dim","source":"dim:head_dim"},
+    {"name":"selection_width","source":"dim:qsa_selection_width"},
+    {"name":"context_length","source":"dim:max_seq_len"},
+    {"name":"position","source":"runtime:pos"}
+  ]},
+  "tests":{"unit":["unittest/test_qwen4_exp_qsa_bf16.py"],"parity":[{"kind":"pytorch","command":".venv/bin/python unittest/test_qwen4_exp_qsa_bf16.py","tolerance":"bit_exact","backend":"cpu_flash_attention"}]}
+}

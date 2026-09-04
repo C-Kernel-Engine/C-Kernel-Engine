@@ -1,0 +1,54 @@
+{
+  "id":"qsa_index_select_bf16",
+  "op":"qsa_index_select",
+  "operation_interface":"qsa.block_index_select.bf16.v1",
+  "variant":"bf16_storage_fp32_score",
+  "modes":{"inference":true,"training":false,"backward":false},
+  "quant":{"weight":"bf16","activation":"bf16_rounded_fp32_view","output":"i32_exact_fp32_view"},
+  "inputs":[
+    {"name":"projected_qk","dtype":"fp32","shape":["R","(HQ+1)*DI"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"index_key_cache_in","dtype":"fp32","shape":["T","DI"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights":[
+    {"name":"q_norm_weight","dtype":"fp32","shape":["DI"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"k_norm_weight","dtype":"fp32","shape":["DI"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "activations":[],
+  "outputs":[
+    {"name":"selected_indices","dtype":"fp32","shape":["R","SW"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"},
+    {"name":"index_key_cache_out","dtype":"fp32","shape":["T","DI"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}
+  ],
+  "scratch":[
+    {"name":"q_norm_scratch","dtype":"fp32","shape":["HQ","DI"],"size_bytes":"indexer_n_heads * indexer_head_dim * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"head_major_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"pooled_key_scratch","dtype":"fp32","shape":["DI"],"size_bytes":"indexer_head_dim * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"block_score_scratch","dtype":"fp32","shape":["BT"],"size_bytes":"(indexer_budget // indexer_compress_ratio) * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"block_index_scratch","dtype":"i32","shape":["BT"],"size_bytes":"(indexer_budget // indexer_compress_ratio) * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"contiguous","access":"read_write","storage_class":"scratch","consumption":"required"}
+  ],
+  "dims":["R","HQ","DI","B","C","DR","T","SW","BT"],
+  "params":["position","rope_theta","eps"],
+  "parallelization":{"supported":["serial_query"],"preferred":{"prefill":"serial_query","decode":"serial_query"}},
+  "impl":{"function":"qwen4_qsa_index_select_bf16","c_declaration":"void qwen4_qsa_index_select_bf16(const float *projected_qk, const float *index_key_cache_in, const float *q_norm_weight, const float *k_norm_weight, float *selected_indices, float *index_key_cache_out, float *q_norm_scratch, float *pooled_key_scratch, float *block_score_scratch, int32_t *block_index_scratch, int rows, int query_heads, int index_head_dim, int token_budget, int compress_ratio, int rotary_dim, int context_length, int position, float rope_theta, float eps);","sources":["src/kernels/qwen4_exp_kernels.c"],"variants":[{"name":"reference","requires":[],"compile_flags":[]}]},
+  "call_abi":{"version":1,"params":[
+    {"name":"projected_qk","source":"activation:projected_qk","cast":"const float*","ports":["input:projected_qk"]},
+    {"name":"index_key_cache_in","source":"activation:index_key_cache_in","cast":"const float*","ports":["input:index_key_cache_in"]},
+    {"name":"q_norm_weight","source":"weight_f:q_norm_weight","cast":"const float*","ports":["weight:q_norm_weight"]},
+    {"name":"k_norm_weight","source":"weight_f:k_norm_weight","cast":"const float*","ports":["weight:k_norm_weight"]},
+    {"name":"selected_indices","source":"output:selected_indices","cast":"float*","ports":["output:selected_indices"]},
+    {"name":"index_key_cache_out","source":"output:index_key_cache_out","cast":"float*","ports":["output:index_key_cache_out"]},
+    {"name":"q_norm_scratch","source":"scratch:q_norm_scratch","cast":"float*"},
+    {"name":"pooled_key_scratch","source":"scratch:pooled_key_scratch","cast":"float*"},
+    {"name":"block_score_scratch","source":"scratch:block_score_scratch","cast":"float*"},
+    {"name":"block_index_scratch","source":"scratch:block_index_scratch","cast":"int32_t*"},
+    {"name":"rows","source":"runtime:seq_len"},
+    {"name":"query_heads","source":"dim:indexer_n_heads"},
+    {"name":"index_head_dim","source":"dim:indexer_head_dim"},
+    {"name":"token_budget","source":"dim:indexer_budget"},
+    {"name":"compress_ratio","source":"dim:indexer_compress_ratio"},
+    {"name":"rotary_dim","source":"dim:rotary_dim"},
+    {"name":"context_length","source":"dim:max_seq_len"},
+    {"name":"position","source":"runtime:pos"},
+    {"name":"rope_theta","source":"dim:rope_theta"},
+    {"name":"eps","source":"dim:rms_eps"}
+  ]},
+  "tests":{"unit":["unittest/test_qwen4_exp_qsa_bf16.py"],"parity":[{"kind":"pytorch","command":".venv/bin/python unittest/test_qwen4_exp_qsa_bf16.py","tolerance":"bf16_exact_or_one_ulp"}]}
+}

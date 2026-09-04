@@ -36,11 +36,29 @@ from compare_first_token_logits_v8 import (  # type: ignore
     run_llama_greedy_trajectory,
     run_llama_logits,
     run_llama_logits_segmented,
+    validate_compiled_prefill_capability,
 )
 
 
 _AUTO_STREAM_LOGITS_BYTES = 256 * 1024 * 1024
 _HIDDEN_CAPTURE_SUFFIXES = {".f32", ".i32"}
+
+
+def _apply_acceptance_contract(report: dict[str, Any], require_bit_exact: bool) -> None:
+    steps = report.get("steps") or []
+    exact_steps = sum(row.get("bit_exact") is True for row in steps)
+    report["numerical_summary"] = {
+        "compared_steps": len(steps),
+        "bit_exact_steps": exact_steps,
+        "full_logits_bit_exact": bool(steps) and exact_steps == len(steps),
+        "first_nonexact_step": next(
+            (row.get("step") for row in steps if row.get("bit_exact") is not True), None
+        ),
+    }
+    report["acceptance_contract"] = "bit_exact_full_logits" if require_bit_exact else "greedy_top1"
+    if require_bit_exact:
+        report["pass"] = bool(report.get("pass")) and report["numerical_summary"]["full_logits_bit_exact"]
+        report["status"] = "pass" if report["pass"] else "fail"
 
 
 def _hidden_capture_paths(dump_dir: Path) -> list[Path]:
@@ -164,6 +182,12 @@ def load_ck_greedy_trajectory(
                 os.environ["CK_PARITY_OP_FILTER"] = str(dump_names).strip()
 
     lib = ctypes.CDLL(str(runtime_path), mode=ctypes.RTLD_GLOBAL)
+    capabilities = None
+    if hasattr(lib, "ck_model_get_capabilities"):
+        lib.ck_model_get_capabilities.argtypes = []
+        lib.ck_model_get_capabilities.restype = ctypes.c_uint64
+        capabilities = int(lib.ck_model_get_capabilities())
+    validate_compiled_prefill_capability("hybrid", capabilities)
     lib.ck_model_init.argtypes = [ctypes.c_char_p]
     lib.ck_model_init.restype = ctypes.c_int
     lib.ck_model_embed_tokens.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.c_int]
@@ -928,6 +952,7 @@ def run_multitoken_trajectory_parity(
             "ck_next": ck_next,
             "llama_next": llama_next,
             "top1_match": ck_next == llama_next,
+            "bit_exact": bool(np.array_equal(ck["logits"][step].view(np.uint32), llama["logits"][step].view(np.uint32))),
             "cosine": float(cmp["cosine"]),
             "rmse": float(cmp["rmse"]),
             "mean_abs_diff": float(cmp["mean_abs_diff"]),
@@ -1166,6 +1191,7 @@ def run_multitoken_parity(
             "ck_next": ck_next,
             "llama_next": llama_next,
             "top1_match": top1_match,
+            "bit_exact": bool(np.array_equal(ck["logits"].view(np.uint32), ll["logits"].view(np.uint32))),
             "cosine": float(cmp["cosine"]),
             "rmse": float(cmp["rmse"]),
             "mean_abs_diff": float(cmp["mean_abs_diff"]),
@@ -1264,6 +1290,7 @@ def main() -> int:
         help="comma-separated token IDs; a matched CK/llama token ends parity successfully",
     )
     ap.add_argument("--summary", action="store_true", help="Print a compact one-line result instead of full JSON.")
+    ap.add_argument("--require-bit-exact", action="store_true", help="Fail unless every compared full-vocabulary logit row is bit-exact.")
     ap.add_argument(
         "--execution-mode",
         choices=["replay", "trajectory"],
@@ -1452,6 +1479,7 @@ def main() -> int:
             stop_token_ids=stop_tokens,
         )
 
+    _apply_acceptance_contract(report, bool(args.require_bit_exact))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -1472,7 +1500,7 @@ def main() -> int:
             )
         else:
             print(
-                "status=pass "
+                f"status={report['status']} "
                 f"llama_mode={llama_decode_mode} "
                 f"ck_mode={args.ck_prefill_mode} "
                 f"llama_no_repack={bool(args.llama_no_repack)} "
@@ -1480,6 +1508,12 @@ def main() -> int:
                 f"steps={len(report.get('steps', []))} "
                 f"final_prefix_len={len(report.get('final_prefix', []))}"
             )
+        numerical = report["numerical_summary"]
+        print(
+            f"acceptance={report['acceptance_contract']} "
+            f"bit_exact_steps={numerical['bit_exact_steps']}/{numerical['compared_steps']} "
+            f"first_nonexact_step={numerical['first_nonexact_step']}"
+        )
         if neutrality is not None:
             repeatability = neutrality.get("baseline_repeatability") or {}
             aggregate = neutrality.get("aggregate_capture") or {}

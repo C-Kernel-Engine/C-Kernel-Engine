@@ -1,0 +1,972 @@
+{
+  "version": 2,
+  "name": "qwen4_exp",
+  "family": "qwen38_flash_next",
+  "projection_inputs": {
+    "recurrent_qkv_proj": {"x": "main_stream_q8"},
+    "recurrent_gate_proj": {"x": "main_stream_q8"},
+    "recurrent_alpha_proj": {"x": "main_stream_q8"},
+    "recurrent_beta_proj": {"x": "main_stream_q8"},
+    "q_gate_proj": {"x": "main_stream_q8"},
+    "q_proj": {"x": "main_stream_q8"},
+    "k_proj": {"x": "main_stream_q8"},
+    "v_proj": {"x": "main_stream_q8"}
+  },
+  "kernels": {
+    "hyper_stream_expand": "hyper_stream_expand_f32",
+    "qsa_index_select": "qsa_index_select_bf16",
+    "qsa_attention": "qsa_attention_bf16",
+    "attn_prefill": "attention_forward_causal_head_major_gqa_flash_compact_token_output",
+    "attn_decode": "attention_forward_decode_head_major_gqa_regular",
+    "full_softmax_topk_router": "moe_softmax_topk_router_pytorch_bf16",
+    "hyper_inject_attn": "hyper_stream_inject_bf16",
+    "hyper_inject_mlp": "hyper_stream_inject_bf16"
+  },
+  "activation_bindings": {
+    "hyper_stream": "hyper_stream",
+    "attn_hyper_injection": "attn_hyper_injection",
+    "mlp_hyper_injection": "mlp_hyper_injection",
+    "ple_embedding": "ple_embedding",
+    "ple_embedding_q8": "main_stream_q8",
+    "ple_key": "ple_key",
+    "ple_value": "ple_value",
+    "ple_token_state": "ple_token_state",
+    "ple_conv_state": "ple_conv_state",
+    "qsa_index_projected": "qsa_index_projected",
+    "qsa_selected_indices": "qsa_selected_indices",
+    "qsa_index_key_cache": "qsa_index_key_cache",
+    "moe_output_stream": "layer_output"
+  },
+  "activation_buffers": {
+    "hyper_stream": {"shape":[{"config":"execution_extent"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}]},
+    "attn_hyper_injection": {"shape":[{"config":"execution_extent"},{"config":"hc_count"}]},
+    "mlp_hyper_injection": {"shape":[{"config":"execution_extent"},{"config":"hc_count"}]},
+    "ple_embedding": {"shape":[{"config":"execution_extent"},{"config":"ple_embed_dim"}]},
+    "ple_key": {"shape":[{"config":"execution_extent"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}]},
+    "ple_value": {"shape":[{"config":"execution_extent"},{"config":"embed_dim"}]},
+    "ple_token_state": {"shape":[{"config":"num_layers"},{"config":"ple_token_history"}]},
+    "ple_conv_state": {"shape":[{"config":"num_layers"},{"config":"ple_conv_history"},{"mul":[{"config":"hc_count"},{"config":"embed_dim"}]}]},
+    "qsa_index_projected": {"shape":[{"config":"execution_extent"},{"config":"qsa_index_proj_dim"}]},
+    "qsa_selected_indices": {"shape":[{"config":"execution_extent"},{"config":"qsa_selection_width"}]},
+    "qsa_index_key_cache": {"shape":[{"config":"num_layers"},{"config":"context_length"},{"config":"indexer_head_dim"}]}
+  },
+  "flags": {
+    "use_qkv_bias": false,
+    "activation": "swiglu",
+    "rope": "rope",
+    "tokenizer": "bpe",
+    "has_qk_norm": true,
+    "prefill_policy": "batched",
+    "residual_topology": "four_stream_gated_hyper_connection",
+    "attention_topology": "deltanet_or_qsa_sparse",
+    "mlp_topology": "packed_moe_plus_gated_shared_expert"
+  },
+  "contract": {
+    "weight_policy": {
+      "ignore": [
+        {
+          "pattern": "layer.*.index_*",
+          "reason": "QSA index projections are inactive when sparse compression is disabled",
+          "when": {"config_key": "indexer_compress_ratio", "equals": 0}
+        }
+      ],
+      "op_bindings": [
+        {"section":"body","op":"ple_ngram_embed","weights":["ple_ngram_embedding","ple_layer_multipliers","ple_ngram_heads_offsets","ple_ngram_heads_vocab_sizes"]},
+        {"section":"body","op":"ple_key_proj","weights":["ple_key"]},
+        {"section":"body","op":"ple_value_proj","weights":["ple_value"]},
+        {"section":"body","op":"ple_gate_conv_inject","weights":["ple_norm_key","ple_norm_query","ple_norm_conv","ple_conv"]},
+        {"section":"body","op":"qsa_index_proj","weights":["index_qk"]},
+        {"section":"body","op":"qsa_index_select","weights":["index_q_norm","index_k_norm"]},
+        {"section":"body","op":"moe_swiglu_packed_expert_mlp","weights":["moe_expert_gate_up","moe_expert_down"]},
+        {"section":"body","op":"moe_swiglu_expert_mlp","weights":["moe_expert_gate","moe_expert_up","moe_expert_down"]},
+        {"section":"body","op":"hyper_mix_attn","weights":["attn_hyper_norm","attn_hyper_mix_down","attn_hyper_mix_up","attn_hyper_inject"]},
+        {"section":"body","op":"hyper_mix_mlp","weights":["mlp_hyper_norm","mlp_hyper_mix_down","mlp_hyper_mix_up","mlp_hyper_inject"]},
+        {"section":"footer","op":"hyper_mix_final","weights":["final_hyper_norm","final_hyper_mix_down","final_hyper_mix_up"]}
+      ]
+    },
+    "runtime_defaults": {
+      "prefill_chunk_length": 4096,
+      "logits_layout": "last",
+      "prefill_gateup_swiglu_fusion_default": false
+    },
+    "tokenizer_contract": {
+      "tokenizer_type": "bpe",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {"source": "manifest_or_gguf"}
+    },
+    "chat_contract": {
+      "version": 1,
+      "name": "qwen4_exp",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<|im_start|>{role}\n",
+      "turn_suffix": "<|im_end|>\n",
+      "assistant_generation_prefix": "<|im_start|>assistant\n",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|im_start|>assistant\n<think>\n",
+        "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+      },
+      "role_labels": {"system": "system", "user": "user", "assistant": "assistant"},
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "thinking_mode_default": "visible",
+      "stop_text_markers": ["<|im_end|>"],
+      "token_stop_markers": ["<|im_end|>"],
+      "template_markers": ["<|im_start|>", "<|im_end|>", "<think>", "</think>"],
+      "min_response_tokens": 8
+    },
+    "attention_contract": {
+      "rope_layout": "split",
+      "rope_type": "rope",
+      "qk_norm": "qsa_layers_only",
+      "kv_layout": "qsa_layer_major_kv_cache",
+      "attn_variant": "hybrid_deltanet_qsa",
+      "layer_policy_config_key": "layer_execution_plan",
+      "layer_kind_config_key": "circuit_layer_kinds"
+    },
+    "block_contract": {
+      "norm_type": "grouped_rmsnorm_plus_one",
+      "residual_formula": "four_stream_hyper_mix_then_weighted_block_injection",
+      "mlp_formula": "topk_packed_experts_plus_sigmoid_gated_shared_swiglu",
+      "activation": "swiglu",
+      "body_type": "qwen4_exp_hybrid"
+    },
+    "logits_contract": {
+      "final_norm": "hyper_connection_mix_without_injection",
+      "lm_head": "untied_or_weight_tying",
+      "logits_layout": "last"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "contract_selected",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {"required_call_args": {}}
+  },
+  "required_contracts": {
+    "decoder.attention": {
+      "op": "attention",
+      "template_ops": ["attn"],
+      "selector": {
+        "config_not_equals": {
+          "decode_kv_cache_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "requires": {
+            "execution.phase": "prefill",
+            "execution.prefill_batching": "batch_append",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "fp16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "f16_flash_auto_qtile64"
+          },
+          "validation": "observed",
+          "evidence": "Quantized Qwen4-Exp writes K/V through llama.cpp-compatible FP16 cache storage before full-attention prefill."
+        },
+        "decode": {
+          "requires": {
+            "execution.phase": "decode",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "fp16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "f16_online_fp32_merge"
+          },
+          "validation": "observed",
+          "evidence": "Quantized Qwen4-Exp decode reads the same llama.cpp-compatible FP16 K/V cache."
+        }
+      }
+    },
+    "decoder.attention_bf16_pytorch": {
+      "op": "attention",
+      "template_ops": ["attn"],
+      "selector": {
+        "config_equals": {
+          "decode_kv_cache_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "requires": {
+            "execution.phase": "prefill",
+            "execution.prefill_batching": "unified_mixed",
+            "execution.attention_schedule": "full_matrix_causal",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "bf16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "bf16_pytorch_sdpa"
+          },
+          "validation": "validated",
+          "evidence": "BF16 Qwen4-Exp full-attention prefill preserves PyTorch BF16 K/V storage and SDPA arithmetic."
+        },
+        "decode": {
+          "requires": {
+            "execution.phase": "decode",
+            "tensor.q.dtype": "fp32",
+            "tensor.kv.dtype": "bf16",
+            "tensor.layout": "head_major",
+            "numerics.attention_reduction": "bf16_pytorch_sdpa"
+          },
+          "validation": "validated",
+          "evidence": "BF16 Qwen4-Exp incremental decode preserves the PyTorch BF16 K/V storage boundary."
+        }
+      }
+    }
+  },
+  "required_numerical_contracts": {
+    "decoder.rope_qk_llama_fp32": {
+      "op": "rope",
+      "operation_interface": "mrope.text_imrope.fp32.v1",
+      "template_ops": ["rope_qk"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Quantized Qwen4-Exp retains normalized Q/K values and IMRoPE outputs in FP32, matching llama.cpp before KV-cache storage."
+        },
+        "decode": {
+          "contract_id": "text_imrope_fp32_input_fp32_compute_fp32_output",
+          "validation": "validated",
+          "evidence": "Quantized decode preserves the same FP32 IMRoPE boundary before cache insertion."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rope_qk.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.rope_qk_bf16_pytorch": {
+      "op": "rope",
+      "operation_interface": "mrope.text_imrope.bf16_pytorch_storage.v1",
+      "template_ops": ["rope_qk"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "text_imrope_bf16_input_pytorch_bf16_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "BF16 Qwen4-Exp consumes BF16-normalized Q/K and stores PyTorch-compatible BF16 IMRoPE outputs."
+        },
+        "decode": {
+          "contract_id": "text_imrope_bf16_input_pytorch_bf16_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "BF16 decode preserves the same PyTorch storage boundary before cache insertion."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rope_qk.output",
+        "producer": "rope_qk",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.ple_gate_conv_llama_fp32": {
+      "op": "ple_gate_conv_inject",
+      "operation_interface": "ple.gate_dilated_conv_inject.fp32.v1",
+      "template_ops": ["ple_gate_conv_inject"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "ple_gate_conv_inject_llama_fp32_activation_fp16_conv",
+          "validation": "observed",
+          "evidence": "Q4 layer-1 X-Ray is exact through the PLE projections and identifies grouped llama RMSNorm as the next required FP32 boundary."
+        },
+        "decode": {
+          "contract_id": "ple_gate_conv_inject_llama_fp32_activation_fp16_conv",
+          "validation": "observed",
+          "evidence": "The quantized decode graph preserves the same PLE FP32 activation and FP16 convolution-weight contract."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.ple.output",
+        "producer": "ple_gate_conv_inject",
+        "logical_layout": "token_stream_hidden_contiguous",
+        "axis_names": ["token", "stream", "hidden"]
+      }
+    },
+    "decoder.projections_bf16_storage.prefill": {
+      "op": "gemm",
+      "template_ops": [
+        "ple_key_proj", "ple_value_proj",
+        "recurrent_qkv_proj", "recurrent_gate_proj",
+        "recurrent_alpha_proj", "recurrent_beta_proj", "recurrent_out_proj",
+        "qsa_index_proj", "q_gate_proj", "k_proj", "v_proj", "out_proj",
+        "moe_router"
+      ],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp stores BF16 projection outputs before recurrent, sparse-attention, routing, and logits consumers."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.bf16_projection.output",
+        "producer": "gemm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.projections_bf16_storage.decode": {
+      "op": "gemm",
+      "template_ops": [
+        "ple_key_proj", "ple_value_proj",
+        "recurrent_qkv_proj", "recurrent_gate_proj",
+        "recurrent_alpha_proj", "recurrent_beta_proj", "recurrent_out_proj",
+        "qsa_index_proj", "q_gate_proj", "k_proj", "v_proj", "out_proj",
+        "moe_router"
+      ],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "decode": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Single-token Qwen4-Exp decode preserves the same BF16 linear output boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.bf16_projection.output",
+        "producer": "gemm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.logits_bf16_storage": {
+      "op": "gemm",
+      "template_ops": ["logits"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "The Qwen4-Exp BF16 language-model head matches PyTorch oneDNN 3.12 exactly across the complete 248,320-entry vocabulary."
+        },
+        "decode": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Captured single-token final-hidden and language-model-head weights produce 248,320/248,320 bit-exact logits with the pinned oneDNN 3.12 provider."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.logits.output",
+        "producer": "logits",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "vocabulary"]
+      }
+    },
+    "decoder.qk_norm_llama_fp32": {
+      "operation_interface": "qk_norm.fp32_inplace.v1",
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "selector": {
+        "config_not_equals": {
+          "decoder_norm_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Quantized Qwen4-Exp Q/K normalization follows llama.cpp's FP64 sum-of-squares reduction and FP32 output boundary."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Quantized single-token attention preserves the same llama.cpp RMSNorm reduction order."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.qk_norm_bf16_pytorch": {
+      "operation_interface": "qk_norm.fp32_bf16_values_inplace.v1",
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "selector": {
+        "config_equals": {
+          "decoder_norm_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp BF16 Q/K normalization uses PyTorch's per-head AVX2 cascade reduction, multiplies the shifted FP32 weight before rounding, and stores BF16 values before RoPE."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
+          "validation": "validated",
+          "evidence": "Single-token QSA decode preserves the same FP32 weight multiplication and BF16 output boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    },
+    "decoder.attn_gate_bf16_pytorch": {
+      "operation_interface": "attn_gate_sigmoid_mul.fp32.v1",
+      "op": "attn_gate_sigmoid_mul",
+      "template_ops": ["attn_gate_sigmoid_mul"],
+      "selector": {
+        "config_equals": {
+          "decoder_norm_storage_boundary": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "attention_gate_pytorch_sleef_bf16_storage",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp stores both the sigmoid result and gated QSA context at BF16 boundaries before the output projection."
+        },
+        "decode": {
+          "contract_id": "attention_gate_pytorch_sleef_bf16_storage",
+          "validation": "validated",
+          "evidence": "Single-token QSA replay is bit-exact against PyTorch with SLEEF sigmoid and BF16 storage boundaries."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.attention.gated_context",
+        "producer": "attn_gate_sigmoid_mul",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_ssm_conv_bf16_pytorch": {
+      "op": "ssm_conv1d",
+      "operation_interface": "ssm_conv1d.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_ssm_conv"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "ssm_conv1d_pytorch_fp32_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp stores the depthwise causal-convolution result to BF16 before applying SiLU."
+        },
+        "decode": {
+          "contract_id": "ssm_conv1d_pytorch_fp32_compute_bf16_output",
+          "validation": "validated",
+          "evidence": "Incremental decode preserves the same BF16 convolution output boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_ssm_conv.output",
+        "producer": "recurrent_ssm_conv",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_dt_gate_fp32_pytorch": {
+      "op": "recurrent_dt_gate",
+      "operation_interface": "recurrent_dt_gate.fp32.v1",
+      "template_ops": ["recurrent_dt_gate"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_dt_gate_pytorch_sleef_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp evaluates its FP32 decay gate with PyTorch's AVX-512 exp/log1p vector path before updating persistent recurrent state."
+        },
+        "decode": {
+          "contract_id": "recurrent_dt_gate_pytorch_sleef_fp32_output",
+          "validation": "validated",
+          "evidence": "Incremental decode preserves the exact FP32 decay value used for the persistent-state update."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_dt_gate.output",
+        "producer": "recurrent_dt_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head"]
+      }
+    },
+    "decoder.recurrent_silu_llama": {
+      "op": "recurrent_silu",
+      "operation_interface": "recurrent_silu.fp32.v1",
+      "template_ops": ["recurrent_silu"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_silu_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "Quantized Qwen4-Exp follows llama.cpp's ISA-vector exponential, denominator-add, and division boundaries after the recurrent convolution."
+        },
+        "decode": {
+          "contract_id": "recurrent_silu_llama_avx2_fp32_output",
+          "validation": "validated",
+          "evidence": "Incremental quantized execution preserves the same llama.cpp FP32 SiLU boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_silu.output",
+        "producer": "recurrent_silu",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_silu_bf16_pytorch": {
+      "op": "recurrent_silu",
+      "operation_interface": "recurrent_silu.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_silu"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_silu_pytorch_sleef_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp consumes the BF16 convolution result and stores the SiLU result to BF16."
+        },
+        "decode": {
+          "contract_id": "recurrent_silu_pytorch_sleef_bf16_input_bf16_output",
+          "validation": "validated",
+          "evidence": "Incremental decode uses the identical BF16 SiLU boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_silu.output",
+        "producer": "recurrent_silu",
+        "logical_layout": "row_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.recurrent_qk_l2_norm_bf16_pytorch": {
+      "op": "recurrent_qk_l2_norm",
+      "operation_interface": "recurrent_qk_l2_norm.fp32_inplace.v1",
+      "template_ops": ["recurrent_qk_l2_norm"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_qk_l2_pytorch_fp32_reduce_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp converts repeated BF16 Q/K values to FP32 before L2 normalization; compact groups can be normalized once because each repeated group is identical."
+        },
+        "decode": {
+          "contract_id": "recurrent_qk_l2_pytorch_fp32_reduce_fp32_output",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the same FP32 L2 normalization after loading BF16-stored compact groups."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_qk_l2_norm.output",
+        "producer": "recurrent_qk_l2_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["token", "group", "channel"]
+      }
+    },
+    "decoder.recurrent_core_llama_grouped": {
+      "op": "gated_deltanet",
+      "template_ops": ["recurrent_core"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gated_deltanet_llama_fused_prefill_fp32_state",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp quantized recurrent layers expose G compact Q/K groups for H value heads; the llama-compatible provider tiles each compact group over its matching value heads while carrying FP32 state in token order."
+        },
+        "decode": {
+          "contract_id": "gated_deltanet_llama_avx2_decode_fp32_state",
+          "validation": "validated",
+          "evidence": "Quantized decode requires the grouped llama-compatible provider because Q/K are [G,D], V is [H,D], and G may differ from H."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_core.output",
+        "producer": "recurrent_core",
+        "logical_layout": "head_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.recurrent_core_bf16_pytorch": {
+      "op": "gated_deltanet",
+      "template_ops": ["recurrent_core"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp repeats each compact Q/K group across its matching value-head group and stores the DeltaNet output to BF16."
+        },
+        "decode": {
+          "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
+          "validation": "validated",
+          "evidence": "Decode uses the same grouped Q/K ownership and FP32 recurrent-state update."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_core.output",
+        "producer": "recurrent_core",
+        "logical_layout": "head_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.recurrent_norm_sigmoid_gate_llama": {
+      "op": "recurrent_norm_gate",
+      "operation_interface": "recurrent_norm_gate.fp32.v1",
+      "template_ops": ["recurrent_norm_gate"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_norm_sigmoid_gate_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp declares sigmoid rather than SiLU output gating; quantized prefill preserves llama.cpp's RMSNorm, scalar sigmoid, and elementwise multiply boundaries."
+        },
+        "decode": {
+          "contract_id": "recurrent_norm_sigmoid_gate_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Matched-schedule Q4 X-Ray remains within 2e-7 through recurrent state and output before the separately declared sigmoid-gated normalization."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_norm_gate.output",
+        "producer": "recurrent_norm_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.hyper_stream_inject_llama": {
+      "op": "hyper_stream_inject",
+      "operation_interface": "hyper_connection.stream_inject.fp32.v1",
+      "template_ops": ["hyper_inject_attn", "hyper_inject_mlp"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "hyper_stream_inject_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Q4 layer-0 X-Ray identifies the first material divergence at hc_combine when the BF16 storage provider is used; llama.cpp retains FP32 product and residual-add boundaries."
+        },
+        "decode": {
+          "contract_id": "hyper_stream_inject_llama_fp32_output",
+          "validation": "validated",
+          "evidence": "Single-token quantized execution uses the same FP32 hyper-stream combine before the next grouped RMS normalization."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.hyper_stream_inject.output",
+        "producer": "hyper_stream_inject",
+        "logical_layout": "token_stream_hidden_contiguous",
+        "axis_names": ["token", "stream", "hidden"]
+      }
+    },
+    "decoder.recurrent_norm_gate_bf16_pytorch": {
+      "op": "recurrent_norm_gate",
+      "operation_interface": "recurrent_norm_gate.fp32_bf16_values.v1",
+      "template_ops": ["recurrent_norm_gate"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Qwen4-Exp applies its declared sigmoid RMSNormGated operation and stores its result to BF16."
+        },
+        "decode": {
+          "contract_id": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+          "validation": "validated",
+          "evidence": "Decode preserves the same BF16 sigmoid RMSNormGated boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.recurrent_norm_gate.output",
+        "producer": "recurrent_norm_gate",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "head", "channel"]
+      }
+    },
+    "decoder.moe_router_llama_fp32": {
+      "op": "full_softmax_topk_router",
+      "operation_interface": "moe_router.full_softmax.topk_renorm.fp32.v1",
+      "template_ops": ["full_softmax_topk_router"],
+      "selector": {
+        "config_not_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "llama_full_softmax_topk_selected_renorm_fp32_avx2",
+          "validation": "validated",
+          "evidence": "Quantized Qwen4-Exp retains selected routing probabilities in FP32; rounding them through BF16 creates a material routed-output divergence."
+        },
+        "decode": {
+          "contract_id": "llama_full_softmax_topk_selected_renorm_fp32_avx2",
+          "validation": "validated",
+          "evidence": "Single-token Q4 X-Ray selects the same experts and preserves llama.cpp's FP32 selected-weight normalization boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.moe_router.weights",
+        "producer": "full_softmax_topk_router",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "selected_expert"]
+      }
+    },
+    "decoder.moe_router_bf16_pytorch": {
+      "op": "full_softmax_topk_router",
+      "operation_interface": "moe_router.full_softmax.topk_renorm.fp32.v1",
+      "template_ops": ["full_softmax_topk_router"],
+      "selector": {
+        "config_equals": {
+          "recurrent_qkv_weight_dtype": "bf16"
+        }
+      },
+      "phases": {
+        "prefill": {
+          "contract_id": "pytorch_full_softmax_topk_selected_renorm_bf16_storage",
+          "validation": "validated",
+          "evidence": "BF16 Qwen4-Exp stores normalized selected routing weights at the PyTorch BF16 boundary."
+        },
+        "decode": {
+          "contract_id": "pytorch_full_softmax_topk_selected_renorm_bf16_storage",
+          "validation": "validated",
+          "evidence": "BF16 decode preserves the same selected routing-weight storage boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.moe_router.weights",
+        "producer": "full_softmax_topk_router",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "selected_expert"]
+      }
+    }
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": ["bpe_tokenizer", "dense_embedding_lookup", "hyper_stream_expand"],
+      "body": {
+        "type": "qwen4_exp_hybrid",
+        "kind_config_key": "circuit_layer_kinds",
+        "quant_aliases_common": {
+          "attn_hyper_norm": "attn_hyper.norm",
+          "attn_hyper_mix_down": "attn_hyper.mix_down",
+          "attn_hyper_mix_up": "attn_hyper.mix_up",
+          "attn_hyper_inject": "attn_hyper.inject",
+          "mlp_hyper_norm": "mlp_hyper.norm",
+          "mlp_hyper_mix_down": "mlp_hyper.mix_down",
+          "mlp_hyper_mix_up": "mlp_hyper.mix_up",
+          "mlp_hyper_inject": "mlp_hyper.inject",
+          "moe_router": "moe_router",
+          "moe_expert_gate_up": "moe_expert_gate_up",
+          "moe_expert_down": "moe_expert_down",
+          "moe_shared_gate": "moe_shared_gate",
+          "moe_shared_up": "moe_shared_up",
+          "moe_shared_down": "moe_shared_down",
+          "moe_shared_router": "moe_shared_router"
+        },
+        "quant_aliases_by_kind": {
+          "recurrent": {
+            "attn_qkv": "attn_qkv", "attn_gate": "attn_gate",
+            "ssm_alpha": "ssm_alpha", "ssm_beta": "ssm_beta",
+            "ssm_conv1d": "ssm_conv1d", "ssm_dt_bias": "ssm_dt_bias",
+            "ssm_a": "ssm_a", "ssm_norm": "ssm_norm", "ssm_out": "ssm_out"
+          },
+          "recurrent_ple": {
+            "attn_qkv": "attn_qkv", "attn_gate": "attn_gate",
+            "ssm_alpha": "ssm_alpha", "ssm_beta": "ssm_beta",
+            "ssm_conv1d": "ssm_conv1d", "ssm_dt_bias": "ssm_dt_bias",
+            "ssm_a": "ssm_a", "ssm_norm": "ssm_norm", "ssm_out": "ssm_out",
+            "ple_ngram_embedding":"ple_ngram_embedding", "ple_layer_multipliers":"ple_layer_multipliers",
+            "ple_ngram_heads_offsets":"ple_ngram_heads_offsets", "ple_ngram_heads_vocab_sizes":"ple_ngram_heads_vocab_sizes",
+            "ple_key":"ple_key", "ple_value":"ple_value", "ple_conv":"ple_conv",
+            "ple_norm_key":"ple_norm_key", "ple_norm_query":"ple_norm_query", "ple_norm_conv":"ple_norm_conv"
+          },
+          "sparse_attention": {
+            "wq": "attn_q_gate", "wk": "attn_k", "wv": "attn_v", "wo": "attn_output",
+            "q_norm": "attn_q_norm", "k_norm": "attn_k_norm", "index_qk": "index_qk",
+            "index_q_norm": "index_q_norm", "index_k_norm": "index_k_norm"
+          },
+          "full_attention": {
+            "wq": "attn_q_gate", "wk": "attn_k", "wv": "attn_v", "wo": "attn_output",
+            "q_norm": "attn_q_norm", "k_norm": "attn_k_norm"
+          },
+          "sparse_attention_ple": {
+            "wq": "attn_q_gate", "wk": "attn_k", "wv": "attn_v", "wo": "attn_output",
+            "q_norm": "attn_q_norm", "k_norm": "attn_k_norm", "index_qk": "index_qk",
+            "index_q_norm": "index_q_norm", "index_k_norm": "index_k_norm",
+            "ple_ngram_embedding":"ple_ngram_embedding", "ple_layer_multipliers":"ple_layer_multipliers",
+            "ple_ngram_heads_offsets":"ple_ngram_heads_offsets", "ple_ngram_heads_vocab_sizes":"ple_ngram_heads_vocab_sizes",
+            "ple_key":"ple_key", "ple_value":"ple_value", "ple_conv":"ple_conv",
+            "ple_norm_key":"ple_norm_key", "ple_norm_query":"ple_norm_query", "ple_norm_conv":"ple_norm_conv"
+          },
+          "full_attention_ple": {
+            "wq": "attn_q_gate", "wk": "attn_k", "wv": "attn_v", "wo": "attn_output",
+            "q_norm": "attn_q_norm", "k_norm": "attn_k_norm",
+            "ple_ngram_embedding":"ple_ngram_embedding", "ple_layer_multipliers":"ple_layer_multipliers",
+            "ple_ngram_heads_offsets":"ple_ngram_heads_offsets", "ple_ngram_heads_vocab_sizes":"ple_ngram_heads_vocab_sizes",
+            "ple_key":"ple_key", "ple_value":"ple_value", "ple_conv":"ple_conv",
+            "ple_norm_key":"ple_norm_key", "ple_norm_query":"ple_norm_query", "ple_norm_conv":"ple_norm_conv"
+          }
+        },
+        "ops_by_kind": {
+          "recurrent": [
+            "hyper_mix_attn", "recurrent_qkv_proj", "recurrent_gate_proj",
+            "recurrent_alpha_proj", "recurrent_beta_proj", "recurrent_split_qkv",
+            "recurrent_dt_gate", "recurrent_conv_state_update", "recurrent_ssm_conv",
+            "recurrent_silu", "recurrent_split_conv_qkv", "recurrent_qk_l2_norm",
+            "recurrent_core", "recurrent_norm_gate", "recurrent_out_proj",
+            "hyper_inject_attn", "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ],
+          "recurrent_ple": [
+            "ple_ngram_embed",
+            {"op":"activation_quantize","kernel":"quantize_row_q8_k","params":{"_input_dim_from_config":"ple_embed_dim"},"graph_slots":{"inputs":{"input":"ple_embedding"},"outputs":{"output":"ple_embedding_q8"}}},
+            {"op":"ple_key_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            {"op":"ple_value_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            "ple_gate_conv_inject",
+            "hyper_mix_attn", "recurrent_qkv_proj", "recurrent_gate_proj",
+            "recurrent_alpha_proj", "recurrent_beta_proj", "recurrent_split_qkv",
+            "recurrent_dt_gate", "recurrent_conv_state_update", "recurrent_ssm_conv",
+            "recurrent_silu", "recurrent_split_conv_qkv", "recurrent_qk_l2_norm",
+            "recurrent_core", "recurrent_norm_gate", "recurrent_out_proj",
+            "hyper_inject_attn", "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ],
+          "sparse_attention": [
+            "hyper_mix_attn", "qsa_index_proj", "qsa_index_select", "q_gate_proj", "split_q_gate", "k_proj",
+            "v_proj", "qk_norm", "rope_qk", "qsa_attention",
+            "attn_gate_sigmoid_mul", "out_proj", "hyper_inject_attn",
+            "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ],
+          "full_attention": [
+            "hyper_mix_attn", "q_gate_proj", "split_q_gate", "k_proj",
+            "v_proj", "qk_norm", "rope_qk", "attn",
+            "attn_gate_sigmoid_mul", "out_proj", "hyper_inject_attn",
+            "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ],
+          "sparse_attention_ple": [
+            "ple_ngram_embed",
+            {"op":"activation_quantize","kernel":"quantize_row_q8_k","params":{"_input_dim_from_config":"ple_embed_dim"},"graph_slots":{"inputs":{"input":"ple_embedding"},"outputs":{"output":"ple_embedding_q8"}}},
+            {"op":"ple_key_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            {"op":"ple_value_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            "ple_gate_conv_inject",
+            "hyper_mix_attn", "qsa_index_proj", "qsa_index_select", "q_gate_proj", "split_q_gate",
+            "k_proj", "v_proj", "qk_norm", "rope_qk", "qsa_attention",
+            "attn_gate_sigmoid_mul", "out_proj", "hyper_inject_attn",
+            "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ],
+          "full_attention_ple": [
+            "ple_ngram_embed",
+            {"op":"activation_quantize","kernel":"quantize_row_q8_k","params":{"_input_dim_from_config":"ple_embed_dim"},"graph_slots":{"inputs":{"input":"ple_embedding"},"outputs":{"output":"ple_embedding_q8"}}},
+            {"op":"ple_key_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            {"op":"ple_value_proj","graph_slots":{"inputs":{"x":"ple_embedding_q8"}}},
+            "ple_gate_conv_inject",
+            "hyper_mix_attn", "q_gate_proj", "split_q_gate",
+            "k_proj", "v_proj", "qk_norm", "rope_qk", "attn",
+            "attn_gate_sigmoid_mul", "out_proj", "hyper_inject_attn",
+            "hyper_mix_mlp",
+            {"op":"moe_router","graph_slots":{"inputs":{"A":"main_stream"},"outputs":{"C":"mlp_scratch"}}},
+            "full_softmax_topk_router",
+            {"op":"moe_swiglu_packed_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"packed_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"moe_swiglu_expert_mlp","when":{"config_key":"moe_expert_weight_layout","equals":"separate_gate_up"},"graph_slots":{"inputs":{"hidden":"main_stream","indices":"q_scratch","routing_weights":"k_scratch"},"outputs":{"output":"mlp_scratch"}}},
+            {"op":"gated_shared_swiglu_expert_mlp","graph_slots":{"inputs":{"hidden":"main_stream","routed":"mlp_scratch"},"outputs":{"output":"moe_output_stream"}}},
+            {"op":"hyper_inject_mlp","graph_slots":{"inputs":{"hyper_input":"hyper_stream","block_output":"moe_output_stream","injection_weight":"mlp_hyper_injection"},"outputs":{"output":"hyper_stream"}}}
+          ]
+        }
+      },
+      "footer": ["hyper_mix_final", "lm_head", "logits"]
+    }
+  }
+}

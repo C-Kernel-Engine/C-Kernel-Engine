@@ -1,0 +1,62 @@
+{
+  "id": "moe_swiglu_shared_forward_bf16_gated",
+  "op": "gated_shared_swiglu_expert_mlp",
+  "operation_interface": "moe_shared_swiglu.bf16_weights.bf16_sigmoid_gate.fp32_transport.v1",
+  "selection": {
+    "status": "production",
+    "priority": 220,
+    "equivalence_group": "bf16_shared_swiglu_bf16_sigmoid_gate_then_routed_add",
+    "phases": ["prefill", "decode"]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "bf16_shared_swiglu_bf16_sigmoid_gate_then_routed_add",
+  "variant": "bf16_gated",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "bf16", "activation": "bf16_in_fp32_transport", "output": "bf16_in_fp32_transport"},
+  "inputs": [
+    {"name":"hidden","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"routed","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights": [
+    {"name":"moe_shared_gate","dtype":"bf16","shape":["I","H"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_up","dtype":"bf16","shape":["I","H"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_down","dtype":"bf16","shape":["H","I"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_router","dtype":"bf16","shape":["1","H"],"layout":"feature_contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "outputs": [
+    {"name":"output","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}
+  ],
+  "dims": ["R", "H", "I"],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill":"row", "decode":"serial"},
+    "strategies": [{"name":"row","partition_dim":"R","param_style":"range","range":{"min_chunk":1}}]
+  },
+  "impl": {
+    "function": "moe_swiglu_shared_forward_bf16_gated_parallel_dispatch",
+    "c_declaration": "void moe_swiglu_shared_forward_bf16_gated_parallel_dispatch(const float *hidden, const float *routed, const uint16_t *shared_gate, const uint16_t *shared_up, const uint16_t *shared_down, const uint16_t *shared_router, float *output, int rows, int hidden_dim, int intermediate_dim);",
+    "sources": ["src/kernels/axpy_kernels.c", "version/v8/src/ck_parallel_prefill_v8.c"]
+  },
+  "implementation": {
+    "isa_dispatch": "runtime",
+    "threading": {"runtime":"ck_threadpool","work_partition":["independent_rows"],"dispatch":["ck_threadpool_parallel_for_n"],"reduction_order_effect":"none"}
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name":"hidden","source":"activation:hidden","cast":"const float*","ports":["input:hidden"]},
+      {"name":"routed","source":"activation:routed","cast":"const float*","ports":["input:routed"]},
+      {"name":"shared_gate","source":"weight:moe_shared_gate","cast":"const uint16_t*","ports":["weight:moe_shared_gate"]},
+      {"name":"shared_up","source":"weight:moe_shared_up","cast":"const uint16_t*","ports":["weight:moe_shared_up"]},
+      {"name":"shared_down","source":"weight:moe_shared_down","cast":"const uint16_t*","ports":["weight:moe_shared_down"]},
+      {"name":"shared_router","source":"weight:moe_shared_router","cast":"const uint16_t*","ports":["weight:moe_shared_router"]},
+      {"name":"output","source":"output:output","cast":"float*","ports":["output:output"]},
+      {"name":"rows","source":"dim:R"},
+      {"name":"hidden_dim","source":"dim:H"},
+      {"name":"intermediate_dim","source":"dim:I"}
+    ]
+  },
+  "tests": {"unit":["unittest/test_moe_swiglu_shared_bf16_gated.py"]},
+  "notes": "BF16 gated shared SwiGLU provider. Arithmetic boundaries mirror the BF16 graph and token rows are independent."
+}

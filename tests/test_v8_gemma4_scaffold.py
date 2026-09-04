@@ -99,8 +99,8 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             context_len=25,
         )
         expected = 25 * (10240 // 256) * 292
-        self.assertEqual(specs["layer_input"]["size"], expected)
-        self.assertGreater(specs["layer_input"]["size"], 25 * 2560 * 4)
+        self.assertEqual(specs["main_stream_q8"]["size"], expected)
+        self.assertEqual(specs["layer_input"]["size"], 25 * 2560 * 4)
 
     def test_quantized_write_extent_rejects_neighbor_overwrite(self) -> None:
         operation = {

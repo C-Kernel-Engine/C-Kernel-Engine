@@ -389,17 +389,29 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
     # Layer offsets struct - union fields across all layers so mixed layer kinds
     # can share one compiled offsets table without generator-side special cases.
     layer_entries = [e for e in weights.get("entries", []) if e.get("name", "").startswith("layer.")]
-    field_names = sorted(
+    layer_weight_names = sorted(
         {
             e["name"].split(".", 2)[2]
             for e in layer_entries
             if len(e.get("name", "").split(".", 2)) == 3
         }
     )
+    layer_field_by_name: Dict[str, str] = {}
+    used_layer_fields = set()
+    for name in layer_weight_names:
+        base = _sanitize_macro(name).lower()
+        field = base
+        suffix = 2
+        while field in used_layer_fields:
+            field = f"{base}_{suffix}"
+            suffix += 1
+        used_layer_fields.add(field)
+        layer_field_by_name[name] = field
 
     lines.append("/* Per-layer weight offsets */")
     lines.append("typedef struct {")
-    for field in field_names:
+    for name in layer_weight_names:
+        field = layer_field_by_name[name]
         lines.append(f"    size_t {field};")
     lines.append("} LayerOffsets;")
     lines.append("")
@@ -411,7 +423,8 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
                         if e.get("name", "").startswith(f"layer.{layer_idx}.")]
         lines.append(f"    [{layer_idx}] = {{")
         for e in layer_entries:
-            field = e["name"].replace(f"layer.{layer_idx}.", "")
+            name = e["name"].replace(f"layer.{layer_idx}.", "")
+            field = layer_field_by_name[name]
             lines.append(f"        .{field} = {e.get('offset', 0)},")
         lines.append("    },")
     lines.append("};")
@@ -1916,10 +1929,17 @@ def emit_op(
         # Quantized providers with specialized emission export their outputs
         # before returning. Keep the generic fallback observable as well, for
         # providers such as compact Q5_K GEMV that use the call-ready ABI.
+        if function.startswith("gemm_"):
+            projection_count = _mul_expr(
+                _hidden_arg("M", "rows", "tokens"),
+                _hidden_arg("N", "out_dim"),
+            )
+        else:
+            projection_count = _hidden_arg("M", "N", "out_dim")
         _emit_hidden_export(
             _hidden_arg("y", "output", "out", "c"),
             op_name,
-            _hidden_arg("M", "N", "out_dim"),
+            projection_count,
         )
     elif op_name == "attention_gate_projection":
         _emit_hidden_export(
@@ -1961,15 +1981,15 @@ def emit_op(
     elif op_name in ("out_proj", "attn_out_proj"):
         out_expr = _hidden_arg("output", "out", "c", "y")
         count_expr = _mul_expr(
-            _hidden_arg("M", "rows", "tokens"),
-            _hidden_arg("N", "out_dim", "embed_dim"),
+            _hidden_arg("M", "rows", "tokens", "_m"),
+            _hidden_arg("N", "out_dim", "embed_dim", "_output_dim"),
         )
         _emit_hidden_export(out_expr, "out_proj", count_expr)
         _emit_hidden_export_last_row(out_expr, "out_proj", _hidden_arg("N", "out_dim", "embed_dim"))
-    elif op_name == "attn":
+    elif op_name in ("attn", "qsa_attention"):
         out_expr = _hidden_arg("out_token", "output", "out", "c", "y")
         count_expr = _mul_expr(
-            _hidden_arg("num_heads"),
+            _hidden_arg("num_heads", "query_heads"),
             _hidden_arg("num_tokens", "tokens", "rows"),
             _hidden_arg("aligned_head_dim", "head_dim"),
         )
@@ -1993,6 +2013,96 @@ def emit_op(
             _hidden_arg("state_dim", "aligned_head_dim", "head_dim"),
         )
         _emit_hidden_export(out_expr, "attn_out", count_expr)
+    elif op_name == "hyper_stream_expand":
+        output = _hidden_arg("output", "out")
+        count = _mul_expr(
+            _hidden_arg("rows", "tokens"),
+            _hidden_arg("streams"),
+            _hidden_arg("hidden_dim", "embed_dim"),
+        )
+        _emit_hidden_export(output, "hyper_stream", count)
+    elif op_name in {"hyper_mix_attn", "hyper_mix_mlp", "hyper_mix_final"}:
+        mixed = _hidden_arg("mixed_output", "output", "out")
+        injection = _hidden_arg("injection_output")
+        normalized = _hidden_arg("normalized_scratch")
+        dynamic = _hidden_arg("dynamic_scratch")
+        gate = _hidden_arg("mix_scratch")
+        rows = _hidden_arg("rows", "tokens")
+        hidden = _hidden_arg("hidden_dim", "embed_dim")
+        streams = _hidden_arg("streams")
+        dynamic_dim = _hidden_arg("dynamic_dim")
+        if op_name == "hyper_mix_attn":
+            checkpoint_prefix = "attn_hyper"
+            mixed_label = "attn_mixed_input"
+            injection_label = "attn_injection_weights"
+        elif op_name == "hyper_mix_mlp":
+            checkpoint_prefix = "mlp_hyper"
+            mixed_label = "mlp_mixed_input"
+            injection_label = "mlp_injection_weights"
+        else:
+            checkpoint_prefix = "final_hyper"
+            mixed_label = "final_hidden"
+            injection_label = "final_injection_weights"
+        _emit_hidden_export(
+            normalized,
+            f"{checkpoint_prefix}_norm",
+            _mul_expr(rows, streams, hidden),
+        )
+        _emit_hidden_export(
+            dynamic,
+            f"{checkpoint_prefix}_dynamic",
+            _mul_expr(rows, dynamic_dim),
+        )
+        _emit_hidden_export(
+            gate,
+            f"{checkpoint_prefix}_gate",
+            _mul_expr(rows, streams, hidden),
+        )
+        _emit_hidden_export(mixed, mixed_label, _mul_expr(rows, hidden))
+        _emit_hidden_export(injection, injection_label, _mul_expr(rows, streams))
+    elif op_name in {"hyper_inject_attn", "hyper_inject_mlp"}:
+        output = _hidden_arg("output", "out")
+        label = "after_attn_hyper" if op_name == "hyper_inject_attn" else "layer_out"
+        count = _mul_expr(
+            _hidden_arg("rows", "tokens"),
+            _hidden_arg("streams"),
+            _hidden_arg("hidden_dim", "embed_dim"),
+        )
+        _emit_hidden_export(output, label, count)
+    elif op_name == "ple_ngram_embed":
+        output = _hidden_arg("output", "embedding_output")
+        ngram_history = _hidden_arg("ngram_size")
+        if ngram_history:
+            ngram_history = f"(({_hidden_raw(ngram_history)}) - 1)"
+        count = _mul_expr(
+            _hidden_arg("rows", "tokens"),
+            ngram_history,
+            _hidden_arg("heads_per_ngram"),
+            _hidden_arg("head_dim"),
+        )
+        _emit_hidden_export(output, "ple_embedding", count)
+    elif op_name in {"ple_key_proj", "ple_value_proj"}:
+        output = _hidden_arg("C", "output", "out", "y")
+        rows = _hidden_arg("M", "m", "rows", "tokens")
+        width = _hidden_arg("N", "n", "out_dim")
+        label = "ple_key_projected" if op_name == "ple_key_proj" else "ple_value_projected"
+        _emit_hidden_export(output, label, _mul_expr(rows, width))
+    elif op_name == "ple_gate_conv_inject":
+        output = _hidden_arg("hyper_output", "output", "out")
+        key_norm = _hidden_arg("key_norm_scratch")
+        query_norm = _hidden_arg("query_norm_scratch")
+        gated = _hidden_arg("gated_scratch")
+        conv_norm = _hidden_arg("conv_norm_scratch")
+        count = _mul_expr(
+            _hidden_arg("rows", "tokens"),
+            _hidden_arg("streams"),
+            _hidden_arg("hidden_dim", "embed_dim"),
+        )
+        _emit_hidden_export(key_norm, "ple_key_normed", count)
+        _emit_hidden_export(query_norm, "ple_query_normed", count)
+        _emit_hidden_export(gated, "ple_gated_value", count)
+        _emit_hidden_export(conv_norm, "ple_conv_normed", count)
+        _emit_hidden_export(output, "ple_layer_out", count)
     elif op_name == "residual_add":
         out_expr = _hidden_arg("output", "out", "c", "y")
         residual_expr = _hidden_arg("b")
@@ -2082,7 +2192,7 @@ def emit_op(
             lines.append(f'    ck_debug_export_hidden(model, {layer}, "post_ffn_norm", (const float*){out_expr}, EMBED_DIM);')
             _emit_hidden_export_last_row(out_expr, "post_ffn_norm", "EMBED_DIM")
     elif op_name == "moe_router":
-        output = _hidden_arg("C", "output", "out")
+        output = _hidden_arg("C", "output", "out", "y")
         rows = _hidden_arg("M", "m", "rows", "tokens")
         width = _hidden_arg("N", "n", "n_experts")
         _emit_hidden_export(output, "moe_router_logits", _mul_expr(rows, width))
@@ -2101,7 +2211,7 @@ def emit_op(
             )
         _emit_hidden_export(weights, "moe_routing_weights", _mul_expr(rows, width))
         _emit_hidden_export_last_row(weights, "moe_routing_weights", width)
-    elif op_name == "moe_swiglu_expert_mlp":
+    elif op_name in ("moe_swiglu_expert_mlp", "moe_swiglu_packed_expert_mlp"):
         output = _hidden_arg("output", "out")
         rows = _hidden_arg("rows", "M", "m", "tokens")
         width = _hidden_arg("hidden_dim", "embed_dim") or "EMBED_DIM"
@@ -2315,12 +2425,22 @@ def emit_op(
         _emit_hidden_export(
             _hidden_arg("output", "out", "c", "y"),
             "linear_attn_out",
-            _hidden_count("m", "n", "rows", "dim", default="EMBED_DIM"),
+            _mul_expr(
+                _hidden_arg("M", "m", "rows", "tokens", "_m"),
+                _hidden_arg("N", "n", "out_dim", "embed_dim", "_output_dim"),
+            ),
         )
     elif op_name == "final_rmsnorm":
         out_expr = _hidden_raw(_hidden_arg("output", "out", "x", "y"))
         if out_expr:
             lines.append(f'    ck_debug_export_hidden(model, {layer}, "final_hidden", (const float*){out_expr}, EMBED_DIM);')
+    elif op_name == "logits":
+        output = _hidden_arg("output", "out", "c", "y")
+        if function.startswith("gemm_"):
+            vocab_size = _hidden_arg("N", "n", "vocab_size")
+        else:
+            vocab_size = _hidden_arg("M", "m", "N", "n", "vocab_size")
+        _emit_hidden_export(output, "logits", vocab_size)
 
     # Add debug output if enabled
     if debug:

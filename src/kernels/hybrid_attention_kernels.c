@@ -1,4 +1,5 @@
 #include "ckernel_engine.h"
+#include "bf16_utils.h"
 
 #include <dlfcn.h>
 #include <math.h>
@@ -125,6 +126,35 @@ void attn_gate_sigmoid_mul_forward(const float *x,
         float *out_row = out + (size_t) row * (size_t) dim;
         for (int col = 0; col < dim; ++col) {
             out_row[col] = x_row[col] * hybrid_sigmoid(gate_row[col]);
+        }
+    }
+}
+
+void attn_gate_sigmoid_mul_pytorch_bf16_storage(const float *x,
+                                                const float *gate,
+                                                float *out,
+                                                int rows,
+                                                int num_heads,
+                                                int state_dim) {
+    if (!x || !gate || !out || rows <= 0 || num_heads <= 0 || state_dim <= 0) {
+        return;
+    }
+    const int dim = num_heads * state_dim;
+    for (int row = 0; row < rows; ++row) {
+        const float *x_row = x + (size_t)row * (size_t)dim;
+        const float *gate_row = gate + (size_t)row * (size_t)dim;
+        float *out_row = out + (size_t)row * (size_t)dim;
+        for (int col = 0; col < dim; col += 16) {
+            const int width = dim - col < 16 ? dim - col : 16;
+            float sigmoid[16];
+            recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(
+                gate_row + col, sigmoid, 1, width);
+            for (int lane = 0; lane < width; ++lane) {
+                const float x_bf16 = bf16_to_float(float_to_bf16(x_row[col + lane]));
+                const float sigmoid_bf16 = bf16_to_float(float_to_bf16(sigmoid[lane]));
+                out_row[col + lane] = bf16_to_float(float_to_bf16(
+                    x_bf16 * sigmoid_bf16));
+            }
         }
     }
 }

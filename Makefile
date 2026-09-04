@@ -355,9 +355,12 @@ endif
 
 # oneDNN paths
 # Prefer oneAPI if installed; otherwise default to /usr/local (typical from-source install).
+DNNL_ROOT_WAS_EXPLICIT := $(if $(filter undefined,$(origin DNNL_ROOT)),,1)
+DNNL_INC_WAS_EXPLICIT := $(if $(filter undefined,$(origin DNNL_INC)),,1)
+DNNL_LIB_WAS_EXPLICIT := $(if $(filter undefined,$(origin DNNL_LIB)),,1)
 DNNL_ROOT ?= $(if $(wildcard $(ONEAPI_ROOT)/dnnl/latest/include/dnnl.h),$(ONEAPI_ROOT)/dnnl/latest,/usr/local)
-DNNL_INC := $(DNNL_ROOT)/include
-DNNL_LIB := $(DNNL_ROOT)/lib
+DNNL_INC ?= $(DNNL_ROOT)/include
+DNNL_LIB ?= $(DNNL_ROOT)/lib
 
 DNNL_HPP := $(wildcard $(DNNL_INC)/dnnl.hpp)
 
@@ -373,8 +376,11 @@ endif
 
 # Add oneDNN support
 ifdef USE_ONEDNN
-    # Prefer /usr/local OpenMP-based oneDNN over Intel oneAPI SYCL version
+    # Prefer /usr/local OpenMP-based oneDNN over Intel oneAPI SYCL version only
+    # for auto-detected builds. Explicit roots/paths identify a numerical
+    # provider runtime and must not be silently replaced.
     DNNL_LOCAL := $(wildcard /usr/local/lib/libdnnl.so)
+    ifeq ($(DNNL_ROOT_WAS_EXPLICIT)$(DNNL_INC_WAS_EXPLICIT)$(DNNL_LIB_WAS_EXPLICIT),)
     ifdef DNNL_LOCAL
         DNNL_INC := /usr/local/include
         DNNL_LIB := /usr/local/lib
@@ -382,6 +388,7 @@ ifdef USE_ONEDNN
         # Intel compiler runtime library (libimf.so, etc.) needed by oneAPI oneDNN
         INTEL_COMPILER_LIB := $(ONEAPI_ROOT)/compiler/latest/lib
         LDFLAGS += -L$(INTEL_COMPILER_LIB) -Wl,-rpath,$(INTEL_COMPILER_LIB)
+    endif
     endif
     CFLAGS += -DUSE_ONEDNN -I$(DNNL_INC)
     LDFLAGS += -L$(DNNL_LIB) -ldnnl -Wl,-rpath,$(DNNL_LIB)
@@ -448,6 +455,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/attention_flash_true.c \
 	           src/kernels/ssm_kernels.c \
 	           src/kernels/hybrid_attention_kernels.c \
+	           src/kernels/hyper_connection_kernels.c \
+	           src/kernels/qwen4_exp_kernels.c \
 	           src/kernels/recurrent_split_kernels.c \
 	           src/kernels/recurrent_gate_kernels.c \
 	           src/kernels/recurrent_state_kernels.c \
@@ -520,6 +529,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/axpy_kernels.c \
 	           src/kernels/fused/rmsnorm_qkv.c \
 	           src/kernels/fused/attention_mlp_fused.c \
+	           version/v8/src/ck_parallel_decode_v8.c \
+	           version/v8/src/ck_parallel_prefill_v8.c \
 	           src/ck_threadpool.c \
            src/ck_parallel_train.c
 
@@ -535,7 +546,9 @@ X86_ONLY_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
 	           src/kernels/quantize_row_q8_k_avx.c \
 	           src/kernels/quantize_row_q8_k_avx2.c \
 	           src/kernels/quantize_row_q8_k_avx512.c \
-	           src/kernels/fused/rmsnorm_q8_k_fused.c
+	           src/kernels/fused/rmsnorm_q8_k_fused.c \
+	           version/v8/src/ck_parallel_decode_v8.c \
+	           version/v8/src/ck_parallel_prefill_v8.c
 
 ifeq ($(IS_ARM_ARCH),)
 else
@@ -1615,6 +1628,27 @@ test-v8-xeon-family-contracts:
 		tests.test_v8_qwen36_contract \
 		tests.test_v8_template_circuit_audit \
 		-v
+
+.PHONY: test-v8-qwen38-flash-contracts
+test-v8-qwen38-flash-contracts: $(BUILD_DIR)/libckernel_engine.so
+	@$(PYTHON) -m pytest -q \
+		tests/test_v8_qwen4_exp_contract.py \
+		tests/test_v8_runtime_kernel_build_requirements.py \
+		tests/test_compare_multitoken_logits_v8.py \
+		unittest/test_hyper_connection_bf16.py \
+		unittest/test_hyper_connection_quantized.py \
+		unittest/test_qwen4_exp_packed_moe_bf16.py \
+		unittest/test_qwen4_exp_ple_bf16.py \
+		unittest/test_qwen4_exp_ple_quantized.py \
+		unittest/test_qwen4_exp_qsa_bf16.py \
+		unittest/test_moe_swiglu_q4k_q5_0.py \
+		unittest/test_moe_swiglu_q4k_q8_0.py \
+		unittest/test_moe_swiglu_shared_bf16_gated.py \
+		unittest/test_recurrent_norm_sigmoid_gate_llama.py \
+		unittest/bf16/test_attn_gate_sigmoid_pytorch_storage_bf16.py \
+		unittest/bf16/test_gemv_storage_contract_bf16.py \
+		unittest/bf16/test_moe_softmax_topk_router_bf16.py \
+		unittest/bf16/test_recurrent_dt_gate_pytorch_fp32.py
 
 .PHONY: test-v8-cohere-laguna-contracts
 test-v8-cohere-laguna-contracts:

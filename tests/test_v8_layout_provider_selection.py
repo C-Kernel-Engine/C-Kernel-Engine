@@ -263,6 +263,50 @@ class LayoutProviderSelectionTests(unittest.TestCase):
             "output",
         )
 
+    def test_attention_input_roles_resolve_direct_and_cache_ports(self):
+        registry = json.loads(
+            (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()
+        )
+        direct = "attention_forward_causal_head_major_gqa_flash_strided_token_output"
+        cached = "attention_forward_causal_head_major_gqa_prefill_append_f16cache_contract"
+        self.assertEqual(build_ir._attention_input_port_name(registry, direct, "q"), "q")
+        self.assertEqual(build_ir._attention_input_port_name(registry, direct, "k"), "k")
+        self.assertEqual(build_ir._attention_input_port_name(registry, direct, "v"), "v")
+        self.assertEqual(build_ir._attention_input_port_name(registry, cached, "q"), "q")
+        self.assertEqual(build_ir._attention_input_port_name(registry, cached, "k"), "k_cache")
+        self.assertEqual(build_ir._attention_input_port_name(registry, cached, "v"), "v_cache")
+
+    def test_attention_input_role_ambiguity_fails_closed(self):
+        registry = json.loads(
+            (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()
+        )
+        mutated = copy.deepcopy(registry)
+        provider = next(
+            item for item in mutated["kernels"]
+            if item.get("id") == "attention_forward_causal_head_major_gqa_flash_strided_token_output"
+        )
+        provider["inputs"].append({"name": "k_cache"})
+        with self.assertRaisesRegex(RuntimeError, "exactly one K input port"):
+            build_ir._attention_input_port_name(mutated, provider["id"], "k")
+
+    def test_legacy_attention_provider_keeps_semantic_port_names(self):
+        registry = json.loads(
+            (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()
+        )
+        provider = (
+            "attention_forward_causal_head_major_gqa_prefill_full_"
+            "bf16cache_pytorch_contract"
+        )
+        self.assertEqual(
+            build_ir._attention_input_port_name(registry, provider, "q"), "q"
+        )
+        self.assertEqual(
+            build_ir._attention_input_port_name(registry, provider, "k"), "k"
+        )
+        self.assertEqual(
+            build_ir._attention_input_port_name(registry, provider, "v"), "v"
+        )
+
     def test_unknown_physical_variant_fails_closed(self):
         registry = json.loads(
             (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()

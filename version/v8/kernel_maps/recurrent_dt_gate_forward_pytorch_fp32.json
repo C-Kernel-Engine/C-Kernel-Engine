@@ -1,0 +1,60 @@
+{
+  "id": "recurrent_dt_gate_forward_pytorch_fp32",
+  "op": "recurrent_dt_gate",
+  "operation_interface": "recurrent_dt_gate.fp32.v1",
+  "variant": "pytorch_sleef_fp32_output",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "alpha", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [
+    {"name": "dt_bias", "dtype": "fp32", "shape": ["H"], "layout": "row_major_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "a", "dtype": "fp32", "shape": ["H"], "layout": "row_major_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "H"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [],
+  "dims": ["R", "H", "S"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "constraints": {
+    "alignment": {"H": 16},
+    "notes": "Validated for scalar state gates (S=1). Requires AVX-512 plus PyTorch's SLEEF exp/log1p symbols."
+  },
+  "impl": {
+    "function": "recurrent_dt_gate_forward_pytorch_fp32",
+    "c_declaration": "void recurrent_dt_gate_forward_pytorch_fp32(const float *alpha, const float *dt_bias, const float *a, float *gate, int rows, int num_heads, int state_dim);",
+    "sources": ["src/kernels/recurrent_gate_kernels.c"],
+    "variants": [{"name": "avx512_sleef", "requires": ["avx512f"], "compile_flags": ["-mavx512f"]}]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "recurrent_dt_gate_pytorch_sleef_fp32_output",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "recurrent_dt_gate_forward_pytorch_fp32",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "runtime",
+      "threading": {"runtime": "serial", "work_partition": ["independent_rows"], "dispatch": ["inline"], "reduction_order_effect": "none"}
+    },
+    "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "alpha", "source": "activation:alpha", "cast": "const float*", "ports": ["input:alpha"]},
+    {"name": "dt_bias", "source": "weight:ssm_dt_bias", "cast": "const float*", "ports": ["weight:dt_bias"]},
+    {"name": "a", "source": "weight:ssm_a", "cast": "const float*", "ports": ["weight:a"]},
+    {"name": "gate", "source": "output:gate", "cast": "float*", "ports": ["output:gate"]},
+    {"name": "rows", "source": "runtime:seq_len"},
+    {"name": "num_heads", "source": "dim:gate_dim"},
+    {"name": "state_dim", "source": "const:1"}
+  ]},
+  "tests": {"parity": ["PyTorch 2.13 CPU AVX-512 F.softplus(alpha + dt_bias) * -exp(A_log), exact FP32 output."]},
+  "notes": "Versioned PyTorch recurrent decay provider; the generic llama-compatible scalar provider remains unchanged."
+}

@@ -1,0 +1,46 @@
+{
+  "id": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+  "op": "recurrent_norm_gate",
+  "operation_interface": "recurrent_norm_gate.fp32_bf16_values.v1",
+  "variant": "pytorch_bf16_sigmoid_storage",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32_bf16_values", "output": "fp32_bf16_values"},
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["R", "H", "D"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "H", "D"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [{"name": "weight", "dtype": "fp32", "shape": ["D"], "layout": "feature_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"}],
+  "outputs": [{"name": "out", "dtype": "fp32", "shape": ["R", "H", "D"], "layout": "contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["R", "H", "D"],
+  "params": [{"name": "eps", "dtype": "float32"}],
+  "impl": {
+    "function": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+    "c_declaration": "void recurrent_norm_sigmoid_gate_pytorch_bf16_storage(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
+    "sources": ["src/kernels/recurrent_norm_kernels.c", "src/kernels/rmsnorm_kernels.c", "src/kernels/recurrent_gate_kernels.c"],
+    "variants": [{"name": "avx512", "requires": ["avx512f", "avx2"], "compile_flags": ["-mavx512f", "-mavx2"]}]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "recurrent_norm_sigmoid_gate_pytorch_bf16_storage",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "compile_time",
+      "threading": {"runtime": "serial", "work_partition": ["independent_rows", "independent_heads"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}
+    },
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "hierarchical_cascade", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "x", "source": "activation:x", "cast": "const float*", "ports": ["input:x"]},
+    {"name": "gate", "source": "activation:gate", "cast": "const float*", "ports": ["input:gate"]},
+    {"name": "weight", "source": "weight:ssm_norm", "cast": "const float*", "ports": ["weight:weight"]},
+    {"name": "out", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
+    {"name": "rows", "source": "runtime:seq_len"},
+    {"name": "num_heads", "source": "dim:recurrent_num_heads"},
+    {"name": "head_dim", "source": "dim:recurrent_head_dim"},
+    {"name": "eps", "source": "dim:rms_eps"}
+  ]},
+  "tests": {"parity": ["Qwen4-Exp BF16 layer-0 RMSNormGated sigmoid call boundary is byte-exact against PyTorch CPU."]}
+}

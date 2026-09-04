@@ -16,6 +16,7 @@
   "dims": ["M", "N", "K"],
   "constraints": {"external_runtime": "onednn_3_7_openmp"},
   "impl": {
+    "allocation_helpers": ["gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl"],
     "function": "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage",
     "c_declaration": "void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
     "sources": ["src/kernels/gemm_kernels_bf16.c"],

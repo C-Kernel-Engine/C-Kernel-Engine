@@ -518,22 +518,31 @@ class CKModel:
 
         template_data = None
         explicit_contract = None
+        explicit_contract_names: set[str] = set()
+
+        def _record_contract(candidate: object) -> None:
+            nonlocal explicit_contract
+            normalized = normalize_chat_contract(candidate)
+            if normalized is None:
+                return
+            name = str(normalized.get("name") or "").strip().lower()
+            if name:
+                explicit_contract_names.add(name)
+            if explicit_contract is None:
+                # Preserve sparse legacy sidecars so hydrate_chat_contract()
+                # can fill fields from the named circuit contract.
+                explicit_contract = candidate
+
         for data in self._iter_runtime_json_docs():
-            explicit_contract = data.get("chat_contract")
-            if explicit_contract is not None:
-                break
+            _record_contract(data.get("chat_contract"))
 
             cfg = data.get("config")
             if isinstance(cfg, dict):
-                explicit_contract = cfg.get("chat_contract")
-                if explicit_contract is not None:
-                    break
+                _record_contract(cfg.get("chat_contract"))
 
             contract = data.get("contract")
             if isinstance(contract, dict):
-                explicit_contract = contract.get("chat_contract")
-                if explicit_contract is not None:
-                    break
+                _record_contract(contract.get("chat_contract"))
                 if template_data is None:
                     template_data = data
 
@@ -541,11 +550,16 @@ class CKModel:
             if isinstance(template, dict):
                 template_contract = template.get("contract")
                 if isinstance(template_contract, dict):
-                    explicit_contract = template_contract.get("chat_contract")
-                    if explicit_contract is not None:
-                        break
+                    _record_contract(template_contract.get("chat_contract"))
                 if template_data is None:
                     template_data = template
+
+        if len(explicit_contract_names) > 1:
+            names = ", ".join(sorted(explicit_contract_names))
+            raise RuntimeError(
+                "conflicting chat contracts in runtime artifacts: "
+                f"{names}; regenerate config and manifest together"
+            )
 
         if explicit_contract is None:
             meta = self._load_model_meta()
@@ -1098,10 +1112,21 @@ class CKModel:
         """Align GGUF fallback tokenizer behavior with manifest/ GGUF tokenizer flags."""
         if self.tokenizer is None:
             return
+        target = getattr(self.tokenizer, "_tokenizer", self.tokenizer)
+
+        # tokenizer.json may carry training/batch padding or truncation policy.
+        # CKE schedules one logical prompt and owns its context bound, so those
+        # policies must not materialize padding tokens or silently trim input.
+        no_padding = getattr(target, "no_padding", None)
+        if callable(no_padding):
+            no_padding()
+        no_truncation = getattr(target, "no_truncation", None)
+        if callable(no_truncation):
+            no_truncation()
+
         special = self._load_tokenizer_contract()
         if not special:
             return
-        target = getattr(self.tokenizer, "_tokenizer", self.tokenizer)
 
         apply_contract = getattr(target, "apply_contract", None)
         if callable(apply_contract):
@@ -1274,7 +1299,18 @@ class CKModel:
                         and isinstance(template_prefill, str)
                         and template_prefill.strip()
                     ):
-                        contract["prefill_policy"] = template_prefill.strip()
+                        template_prefill = template_prefill.strip()
+                        # A model conversion may demote batched prefill after
+                        # inspecting its concrete storage/layout contract.  A
+                        # generic template default must not promote it again.
+                        # Sequential is therefore sticky unless the explicit
+                        # BF16 hybrid certification above applies.
+                        if (
+                            template_prefill.lower() == "sequential_decode"
+                            or str(contract.get("prefill_policy") or "").strip().lower()
+                            != "sequential_decode"
+                        ):
+                            contract["prefill_policy"] = template_prefill
 
         # Certification/benchmark override for hybrid models whose packaged
         # template still defaults to sequential decode.  This is deliberately

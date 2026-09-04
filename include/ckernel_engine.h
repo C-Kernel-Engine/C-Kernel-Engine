@@ -55,6 +55,179 @@ void ck_set_num_threads(int num_threads);
 int ck_get_num_threads(void);
 int ck_get_physical_cores(void);
 
+void hyper_stream_expand_bf16(const float *input,
+                              float *output,
+                              int rows,
+                              int streams,
+                              int hidden_dim);
+void hyper_stream_expand_f32(const float *input,
+                             float *output,
+                             int rows,
+                             int streams,
+                             int hidden_dim);
+void hyper_connection_mix_bf16(const float *hyper_input,
+                               const float *norm_weight,
+                               const uint16_t *mix_down_weight,
+                               const uint16_t *mix_up_weight,
+                               const uint16_t *inject_weight,
+                               float *mixed_output,
+                               float *injection_output,
+                               float *normalized_scratch,
+                               float *dynamic_scratch,
+                               float *mix_scratch,
+                               int rows,
+                               int streams,
+                               int hidden_dim,
+                               int dynamic_dim,
+                               float eps,
+                               int emit_injection);
+void hyper_connection_mix_q4k_q5_0_q4k(const float *hyper_input,
+                                       const float *norm_weight,
+                                       const void *mix_down_weight,
+                                       const void *mix_up_weight,
+                                       const void *inject_weight,
+                                       float *mixed_output,
+                                       float *injection_output,
+                                       float *normalized_scratch,
+                                       float *dynamic_scratch,
+                                       float *mix_scratch,
+                                       int rows,
+                                       int streams,
+                                       int hidden_dim,
+                                       int dynamic_dim,
+                                       float eps,
+                                       int emit_injection);
+void hyper_connection_mix_q6k_q5_0_q4k(const float *hyper_input,
+                                       const float *norm_weight,
+                                       const void *mix_down_weight,
+                                       const void *mix_up_weight,
+                                       const void *inject_weight,
+                                       float *mixed_output,
+                                       float *injection_output,
+                                       float *normalized_scratch,
+                                       float *dynamic_scratch,
+                                       float *mix_scratch,
+                                       int rows,
+                                       int streams,
+                                       int hidden_dim,
+                                       int dynamic_dim,
+                                       float eps,
+                                       int emit_injection);
+void hyper_stream_inject_bf16(const float *hyper_input,
+                              const float *block_output,
+                              const float *injection_weight,
+                              float *output,
+                              int rows,
+                              int streams,
+                              int hidden_dim);
+void hyper_stream_inject_f32(const float *hyper_input,
+                             const float *block_output,
+                             const float *injection_weight,
+                             float *output,
+                             int rows,
+                             int streams,
+                             int hidden_dim);
+
+void qwen4_ple_ngram_embed_bf16(const int32_t *token_ids,
+                                const uint16_t *embedding,
+                                const int64_t *layer_multipliers,
+                                const int64_t *head_offsets,
+                                const int64_t *head_vocab_sizes,
+                                float *output,
+                                const float *token_state_in,
+                                float *token_state_out,
+                                int rows,
+                                int ngram_size,
+                                int heads_per_ngram,
+                                int head_dim,
+                                int eos_token_id,
+                                int position);
+void qwen4_ple_ngram_embed_q5_0(const int32_t *token_ids,
+                                const void *embedding,
+                                const int64_t *layer_multipliers,
+                                const int64_t *head_offsets,
+                                const int64_t *head_vocab_sizes,
+                                float *output,
+                                const float *token_state_in,
+                                float *token_state_out,
+                                int rows,
+                                int ngram_size,
+                                int heads_per_ngram,
+                                int head_dim,
+                                int eos_token_id,
+                                int position);
+void qwen4_ple_gate_conv_inject_bf16(
+    const float *hyper_input,
+    const float *key_projected,
+    const float *value_projected,
+    const float *norm_key_weight,
+    const float *norm_query_weight,
+    const float *norm_conv_weight,
+    const uint16_t *conv_weight,
+    float *hyper_output,
+    float *key_norm_scratch,
+    float *query_norm_scratch,
+    float *gated_scratch,
+    float *conv_norm_scratch,
+    const float *conv_state_in,
+    float *conv_state_out,
+    int rows,
+    int streams,
+    int hidden_dim,
+    int kernel_size,
+    int dilation,
+    float eps);
+void qwen4_ple_gate_conv_inject_fp16(
+    const float *hyper_input,
+    const float *key_projected,
+    const float *value_projected,
+    const float *norm_key_weight,
+    const float *norm_query_weight,
+    const float *norm_conv_weight,
+    const uint16_t *conv_weight,
+    float *hyper_output,
+    float *key_norm_scratch,
+    float *query_norm_scratch,
+    float *gated_scratch,
+    float *conv_norm_scratch,
+    const float *conv_state_in,
+    float *conv_state_out,
+    int rows,
+    int streams,
+    int hidden_dim,
+    int kernel_size,
+    int dilation,
+    float eps);
+void qwen4_ple_gate_conv_inject_llama_fp16(
+    const float *hyper_input,
+    const float *key_projected,
+    const float *value_projected,
+    const float *norm_key_weight,
+    const float *norm_query_weight,
+    const float *norm_conv_weight,
+    const uint16_t *conv_weight,
+    float *hyper_output,
+    float *key_norm_scratch,
+    float *query_norm_scratch,
+    float *gated_scratch,
+    float *conv_norm_scratch,
+    const float *conv_state_in,
+    float *conv_state_out,
+    int rows,
+    int streams,
+    int hidden_dim,
+    int kernel_size,
+    int dilation,
+    float eps);
+void qwen4_qsa_index_select_bf16(
+    const float *projected_qk, const float *index_key_cache_in,
+    const float *q_norm_weight, const float *k_norm_weight,
+    float *selected_indices, float *index_key_cache_out,
+    float *q_norm_scratch, float *pooled_key_scratch,
+    float *block_score_scratch, int32_t *block_index_scratch,
+    int rows, int query_heads, int index_head_dim, int token_budget,
+    int compress_ratio, int rotary_dim, int context_length,
+    int position, float rope_theta, float eps);
 // Residual kernels used by IR/codegen runtime paths.
 void ck_residual_add_token_major(const float *a,
                                  const float *b,
@@ -248,6 +421,14 @@ void gemv_bf16_parallel_dispatch(float *y,
                                  const void *W,
                                  const float *x,
                                  int M, int K);
+void gemv_bf16_bf16_storage(float *y,
+                            const void *W,
+                            const float *x,
+                            int M, int K);
+void gemv_bf16_bf16_storage_parallel_dispatch(float *y,
+                                               const void *W,
+                                               const float *x,
+                                               int M, int K);
 
 void gemm_nt_bf16(const float *A,
                   const void *B,
@@ -312,6 +493,9 @@ void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage(const float *A,
                                                        const float *bias,
                                                        float *C,
                                                        int M, int N, int K);
+void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage(
+    const float *A, const void *B, const float *bias, float *C,
+    int M, int N, int K);
 void patch_projection_bf16_pytorch_onednn_conv3d_storage(
     const float *input, const void *weights, const float *bias, float *output,
     int batch, int out_channels, int in_channels, int temporal,
@@ -1201,6 +1385,15 @@ void qk_norm_forward_pytorch_bf16_storage(float *q,
                                           int num_tokens,
                                           int head_dim,
                                           float eps);
+void qk_norm_forward_qwen4_pytorch_bf16_storage(float *q,
+                                                float *k,
+                                                const float *q_gamma,
+                                                const float *k_gamma,
+                                                int num_heads,
+                                                int num_kv_heads,
+                                                int num_tokens,
+                                                int head_dim,
+                                                float eps);
 void qk_norm_forward_prefill_exact(float *q, float *k,
                                    const float *q_gamma, const float *k_gamma,
                                    int num_heads, int num_kv_heads,
@@ -1967,6 +2160,23 @@ ck_attention_status_t attention_forward_decode_head_major_gqa_bf16cache_pytorch_
     int head_dim,
     int aligned_head_dim,
     ck_attention_reduction_t reduction);
+void attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract(
+    const float *query,
+    const uint16_t *key_cache,
+    const uint16_t *value_cache,
+    const float *selected_indices,
+    float *output,
+    float *score_scratch,
+    int rows,
+    int query_heads,
+    int kv_heads,
+    int head_dim,
+    int selection_width,
+    int context_length,
+    int position);
+// Returns whether the sparse QSA BF16 CPU-flash provider is present in this
+// build. Unlike ordinary BF16 GQA, this provider requires AVX-512F.
+int ck_attention_sparse_bf16_pytorch_gqa_available(void);
 // Returns whether the exact native PyTorch BF16 GQA provider can execute in
 // this build and process. This probes required MKL and SLEEF symbols.
 int ck_attention_bf16_pytorch_gqa_available(void);
@@ -2365,6 +2575,16 @@ void recurrent_dt_gate_forward(const float *alpha,
                                int num_heads,
                                int state_dim);
 
+// Bit-exact PyTorch FP32 softplus contract for Qwen4-Exp recurrent gates.
+// The validated AVX-512 provider follows PyTorch's vector exp/log1p path.
+void recurrent_dt_gate_forward_pytorch_fp32(const float *alpha,
+                                             const float *dt_bias,
+                                             const float *a,
+                                             float *gate,
+                                             int rows,
+                                             int num_heads,
+                                             int state_dim);
+
 // Backward for recurrent_dt_gate_forward.
 // Layout:
 //   d_gate    : [rows, dim]
@@ -2462,10 +2682,18 @@ void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x,
                                                             float *out,
                                                             int rows,
                                                             int dim);
+void recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(const float *x,
+                                                               float *out,
+                                                               int rows,
+                                                               int dim);
 void recurrent_silu_forward_ggml(const float *x,
                                  float *out,
                                  int rows,
                                  int dim);
+void recurrent_sigmoid_forward_ggml(const float *x,
+                                    float *out,
+                                    int rows,
+                                    int dim);
 
 // Backward for recurrent_silu_forward.
 void recurrent_silu_backward(const float *d_out,
@@ -2515,6 +2743,13 @@ void recurrent_qk_l2_norm_pytorch_bf16_storage(float *q,
                                                 int expanded_heads,
                                                 int head_dim,
                                                 float eps);
+void recurrent_qk_l2_norm_pytorch_fp32_output(float *q,
+                                               float *k,
+                                               int rows,
+                                               int q_dim,
+                                               int k_dim,
+                                               int head_dim,
+                                               float eps);
 
 // Backward for recurrent_qk_l2_norm_forward.
 void recurrent_qk_l2_norm_backward(const float *d_q_out,
@@ -2543,6 +2778,14 @@ void recurrent_norm_gate_forward(const float *x,
                                  int num_heads,
                                  int head_dim,
                                  float eps);
+void recurrent_norm_sigmoid_gate_llama_avx2_forward(const float *x,
+                                                     const float *gate,
+                                                     const float *weight,
+                                                     float *out,
+                                                     int rows,
+                                                     int num_heads,
+                                                     int head_dim,
+                                                     float eps);
 
 // Backward for recurrent_norm_gate_forward.
 void recurrent_norm_gate_backward(const float *d_out,
@@ -2696,6 +2939,12 @@ void attn_gate_sigmoid_mul_forward(const float *x,
                                    int rows,
                                    int num_heads,
                                    int state_dim);
+void attn_gate_sigmoid_mul_pytorch_bf16_storage(const float *x,
+                                                const float *gate,
+                                                float *out,
+                                                int rows,
+                                                int num_heads,
+                                                int state_dim);
 
 void attn_gate_softplus_mul_forward(const float *x,
                                     const float *gate,
@@ -2837,6 +3086,14 @@ void recurrent_norm_gate_pytorch_bf16_storage(const float *x,
                                                int num_heads,
                                                int head_dim,
                                                float eps);
+void recurrent_norm_sigmoid_gate_pytorch_bf16_storage(const float *x,
+                                                       const float *gate,
+                                                       const float *weight,
+                                                       float *out,
+                                                       int rows,
+                                                       int num_heads,
+                                                       int head_dim,
+                                                       float eps);
 
 // Gated DeltaNet recurrent backward used by qwen3next/Qwen3.5 linear attention.
 // Layout:
@@ -2988,6 +3245,15 @@ void kv_cache_store_bf16(uint16_t *__restrict kv_cache_k,
                          int num_kv_heads,
                          int head_dim,
                          int max_seq_len);
+void kv_cache_store_batch_f32(float *__restrict kv_cache_k,
+                              float *__restrict kv_cache_v,
+                              const float *__restrict k,
+                              const float *__restrict v,
+                              int start_pos,
+                              int num_tokens,
+                              int num_kv_heads,
+                              int head_dim,
+                              int max_seq_len);
 void kv_cache_store_batch_bf16(uint16_t *__restrict kv_cache_k,
                                uint16_t *__restrict kv_cache_v,
                                const float *__restrict k,
@@ -3393,8 +3659,18 @@ void moe_swiglu_expert_forward_bf16_parallel_dispatch(
     const uint16_t *expert_down, float *output, int rows, int hidden_dim,
     int intermediate_dim, int n_experts, int top_k);
 
+void moe_swiglu_packed_expert_forward_bf16(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate_up, const uint16_t *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k);
+
 size_t moe_swiglu_expert_q4k_q5k_workspace_bytes(int hidden_dim,
                                                   int intermediate_dim);
+size_t moe_swiglu_expert_q4k_q8_0_workspace_bytes(int hidden_dim,
+                                                   int intermediate_dim);
+size_t moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes(
+    int hidden_dim, int intermediate_dim);
 
 int moe_swiglu_expert_forward_q4k_q5k_workspace(
     const float *hidden,
@@ -3413,6 +3689,22 @@ int moe_swiglu_expert_forward_q4k_q5k_workspace(
     size_t workspace_bytes);
 
 int moe_swiglu_expert_forward_q4k_q6k_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q5_0_workspace(
     const float *hidden,
     const int *indices,
     const float *routing_weights,
@@ -3475,6 +3767,34 @@ int moe_swiglu_expert_forward_q4k_q4k_parallel_workspace(
     int top_k,
     void *workspace,
     size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q5_0_parallel_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q8_0_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
+
+int moe_swiglu_expert_forward_q4k_q8_0_parallel_workspace(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const void *expert_gate, const void *expert_up, const void *expert_down,
+    float *output, int rows, int hidden_dim, int intermediate_dim,
+    int n_experts, int top_k, void *workspace, size_t workspace_bytes);
 
 int moe_swiglu_shared_forward_q4k_q6k_workspace(
     const float *hidden,
@@ -3641,6 +3961,30 @@ int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
     void *workspace,
     size_t workspace_bytes);
 
+int moe_swiglu_shared_forward_q4k_q8_0_gated_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes);
+
+int moe_swiglu_shared_forward_q4k_q8_0_gated_parallel_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes);
+
+int moe_swiglu_shared_forward_q4k_q5_0_gated_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes);
+
+int moe_swiglu_shared_forward_q4k_q5_0_gated_parallel_workspace(
+    const float *hidden, const float *routed, const void *shared_gate,
+    const void *shared_up, const void *shared_down,
+    const float *shared_gate_input, float *output, int rows, int hidden_dim,
+    int intermediate_dim, void *workspace, size_t workspace_bytes);
+
 void moe_swiglu_shared_forward_bf16(const float *hidden,
                                     const float *routed,
                                     const uint16_t *shared_gate,
@@ -3659,6 +4003,21 @@ void moe_swiglu_shared_forward_bf16_parallel_dispatch(
     const float *hidden, const float *routed, const uint16_t *shared_gate,
     const uint16_t *shared_up, const uint16_t *shared_down, float *output,
     int rows, int hidden_dim, int intermediate_dim);
+void moe_swiglu_shared_forward_bf16_gated(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    const uint16_t *shared_router, float *output, int rows,
+    int hidden_dim, int intermediate_dim);
+void moe_swiglu_shared_forward_bf16_gated_row_range(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    const uint16_t *shared_router, float *output, int rows,
+    int hidden_dim, int intermediate_dim, int row_begin, int row_end);
+void moe_swiglu_shared_forward_bf16_gated_parallel_dispatch(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    const uint16_t *shared_router, float *output, int rows,
+    int hidden_dim, int intermediate_dim);
 void farskip_swiglu_shared_combine_bf16(const float *hidden,
                                         const float *routed,
                                         const float *post_attn_residual,
@@ -3732,6 +4091,16 @@ void topk_softmax_f32(const float *scores,
 size_t moe_softmax_topk_router_workspace_bytes(int n_experts);
 
 int moe_softmax_topk_router_llama_f32_workspace(
+    const float *logits,
+    int *indices,
+    float *weights,
+    int rows,
+    int n_experts,
+    int top_k,
+    float routed_scaling_factor,
+    void *workspace,
+    size_t workspace_bytes);
+int moe_softmax_topk_router_pytorch_bf16_workspace(
     const float *logits,
     int *indices,
     float *weights,

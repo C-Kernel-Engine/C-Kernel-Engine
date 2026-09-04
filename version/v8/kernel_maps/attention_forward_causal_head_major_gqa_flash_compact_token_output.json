@@ -1,0 +1,106 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_flash_compact_token_output",
+  "name": "Causal GQA flash attention with compact K/V and token-major output",
+  "op": "attention",
+  "operation_interface": "attention.causal_gqa.compact_kv.token_output.fp32.v1",
+  "version": 1,
+  "status": "stable",
+  "description": "Consumes compact head-major Q/K/V scratch and writes token-major output without a post-attention transpose.",
+  "selection": {
+    "status": "production",
+    "priority": 310,
+    "equivalence_group": "attention.fp32_online_causal_compact.v1",
+    "phases": ["prefill"]
+  },
+  "physical_contract_version": 1,
+  "inputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": ["KV", "T", "D"],
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["T", "H", "D"],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_flash_strided_token_output",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_token_output(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+    "sources": [
+      "src/kernels/attention_kernels.c",
+      "src/kernels/softmax_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "avx2",
+        "requires": ["avx2", "fma"],
+        "compile_flags": ["-mavx2", "-mfma"]
+      },
+      {
+        "name": "ref",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "float*", "ports": ["input:q"]},
+      {"name": "k", "source": "scratch:k_scratch", "cast": "float*", "ports": ["input:k"]},
+      {"name": "v", "source": "scratch:v_scratch", "cast": "float*", "ports": ["input:v"]},
+      {"name": "output", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "kv_stride_tokens", "source": "dim:seq_len"}
+    ]
+  },
+  "parallel": {
+    "strategy": "internal_threadpool",
+    "work_unit": "query_head"
+  },
+  "numerical_capabilities": {
+    "input_dtype": "fp32",
+    "accumulation_dtype": "fp32",
+    "reduction_order": "online_softmax_token_order",
+    "output_dtype": "fp32"
+  }
+}

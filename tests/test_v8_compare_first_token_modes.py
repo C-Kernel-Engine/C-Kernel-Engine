@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -90,3 +91,33 @@ def test_batched_mode_requires_compiled_prefill_capability() -> None:
 
 def test_sequential_mode_does_not_require_compiled_prefill_capability() -> None:
     compare.validate_compiled_prefill_capability("sequential_decode", None)
+
+
+def test_batched_replay_forces_runtime_schedule_and_restores_environment() -> None:
+    name = "CK_V8_FORCE_BATCHED_PREFILL"
+    previous = os.environ.pop(name, None)
+    try:
+        with compare.runtime_prefill_environment("hybrid"):
+            assert os.environ[name] == "1"
+        assert name not in os.environ
+
+        os.environ[name] = "caller-value"
+        with compare.runtime_prefill_environment("batched"):
+            assert os.environ[name] == "1"
+        assert os.environ[name] == "caller-value"
+    finally:
+        if previous is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = previous
+
+
+def test_sequential_replay_does_not_force_batched_runtime() -> None:
+    name = "CK_V8_FORCE_BATCHED_PREFILL"
+    previous = os.environ.pop(name, None)
+    try:
+        with compare.runtime_prefill_environment("sequential_decode"):
+            assert name not in os.environ
+    finally:
+        if previous is not None:
+            os.environ[name] = previous

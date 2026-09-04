@@ -57,6 +57,18 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.c_float,
             ]
             bwd.restype = None
+
+            pytorch_fwd = lib.recurrent_qk_l2_norm_pytorch_fp32_output
+            pytorch_fwd.argtypes = [
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_float,
+            ]
+            pytorch_fwd.restype = None
             return lib
     return None
 
@@ -149,6 +161,29 @@ class TestRecurrentQKL2Norm(unittest.TestCase):
             seed=23,
             input_scale=1e-9,
         )
+
+    def test_qwen4_exp_pytorch_fp32_output_is_bit_exact(self) -> None:
+        torch.manual_seed(1234)
+        rows = 3
+        q = (torch.randn(rows, 16, 128) * 0.03).to(torch.bfloat16).float()
+        k = (torch.randn(rows, 16, 128) * 0.03).to(torch.bfloat16).float()
+        q_ref = q * torch.rsqrt((q * q).sum(dim=-1, keepdim=True) + 1e-6)
+        k_ref = k * torch.rsqrt((k * k).sum(dim=-1, keepdim=True) + 1e-6)
+        ck_q = q.numpy().copy()
+        ck_k = k.numpy().copy()
+
+        LIB.recurrent_qk_l2_norm_pytorch_fp32_output(
+            _as_ptr(ck_q),
+            _as_ptr(ck_k),
+            rows,
+            16 * 128,
+            16 * 128,
+            128,
+            ctypes.c_float(1e-6),
+        )
+
+        np.testing.assert_array_equal(ck_q, q_ref.numpy())
+        np.testing.assert_array_equal(ck_k, k_ref.numpy())
 
 
 if __name__ == "__main__":

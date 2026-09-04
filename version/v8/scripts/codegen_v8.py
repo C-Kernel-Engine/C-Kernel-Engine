@@ -799,9 +799,15 @@ def _build_hybrid_decode_prefill_layout(
     return out
 
 
-def _uses_generated_batched_prefill(ir_obj: Dict[str, Any]) -> bool:
-    """Return whether the runtime contract permits the generated prefill path."""
-    policy = str((ir_obj.get("config") or {}).get("prefill_policy") or "").strip().lower()
+def _uses_generated_batched_prefill(
+    ir_obj: Dict[str, Any],
+    prefill_obj: Dict[str, Any] | None = None,
+) -> bool:
+    """Return whether the supplied prefill contract permits generated prefill."""
+    policy_source = prefill_obj if prefill_obj is not None else ir_obj
+    policy = str(
+        (policy_source.get("config") or {}).get("prefill_policy") or ""
+    ).strip().lower()
     return policy not in {"sequential_decode", "decode"}
 
 
@@ -1443,24 +1449,6 @@ def _patch_standalone_prefill_runtime(code: str, layout_obj: Dict[str, Any]) -> 
     if str(layout_obj.get("mode", "")).lower() != "prefill":
         return code
 
-    helper_sig = "static void kv_cache_batch_copy("
-    if "kv_cache_batch_copy(" in code and helper_sig not in code:
-        helper_block = """
-/* v8 standalone prefill compat: generic codegen leaves kv_cache_batch_copy as
- * a pseudo-op call. The real multimodal prefill path uses the explicit helper
- * emitted later in this file; this shim only makes the standalone runtime
- * self-contained enough to compile. */
-static void kv_cache_batch_copy(void *k_dst, const void *k_src, void *v_dst, const void *v_src, size_t nbytes) {
-    if (k_dst && k_src && nbytes > 0) memcpy(k_dst, k_src, nbytes);
-    if (v_dst && v_src && nbytes > 0) memcpy(v_dst, v_src, nbytes);
-}
-"""
-        insert_after = "#include <math.h>"
-        if insert_after in code:
-            code = code.replace(insert_after, insert_after + "\n\n" + helper_block.strip(), 1)
-        else:
-            code = helper_block.strip() + "\n\n" + code
-
     code = code.replace("vocab_size * sizeof(float)", "VOCAB_SIZE * sizeof(float)")
 
     bad_copy_pat = re.compile(
@@ -1532,17 +1520,23 @@ def main(argv: list[str] | None = None) -> int:
         ir_obj = _patch_codegen_config(json.load(f))
     with open(args.layout, "r", encoding="utf-8") as f:
         layout_obj = _patch_codegen_config(json.load(f))
-    uses_generated_batched_prefill = _uses_generated_batched_prefill(ir_obj)
+    supplied_prefill_obj = None
+    if args.prefill is not None:
+        with open(args.prefill, "r", encoding="utf-8") as f:
+            supplied_prefill_obj = _patch_codegen_config(json.load(f))
+    uses_generated_batched_prefill = _uses_generated_batched_prefill(
+        ir_obj, supplied_prefill_obj
+    )
     prefill_obj = None
     prefill_layout_obj = None
     if args.prefill_layout is not None and uses_generated_batched_prefill:
         with open(args.prefill_layout, "r", encoding="utf-8") as f:
             prefill_layout_obj = _patch_codegen_config(json.load(f))
         layout_obj = _build_hybrid_decode_prefill_layout(layout_obj, prefill_layout_obj)
-    if args.prefill is not None and uses_generated_batched_prefill:
-        with open(args.prefill, "r", encoding="utf-8") as f:
-            prefill_obj = _patch_codegen_config(json.load(f))
-        prefill_obj = _normalize_prefill_for_decode_layout(prefill_obj, layout_obj)
+    if supplied_prefill_obj is not None and uses_generated_batched_prefill:
+        prefill_obj = _normalize_prefill_for_decode_layout(
+            supplied_prefill_obj, layout_obj
+        )
 
     init_call_obj = None
     init_path = args.init if args.init is not None else args.ir.parent / "init_call.json"

@@ -80,6 +80,12 @@ extern void moe_swiglu_shared_forward_bf16(
 extern void moe_swiglu_shared_forward_bf16_row_range(
     const float *, const float *, const uint16_t *, const uint16_t *,
     const uint16_t *, float *, int, int, int, int, int);
+extern void moe_swiglu_shared_forward_bf16_gated(
+    const float *, const float *, const uint16_t *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, int, int, int);
+extern void moe_swiglu_shared_forward_bf16_gated_row_range(
+    const float *, const float *, const uint16_t *, const uint16_t *,
+    const uint16_t *, const uint16_t *, float *, int, int, int, int, int);
 extern void farskip_swiglu_shared_combine_bf16(
     const float *, const float *, const float *, const uint16_t *,
     const uint16_t *, const uint16_t *, float *, float *, int, int, int);
@@ -342,6 +348,9 @@ extern void ck_residual_add_token_major(
 extern void recurrent_norm_gate_llama_avx2_forward(
     const float *x, const float *gate, const float *weight, float *out,
     int rows, int num_heads, int head_dim, float eps);
+extern void recurrent_norm_sigmoid_gate_llama_avx2_forward(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps);
 extern void gemm_nt_q5_k_prepared_q8_m4_nrange(
     const void *A_q8, const void *B_prepared, const float *bias, float *C,
     int M, int N, int K, int n_begin, int n_end);
@@ -568,6 +577,19 @@ typedef struct {
 typedef struct {
     const float *hidden;
     const float *routed;
+    const uint16_t *shared_gate;
+    const uint16_t *shared_up;
+    const uint16_t *shared_down;
+    const uint16_t *shared_router;
+    float *output;
+    int rows;
+    int hidden_dim;
+    int intermediate_dim;
+} bf16_moe_shared_gated_args_t;
+
+typedef struct {
+    const float *hidden;
+    const float *routed;
     const float *post_attn_residual;
     const uint16_t *shared_gate;
     const uint16_t *shared_up;
@@ -773,6 +795,44 @@ void moe_swiglu_shared_forward_bf16_parallel_dispatch(
         pool, active, 0, rows, grain, work_bf16_moe_shared_rows, &args);
 }
 
+static void work_bf16_moe_shared_gated_rows(
+    int begin, int end, void *userdata)
+{
+    const bf16_moe_shared_gated_args_t *args =
+        (const bf16_moe_shared_gated_args_t *)userdata;
+    moe_swiglu_shared_forward_bf16_gated_row_range(
+        args->hidden, args->routed, args->shared_gate, args->shared_up,
+        args->shared_down, args->shared_router, args->output, args->rows,
+        args->hidden_dim, args->intermediate_dim, begin, end);
+}
+
+void moe_swiglu_shared_forward_bf16_gated_parallel_dispatch(
+    const float *hidden, const float *routed, const uint16_t *shared_gate,
+    const uint16_t *shared_up, const uint16_t *shared_down,
+    const uint16_t *shared_router, float *output, int rows, int hidden_dim,
+    int intermediate_dim)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (ck_env_enabled("CK_DISABLE_BF16_MOE_PARALLEL_PREFILL") ||
+        !pool || ck_threadpool_n_threads(pool) <= 1 || rows < 2) {
+        moe_swiglu_shared_forward_bf16_gated(
+            hidden, routed, shared_gate, shared_up, shared_down,
+            shared_router, output, rows, hidden_dim, intermediate_dim);
+        return;
+    }
+
+    bf16_moe_shared_gated_args_t args = {
+        hidden, routed, shared_gate, shared_up, shared_down, shared_router,
+        output, rows, hidden_dim, intermediate_dim,
+    };
+    const int active = ck_independent_row_active_threads(pool, rows, 1);
+    int grain = rows / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, rows, grain,
+        work_bf16_moe_shared_gated_rows, &args);
+}
+
 static void work_bf16_farskip_shared_rows(int begin, int end, void *userdata)
 {
     const bf16_farskip_shared_args_t *args =
@@ -896,6 +956,19 @@ static void work_recurrent_norm_gate_rows(int begin, int end, void *userdata)
         (size_t)args->num_heads * (size_t)args->head_dim;
     const size_t offset = (size_t)begin * row_elems;
     recurrent_norm_gate_llama_avx2_forward(
+        args->x + offset, args->gate + offset, args->weight,
+        args->out + offset, end - begin, args->num_heads,
+        args->head_dim, args->eps);
+}
+
+static void work_recurrent_norm_sigmoid_gate_rows(int begin, int end, void *userdata)
+{
+    recurrent_norm_gate_args_t *args =
+        (recurrent_norm_gate_args_t *)userdata;
+    const size_t row_elems =
+        (size_t)args->num_heads * (size_t)args->head_dim;
+    const size_t offset = (size_t)begin * row_elems;
+    recurrent_norm_sigmoid_gate_llama_avx2_forward(
         args->x + offset, args->gate + offset, args->weight,
         args->out + offset, end - begin, args->num_heads,
         args->head_dim, args->eps);
@@ -1132,6 +1205,34 @@ void recurrent_norm_gate_llama_avx2_parallel_dispatch(
     ck_threadpool_parallel_for_n(
         pool, ck_independent_row_active_threads(pool, rows, grain),
         0, rows, grain, work_recurrent_norm_gate_rows, &args);
+}
+
+void recurrent_norm_sigmoid_gate_llama_avx2_parallel_dispatch(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int grain = 4;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || rows < grain * 2 ||
+        num_heads <= 0 || head_dim <= 0) {
+        recurrent_norm_sigmoid_gate_llama_avx2_forward(
+            x, gate, weight, out, rows, num_heads, head_dim, eps);
+        return;
+    }
+
+    recurrent_norm_gate_args_t args = {
+        .x = x,
+        .gate = gate,
+        .weight = weight,
+        .out = out,
+        .rows = rows,
+        .num_heads = num_heads,
+        .head_dim = head_dim,
+        .eps = eps,
+    };
+    ck_threadpool_parallel_for_n(
+        pool, ck_independent_row_active_threads(pool, rows, grain),
+        0, rows, grain, work_recurrent_norm_sigmoid_gate_rows, &args);
 }
 
 static int ck_deltanet_chunk64_available(void)

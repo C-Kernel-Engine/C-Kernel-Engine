@@ -17,6 +17,7 @@
 typedef float (*ck_recurrent_libm_f32_fn)(float);
 static ck_recurrent_libm_f32_fn ck_recurrent_llama_expf = NULL;
 static ck_recurrent_libm_f32_fn ck_recurrent_llama_logf = NULL;
+static ck_recurrent_libm_f32_fn ck_recurrent_pytorch_log1pf = NULL;
 static void *ck_recurrent_libm_handle = NULL;
 static pthread_once_t ck_recurrent_libm_once = PTHREAD_ONCE_INIT;
 
@@ -28,6 +29,8 @@ static void ck_bind_recurrent_llama_libm(void)
             (ck_recurrent_libm_f32_fn)dlsym(ck_recurrent_libm_handle, "expf");
         ck_recurrent_llama_logf =
             (ck_recurrent_libm_f32_fn)dlsym(ck_recurrent_libm_handle, "logf");
+        ck_recurrent_pytorch_log1pf =
+            (ck_recurrent_libm_f32_fn)dlsym(ck_recurrent_libm_handle, "log1pf");
     }
     if (!ck_recurrent_llama_expf || !ck_recurrent_llama_logf) {
         fprintf(stderr,
@@ -147,7 +150,9 @@ void recurrent_silu_forward(const float *x,
 
 #if defined(__AVX512F__)
 typedef __m512 (*ck_recurrent_sleef_expf16_fn)(__m512);
+typedef __m512 (*ck_recurrent_sleef_log1pf16_fn)(__m512);
 static ck_recurrent_sleef_expf16_fn ck_recurrent_pytorch_expf16 = NULL;
+static ck_recurrent_sleef_log1pf16_fn ck_recurrent_pytorch_log1pf16 = NULL;
 static void *ck_recurrent_sleef_handle = NULL;
 static pthread_once_t ck_recurrent_sleef_once = PTHREAD_ONCE_INIT;
 
@@ -159,13 +164,90 @@ static void ck_bind_recurrent_pytorch_sleef(void)
         if (ck_recurrent_sleef_handle) {
             ck_recurrent_pytorch_expf16 = (ck_recurrent_sleef_expf16_fn)dlsym(
                 ck_recurrent_sleef_handle, "Sleef_expf16_u10");
+            ck_recurrent_pytorch_log1pf16 = (ck_recurrent_sleef_log1pf16_fn)dlsym(
+                ck_recurrent_sleef_handle, "Sleef_log1pf16_u10");
         }
     } else {
         ck_recurrent_pytorch_expf16 =
             (ck_recurrent_sleef_expf16_fn)dlsym(RTLD_DEFAULT, "Sleef_expf16_u10");
+        ck_recurrent_pytorch_log1pf16 =
+            (ck_recurrent_sleef_log1pf16_fn)dlsym(RTLD_DEFAULT, "Sleef_log1pf16_u10");
     }
 }
 #endif
+
+void recurrent_dt_gate_forward_pytorch_fp32(const float *alpha,
+                                             const float *dt_bias,
+                                             const float *a,
+                                             float *gate,
+                                             int rows,
+                                             int num_heads,
+                                             int state_dim)
+{
+    if (!alpha || !dt_bias || !a || !gate || rows < 0 || num_heads < 0 || state_dim != 1) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: invalid PyTorch FP32 recurrent dt-gate arguments\n");
+        abort();
+    }
+#if defined(__AVX512F__)
+    pthread_once(&ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);
+    if (!ck_recurrent_pytorch_expf16 || !ck_recurrent_pytorch_log1pf16) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires "
+                "SLEEF Sleef_expf16_u10 and Sleef_log1pf16_u10; set CK_SLEEF_LIBRARY\n");
+        abort();
+    }
+    if ((num_heads & 15) != 0) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: PyTorch AVX-512 recurrent dt gate requires "
+                "a head count divisible by 16 (got %d)\n",
+                num_heads);
+        abort();
+    }
+    pthread_once(&ck_recurrent_libm_once, ck_bind_recurrent_llama_libm);
+    if (!ck_recurrent_pytorch_log1pf) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires "
+                "log1pf from libm.so.6\n");
+        abort();
+    }
+    const __m512 threshold = _mm512_set1_ps(20.0f);
+    const int count = rows * num_heads;
+    int index = 0;
+    for (; index + 32 <= count; index += 32) {
+        for (int half = 0; half < 2; ++half) {
+            float x_lanes[16] __attribute__((aligned(64)));
+            float a_lanes[16] __attribute__((aligned(64)));
+            const int base = index + half * 16;
+            for (int lane = 0; lane < 16; ++lane) {
+                const int head = (base + lane) % num_heads;
+                x_lanes[lane] = alpha[base + lane] + dt_bias[head];
+                a_lanes[lane] = a[head];
+            }
+            const __m512 x = _mm512_load_ps(x_lanes);
+            const __m512 softplus = _mm512_mask_blend_ps(
+                _mm512_cmp_ps_mask(x, threshold, _CMP_GT_OQ),
+                ck_recurrent_pytorch_log1pf16(ck_recurrent_pytorch_expf16(x)),
+                x);
+            _mm512_storeu_ps(
+                gate + base,
+                _mm512_mul_ps(softplus, _mm512_load_ps(a_lanes)));
+        }
+    }
+    for (; index < count; ++index) {
+        const int head = index % num_heads;
+        const float x = alpha[index] + dt_bias[head];
+        const float softplus = x > 20.0f
+            ? x
+            : ck_recurrent_pytorch_log1pf(ck_recurrent_llama_expf(x));
+        gate[index] = softplus * a[head];
+    }
+#else
+    fprintf(stderr,
+            "HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires AVX-512\n");
+    abort();
+#endif
+}
 
 void recurrent_silu_forward_pytorch_bf16_storage(const float *x,
                                                   float *out,
@@ -251,6 +333,48 @@ void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x,
     for (; i < count; ++i) {
         const float value = bf16_to_float(float_to_bf16(x[i]));
         out[i] = value / (1.0f + expf(-value));
+    }
+}
+
+void recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(
+                                                            const float *x,
+                                                            float *out,
+                                                            int rows,
+                                                            int dim)
+{
+    if (!x || !out || rows < 0 || dim < 0) {
+        fprintf(stderr, "HARD KERNEL CONTRACT FAULT: invalid BF16-input FP32-output sigmoid arguments\n");
+        abort();
+    }
+#if defined(__AVX512F__)
+    pthread_once(&ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);
+    if (!ck_recurrent_pytorch_expf16) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: PyTorch BF16-input sigmoid requires "
+                "SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n");
+        abort();
+    }
+#endif
+    const int count = rows * dim;
+    int i = 0;
+#if defined(__AVX512F__)
+    for (; i + 16 <= count; i += 16) {
+        float lanes[16] __attribute__((aligned(64)));
+        for (int lane = 0; lane < 16; ++lane) {
+            lanes[lane] = bf16_to_float(float_to_bf16(x[i + lane]));
+        }
+        const __m512 values = _mm512_load_ps(lanes);
+        const __m512 denominator = _mm512_add_ps(
+            _mm512_set1_ps(1.0f),
+            ck_recurrent_pytorch_expf16(
+                _mm512_sub_ps(_mm512_setzero_ps(), values)));
+        _mm512_storeu_ps(out + i,
+                         _mm512_div_ps(_mm512_set1_ps(1.0f), denominator));
+    }
+#endif
+    for (; i < count; ++i) {
+        const float value = bf16_to_float(float_to_bf16(x[i]));
+        out[i] = 1.0f / (1.0f + expf(-value));
     }
 }
 
@@ -370,6 +494,20 @@ void recurrent_silu_forward_ggml(const float *x,
         for (; col < dim; ++col) {
             const float xv = x_row[col];
             out_row[col] = xv / (1.0f + llama_expf(-xv));
+        }
+    }
+}
+
+void recurrent_sigmoid_forward_ggml(const float *x,
+                                    float *out,
+                                    int rows,
+                                    int dim) {
+    float (*volatile llama_expf)(float) = expf;
+    for (int row = 0; row < rows; ++row) {
+        const float *x_row = x + (size_t) row * (size_t) dim;
+        float *out_row = out + (size_t) row * (size_t) dim;
+        for (int col = 0; col < dim; ++col) {
+            out_row[col] = 1.0f / (1.0f + llama_expf(-x_row[col]));
         }
     }
 }

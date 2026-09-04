@@ -16,7 +16,8 @@ OUTPUT:
 
 PHYSICAL BUFFERS:
     - A_EMBEDDED_INPUT  : Main activation buffer 1 (FP32)
-    - A_LAYER_INPUT     : Main activation buffer 2 (FP32/Q8)
+    - A_LAYER_INPUT     : Main activation buffer 2 (FP32)
+    - A_MAIN_STREAM_Q8  : Quantized activation view (Q8_0/Q8_K)
     - A_RESIDUAL        : Saved residual for skip connections (FP32)
     - A_ATTN_SCRATCH    : Q/K/V projections and attention output (FP32)
     - A_MLP_SCRATCH     : MLP gate_up and swiglu output (FP32)
@@ -60,7 +61,13 @@ PHYSICAL_BUFFERS = {
         name="A_LAYER_INPUT",
         dtype="fp32",
         last_writer=-1,
-        can_hold=["fp32", "q8_0", "q8_k"]
+        can_hold=["fp32"]
+    ),
+    "A_MAIN_STREAM_Q8": PhysicalBuffer(
+        name="A_MAIN_STREAM_Q8",
+        dtype="q8_k",
+        last_writer=-1,
+        can_hold=["q8_0", "q8_k"]
     ),
     "A_RESIDUAL": PhysicalBuffer(
         name="A_RESIDUAL",
@@ -212,7 +219,7 @@ PHYSICAL_BUFFERS = {
 SLOT_TO_BUFFER_DEFAULT = {
     # Main activation stream (ping-pongs between two buffers)
     "main_stream": "A_EMBEDDED_INPUT",
-    "main_stream_q8": "A_LAYER_INPUT",  # Quantized stream uses other buffer
+    "main_stream_q8": "A_MAIN_STREAM_Q8",
 
     # Residual storage
     "residual": "A_RESIDUAL",
@@ -270,7 +277,7 @@ class BufferState:
 
     # Track which buffer currently holds data for each logical purpose
     main_stream_buffer: str = "A_EMBEDDED_INPUT"  # Alternates
-    main_stream_q8_buffer: str = "A_LAYER_INPUT"  # Alternates opposite
+    main_stream_q8_buffer: str = "A_MAIN_STREAM_Q8"
     slot_bindings: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):

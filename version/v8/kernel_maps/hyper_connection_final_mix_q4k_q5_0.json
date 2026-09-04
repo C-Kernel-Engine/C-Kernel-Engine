@@ -1,0 +1,43 @@
+{
+  "id": "hyper_connection_final_mix_q4k_q5_0",
+  "op": "hyper_connection_final_mix",
+  "operation_interface": "hyper_connection.final_mix.mixed_quant.v1",
+  "variant": "q4k_down_q5_0_up_fp32_activation",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"mix_down_weight": "q4_k", "mix_up_weight": "q5_0", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name":"hyper_input","dtype":"fp32","shape":["R","S*D"],"layout":"token_stream_hidden_contiguous","access":"read","storage_class":"activation","consumption":"required"}],
+  "weights": [
+    {"name":"norm_weight","dtype":"fp32","shape":["S*D"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"mix_down_weight","dtype":"q4_k","shape":["X","S*D"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"mix_up_weight","dtype":"q5_0","shape":["S*D","X"],"layout":"row_major","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "activations": [],
+  "outputs": [{"name":"mixed_output","dtype":"fp32","shape":["R","D"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}],
+  "scratch": [
+    {"name":"normalized_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"dynamic_scratch","dtype":"fp32","shape":["R","X"],"size_bytes":"R * X * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_major_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"mix_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"}
+  ],
+  "dims": ["R","S","D","X"],
+  "params": ["eps"],
+  "impl": {
+    "function":"hyper_connection_mix_q4k_q5_0_q4k",
+    "c_declaration":"void hyper_connection_mix_q4k_q5_0_q4k(const float *hyper_input, const float *norm_weight, const void *mix_down_weight, const void *mix_up_weight, const void *inject_weight, float *mixed_output, float *injection_output, float *normalized_scratch, float *dynamic_scratch, float *mix_scratch, int rows, int streams, int hidden_dim, int dynamic_dim, float eps, int emit_injection);",
+    "sources":["src/kernels/hyper_connection_kernels.c","src/kernels/gemm_kernels_q4k.c","src/kernels/gemm_kernels_q5_0.c","src/kernels/gemm_kernels_q4k_q8k_vnni.c","version/v8/src/ck_parallel_prefill_v8.c"],
+    "variants":[{"name":"native","requires":[],"compile_flags":[]}]
+  },
+  "call_abi": {"version":1,"params":[
+    {"name":"hyper_input","source":"activation:hyper_input","cast":"const float*","ports":["input:hyper_input"]},
+    {"name":"norm_weight","source":"weight_f:norm_weight","cast":"const float*","ports":["weight:norm_weight"]},
+    {"name":"mix_down_weight","source":"weight:mix_down_weight","cast":"const void*","ports":["weight:mix_down_weight"]},
+    {"name":"mix_up_weight","source":"weight:mix_up_weight","cast":"const void*","ports":["weight:mix_up_weight"]},
+    {"name":"inject_weight","source":"null"},
+    {"name":"mixed_output","source":"output:mixed_output","cast":"float*","ports":["output:mixed_output"]},
+    {"name":"injection_output","source":"null"},
+    {"name":"normalized_scratch","source":"scratch:normalized_scratch","cast":"float*"},
+    {"name":"dynamic_scratch","source":"scratch:dynamic_scratch","cast":"float*"},
+    {"name":"mix_scratch","source":"scratch:mix_scratch","cast":"float*"},
+    {"name":"rows","source":"dim:seq_len"},{"name":"streams","source":"dim:hc_count"},{"name":"hidden_dim","source":"dim:embed_dim"},{"name":"dynamic_dim","source":"dim:hc_lowrank"},{"name":"eps","source":"dim:rms_eps"},{"name":"emit_injection","source":"const:0"}
+  ]},
+  "tests":{"unit":["unittest/test_hyper_connection_quantized.py"]}
+}

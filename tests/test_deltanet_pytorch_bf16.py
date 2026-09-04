@@ -28,6 +28,10 @@ def _library_path() -> Path:
 
 
 def _load_provider():
+    torch_library = Path(torch.__file__).resolve().parent / "lib" / "libtorch_cpu.so"
+    if torch_library.is_file():
+        os.environ.setdefault("CK_MKL_LIBRARY", str(torch_library))
+        os.environ.setdefault("CK_SLEEF_LIBRARY", str(torch_library))
     lib = ctypes.CDLL(str(_library_path()))
     provider = lib.gated_deltanet_pytorch_grouped_bf16_forward
     pointer = ctypes.POINTER(ctypes.c_float)
@@ -109,9 +113,12 @@ def test_qwen36_bf16_decode_matches_pytorch_grouped_heads(
     )
     reference_state, reference_output = _pytorch_reference(q, k, v, g, beta, state)
 
-    # FP32 state differs only through the provider's fixed AVX reduction tree.
-    np.testing.assert_allclose(ck_state, reference_state, atol=1e-7, rtol=0.0)
-    # Both paths store output to BF16; permit one smallest observed BF16 bin at
-    # near-zero values while requiring at least 99.9% elementwise identity.
-    np.testing.assert_allclose(ck_output, reference_output, atol=5e-7, rtol=0.0)
-    assert np.count_nonzero(ck_output == reference_output) / ck_output.size >= 0.999
+    if state_dim == 128:
+        # Production Qwen recurrent geometry must preserve the persistent FP32
+        # state exactly; a one-ULP mismatch can accumulate across decode tokens.
+        np.testing.assert_array_equal(ck_state.view(np.uint32), reference_state.view(np.uint32))
+        np.testing.assert_array_equal(ck_output.view(np.uint32), reference_output.view(np.uint32))
+    else:
+        np.testing.assert_allclose(ck_state, reference_state, atol=1e-7, rtol=0.0)
+        np.testing.assert_allclose(ck_output, reference_output, atol=5e-7, rtol=0.0)
+        assert np.count_nonzero(ck_output == reference_output) / ck_output.size >= 0.999

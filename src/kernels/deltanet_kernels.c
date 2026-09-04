@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -87,6 +88,105 @@ static inline float ck_deltanet_llama_sigmoidf(float x)
 {
     pthread_once(&ck_deltanet_libm_once, ck_bind_deltanet_llama_libm);
     return 1.0f / (1.0f + ck_deltanet_llama_expf(-x));
+}
+
+#if defined(__AVX512F__)
+typedef __m512 (*ck_deltanet_sleef_expf16_fn)(__m512);
+static ck_deltanet_sleef_expf16_fn ck_deltanet_pytorch_expf16 = NULL;
+static void *ck_deltanet_sleef_handle = NULL;
+#endif
+
+typedef void (*ck_deltanet_mkl_vsexp_fn)(int, const float *, float *);
+static ck_deltanet_mkl_vsexp_fn ck_deltanet_pytorch_vsexp = NULL;
+static void *ck_deltanet_mkl_handle = NULL;
+static pthread_once_t ck_deltanet_pytorch_primitives_once = PTHREAD_ONCE_INIT;
+
+static void ck_bind_deltanet_pytorch_primitives(void)
+{
+    const char *mkl_library = getenv("CK_MKL_LIBRARY");
+    if (mkl_library && *mkl_library) {
+        ck_deltanet_mkl_handle = dlopen(mkl_library, RTLD_NOW | RTLD_LOCAL);
+        if (ck_deltanet_mkl_handle) {
+            ck_deltanet_pytorch_vsexp =
+                (ck_deltanet_mkl_vsexp_fn)dlsym(
+                    ck_deltanet_mkl_handle, "vsExp");
+        }
+    } else {
+        ck_deltanet_pytorch_vsexp =
+            (ck_deltanet_mkl_vsexp_fn)dlsym(RTLD_DEFAULT, "vsExp");
+    }
+
+#if defined(__AVX512F__)
+    const char *library = getenv("CK_SLEEF_LIBRARY");
+    if (library && *library) {
+        ck_deltanet_sleef_handle = dlopen(library, RTLD_NOW | RTLD_LOCAL);
+        if (ck_deltanet_sleef_handle) {
+            ck_deltanet_pytorch_expf16 =
+                (ck_deltanet_sleef_expf16_fn)dlsym(
+                    ck_deltanet_sleef_handle, "Sleef_expf16_u10");
+        }
+    } else {
+        ck_deltanet_pytorch_expf16 =
+            (ck_deltanet_sleef_expf16_fn)dlsym(
+                RTLD_DEFAULT, "Sleef_expf16_u10");
+    }
+#endif
+}
+
+static void ck_deltanet_pytorch_gate_values(const float *g,
+                                             const float *beta,
+                                             float *gate_values,
+                                             float *beta_values,
+                                             int num_heads)
+{
+    pthread_once(
+        &ck_deltanet_pytorch_primitives_once,
+        ck_bind_deltanet_pytorch_primitives);
+    if (!ck_deltanet_pytorch_vsexp) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: PyTorch DeltaNet requires "
+                "MKL vsExp; set CK_MKL_LIBRARY\n");
+        abort();
+    }
+    ck_deltanet_pytorch_vsexp(num_heads, g, gate_values);
+
+    int h = 0;
+#if defined(__AVX512F__)
+    if (ck_deltanet_pytorch_expf16) {
+        const __m512 one = _mm512_set1_ps(1.0f);
+        for (; h + 15 < num_heads; h += 16) {
+            const __m512 bv = _mm512_loadu_ps(beta + h);
+            const __m512 beta_exp = ck_deltanet_pytorch_expf16(
+                _mm512_sub_ps(_mm512_setzero_ps(), bv));
+            const __m512 beta_sigmoid = _mm512_div_ps(
+                one, _mm512_add_ps(one, beta_exp));
+            float beta_lanes[16];
+            _mm512_storeu_ps(beta_lanes, beta_sigmoid);
+            for (int lane = 0; lane < 16; ++lane) {
+                beta_values[h + lane] = bf16_to_float(
+                    float_to_bf16(beta_lanes[lane]));
+            }
+        }
+    }
+#endif
+    for (; h < num_heads; ++h) {
+        beta_values[h] = bf16_to_float(float_to_bf16(
+            ck_deltanet_sigmoidf(beta[h])));
+    }
+}
+
+void gated_deltanet_pytorch_gate_values_debug(const float *g,
+                                              const float *beta,
+                                              float *gate_values,
+                                              float *beta_values,
+                                              int num_heads)
+{
+    if (!g || !beta || !gate_values || !beta_values || num_heads <= 0 ||
+        num_heads > CK_DELTANET_MAX_STACK_DIM) {
+        return;
+    }
+    ck_deltanet_pytorch_gate_values(
+        g, beta, gate_values, beta_values, num_heads);
 }
 
 void gated_deltanet_autoregressive_forward_ref(const float *q,
@@ -491,7 +591,8 @@ static void gated_deltanet_llama_avx2_grouped_forward_impl(
 #if defined(__AVX2__)
     (void) norm_eps;
     if (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||
-        num_heads <= 0 || group_count <= 0 || num_heads % group_count != 0 ||
+        num_heads <= 0 || num_heads > CK_DELTANET_MAX_STACK_DIM ||
+        group_count <= 0 || num_heads % group_count != 0 ||
         state_dim <= 0 || state_dim > CK_DELTANET_MAX_STACK_DIM ||
         head_begin < 0 || head_end < head_begin || head_end > num_heads) {
         return;
@@ -708,6 +809,283 @@ void gated_deltanet_llama_avx2_forward_head_range(
         head_begin, head_end);
 }
 
+static int ck_deltanet_ceil_log2(int value)
+{
+    int result = 0;
+    int power = 1;
+    while (power < value) {
+        power <<= 1;
+        ++result;
+    }
+    return result;
+}
+
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("fp-contract=off")))
+#endif
+static void ck_deltanet_pytorch_outer_sum(const float *matrix,
+                                         const float *row_weights,
+                                         float *output,
+                                         int state_dim)
+{
+    const int num_levels = 4;
+    int level_power = ck_deltanet_ceil_log2(state_dim) / num_levels;
+    if (level_power < 4) {
+        level_power = 4;
+    }
+    const int level_step = 1 << level_power;
+    const int level_mask = level_step - 1;
+    int col = 0;
+
+#if defined(__AVX512F__)
+    /* PyTorch vectorized_outer_sum reduces four adjacent vectors together. */
+    for (; col + 63 < state_dim; col += 64) {
+        __m512 acc[4][4];
+        for (int level = 0; level < num_levels; ++level) {
+            for (int block = 0; block < 4; ++block) {
+                acc[level][block] = _mm512_setzero_ps();
+            }
+        }
+
+        int i = 0;
+        for (; i + level_step <= state_dim;) {
+            for (int j = 0; j < level_step; ++j, ++i) {
+                const float *row = matrix + (size_t)i * (size_t)state_dim + col;
+                const __m512 weight = _mm512_set1_ps(row_weights[i]);
+                for (int block = 0; block < 4; ++block) {
+                    const __m512 product = _mm512_mul_ps(
+                        _mm512_loadu_ps(row + block * 16), weight);
+                    acc[0][block] = _mm512_add_ps(acc[0][block], product);
+                }
+            }
+
+            for (int level = 1; level < num_levels; ++level) {
+                for (int block = 0; block < 4; ++block) {
+                    acc[level][block] = _mm512_add_ps(
+                        acc[level][block], acc[level - 1][block]);
+                    acc[level - 1][block] = _mm512_setzero_ps();
+                }
+                const int mask = level_mask << (level * level_power);
+                if ((i & mask) != 0) {
+                    break;
+                }
+            }
+        }
+
+        for (; i < state_dim; ++i) {
+            const float *row = matrix + (size_t)i * (size_t)state_dim + col;
+            const __m512 weight = _mm512_set1_ps(row_weights[i]);
+            for (int block = 0; block < 4; ++block) {
+                const __m512 product = _mm512_mul_ps(
+                    _mm512_loadu_ps(row + block * 16), weight);
+                acc[0][block] = _mm512_add_ps(acc[0][block], product);
+            }
+        }
+
+        for (int level = 1; level < num_levels; ++level) {
+            for (int block = 0; block < 4; ++block) {
+                acc[0][block] = _mm512_add_ps(
+                    acc[0][block], acc[level][block]);
+            }
+        }
+        for (int block = 0; block < 4; ++block) {
+            _mm512_storeu_ps(output + col + block * 16, acc[0][block]);
+        }
+    }
+#elif defined(__AVX2__)
+    for (; col + 31 < state_dim; col += 32) {
+        __m256 acc[4][4];
+        for (int level = 0; level < num_levels; ++level) {
+            for (int block = 0; block < 4; ++block) {
+                acc[level][block] = _mm256_setzero_ps();
+            }
+        }
+
+        int i = 0;
+        for (; i + level_step <= state_dim;) {
+            for (int j = 0; j < level_step; ++j, ++i) {
+                const float *row = matrix + (size_t)i * (size_t)state_dim + col;
+                const __m256 weight = _mm256_set1_ps(row_weights[i]);
+                for (int block = 0; block < 4; ++block) {
+                    const __m256 product = _mm256_mul_ps(
+                        _mm256_loadu_ps(row + block * 8), weight);
+                    acc[0][block] = _mm256_add_ps(acc[0][block], product);
+                }
+            }
+            for (int level = 1; level < num_levels; ++level) {
+                for (int block = 0; block < 4; ++block) {
+                    acc[level][block] = _mm256_add_ps(
+                        acc[level][block], acc[level - 1][block]);
+                    acc[level - 1][block] = _mm256_setzero_ps();
+                }
+                const int mask = level_mask << (level * level_power);
+                if ((i & mask) != 0) {
+                    break;
+                }
+            }
+        }
+        for (; i < state_dim; ++i) {
+            const float *row = matrix + (size_t)i * (size_t)state_dim + col;
+            const __m256 weight = _mm256_set1_ps(row_weights[i]);
+            for (int block = 0; block < 4; ++block) {
+                const __m256 product = _mm256_mul_ps(
+                    _mm256_loadu_ps(row + block * 8), weight);
+                acc[0][block] = _mm256_add_ps(acc[0][block], product);
+            }
+        }
+        for (int level = 1; level < num_levels; ++level) {
+            for (int block = 0; block < 4; ++block) {
+                acc[0][block] = _mm256_add_ps(
+                    acc[0][block], acc[level][block]);
+            }
+        }
+        for (int block = 0; block < 4; ++block) {
+            _mm256_storeu_ps(output + col + block * 8, acc[0][block]);
+        }
+    }
+#endif
+
+    /* Production Qwen dimensions are covered above. Keep a deterministic
+     * scalar fallback for uncommon tail widths. */
+    for (; col < state_dim; ++col) {
+        float sum = 0.0f;
+        for (int row = 0; row < state_dim; ++row) {
+            sum += matrix[(size_t)row * (size_t)state_dim + col] *
+                   row_weights[row];
+        }
+        output[col] = sum;
+    }
+}
+
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("fp-contract=off")))
+#endif
+static void gated_deltanet_pytorch_grouped_bf16_forward_impl(
+                                                  const float *q,
+                                                  const float *k,
+                                                  const float *v,
+                                                  const float *g,
+                                                  const float *beta,
+                                                  const float *state_in,
+                                                  float *state_out,
+                                                  float *out,
+                                                  float *debug_decayed_state,
+                                                  float *debug_memory,
+                                                  float *debug_delta,
+                                                  int num_heads,
+                                                  int group_count,
+                                                  int state_dim,
+                                                  float norm_eps)
+{
+    (void)norm_eps;
+    if (!q || !k || !v || !g || !beta || !state_in || !state_out || !out ||
+        num_heads <= 0 || group_count <= 0 || num_heads % group_count != 0 ||
+        state_dim <= 0 || state_dim > CK_DELTANET_MAX_STACK_DIM) {
+        return;
+    }
+
+    const size_t vector_stride = (size_t)state_dim;
+    const size_t state_stride = vector_stride * vector_stride;
+    const int heads_per_group = num_heads / group_count;
+    const float sqrt_dim = sqrtf((float)state_dim);
+    float gate_values[CK_DELTANET_MAX_STACK_DIM];
+    float beta_values[CK_DELTANET_MAX_STACK_DIM];
+    float memory[CK_DELTANET_MAX_STACK_DIM];
+    float delta[CK_DELTANET_MAX_STACK_DIM];
+    float q_scaled[CK_DELTANET_MAX_STACK_DIM];
+    ck_deltanet_pytorch_gate_values(
+        g, beta, gate_values, beta_values, num_heads);
+
+    for (int h = 0; h < num_heads; ++h) {
+        const int group = h / heads_per_group;
+        const float *q_head = q + (size_t)group * vector_stride;
+        const float *k_head = k + (size_t)group * vector_stride;
+        const float *v_head = v + (size_t)h * vector_stride;
+        const float *state_prev = state_in + (size_t)h * state_stride;
+        float *state_cur = state_out + (size_t)h * state_stride;
+        float *out_head = out + (size_t)h * vector_stride;
+
+        for (int col = 0; col < state_dim; ++col) {
+            q_scaled[col] = q_head[col] / sqrt_dim;
+        }
+
+        /* Materialize the decayed state before the separately ordered sum. */
+        for (int row = 0; row < state_dim; ++row) {
+            const size_t row_offset = (size_t)row * vector_stride;
+            int col = 0;
+#if defined(__AVX2__)
+            const __m256 gate8 = _mm256_set1_ps(gate_values[h]);
+            for (; col + 7 < state_dim; col += 8) {
+                const __m256 state = _mm256_mul_ps(
+                    _mm256_loadu_ps(state_prev + row_offset + (size_t)col),
+                    gate8);
+                _mm256_storeu_ps(state_cur + row_offset + (size_t)col, state);
+            }
+#endif
+            for (; col < state_dim; ++col) {
+                const size_t offset = row_offset + (size_t)col;
+                const float state = state_prev[offset] * gate_values[h];
+                state_cur[offset] = state;
+            }
+        }
+
+        ck_deltanet_pytorch_outer_sum(
+            state_cur, k_head, memory, state_dim);
+
+        if (debug_decayed_state) {
+            memcpy(
+                debug_decayed_state + (size_t)h * state_stride,
+                state_cur,
+                state_stride * sizeof(float));
+        }
+        if (debug_memory) {
+            memcpy(
+                debug_memory + (size_t)h * vector_stride,
+                memory,
+                vector_stride * sizeof(float));
+        }
+
+        for (int col = 0; col < state_dim; ++col) {
+            delta[col] = (v_head[col] - memory[col]) * beta_values[h];
+        }
+        if (debug_delta) {
+            memcpy(
+                debug_delta + (size_t)h * vector_stride,
+                delta,
+                vector_stride * sizeof(float));
+        }
+
+        for (int row = 0; row < state_dim; ++row) {
+            const size_t row_offset = (size_t)row * vector_stride;
+            const float key = k_head[row];
+            int col = 0;
+#if defined(__AVX2__)
+            const __m256 key8 = _mm256_set1_ps(key);
+            for (; col + 7 < state_dim; col += 8) {
+                const __m256 update = _mm256_mul_ps(
+                    key8, _mm256_loadu_ps(delta + col));
+                const __m256 state = _mm256_add_ps(
+                    _mm256_loadu_ps(state_cur + row_offset + (size_t)col),
+                    update);
+                _mm256_storeu_ps(state_cur + row_offset + (size_t)col, state);
+            }
+#endif
+            for (; col < state_dim; ++col) {
+                const size_t offset = row_offset + (size_t)col;
+                const float state = state_cur[offset] + key * delta[col];
+                state_cur[offset] = state;
+            }
+        }
+
+        ck_deltanet_pytorch_outer_sum(
+            state_cur, q_scaled, out_head, state_dim);
+
+        for (int col = 0; col < state_dim; ++col) {
+            out_head[col] = bf16_to_float(float_to_bf16(out_head[col]));
+        }
+    }
+}
+
 void gated_deltanet_pytorch_grouped_bf16_forward(const float *q,
                                                   const float *k,
                                                   const float *v,
@@ -721,13 +1099,33 @@ void gated_deltanet_pytorch_grouped_bf16_forward(const float *q,
                                                   int state_dim,
                                                   float norm_eps)
 {
-    gated_deltanet_llama_avx2_grouped_forward_impl(
+    gated_deltanet_pytorch_grouped_bf16_forward_impl(
         q, k, v, g, beta, state_in, state_out, out,
-        num_heads, group_count, state_dim, norm_eps, 0, num_heads, 1);
-    const size_t count = (size_t)num_heads * (size_t)state_dim;
-    for (size_t i = 0; i < count; ++i) {
-        out[i] = bf16_to_float(float_to_bf16(out[i]));
-    }
+        NULL, NULL, NULL,
+        num_heads, group_count, state_dim, norm_eps);
+}
+
+void gated_deltanet_pytorch_grouped_bf16_forward_debug(
+                                                  const float *q,
+                                                  const float *k,
+                                                  const float *v,
+                                                  const float *g,
+                                                  const float *beta,
+                                                  const float *state_in,
+                                                  float *state_out,
+                                                  float *out,
+                                                  float *decayed_state,
+                                                  float *memory,
+                                                  float *delta,
+                                                  int num_heads,
+                                                  int group_count,
+                                                  int state_dim,
+                                                  float norm_eps)
+{
+    gated_deltanet_pytorch_grouped_bf16_forward_impl(
+        q, k, v, g, beta, state_in, state_out, out,
+        decayed_state, memory, delta,
+        num_heads, group_count, state_dim, norm_eps);
 }
 
 void gated_deltanet_llama_avx2_prefill_forward(const float *q,

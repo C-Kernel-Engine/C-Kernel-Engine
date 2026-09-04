@@ -3,6 +3,17 @@
   "schema_version": 1,
   "engine_contract_version": "8",
   "contracts": {
+    "hyper_stream_expand_exact_fp32": {
+      "operator_family": "hyper_stream_expand",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "ascending_token_then_stream_exact_fp32_copy"},
+      "rounding": {"mode": "none", "points": ["input_load", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Copies each FP32 hidden row exactly into every declared hyper-connection stream without an intermediate storage conversion."
+    },
     "multimodal_prefix_insert_exact_fp32": {
       "operator_family": "multimodal_prefix_insert",
       "status": "validated",
@@ -489,6 +500,66 @@
       "position_transform": null,
       "description": "Qwen3.5 recurrent gated normalization matches llama.cpp's separate RMSNorm, weight multiply, AVX2 SiLU, and final elementwise multiply operations."
     },
+    "hyper_stream_inject_llama_fp32_output": {
+      "operator_family": "hyper_stream_inject",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "llama_block_output_times_injection_then_residual_add"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["weighted_product", "partial_store", "output_store"]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "fp32",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Quantized hyper-connection injection matches llama.cpp's FP32 multiply followed by FP32 residual addition without a BF16 storage boundary."
+    },
+    "recurrent_norm_sigmoid_gate_llama_fp32_output": {
+      "operator_family": "recurrent_norm_gate",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "llama_rmsnorm_then_weight_mul_then_scalar_sigmoid_then_elementwise_mul"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["square_product", "reduction_finalize", "reciprocal_sqrt", "normalization_scale", "weight_scale", "vector_exponential", "output_divide", "output_store"]
+      },
+      "reduction": {
+        "kind": "normalization",
+        "order": "left_to_right",
+        "partial_accumulator": "fp64",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Qwen4-Exp quantized recurrent gating matches llama.cpp's separate RMSNorm and model-declared scalar sigmoid before the final elementwise multiply."
+    },
     "recurrent_norm_gate_pytorch_bf16_storage": {
       "operator_family": "recurrent_norm_gate",
       "status": "validated",
@@ -518,6 +589,36 @@
       },
       "position_transform": null,
       "description": "PyTorch Qwen3Next BF16 RMSNormGated boundaries: FP32 RMS statistics, BF16 norm/weight product, FP32 SLEEF SiLU, and BF16 final storage."
+    },
+    "recurrent_norm_sigmoid_gate_pytorch_bf16_storage": {
+      "operator_family": "recurrent_norm_gate",
+      "status": "validated",
+      "storage": {"input": "bf16", "weight": "bf16", "output": "bf16"},
+      "compute": {
+        "input": "fp32",
+        "weight": "bf16",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "aten_avx2_rmsnorm_then_bf16_normalized_store_then_bf16_weight_mul_then_fp32_sleef_sigmoid_gate_then_bf16_output"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "reduction_finalize", "normalization_scale", "activation_intermediate_store", "weight_scale", "vector_exponential", "weighted_product", "output_store"]
+      },
+      "reduction": {
+        "kind": "normalization",
+        "order": "hierarchical_cascade",
+        "partial_accumulator": "fp32",
+        "merge_order": "hierarchical_cascade"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "PyTorch BF16 RMSNormGated boundaries with a model-declared sigmoid gate: FP32 RMS statistics, BF16 norm/weight product, FP32 SLEEF sigmoid, and BF16 final storage."
     },
     "rmsnorm_fp32_square_fp64_sum_fp32_output": {
       "operator_family": "rmsnorm",
@@ -840,6 +941,36 @@
       },
       "description": "Align-corners tiled 2D position interpolation with FP32 rational coordinates and contracted float32 evaluation order."
     },
+    "recurrent_dt_gate_pytorch_sleef_fp32_output": {
+      "operator_family": "recurrent_dt_gate",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "fp32_alpha_plus_bias_then_sleef_expf16_u10_then_sleef_log1pf16_u10_then_fp32_a_multiply"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "vector_exponential", "logarithm", "weighted_product", "output_store"]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "PyTorch CPU FP32 recurrent decay gate used by Qwen4-Exp: vector softplus follows ATen's AVX-512 SLEEF exp/log1p path before multiplying by -exp(A_log)."
+    },
     "recurrent_qk_l2_llama_cpu_fp32_output": {
       "operator_family": "recurrent_qk_l2_norm",
       "status": "validated",
@@ -868,6 +999,36 @@
       },
       "position_transform": null,
       "description": "llama.cpp CPU L2 normalization: FP32 products, ascending FP64 sum, and epsilon as a minimum denominator."
+    },
+    "recurrent_qk_l2_pytorch_fp32_reduce_fp32_output": {
+      "operator_family": "recurrent_qk_l2_norm",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "aten_native_fp32_avx2_width_four_way_cascade_square_sum_then_add_eps_then_rsqrt_then_fp32_multiply"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["square_product", "reduction_update", "denominator_add", "reciprocal_sqrt", "normalization_scale", "output_store"]
+      },
+      "reduction": {
+        "kind": "normalization",
+        "order": "hierarchical_cascade",
+        "partial_accumulator": "fp32",
+        "merge_order": "hierarchical_cascade"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "PyTorch CPU FP32 L2 normalization used after Qwen4-Exp converts its BF16 recurrent Q/K activations to FP32; the reduction reproduces ATen's x86 four-way cascade rather than widening the arithmetic order to AVX-512 lanes."
     },
     "recurrent_qk_l2_pytorch_bf16_vector_tail_bf16_output": {
       "operator_family": "recurrent_qk_l2_norm",
@@ -1051,8 +1212,8 @@
         "input": "fp32",
         "weight": "none",
         "accumulator": "fp32",
-        "contraction": "enabled",
-        "evaluation_order": "ascending_token_grouped_qk_repeat_interleave_group_equals_head_div_heads_per_group_then_avx2_state_update_then_bf16_output_store"
+        "contraction": "disabled",
+        "evaluation_order": "ascending_token_grouped_qk_repeat_interleave_then_mkl_vml_exp_then_materialized_multiply_pytorch_cpu_vectorized_outer_cascade_sum_then_materialized_state_outer_product_add_then_bf16_output_store"
       },
       "rounding": {
         "mode": "rne",
@@ -1060,9 +1221,9 @@
       },
       "reduction": {
         "kind": "composite",
-        "order": "stage_ordered",
+        "order": "hierarchical_cascade",
         "partial_accumulator": "fp32",
-        "merge_order": "pairwise_tree"
+        "merge_order": "hierarchical_cascade"
       },
       "threading": {
         "work_partition": "serial",
@@ -1071,7 +1232,7 @@
         "thread_count_changes_arithmetic_order": false
       },
       "position_transform": null,
-      "description": "Qwen3.6 BF16 Gated DeltaNet provider: expand compact Q/K groups across adjacent value heads using group = head / (H / G), retain FP32 recurrent state, and store the attention output to BF16."
+      "description": "PyTorch CPU BF16 Gated DeltaNet provider: expand compact Q/K groups across adjacent value heads, use MKL VML exp and the PyTorch CPU vectorized outer cascade, preserve materialized multiply/add boundaries without FMA contraction, retain FP32 recurrent state, and store output to BF16."
     },
     "yarn_rope_cache_contiguous_positions_fp32": {
       "operator_family": "yarn_rope_init",
@@ -2197,6 +2358,40 @@
       "position_transform": null,
       "description": "llama.cpp CPU attention gating evaluates sigmoid as 1.0f/(1.0f+expf(-gate)) before the FP32 attention multiply; the algebraically equivalent sign-stable branch is not numerically interchangeable."
     },
+    "attention_gate_pytorch_sleef_bf16_storage": {
+      "operator_family": "attention_gate",
+      "status": "validated",
+      "storage": {
+        "input": "bf16",
+        "weight": "none",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp32",
+        "contraction": "disabled",
+        "evaluation_order": "bf16_gate_to_fp32_then_sleef_sigmoid_then_bf16_sigmoid_store_then_bf16_attention_multiply_then_bf16_output_store"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "vector_exponential", "denominator_add", "reciprocal", "activation_intermediate_store", "weighted_product", "output_store"]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "PyTorch CPU BF16 attention gate using the active SLEEF vector exponential, a BF16 sigmoid boundary, and a BF16 product boundary."
+    },
     "swiglu_fp32_ggml_vector_exp_fp32_output": {
       "operator_family": "swiglu",
       "status": "validated",
@@ -2778,6 +2973,47 @@
       "position_transform": null,
       "description": "Observed llama.cpp-compatible AVX2 full-softmax top-k MoE routing order. Distinct-score Qwen3.5 production shapes are bit-exact; equal-score cross-toolchain ordering remains uncertified."
     },
+    "pytorch_full_softmax_topk_selected_renorm_bf16_storage": {
+      "operator_family": "moe_router",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "enabled",
+        "evaluation_order": "full_vector_max_then_avx2_fma_exponential_chunks_then_fp64_chunk_sum_then_fp32_probability_scale_then_topk_then_fp64_selected_sum_cast_fp32_clamp_divide_scale_then_bf16_rne_store"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "vector_exponential",
+          "reduction_update",
+          "softmax_probability_store",
+          "reduction_finalize",
+          "output_divide",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp64",
+        "merge_order": "selected_slot_order"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Validated PyTorch BF16 router boundary: perform full-softmax top-k selection and selected-weight renormalization in FP32, then store each selected routing weight with BF16 round-to-nearest-even."
+    },
     "q8_0_q8_0_shared_swiglu_fp32_sigmoid_gate_then_routed_add": {
       "operator_family": "moe_shared_swiglu",
       "status": "observed",
@@ -2961,6 +3197,56 @@
       "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
       "position_transform": null,
       "description": "Observed compact shared SwiGLU composition for Q4_K gate/up and Q4_K down weights, followed by an FP32 routed-result addition."
+    },
+    "ple_gate_conv_inject_llama_fp32_activation_fp16_conv": {
+      "operator_family": "ple_gate_conv_inject",
+      "status": "observed",
+      "storage": {"input":"fp32","weight":"fp16","output":"fp32"},
+      "compute": {
+        "input": "fp32",
+        "weight": "fp16",
+        "accumulator": "fp64",
+        "contraction": "disabled",
+        "evaluation_order": "grouped_llama_rmsnorm_then_materialized_fp32_mul_fp64_sum_rows_then_signed_sqrt_sigmoid_then_grouped_llama_rmsnorm_then_fp16_depthwise_conv_then_silu_then_nested_residual_add"
+      },
+      "rounding": {"mode":"rne","points":["square_product","reduction_finalize","reciprocal_sqrt","normalization_scale","weight_scale","weighted_product","reduction_update","vector_exponential","output_store"]},
+      "reduction": {"kind":"composite","order":"stage_ordered","partial_accumulator":"fp64","merge_order":"implementation_defined"},
+      "threading": {"work_partition":"independent_rows","split_strategy":"independent_outputs","deterministic":true,"thread_count_changes_arithmetic_order":false},
+      "position_transform": null,
+      "description": "Observed llama.cpp Qwen4-Exp PLE path with FP32 activation boundaries, grouped llama RMSNorm, FP64 SUM_ROWS folding, FP16 depthwise-convolution weights, and nested FP32 residual additions. Promotion requires complete PLE X-Ray parity."
+    },
+    "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output": {
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "bf16",
+        "output": "bf16"
+      },
+      "compute": {
+        "input": "bf16_rne",
+        "weight": "bf16",
+        "accumulator": "fp32",
+        "evaluation_order": "onednn_3_12_brg_matmul_avx512_core_bf16"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": ["input_load", "output_store"]
+      },
+      "reduction": {
+        "kind": "dot_product",
+        "order": "contract_defined_chunks",
+        "partial_accumulator": "fp32",
+        "merge_order": "implementation_defined"
+      },
+      "threading": {
+        "work_partition": "split_k",
+        "split_strategy": "split_k",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": true
+      },
+      "position_transform": null,
+      "description": "PyTorch 2.13 BF16 Linear parity contract for oneDNN 3.12.0 OpenMP at source commit 80afa71049cd69a3df32adcccb623b12cd7baa22. The result is deterministic only for a fixed thread count.",
+      "operator_family": "gemm"
     },
     "bf16_weight_bf16_input_pytorch_onednn_brgemm_bf16_output": {
       "status": "validated",

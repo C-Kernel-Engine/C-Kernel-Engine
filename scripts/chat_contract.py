@@ -21,6 +21,7 @@ PRESET_ALIASES = {
     "qwen2": "qwen2",
     "qwen3": "qwen3",
     "qwen35": "qwen35",
+    "qwen4_exp": "qwen4_exp",
     "gemma": "gemma3",
     "gemma3": "gemma3",
     "gemma4": "gemma4",
@@ -273,6 +274,8 @@ def _infer_explicit_contract_name(
     if model_type_lc.startswith("glm") or template_name_lc.startswith("glm"):
         return "glm4"
     if "<|im_start|>" in template and "<|im_end|>" in template:
+        if model_type_lc in {"qwen4exp", "qwen4_exp", "qwen4_exp_text"} or template_name_lc == "qwen4_exp":
+            return "qwen4_exp"
         if model_type_lc == "qwen35" or template_name_lc == "qwen35":
             return "qwen35"
         if model_type_lc == "qwen3" or template_name_lc == "qwen3":

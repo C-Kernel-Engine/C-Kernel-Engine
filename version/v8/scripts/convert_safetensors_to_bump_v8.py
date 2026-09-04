@@ -78,6 +78,10 @@ DTYPE_TO_CK = {
     "float32": ("fp32", CK_DT_FP32, 4),
     "bfloat16": ("bf16", CK_DT_BF16, 2),
     "float16": ("fp16", CK_DT_FP16, 2),
+    # BUMP's fixed dtype byte has no integer metadata code. Small control
+    # tensors retain their exact i64 payload and are identified by the v5
+    # manifest entry, as tokenizer i32/u8 sidecars already are.
+    "I64": ("i64", CK_DT_FP32, 8),
 }
 
 SAFETENSORS_CK_MAP_PATH = SCRIPT_DIR.parent / "model_maps" / "safetensors_ck_map.json"
@@ -166,6 +170,9 @@ def _torch_to_bytes(t, dtype_policy: str) -> tuple[bytes, str, list[int]]:
     import torch
 
     shape = [int(x) for x in t.shape]
+    if dtype_policy == "i64":
+        arr = t.to(dtype=torch.int64).numpy().astype(np.int64, copy=False)
+        return arr.tobytes(order="C"), "i64", shape
     if dtype_policy == "fp32":
         arr = t.to(dtype=torch.float32).numpy().astype(np.float32, copy=False)
         return arr.tobytes(order="C"), "fp32", shape
@@ -192,6 +199,8 @@ def _dtype_code(dtype_name: str) -> int:
         return CK_DT_FP16
     if dtype_name == "nvfp4":
         return CK_DT_NVFP4
+    if dtype_name == "i64":
+        return CK_DT_FP32
     raise ValueError(f"unsupported dtype {dtype_name}")
 
 
@@ -693,6 +702,183 @@ def _qwen35_architecture_metadata(config: dict[str, Any]) -> dict[str, Any]:
         "has_mtp_assistant": mtp_layers > 0,
         "mtp_num_layers": mtp_layers,
         "mtp_use_dedicated_embeddings": bool(text.get("mtp_use_dedicated_embeddings", False)),
+    }
+
+
+def _qwen4_exp_text_refs(
+    config: dict[str, Any], headers: dict[str, HeaderTensor]
+) -> list[TensorRef]:
+    """Map Qwen3.8 Flash Next text tensors without collapsing its topology."""
+    text = config.get("text_config") if isinstance(config.get("text_config"), dict) else config
+    num_layers = int(text.get("num_hidden_layers") or 0)
+    layer_types = [str(value) for value in (text.get("layer_types") or [])]
+    if num_layers <= 0 or len(layer_types) != num_layers:
+        raise SystemExit("Qwen4-Exp requires one explicit layer type per decoder layer")
+
+    root = "model.language_model"
+    refs: list[TensorRef] = [
+        TensorRef("token_emb", (_require_existing(headers, (f"{root}.embed_tokens.weight",), "token embeddings"),)),
+        TensorRef("hyper.norm", (_require_existing(headers, (f"{root}.hyper_connection_mixer.hc_norm.weight",), "final hyper-connection norm"),), dtype="fp32"),
+        TensorRef("hyper.mix_down", (_require_existing(headers, (f"{root}.hyper_connection_mixer.input_mix_weight_down.weight",), "final hyper-connection down projection"),)),
+        TensorRef("hyper.mix_up", (_require_existing(headers, (f"{root}.hyper_connection_mixer.input_mix_weight_up.weight",), "final hyper-connection up projection"),)),
+    ]
+
+    for layer, layer_type in enumerate(layer_types):
+        pfx = f"{root}.layers.{layer}"
+        for stage in ("attn", "mlp"):
+            hp = f"{pfx}.{stage}_hyper_connection"
+            target = f"layer.{layer}.{stage}_hyper"
+            refs.extend([
+                TensorRef(f"{target}.norm", (_require_existing(headers, (f"{hp}.hc_norm.weight",), f"layer {layer} {stage} hyper norm"),), dtype="fp32"),
+                TensorRef(f"{target}.mix_down", (_require_existing(headers, (f"{hp}.input_mix_weight_down.weight",), f"layer {layer} {stage} hyper mix down"),)),
+                TensorRef(f"{target}.mix_up", (_require_existing(headers, (f"{hp}.input_mix_weight_up.weight",), f"layer {layer} {stage} hyper mix up"),)),
+                TensorRef(f"{target}.inject", (_require_existing(headers, (f"{hp}.block_inject_weight.weight",), f"layer {layer} {stage} block injection"),)),
+            ])
+
+        mlp = f"{pfx}.mlp"
+        refs.extend([
+            TensorRef(f"layer.{layer}.moe_router", (_require_existing(headers, (f"{mlp}.gate.weight",), f"layer {layer} MoE router"),)),
+            TensorRef(f"layer.{layer}.moe_expert_gate_up", (_require_existing(headers, (f"{mlp}.experts.gate_up_proj",), f"layer {layer} packed expert gate/up"),)),
+            TensorRef(f"layer.{layer}.moe_expert_down", (_require_existing(headers, (f"{mlp}.experts.down_proj",), f"layer {layer} packed expert down"),)),
+            TensorRef(f"layer.{layer}.moe_shared_gate", (_require_existing(headers, (f"{mlp}.shared_expert.gate_proj.weight",), f"layer {layer} shared expert gate"),)),
+            TensorRef(f"layer.{layer}.moe_shared_up", (_require_existing(headers, (f"{mlp}.shared_expert.up_proj.weight",), f"layer {layer} shared expert up"),)),
+            TensorRef(f"layer.{layer}.moe_shared_down", (_require_existing(headers, (f"{mlp}.shared_expert.down_proj.weight",), f"layer {layer} shared expert down"),)),
+            TensorRef(f"layer.{layer}.moe_shared_router", (_require_existing(headers, (f"{mlp}.shared_expert_gate.weight",), f"layer {layer} shared expert router"),)),
+        ])
+
+        if layer_type == "linear_attention":
+            attn = f"{pfx}.linear_attn"
+            refs.extend([
+                TensorRef(f"layer.{layer}.attn_qkv", (_require_existing(headers, (f"{attn}.in_proj_qkv.weight",), f"layer {layer} recurrent qkv"),)),
+                TensorRef(f"layer.{layer}.attn_gate", (_require_existing(headers, (f"{attn}.in_proj_z.weight",), f"layer {layer} recurrent output gate"),)),
+                TensorRef(f"layer.{layer}.ssm_alpha", (_require_existing(headers, (f"{attn}.in_proj_a.weight",), f"layer {layer} recurrent alpha"),)),
+                TensorRef(f"layer.{layer}.ssm_beta", (_require_existing(headers, (f"{attn}.in_proj_b.weight",), f"layer {layer} recurrent beta"),)),
+                TensorRef(f"layer.{layer}.ssm_conv1d", (_require_existing(headers, (f"{attn}.conv1d.weight",), f"layer {layer} recurrent conv1d"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ssm_dt_bias", (_require_existing(headers, (f"{attn}.dt_bias",), f"layer {layer} recurrent dt bias"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ssm_a", (_require_existing(headers, (f"{attn}.A_log",), f"layer {layer} recurrent A_log"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ssm_norm", (_require_existing(headers, (f"{attn}.norm.weight",), f"layer {layer} recurrent norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ssm_out", (_require_existing(headers, (f"{attn}.out_proj.weight",), f"layer {layer} recurrent output"),)),
+            ])
+        elif layer_type in {"qwen_sparse_attention", "full_attention"}:
+            attn = f"{pfx}.self_attn"
+            refs.extend([
+                TensorRef(f"layer.{layer}.attn_q_gate", (_require_existing(headers, (f"{attn}.q_proj.weight",), f"layer {layer} sparse q/gate"),)),
+                TensorRef(f"layer.{layer}.attn_k", (_require_existing(headers, (f"{attn}.k_proj.weight",), f"layer {layer} sparse k"),)),
+                TensorRef(f"layer.{layer}.attn_v", (_require_existing(headers, (f"{attn}.v_proj.weight",), f"layer {layer} sparse v"),)),
+                TensorRef(f"layer.{layer}.attn_output", (_require_existing(headers, (f"{attn}.o_proj.weight",), f"layer {layer} sparse output"),)),
+                TensorRef(f"layer.{layer}.attn_q_norm", (_require_existing(headers, (f"{attn}.q_norm.weight",), f"layer {layer} q norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.attn_k_norm", (_require_existing(headers, (f"{attn}.k_norm.weight",), f"layer {layer} k norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.index_qk", (_require_existing(headers, (f"{attn}.indexer.index_qk_proj.weight",), f"layer {layer} indexer qk"),)),
+                TensorRef(f"layer.{layer}.index_q_norm", (_require_existing(headers, (f"{attn}.indexer.q_layernorm.weight",), f"layer {layer} indexer q norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.index_k_norm", (_require_existing(headers, (f"{attn}.indexer.k_layernorm.weight",), f"layer {layer} indexer k norm"),), dtype="fp32"),
+            ])
+        else:
+            raise SystemExit(f"Unsupported Qwen4-Exp layer type at layer {layer}: {layer_type}")
+
+        ple = f"{pfx}.ple"
+        if f"{ple}.key_proj.weight" in headers:
+            refs.extend([
+                TensorRef(f"layer.{layer}.ple_key", (f"{ple}.key_proj.weight",)),
+                TensorRef(f"layer.{layer}.ple_value", (_require_existing(headers, (f"{ple}.value_proj.weight",), f"layer {layer} PLE value"),)),
+                TensorRef(f"layer.{layer}.ple_conv", (_require_existing(headers, (f"{ple}.conv1d.weight",), f"layer {layer} PLE conv"),)),
+                TensorRef(f"layer.{layer}.ple_norm_key", (_require_existing(headers, (f"{ple}.norm_key.weight",), f"layer {layer} PLE key norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ple_norm_query", (_require_existing(headers, (f"{ple}.norm_query.weight",), f"layer {layer} PLE query norm"),), dtype="fp32"),
+                TensorRef(f"layer.{layer}.ple_norm_conv", (_require_existing(headers, (f"{ple}.norm_conv.weight",), f"layer {layer} PLE conv norm"),), dtype="fp32"),
+            ])
+            ep = f"{ple}.ple_embedding"
+            for suffix in ("layer_multipliers", "ngram_heads_offsets", "ngram_heads_vocab_sizes"):
+                refs.append(TensorRef(f"layer.{layer}.ple_{suffix}", (_require_existing(headers, (f"{ep}.{suffix}",), f"layer {layer} PLE {suffix}"),), dtype="i64"))
+            shard_prefix = f"{ep}.ngram_embedding.shard_"
+            shard_names = sorted(
+                (name for name in headers if name.startswith(shard_prefix) and name.endswith(".weight")),
+                key=lambda name: int(name[len(shard_prefix):].split(".", 1)[0]),
+            )
+            expected_shards = int(text.get("split_ngram_parts") or 0)
+            if len(shard_names) != expected_shards:
+                raise SystemExit(
+                    f"Qwen4-Exp layer {layer} PLE has {len(shard_names)} embedding shards; expected {expected_shards}"
+                )
+            shard_shapes = [headers[name].shape for name in shard_names]
+            if any(len(shape) != 2 for shape in shard_shapes):
+                raise SystemExit(
+                    f"Qwen4-Exp layer {layer} PLE embedding shards must be rank-2"
+                )
+            embedding_dim = int(shard_shapes[0][1])
+            if any(int(shape[1]) != embedding_dim for shape in shard_shapes):
+                raise SystemExit(
+                    f"Qwen4-Exp layer {layer} PLE embedding shards disagree on embedding dimension"
+                )
+            total_vocab_size = sum(int(shape[0]) for shape in shard_shapes)
+            refs.append(TensorRef(
+                f"layer.{layer}.ple_ngram_embedding",
+                tuple(shard_names),
+                shape=(total_vocab_size, embedding_dim),
+            ))
+
+    lm_head = _require_existing(headers, ("lm_head.weight", f"{root}.lm_head.weight"), "language model head")
+    refs.append(TensorRef("output.weight", (lm_head,)))
+    return refs
+
+
+def _qwen4_exp_architecture_metadata(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate Qwen3.8 Flash Next topology and retain it for circuit lowering."""
+    text = config.get("text_config") if isinstance(config.get("text_config"), dict) else config
+    required_positive = (
+        "num_hidden_layers", "hidden_size", "num_attention_heads",
+        "num_key_value_heads", "head_dim", "hc_count", "hc_lowrank",
+        "num_experts", "num_experts_per_tok", "moe_intermediate_size",
+        "linear_num_key_heads", "linear_num_value_heads",
+        "linear_key_head_dim", "linear_value_head_dim",
+        "indexer_budget", "indexer_compress_ratio", "ngram_size",
+        "split_ngram_parts",
+    )
+    values = {key: int(text.get(key) or 0) for key in required_positive}
+    missing = [key for key, value in values.items() if value <= 0]
+    if missing:
+        raise SystemExit(f"Qwen4-Exp config missing required positive values: {missing}")
+    layer_types = [str(value) for value in (text.get("layer_types") or [])]
+    if len(layer_types) != values["num_hidden_layers"]:
+        raise SystemExit("Qwen4-Exp layer_types must cover every decoder layer")
+    unsupported = sorted(set(layer_types) - {"linear_attention", "qwen_sparse_attention", "full_attention"})
+    if unsupported:
+        raise SystemExit(f"Unsupported Qwen4-Exp layer types: {unsupported}")
+    ple_layer_ids = [int(value) for value in (text.get("ple_layer_ids") or [])]
+    if any(layer <= 0 or layer > values["num_hidden_layers"] for layer in ple_layer_ids):
+        raise SystemExit("Qwen4-Exp PLE layer ids use one-based decoder insertion points")
+    ple_owner_layers = [layer - 1 for layer in ple_layer_ids]
+    rotary_dim = int(values["head_dim"] * float(text.get("partial_rotary_factor") or 1.0))
+    if rotary_dim <= 0 or rotary_dim % 2:
+        raise SystemExit("Qwen4-Exp partial rotary width must be positive and even")
+    rope = text.get("rope_parameters") if isinstance(text.get("rope_parameters"), dict) else {}
+    mrope_sections = [int(value) for value in (rope.get("mrope_section") or [])]
+    mrope_interleaved = bool(rope.get("mrope_interleaved", False))
+    if len(mrope_sections) not in {3, 4}:
+        raise SystemExit("Qwen4-Exp M-RoPE requires three or four section widths")
+    if 2 * sum(mrope_sections) != rotary_dim:
+        raise SystemExit(
+            "Qwen4-Exp M-RoPE sections must describe the configured rotary width"
+        )
+    return {
+        **values,
+        "layer_types": layer_types,
+        "layer_kinds": ["recurrent" if kind == "linear_attention" else "sparse_attention" for kind in layer_types],
+        "ple_layer_ids": ple_layer_ids,
+        "ple_owner_layers": ple_owner_layers,
+        "rotary_dim": rotary_dim,
+        "mrope_sections": mrope_sections + ([0] if len(mrope_sections) == 3 else []),
+        "mrope_n_dims": rotary_dim,
+        "mrope_interleaved": mrope_interleaved,
+        "full_attention_interval": int(text.get("full_attention_interval") or 4),
+        "norm_topk_prob": bool(text.get("norm_topk_prob", True)),
+        "shared_expert_intermediate_size": int(text.get("shared_expert_intermediate_size") or 0),
+        "indexer_head_dim": int(text.get("indexer_head_dim") or 0),
+        "indexer_n_heads": int(text.get("indexer_n_heads") or 0),
+        "indexer_kv_heads": int(text.get("indexer_kv_heads") or 0),
+        "ngram_vocab_size_base": int(text.get("ngram_vocab_size_base") or 0),
+        "heads_per_ngram": int(text.get("heads_per_ngram") or 0),
+        "ple_embed_dim": int(text.get("ple_embed_dim") or 0),
+        "ple_conv_kernel_size": int(text.get("ple_conv_kernel_size") or 0),
+        "mtp_num_hidden_layers": int(text.get("mtp_num_hidden_layers") or 0),
     }
 
 
@@ -1205,6 +1391,10 @@ def _infer_arch(hf: dict[str, Any]) -> str:
         return "gemma4"
     if "gemma" in mt and "3" in mt:
         return "gemma3"
+    if mt in {"qwen4_exp", "qwen4_exp_text"} or any(
+        "qwen4exp" in name or "qwen4_exp" in name for name in arch_names
+    ):
+        return "qwen4_exp"
     if "qwen3_5" in mt or "qwen3.5" in mt or "qwen35" in mt:
         return "qwen35"
     if "qwen3_vl" in mt or any("qwen3vl" in name or "qwen3_vl" in name for name in arch_names):
@@ -1237,6 +1427,8 @@ def _refs_for_arch(arch: str, config: dict[str, Any], headers: dict[str, HeaderT
         return _gemma4_text_refs(config, headers)
     if arch == "qwen35":
         return _qwen35_text_refs(config, headers)
+    if arch == "qwen4_exp":
+        return _qwen4_exp_text_refs(config, headers)
     if arch == "qwen3_vl_vision":
         return _qwen3vl_vision_refs(config, headers)
     if arch == "nemotron_h":
@@ -2102,6 +2294,112 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
             "dtype": "bf16",
         })
 
+    if arch == "qwen4_exp":
+        architecture = _qwen4_exp_architecture_metadata(hf)
+        headers = _load_safetensors_headers(model_dir)
+        recurrent_qkv_weight_dtypes = {
+            _header_dtype_to_ck(header.dtype)[0]
+            for name, header in headers.items()
+            if name.endswith(".linear_attn.in_proj_qkv.weight")
+        }
+        if len(recurrent_qkv_weight_dtypes) > 1:
+            raise SystemExit(
+                "Qwen4-Exp recurrent QKV projection weights must use one "
+                "storage dtype; found "
+                f"{sorted(recurrent_qkv_weight_dtypes)}"
+            )
+        recurrent_qkv_weight_dtype = (
+            next(iter(recurrent_qkv_weight_dtypes))
+            if recurrent_qkv_weight_dtypes
+            else ""
+        )
+        layer_types = list(architecture["layer_types"])
+        layer_kinds = list(architecture["layer_kinds"])
+        circuit_layer_kinds = [
+            f"{kind}_ple" if layer in architecture["ple_owner_layers"] else kind
+            for layer, kind in enumerate(layer_kinds)
+        ]
+        execution_plan: list[dict[str, Any]] = []
+        for layer, kind in enumerate(layer_kinds):
+            recurrent = kind == "recurrent"
+            execution_plan.append({
+                "layer": layer,
+                "kind": kind,
+                "state_policy": "recurrent_state" if recurrent else "kv_cache",
+                "attention_policy": "none" if recurrent else "qsa_sparse",
+                "recurrent_policy": "deltanet" if recurrent else "none",
+                "kv_policy": "none" if recurrent else "produce",
+                "ple": layer in architecture["ple_owner_layers"],
+            })
+        cfg.update({
+            "model": "qwen4_exp",
+            "arch": "qwen4_exp",
+            "model_type": "qwen4_exp",
+            "intermediate_size": int(architecture["moe_intermediate_size"]),
+            "intermediate_dim": int(architecture["moe_intermediate_size"]),
+            "n_routed_experts": int(architecture["num_experts"]),
+            "experts_per_tok": int(architecture["num_experts_per_tok"]),
+            "max_seq_len": int(cfg.get("context_length") or 0),
+            "rotary_dim": int(architecture["rotary_dim"]),
+            "mrope_sections": list(architecture["mrope_sections"]),
+            "mrope_n_dims": int(architecture["mrope_n_dims"]),
+            "mrope_interleaved": bool(architecture["mrope_interleaved"]),
+            "layer_types": layer_types,
+            "layer_kinds": layer_kinds,
+            "circuit_layer_kinds": circuit_layer_kinds,
+            "layer_execution_plan": execution_plan,
+            "layer_state_policy": [row["state_policy"] for row in execution_plan],
+            "layer_attention_policy": [row["attention_policy"] for row in execution_plan],
+            "layer_recurrent_policy": [row["recurrent_policy"] for row in execution_plan],
+            "layer_kv_policy": [row["kv_policy"] for row in execution_plan],
+            "has_qk_norm": True,
+            "has_attention_biases": False,
+            "prefill_policy": "batched",
+            "recurrent_state_physical_layout": "head_key_value_contiguous",
+            "ssm_conv_kernel": int(text.get("linear_conv_kernel_dim") or 4),
+            "ssm_state_size": int(architecture["linear_key_head_dim"]),
+            "ssm_group_count": int(architecture["linear_num_key_heads"]),
+            "ssm_time_step_rank": int(architecture["linear_num_value_heads"]),
+            "ssm_inner_size": int(architecture["linear_num_value_heads"] * architecture["linear_value_head_dim"]),
+            "q_dim": int(architecture["linear_num_key_heads"] * architecture["linear_key_head_dim"]),
+            "k_dim": int(architecture["linear_num_key_heads"] * architecture["linear_key_head_dim"]),
+            "v_dim": int(architecture["linear_num_value_heads"] * architecture["linear_value_head_dim"]),
+            "ssm_conv_channels": int(
+                2 * architecture["linear_num_key_heads"] * architecture["linear_key_head_dim"]
+                + architecture["linear_num_value_heads"] * architecture["linear_value_head_dim"]
+            ),
+            "recurrent_num_heads": int(architecture["linear_num_value_heads"]),
+            "recurrent_head_dim": int(architecture["linear_value_head_dim"]),
+            "attn_out_dim": int(architecture["num_attention_heads"] * int(text.get("head_dim") or 0)),
+            "attn_q_gate_proj_dim": int(2 * architecture["num_attention_heads"] * int(text.get("head_dim") or 0)),
+            "qsa_index_proj_dim": int(
+                (architecture["indexer_n_heads"] + architecture["indexer_kv_heads"])
+                * architecture["indexer_head_dim"]
+            ),
+            "qsa_selection_width": int(
+                architecture["indexer_budget"] + architecture["indexer_compress_ratio"] - 1
+            ),
+            "qsa_block_topk": int(
+                architecture["indexer_budget"] // architecture["indexer_compress_ratio"]
+            ),
+            "ple_ngram_heads": int((architecture["ngram_size"] - 1) * architecture["heads_per_ngram"]),
+            "ple_token_history": int(architecture["ngram_size"] - 1),
+            "ple_ngram_head_dim": int(
+                architecture["ple_embed_dim"]
+                // ((architecture["ngram_size"] - 1) * architecture["heads_per_ngram"])
+            ),
+            "ple_conv_history": int(
+                (architecture["ple_conv_kernel_size"] - 1) * architecture["ngram_size"]
+            ),
+            "ple_eos_token_id": int(cfg.get("eos_token_id") or 0),
+            "decoder_norm_storage_boundary": "bf16",
+            "decoder_residual_storage_boundary": "bf16",
+            "decode_kv_cache_dtype": "bf16",
+            **architecture,
+        })
+        if recurrent_qkv_weight_dtype:
+            cfg["recurrent_qkv_weight_dtype"] = recurrent_qkv_weight_dtype
+
     if arch == "qwen35":
         architecture = _qwen35_architecture_metadata(hf)
         headers = _load_safetensors_headers(model_dir)
@@ -2293,7 +2591,7 @@ def _entry_size_from_header(
         )
         if effective_policy != "preserve":
             out_dtype = effective_policy
-            elem = {"fp32": 4, "bf16": 2, "fp16": 2}[out_dtype]
+            elem = {"fp32": 4, "bf16": 2, "fp16": 2, "i64": 8}[out_dtype]
         else:
             out_dtype, elem = _header_dtype_to_ck(h.dtype)
         shape = [int(x) for x in ref.shape]
@@ -2312,7 +2610,7 @@ def _entry_size_from_header(
         shape = h.shape
         if effective_policy != "preserve":
             dtype = effective_policy
-            elem = {"fp32": 4, "bf16": 2, "fp16": 2}[dtype]
+            elem = {"fp32": 4, "bf16": 2, "fp16": 2, "i64": 8}[dtype]
         else:
             dtype, elem = _header_dtype_to_ck(h.dtype)
         total += int(np.prod(shape, dtype=np.int64)) * elem
@@ -2341,6 +2639,19 @@ def _is_qwen35_shifted_norm_ref(ref: TensorRef) -> bool:
     ))
 
 
+def _is_qwen4_exp_shifted_norm_ref(ref: TensorRef) -> bool:
+    if not ref.source_names:
+        return False
+    src = ref.source_names[0]
+    shifted_suffixes = (
+        "norm.weight",
+        "norm_key.weight",
+        "norm_query.weight",
+        "norm_conv.weight",
+    )
+    return src.endswith(shifted_suffixes) and not src.endswith("linear_attn.norm.weight")
+
+
 def _ref_transform(arch: str, ref: TensorRef) -> str | None:
     if ref.transform:
         return ref.transform
@@ -2348,6 +2659,8 @@ def _ref_transform(arch: str, ref: TensorRef) -> str | None:
         return "neg_exp_a_log"
     if arch == "qwen35" and _is_qwen35_shifted_norm_ref(ref):
         return "qwen35_norm_plus_one"
+    if arch == "qwen4_exp" and _is_qwen4_exp_shifted_norm_ref(ref):
+        return "qwen4_exp_norm_plus_one"
     return None
 
 
@@ -2360,6 +2673,8 @@ def _ignored_source_tensor(arch: str, name: str) -> str | None:
         return "vision_tower_not_in_decoder_pass"
     if arch == "qwen35" and name.startswith("model.vision_model."):
         return "vision_tower_not_in_decoder_pass"
+    if arch == "qwen4_exp" and name.startswith("model.visual."):
+        return "vision_tower_not_in_text_artifact"
     if arch == "qwen3vl" and (name.startswith("model.visual.") or name.startswith("visual.")):
         return "vision_tower_not_in_decoder_pass"
     if arch == "qwen3_vl_vision" and (name.startswith("model.language_model.") or name.startswith("model.model.") or name == "lm_head.weight"):
@@ -2474,7 +2789,7 @@ def _write_ref(
         if transform == "neg_exp_a_log":
             import torch
             t = -torch.exp(t.to(dtype=torch.float32))
-        elif transform == "qwen35_norm_plus_one":
+        elif transform in {"qwen35_norm_plus_one", "qwen4_exp_norm_plus_one"}:
             import torch
             t = t.to(dtype=torch.float32) + 1.0
         elif transform in {"qwen3vl_patch_temporal_0", "qwen3vl_patch_temporal_1"}:
@@ -2663,7 +2978,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

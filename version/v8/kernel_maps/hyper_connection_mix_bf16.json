@@ -1,0 +1,63 @@
+{
+  "id": "hyper_connection_mix_bf16",
+  "op": "hyper_connection_mix",
+  "operation_interface": "hyper_connection.mix.bf16_storage.v1",
+  "variant": "bf16_storage",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"mix_down_weight": "bf16", "mix_up_weight": "bf16", "inject_weight": "bf16", "activation": "bf16", "output": "bf16"},
+  "inputs": [{"name": "hyper_input", "dtype": "fp32", "shape": ["R", "S*D"], "layout": "token_stream_hidden_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [
+    {"name": "norm_weight", "dtype": "fp32", "shape": ["S*D"], "layout": "contiguous", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "mix_down_weight", "dtype": "bf16", "shape": ["X", "S*D"], "layout": "row_major", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "mix_up_weight", "dtype": "bf16", "shape": ["S*D", "X"], "layout": "row_major", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "inject_weight", "dtype": "bf16", "shape": ["S", "S*D"], "layout": "row_major", "access": "read", "storage_class": "weight", "consumption": "optional", "optional": true}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "mixed_output", "dtype": "fp32", "shape": ["R", "D"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"},
+    {"name": "injection_output", "dtype": "fp32", "shape": ["R", "S"], "layout": "token_stream_contiguous", "access": "write", "storage_class": "activation", "consumption": "optional", "optional": true}
+  ],
+  "scratch": [
+    {"name": "normalized_scratch", "dtype": "fp32", "shape": ["R", "S*D"], "size_bytes": "R * S * H * 4", "size_resolution": "required", "alignment": 64, "lifetime": "kernel_call", "layout": "token_stream_hidden_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"},
+    {"name": "dynamic_scratch", "dtype": "fp32", "shape": ["R", "X"], "size_bytes": "R * X * 4", "size_resolution": "required", "alignment": 64, "lifetime": "kernel_call", "layout": "token_major_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"},
+    {"name": "mix_scratch", "dtype": "fp32", "shape": ["R", "S*D"], "size_bytes": "R * S * H * 4", "size_resolution": "required", "alignment": 64, "lifetime": "kernel_call", "layout": "token_stream_hidden_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "dims": ["R", "S", "D", "X"],
+  "params": ["eps", "emit_injection"],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "hyper_connection_mix_bf16",
+    "c_declaration": "void hyper_connection_mix_bf16(const float *hyper_input, const float *norm_weight, const uint16_t *mix_down_weight, const uint16_t *mix_up_weight, const uint16_t *inject_weight, float *mixed_output, float *injection_output, float *normalized_scratch, float *dynamic_scratch, float *mix_scratch, int rows, int streams, int hidden_dim, int dynamic_dim, float eps, int emit_injection);",
+    "sources": ["src/kernels/hyper_connection_kernels.c"],
+    "variants": [{"name": "reference", "requires": [], "compile_flags": []}]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name":"hyper_input","source":"activation:hyper_input","cast":"const float*","ports":["input:hyper_input"]},
+      {"name":"norm_weight","source":"weight_f:norm_weight","cast":"const float*","ports":["weight:norm_weight"]},
+      {"name":"mix_down_weight","source":"weight:mix_down_weight","cast":"const uint16_t*","ports":["weight:mix_down_weight"]},
+      {"name":"mix_up_weight","source":"weight:mix_up_weight","cast":"const uint16_t*","ports":["weight:mix_up_weight"]},
+      {"name":"inject_weight","source":"weight:inject_weight","cast":"const uint16_t*","ports":["weight:inject_weight"]},
+      {"name":"mixed_output","source":"output:mixed_output","cast":"float*","ports":["output:mixed_output"]},
+      {"name":"injection_output","source":"output:injection_output","cast":"float*","ports":["output:injection_output"]},
+      {"name":"normalized_scratch","source":"scratch:normalized_scratch","cast":"float*"},
+      {"name":"dynamic_scratch","source":"scratch:dynamic_scratch","cast":"float*"},
+      {"name":"mix_scratch","source":"scratch:mix_scratch","cast":"float*"},
+      {"name":"rows","source":"dim:seq_len"},
+      {"name":"streams","source":"dim:hc_count"},
+      {"name":"hidden_dim","source":"dim:embed_dim"},
+      {"name":"dynamic_dim","source":"dim:hc_lowrank"},
+      {"name":"eps","source":"dim:rms_eps"},
+      {"name":"emit_injection","source":"const:1"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_hyper_connection_bf16.py"],
+    "parity": [{"kind": "pytorch", "command": ".venv/bin/python unittest/test_hyper_connection_bf16.py", "tolerance": "bf16_exact_or_one_ulp"}]
+  }
+}

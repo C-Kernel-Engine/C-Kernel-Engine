@@ -12,6 +12,7 @@ Writes a compact JSON report with top-k overlap and full-logits diff stats.
 """
 
 import argparse
+from contextlib import contextmanager
 import ctypes
 import hashlib
 import json
@@ -203,6 +204,22 @@ def validate_compiled_prefill_capability(
             "batched prefill requested but the loaded runtime was compiled without "
             "generated prefill support"
         )
+
+
+@contextmanager
+def runtime_prefill_environment(prefill_policy: str):
+    """Make the runtime execute the schedule selected by the replay contract."""
+    name = "CK_V8_FORCE_BATCHED_PREFILL"
+    previous = os.environ.get(name)
+    if prefill_policy in {"batched", "hybrid"}:
+        os.environ[name] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = previous
 
 
 def _run(
@@ -707,7 +724,8 @@ def load_ck_logits_segmented(
             if not prompt:
                 raise RuntimeError("hybrid CK replay requires at least one prompt token")
             arr = (ctypes.c_int32 * len(prompt))(*prompt)
-            rc = lib.ck_model_embed_tokens(arr, len(prompt))
+            with runtime_prefill_environment(prefill_policy):
+                rc = lib.ck_model_embed_tokens(arr, len(prompt))
             if rc != 0:
                 raise RuntimeError(f"ck_model_embed_tokens failed rc={rc}")
             rc = lib.ck_model_forward(None)
@@ -719,7 +737,8 @@ def load_ck_logits_segmented(
                     raise RuntimeError(f"ck_model_decode failed rc={rc}")
         else:
             arr = (ctypes.c_int32 * len(tokens))(*tokens)
-            rc = lib.ck_model_embed_tokens(arr, len(tokens))
+            with runtime_prefill_environment(prefill_policy):
+                rc = lib.ck_model_embed_tokens(arr, len(tokens))
             if rc != 0:
                 raise RuntimeError(f"ck_model_embed_tokens failed rc={rc}")
             rc = lib.ck_model_forward(None)

@@ -7508,23 +7508,92 @@ static float ck_pytorch_scale_max_f32(float *scores, int count, float scale)
     return maximum;
 }
 
+static float ck_pytorch_reduce_add_f32x16(__m512 values)
+{
+    __m512 shuffled = _mm512_shuffle_f32x4(values, values, 0x4e);
+    values = _mm512_add_ps(values, shuffled);
+    shuffled = _mm512_shuffle_f32x4(values, values, 0xb1);
+    values = _mm512_add_ps(values, shuffled);
+    shuffled = _mm512_shuffle_ps(values, values, 0x4e);
+    values = _mm512_add_ps(values, shuffled);
+    shuffled = _mm512_shuffle_ps(values, values, 0xb1);
+    values = _mm512_add_ps(values, shuffled);
+    return _mm512_cvtss_f32(values);
+}
+
+static inline __m512 ck_pytorch_flash_fexp_u20_f32x16(__m512 values)
+{
+    const __m512 c0 = _mm512_set1_ps(0.00010703434948458272f);
+    const __m512 c1 = _mm512_set1_ps(0.30354260500649682f);
+    const __m512 c2 = _mm512_set1_ps(-0.22433836478672356f);
+    const __m512 c3 = _mm512_set1_ps(-0.079204240219773236f);
+    const __m512 log2e = _mm512_castsi512_ps(_mm512_set1_epi32(0x3fb8aa3b));
+    const __m512 exponent_scale = _mm512_set1_ps(8388608.0f);
+    const __m512 exponent_bias = _mm512_set1_ps(8388608.0f * 127.0f);
+    const __m512 min_input =
+        _mm512_castsi512_ps(_mm512_set1_epi32(0xc2aeac50));
+    const __m512 max_input =
+        _mm512_castsi512_ps(_mm512_set1_epi32(0x42b17218));
+
+    const __mmask16 below_min =
+        _mm512_cmp_ps_mask(values, min_input, _CMP_LT_OS);
+    const __mmask16 above_max =
+        _mm512_cmp_ps_mask(values, max_input, _CMP_GT_OS);
+    __m512 base2 = _mm512_mul_ps(values, log2e);
+    const __m512 fractional = _mm512_sub_ps(base2, _mm512_floor_ps(base2));
+    __m512 correction = _mm512_fmadd_ps(fractional, c3, c2);
+    correction = _mm512_fmadd_ps(fractional, correction, c1);
+    correction = _mm512_fmadd_ps(fractional, correction, c0);
+    base2 = _mm512_sub_ps(base2, correction);
+    const __m512 encoded =
+        _mm512_fmadd_ps(exponent_scale, base2, exponent_bias);
+    __m512i result = _mm512_cvttps_epi32(encoded);
+    result = _mm512_mask_mov_epi32(result, below_min, _mm512_setzero_epi32());
+    result = _mm512_mask_mov_epi32(
+        result, above_max, _mm512_set1_epi32(0x7f800000));
+    return _mm512_castsi512_ps(result);
+}
+
 static float ck_pytorch_exp_sum_bf16(
     float *scores, uint16_t *probabilities, int count, float maximum)
 {
     const __m512 maximum_v = _mm512_set1_ps(maximum);
-    __m512 sum_v = _mm512_setzero_ps();
+    __m512 sum_lo_v = _mm512_setzero_ps();
+    __m512 sum_hi_v = _mm512_setzero_ps();
+    __m512 sum_tail_v = _mm512_setzero_ps();
     int i = 0;
+    for (; i + 32 <= count; i += 32) {
+        __m512 values_lo = _mm512_sub_ps(
+            _mm512_loadu_ps(scores + i), maximum_v);
+        __m512 values_hi = _mm512_sub_ps(
+            _mm512_loadu_ps(scores + i + 16), maximum_v);
+        values_lo = ck_pytorch_flash_fexp_u20_f32x16(values_lo);
+        values_hi = ck_pytorch_flash_fexp_u20_f32x16(values_hi);
+        sum_lo_v = _mm512_add_ps(sum_lo_v, values_lo);
+        sum_hi_v = _mm512_add_ps(sum_hi_v, values_hi);
+        float lanes[16] __attribute__((aligned(64)));
+        _mm512_store_ps(lanes, values_lo);
+        for (int lane = 0; lane < 16; ++lane) {
+            probabilities[i + lane] = float_to_bf16(lanes[lane]);
+        }
+        _mm512_store_ps(lanes, values_hi);
+        for (int lane = 0; lane < 16; ++lane) {
+            probabilities[i + 16 + lane] = float_to_bf16(lanes[lane]);
+        }
+    }
     for (; i + 16 <= count; i += 16) {
         __m512 values = _mm512_sub_ps(_mm512_loadu_ps(scores + i), maximum_v);
-        values = ck_pytorch_attention_expf16(values);
-        sum_v = _mm512_add_ps(sum_v, values);
+        values = ck_pytorch_flash_fexp_u20_f32x16(values);
+        sum_tail_v = _mm512_add_ps(sum_tail_v, values);
         float lanes[16] __attribute__((aligned(64)));
         _mm512_store_ps(lanes, values);
         for (int lane = 0; lane < 16; ++lane) {
             probabilities[i + lane] = float_to_bf16(lanes[lane]);
         }
     }
-    float sum = _mm512_reduce_add_ps(sum_v);
+    sum_lo_v = _mm512_add_ps(sum_lo_v, sum_tail_v);
+    float sum = ck_pytorch_reduce_add_f32x16(
+        _mm512_add_ps(sum_lo_v, sum_hi_v));
     for (; i < count; ++i) {
         const float value = expf(scores[i] - maximum);
         sum += value;
@@ -7977,11 +8046,13 @@ static ck_attention_status_t ck_attention_prefill_bf16_pytorch_math_gqa_full(
     return CK_ATTENTION_STATUS_OK;
 }
 
-static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
+static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash_masked(
     const float *q_token,
     const uint16_t *k_cache,
     const uint16_t *v_cache,
     float *out_token,
+    const float *selected_indices,
+    int selection_width,
     int num_heads,
     int num_kv_heads,
     int kv_tokens,
@@ -7994,7 +8065,7 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
         return CK_ATTENTION_STATUS_UNSUPPORTED_CONTRACT;
     }
     pthread_once(&ck_pytorch_attention_once, ck_bind_pytorch_attention_primitives);
-    if (!ck_pytorch_bf16_gemm || !ck_pytorch_sgemm || !ck_pytorch_attention_expf16) {
+    if (!ck_pytorch_bf16_gemm || !ck_pytorch_attention_expf16) {
         fprintf(stderr,
                 "CK BF16 PyTorch SDPA provider requires MKL gemm_bf16bf16f32 "
                 "and SLEEF Sleef_expf16_u10; set CK_MKL_LIBRARY and "
@@ -8018,6 +8089,7 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
 
         float running_max = -INFINITY;
         float running_sum = 0.0f;
+        int has_destination = 0;
         for (int start = 0; start < kv_tokens; start += CK_PYTORCH_KV_SPLIT) {
             const int block = kv_tokens - start < CK_PYTORCH_KV_SPLIT
                 ? kv_tokens - start : CK_PYTORCH_KV_SPLIT;
@@ -8032,13 +8104,38 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
                 &aligned_head_dim, q_bf16, &aligned_head_dim,
                 &zero_f, scores, &block);
 
+            if (selected_indices) {
+                int selected = 0;
+                int cursor = 0;
+                while (cursor < selection_width &&
+                       (int)selected_indices[cursor] < start) {
+                    ++cursor;
+                }
+                for (int token = 0; token < block; ++token) {
+                    const int absolute_token = start + token;
+                    while (cursor < selection_width &&
+                           selected_indices[cursor] >= 0.0f &&
+                           (int)selected_indices[cursor] < absolute_token) {
+                        ++cursor;
+                    }
+                    if (cursor < selection_width &&
+                        (int)selected_indices[cursor] == absolute_token) {
+                        ++selected;
+                        ++cursor;
+                    } else {
+                        scores[token] = -INFINITY;
+                    }
+                }
+                if (selected == 0 && !has_destination) continue;
+            }
+
             const float block_max = ck_pytorch_scale_max_f32(scores, block, scale);
             const float maximum = running_max > block_max ? running_max : block_max;
             const float block_sum = ck_pytorch_exp_sum_bf16(
                 scores, probabilities, block, maximum);
             const float previous_scale = expf(running_max - maximum);
             running_sum = block_sum + previous_scale * running_sum;
-            if (start > 0) {
+            if (has_destination) {
                 const __m512 previous_scale_v = _mm512_set1_ps(previous_scale);
                 int d = 0;
                 for (; d + 16 <= head_dim; d += 16) {
@@ -8048,15 +8145,19 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
                 }
                 for (; d < head_dim; ++d) destination[d] *= previous_scale;
             }
-            const float beta = start == 0 ? 0.0f : 1.0f;
+            const float beta = has_destination ? 1.0f : 0.0f;
             ck_pytorch_bf16_gemm(
                 &no_transpose, &no_transpose, &head_dim, &one, &block,
                 &one_f, v_head + (size_t)start * (size_t)aligned_head_dim,
                 &aligned_head_dim, probabilities, &block,
                 &beta, destination, &head_dim);
             running_max = maximum;
+            has_destination = 1;
         }
 
+        if (!has_destination) {
+            return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+        }
         const float reciprocal = running_sum != 0.0f ? 1.0f / running_sum : 1.0f;
         for (int d = 0; d < head_dim; ++d) {
             out_head[d] = bf16_to_float(float_to_bf16(destination[d] * reciprocal));
@@ -8065,7 +8166,84 @@ static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
     }
     return CK_ATTENTION_STATUS_OK;
 }
+
+static ck_attention_status_t ck_attention_decode_bf16_pytorch_cpu_flash(
+    const float *q_token,
+    const uint16_t *k_cache,
+    const uint16_t *v_cache,
+    float *out_token,
+    int num_heads,
+    int num_kv_heads,
+    int kv_tokens,
+    int cache_capacity,
+    int head_dim,
+    int aligned_head_dim)
+{
+    return ck_attention_decode_bf16_pytorch_cpu_flash_masked(
+        q_token, k_cache, v_cache, out_token, NULL, 0,
+        num_heads, num_kv_heads, kv_tokens, cache_capacity,
+        head_dim, aligned_head_dim);
+}
 #endif
+
+void attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract(
+    const float *query,
+    const uint16_t *key_cache,
+    const uint16_t *value_cache,
+    const float *selected_indices,
+    float *output,
+    float *score_scratch,
+    int rows,
+    int query_heads,
+    int kv_heads,
+    int head_dim,
+    int selection_width,
+    int context_length,
+    int position)
+{
+    (void)score_scratch;
+    if (!query || !key_cache || !value_cache || !selected_indices || !output ||
+        rows <= 0 || query_heads <= 0 || kv_heads <= 0 || head_dim <= 0 ||
+        selection_width <= 0 || context_length <= 0 || position < 0 ||
+        position + rows > context_length || query_heads % kv_heads != 0) {
+        fprintf(stderr, "CK sparse BF16 CPU-flash attention: invalid contract\n");
+        abort();
+    }
+
+#if defined(__AVX512F__)
+    for (int row = 0; row < rows; ++row) {
+        const int visible_tokens = position + row + 1;
+        const ck_attention_status_t status =
+            ck_attention_decode_bf16_pytorch_cpu_flash_masked(
+                query + (size_t)row * (size_t)query_heads * (size_t)head_dim,
+                key_cache, value_cache,
+                output + (size_t)row * (size_t)query_heads * (size_t)head_dim,
+                selected_indices + (size_t)row * (size_t)selection_width,
+                selection_width, query_heads, kv_heads, visible_tokens,
+                context_length, head_dim, head_dim);
+        if (status != CK_ATTENTION_STATUS_OK) {
+            fprintf(stderr,
+                    "CK sparse BF16 CPU-flash attention unavailable (status=%d)\n",
+                    (int)status);
+            abort();
+        }
+    }
+#else
+    fprintf(stderr,
+            "CK sparse BF16 CPU-flash attention requires AVX-512F; "
+            "no numerically different fallback is permitted\n");
+    abort();
+#endif
+}
+
+int ck_attention_sparse_bf16_pytorch_gqa_available(void)
+{
+#if defined(__AVX512F__)
+    return ck_attention_bf16_pytorch_gqa_available();
+#else
+    return 0;
+#endif
+}
 
 int ck_attention_bf16_pytorch_gqa_available(void)
 {

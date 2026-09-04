@@ -24,6 +24,8 @@
 #include <float.h>
 #include <math.h>
 
+#include "bf16_utils.h"
+
 #if defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
@@ -180,6 +182,44 @@ size_t moe_softmax_topk_router_workspace_bytes(int n_experts)
     return ((size_t)n_experts * sizeof(float) + 63u) & ~(size_t)63u;
 }
 
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+/* Match ggml's AVX-512 exp approximation and instruction grouping exactly. */
+static inline __m512 ck_moe_ggml_expf512(__m512 x)
+{
+    const __m512 r = _mm512_set1_ps(0x1.8p23f);
+    const __m512 z = _mm512_fmadd_ps(x, _mm512_set1_ps(0x1.715476p+0f), r);
+    const __m512 n = _mm512_sub_ps(z, r);
+    const __m512 b = _mm512_fnmadd_ps(
+        n, _mm512_set1_ps(0x1.7f7d1cp-20f),
+        _mm512_fnmadd_ps(n, _mm512_set1_ps(0x1.62e4p-1f), x));
+    const __mmask16 d = _mm512_cmp_ps_mask(
+        _mm512_abs_ps(n), _mm512_set1_ps(192.0f), _CMP_GT_OQ);
+    const __m512 u = _mm512_mul_ps(b, b);
+    const __m512 j = _mm512_fmadd_ps(
+        _mm512_fmadd_ps(
+            _mm512_fmadd_ps(
+                _mm512_set1_ps(0x1.0e4020p-7f), b,
+                _mm512_set1_ps(0x1.573e2ep-5f)),
+            u,
+            _mm512_fmadd_ps(
+                _mm512_set1_ps(0x1.555e66p-3f), b,
+                _mm512_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm512_fmadd_ps(
+            _mm512_set1_ps(0x1.ffffecp-1f), b,
+            _mm512_set1_ps(1.0f)));
+    const __m512 res = _mm512_scalef_ps(j, n);
+    if (_mm512_kortestz(d, d)) {
+        return res;
+    }
+    const __m512 zero = _mm512_setzero_ps();
+    const __m512 alt = _mm512_mask_blend_ps(
+        _mm512_cmp_ps_mask(n, zero, _CMP_LE_OQ),
+        _mm512_set1_ps(INFINITY), zero);
+    return _mm512_mask_blend_ps(d, res, alt);
+}
+#endif
+
 #if defined(__AVX2__) && defined(__FMA__)
 static inline __m256 ck_moe_ggml_expf256(__m256 x)
 {
@@ -246,7 +286,14 @@ static double ck_moe_llama_softmax_row(float *probabilities,
 {
     double sum = 0.0;
     int expert = 0;
-#if defined(__AVX2__) && defined(__FMA__)
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+    for (; expert + 15 < n_experts; expert += 16) {
+        const __m512 value = ck_moe_ggml_expf512(_mm512_sub_ps(
+            _mm512_loadu_ps(logits + expert), _mm512_set1_ps(max_value)));
+        _mm512_storeu_ps(probabilities + expert, value);
+        sum += (double)_mm512_reduce_add_ps(value);
+    }
+#elif defined(__AVX2__) && defined(__FMA__)
     for (; expert + 7 < n_experts; expert += 8) {
         const __m256 value = ck_moe_ggml_expf256(_mm256_sub_ps(
             _mm256_loadu_ps(logits + expert), _mm256_set1_ps(max_value)));
@@ -321,6 +368,29 @@ int moe_softmax_topk_router_llama_f32_workspace(
             row_weights[slot] =
                 (row_weights[slot] / selected_sum) * routed_scaling_factor;
         }
+    }
+    return 0;
+}
+
+int moe_softmax_topk_router_pytorch_bf16_workspace(
+    const float *logits,
+    int *indices,
+    float *weights,
+    int rows,
+    int n_experts,
+    int top_k,
+    float routed_scaling_factor,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const int status = moe_softmax_topk_router_llama_f32_workspace(
+        logits, indices, weights, rows, n_experts, top_k,
+        routed_scaling_factor, workspace, workspace_bytes);
+    if (status != 0) {
+        return status;
+    }
+    for (size_t index = 0; index < (size_t)rows * (size_t)top_k; ++index) {
+        weights[index] = bf16_to_float(float_to_bf16(weights[index]));
     }
     return 0;
 }

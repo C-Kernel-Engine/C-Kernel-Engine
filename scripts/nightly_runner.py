@@ -842,6 +842,12 @@ MAKE_TARGETS = {
         "target": "test-v8-cohere-laguna-contracts",
         "timeout_sec": 300,
     },
+    "v8_qwen38_flash_contracts": {
+        "name": "Qwen3.8 Flash Circuit and Numerical Providers",
+        "category": "parity",
+        "target": "test-v8-qwen38-flash-contracts",
+        "timeout_sec": 600,
+    },
     "v8_command_a_plus_nvfp4": {
         "name": "Command A+ Native NVFP4 / X-ray Contracts",
         "category": "parity",

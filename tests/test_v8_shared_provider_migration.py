@@ -37,6 +37,7 @@ MIGRATED_PROVIDERS = [
     "kv_cache_store",
     "kv_cache_store_batch_bf16",
     "kv_cache_store_batch_f16",
+    "kv_cache_store_batch_f32",
     "kv_cache_store_bf16",
     "kv_cache_store_f16",
     "logits_copy_to_position",
@@ -69,7 +70,7 @@ ROPE_FORWARD_PROVIDERS = [
     "rope_forward_qk_split_direct",
 ]
 KV_SINGLE_PROVIDERS = ["kv_cache_store", "kv_cache_store_bf16", "kv_cache_store_f16"]
-KV_BATCH_PROVIDERS = ["kv_cache_store_batch_bf16", "kv_cache_store_batch_f16"]
+KV_BATCH_PROVIDERS = ["kv_cache_store_batch_f32", "kv_cache_store_batch_bf16", "kv_cache_store_batch_f16"]
 KV_STATE_PROVIDERS = KV_SINGLE_PROVIDERS + KV_BATCH_PROVIDERS
 ROPE_INIT_PROVIDERS = [
     "rope_precompute_cache",
@@ -144,8 +145,8 @@ class MigratedProviderMetadataTests(unittest.TestCase):
 
     def test_migrated_provider_list_is_exact(self):
         self.assertEqual(MIGRATED_PROVIDERS, sorted(MIGRATED_PROVIDERS))
-        self.assertEqual(len(MIGRATED_PROVIDERS), 27)
-        self.assertEqual(len(set(MIGRATED_PROVIDERS)), 27)
+        self.assertEqual(len(MIGRATED_PROVIDERS), 28)
+        self.assertEqual(len(set(MIGRATED_PROVIDERS)), 28)
 
     def test_selection_blocks_match_schema(self):
         for provider_id, doc in self.docs.items():

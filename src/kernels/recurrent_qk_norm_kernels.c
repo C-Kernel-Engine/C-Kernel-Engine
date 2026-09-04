@@ -94,6 +94,167 @@ void recurrent_qk_l2_norm_forward(float *q,
     recurrent_l2_norm_rows_forward_one(k, rows, k_dim, head_dim, eps);
 }
 
+static int recurrent_ceil_log2(int value)
+{
+    int result = 0;
+    int remaining = value - 1;
+    while (remaining > 0) {
+        ++result;
+        remaining >>= 1;
+    }
+    return result;
+}
+
+static float recurrent_pytorch_fp32_square_sum(const float *x, int dim)
+{
+#if defined(__AVX2__)
+    if (dim >= 8) {
+        enum { ilp_factor = 4, num_levels = 4, vector_width = 8 };
+        const int vector_count = dim / vector_width;
+        const int cascade_count = vector_count / ilp_factor;
+        const int level_power =
+            recurrent_ceil_log2(cascade_count) / num_levels > 4
+                ? recurrent_ceil_log2(cascade_count) / num_levels
+                : 4;
+        const int level_step = 1 << level_power;
+        const int level_mask = level_step - 1;
+        __m256 acc[num_levels][ilp_factor];
+        for (int level = 0; level < num_levels; ++level) {
+            for (int lane = 0; lane < ilp_factor; ++lane) {
+                acc[level][lane] = _mm256_setzero_ps();
+            }
+        }
+
+        int group = 0;
+        while (group + level_step <= cascade_count) {
+            for (int offset = 0; offset < level_step; ++offset, ++group) {
+                for (int lane = 0; lane < ilp_factor; ++lane) {
+                    const int vector_index = group * ilp_factor + lane;
+                    const __m256 value = _mm256_loadu_ps(
+                        x + vector_index * vector_width);
+                    const __m256 square = _mm256_mul_ps(value, value);
+                    acc[0][lane] = _mm256_add_ps(acc[0][lane], square);
+                }
+            }
+            for (int level = 1; level < num_levels; ++level) {
+                for (int lane = 0; lane < ilp_factor; ++lane) {
+                    acc[level][lane] =
+                        _mm256_add_ps(acc[level][lane], acc[level - 1][lane]);
+                    acc[level - 1][lane] = _mm256_setzero_ps();
+                }
+                const int mask = level_mask << (level * level_power);
+                if ((group & mask) != 0) {
+                    break;
+                }
+            }
+        }
+        for (; group < cascade_count; ++group) {
+            for (int lane = 0; lane < ilp_factor; ++lane) {
+                const int vector_index = group * ilp_factor + lane;
+                const __m256 value = _mm256_loadu_ps(
+                    x + vector_index * vector_width);
+                const __m256 square = _mm256_mul_ps(value, value);
+                acc[0][lane] = _mm256_add_ps(acc[0][lane], square);
+            }
+        }
+        for (int level = 1; level < num_levels; ++level) {
+            for (int lane = 0; lane < ilp_factor; ++lane) {
+                acc[0][lane] =
+                    _mm256_add_ps(acc[0][lane], acc[level][lane]);
+            }
+        }
+
+        int vector_index = cascade_count * ilp_factor;
+        for (; vector_index < vector_count; ++vector_index) {
+            const __m256 value = _mm256_loadu_ps(
+                x + vector_index * vector_width);
+            const __m256 square = _mm256_mul_ps(value, value);
+            acc[0][0] = _mm256_add_ps(acc[0][0], square);
+        }
+        for (int lane = 1; lane < ilp_factor; ++lane) {
+            acc[0][0] = _mm256_add_ps(acc[0][0], acc[0][lane]);
+        }
+
+        _Alignas(32) float lanes[8];
+        _mm256_store_ps(lanes, acc[0][0]);
+        volatile float sum = 0.0f;
+        for (int lane = 0; lane < 8; ++lane) {
+            sum = sum + lanes[lane];
+        }
+        for (int d = vector_count * vector_width; d < dim; ++d) {
+            sum = sum + x[d] * x[d];
+        }
+        return sum;
+    }
+#endif
+    volatile float sum = 0.0f;
+    for (int d = 0; d < dim; ++d) {
+        sum = sum + x[d] * x[d];
+    }
+    return sum;
+}
+
+static void recurrent_pytorch_fp32_l2_rows(float *x,
+                                            int rows,
+                                            int dim,
+                                            int head_dim,
+                                            float eps)
+{
+    if (!x || rows <= 0 || dim <= 0 || head_dim <= 0 ||
+        dim % head_dim != 0) {
+        return;
+    }
+    const int num_heads = dim / head_dim;
+    for (int row = 0; row < rows; ++row) {
+        float *row_ptr = x + (size_t)row * (size_t)dim;
+        for (int head = 0; head < num_heads; ++head) {
+            float *head_ptr = row_ptr + (size_t)head * (size_t)head_dim;
+            const float sum = recurrent_pytorch_fp32_square_sum(
+                head_ptr, head_dim);
+            const float inverse = 1.0f / sqrtf(sum + eps);
+#if defined(__AVX512F__)
+            const __m512 inv = _mm512_set1_ps(inverse);
+            int d = 0;
+            for (; d + 16 <= head_dim; d += 16) {
+                _mm512_storeu_ps(
+                    head_ptr + d,
+                    _mm512_mul_ps(_mm512_loadu_ps(head_ptr + d), inv));
+            }
+            for (; d < head_dim; ++d) {
+                head_ptr[d] = head_ptr[d] * inverse;
+            }
+#elif defined(__AVX2__)
+            const __m256 inv = _mm256_set1_ps(inverse);
+            int d = 0;
+            for (; d + 8 <= head_dim; d += 8) {
+                _mm256_storeu_ps(
+                    head_ptr + d,
+                    _mm256_mul_ps(_mm256_loadu_ps(head_ptr + d), inv));
+            }
+            for (; d < head_dim; ++d) {
+                head_ptr[d] = head_ptr[d] * inverse;
+            }
+#else
+            for (int d = 0; d < head_dim; ++d) {
+                head_ptr[d] = head_ptr[d] * inverse;
+            }
+#endif
+        }
+    }
+}
+
+void recurrent_qk_l2_norm_pytorch_fp32_output(float *q,
+                                               float *k,
+                                               int rows,
+                                               int q_dim,
+                                               int k_dim,
+                                               int head_dim,
+                                               float eps)
+{
+    recurrent_pytorch_fp32_l2_rows(q, rows, q_dim, head_dim, eps);
+    recurrent_pytorch_fp32_l2_rows(k, rows, k_dim, head_dim, eps);
+}
+
 static float recurrent_pytorch_bf16_square_sum(const float *x, int dim)
 {
 #if defined(__AVX2__)

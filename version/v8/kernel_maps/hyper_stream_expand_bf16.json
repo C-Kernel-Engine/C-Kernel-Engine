@@ -1,0 +1,37 @@
+{
+  "id": "hyper_stream_expand_bf16",
+  "op": "hyper_stream_expand",
+  "operation_interface": "hyper_connection.stream_expand.bf16_storage.v1",
+  "variant": "bf16_storage",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "bf16", "output": "bf16"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["R", "D"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [],
+  "activations": [],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["R", "S*D"], "layout": "token_stream_hidden_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["R", "S", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "hyper_stream_expand_bf16",
+    "c_declaration": "void hyper_stream_expand_bf16(const float *input, float *output, int rows, int streams, int hidden_dim);",
+    "sources": ["src/kernels/hyper_connection_kernels.c"],
+    "variants": [{"name": "reference", "requires": [], "compile_flags": []}]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name":"input","source":"activation:input","cast":"const float*","ports":["input:input"]},
+      {"name":"output","source":"output:output","cast":"float*","ports":["output:output"]},
+      {"name":"rows","source":"dim:seq_len"},
+      {"name":"streams","source":"dim:hc_count"},
+      {"name":"hidden_dim","source":"dim:embed_dim"}
+    ]
+  },
+  "tests": {"unit": ["unittest/test_hyper_connection_bf16.py"]}
+}

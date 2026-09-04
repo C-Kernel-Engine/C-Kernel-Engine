@@ -1,0 +1,92 @@
+{
+  "id": "gemv_bf16_bf16_storage",
+  "op": "gemv",
+  "operation_interface": "gemv.bf16_weight.bf16_values.bf16_output.v1",
+  "variant": "bf16_w_fp32_bf16_values_a_bf16_values_out",
+  "quant": {
+    "weight": "bf16",
+    "activation": "fp32",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["K"],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "Input vector [K], rounded to BF16 at the projection boundary"
+    }
+  ],
+  "weights": [
+    {
+      "name": "W",
+      "dtype": "bf16",
+      "shape": ["M", "K"],
+      "layout": "row_major_contiguous",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
+      "desc": "Row-major BF16 weight matrix"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "y",
+      "dtype": "fp32",
+      "shape": ["M"],
+      "layout": "contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16 RNE projection values represented in FP32 storage"
+    }
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "constraints": {},
+  "impl": {
+    "function": "gemv_bf16_bf16_storage_parallel_dispatch",
+    "c_declaration": "void gemv_bf16_bf16_storage_parallel_dispatch(float *y, const void *W, const float *x, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_bf16.c"]
+  },
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [
+    {
+      "contract_id": "bf16_weight_bf16_input_fp32_dot_bf16_output",
+      "status": "validated",
+      "phases": ["decode"],
+      "function": "gemv_bf16_bf16_storage_parallel_dispatch",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows"],
+          "dispatch": ["ck_threadpool_parallel_for_n"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "y", "source": "output:y", "cast": "float*", "ports": ["output:y"]},
+      {"name": "W", "source": "weight:_first_weight", "ports": ["weight:W"]},
+      {"name": "x", "source": "activation:x", "cast": "const float*", "ports": ["input:x"]},
+      {"name": "M", "source": "dim:_output_dim"},
+      {"name": "K", "source": "dim:_input_dim"}
+    ]
+  },
+  "notes": "Decode GEMV with BF16 activation-load and output-storage boundaries matching PyTorch BF16 linear."
+}

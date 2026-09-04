@@ -109,6 +109,50 @@ def _single_kernel_port_name(
     return str(name).strip() if name else None
 
 
+_ATTENTION_INPUT_PORT_ALIASES = {
+    "q": ("q", "query", "q_token"),
+    "k": ("k", "key", "k_cache", "key_cache"),
+    "v": ("v", "value", "v_cache", "value_cache"),
+}
+
+
+def _attention_input_port_name(
+    registry: Dict[str, Any], kernel_id: str, semantic: str
+) -> str:
+    """Resolve a Q/K/V role from the selected attention provider interface."""
+    aliases = _ATTENTION_INPUT_PORT_ALIASES.get(semantic)
+    if aliases is None:
+        raise RuntimeError(
+            f"HARD PHYSICAL CONTRACT FAULT: unknown attention input role {semantic!r}."
+        )
+    provider = _kernel_map_by_id(registry, kernel_id)
+    inputs = provider.get("inputs")
+    runtime_buffers = provider.get("runtime_buffers")
+    has_declared_ports = isinstance(inputs, list) or isinstance(runtime_buffers, list)
+    if not has_declared_ports and not provider.get("physical_contract_version"):
+        # Legacy numerical providers may predate explicit physical ports. Keep
+        # their established semantic name; the route resolver will decline to
+        # manage the edge. Physical providers must always declare their ports.
+        return semantic
+    ports = [
+        *(inputs if isinstance(inputs, list) else []),
+        *(runtime_buffers if isinstance(runtime_buffers, list) else []),
+    ]
+    names = {
+        str(port.get("name", "")).strip()
+        for port in ports
+        if isinstance(port, dict)
+    }
+    matches = [alias for alias in aliases if alias in names]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"HARD PHYSICAL CONTRACT FAULT: attention provider {kernel_id!r} "
+            f"must declare exactly one {semantic.upper()} input port from {aliases!r}; "
+            f"found {matches!r}."
+        )
+    return matches[0]
+
+
 def _resolve_layout_edge(
     registry: Dict[str, Any],
     *,
@@ -508,6 +552,17 @@ def _is_text_mrope_operation(operation: Dict[str, Any]) -> bool:
             and isinstance(position, dict)
             and position.get("pairing") == "multi_section"
         )
+
+    interface_validation = (
+        operation.get("interface_validation")
+        if isinstance(operation.get("interface_validation"), dict)
+        else {}
+    )
+    operation_interface = str(
+        interface_validation.get("operation_interface", "") or ""
+    ).strip()
+    if operation_interface.startswith("mrope.text_"):
+        return True
 
     if str(operation.get("op", "")) != "rope_qk":
         return False
@@ -1563,6 +1618,88 @@ OP_DATAFLOW = {
         "inputs": {"token_ids": "external:token_ids"},
         "outputs": {"out": {"slot": "main_stream", "dtype": "fp32"}},
     },
+    "hyper_stream_expand": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "hyper_stream", "dtype": "fp32"}},
+    },
+    "hyper_mix_attn": {
+        "inputs": {"hyper_input": "hyper_stream"},
+        "outputs": {
+            "mixed_output": {"slot": "main_stream", "dtype": "fp32"},
+            "injection_output": {"slot": "attn_hyper_injection", "dtype": "fp32"},
+        },
+    },
+    "hyper_inject_attn": {
+        "inputs": {
+            "hyper_input": "hyper_stream",
+            "block_output": "main_stream",
+            "injection_weight": "attn_hyper_injection",
+        },
+        "outputs": {"output": {"slot": "hyper_stream", "dtype": "fp32"}},
+    },
+    "hyper_mix_mlp": {
+        "inputs": {"hyper_input": "hyper_stream"},
+        "outputs": {
+            "mixed_output": {"slot": "main_stream", "dtype": "fp32"},
+            "injection_output": {"slot": "mlp_hyper_injection", "dtype": "fp32"},
+        },
+    },
+    "hyper_inject_mlp": {
+        "inputs": {
+            "hyper_input": "hyper_stream",
+            "block_output": "main_stream",
+            "injection_weight": "mlp_hyper_injection",
+        },
+        "outputs": {"output": {"slot": "hyper_stream", "dtype": "fp32"}},
+    },
+    "hyper_mix_final": {
+        "inputs": {"hyper_input": "hyper_stream"},
+        "outputs": {"mixed_output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "ple_ngram_embed": {
+        "inputs": {
+            "token_ids": "external:token_ids",
+            "token_state_in": "external:ple_token_state",
+        },
+        "outputs": {
+            "embedding_output": {"slot": "ple_embedding", "dtype": "fp32"},
+            "token_state_out": {"slot": "ple_token_state", "dtype": "fp32"},
+        },
+    },
+    "ple_key_proj": {
+        "inputs": {"x": "ple_embedding"},
+        "outputs": {"y": {"slot": "ple_key", "dtype": "fp32"}},
+    },
+    "ple_value_proj": {
+        "inputs": {"x": "ple_embedding"},
+        "outputs": {"y": {"slot": "ple_value", "dtype": "fp32"}},
+    },
+    "ple_gate_conv_inject": {
+        "inputs": {
+            "hyper_input": "hyper_stream",
+            "key_projected": "ple_key",
+            "value_projected": "ple_value",
+            "conv_state_in": "external:ple_conv_state",
+        },
+        "outputs": {
+            "hyper_output": {"slot": "hyper_stream", "dtype": "fp32"},
+            "conv_state_out": {"slot": "ple_conv_state", "dtype": "fp32"},
+        },
+    },
+    "qsa_index_proj": {
+        "inputs": {"x": "main_stream"},
+        "outputs": {"y": {"slot": "qsa_index_projected", "dtype": "fp32"}},
+    },
+    "qsa_index_select": {
+        "inputs": {
+            "projected_qk": "qsa_index_projected",
+            "index_key_cache_in": "external:qsa_index_key_cache",
+        },
+        "outputs": {
+            "selected_indices": {"slot": "qsa_selected_indices", "dtype": "fp32"},
+            "index_key_cache_out": {"slot": "qsa_index_key_cache", "dtype": "fp32"},
+        },
+    },
     "assistant_pre_projection": {
         "inputs": {"x": "backbone_stream"},
         "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
@@ -1679,6 +1816,10 @@ OP_DATAFLOW = {
     "quantize_input_2": {
         "inputs": {"input": "main_stream"},
         "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_0"}},
+    },
+    "activation_quantize": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_k"}},
     },
     "residual_save": {
         "inputs": {"src": "main_stream"},
@@ -1867,6 +2008,15 @@ OP_DATAFLOW = {
         "inputs": {"q": "q_scratch", "k": "kv_cache", "v": "kv_cache"},
         "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
     },
+    "qsa_attention": {
+        "inputs": {
+            "query": "q_scratch",
+            "key_cache": "kv_cache",
+            "value_cache": "kv_cache",
+            "selected_indices": "qsa_selected_indices",
+        },
+        "outputs": {"output": {"slot": "attn_scratch", "dtype": "fp32"}},
+    },
     "attn_shared_kv": {
         "inputs": {"q": "q_scratch"},
         "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
@@ -1975,6 +2125,14 @@ OP_DATAFLOW = {
         "outputs": {"out": {"slot": "attn_scratch", "dtype": "fp32"}},
     },
     "moe_swiglu_expert_mlp": {
+        "inputs": {
+            "hidden": "layer_input",
+            "indices": "q_scratch",
+            "routing_weights": "k_scratch",
+        },
+        "outputs": {"output": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "moe_swiglu_packed_expert_mlp": {
         "inputs": {
             "hidden": "layer_input",
             "indices": "q_scratch",
@@ -3608,12 +3766,24 @@ def build_activation_specs(
     if backbone_hidden_size > 0:
         add("backbone_stream", seq_len * backbone_hidden_size * 4, f"[{seq_len}, {backbone_hidden_size}]")
     add("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
-    q8k_blocks = (intermediate_size + 255) // 256
+    quantized_stream_width = max(
+        int(embed_dim),
+        int(intermediate_size),
+        int(config.get("q_dim", 0) or 0),
+        int(config.get("k_dim", 0) or 0),
+        int(config.get("v_dim", 0) or 0),
+        int(config.get("ssm_inner_size", 0) or 0),
+        int(config.get("gate_dim", 0) or 0),
+        int(config.get("attn_out_dim", 0) or 0),
+    )
+    q8k_blocks = (quantized_stream_width + 255) // 256
     q8k_size = q8k_blocks * _dtype_size_bytes("q8_k_block") * seq_len
+    add("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
     add(
-        "layer_input",
-        max(embedded_size, q8k_size),
-        f"[{seq_len}, max({embed_dim}, Q8_K({intermediate_size}))]",
+        "main_stream_q8",
+        q8k_size,
+        f"[{seq_len}, Q8_K({quantized_stream_width})]",
+        "q8_k",
     )
     add("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
 
@@ -3810,6 +3980,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "position_ids_2d": "position_ids",
     "patch_bias_add": "rowwise_bias_add",
     "dense_embedding_lookup": "embedding",  # Token embedding lookup
+    "hyper_stream_expand": "hyper_stream_expand",
+    "activation_quantize": "quantize",
     "residual_save": "residual_save",
     "embedding": "embedding",
 
@@ -3857,6 +4029,18 @@ TEMPLATE_TO_KERNEL_OP = {
     "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul",
     "attn_gate_softplus_mul": "attn_gate_softplus_mul",
     "recurrent_out_proj": "matmul",
+    "hyper_mix_attn": "hyper_connection_mix",
+    "hyper_inject_attn": "hyper_stream_inject",
+    "hyper_mix_mlp": "hyper_connection_mix",
+    "hyper_inject_mlp": "hyper_stream_inject",
+    "hyper_mix_final": "hyper_connection_final_mix",
+    "ple_ngram_embed": "ple_ngram_embed",
+    "ple_key_proj": "matmul",
+    "ple_value_proj": "matmul",
+    "ple_gate_conv_inject": "ple_gate_conv_inject",
+    "qsa_index_proj": "matmul",
+    "qsa_index_select": "qsa_index_select",
+    "qsa_attention": "qsa_attention",
     "mamba_in_proj": "matmul",
     "mamba_in_proj_split": "mamba_in_proj_split",
     "mamba_dt_softplus": "mamba_dt_softplus",
@@ -3870,6 +4054,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "moe_relu2_expert_mlp": "moe_relu2_expert_mlp",
     "shared_relu2_expert_mlp": "shared_relu2_expert_mlp",
     "moe_swiglu_expert_mlp": "moe_swiglu_expert_mlp",
+    "moe_swiglu_packed_expert_mlp": "moe_swiglu_packed_expert_mlp",
     "shared_swiglu_expert_mlp": "shared_swiglu_expert_mlp",
     "gated_shared_swiglu_expert_mlp": "gated_shared_swiglu_expert_mlp",
     "farskip_routed_shared_combine": "farskip_routed_shared_combine",
@@ -3965,6 +4150,31 @@ WEIGHT_TO_KERNEL_INPUT = {
     # Recurrent block special tensors
     "ssm_conv1d": "kernel",
     "ssm_a": "A",
+    "attn_hyper_norm": "norm_weight",
+    "attn_hyper_mix_down": "mix_down_weight",
+    "attn_hyper_mix_up": "mix_up_weight",
+    "attn_hyper_inject": "inject_weight",
+    "mlp_hyper_norm": "norm_weight",
+    "mlp_hyper_mix_down": "mix_down_weight",
+    "mlp_hyper_mix_up": "mix_up_weight",
+    "mlp_hyper_inject": "inject_weight",
+    "final_hyper_norm": "norm_weight",
+    "final_hyper_mix_down": "mix_down_weight",
+    "final_hyper_mix_up": "mix_up_weight",
+    "ple_ngram_embedding": "embedding",
+    "ple_layer_multipliers": "layer_multipliers",
+    "ple_ngram_heads_offsets": "head_offsets",
+    "ple_ngram_heads_vocab_sizes": "head_vocab_sizes",
+    "ple_key": "W",
+    "ple_value": "W",
+    "ple_norm_key": "norm_key_weight",
+    "ple_norm_query": "norm_query_weight",
+    "ple_norm_conv": "norm_conv_weight",
+    "ple_conv": "conv_weight",
+    "index_qk": "W",
+    "index_q_norm": "q_norm_weight",
+    "index_k_norm": "k_norm_weight",
+    "moe_expert_gate_up": "expert_gate_up",
     # Embeddings
     "token_emb": "weight",
     "pos_emb": "pos_emb",
@@ -4134,6 +4344,13 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
 
 
 PRE_NORM_OP_NAMES = {"rmsnorm", "layernorm", "attn_norm", "cross_attn_norm", "ffn_norm", "post_attention_norm", "block_rmsnorm"}
+# Operations whose FP32 result may fan out to one or more quantized
+# projections. The selected consumer contracts decide whether a quantizer is
+# inserted; listing an anchor here does not force quantization for BF16/FP32
+# providers.
+ACTIVATION_QUANTIZATION_ANCHOR_OP_NAMES = PRE_NORM_OP_NAMES | {
+    "hyper_mix_attn",
+}
 RESIDUAL_SOURCE_BRANCH_STARTERS = {
     # Attention branches
     "q_proj", "cross_q_proj", "q_gate_proj", "qkv_proj", "qkv_packed_proj",
@@ -4921,6 +5138,13 @@ def _kernel_scratch_size_bytes(
         return int(size_expression) if size_expression >= 0 else None
     if isinstance(size_expression, str) and size_expression.strip():
         symbols = {
+            **{
+                str(key): value
+                for key, value in values.items()
+                if str(key).isidentifier()
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+            },
             "R": values.get("R", values.get("_m", values.get("seq_len"))),
             "H": values.get(
                 "H", values.get("embed_dim", values.get("hidden_size"))
@@ -4935,6 +5159,8 @@ def _kernel_scratch_size_bytes(
             "K": values.get(
                 "K", values.get("experts_per_tok", values.get("num_experts_per_tok"))
             ),
+            "S": values.get("S", values.get("hc_count")),
+            "X": values.get("X", values.get("hc_lowrank")),
         }
 
         def _row_bytes(extent: int, block_elements: int, block_bytes: int) -> int:
@@ -4949,6 +5175,15 @@ def _kernel_scratch_size_bytes(
             "align64": lambda value: (value + 63) & ~63,
             "q8_k_row_bytes": lambda value: _row_bytes(value, 256, 292),
             "q8_0_row_bytes": lambda value: _row_bytes(value, 32, 34),
+            "q4_k_packed_meta_x8_bytes": lambda output_dim, input_dim: (
+                (
+                    ((int(output_dim) + 7) // 8)
+                    * (int(input_dim) // 256)
+                    * 1192
+                    + 63
+                )
+                & ~63
+            ),
         }
 
         def _evaluate(node: ast.AST) -> int:
@@ -4979,10 +5214,14 @@ def _kernel_scratch_size_bytes(
                 isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Name)
                 and node.func.id in functions
-                and len(node.args) == 1
+                and node.args
                 and not node.keywords
             ):
-                return int(functions[node.func.id](_evaluate(node.args[0])))
+                return int(
+                    functions[node.func.id](
+                        *(_evaluate(argument) for argument in node.args)
+                    )
+                )
             raise RuntimeError(
                 "HARD SCRATCH CONTRACT FAULT: unsupported size_bytes expression node "
                 f"{type(node).__name__}"
@@ -5335,7 +5574,7 @@ def _template_uses_kv_cache(template: Dict[str, Any], config: Optional[Dict[str,
     if kv_layout:
         return True
     template_ops = _collect_template_ops(template, config)
-    return bool({"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"} & set(template_ops))
+    return bool({"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"} & set(template_ops))
 
 
 def _resolve_decode_kv_cache_dtype(template: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> str:
@@ -5548,6 +5787,25 @@ def _apply_layer_quant_aliases(
 
     return effective
 
+
+def _apply_header_quant_aliases(
+    header_quant: Dict[str, Any],
+    entry_dtype: Dict[str, str],
+) -> Dict[str, Any]:
+    """Resolve canonical non-layer weight slots from shared weight patterns."""
+    effective = dict(header_quant or {})
+    for canonical, candidates in WEIGHT_PATTERNS.items():
+        if canonical in effective:
+            continue
+        for candidate in candidates:
+            if "{L}" in candidate:
+                continue
+            dtype = effective.get(candidate) or entry_dtype.get(candidate)
+            if dtype:
+                effective[canonical] = str(dtype).lower()
+                break
+    return effective
+
 def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Optional[int]]:
     """Compute output/input dims for matmul-like ops (gemv/gemm) and quantize ops."""
     embed = config.get("embed_dim", 896)
@@ -5575,6 +5833,12 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         if q_gate_proj <= 0:
             q_gate_proj = 2 * (heads * head_dim)
         return q_gate_proj, embed
+    if op_name == "qsa_index_proj":
+        return int(config.get("qsa_index_proj_dim", 0) or 0) or None, embed
+    if op_name == "ple_key_proj":
+        return int(config.get("hc_count", 1) or 1) * embed, int(config.get("ple_embed_dim", embed) or embed)
+    if op_name == "ple_value_proj":
+        return embed, int(config.get("ple_embed_dim", embed) or embed)
     if op_name == "attention_gate_projection":
         # Separate learned gate for gated attention (unlike q_gate_proj, which
         # denotes a packed Q+gate tensor).  Its width follows the attention
@@ -5612,7 +5876,7 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return int(config.get("n_routed_experts", config.get("num_experts", 0)) or 0) or None, embed
     if op_name in ("kv_a_proj",):
         return int(config.get("kv_lora_rank", 0) or 0) + int(config.get("qk_rope_head_dim", 0) or 0), embed
-    if op_name in ("moe_relu2_expert_mlp", "moe_swiglu_expert_mlp"):
+    if op_name in ("moe_relu2_expert_mlp", "moe_swiglu_expert_mlp", "moe_swiglu_packed_expert_mlp"):
         return int(config.get("moe_intermediate_size", inter) or inter), embed
     if op_name in (
         "shared_relu2_expert_mlp",
@@ -6742,6 +7006,18 @@ def _apply_layer_scoped_recurrent_state_offsets(
     stride_by_buffer = {
         "recurrent_conv_state": _recurrent_state_stride_bytes(config, "conv"),
         "recurrent_ssm_state": _recurrent_state_stride_bytes(config, "ssm"),
+        "ple_token_state": max(1, int(config.get("ple_token_history", 0) or 0)) * 4,
+        "ple_conv_state": (
+            max(1, int(config.get("ple_conv_history", 0) or 0))
+            * max(1, int(config.get("hc_count", 0) or 0))
+            * max(1, int(config.get("embed_dim", config.get("hidden_size", 0)) or 0))
+            * 4
+        ),
+        "qsa_index_key_cache": (
+            max(1, int(config.get("context_length", config.get("max_seq_len", 0)) or 0))
+            * max(1, int(config.get("indexer_head_dim", 0) or 0))
+            * 4
+        ),
     }
 
     for section_name in ("activations", "outputs"):
@@ -7162,6 +7438,156 @@ def resolve_swiglu_moe_provider(
     )
 
 
+_HYPER_CONNECTION_WEIGHT_ROLES = {
+    "hyper_mix_attn": {
+        "mix_down_weight": "attn_hyper_mix_down",
+        "mix_up_weight": "attn_hyper_mix_up",
+        "inject_weight": "attn_hyper_inject",
+    },
+    "hyper_mix_mlp": {
+        "mix_down_weight": "mlp_hyper_mix_down",
+        "mix_up_weight": "mlp_hyper_mix_up",
+        "inject_weight": "mlp_hyper_inject",
+    },
+    "hyper_mix_final": {
+        "mix_down_weight": "final_hyper_mix_down",
+        "mix_up_weight": "final_hyper_mix_up",
+    },
+}
+
+
+def resolve_hyper_connection_provider(
+    registry: Dict,
+    *,
+    template_op: str,
+    layer_quant: Dict[str, Any],
+    header_quant: Dict[str, Any],
+    mode: str,
+) -> str:
+    """Resolve a hyper-connection provider from every matrix storage role."""
+    role_keys = _HYPER_CONNECTION_WEIGHT_ROLES.get(template_op)
+    if role_keys is None:
+        raise RuntimeError(
+            f"HARD KERNEL RESOLUTION FAULT: {template_op!r} is not a "
+            "declared hyper-connection operation."
+        )
+
+    quant: Dict[str, str] = {}
+    for role, weight_key in role_keys.items():
+        dtype = layer_quant.get(weight_key)
+        if dtype in (None, "", "fp32"):
+            dtype = header_quant.get(weight_key, dtype)
+        normalized = str(dtype or "").strip().lower()
+        if not normalized:
+            raise RuntimeError(
+                "HARD KERNEL RESOLUTION FAULT: missing storage dtype for "
+                f"{template_op}.{weight_key}."
+            )
+        quant[role] = normalized
+
+    kernel_op = TEMPLATE_TO_KERNEL_OP[template_op]
+    kernel_id = find_kernel(
+        registry,
+        op=kernel_op,
+        quant=quant,
+        mode=mode,
+        prefer_q8_activation=False,
+    )
+    if kernel_id:
+        return kernel_id
+    role_summary = ", ".join(f"{role}={dtype}" for role, dtype in quant.items())
+    raise RuntimeError(
+        "HARD KERNEL RESOLUTION FAULT: no hyper-connection provider for "
+        f"{template_op} ({role_summary})."
+    )
+
+
+def resolve_weighted_composite_provider(
+    registry: Dict,
+    *,
+    template_op: str,
+    kernel_op: str,
+    layer_quant: Dict[str, Any],
+    header_quant: Dict[str, Any],
+    mode: str,
+    prefer_q8_activation: bool,
+) -> Optional[str]:
+    """Resolve composite providers whose storage contract spans several weights."""
+    if template_op in _HYPER_CONNECTION_WEIGHT_ROLES:
+        return resolve_hyper_connection_provider(
+            registry,
+            template_op=template_op,
+            layer_quant=layer_quant,
+            header_quant=header_quant,
+            mode=mode,
+        )
+    if template_op == "moe_swiglu_packed_expert_mlp":
+        packed_dtype = str(layer_quant.get("moe_expert_gate_up", "")).lower()
+        down_dtype = str(layer_quant.get("moe_expert_down", "")).lower()
+        quant = (
+            {"weight": packed_dtype}
+            if packed_dtype == down_dtype and packed_dtype in {"fp32", "bf16"}
+            else {"gate_up_weight": packed_dtype, "down_weight": down_dtype}
+        )
+        kernel_id = find_kernel(
+            registry,
+            op=kernel_op,
+            quant=quant,
+            mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
+        )
+        if kernel_id:
+            return kernel_id
+        raise RuntimeError(
+            "HARD KERNEL RESOLUTION FAULT: no packed composite SwiGLU "
+            f"provider for gate_up={packed_dtype}, down={down_dtype}."
+        )
+    if template_op == "ple_gate_conv_inject":
+        conv_dtype = str(layer_quant.get("ple_conv", "")).strip().lower()
+        if not conv_dtype:
+            raise RuntimeError(
+                "HARD KERNEL RESOLUTION FAULT: missing storage dtype for "
+                "ple_gate_conv_inject.ple_conv."
+            )
+        kernel_id = find_kernel(
+            registry,
+            op=kernel_op,
+            quant={"conv_weight": conv_dtype},
+            mode=mode,
+            prefer_q8_activation=False,
+        )
+        if kernel_id:
+            return kernel_id
+        raise RuntimeError(
+            "HARD KERNEL RESOLUTION FAULT: no PLE gate/conv provider "
+            f"for conv_weight={conv_dtype}."
+        )
+    return None
+
+
+def resolve_explicit_kernel_override(
+    *,
+    explicit_kernel: str,
+    weight_keys: Any,
+    layer_quant: Dict[str, Any],
+    header_quant: Dict[str, Any],
+    mode: str,
+    bf16_dense_matmul: bool,
+) -> Optional[str]:
+    """Apply storage-aware normalization to a circuit-selected provider."""
+    if not explicit_kernel:
+        return None
+    if bf16_dense_matmul and isinstance(weight_keys, list) and weight_keys:
+        weight_dtype = str(layer_quant.get(weight_keys[0], "fp32") or "fp32").lower()
+        if weight_dtype == "fp32":
+            weight_dtype = str(
+                header_quant.get(weight_keys[0], weight_dtype) or weight_dtype
+            ).lower()
+        if weight_dtype == "bf16":
+            return "gemm_nt_bf16" if mode == "prefill" else "gemv_bf16"
+    return explicit_kernel
+
+
 def kernel_needs_q8_activation(registry: Dict, kernel_id: str) -> bool:
     """
     Check if a kernel requires Q8_0 quantized activation input.
@@ -7455,6 +7881,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         post_proj_entry = entry_dtype.get("assistant.post_projection")
         if post_proj_entry:
             header_quant["assistant_post_projection"] = post_proj_entry
+    header_quant = _apply_header_quant_aliases(header_quant, entry_dtype)
     config = manifest.get("config", {})
     template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
     template_contract = template.get("contract", {}) if isinstance(template.get("contract"), dict) else {}
@@ -7779,6 +8206,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "recurrent_beta_proj": ["ssm_beta"],
         "recurrent_ssm_conv": ["ssm_conv1d"],
         "recurrent_out_proj": ["ssm_out"],
+        "hyper_stream_expand": [],
+        "hyper_mix_attn": ["attn_hyper_norm", "attn_hyper_mix_down", "attn_hyper_mix_up", "attn_hyper_inject"],
+        "hyper_inject_attn": [],
+        "hyper_mix_mlp": ["mlp_hyper_norm", "mlp_hyper_mix_down", "mlp_hyper_mix_up", "mlp_hyper_inject"],
+        "hyper_inject_mlp": [],
+        "hyper_mix_final": ["final_hyper_norm", "final_hyper_mix_down", "final_hyper_mix_up"],
+        "ple_ngram_embed": ["ple_ngram_embedding", "ple_layer_multipliers", "ple_ngram_heads_offsets", "ple_ngram_heads_vocab_sizes"],
+        "ple_key_proj": ["ple_key"],
+        "ple_value_proj": ["ple_value"],
+        "ple_gate_conv_inject": ["ple_norm_key", "ple_norm_query", "ple_norm_conv", "ple_conv"],
+        "qsa_index_proj": ["index_qk"],
+        "qsa_index_select": ["index_q_norm", "index_k_norm"],
+        "qsa_attention": [],
     "mamba_in_proj": ["mamba_in_proj"],
     "mamba_in_proj_split": [],
     "mamba_dt_softplus": ["mamba_dt_bias"],
@@ -7792,6 +8232,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     "moe_relu2_expert_mlp": ["moe_expert_up", "moe_expert_down"],
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
     "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_gate_scale", "moe_expert_up", "moe_expert_up_scale", "moe_expert_down", "moe_expert_down_scale"],
+    "moe_swiglu_packed_expert_mlp": ["moe_expert_gate_up", "moe_expert_down"],
     "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_gate_scale", "moe_shared_up", "moe_shared_up_scale", "moe_shared_down", "moe_shared_down_scale"],
     "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
@@ -7923,6 +8364,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "branch_fc2",
         "assistant_pre_projection",
         "assistant_post_projection",
+        "ple_key_proj",
+        "ple_value_proj",
+        "qsa_index_proj",
     }
 
     def map_op_to_kernel(op: str, layer_quant: Dict, mode: str, header_quant: Dict) -> List[str]:
@@ -8032,15 +8476,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if op == "attn" and mode == "prefill" and not _attention_contract_is_causal(template, config):
                 return ["attention_forward_full_head_major_gqa_flash_strided"]
 
-        explicit_kernel = str(template_kernels.get(op, "") or "").strip()
-        if explicit_kernel:
-            explicit_weight_info = OP_TO_WEIGHT_KEYS.get(op)
-            if op in BF16_DENSE_MATMUL_OPS and isinstance(explicit_weight_info, list) and explicit_weight_info:
-                explicit_weight_dtype = str(layer_quant.get(explicit_weight_info[0], "fp32") or "fp32").lower()
-                if explicit_weight_dtype == "fp32":
-                    explicit_weight_dtype = str(header_quant.get(explicit_weight_info[0], explicit_weight_dtype) or explicit_weight_dtype).lower()
-                if explicit_weight_dtype == "bf16":
-                    return ["gemm_nt_bf16" if mode == "prefill" else "gemv_bf16"]
+        explicit_kernel = resolve_explicit_kernel_override(
+            explicit_kernel=str(template_kernels.get(op, "") or "").strip(),
+            weight_keys=OP_TO_WEIGHT_KEYS.get(op),
+            layer_quant=layer_quant,
+            header_quant=header_quant,
+            mode=mode,
+            bf16_dense_matmul=op in BF16_DENSE_MATMUL_OPS,
+        )
+        if explicit_kernel is not None:
             return [explicit_kernel]
 
         kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
@@ -8083,6 +8527,17 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             # was from ckernel_orchestration.c which is not used in v7.
             # Fall through to standard matmul handling below.
 
+            composite_provider = resolve_weighted_composite_provider(
+                registry,
+                template_op=op,
+                kernel_op=kernel_op,
+                layer_quant=layer_quant,
+                header_quant=header_quant,
+                mode=mode,
+                prefer_q8_activation=prefer_q8_activation,
+            )
+            if composite_provider is not None:
+                return [composite_provider]
             if op == "moe_swiglu_expert_mlp":
                 return [resolve_swiglu_moe_provider(
                     registry,
@@ -8093,6 +8548,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     prefer_q8_activation=prefer_q8_activation,
                 )]
             if op == "shared_swiglu_expert_mlp":
+                return [resolve_swiglu_moe_provider(
+                    registry,
+                    kernel_op=kernel_op,
+                    layer_quant=layer_quant,
+                    weight_prefix="moe_shared",
+                    mode=mode,
+                    prefer_q8_activation=prefer_q8_activation,
+                )]
+            if op == "gated_shared_swiglu_expert_mlp":
                 return [resolve_swiglu_moe_provider(
                     registry,
                     kernel_op=kernel_op,
@@ -8554,7 +9018,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
                         # Check if we need to insert quantize op after rmsnorm
                         # v7 compatibility: quantize activation before Q8_0 activation kernels
-                        if op in PRE_NORM_OP_NAMES and op_idx + 1 < len(layer_ops):
+                        if (
+                            op in ACTIVATION_QUANTIZATION_ANCHOR_OP_NAMES
+                            and op_idx + 1 < len(layer_ops)
+                        ):
                             next_op = layer_ops[op_idx + 1]
                             next_item = layer_items[op_idx + 1]
                             next_kernels = []
@@ -8739,12 +9206,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                         if not kernels and OP_TO_WEIGHT_KEYS.get(op) != "metadata":
                             print(f"            {op:20s} → (no kernel)")
 
-                        # Insert one quantize op after rmsnorm if any consumer in
-                        # this normed section needs a Q8 activation. Qwen3.5
-                        # recurrent blocks have a FP32 qkv projection followed by
-                        # a Q4_K/Q8_K gate projection, so checking only the
-                        # immediate next op misses the required quantize.
-                        if op in PRE_NORM_OP_NAMES and op_idx + 1 < len(layer_ops):
+                        # Insert one quantize op after a declared activation
+                        # anchor if any direct projection consumer needs a Q8
+                        # activation. Some projections share the anchor output,
+                        # so checking only the immediate next op can miss the
+                        # required quantized view.
+                        if (
+                            op in ACTIVATION_QUANTIZATION_ANCHOR_OP_NAMES
+                            and op_idx + 1 < len(layer_ops)
+                        ):
                             section_kernels = []
                             for future_op_item in layer_items[op_idx + 1:]:
                                 future_op = future_op_item["op"]
@@ -9797,6 +10267,7 @@ _DECODE_ATTENTION_OPS = {
     "attn_sliding",
     "attn_shared_kv",
     "attn_sliding_shared_kv",
+    "qsa_attention",
     "mla_attention",
 }
 
@@ -9954,6 +10425,10 @@ def generate_ir_lower_1(
             lowered_op["resolved_codegen_capability"] = codegen_capability
         if ir_op.get("required_contract") is not None:
             lowered_op["required_contract"] = copy.deepcopy(ir_op["required_contract"])
+        if ir_op.get("interface_validation") is not None:
+            lowered_op["interface_validation"] = copy.deepcopy(
+                ir_op["interface_validation"]
+            )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
         if ir_op.get("resolved_contract") is not None:
@@ -9984,14 +10459,6 @@ def generate_ir_lower_1(
                 1 if mode == "decode" else manifest.get("config", {}).get("context_length", 2048),
             ))
             lowered_op["params"]["_memcpy_bytes"] = embed_dim * seq_len * 4  # FP32 = 4 bytes
-        elif op_name == "kv_cache_batch_copy":
-            # NOTE: "batch" here means a token block in prefill, not multi-request batching.
-            # A clearer name would be kv_cache_token_block_copy (keep op ID for v7 compatibility).
-            num_kv_heads = int(lowered_op["params"].get("num_kv_heads", manifest.get("config", {}).get("num_kv_heads", 1)))
-            head_dim = int(lowered_op["params"].get("head_dim", manifest.get("config", {}).get("head_dim", 1)))
-            seq_len = int(lowered_op["params"].get("seq_len", manifest.get("config", {}).get("context_length", 1)))
-            lowered_op["params"]["_kv_copy_bytes"] = num_kv_heads * head_dim * seq_len * 4  # FP32 bytes
-
         # Map kernel input activations from kernel map
         # New format has 4 sections:
         #   - 'inputs': input activations from previous layer
@@ -10093,7 +10560,7 @@ def generate_ir_lower_1(
     prefill_attention_kernel_by_layer = {
         int(candidate.get("layer", 0)): str(candidate.get("kernel", ""))
         for candidate in lowered_ops
-        if candidate.get("op") in {"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"}
+        if candidate.get("op") in {"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"}
     }
     prefill_out_kernel_by_layer = {
         int(candidate.get("layer", 0)): str(candidate.get("kernel", ""))
@@ -10126,6 +10593,12 @@ def generate_ir_lower_1(
             producer["_resolved_physical_execution"] = physical_execution
         return converter if managed else legacy_converter
 
+    def _prefill_attention_port(layer: int, semantic: str, fallback: str) -> str:
+        consumer_kernel = prefill_attention_kernel_by_layer.get(int(layer), "")
+        if not consumer_kernel:
+            return fallback
+        return _attention_input_port_name(registry, consumer_kernel, semantic)
+
     force_decode_attn_regular = str(os.environ.get("CK_V7_DECODE_ATTN_REGULAR", "")).strip().lower() in ("1", "true", "yes", "on")
     decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
     decode_uses_fp16_kv = decode_kv_cache_dtype in {"fp16", "f16"}
@@ -10134,7 +10607,7 @@ def generate_ir_lower_1(
     decode_attention_layers = {
         int(op.get("layer", 0))
         for op in lowered_ops
-        if str(op.get("op", "")) in {"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"}
+        if str(op.get("op", "")) in {"attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"}
     }
     decode_rope_layers = {
         int(op.get("layer", 0))
@@ -10165,6 +10638,34 @@ def generate_ir_lower_1(
         except (TypeError, ValueError):
             pass
         return int(layer)
+
+    def _bind_decode_attention_cache_inputs(
+        attention_op: Dict[str, Any],
+        kv_read_layer: int,
+    ) -> None:
+        """Rebind the provider-declared K/V cache ports for decode.
+
+        Most attention providers expose ``k_cache``/``v_cache`` while sparse
+        attention providers may use the more explicit
+        ``key_cache``/``value_cache`` names. Preserve whichever interface was
+        stitched from the kernel map instead of appending legacy aliases that
+        are absent from the provider call ABI.
+        """
+        inputs = attention_op.setdefault("inputs", {})
+        key_port = "key_cache" if "key_cache" in inputs else "k_cache"
+        value_port = "value_cache" if "value_cache" in inputs else "v_cache"
+        inputs[key_port] = {
+            "type": "kv_cache",
+            "source": f"kv_cache_k_L{kv_read_layer}",
+        }
+        inputs[value_port] = {
+            "type": "kv_cache",
+            "source": f"kv_cache_v_L{kv_read_layer}",
+        }
+        for obsolete_port in ({"k", "k_cache", "key_cache"} - {key_port}):
+            inputs.pop(obsolete_port, None)
+        for obsolete_port in ({"v", "v_cache", "value_cache"} - {value_port}):
+            inputs.pop(obsolete_port, None)
 
     def _make_decode_kv_store_op(anchor_op: Dict[str, Any]) -> Dict[str, Any]:
         layer = int(anchor_op["layer"])
@@ -10307,11 +10808,7 @@ def generate_ir_lower_1(
                 _require_resolved_decode_attention_kernel(op)
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                op.setdefault("inputs", {})
-                op["inputs"]["k_cache"] = {"type": "kv_cache", "source": f"kv_cache_k_L{kv_read_layer}"}
-                op["inputs"]["v_cache"] = {"type": "kv_cache", "source": f"kv_cache_v_L{kv_read_layer}"}
-                op["inputs"].pop("k", None)
-                op["inputs"].pop("v", None)
+                _bind_decode_attention_cache_inputs(op, kv_read_layer)
             elif op["op"] in _DECODE_ATTENTION_OPS:
                 decode_kernel = _require_resolved_decode_attention_kernel(op)
                 decode_attention_count += 1
@@ -10323,13 +10820,7 @@ def generate_ir_lower_1(
                     )
                 kv_read_layer = _kv_read_layer_for(int(op.get("layer", 0)))
                 op["_kv_cache_read_layer"] = kv_read_layer
-                # Update inputs to use KV cache instead of scratch
-                op.setdefault("inputs", {})
-                op["inputs"]["k_cache"] = {"type": "kv_cache", "source": f"kv_cache_k_L{kv_read_layer}"}
-                op["inputs"]["v_cache"] = {"type": "kv_cache", "source": f"kv_cache_v_L{kv_read_layer}"}
-                # Remove scratch K/V references if present
-                op["inputs"].pop("k", None)
-                op["inputs"].pop("v", None)
+                _bind_decode_attention_cache_inputs(op, kv_read_layer)
 
             if op_name in ("cross_k_proj", "cross_v_proj"):
                 is_key = op_name == "cross_k_proj"
@@ -10372,7 +10863,7 @@ def generate_ir_lower_1(
                     op,
                     producer_port="C",
                     consumer_kernel=prefill_attention_kernel_by_layer.get(int(layer), ""),
-                    consumer_port="k_cache",
+                    consumer_port=_prefill_attention_port(layer, "q", "q"),
                     legacy_converter="layout_convert_token_to_head_f32",
                 )
                 if converter is None:
@@ -10399,7 +10890,7 @@ def generate_ir_lower_1(
                     op,
                     producer_port="C",
                     consumer_kernel=prefill_attention_kernel_by_layer.get(int(layer), ""),
-                    consumer_port="v_cache",
+                    consumer_port=_prefill_attention_port(layer, "k", "k_cache"),
                     legacy_converter="layout_convert_token_to_head_f32",
                 )
                 if converter is None:
@@ -10426,7 +10917,7 @@ def generate_ir_lower_1(
                     op,
                     producer_port="C",
                     consumer_kernel=prefill_attention_kernel_by_layer.get(int(layer), ""),
-                    consumer_port="q",
+                    consumer_port=_prefill_attention_port(layer, "v", "v_cache"),
                     legacy_converter="layout_convert_token_to_head_f32",
                 )
                 if converter is None:
@@ -10502,7 +10993,7 @@ def generate_ir_lower_1(
             # projection/residual path consumes token-major [T, H*D]. Emit the
             # bridge for all prefill graphs, regardless of whether a KV cache
             # also exists.
-            if op["op"] in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"):
+            if op["op"] in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"):
                 layer = op["layer"]
                 output_converter = _prefill_converter(
                     op,
@@ -10527,12 +11018,10 @@ def generate_ir_lower_1(
                 if uses_kv_cache:
                     shared_q_prefill = op["op"] in ("attn_shared_kv", "attn_sliding_shared_kv")
                     copy_src = "q_scratch" if shared_q_prefill else "k_scratch"
-                    exact_f16_append = append_before_attention and decode_uses_fp16_kv
-                    exact_bf16_append = append_before_attention and decode_uses_bf16_kv
                     batch_store_kernel = (
-                        "kv_cache_store_batch_bf16" if exact_bf16_append
-                        else "kv_cache_store_batch_f16" if exact_f16_append
-                        else "kv_cache_batch_copy"
+                        "kv_cache_store_batch_bf16" if decode_uses_bf16_kv
+                        else "kv_cache_store_batch_f16" if decode_uses_fp16_kv
+                        else "kv_cache_store_batch_f32"
                     )
                     kv_batch_copy_op = {
                         "idx": len(final_ops),
@@ -10580,9 +11069,6 @@ def generate_ir_lower_1(
                     }
                     final_ops.append(transpose_attn_out_op)
                 if uses_kv_cache and not append_before_attention:
-                    # TODO(contract): validate this op against runtime_invariants contract:
-                    # _kv_copy_bytes must exist and match
-                    # (num_kv_heads * head_dim * seq_len * sizeof(fp32)).
                     final_ops.append(kv_batch_copy_op)
                     kv_store_count += 1
 
@@ -10621,20 +11107,10 @@ def generate_ir_lower_1(
 
     # Renumber ops and normalize derived params for auto-inserted kernels.
     # TODO(contract): centralize required-arg derivation/validation for all ops
-    # (not only kv_cache_batch_copy/residual_save) and fail in lower stage if any
+    # and fail in lower stage if any
     # required call arg is missing/invalid.
     for i, op in enumerate(final_ops):
         op["idx"] = i
-        if op.get("op") == "kv_cache_batch_copy":
-            params = op.setdefault("params", {})
-            num_kv_heads = int(params.get("num_kv_heads", config.get("num_kv_heads", 1)))
-            head_dim = int(params.get("head_dim", config.get("head_dim", 1)))
-            seq_len = int(params.get("seq_len", config.get("context_length", config.get("context_len", 1))))
-            params["num_kv_heads"] = num_kv_heads
-            params["head_dim"] = head_dim
-            params["seq_len"] = seq_len
-            params["_kv_copy_bytes"] = num_kv_heads * head_dim * seq_len * 4  # FP32 bytes
-
     lowered_ops = final_ops
     print(f"  Inserted {kv_store_count} kv_cache_store operations")
     if not uses_kv_cache:
@@ -10714,6 +11190,7 @@ WEIGHT_PATTERNS = {
     "moe_expert_up": ["layer.{L}.moe_expert_up", "layer.{L}.moe_expert.{E}.up"],
     "moe_expert_up_scale": ["layer.{L}.moe_expert_up_scale"],
     "moe_expert_down": ["layer.{L}.moe_expert_down", "layer.{L}.moe_expert.{E}.down"],
+    "moe_expert_gate_up": ["layer.{L}.moe_expert_gate_up"],
     "moe_expert_down_scale": ["layer.{L}.moe_expert_down_scale"],
     "moe_shared_gate": ["layer.{L}.moe_shared_gate"],
     "moe_shared_gate_scale": ["layer.{L}.moe_shared_gate_scale"],
@@ -10806,6 +11283,30 @@ WEIGHT_PATTERNS = {
     "branch_fc1_b": ["v.deepstack.{L}.fc1.bias"],
     "branch_fc2_w": ["v.deepstack.{L}.fc2.weight"],
     "branch_fc2_b": ["v.deepstack.{L}.fc2.bias"],
+    "attn_hyper_norm": ["layer.{L}.attn_hyper.norm"],
+    "attn_hyper_mix_down": ["layer.{L}.attn_hyper.mix_down"],
+    "attn_hyper_mix_up": ["layer.{L}.attn_hyper.mix_up"],
+    "attn_hyper_inject": ["layer.{L}.attn_hyper.inject"],
+    "mlp_hyper_norm": ["layer.{L}.mlp_hyper.norm"],
+    "mlp_hyper_mix_down": ["layer.{L}.mlp_hyper.mix_down"],
+    "mlp_hyper_mix_up": ["layer.{L}.mlp_hyper.mix_up"],
+    "mlp_hyper_inject": ["layer.{L}.mlp_hyper.inject"],
+    "final_hyper_norm": ["hyper.norm"],
+    "final_hyper_mix_down": ["hyper.mix_down"],
+    "final_hyper_mix_up": ["hyper.mix_up"],
+    "ple_ngram_embedding": ["layer.{L}.ple_ngram_embedding"],
+    "ple_layer_multipliers": ["layer.{L}.ple_layer_multipliers"],
+    "ple_ngram_heads_offsets": ["layer.{L}.ple_ngram_heads_offsets"],
+    "ple_ngram_heads_vocab_sizes": ["layer.{L}.ple_ngram_heads_vocab_sizes"],
+    "ple_key": ["layer.{L}.ple_key"],
+    "ple_value": ["layer.{L}.ple_value"],
+    "ple_norm_key": ["layer.{L}.ple_norm_key"],
+    "ple_norm_query": ["layer.{L}.ple_norm_query"],
+    "ple_norm_conv": ["layer.{L}.ple_norm_conv"],
+    "ple_conv": ["layer.{L}.ple_conv"],
+    "index_qk": ["layer.{L}.index_qk"],
+    "index_q_norm": ["layer.{L}.index_q_norm"],
+    "index_k_norm": ["layer.{L}.index_k_norm"],
 }
 
 # Template op → weight refs it uses
@@ -10837,6 +11338,8 @@ TEMPLATE_OP_WEIGHTS = {
     "vision_position_ids": [],
     "position_ids_2d": [],
     "dense_embedding_lookup": ["token_emb"],  # Token embeddings only (pos_emb for non-RoPE)
+    "hyper_stream_expand": [],
+    "activation_quantize": [],
     "assistant_pre_projection": ["assistant_pre_projection"],
 
     # Attention block (body + footer)
@@ -10893,6 +11396,18 @@ TEMPLATE_OP_WEIGHTS = {
     "recurrent_core": [],
     "recurrent_norm_gate": ["ssm_norm"],
     "recurrent_out_proj": ["ssm_out"],
+    "hyper_mix_attn": ["attn_hyper_norm", "attn_hyper_mix_down", "attn_hyper_mix_up", "attn_hyper_inject"],
+    "hyper_inject_attn": [],
+    "hyper_mix_mlp": ["mlp_hyper_norm", "mlp_hyper_mix_down", "mlp_hyper_mix_up", "mlp_hyper_inject"],
+    "hyper_inject_mlp": [],
+    "hyper_mix_final": ["final_hyper_norm", "final_hyper_mix_down", "final_hyper_mix_up"],
+    "ple_ngram_embed": ["ple_ngram_embedding", "ple_layer_multipliers", "ple_ngram_heads_offsets", "ple_ngram_heads_vocab_sizes"],
+    "ple_key_proj": ["ple_key"],
+    "ple_value_proj": ["ple_value"],
+    "ple_gate_conv_inject": ["ple_norm_key", "ple_norm_query", "ple_norm_conv", "ple_conv"],
+    "qsa_index_proj": ["index_qk"],
+    "qsa_index_select": ["index_q_norm", "index_k_norm"],
+    "qsa_attention": [],
     "mamba_in_proj": ["mamba_in_proj"],
     "mamba_in_proj_split": [],
     "mamba_dt_softplus": ["mamba_dt_bias"],
@@ -10905,6 +11420,7 @@ TEMPLATE_OP_WEIGHTS = {
     "moe_relu2_expert_mlp": ["moe_expert_up", "moe_expert_down"],
     "shared_relu2_expert_mlp": ["moe_shared_up", "moe_shared_down"],
     "moe_swiglu_expert_mlp": ["moe_expert_gate", "moe_expert_gate_scale", "moe_expert_up", "moe_expert_up_scale", "moe_expert_down", "moe_expert_down_scale"],
+    "moe_swiglu_packed_expert_mlp": ["moe_expert_gate_up", "moe_expert_down"],
     "shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_gate_scale", "moe_shared_up", "moe_shared_up_scale", "moe_shared_down", "moe_shared_down_scale"],
     "gated_shared_swiglu_expert_mlp": ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
     "farskip_routed_shared_combine": ["moe_shared_gate", "moe_shared_up", "moe_shared_down"],
@@ -11409,14 +11925,28 @@ def generate_memory_layout(
         add_buffer("backbone_stream", seq_len * backbone_hidden_size * 4, f"[{seq_len}, {backbone_hidden_size}]")
     add_buffer("embedded_input", embedded_size, f"[{seq_len}, {embed_dim}]")
 
-    # Layer input buffer (for ping-pong)
-    # Must be large enough for Q8_K quantization of MLP intermediate (n_ff elements)
-    # Size this from the canonical block ABI; packed Q8_K includes 256 int8
-    # values, one fp32 scale, and 16 int16 block sums.
-    q8k_blocks = (intermediate_size + 255) // 256
+    # Layer input remains an FP32 semantic stream. Quantized projections use a
+    # distinct physical view so inserting quantization cannot clobber a live
+    # residual or auxiliary stream that happens to occupy layer_input.
+    quantized_stream_width = max(
+        int(embed_dim),
+        int(intermediate_size),
+        int(config.get("q_dim", 0) or 0),
+        int(config.get("k_dim", 0) or 0),
+        int(config.get("v_dim", 0) or 0),
+        int(config.get("ssm_inner_size", 0) or 0),
+        int(config.get("gate_dim", 0) or 0),
+        int(config.get("attn_out_dim", 0) or 0),
+    )
+    q8k_blocks = (quantized_stream_width + 255) // 256
     q8k_size = q8k_blocks * _dtype_size_bytes("q8_k_block") * seq_len
-    layer_input_size = max(embedded_size, q8k_size)
-    add_buffer("layer_input", layer_input_size, f"[{seq_len}, max({embed_dim}, Q8_K({intermediate_size}))]")
+    add_buffer("layer_input", embedded_size, f"[{seq_len}, {embed_dim}]")
+    add_buffer(
+        "main_stream_q8",
+        q8k_size,
+        f"[{seq_len}, Q8_K({quantized_stream_width})]",
+        "q8_k",
+    )
 
     # Residual buffer (for residual connections - stores input before layer processing)
     add_buffer("residual", embedded_size, f"[{seq_len}, {embed_dim}]")
@@ -11911,12 +12441,13 @@ def generate_memory_layout_packed(
             current_input_buffer = "embedded_input"
             current_output_buffer = "layer_input"
         elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "attn_gate_softplus_mul", "k_proj", "v_proj", "qkv_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk", "vision_position_ids", "position_ids_2d", "bias_add") or \
-                (mode == "prefill" and op_type in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv")):
+                (mode == "prefill" and op_type in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention")):
             pass
         else:
             current_input_buffer, current_output_buffer = current_output_buffer, current_input_buffer
 
     # Ensure required buffers exist for runtime pointers
+    alloc_act("main_stream_q8")
     alloc_act("kv_cache")
     alloc_act("rope_cache")
     alloc_act("logits")
@@ -12144,6 +12675,7 @@ def generate_ir_lower_2(
     buffer_name_map = {
         "A_EMBEDDED_INPUT": "embedded_input",
         "A_LAYER_INPUT": "layer_input",
+        "A_MAIN_STREAM_Q8": "main_stream_q8",
         "A_RESIDUAL": "residual",
         "A_ATTN_SCRATCH": "attn_scratch",
         "A_ATTN_Q_GATE_PACKED": "attn_q_gate_packed",
@@ -12210,6 +12742,10 @@ def generate_ir_lower_2(
         }
         if ir_op.get("required_contract") is not None:
             lowered_op["required_contract"] = copy.deepcopy(ir_op["required_contract"])
+        if ir_op.get("interface_validation") is not None:
+            lowered_op["interface_validation"] = copy.deepcopy(
+                ir_op["interface_validation"]
+            )
         if isinstance(ir_op.get("graph_slots"), dict):
             lowered_op["graph_slots"] = copy.deepcopy(ir_op["graph_slots"])
         if ir_op.get("resolved_contract") is not None:
@@ -12405,7 +12941,7 @@ def generate_ir_lower_2(
             # - Kernels with fp32 activation (e.g., gemm_nt_q5_1) need FP32 input
             #   → use embedded_input (FP32 buffer)
             # - Kernels with q8_0 activation (e.g., gemm_nt_q8_0_q8_0) need Q8 input
-            #   → use layer_input (Q8 buffer, where quantize_input writes)
+            #   → use the dedicated main_stream_q8 buffer
             # ═══════════════════════════════════════════════════════════════
             op_id = ir_op.get("idx", ir_op.get("op_id", -1))
             kernel_id = ir_op.get("kernel", "")
@@ -12413,9 +12949,8 @@ def generate_ir_lower_2(
             # Determine the correct input buffer based on kernel's activation dtype.
             # Body projections consume the pre-norm stream. Quantized kernels read
             # the Q8 view planned for that stream; FP32/BF16 kernels must read the
-            # physical FP32 stream. This matters for Qwen3.5 recurrent_qkv_proj:
-            # gemv_q5_k consumes FP32 activations, while layer_input is also reused
-            # as the Q8 scratch for quantize_input_0 on this layout.
+            # physical FP32 stream. This matters whenever another semantic stream
+            # remains live across an inserted quantization operation.
             needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
 
             # Projection activation ports are circuit ABI, not aliases to infer.
@@ -13204,7 +13739,7 @@ def generate_ir_lower_2(
                     # Fallback to legacy logic for unplanned ops
                     if "embedding" in ir_op.get("kernel", "").lower():
                         output_buf_name = "embedded_input"
-                    elif ir_op.get("op") in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"):
+                    elif ir_op.get("op") in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"):
                         output_buf_name = "attn_scratch"
                     elif ir_op.get("op") == "logits":
                         output_buf_name = "logits"
@@ -13500,7 +14035,7 @@ def generate_ir_lower_2(
             merged_tokens = int(params.get("vision_merged_tokens", 0) or 0)
             hidden_dim = int(params.get("projector_hidden_dim", 0) or 0)
             params.setdefault("gelu_elems", merged_tokens * hidden_dim)
-        if op_type in ("quantize_input_0", "quantize_input_1", "quantize_input_2", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_mamba_out_proj_input", "quantize_final_output"):
+        if op_type in ("activation_quantize", "quantize_input_0", "quantize_input_1", "quantize_input_2", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_mamba_out_proj_input", "quantize_final_output"):
             default_quant_rows = int(params.get("_m", params.get("seq_len", 1)) or 1)
             params.setdefault("rows", default_quant_rows)
         if op_type == "quantize_final_output":
@@ -13628,6 +14163,7 @@ def generate_ir_lower_2(
         if op_type in {
             "full_softmax_topk_router",
             "moe_swiglu_expert_mlp",
+            "moe_swiglu_packed_expert_mlp",
             "shared_swiglu_expert_mlp",
             "gated_shared_swiglu_expert_mlp",
         }:
@@ -13674,7 +14210,7 @@ def generate_ir_lower_2(
             params["_m"] = int(params.get("vision_merged_tokens", params.get("_m", 1)) or 1)
         if op_type in ("vision_position_ids", "position_ids_2d") or _is_vision_mrope_operation(ir_op):
             params["_m"] = int(params.get("vision_num_patches", params.get("_m", 1)) or 1)
-        if op_type in ("quantize_input_0", "quantize_input_1", "quantize_input_2", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_mamba_out_proj_input", "quantize_final_output"):
+        if op_type in ("activation_quantize", "quantize_input_0", "quantize_input_1", "quantize_input_2", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_mamba_out_proj_input", "quantize_final_output"):
             inferred_quant_rows = int(params.get("_m", params.get("seq_len", params.get("rows", 1))) or 1)
             if int(params.get("rows", 0) or 0) <= 1 and inferred_quant_rows > 1:
                 params["rows"] = inferred_quant_rows
@@ -13809,10 +14345,11 @@ def generate_ir_lower_2(
                          "transpose_cross_q_to_head_major", "transpose_cross_kv_to_head_major",
                          "transpose_cross_attn_out_to_token_major",
                          "q_gate_proj", "split_q_gate", "split_qkv_packed", "attn_gate_sigmoid_mul", "attn_gate_softplus_mul", "k_proj", "v_proj", "qkv_proj", "qkv_packed_proj", "q_norm", "rope_qk", "rope_q", "mrope_qk",
+                         "qsa_index_proj", "qsa_index_select",
                          "recurrent_qk_l2_norm",
                          "mlp_gate_up", "mlp_up", "silu_mul", "geglu", "gelu", "mlp_down", "projector_fc1", "projector_gelu", "projector_prep", "projector_fc2", "branch_fc1", "branch_gelu", "branch_fc2", "branch_concat", "spatial_merge", "bias_add") or \
                 (ir_op.get("section", "") == "branch" and op_type == "layernorm") or \
-                (mode == "prefill" and op_type in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv")):
+                (mode == "prefill" and op_type in ("attn", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention")):
             # Ops that don't advance the token-major stream, don't ping-pong
             pass
         else:
@@ -13860,6 +14397,19 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
         k.get("id"): k.get("quant", {})
         for k in registry.get("kernels", [])
         if k.get("id")
+    }
+    kernel_operation = {
+        k.get("id"): str(k.get("op", "") or "")
+        for k in registry.get("kernels", [])
+        if k.get("id")
+    }
+    activation_layout = (
+        lowered_ir.get("memory", {}).get("activations", {}).get("buffers", [])
+    )
+    physical_activation_dtype = {
+        str(buf.get("name", "")): str(buf.get("dtype", "") or "").lower()
+        for buf in activation_layout
+        if isinstance(buf, dict) and buf.get("name")
     }
     kernel_weight_contract = {}
     for k in registry.get("kernels", []):
@@ -13909,6 +14459,50 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                         f"   kernel weight dtype: {expected_weight_dtype or '<missing>'}\n"
                         f"   Fix: ensure quant_summary aliases select BF16 kernels for safetensors/BUMP weights\n"
                     )
+
+        # A provider's activation storage is a physical ABI, not a semantic
+        # hint. Without this gate, generated C can interpret FP32 bytes as
+        # packed quantization blocks and still produce finite-looking output.
+        expected_activation_dtype = str(
+            kernel_quant.get(kernel_id, {}).get("activation", "")
+        ).lower()
+        if (
+            expected_activation_dtype in {"q8_0", "q8_k"}
+            and kernel_operation.get(kernel_id) != "quantize"
+        ):
+            activations = op.get("activations", {})
+            activation_input = (
+                activations.get("x_q8")
+                or activations.get("x")
+                or activations.get("A")
+                or activations.get("input")
+            )
+            if not isinstance(activation_input, dict):
+                raise RuntimeError(
+                    "HARD ACTIVATION STORAGE FAULT: quantized provider has no "
+                    f"resolved activation input: op={op_name!r}, layer={layer}, "
+                    f"kernel={kernel_id!r}, expected={expected_activation_dtype!r}."
+                )
+            actual_activation_dtype = str(
+                activation_input.get("dtype", "") or ""
+            ).lower()
+            buffer_name = str(activation_input.get("buffer", "") or "")
+            physical_dtype = physical_activation_dtype.get(buffer_name, "")
+            logical_mismatch = actual_activation_dtype != expected_activation_dtype
+            physical_mismatch = bool(physical_dtype) and physical_dtype not in {
+                "q8_0",
+                "q8_k",
+            }
+            if logical_mismatch or physical_mismatch:
+                raise RuntimeError(
+                    "HARD ACTIVATION STORAGE FAULT: quantized provider input "
+                    "does not match its physical ABI: "
+                    f"op={op_name!r}, layer={layer}, kernel={kernel_id!r}, "
+                    f"expected={expected_activation_dtype!r}, "
+                    f"actual={actual_activation_dtype or '<missing>'!r}, "
+                    f"buffer={buffer_name or '<missing>'!r}, "
+                    f"physical={physical_dtype or '<unavailable>'!r}."
+                )
 
         # ===== BODY PROJECTION INPUT STREAM =====
         # Projections inside a transformer/recurrent block consume the normalized
@@ -13988,7 +14582,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                 )
 
         # ===== ATTENTION OPERATIONS =====
-        if op_name in ("attn", "attention", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv"):
+        if op_name in ("attn", "attention", "attn_sliding", "attn_shared_kv", "attn_sliding_shared_kv", "qsa_attention"):
             outputs = op.get("outputs", {})
             activations = op.get("activations", {})
 
@@ -14006,7 +14600,11 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                     )
 
             # Check KV cache inputs: must come from kv_cache
-            k_cache = activations.get("k_cache") or activations.get("k")
+            k_cache = (
+                activations.get("key_cache")
+                or activations.get("k_cache")
+                or activations.get("k")
+            )
             if k_cache:
                 k_buf = k_cache.get("buffer", "")
                 allowed_k = ("q_scratch", "kv_cache") if op_name in ("attn_shared_kv", "attn_sliding_shared_kv") else ("kv_cache",)
@@ -14019,7 +14617,11 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                         f"   Fix: Add kernel I/O -> dataflow name mapping in generate_ir_lower_2()\n"
                     )
 
-            v_cache = activations.get("v_cache") or activations.get("v")
+            v_cache = (
+                activations.get("value_cache")
+                or activations.get("v_cache")
+                or activations.get("v")
+            )
             if v_cache:
                 v_buf = v_cache.get("buffer", "")
                 allowed_v = ("q_scratch", "kv_cache") if op_name in ("attn_shared_kv", "attn_sliding_shared_kv") else ("kv_cache",)
@@ -14094,10 +14696,10 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
 
             # Input buffer must match logits kernel activation dtype:
             # - fp32 activation kernels read embedded_input (main_stream)
-            # - q8 activation kernels read layer_input (main_stream_q8)
+            # - q8 activation kernels read main_stream_q8
             kernel_id = op.get("kernel", "")
             needs_q8_input = kernel_needs_q8_activation(registry, kernel_id)
-            expected_input_buf = "layer_input" if needs_q8_input else "embedded_input"
+            expected_input_buf = "main_stream_q8" if needs_q8_input else "embedded_input"
 
             x_in = (
                 activations.get("x")
@@ -14129,17 +14731,17 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                     )
 
         # ===== QUANTIZE FINAL OUTPUT =====
-        elif op_name in ("quantize_final_output", "quantize"):
+        elif op_name in ("activation_quantize", "quantize_final_output", "quantize"):
             outputs = op.get("outputs", {})
             out = outputs.get("output") or outputs.get("y")
             if out:
                 buf = out.get("buffer", "")
-                # Quantize output goes to layer_input (main stream Q8 buffer)
-                if buf not in ("layer_input",):
+                # Quantize output goes to the dedicated main stream Q8 buffer.
+                if buf not in ("main_stream_q8",):
                     raise RuntimeError(
                         f"\n❌ HARD FAULT: Invalid buffer assignment\n"
                         f"   op={op_name} layer={layer}\n"
-                        f"   expected output: layer_input (main_stream_q8)\n"
+                        f"   expected output: main_stream_q8\n"
                         f"   got: {buf}\n"
                     )
 
@@ -15044,53 +15646,6 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             if resolved_weight_ref:
                 arg_doc["weight_ref"] = resolved_weight_ref
             args.append(arg_doc)
-
-        # Strict runtime invariant checks (lowered-call stage, before codegen).
-        if op_name == "kv_cache_batch_copy":
-            size_arg = arg_by_source(args, "dim:_kv_copy_bytes")
-            if not size_arg:
-                op_errors.append(
-                    f"{func}: missing required call arg dim:_kv_copy_bytes "
-                    "(kv token-block copy size)"
-                )
-            else:
-                size_expr = str(size_arg.get("expr", "")).strip()
-                if size_expr in {"", "0", "NULL"}:
-                    op_errors.append(f"{func}: invalid _kv_copy_bytes expression '{size_expr or '<empty>'}'")
-                size_val = parse_int_literal(size_expr)
-                if size_val is not None and size_val <= 0:
-                    op_errors.append(f"{func}: _kv_copy_bytes must be > 0 (got {size_val})")
-
-                n_kv_arg = arg_by_source(args, "dim:num_kv_heads")
-                hd_arg = arg_by_source(args, "dim:head_dim")
-                seq_arg = arg_by_source(args, "dim:seq_len")
-                n_kv = parse_int_literal(n_kv_arg.get("expr", "")) if n_kv_arg else None
-                hd = parse_int_literal(hd_arg.get("expr", "")) if hd_arg else None
-                seq = parse_int_literal(seq_arg.get("expr", "")) if seq_arg else None
-                if None not in (n_kv, hd, seq) and size_val is not None:
-                    expected = int(n_kv) * int(hd) * int(seq) * 4
-                    if expected <= 0:
-                        op_errors.append(
-                            f"{func}: invalid kv copy dimensions "
-                            f"(num_kv_heads={n_kv}, head_dim={hd}, seq_len={seq})"
-                        )
-                    elif size_val != expected:
-                        op_errors.append(
-                            f"{func}: _kv_copy_bytes mismatch (expected {expected}, got {size_val})"
-                        )
-
-            for src_key, label in (("activation:k_src", "k_src"), ("activation:v_src", "v_src")):
-                src_arg = arg_by_source(args, src_key)
-                if not src_arg:
-                    op_errors.append(f"{func}: missing required call arg {src_key}")
-                elif str(src_arg.get("expr", "")).strip() == "NULL":
-                    op_errors.append(f"{func}: {label} resolved to NULL")
-            for dst_key, label in (("output:k_dst", "k_dst"), ("output:v_dst", "v_dst")):
-                dst_arg = arg_by_source(args, dst_key)
-                if not dst_arg:
-                    op_errors.append(f"{func}: missing required call arg {dst_key}")
-                elif str(dst_arg.get("expr", "")).strip() == "NULL":
-                    op_errors.append(f"{func}: {label} resolved to NULL")
 
         if op_errors:
             all_errors.append({

@@ -1,21 +1,22 @@
 {
   "id": "gated_deltanet_pytorch_grouped_bf16_forward",
   "op": "gated_deltanet",
+  "operation_interface": "gated_deltanet.grouped_qk.decode.bf16_output.v1",
   "variant": "pytorch_grouped_qk_decode_bf16_output",
   "modes": {"inference": true, "training": false, "backward": false},
   "quant": {"weight": "none", "activation": "fp32_bf16_values", "output": "fp32_bf16_values"},
   "inputs": [
-    {"name": "q", "dtype": "fp32", "shape": ["G", "D"]},
-    {"name": "k", "dtype": "fp32", "shape": ["G", "D"]},
-    {"name": "v", "dtype": "fp32", "shape": ["H", "D"]},
-    {"name": "g", "dtype": "fp32", "shape": ["H"]},
-    {"name": "beta", "dtype": "fp32", "shape": ["H"]},
-    {"name": "state_in", "dtype": "fp32", "shape": ["H", "D", "D"]}
+    {"name": "q", "dtype": "fp32", "shape": ["G", "D"], "layout": "row_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["G", "D"], "layout": "row_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "v", "dtype": "fp32", "shape": ["H", "D"], "layout": "row_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "g", "dtype": "fp32", "shape": ["H"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "beta", "dtype": "fp32", "shape": ["H"], "layout": "contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "state_in", "dtype": "fp32", "shape": ["H", "D", "D"], "layout": "head_major_contiguous", "access": "read", "storage_class": "state", "consumption": "required"}
   ],
   "weights": [],
   "outputs": [
-    {"name": "state_out", "dtype": "fp32", "shape": ["H", "D", "D"]},
-    {"name": "out", "dtype": "fp32", "shape": ["H", "D"]}
+    {"name": "state_out", "dtype": "fp32", "shape": ["H", "D", "D"], "layout": "head_major_contiguous", "access": "write", "storage_class": "state", "consumption": "required"},
+    {"name": "out", "dtype": "fp32", "shape": ["H", "D"], "layout": "row_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
   "dims": ["H", "G", "D"],
   "params": [{"name": "norm_eps", "dtype": "float32"}],
@@ -23,7 +24,7 @@
     "function": "gated_deltanet_pytorch_grouped_bf16_forward",
     "c_declaration": "void gated_deltanet_pytorch_grouped_bf16_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int group_count, int state_dim, float norm_eps);",
     "sources": ["src/kernels/deltanet_kernels.c"],
-    "variants": [{"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}]
+    "variants": [{"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}]
   },
   "numerical_capabilities": [{
     "contract_id": "gated_deltanet_pytorch_grouped_qk_fp32_state_bf16_output",
@@ -32,21 +33,21 @@
     "function": "gated_deltanet_pytorch_grouped_bf16_forward",
     "explicit_selector": true,
     "implementation": {"isa_dispatch": "compile_time", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
-    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "pairwise_tree", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "hierarchical_cascade", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
   }],
   "call_abi": {"version": 1, "params": [
-    {"name": "q", "source": "activation:q", "cast": "const float*"},
-    {"name": "k", "source": "activation:k", "cast": "const float*"},
-    {"name": "v", "source": "activation:v", "cast": "const float*"},
-    {"name": "g", "source": "activation:g", "cast": "const float*"},
-    {"name": "beta", "source": "activation:beta", "cast": "const float*"},
-    {"name": "state_in", "source": "activation:state_in", "cast": "const float*"},
-    {"name": "state_out", "source": "output:state_out", "cast": "float*"},
-    {"name": "out", "source": "output:out", "cast": "float*"},
+    {"name": "q", "source": "activation:q", "cast": "const float*", "ports": ["input:q"]},
+    {"name": "k", "source": "activation:k", "cast": "const float*", "ports": ["input:k"]},
+    {"name": "v", "source": "activation:v", "cast": "const float*", "ports": ["input:v"]},
+    {"name": "g", "source": "activation:g", "cast": "const float*", "ports": ["input:g"]},
+    {"name": "beta", "source": "activation:beta", "cast": "const float*", "ports": ["input:beta"]},
+    {"name": "state_in", "source": "activation:state_in", "cast": "const float*", "ports": ["input:state_in"]},
+    {"name": "state_out", "source": "output:state_out", "cast": "float*", "ports": ["output:state_out"]},
+    {"name": "out", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
     {"name": "num_heads", "source": "dim:ssm_time_step_rank"},
     {"name": "group_count", "source": "dim:ssm_group_count"},
     {"name": "state_dim", "source": "dim:recurrent_head_dim"},
     {"name": "norm_eps", "source": "dim:rms_eps"}
   ]},
-  "tests": {"parity": ["Real Qwen3.6-27B grouped Q/K buffers; no out-of-bounds head reads."]}
+  "tests": {"parity": ["Real Qwen3.6-27B grouped Q/K buffers; no out-of-bounds head reads.", "Qwen3.8 Flash Next H48/G16/D128 persistent state and BF16 output are bit-exact against PyTorch 2.13 CPU AVX-512."]}
 }

@@ -508,7 +508,8 @@
         {
           "target": "layer.{L}.post_attention_norm",
           "sources": [
-            "model.layers.{L}.post_self_attn_layernorm.weight"
+            "model.layers.{L}.post_self_attn_layernorm.weight",
+            "model.layers.{L}.post_attention_layernorm.weight"
           ],
           "dtype": "fp32"
         },
@@ -549,7 +550,8 @@
         {
           "target": "layer.{L}.post_ffn_norm",
           "sources": [
-            "model.layers.{L}.post_mlp_layernorm.weight"
+            "model.layers.{L}.post_mlp_layernorm.weight",
+            "model.layers.{L}.post_attention_layernorm.weight"
           ],
           "dtype": "fp32"
         },
@@ -908,6 +910,24 @@
         "model.visual.deepstack_merger_list.*.linear_fc2.weight"
       ],
       "notes": "Official safetensors patch_embed.proj.weight is [out,in,temporal,h,w]. CK maps it into v.patch_embd.weight and v.patch_embd.weight.1 with temporal split transforms."
+    },
+    "qwen4_exp": {
+      "template": "qwen4_exp",
+      "family": "qwen38_flash_next",
+      "aliases": [
+        "qwen4_exp",
+        "qwen4_exp_text",
+        "Qwen4ExpForConditionalGeneration"
+      ],
+      "status": "strict_text_bringup",
+      "config": {
+        "model": "qwen4_exp",
+        "arch": "qwen4_exp",
+        "model_type": "qwen4_exp",
+        "artifact_scope": "text_decoder",
+        "prefill_policy": "batched"
+      },
+      "notes": "Qwen3.8 Flash Next uses a dedicated circuit. The procedural source mapper preserves hyper-connections, PLE shards, QSA indexer tensors, DeltaNet state, and packed MoE experts; vision tensors are a separate artifact."
     }
   }
 }

@@ -134,6 +134,9 @@ class TestKvCacheAppendBounds(unittest.TestCase):
     def test_store_bf16(self):
         self._check_store("kv_cache_store_bf16", "bf16", _bf16_roundtrip, _readback_bf16)
 
+    def test_store_batch_fp32(self):
+        self._check_batch("kv_cache_store_batch_f32", "fp32", lambda x: x, _readback_fp32)
+
     def test_store_batch_f16(self):
         self._check_batch("kv_cache_store_batch_f16", "f16", _fp16_roundtrip, _readback_f16)
 

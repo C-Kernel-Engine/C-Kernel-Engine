@@ -1065,6 +1065,7 @@ int main(int argc, char ** argv) {
         {"qwen3vl_replay_step45", 59, 1024, 4096, true, false, false},
         {"qwen3vl_qkv_width", 16, 4096, 4096, true, false, false},
         {"qwen3vl_down_k_width", 16, 512, 11008, true, false, false},
+        {"qwen4_exp_recurrent_z_prefill", 40, 6144, 2560, true, false, false},
     };
     const case_spec * cases = quick ? quick_cases : full_cases;
     const size_t case_count = quick

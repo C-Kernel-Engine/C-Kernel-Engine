@@ -1,0 +1,71 @@
+{
+  "id": "hyper_stream_inject_f32",
+  "op": "hyper_stream_inject",
+  "operation_interface": "hyper_connection.stream_inject.fp32.v1",
+  "variant": "fp32_llama_order",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "hyper_input", "dtype": "fp32", "shape": ["R", "S*D"], "layout": "token_stream_hidden_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "block_output", "dtype": "fp32", "shape": ["R", "D"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "injection_weight", "dtype": "fp32", "shape": ["R", "S"], "layout": "token_stream_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["R", "S*D"], "layout": "token_stream_hidden_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "may_alias": ["input:hyper_input"]}
+  ],
+  "scratch": [],
+  "dims": ["R", "S", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "hyper_stream_inject_f32",
+    "c_declaration": "void hyper_stream_inject_f32(const float *hyper_input, const float *block_output, const float *injection_weight, float *output, int rows, int streams, int hidden_dim);",
+    "sources": ["src/kernels/hyper_connection_kernels.c"],
+    "variants": [{"name": "reference", "requires": [], "compile_flags": []}]
+  },
+  "numerical_capabilities": [{
+    "contract_id": "hyper_stream_inject_llama_fp32_output",
+    "status": "validated",
+    "phases": ["prefill", "decode"],
+    "function": "hyper_stream_inject_f32",
+    "explicit_selector": true,
+    "implementation": {
+      "isa_dispatch": "scalar",
+      "threading": {
+        "runtime": "serial",
+        "work_partition": ["independent_rows"],
+        "dispatch": ["inline"],
+        "reduction_order_effect": "none"
+      }
+    },
+    "arithmetic": {
+      "partial_accumulator": "fp32",
+      "merge_order": "none",
+      "deterministic": true,
+      "thread_count_changes_arithmetic_order": false,
+      "split_strategy": "independent_outputs"
+    }
+  }],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "hyper_input", "source": "activation:hyper_input", "cast": "const float*", "ports": ["input:hyper_input"]},
+      {"name": "block_output", "source": "activation:block_output", "cast": "const float*", "ports": ["input:block_output"]},
+      {"name": "injection_weight", "source": "activation:injection_weight", "cast": "const float*", "ports": ["input:injection_weight"]},
+      {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+      {"name": "rows", "source": "dim:seq_len"},
+      {"name": "streams", "source": "dim:hc_count"},
+      {"name": "hidden_dim", "source": "dim:embed_dim"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_hyper_connection_bf16.py"],
+    "parity": [{"kind": "llama.cpp_production_graph", "command": "make test-v8-qwen4-exp-contract", "tolerance": "5e-7"}]
+  }
+}

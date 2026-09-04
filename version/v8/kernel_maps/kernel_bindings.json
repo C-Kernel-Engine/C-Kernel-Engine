@@ -1480,54 +1480,6 @@
         }
       ]
     },
-    "kv_cache_batch_copy": {
-      "params": [
-        {
-          "name": "k_dst",
-          "source": "output:k_dst",
-          "cast": "void*"
-        },
-        {
-          "name": "k_src",
-          "source": "activation:k_src",
-          "cast": "const void*"
-        },
-        {
-          "name": "v_dst",
-          "source": "output:v_dst",
-          "cast": "void*"
-        },
-        {
-          "name": "v_src",
-          "source": "activation:v_src",
-          "cast": "const void*"
-        },
-        {
-          "name": "size",
-          "source": "dim:_kv_copy_bytes"
-        }
-      ],
-      "notes": "Emit two memcpy calls: K and V cache batch copy in prefill mode."
-    },
-    "memmove": {
-      "params": [
-        {
-          "name": "dst",
-          "source": "output:dst",
-          "cast": "void*"
-        },
-        {
-          "name": "src",
-          "source": "activation:src",
-          "cast": "const void*"
-        },
-        {
-          "name": "size",
-          "source": "param:_copy_size"
-        }
-      ],
-      "notes": "Memory move for overlapping buffers. Used for copy_last_logits in prefill mode."
-    },
     "transpose_inplace": {
       "params": [
         {

@@ -1,0 +1,58 @@
+{
+  "id":"ple_gate_conv_inject_fp16",
+  "op":"ple_gate_conv_inject",
+  "operation_interface":"ple.gate_dilated_conv_inject.fp16.v1",
+  "variant":"fp16_conv_storage",
+  "modes":{"inference":true,"training":false,"backward":false},
+  "quant":{"conv_weight":"fp16","activation":"bf16","output":"bf16"},
+  "inputs":[
+    {"name":"hyper_input","dtype":"fp32","shape":["R","S*D"],"layout":"token_stream_hidden_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"key_projected","dtype":"fp32","shape":["R","S*D"],"layout":"token_stream_hidden_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"value_projected","dtype":"fp32","shape":["R","D"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"conv_state_in","dtype":"fp32","shape":["C","S*D"],"layout":"history_channel_contiguous","access":"read","storage_class":"activation","consumption":"required"}
+  ],
+  "weights":[
+    {"name":"norm_key_weight","dtype":"fp32","shape":["S*D"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"norm_query_weight","dtype":"fp32","shape":["S*D"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"norm_conv_weight","dtype":"fp32","shape":["S*D"],"layout":"contiguous","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"conv_weight","dtype":"fp16","shape":["S*D","K"],"layout":"channel_kernel_contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "activations":[],
+  "outputs":[
+    {"name":"hyper_output","dtype":"fp32","shape":["R","S*D"],"layout":"token_stream_hidden_contiguous","access":"write","storage_class":"activation","consumption":"required"},
+    {"name":"conv_state_out","dtype":"fp32","shape":["C","S*D"],"layout":"history_channel_contiguous","access":"write","storage_class":"activation","consumption":"required"}
+  ],
+  "scratch":[
+    {"name":"key_norm_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"query_norm_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"gated_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"},
+    {"name":"conv_norm_scratch","dtype":"fp32","shape":["R","S*D"],"size_bytes":"R * S * H * 4","size_resolution":"required","alignment":64,"lifetime":"kernel_call","layout":"token_stream_hidden_contiguous","access":"read_write","storage_class":"scratch","consumption":"required"}
+  ],
+  "dims":["R","S","D","K","C"],
+  "params":["eps","dilation"],
+  "parallelization":{"supported":["row_channel"],"preferred":{"prefill":"row_channel","decode":"channel"},"strategies":[{"name":"row_channel","partition_dim":"R","param_style":"range","range":{"min_chunk":1}}]},
+  "impl":{"function":"qwen4_ple_gate_conv_inject_fp16","c_declaration":"void qwen4_ple_gate_conv_inject_fp16(const float *hyper_input, const float *key_projected, const float *value_projected, const float *norm_key_weight, const float *norm_query_weight, const float *norm_conv_weight, const uint16_t *conv_weight, float *hyper_output, float *key_norm_scratch, float *query_norm_scratch, float *gated_scratch, float *conv_norm_scratch, const float *conv_state_in, float *conv_state_out, int rows, int streams, int hidden_dim, int kernel_size, int dilation, float eps);","sources":["src/kernels/qwen4_exp_kernels.c"],"variants":[{"name":"reference","requires":[],"compile_flags":[]}]},
+  "call_abi":{"version":1,"params":[
+    {"name":"hyper_input","source":"activation:hyper_input","cast":"const float*","ports":["input:hyper_input"]},
+    {"name":"key_projected","source":"activation:key_projected","cast":"const float*","ports":["input:key_projected"]},
+    {"name":"value_projected","source":"activation:value_projected","cast":"const float*","ports":["input:value_projected"]},
+    {"name":"norm_key_weight","source":"weight_f:norm_key_weight","cast":"const float*","ports":["weight:norm_key_weight"]},
+    {"name":"norm_query_weight","source":"weight_f:norm_query_weight","cast":"const float*","ports":["weight:norm_query_weight"]},
+    {"name":"norm_conv_weight","source":"weight_f:norm_conv_weight","cast":"const float*","ports":["weight:norm_conv_weight"]},
+    {"name":"conv_weight","source":"weight:conv_weight","cast":"const uint16_t*","ports":["weight:conv_weight"]},
+    {"name":"hyper_output","source":"output:hyper_output","cast":"float*","ports":["output:hyper_output"]},
+    {"name":"key_norm_scratch","source":"scratch:key_norm_scratch","cast":"float*"},
+    {"name":"query_norm_scratch","source":"scratch:query_norm_scratch","cast":"float*"},
+    {"name":"gated_scratch","source":"scratch:gated_scratch","cast":"float*"},
+    {"name":"conv_norm_scratch","source":"scratch:conv_norm_scratch","cast":"float*"},
+    {"name":"conv_state_in","source":"activation:conv_state_in","cast":"const float*","ports":["input:conv_state_in"]},
+    {"name":"conv_state_out","source":"output:conv_state_out","cast":"float*","ports":["output:conv_state_out"]},
+    {"name":"rows","source":"runtime:seq_len"},
+    {"name":"streams","source":"dim:hc_count"},
+    {"name":"hidden_dim","source":"dim:embed_dim"},
+    {"name":"kernel_size","source":"dim:ple_conv_kernel_size"},
+    {"name":"dilation","source":"dim:ngram_size"},
+    {"name":"eps","source":"dim:rms_eps"}
+  ]},
+  "tests":{"unit":["unittest/test_qwen4_exp_ple_quantized.py"],"parity":[{"kind":"llama.cpp","command":".venv/bin/python unittest/test_qwen4_exp_ple_quantized.py","tolerance":"fp16_exact"}]}
+}

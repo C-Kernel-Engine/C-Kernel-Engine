@@ -1,0 +1,86 @@
+{
+  "id": "copy_last_logits",
+  "op": "copy_last_logits",
+  "operation_interface": "copy_last_logits.fp32.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "copy_last_logits.fp32.v1",
+    "phases": ["prefill"]
+  },
+  "variant": "fp32_overlap_safe",
+  "quant": {
+    "weight": null,
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "src",
+      "dtype": "fp32",
+      "shape": ["vocab_size"],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "dst",
+      "dtype": "fp32",
+      "shape": ["vocab_size"],
+      "layout": "contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": ["vocab_size"],
+  "params": [
+    {
+      "name": "_copy_size",
+      "type": "size_t",
+      "desc": "Number of logits bytes to copy"
+    }
+  ],
+  "impl": {
+    "function": "memmove",
+    "c_declaration": "void *memmove(void *dst, const void *src, size_t size);",
+    "sources": [],
+    "variants": [
+      {
+        "name": "libc",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "dst",
+        "source": "output:dst",
+        "cast": "void*",
+        "ports": ["output:dst"]
+      },
+      {
+        "name": "src",
+        "source": "activation:src",
+        "cast": "const void*",
+        "ports": ["input:src"]
+      },
+      {
+        "name": "size",
+        "source": "param:_copy_size"
+      }
+    ]
+  },
+  "tests": {
+    "contract": ["tests/test_v8_runtime_kernel_build_requirements.py"]
+  },
+  "notes": "Overlap-safe copy of the final prefill token logits to the runtime output position."
+}

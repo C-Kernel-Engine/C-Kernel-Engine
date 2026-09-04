@@ -142,6 +142,8 @@ def _map_functions() -> dict[str, list[dict[str, Any]]]:
         doc = json.loads(path.read_text(encoding="utf-8"))
         impl = doc.get("impl") or {}
         names = {impl.get("function")}
+        # Shared implementations retain the allocation debt of each mapped wrapper.
+        names.update(impl.get("allocation_helpers", []))
         names.update(
             capability.get("function")
             for capability in doc.get("numerical_capabilities", [])

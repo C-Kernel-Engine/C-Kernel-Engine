@@ -192,6 +192,7 @@ def build_report() -> Dict[str, Any]:
     interface_ready = [item for item in maps if item[1].get("operation_interface")]
     interface_abi_ready = [item for item in interface_ready if _has_complete_interface_abi(item[1])]
     legacy_interface_ready = [item for item in legacy if item[1].get("operation_interface")]
+    legacy_unready = [item for item in legacy if not item[1].get("operation_interface")]
     selection_managed = [item for item in maps if _validate_selection(item[1], item[0])]
     production_selected = [
         item for item in selection_managed
@@ -215,6 +216,7 @@ def build_report() -> Dict[str, Any]:
             "interface_abi_crossvalidated_maps": len(crossvalidated),
             "contract_pending_maps": len(pending),
             "legacy_maps": len(legacy),
+            "legacy_unready_maps": len(legacy_unready),
             "legacy_contract_shaped_maps": len(legacy_contract_shaped),
             "map_owned_call_abi": len(map_owned_abi),
             "legacy_call_abi": len(maps) - len(map_owned_abi),
@@ -256,8 +258,13 @@ def validate_ratchet(report: Dict[str, Any], baseline: Dict[str, Any]) -> None:
             "contract-pending map debt increased",
         ),
         (
-            counts["legacy_maps"] <= baseline["maximum_legacy_maps"],
-            "legacy map debt increased",
+            counts["legacy_unready_maps"]
+            <= baseline.get(
+                "maximum_legacy_unready_maps",
+                baseline["maximum_legacy_maps"]
+                - baseline.get("minimum_legacy_interface_ready_maps", 0),
+            ),
+            "legacy map interface debt increased",
         ),
         (
             selection["legacy_selection_if_statements"]

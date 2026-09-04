@@ -1,0 +1,41 @@
+{
+  "id":"moe_swiglu_shared_forward_q4k_q8_0_gated",
+  "op":"gated_shared_swiglu_expert_mlp",
+  "operation_interface":"moe_shared_swiglu.q4_k_gate_up.q8_0_down.fp32_scalar_gate.fp32_output.v1",
+  "selection":{"status":"production","priority":205,"equivalence_group":"q4_k_q8_k_shared_swiglu_q8_0_down_fp32_sigmoid_gate_then_routed_add","phases":["prefill","decode"]},
+  "physical_contract_version":1,
+  "contract_schema_version":1,
+  "numerical_contract":"q4_k_q8_k_shared_swiglu_q8_0_down_fp32_sigmoid_gate_then_routed_add",
+  "variant":"compact_q4_k_q8_0_gated",
+  "modes":{"inference":true,"training":false,"backward":false},
+  "quant":{"gate_weight":"q4_k","up_weight":"q4_k","down_weight":"q8_0","router_weight":"fp32","activation":"fp32_to_q8_k","output":"fp32"},
+  "inputs":[
+    {"name":"hidden","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"required"},
+    {"name":"routed","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"read","storage_class":"activation","consumption":"optional"}
+  ],
+  "weights":[
+    {"name":"moe_shared_gate","dtype":"q4_k","shape":["I","H"],"layout":"opaque_packed","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_up","dtype":"q4_k","shape":["I","H"],"layout":"opaque_packed","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_down","dtype":"q8_0","shape":["H","I"],"layout":"opaque_packed","access":"read","storage_class":"weight","consumption":"required"},
+    {"name":"moe_shared_router","dtype":"fp32","shape":[1,"H"],"layout":"feature_contiguous","access":"read","storage_class":"weight","consumption":"required"}
+  ],
+  "outputs":[{"name":"output","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}],
+  "scratch":[{"name":"workspace","dtype":"u8","alignment":64,"lifetime":"kernel_call","size_resolution":"required","size_bytes":"align64(4 * q8_k_row_bytes(H)) + 2 * align64(4 * I * 4) + align64(4 * q8_0_row_bytes(I)) + align64(4 * H * 4)","desc":"Four-row hidden Q8_K, gate/up, Q8_0 activation, and shared-output storage matching the prefill reduction boundary."}],
+  "dims":["R","H","I"],
+  "constraints":{"alignment":{"H":256,"I":256}},
+  "impl":{"function":"moe_swiglu_shared_forward_q4k_q8_0_gated_parallel_workspace","c_declaration":"int moe_swiglu_shared_forward_q4k_q8_0_gated_parallel_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, const float *shared_gate_input, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);","sources":["src/kernels/axpy_kernels.c","src/kernels/gemm_kernels_q4k_q8k.c","src/kernels/gemm_kernels_q4k_q8k_vnni.c","src/kernels/gemm_kernels_q8_0.c","src/kernels/gemm_kernels.c","src/kernels/swiglu_kernels.c","version/v8/src/ck_parallel_prefill_v8.c"]},
+  "implementation":{"isa_dispatch":"runtime","threading":{"runtime":"ck_threadpool","work_partition":["independent_rows","output_tiles"],"dispatch":["internal_threaded"],"reduction_order_effect":"contract_defined"}},
+  "call_abi":{"version":1,"params":[
+    {"name":"hidden","source":"activation:hidden","cast":"const float*","ports":["input:hidden"]},
+    {"name":"routed","source":"activation:routed","cast":"const float*","ports":["input:routed"]},
+    {"name":"shared_gate","source":"weight:moe_shared_gate","ports":["weight:moe_shared_gate"]},
+    {"name":"shared_up","source":"weight:moe_shared_up","ports":["weight:moe_shared_up"]},
+    {"name":"shared_down","source":"weight:moe_shared_down","ports":["weight:moe_shared_down"]},
+    {"name":"shared_gate_input","source":"weight:moe_shared_router","cast":"const float*","ports":["weight:moe_shared_router"]},
+    {"name":"output","source":"output:output","cast":"float*","ports":["output:output"]},
+    {"name":"rows","source":"dim:R"},{"name":"hidden_dim","source":"dim:H"},{"name":"intermediate_dim","source":"dim:I"},
+    {"name":"workspace","source":"scratch:workspace","cast":"void*"},{"name":"workspace_bytes","source":"scratch_size:workspace"}
+  ]},
+  "tests":{"unit":["unittest/test_moe_swiglu_q4k_q8_0.py"]},
+  "notes":"Mixed Q4_K gate/up and Q8_0 down gated shared SwiGLU provider."
+}

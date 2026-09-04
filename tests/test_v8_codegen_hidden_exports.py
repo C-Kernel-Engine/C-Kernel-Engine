@@ -224,6 +224,29 @@ class HiddenExportExtentTests(unittest.TestCase):
 
             self.assertIn(f'"{label}", (const float*)OUT, (1) * (48)', emitted)
 
+    def test_recurrent_output_projection_exports_rows_times_output_dim(self) -> None:
+        emitted = codegen.emit_op(
+            {
+                "op": "recurrent_out_proj",
+                "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
+                "layer": 1,
+                "args": [
+                    _arg("A", "A"),
+                    _arg("B", "B"),
+                    _arg("bias", "NULL"),
+                    _arg("C", "OUT"),
+                    _arg("M", "num_tokens"),
+                    _arg("N", "256"),
+                    _arg("K", "6144"),
+                ],
+            }
+        )
+
+        self.assertIn(
+            '"linear_attn_out", (const float*)OUT, (num_tokens) * (256)',
+            emitted,
+        )
+
     def test_qwen35_attention_exports_gate_and_pregate_boundaries(self) -> None:
         split = codegen.emit_op(
             {
@@ -256,6 +279,19 @@ class HiddenExportExtentTests(unittest.TestCase):
                 ],
             }
         )
+        qsa_attention = codegen.emit_op(
+            {
+                "op": "qsa_attention",
+                "function": "attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract",
+                "layer": 3,
+                "args": [
+                    _arg("output", "QSA_ATTN"),
+                    _arg("query_heads", "8"),
+                    _arg("rows", "1"),
+                    _arg("head_dim", "256"),
+                ],
+            }
+        )
         gated = codegen.emit_op(
             {
                 "op": "attn_gate_sigmoid_mul",
@@ -274,6 +310,10 @@ class HiddenExportExtentTests(unittest.TestCase):
 
         self.assertIn('"attn_gate", (const float*)GATE, (1) * (2048)', split)
         self.assertIn('"attn_pregate", (const float*)ATTN, (8) * (1) * (256)', attention)
+        self.assertIn(
+            '"attn_pregate", (const float*)QSA_ATTN, (8) * (1) * (256)',
+            qsa_attention,
+        )
         self.assertIn('"attn_out", (const float*)ATTN, (8) * (18) * (256)', gated)
 
     def test_mla_exports_each_semantic_attention_boundary(self) -> None:
@@ -408,7 +448,7 @@ class HiddenExportExtentTests(unittest.TestCase):
                 "function": "gemm_blocked_serial",
                 "layer": 1,
                 "args": [
-                    _arg("C", "ROUTER"),
+                    _arg("y", "ROUTER"),
                     _arg("M", "30"),
                     _arg("N", "64"),
                 ],
@@ -429,8 +469,8 @@ class HiddenExportExtentTests(unittest.TestCase):
         )
         routed = codegen.emit_op(
             {
-                "op": "moe_swiglu_expert_mlp",
-                "function": "moe_swiglu_expert_forward_bf16",
+                "op": "moe_swiglu_packed_expert_mlp",
+                "function": "moe_swiglu_packed_expert_forward_bf16",
                 "layer": 1,
                 "args": [
                     _arg("output", "ROUTED"),
@@ -459,6 +499,175 @@ class HiddenExportExtentTests(unittest.TestCase):
         self.assertIn('"moe_routing_weights", (const float*)ROUTING, (30) * (6)', selection)
         self.assertIn('"moe_routed_output", (const float*)ROUTED, (30) * (2048)', routed)
         self.assertIn('"moe_combined_output", (const float*)COMBINED, (30) * (2048)', combined)
+
+    def test_qwen4_composite_stream_boundaries_are_observable(self) -> None:
+        mix = codegen.emit_op(
+            {
+                "op": "hyper_mix_attn",
+                "function": "hyper_connection_mix_bf16",
+                "layer": 1,
+                "args": [
+                    _arg("mixed_output", "MIXED"),
+                    _arg("injection_output", "INJECT"),
+                    _arg("normalized_scratch", "NORMALIZED"),
+                    _arg("dynamic_scratch", "DYNAMIC"),
+                    _arg("mix_scratch", "GATE"),
+                    _arg("rows", "1"),
+                    _arg("streams", "4"),
+                    _arg("hidden_dim", "256"),
+                    _arg("dynamic_dim", "64"),
+                ],
+            }
+        )
+        inject = codegen.emit_op(
+            {
+                "op": "hyper_inject_mlp",
+                "function": "hyper_stream_inject_bf16",
+                "layer": 1,
+                "args": [
+                    _arg("output", "HYPER"),
+                    _arg("rows", "1"),
+                    _arg("streams", "4"),
+                    _arg("hidden_dim", "256"),
+                ],
+            }
+        )
+        ple = codegen.emit_op(
+            {
+                "op": "ple_gate_conv_inject",
+                "function": "qwen4_ple_gate_conv_inject_bf16",
+                "layer": 1,
+                "args": [
+                    _arg("hyper_output", "PLE_OUT"),
+                    _arg("key_norm_scratch", "KEY_NORM"),
+                    _arg("query_norm_scratch", "QUERY_NORM"),
+                    _arg("gated_scratch", "GATED"),
+                    _arg("conv_norm_scratch", "CONV_NORM"),
+                    _arg("rows", "1"),
+                    _arg("streams", "4"),
+                    _arg("hidden_dim", "256"),
+                ],
+            }
+        )
+
+        self.assertIn('"attn_hyper_norm", (const float*)NORMALIZED, (1) * (4) * (256)', mix)
+        self.assertIn('"attn_hyper_dynamic", (const float*)DYNAMIC, (1) * (64)', mix)
+        self.assertIn('"attn_hyper_gate", (const float*)GATE, (1) * (4) * (256)', mix)
+        self.assertIn('"attn_mixed_input", (const float*)MIXED, (1) * (256)', mix)
+        self.assertIn('"attn_injection_weights", (const float*)INJECT, (1) * (4)', mix)
+        self.assertIn('"layer_out", (const float*)HYPER, (1) * (4) * (256)', inject)
+        self.assertIn('"ple_key_normed", (const float*)KEY_NORM, (1) * (4) * (256)', ple)
+        self.assertIn('"ple_query_normed", (const float*)QUERY_NORM, (1) * (4) * (256)', ple)
+        self.assertIn('"ple_gated_value", (const float*)GATED, (1) * (4) * (256)', ple)
+        self.assertIn('"ple_conv_normed", (const float*)CONV_NORM, (1) * (4) * (256)', ple)
+        self.assertIn('"ple_layer_out", (const float*)PLE_OUT, (1) * (4) * (256)', ple)
+
+    def test_bf16_logits_export_covers_the_vocabulary(self) -> None:
+        gemv = codegen.emit_op(
+            {
+                "op": "logits",
+                "function": "gemv_bf16_parallel_dispatch",
+                "layer": -1,
+                "args": [
+                    _arg("output", "LOGITS"),
+                    _arg("weights", "WEIGHTS"),
+                    _arg("input", "HIDDEN"),
+                    _arg("M", "248320"),
+                    _arg("K", "256"),
+                ],
+            }
+        )
+        self.assertIn(
+            'ck_debug_export_hidden(model, -1, "logits", '
+            "(const float*)LOGITS, 248320)",
+            gemv,
+        )
+
+        gemm = codegen.emit_op(
+            {
+                "op": "logits",
+                "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
+                "layer": -1,
+                "args": [
+                    _arg("A", "HIDDEN"),
+                    _arg("B", "WEIGHTS"),
+                    _arg("bias", "NULL"),
+                    _arg("C", "LOGITS"),
+                    _arg("M", "1"),
+                    _arg("N", "248320"),
+                    _arg("K", "256"),
+                ],
+            }
+        )
+        self.assertIn(
+            'ck_debug_export_hidden(model, -1, "logits", '
+            "(const float*)LOGITS, 248320)",
+            gemm,
+        )
+
+    def test_bf16_projection_exports_use_provider_shape_convention(self) -> None:
+        gemv = codegen.emit_op(
+            {
+                "op": "v_proj",
+                "function": "gemv_bf16_parallel_dispatch",
+                "layer": 3,
+                "args": [
+                    _arg("output", "VALUE"),
+                    _arg("weights", "WEIGHTS"),
+                    _arg("input", "HIDDEN"),
+                    _arg("M", "512"),
+                    _arg("K", "256"),
+                ],
+            }
+        )
+        self.assertIn(
+            'ck_debug_export_hidden(model, 3, "v_proj", '
+            "(const float*)VALUE, 512)",
+            gemv,
+        )
+
+        gemm = codegen.emit_op(
+            {
+                "op": "v_proj",
+                "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
+                "layer": 3,
+                "args": [
+                    _arg("A", "HIDDEN"),
+                    _arg("B", "WEIGHTS"),
+                    _arg("bias", "NULL"),
+                    _arg("C", "VALUE"),
+                    _arg("M", "4"),
+                    _arg("N", "512"),
+                    _arg("K", "256"),
+                ],
+            }
+        )
+        self.assertIn(
+            'ck_debug_export_hidden(model, 3, "v_proj", '
+            "(const float*)VALUE, (4) * (512))",
+            gemm,
+        )
+
+    def test_qwen4_ple_embedding_export_uses_history_ngram_count(self) -> None:
+        emitted = codegen.emit_op(
+            {
+                "op": "ple_ngram_embed",
+                "function": "qwen4_ple_ngram_embed_bf16",
+                "layer": 1,
+                "args": [
+                    _arg("output", "PLE_EMBED"),
+                    _arg("rows", "2"),
+                    _arg("ngram_size", "3"),
+                    _arg("heads_per_ngram", "2"),
+                    _arg("head_dim", "64"),
+                ],
+            }
+        )
+
+        self.assertIn(
+            '"ple_embedding", (const float*)PLE_EMBED, (2) * (((3) - 1)) * (2) * (64)',
+            emitted,
+        )
 
     def test_farskip_combine_exports_both_persistent_streams(self) -> None:
         emitted = codegen.emit_op(

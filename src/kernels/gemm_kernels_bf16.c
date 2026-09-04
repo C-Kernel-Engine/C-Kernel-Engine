@@ -666,6 +666,57 @@ void gemv_bf16_parallel_dispatch(float *y,
         pool, active, 0, M, grain, ck_gemv_bf16_rows, &args);
 }
 
+static void gemv_bf16_bf16_storage_row_range(float *y,
+                                              const uint16_t *w,
+                                              const float *x,
+                                              int M, int K,
+                                              int row_begin, int row_end)
+{
+    gemv_bf16_row_range(y, w, x, M, K, row_begin, row_end);
+    for (int row = row_begin; row < row_end; ++row) {
+        y[row] = bf16_to_float(float_to_bf16(y[row]));
+    }
+}
+
+static void ck_gemv_bf16_storage_rows(int begin, int end, void *opaque)
+{
+    const ck_gemv_bf16_args_t *args = (const ck_gemv_bf16_args_t *)opaque;
+    gemv_bf16_bf16_storage_row_range(
+        args->y, args->w, args->x, args->M, args->K, begin, end);
+}
+
+void gemv_bf16_bf16_storage_parallel_dispatch(float *y,
+                                               const void *W,
+                                               const float *x,
+                                               int M, int K)
+{
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M < 2 ||
+        (size_t)M * (size_t)K <= 65536) {
+        gemv_bf16_bf16_storage_row_range(
+            y, (const uint16_t *)W, x, M, K, 0, M);
+        return;
+    }
+
+    ck_gemv_bf16_args_t args = {
+        .y = y, .w = (const uint16_t *)W, .x = x, .M = M, .K = K,
+    };
+    int active = ck_threadpool_n_threads(pool);
+    if (active > M) active = M;
+    int grain = M / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(
+        pool, active, 0, M, grain, ck_gemv_bf16_storage_rows, &args);
+}
+
+void gemv_bf16_bf16_storage(float *y,
+                            const void *W,
+                            const float *x,
+                            int M, int K)
+{
+    gemv_bf16_bf16_storage_parallel_dispatch(y, W, x, M, K);
+}
+
 void gemm_nt_bf16_row_range(const float *A,
                             const void *B,
                             const float *bias,
@@ -1314,18 +1365,16 @@ static dnnl_stream_t ck_pytorch_brgemm_stream;
 static int ck_pytorch_brgemm_init_status = -1;
 static pthread_once_t ck_pytorch_brgemm_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t ck_pytorch_brgemm_lock = PTHREAD_MUTEX_INITIALIZER;
+static const dnnl_version_t *ck_pytorch_brgemm_version;
 
 static void ck_pytorch_brgemm_init(void)
 {
     const dnnl_version_t *version = dnnl_version();
-    static const char expected_hash[] = "8d263e693366ef8db40acc569cc7d8edf644556d";
-    if (!version || version->major != 3 || version->minor != 7 || version->patch != 1 ||
-        version->cpu_runtime != DNNL_RUNTIME_OMP || !version->hash ||
-        strcmp(version->hash, expected_hash) != 0) {
+    if (!version || version->cpu_runtime != DNNL_RUNTIME_OMP || !version->hash) {
         fprintf(stderr,
                 "HARD KERNEL CONTRACT FAULT: PyTorch oneDNN BF16 BRGEMM requires "
-                "oneDNN 3.7.1 OpenMP at %s (found %d.%d.%d runtime=%u hash=%s)\n",
-                expected_hash,
+                "an identity-bearing OpenMP oneDNN runtime "
+                "(found %d.%d.%d runtime=%u hash=%s)\n",
                 version ? version->major : -1,
                 version ? version->minor : -1,
                 version ? version->patch : -1,
@@ -1333,6 +1382,7 @@ static void ck_pytorch_brgemm_init(void)
                 version && version->hash ? version->hash : "<missing>");
         return;
     }
+    ck_pytorch_brgemm_version = version;
     if (dnnl_engine_create(&ck_pytorch_brgemm_engine, dnnl_cpu, 0) != dnnl_success) return;
     if (dnnl_stream_create(&ck_pytorch_brgemm_stream, ck_pytorch_brgemm_engine,
                            dnnl_stream_default_flags) != dnnl_success) {
@@ -1349,19 +1399,42 @@ static void ck_pytorch_brgemm_fault(const char *message, int M, int N, int K)
                     "(M=%d N=%d K=%d)\n", message, M, N, K);
     abort();
 }
+
+static void ck_pytorch_brgemm_require_version(int major, int minor, int patch,
+                                               const char *source_hash,
+                                               const char *provider,
+                                               int M, int N, int K)
+{
+    pthread_once(&ck_pytorch_brgemm_once, ck_pytorch_brgemm_init);
+    if (ck_pytorch_brgemm_init_status != 0 || !ck_pytorch_brgemm_version) {
+        ck_pytorch_brgemm_fault("could not initialize oneDNN", M, N, K);
+    }
+    if (ck_pytorch_brgemm_version->major != major ||
+        ck_pytorch_brgemm_version->minor != minor ||
+        ck_pytorch_brgemm_version->patch != patch ||
+        strcmp(ck_pytorch_brgemm_version->hash, source_hash) != 0) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: %s requires oneDNN %d.%d.%d "
+                "OpenMP at %s (found %d.%d.%d runtime=%u hash=%s)\n",
+                provider, major, minor, patch, source_hash,
+                ck_pytorch_brgemm_version->major,
+                ck_pytorch_brgemm_version->minor,
+                ck_pytorch_brgemm_version->patch,
+                ck_pytorch_brgemm_version->cpu_runtime,
+                ck_pytorch_brgemm_version->hash);
+        abort();
+    }
+}
 #endif
 
-void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage(const float *A,
-                                                       const void *B,
-                                                       const float *bias,
-                                                       float *C,
-                                                       int M, int N, int K)
+static void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
+    const float *A, const void *B, const float *bias, float *C,
+    int M, int N, int K)
 {
 #ifdef USE_ONEDNN
     if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0) {
         ck_pytorch_brgemm_fault("received an invalid tensor contract", M, N, K);
     }
-    pthread_once(&ck_pytorch_brgemm_once, ck_pytorch_brgemm_init);
     if (ck_pytorch_brgemm_init_status != 0) {
         ck_pytorch_brgemm_fault("could not initialize oneDNN", M, N, K);
     }
@@ -1460,6 +1533,34 @@ cleanup:
 #endif
 }
 
+void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage(const float *A,
+                                                       const void *B,
+                                                       const float *bias,
+                                                       float *C,
+                                                       int M, int N, int K)
+{
+#ifdef USE_ONEDNN
+    ck_pytorch_brgemm_require_version(
+        3, 7, 1, "8d263e693366ef8db40acc569cc7d8edf644556d",
+        "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage", M, N, K);
+#endif
+    gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
+        A, B, bias, C, M, N, K);
+}
+
+void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage(
+    const float *A, const void *B, const float *bias, float *C,
+    int M, int N, int K)
+{
+#ifdef USE_ONEDNN
+    ck_pytorch_brgemm_require_version(
+        3, 12, 0, "80afa71049cd69a3df32adcccb623b12cd7baa22",
+        "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage", M, N, K);
+#endif
+    gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
+        A, B, bias, C, M, N, K);
+}
+
 void patch_projection_bf16_pytorch_onednn_conv3d_storage(
     const float *input, const void *weights, const float *bias, float *output,
     int batch, int out_channels, int in_channels, int temporal,
@@ -1477,6 +1578,10 @@ void patch_projection_bf16_pytorch_onednn_conv3d_storage(
         ck_pytorch_brgemm_fault("could not initialize oneDNN Conv3D", batch,
                                 out_channels, in_channels * temporal * patch_h * patch_w);
     }
+    ck_pytorch_brgemm_require_version(
+        3, 7, 1, "8d263e693366ef8db40acc569cc7d8edf644556d",
+        "patch_projection_bf16_pytorch_onednn_conv3d_storage",
+        batch, out_channels, in_channels * temporal * patch_h * patch_w);
 
     const size_t input_count = (size_t)batch * (size_t)in_channels *
         (size_t)temporal * (size_t)patch_h * (size_t)patch_w;

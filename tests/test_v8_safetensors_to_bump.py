@@ -130,6 +130,190 @@ def _require_torch_safetensors() -> tuple[object, object]:
     return torch, st
 
 
+def _qwen4_exp_tiny_config() -> dict[str, object]:
+    return {
+        "architectures": ["Qwen4ExpForConditionalGeneration"],
+        "model_type": "qwen4_exp",
+        "text_config": {
+            "model_type": "qwen4_exp_text",
+            "num_hidden_layers": 4,
+            "hidden_size": 256,
+            "num_attention_heads": 8,
+            "num_key_value_heads": 2,
+            "head_dim": 256,
+            "hc_count": 4,
+            "hc_lowrank": 320,
+            "num_experts": 8,
+            "num_experts_per_tok": 4,
+            "moe_intermediate_size": 256,
+            "shared_expert_intermediate_size": 256,
+            "linear_num_key_heads": 16,
+            "linear_num_value_heads": 48,
+            "linear_key_head_dim": 128,
+            "linear_value_head_dim": 128,
+            "linear_conv_kernel_dim": 4,
+            "indexer_budget": 2048,
+            "indexer_compress_ratio": 4,
+            "indexer_head_dim": 128,
+            "indexer_n_heads": 4,
+            "indexer_kv_heads": 1,
+            "ngram_size": 3,
+            "ngram_vocab_size_base": 2048,
+            "heads_per_ngram": 8,
+            "ple_embed_dim": 256,
+            "ple_conv_kernel_size": 4,
+            "split_ngram_parts": 2,
+            "ple_layer_ids": [2],
+            "partial_rotary_factor": 0.25,
+            "rope_parameters": {
+                "mrope_section": [11, 11, 10],
+                "mrope_interleaved": True,
+            },
+            "full_attention_interval": 4,
+            "norm_topk_prob": True,
+            "mtp_num_hidden_layers": 1,
+            "vocab_size": 248320,
+            "eos_token_id": 248044,
+            "max_position_embeddings": 262144,
+            "layer_types": [
+                "linear_attention",
+                "linear_attention",
+                "linear_attention",
+                "qwen_sparse_attention",
+            ],
+        },
+    }
+
+
+def _qwen4_exp_tiny_headers(converter) -> dict[str, object]:
+    names = {
+        "model.language_model.embed_tokens.weight",
+        "model.language_model.hyper_connection_mixer.hc_norm.weight",
+        "model.language_model.hyper_connection_mixer.input_mix_weight_down.weight",
+        "model.language_model.hyper_connection_mixer.input_mix_weight_up.weight",
+        "lm_head.weight",
+        "model.visual.patch_embed.proj.weight",
+    }
+    layer_types = [
+        "linear_attention", "linear_attention", "linear_attention", "qwen_sparse_attention"
+    ]
+    for layer, layer_type in enumerate(layer_types):
+        pfx = f"model.language_model.layers.{layer}"
+        for stage in ("attn", "mlp"):
+            hp = f"{pfx}.{stage}_hyper_connection"
+            names.update({
+                f"{hp}.hc_norm.weight",
+                f"{hp}.input_mix_weight_down.weight",
+                f"{hp}.input_mix_weight_up.weight",
+                f"{hp}.block_inject_weight.weight",
+            })
+        mlp = f"{pfx}.mlp"
+        names.update({
+            f"{mlp}.gate.weight",
+            f"{mlp}.experts.gate_up_proj",
+            f"{mlp}.experts.down_proj",
+            f"{mlp}.shared_expert.gate_proj.weight",
+            f"{mlp}.shared_expert.up_proj.weight",
+            f"{mlp}.shared_expert.down_proj.weight",
+            f"{mlp}.shared_expert_gate.weight",
+        })
+        if layer_type == "linear_attention":
+            attn = f"{pfx}.linear_attn"
+            names.update({
+                f"{attn}.in_proj_qkv.weight", f"{attn}.in_proj_z.weight",
+                f"{attn}.in_proj_a.weight", f"{attn}.in_proj_b.weight",
+                f"{attn}.conv1d.weight", f"{attn}.dt_bias", f"{attn}.A_log",
+                f"{attn}.norm.weight", f"{attn}.out_proj.weight",
+            })
+        else:
+            attn = f"{pfx}.self_attn"
+            names.update({
+                f"{attn}.q_proj.weight", f"{attn}.k_proj.weight",
+                f"{attn}.v_proj.weight", f"{attn}.o_proj.weight",
+                f"{attn}.q_norm.weight", f"{attn}.k_norm.weight",
+                f"{attn}.indexer.index_qk_proj.weight",
+                f"{attn}.indexer.q_layernorm.weight",
+                f"{attn}.indexer.k_layernorm.weight",
+            })
+    ple = "model.language_model.layers.1.ple"
+    names.update({
+        f"{ple}.key_proj.weight", f"{ple}.value_proj.weight",
+        f"{ple}.conv1d.weight", f"{ple}.norm_key.weight",
+        f"{ple}.norm_query.weight", f"{ple}.norm_conv.weight",
+        f"{ple}.ple_embedding.layer_multipliers",
+        f"{ple}.ple_embedding.ngram_heads_offsets",
+        f"{ple}.ple_embedding.ngram_heads_vocab_sizes",
+        f"{ple}.ple_embedding.ngram_embedding.shard_0.weight",
+        f"{ple}.ple_embedding.ngram_embedding.shard_1.weight",
+    })
+    return {
+        name: converter.HeaderTensor(
+            name=name,
+            dtype="I64" if name.endswith(("layer_multipliers", "ngram_heads_offsets", "ngram_heads_vocab_sizes")) else "BF16",
+            shape=[2, 16] if ".ngram_embedding.shard_" in name else [1],
+            shard=Path("model.safetensors"),
+        )
+        for name in names
+    }
+
+
+def test_qwen4_exp_import_contract_preserves_flash_next_topology(
+    tmp_path: Path, monkeypatch
+) -> None:
+    converter = _load_converter()
+    hf = _qwen4_exp_tiny_config()
+    assert converter._infer_arch(hf) == "qwen4_exp"
+
+    architecture = converter._qwen4_exp_architecture_metadata(hf)
+    assert architecture["layer_kinds"] == [
+        "recurrent", "recurrent", "recurrent", "sparse_attention"
+    ]
+    assert architecture["ple_layer_ids"] == [2]
+    assert architecture["ple_owner_layers"] == [1]
+    assert architecture["rotary_dim"] == 64
+    assert architecture["mrope_sections"] == [11, 11, 10, 0]
+
+    headers = _qwen4_exp_tiny_headers(converter)
+    refs = converter._qwen4_exp_text_refs(hf, headers)
+    by_name = {ref.ck_name: ref for ref in refs}
+    assert "layer.3.index_qk" in by_name
+    assert "layer.1.ple_ngram_embedding" in by_name
+    assert by_name["layer.1.ple_ngram_embedding"].shape == (4, 16)
+    assert len(by_name["layer.1.ple_ngram_embedding"].source_names) == 2
+    assert by_name["layer.1.ple_layer_multipliers"].dtype == "i64"
+    assert converter._ref_transform("qwen4_exp", by_name["layer.3.attn_q_norm"]) == "qwen4_exp_norm_plus_one"
+    for name in ("ple_norm_key", "ple_norm_query", "ple_norm_conv"):
+        assert converter._ref_transform("qwen4_exp", by_name[f"layer.1.{name}"]) == (
+            "qwen4_exp_norm_plus_one"
+        )
+    assert converter._ref_transform("qwen4_exp", by_name["layer.0.ssm_norm"]) is None
+
+    audit = converter._build_source_audit("qwen4_exp", headers, refs)
+    assert audit["verdict"] == "pass"
+    assert audit["unmapped_source_tensors"] == []
+    assert audit["ignored_source_tensors"] == [{
+        "source": "model.visual.patch_embed.proj.weight",
+        "reason": "vision_tower_not_in_text_artifact",
+    }]
+
+    checkpoint = tmp_path / "qwen4_exp"
+    checkpoint.mkdir()
+    (checkpoint / "config.json").write_text(json.dumps(hf), encoding="utf-8")
+    monkeypatch.setattr(converter, "_load_safetensors_headers", lambda _: headers)
+    config = converter._build_config(checkpoint, "qwen4_exp", None)
+    assert config["model"] == "qwen4_exp"
+    assert config["layer_attention_policy"] == ["none", "none", "none", "qsa_sparse"]
+    assert config["circuit_layer_kinds"] == [
+        "recurrent", "recurrent_ple", "recurrent", "sparse_attention"
+    ]
+    assert config["n_routed_experts"] == 8
+    assert config["experts_per_tok"] == 4
+    assert config["recurrent_qkv_weight_dtype"] == "bf16"
+    assert config["ple_eos_token_id"] == 248044
+    assert config["layer_execution_plan"][1]["ple"] is True
+    assert config["layer_execution_plan"][2]["ple"] is False
+
+
 
 
 def _write_tiny_bpe_tokenizer(checkpoint: Path, vocab_size: int) -> None:
@@ -1517,7 +1701,11 @@ def test_glm4_safetensors_to_bump_uses_declarative_source_map(tmp_path: Path) ->
 
     assert manifest["model"] == "glm4"
     assert manifest["template"]["name"] == "glm4"
-    assert manifest["template"]["contract"]["chat_contract"]["force_bos_text_if_tokenizer_add_bos_false"] == "[gMASK]"
+    assert (
+        manifest["template"]["contract"]["chat_contract"]
+        ["force_bos_text_if_tokenizer_add_bos_false"]
+        == "[gMASK]<sop>\n"
+    )
     assert manifest["has_attention_biases"] is True
     assert manifest["has_qk_norm"] is False
     assert manifest["config"]["rotary_dim"] == 2

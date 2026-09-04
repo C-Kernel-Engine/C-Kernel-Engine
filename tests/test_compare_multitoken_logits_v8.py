@@ -24,6 +24,41 @@ SPEC.loader.exec_module(runner)
 
 
 class MultitokenParityEOSContractTests(unittest.TestCase):
+    def test_trajectory_rejects_a_runtime_without_batched_prefill_before_init(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory) / "libmodel.so"
+            runtime.write_bytes(b"test runtime")
+            library = mock.Mock()
+            library.ck_model_get_capabilities.return_value = 0
+            with mock.patch.object(runner.ctypes, "CDLL", return_value=library):
+                with self.assertRaisesRegex(RuntimeError, "without generated prefill"):
+                    runner.load_ck_greedy_trajectory(
+                        model_dir=Path(directory), prompt_tokens=[7],
+                        max_new_tokens=1, runtime_so=runtime,
+                    )
+            library.ck_model_init.assert_not_called()
+
+    def test_exact_acceptance_rejects_matching_tokens_with_logit_drift(self):
+        report = {"pass": True, "steps": [{"step": 0, "top1_match": True, "bit_exact": False}]}
+        runner._apply_acceptance_contract(report, True)
+        self.assertFalse(report["pass"])
+        self.assertEqual(report["numerical_summary"]["first_nonexact_step"], 0)
+
+    def test_exact_acceptance_requires_nonempty_measured_evidence(self):
+        for steps in ([], [{"step": 0, "top1_match": True}]):
+            report = {"pass": True, "steps": steps}
+            runner._apply_acceptance_contract(report, True)
+            self.assertFalse(report["pass"])
+
+    def test_exact_acceptance_accepts_exact_rows_and_keeps_top1_mode_explicit(self):
+        report = {"pass": True, "steps": [{"step": 0, "bit_exact": True}]}
+        runner._apply_acceptance_contract(report, True)
+        self.assertTrue(report["pass"])
+        report = {"pass": True, "steps": [{"step": 0, "bit_exact": False}]}
+        runner._apply_acceptance_contract(report, False)
+        self.assertTrue(report["pass"])
+        self.assertEqual(report["acceptance_contract"], "greedy_top1")
+
     def _run(self, ck_logits: np.ndarray, llama_logits: np.ndarray) -> dict:
         with mock.patch.object(runner, "run_llama_logits", return_value={"logits": llama_logits}), \
              mock.patch.object(runner, "load_ck_logits", return_value={"logits": ck_logits}):

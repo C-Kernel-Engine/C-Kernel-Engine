@@ -347,7 +347,7 @@ class Cohere2MoeContractTests(unittest.TestCase):
         for op_name in ("out_proj", "mlp_gate_up", "mlp_down"):
             op = layer_zero[op_name]
             a_arg = next(arg for arg in op["args"] if arg["name"] == "A")
-            self.assertEqual(a_arg["buffer_ref"], "layer_input", op_name)
+            self.assertEqual(a_arg["buffer_ref"], "main_stream_q8", op_name)
 
         out_proj = layer_zero["out_proj"]
         k_arg = next(arg for arg in out_proj["args"] if arg["name"] == "K")
@@ -356,7 +356,7 @@ class Cohere2MoeContractTests(unittest.TestCase):
         quant_input = next(arg for arg in out_quant["args"] if arg["name"] == "x")
         quant_output = next(arg for arg in out_quant["args"] if arg["name"] == "y")
         self.assertEqual(quant_input["buffer_ref"], "attn_scratch")
-        self.assertEqual(quant_output["buffer_ref"], "layer_input")
+        self.assertEqual(quant_output["buffer_ref"], "main_stream_q8")
         self.assertNotEqual(quant_input["buffer_ref"], quant_output["buffer_ref"])
         quant_k = next(arg for arg in out_quant["args"] if arg["name"] == "k")
         self.assertEqual(quant_k["expr"], str(manifest["config"]["attn_out_dim"]))
@@ -365,7 +365,7 @@ class Cohere2MoeContractTests(unittest.TestCase):
         down_input = next(arg for arg in down_quant["args"] if arg["name"] == "x")
         down_output = next(arg for arg in down_quant["args"] if arg["name"] == "y")
         self.assertEqual(down_input["buffer_ref"], "mlp_scratch")
-        self.assertEqual(down_output["buffer_ref"], "layer_input")
+        self.assertEqual(down_output["buffer_ref"], "main_stream_q8")
         self.assertNotEqual(down_input["buffer_ref"], down_output["buffer_ref"])
 
     def test_decode_parallel_branch_has_a_live_attention_output(self) -> None:

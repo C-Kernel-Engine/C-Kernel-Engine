@@ -385,6 +385,27 @@ class TestCKChatRuntimeContract(unittest.TestCase):
 
         self.assertEqual(contract.get("prefill_policy"), "sequential_decode")
 
+    def test_runtime_contract_does_not_promote_model_demoted_prefill(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_model_prefill_") as td:
+            run_dir = Path(td)
+            (run_dir / "weights_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "config": {
+                            "prefill_policy": "sequential_decode",
+                            "recurrent_qkv_weight_dtype": "q6_k",
+                            "layer_kinds": ["recurrent", "sparse_attention"],
+                        },
+                        "template": {"flags": {"prefill_policy": "batched"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            contract = model._load_runtime_contract()
+
+        self.assertEqual(contract.get("prefill_policy"), "sequential_decode")
+
     def test_runtime_contract_allows_explicit_batched_prefill_certification(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_force_batched_") as td:
             run_dir = Path(td)
@@ -625,6 +646,50 @@ class TestCKChatRuntimeContract(unittest.TestCase):
             str(contract.get("assistant_generation_prefix_by_thinking_mode", {}).get("suppressed", "")),
         )
 
+    def test_qwen4_exp_chatml_preserves_declared_thinking_protocol(self) -> None:
+        circuit = json.loads(
+            (ROOT / "version/v8/circuits/qwen4_exp.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        contract = chat_contract.build_chat_contract(
+            template_data=circuit,
+            chat_template=(
+                "<|im_start|>user\n{{ prompt }}<|im_end|>\n"
+                "<|im_start|>assistant\n<think>\n"
+            ),
+            model_type="qwen4exp",
+            model_name="Qwen3.8-Flash-Next",
+        )
+
+        self.assertIsNotNone(contract)
+        self.assertEqual(contract.get("name"), "qwen4_exp")
+        self.assertEqual(contract.get("thinking_mode_default"), "visible")
+        self.assertEqual(
+            contract["assistant_generation_prefix_by_thinking_mode"]["visible"],
+            "<|im_start|>assistant\n<think>\n",
+        )
+
+        with tempfile.TemporaryDirectory(prefix="ck_chat_qwen4_exp_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps({"chat_contract": contract}), encoding="utf-8"
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            model._configure_chat_template("auto")
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<|im_start|>user\nHello<|im_end|>\n"
+                "<|im_start|>assistant\n<think>\n",
+            )
+
+            model.thinking_mode = "suppressed"
+            self.assertEqual(
+                model.format_chat_prompt("Hello"),
+                "<|im_start|>user\nHello<|im_end|>\n"
+                "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            )
+
     def test_explicit_sidecar_chat_contract_drives_runtime_formatting(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_sidecar_") as td:
             run_dir = Path(td)
@@ -668,6 +733,22 @@ class TestCKChatRuntimeContract(unittest.TestCase):
                 model.format_chat_prompt("Hello"),
                 "<bos><sys>SYS|<usr>PREFIX:Hello|<bot>",
             )
+
+    def test_conflicting_runtime_chat_contracts_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_contract_conflict_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps({"chat_contract": {"name": "qwen4_exp"}}),
+                encoding="utf-8",
+            )
+            (run_dir / "weights_manifest.json").write_text(
+                json.dumps({"chat_contract": {"name": "qwen"}}),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+
+            with self.assertRaisesRegex(RuntimeError, "conflicting chat contracts"):
+                model._load_chat_contract()
 
     def test_explicit_sidecar_chat_contract_blocks_raw_prompt_mode(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_sidecar_raw_") as td:
@@ -1176,6 +1257,27 @@ class TestCKChatRuntimeContract(unittest.TestCase):
         self.assertEqual(model.tokenizer.unk_id, 13)
         self.assertEqual(model.tokenizer.pad_id, 14)
         self.assertEqual(model.tokenizer.model_type, "gpt2")
+
+    def test_apply_python_tokenizer_contract_disables_file_batch_policies(self) -> None:
+        class FakeTokenizer:
+            def __init__(self):
+                self.padding_enabled = True
+                self.truncation_enabled = True
+
+            def no_padding(self):
+                self.padding_enabled = False
+
+            def no_truncation(self):
+                self.truncation_enabled = False
+
+        model = ck_chat.CKModel("/tmp/unused")
+        model.tokenizer = FakeTokenizer()
+
+        with mock.patch.object(model, "_load_tokenizer_contract", return_value={}):
+            model._apply_python_tokenizer_contract()
+
+        self.assertFalse(model.tokenizer.padding_enabled)
+        self.assertFalse(model.tokenizer.truncation_enabled)
 
     def test_load_python_tokenizer_prefers_exported_tokenizer_json_contract_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_tok_path_") as td:

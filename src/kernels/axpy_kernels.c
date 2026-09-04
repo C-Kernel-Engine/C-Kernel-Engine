@@ -63,6 +63,25 @@ void gemm_q4_k_q8_k_packed_vnni_x8_compact_order_rows4(
     int output_dim,
     int input_dim);
 size_t q4_k_packed_vnni_x8_block_size(void);
+size_t q4_k_packed_meta_x8_block_size(void);
+void pack_q4_k_to_packed_meta_x8(
+    const void *source, void *destination, int output_dim, int input_dim);
+void gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+    const void *input,
+    const void *packed_weight,
+    const float *bias,
+    float *output,
+    int rows,
+    int output_dim,
+    int input_dim);
+void gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+    const void *input,
+    const void *weight,
+    const float *bias,
+    float *output,
+    int rows,
+    int output_dim,
+    int input_dim);
 
 /* =============================================================================
  * AXPY: y = y + alpha * x
@@ -417,6 +436,11 @@ static inline float ck_moe_silu_f32(float x)
     return x * ck_moe_sigmoid_f32(x);
 }
 
+static inline float ck_moe_bf16_round(float x)
+{
+    return bf16_to_float(float_to_bf16(x));
+}
+
 static inline float ck_moe_dsilu_f32(float x)
 {
     const float sig = ck_moe_sigmoid_f32(x);
@@ -555,9 +579,149 @@ void moe_swiglu_expert_forward_bf16(const float *hidden,
         output, rows, hidden_dim, intermediate_dim, n_experts, top_k, 0, rows);
 }
 
+void moe_swiglu_packed_expert_forward_bf16(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const uint16_t *expert_gate_up,
+    const uint16_t *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k)
+{
+    if (!hidden || !indices || !routing_weights || !expert_gate_up ||
+        !expert_down || !output || rows <= 0 || hidden_dim <= 0 ||
+        intermediate_dim <= 0 || n_experts <= 0 || top_k <= 0) {
+        return;
+    }
+
+    float projection[2 * intermediate_dim];
+    float activation[intermediate_dim];
+    const size_t packed_expert_stride =
+        (size_t)2 * (size_t)intermediate_dim * (size_t)hidden_dim;
+    const size_t packed_up_offset =
+        (size_t)intermediate_dim * (size_t)hidden_dim;
+    for (int row = 0; row < rows; ++row) {
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        for (int hidden_col = 0; hidden_col < hidden_dim; ++hidden_col) {
+            y[hidden_col] = 0.0f;
+        }
+    }
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        for (int slot = 0; slot < top_k; ++slot) {
+                const size_t route_index =
+                    (size_t)row * (size_t)top_k + (size_t)slot;
+                const int expert = indices[route_index];
+                if (expert < 0 || expert >= n_experts) continue;
+                const uint16_t *packed =
+                    expert_gate_up + (size_t)expert * packed_expert_stride;
+                const uint16_t *gate = packed;
+                const uint16_t *up = packed + packed_up_offset;
+                for (int intermediate = 0; intermediate < intermediate_dim;
+                     ++intermediate) {
+                    float gate_value = 0.0f;
+                    float up_value = 0.0f;
+                    const size_t row_offset =
+                        (size_t)intermediate * (size_t)hidden_dim;
+                    for (int hidden_col = 0; hidden_col < hidden_dim;
+                         ++hidden_col) {
+                        const float input =
+                            ck_moe_bf16_round(x[hidden_col]);
+                        gate_value +=
+                            bf16_to_float(gate[row_offset + hidden_col]) * input;
+                        up_value +=
+                            bf16_to_float(up[row_offset + hidden_col]) * input;
+                    }
+                    projection[intermediate] =
+                        ck_moe_bf16_round(gate_value);
+                    projection[intermediate_dim + intermediate] =
+                        ck_moe_bf16_round(up_value);
+                }
+                swiglu_forward_pytorch_bf16_storage(
+                    projection, activation, 1, intermediate_dim);
+
+                const float route_weight =
+                    ck_moe_bf16_round(routing_weights[route_index]);
+                for (int hidden_col = 0; hidden_col < hidden_dim;
+                     ++hidden_col) {
+                    float value = 0.0f;
+                    for (int intermediate = 0;
+                         intermediate < intermediate_dim; ++intermediate) {
+                        value += bf16_to_float(expert_down[
+                            ck_moe_down_idx(expert, hidden_col, intermediate,
+                                            hidden_dim, intermediate_dim)]) *
+                                 activation[intermediate];
+                    }
+                    const float down_stored = ck_moe_bf16_round(value);
+                    const float weighted = ck_moe_bf16_round(
+                        down_stored * route_weight);
+                    y[hidden_col] += weighted;
+                }
+        }
+        for (int hidden_col = 0; hidden_col < hidden_dim; ++hidden_col) {
+            y[hidden_col] = ck_moe_bf16_round(y[hidden_col]);
+        }
+    }
+}
+
 static size_t ck_moe_align64(size_t value)
 {
     return (value + 63u) & ~(size_t)63u;
+}
+
+static size_t ck_moe_q4k_llama_projection_scratch_bytes(
+    int output_dim, int input_dim)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+    if (output_dim <= 0 || input_dim <= 0 || output_dim % 16 != 0 ||
+        input_dim % 256 != 0) {
+        return 0;
+    }
+    return ck_moe_align64(
+        (size_t)((output_dim + 7) / 8) * (size_t)(input_dim / 256) *
+        q4_k_packed_meta_x8_block_size());
+#else
+    (void)output_dim;
+    (void)input_dim;
+    return 0;
+#endif
+}
+
+static void ck_moe_q4k_llama_projection(
+    float *output,
+    const void *weights,
+    const void *input_q8,
+    int output_dim,
+    int input_dim,
+    void *scratch)
+{
+#if defined(__AVX512F__) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+    if (scratch && output_dim > 0 && input_dim > 0 &&
+        output_dim % 16 == 0 && input_dim % 256 == 0) {
+        pack_q4_k_to_packed_meta_x8(weights, scratch, output_dim, input_dim);
+        gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order(
+            input_q8, scratch, NULL, output, 1, output_dim, input_dim);
+        return;
+    }
+    gemv_q4_k_q8_k(output, weights, input_q8, output_dim, input_dim);
+#else
+    (void)scratch;
+    gemv_q4_k_q8_k(output, weights, input_q8, output_dim, input_dim);
+#endif
+}
+
+static void ck_moe_llama_weighted_accumulate(
+    float *output, const float *expert_output, float route_weight, int n)
+{
+    for (int i = 0; i < n; ++i) {
+        volatile float weighted = expert_output[i] * route_weight;
+        output[i] += weighted;
+    }
 }
 
 size_t moe_swiglu_expert_q4k_q5k_workspace_bytes(int hidden_dim,
@@ -572,6 +736,45 @@ size_t moe_swiglu_expert_q4k_q5k_workspace_bytes(int hidden_dim,
     bytes += ck_moe_align64(2u * (size_t)intermediate_dim * sizeof(float));
     bytes += ck_moe_align64(ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)intermediate_dim));
     bytes += ck_moe_align64((size_t)hidden_dim * sizeof(float));
+    return bytes;
+}
+
+size_t moe_swiglu_expert_q4k_q8_0_workspace_bytes(int hidden_dim,
+                                                   int intermediate_dim)
+{
+    if (hidden_dim <= 0 || intermediate_dim <= 0 ||
+        hidden_dim % 256 != 0 || intermediate_dim % QK8_0 != 0) {
+        return 0;
+    }
+
+    size_t bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    bytes += ck_moe_align64(2u * (size_t)intermediate_dim * sizeof(float));
+    bytes += ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim));
+    bytes += ck_moe_align64((size_t)hidden_dim * sizeof(float));
+    bytes += ck_moe_q4k_llama_projection_scratch_bytes(
+        intermediate_dim, hidden_dim);
+    return bytes;
+}
+
+size_t moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes(
+    int hidden_dim, int intermediate_dim)
+{
+    enum { batch_rows = 4 };
+    if (hidden_dim <= 0 || intermediate_dim <= 0 ||
+        hidden_dim % 256 != 0 || intermediate_dim % QK8_0 != 0) {
+        return 0;
+    }
+
+    size_t bytes = ck_moe_align64(
+        batch_rows * ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    bytes += 2u * ck_moe_align64(
+        batch_rows * (size_t)intermediate_dim * sizeof(float));
+    bytes += ck_moe_align64(
+        batch_rows * ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim));
+    bytes += ck_moe_align64(
+        batch_rows * (size_t)hidden_dim * sizeof(float));
     return bytes;
 }
 
@@ -735,6 +938,168 @@ int moe_swiglu_expert_forward_q4k_q6k_workspace(
             gemv_q6_k_q8_k(expert_output, down_base + down_offset, act_q8,
                            hidden_dim, intermediate_dim);
             axpy_f32(y, expert_output, routing_weights[route_index], hidden_dim);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q8_0_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q8_0_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !indices || !routing_weights || !expert_gate ||
+        !expert_up || !expert_down || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0 || n_experts <= 0 ||
+        top_k <= 0 || top_k > n_experts) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *expert_output = (float *)cursor;
+    cursor += ck_moe_align64((size_t)hidden_dim * sizeof(float));
+    void *projection_scratch = cursor;
+
+    const size_t gate_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t down_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q8_0, (size_t)intermediate_dim);
+    const uint8_t *gate_base = (const uint8_t *)expert_gate;
+    const uint8_t *up_base = (const uint8_t *)expert_up;
+    const uint8_t *down_base = (const uint8_t *)expert_down;
+
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        for (int slot = 0; slot < top_k; ++slot) {
+            const size_t route_index =
+                (size_t)row * (size_t)top_k + (size_t)slot;
+            const int expert = indices[route_index];
+            if (expert < 0 || expert >= n_experts) return -2;
+            const size_t gate_offset =
+                (size_t)expert * (size_t)intermediate_dim * gate_row_bytes;
+            const size_t down_offset =
+                (size_t)expert * (size_t)hidden_dim * down_row_bytes;
+            ck_moe_q4k_llama_projection(
+                gate_up, gate_base + gate_offset, hidden_q8,
+                intermediate_dim, hidden_dim, projection_scratch);
+            ck_moe_q4k_llama_projection(
+                gate_up + intermediate_dim, up_base + gate_offset, hidden_q8,
+                intermediate_dim, hidden_dim, projection_scratch);
+            swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+            quantize_row_q8_0(gate_up, act_q8, intermediate_dim);
+            gemv_q8_0_q8_0(expert_output, down_base + down_offset, act_q8,
+                           hidden_dim, intermediate_dim);
+            ck_moe_llama_weighted_accumulate(
+                y, expert_output, routing_weights[route_index], hidden_dim);
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_expert_forward_q4k_q5_0_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q8_0_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !indices || !routing_weights || !expert_gate ||
+        !expert_up || !expert_down || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0 || n_experts <= 0 ||
+        top_k <= 0 || top_k > n_experts) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t act_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *act_q8 = cursor;
+    cursor += act_q8_bytes;
+    float *expert_output = (float *)cursor;
+    cursor += ck_moe_align64((size_t)hidden_dim * sizeof(float));
+    void *projection_scratch = cursor;
+
+    const size_t gate_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q4_K, (size_t)hidden_dim);
+    const size_t down_row_bytes = ck_dtype_row_bytes(
+        CK_DT_Q5_0, (size_t)intermediate_dim);
+    const uint8_t *gate_base = (const uint8_t *)expert_gate;
+    const uint8_t *up_base = (const uint8_t *)expert_up;
+    const uint8_t *down_base = (const uint8_t *)expert_down;
+
+    memset(output, 0, (size_t)rows * (size_t)hidden_dim * sizeof(float));
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        for (int slot = 0; slot < top_k; ++slot) {
+            const size_t route_index =
+                (size_t)row * (size_t)top_k + (size_t)slot;
+            const int expert = indices[route_index];
+            if (expert < 0 || expert >= n_experts) return -2;
+            const size_t gate_offset =
+                (size_t)expert * (size_t)intermediate_dim * gate_row_bytes;
+            const size_t down_offset =
+                (size_t)expert * (size_t)hidden_dim * down_row_bytes;
+            ck_moe_q4k_llama_projection(
+                gate_up, gate_base + gate_offset, hidden_q8,
+                intermediate_dim, hidden_dim, projection_scratch);
+            ck_moe_q4k_llama_projection(
+                gate_up + intermediate_dim, up_base + gate_offset, hidden_q8,
+                intermediate_dim, hidden_dim, projection_scratch);
+            swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+            quantize_row_q8_0(gate_up, act_q8, intermediate_dim);
+            gemv_q5_0_q8_0(expert_output, down_base + down_offset, act_q8,
+                           hidden_dim, intermediate_dim);
+            ck_moe_llama_weighted_accumulate(
+                y, expert_output, routing_weights[route_index], hidden_dim);
         }
     }
     return 0;
@@ -1139,7 +1504,9 @@ int moe_swiglu_expert_forward_q4k_q5k_parallel_workspace(
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > rows) active = rows;
     if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
-    if (workspace_bytes < stride * (size_t)active) return -1;
+    const size_t workspace_workers = workspace_bytes / stride;
+    if (workspace_workers == 0) return -1;
+    if ((size_t)active > workspace_workers) active = (int)workspace_workers;
     if (active <= 1) {
         return moe_swiglu_expert_forward_q4k_q5k_workspace(
             hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
@@ -1178,6 +1545,8 @@ typedef int (*ck_moe_expert_workspace_fn)(
 typedef enum {
     CK_MOE_DOWN_Q4_K,
     CK_MOE_DOWN_Q6_K,
+    CK_MOE_DOWN_Q5_0,
+    CK_MOE_DOWN_Q8_0,
 } ck_moe_down_kind_t;
 
 typedef struct {
@@ -1258,8 +1627,12 @@ static void ck_moe_q4k_mixed_route_work(int ith, int nth, void *opaque)
 
     const size_t gate_up_bytes = ck_moe_align64(
         2u * (size_t)args->intermediate_dim * sizeof(float));
-    const size_t act_q8_bytes = ck_moe_align64(
-        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)args->intermediate_dim));
+    const int q8_0_activation =
+        args->down_kind == CK_MOE_DOWN_Q5_0 ||
+        args->down_kind == CK_MOE_DOWN_Q8_0;
+    const size_t act_q8_bytes = ck_moe_align64(ck_dtype_row_bytes(
+        q8_0_activation ? CK_DT_Q8_0 : CK_DT_Q8_K,
+        (size_t)args->intermediate_dim));
     uint8_t *cursor = args->workspace + (size_t)ith * args->workspace_stride;
     cursor += args->hidden_q8_bytes;
     float *gate_up = (float *)cursor;
@@ -1268,20 +1641,38 @@ static void ck_moe_q4k_mixed_route_work(int ith, int nth, void *opaque)
     cursor += act_q8_bytes;
     float *expert_output = (float *)cursor;
     args->expert_output[ith] = expert_output;
+    cursor += ck_moe_align64((size_t)args->hidden_dim * sizeof(float));
+    void *projection_scratch = cursor;
 
     const size_t gate_row_bytes = ck_dtype_row_bytes(
         CK_DT_Q4_K, (size_t)args->hidden_dim);
     const size_t gate_offset =
         (size_t)expert * (size_t)args->intermediate_dim * gate_row_bytes;
-    gemv_q4_k_q8_k(
-        gate_up, (const uint8_t *)args->expert_gate + gate_offset,
-        args->hidden_q8, args->intermediate_dim, args->hidden_dim);
-    gemv_q4_k_q8_k(
-        gate_up + args->intermediate_dim,
-        (const uint8_t *)args->expert_up + gate_offset,
-        args->hidden_q8, args->intermediate_dim, args->hidden_dim);
+    if (q8_0_activation) {
+        ck_moe_q4k_llama_projection(
+            gate_up, (const uint8_t *)args->expert_gate + gate_offset,
+            args->hidden_q8, args->intermediate_dim, args->hidden_dim,
+            projection_scratch);
+        ck_moe_q4k_llama_projection(
+            gate_up + args->intermediate_dim,
+            (const uint8_t *)args->expert_up + gate_offset,
+            args->hidden_q8, args->intermediate_dim, args->hidden_dim,
+            projection_scratch);
+    } else {
+        gemv_q4_k_q8_k(
+            gate_up, (const uint8_t *)args->expert_gate + gate_offset,
+            args->hidden_q8, args->intermediate_dim, args->hidden_dim);
+        gemv_q4_k_q8_k(
+            gate_up + args->intermediate_dim,
+            (const uint8_t *)args->expert_up + gate_offset,
+            args->hidden_q8, args->intermediate_dim, args->hidden_dim);
+    }
     swiglu_forward_ggml(gate_up, gate_up, 1, args->intermediate_dim);
-    quantize_row_q8_k(gate_up, act_q8, args->intermediate_dim);
+    if (q8_0_activation) {
+        quantize_row_q8_0(gate_up, act_q8, args->intermediate_dim);
+    } else {
+        quantize_row_q8_k(gate_up, act_q8, args->intermediate_dim);
+    }
 
     if (args->down_kind == CK_MOE_DOWN_Q6_K) {
         const size_t row_bytes = ck_dtype_row_bytes(
@@ -1289,6 +1680,22 @@ static void ck_moe_q4k_mixed_route_work(int ith, int nth, void *opaque)
         const size_t offset =
             (size_t)expert * (size_t)args->hidden_dim * row_bytes;
         gemv_q6_k_q8_k(
+            expert_output, (const uint8_t *)args->expert_down + offset,
+            act_q8, args->hidden_dim, args->intermediate_dim);
+    } else if (args->down_kind == CK_MOE_DOWN_Q5_0) {
+        const size_t row_bytes = ck_dtype_row_bytes(
+            CK_DT_Q5_0, (size_t)args->intermediate_dim);
+        const size_t offset =
+            (size_t)expert * (size_t)args->hidden_dim * row_bytes;
+        gemv_q5_0_q8_0(
+            expert_output, (const uint8_t *)args->expert_down + offset,
+            act_q8, args->hidden_dim, args->intermediate_dim);
+    } else if (args->down_kind == CK_MOE_DOWN_Q8_0) {
+        const size_t row_bytes = ck_dtype_row_bytes(
+            CK_DT_Q8_0, (size_t)args->intermediate_dim);
+        const size_t offset =
+            (size_t)expert * (size_t)args->hidden_dim * row_bytes;
+        gemv_q8_0_q8_0(
             expert_output, (const uint8_t *)args->expert_down + offset,
             act_q8, args->hidden_dim, args->intermediate_dim);
     } else {
@@ -1357,8 +1764,16 @@ static int ck_moe_q4k_mixed_route_parallel(
         if (args.status[slot] != 0 || !args.expert_output[slot]) {
             return args.status[slot] != 0 ? args.status[slot] : -1;
         }
-        axpy_f32(
-            output, args.expert_output[slot], routing_weights[slot], hidden_dim);
+        if (down_kind == CK_MOE_DOWN_Q5_0 ||
+            down_kind == CK_MOE_DOWN_Q8_0) {
+            ck_moe_llama_weighted_accumulate(
+                output, args.expert_output[slot], routing_weights[slot],
+                hidden_dim);
+        } else {
+            axpy_f32(
+                output, args.expert_output[slot], routing_weights[slot],
+                hidden_dim);
+        }
     }
     return 0;
 }
@@ -1381,8 +1796,11 @@ static int ck_moe_q4k_mixed_parallel_workspace(
     ck_moe_expert_workspace_fn serial_fn,
     ck_moe_down_kind_t down_kind)
 {
-    const size_t stride = moe_swiglu_expert_q4k_q5k_workspace_bytes(
-        hidden_dim, intermediate_dim);
+    const int q8_0_activation =
+        down_kind == CK_MOE_DOWN_Q5_0 || down_kind == CK_MOE_DOWN_Q8_0;
+    const size_t stride = q8_0_activation
+        ? moe_swiglu_expert_q4k_q8_0_workspace_bytes(hidden_dim, intermediate_dim)
+        : moe_swiglu_expert_q4k_q5k_workspace_bytes(hidden_dim, intermediate_dim);
     if (!hidden || !indices || !routing_weights || !expert_gate || !expert_up ||
         !expert_down || !output || !workspace || !serial_fn || stride == 0 ||
         rows <= 0 || n_experts <= 0 || top_k <= 0 || top_k > n_experts) {
@@ -1401,7 +1819,9 @@ static int ck_moe_q4k_mixed_parallel_workspace(
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > rows) active = rows;
     if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
-    if (workspace_bytes < stride * (size_t)active) return -1;
+    const size_t workspace_workers = workspace_bytes / stride;
+    if (workspace_workers == 0) return -1;
+    if ((size_t)active > workspace_workers) active = (int)workspace_workers;
     if (active <= 1) {
         return serial_fn(
             hidden, indices, routing_weights, expert_gate, expert_up,
@@ -1481,6 +1901,52 @@ int moe_swiglu_expert_forward_q4k_q4k_parallel_workspace(
         moe_swiglu_expert_forward_q4k_q4k_workspace, CK_MOE_DOWN_Q4_K);
 }
 
+int moe_swiglu_expert_forward_q4k_q8_0_parallel_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    return ck_moe_q4k_mixed_parallel_workspace(
+        hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
+        output, rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes,
+        moe_swiglu_expert_forward_q4k_q8_0_workspace, CK_MOE_DOWN_Q8_0);
+}
+
+int moe_swiglu_expert_forward_q4k_q5_0_parallel_workspace(
+    const float *hidden,
+    const int *indices,
+    const float *routing_weights,
+    const void *expert_gate,
+    const void *expert_up,
+    const void *expert_down,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int n_experts,
+    int top_k,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    return ck_moe_q4k_mixed_parallel_workspace(
+        hidden, indices, routing_weights, expert_gate, expert_up, expert_down,
+        output, rows, hidden_dim, intermediate_dim, n_experts, top_k,
+        workspace, workspace_bytes,
+        moe_swiglu_expert_forward_q4k_q5_0_workspace, CK_MOE_DOWN_Q5_0);
+}
+
 typedef int (*ck_moe_shared_workspace_fn)(
     const float *, const float *, const void *, const void *, const void *,
     float *, int, int, int, void *, size_t);
@@ -1551,7 +2017,9 @@ static int ck_moe_shared_q4k_parallel_workspace(
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > rows) active = rows;
     if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
-    if (workspace_bytes < stride * (size_t)active) return -1;
+    const size_t workspace_workers = workspace_bytes / stride;
+    if (workspace_workers == 0) return -1;
+    if ((size_t)active > workspace_workers) active = (int)workspace_workers;
     if (active <= 1) {
         return serial_fn(
             hidden, routed, shared_gate, shared_up, shared_down, output, rows,
@@ -2238,6 +2706,184 @@ int moe_swiglu_shared_forward_q8_0_gated_workspace(
     return 0;
 }
 
+int moe_swiglu_shared_forward_q4k_q8_0_gated_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !shared_gate || !shared_up || !shared_down ||
+        !shared_gate_input || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0) {
+        return -1;
+    }
+
+    enum { CK_SHARED_Q4K_BATCH_ROWS = 4 };
+    const size_t hidden_q8_stride =
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim);
+    const size_t activation_q8_stride =
+        ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim);
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        CK_SHARED_Q4K_BATCH_ROWS * hidden_q8_stride);
+    const size_t projection_bytes = ck_moe_align64(
+        CK_SHARED_Q4K_BATCH_ROWS * (size_t)intermediate_dim * sizeof(float));
+    const size_t activation_q8_bytes = ck_moe_align64(
+        CK_SHARED_Q4K_BATCH_ROWS * activation_q8_stride);
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_values = (float *)cursor;
+    cursor += projection_bytes;
+    float *up_values = (float *)cursor;
+    cursor += projection_bytes;
+    void *activation_q8 = cursor;
+    cursor += activation_q8_bytes;
+    float *shared_output = (float *)cursor;
+
+    /* llama.cpp evaluates Q4_K prefill projections in complete four-row GEMM
+     * groups, then uses the GEMV reduction order only for the residual tail.
+     * Keeping that boundary here matters: tiny per-row reduction differences
+     * can cross the following Q8_0 activation quantization threshold. */
+    for (int row0 = 0; row0 < rows; row0 += CK_SHARED_Q4K_BATCH_ROWS) {
+        int batch_rows = rows - row0;
+        if (batch_rows > CK_SHARED_Q4K_BATCH_ROWS) {
+            batch_rows = CK_SHARED_Q4K_BATCH_ROWS;
+        }
+        for (int local_row = 0; local_row < batch_rows; ++local_row) {
+            const float *x = hidden +
+                (size_t)(row0 + local_row) * (size_t)hidden_dim;
+            quantize_row_q8_k(
+                x,
+                (uint8_t *)hidden_q8 +
+                    (size_t)local_row * hidden_q8_stride,
+                hidden_dim);
+        }
+        gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+            hidden_q8, shared_gate, NULL, gate_values,
+            batch_rows, intermediate_dim, hidden_dim);
+        gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+            hidden_q8, shared_up, NULL, up_values,
+            batch_rows, intermediate_dim, hidden_dim);
+        swiglu_forward_ggml_split(
+            gate_values, up_values, gate_values, batch_rows, intermediate_dim);
+
+        for (int local_row = 0; local_row < batch_rows; ++local_row) {
+            const int row = row0 + local_row;
+            const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+            const float *routed_row = routed
+                ? routed + (size_t)row * (size_t)hidden_dim
+                : NULL;
+            float *output_row = output + (size_t)row * (size_t)hidden_dim;
+            void *activation_q8_row = (uint8_t *)activation_q8 +
+                (size_t)local_row * activation_q8_stride;
+            float *shared_output_row = shared_output +
+                (size_t)local_row * (size_t)hidden_dim;
+
+            quantize_row_q8_0(
+                gate_values + (size_t)local_row * (size_t)intermediate_dim,
+                activation_q8_row, intermediate_dim);
+            gemv_q8_0_q8_0(
+                shared_output_row, shared_down, activation_q8_row,
+                hidden_dim, intermediate_dim);
+
+            float gate_value = 0.0f;
+            gemm_nt_f32_llama_production(
+                x, shared_gate_input, NULL, &gate_value, 1, 1, hidden_dim);
+            const float gate_scale = 1.0f / (1.0f + expf(-gate_value));
+            for (int h = 0; h < hidden_dim; ++h) {
+                const float routed_value = routed_row ? routed_row[h] : 0.0f;
+                volatile float gated_shared =
+                    shared_output_row[h] * gate_scale;
+                output_row[h] = routed_value + gated_shared;
+            }
+        }
+    }
+    return 0;
+}
+
+int moe_swiglu_shared_forward_q4k_q5_0_gated_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    const size_t required = moe_swiglu_expert_q4k_q8_0_workspace_bytes(
+        hidden_dim, intermediate_dim);
+    if (!hidden || !shared_gate || !shared_up || !shared_down ||
+        !shared_gate_input || !output || !workspace || required == 0 ||
+        workspace_bytes < required || rows <= 0) {
+        return -1;
+    }
+
+    const size_t hidden_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_K, (size_t)hidden_dim));
+    const size_t gate_up_bytes = ck_moe_align64(
+        2u * (size_t)intermediate_dim * sizeof(float));
+    const size_t activation_q8_bytes = ck_moe_align64(
+        ck_dtype_row_bytes(CK_DT_Q8_0, (size_t)intermediate_dim));
+    uint8_t *cursor = (uint8_t *)workspace;
+    void *hidden_q8 = cursor;
+    cursor += hidden_q8_bytes;
+    float *gate_up = (float *)cursor;
+    cursor += gate_up_bytes;
+    void *activation_q8 = cursor;
+    cursor += activation_q8_bytes;
+    float *shared_output = (float *)cursor;
+
+    for (int row = 0; row < rows; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        const float *routed_row = routed
+            ? routed + (size_t)row * (size_t)hidden_dim
+            : NULL;
+        float *output_row = output + (size_t)row * (size_t)hidden_dim;
+
+        quantize_row_q8_k(x, hidden_q8, hidden_dim);
+        gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+            hidden_q8, shared_gate, NULL, gate_up,
+            1, intermediate_dim, hidden_dim);
+        gemm_nt_q4_k_q8_k_pairwise_split_min_parallel_dispatch(
+            hidden_q8, shared_up, NULL, gate_up + intermediate_dim,
+            1, intermediate_dim, hidden_dim);
+        swiglu_forward_ggml(gate_up, gate_up, 1, intermediate_dim);
+        quantize_row_q8_0(gate_up, activation_q8, intermediate_dim);
+        gemv_q5_0_q8_0(shared_output, shared_down, activation_q8,
+                       hidden_dim, intermediate_dim);
+
+        float gate_value = 0.0f;
+        gemm_nt_f32_llama_production(
+            x, shared_gate_input, NULL, &gate_value, 1, 1, hidden_dim);
+        const float gate_scale = 1.0f / (1.0f + expf(-gate_value));
+        for (int h = 0; h < hidden_dim; ++h) {
+            const float routed_value = routed_row ? routed_row[h] : 0.0f;
+            volatile float gated_shared = shared_output[h] * gate_scale;
+            output_row[h] = routed_value + gated_shared;
+        }
+    }
+    return 0;
+}
+
+typedef int (*ck_moe_shared_gated_workspace_fn)(
+    const float *, const float *, const void *, const void *, const void *,
+    const float *, float *, int, int, int, void *, size_t);
+
 typedef struct {
     const float *hidden;
     const float *routed;
@@ -2251,6 +2897,7 @@ typedef struct {
     int intermediate_dim;
     uint8_t *workspace;
     size_t workspace_stride;
+    ck_moe_shared_gated_workspace_fn serial_fn;
     int status[CK_THREADPOOL_MAX_THREADS];
 } ck_moe_shared_q8_0_parallel_args_t;
 
@@ -2265,7 +2912,7 @@ static void ck_moe_shared_q8_0_parallel_work(int ith, int nth, void *opaque)
         return;
     }
 
-    args->status[ith] = moe_swiglu_shared_forward_q8_0_gated_workspace(
+    args->status[ith] = args->serial_fn(
         args->hidden + (size_t)begin * (size_t)args->hidden_dim,
         args->routed
             ? args->routed + (size_t)begin * (size_t)args->hidden_dim
@@ -2282,7 +2929,7 @@ static void ck_moe_shared_q8_0_parallel_work(int ith, int nth, void *opaque)
         args->workspace_stride);
 }
 
-int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+static int ck_moe_shared_gated_parallel_workspace(
     const float *hidden,
     const float *routed,
     const void *shared_gate,
@@ -2294,12 +2941,13 @@ int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
     int hidden_dim,
     int intermediate_dim,
     void *workspace,
-    size_t workspace_bytes)
+    size_t workspace_bytes,
+    size_t stride,
+    ck_moe_shared_gated_workspace_fn serial_fn)
 {
-    const size_t stride = moe_swiglu_shared_q8_0_gated_workspace_bytes(
-        hidden_dim, intermediate_dim);
     if (!hidden || !shared_gate || !shared_up || !shared_down ||
-        !shared_gate_input || !output || !workspace || stride == 0 || rows <= 0) {
+        !shared_gate_input || !output || !workspace || !serial_fn ||
+        stride == 0 || rows <= 0) {
         return -1;
     }
 
@@ -2307,12 +2955,11 @@ int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
     int active = pool ? ck_threadpool_n_threads(pool) : 1;
     if (active > rows) active = rows;
     if (active > CK_THREADPOOL_MAX_THREADS) active = CK_THREADPOOL_MAX_THREADS;
-    if ((size_t)active > SIZE_MAX / stride ||
-        workspace_bytes < stride * (size_t)active) {
-        return -1;
-    }
+    const size_t workspace_workers = workspace_bytes / stride;
+    if (workspace_workers == 0) return -1;
+    if ((size_t)active > workspace_workers) active = (int)workspace_workers;
     if (active <= 1) {
-        return moe_swiglu_shared_forward_q8_0_gated_workspace(
+        return serial_fn(
             hidden, routed, shared_gate, shared_up, shared_down,
             shared_gate_input, output, rows, hidden_dim, intermediate_dim,
             workspace, stride);
@@ -2331,6 +2978,7 @@ int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
         .intermediate_dim = intermediate_dim,
         .workspace = (uint8_t *)workspace,
         .workspace_stride = stride,
+        .serial_fn = serial_fn,
         .status = {0},
     };
     ck_threadpool_dispatch_n(
@@ -2339,6 +2987,69 @@ int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
         if (args.status[ith] != 0) return args.status[ith];
     }
     return 0;
+}
+
+int moe_swiglu_shared_forward_q8_0_gated_parallel_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    return ck_moe_shared_gated_parallel_workspace(
+        hidden, routed, shared_gate, shared_up, shared_down, shared_gate_input,
+        output, rows, hidden_dim, intermediate_dim, workspace, workspace_bytes,
+        moe_swiglu_shared_q8_0_gated_workspace_bytes(hidden_dim, intermediate_dim),
+        moe_swiglu_shared_forward_q8_0_gated_workspace);
+}
+
+int moe_swiglu_shared_forward_q4k_q8_0_gated_parallel_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    /* Gate/up use the output-parallel pairwise Q4_K provider. Do not wrap
+     * that provider in a second dispatch on the same persistent pool. */
+    return moe_swiglu_shared_forward_q4k_q8_0_gated_workspace(
+        hidden, routed, shared_gate, shared_up, shared_down, shared_gate_input,
+        output, rows, hidden_dim, intermediate_dim, workspace, workspace_bytes);
+}
+
+int moe_swiglu_shared_forward_q4k_q5_0_gated_parallel_workspace(
+    const float *hidden,
+    const float *routed,
+    const void *shared_gate,
+    const void *shared_up,
+    const void *shared_down,
+    const float *shared_gate_input,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    void *workspace,
+    size_t workspace_bytes)
+{
+    /* See the Q8_0-down variant above: inner projection dispatch owns the
+     * pool so nested row dispatch would deadlock. */
+    return moe_swiglu_shared_forward_q4k_q5_0_gated_workspace(
+        hidden, routed, shared_gate, shared_up, shared_down, shared_gate_input,
+        output, rows, hidden_dim, intermediate_dim, workspace, workspace_bytes);
 }
 
 void moe_swiglu_expert_backward_f32(const float *d_output,
@@ -2540,6 +3251,101 @@ void moe_swiglu_shared_forward_bf16(const float *hidden,
     moe_swiglu_shared_forward_bf16_row_range(
         hidden, routed, shared_gate, shared_up, shared_down, output,
         rows, hidden_dim, intermediate_dim, 0, rows);
+}
+
+void moe_swiglu_shared_forward_bf16_gated_row_range(
+    const float *hidden,
+    const float *routed,
+    const uint16_t *shared_gate,
+    const uint16_t *shared_up,
+    const uint16_t *shared_down,
+    const uint16_t *shared_router,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim,
+    int row_begin,
+    int row_end)
+{
+    if (!hidden || !shared_gate || !shared_up || !shared_down ||
+        !shared_router || !output || rows <= 0 || hidden_dim <= 0 ||
+        intermediate_dim <= 0 || row_begin < 0 || row_begin >= row_end ||
+        row_end > rows) {
+        return;
+    }
+
+    float activation[intermediate_dim];
+    for (int row = row_begin; row < row_end; ++row) {
+        const float *x = hidden + (size_t)row * (size_t)hidden_dim;
+        const float *route = routed
+            ? routed + (size_t)row * (size_t)hidden_dim
+            : NULL;
+        float *y = output + (size_t)row * (size_t)hidden_dim;
+
+        for (int intermediate = 0; intermediate < intermediate_dim;
+             ++intermediate) {
+            float gate_sum = 0.0f;
+            float up_sum = 0.0f;
+            const size_t weight_base =
+                (size_t)intermediate * (size_t)hidden_dim;
+            for (int hidden_col = 0; hidden_col < hidden_dim; ++hidden_col) {
+                const float value = ck_moe_bf16_round(x[hidden_col]);
+                gate_sum += bf16_to_float(
+                    shared_gate[weight_base + (size_t)hidden_col]) * value;
+                up_sum += bf16_to_float(
+                    shared_up[weight_base + (size_t)hidden_col]) * value;
+            }
+            const float gate_value = ck_moe_bf16_round(gate_sum);
+            const float up_value = ck_moe_bf16_round(up_sum);
+            const float silu = ck_moe_bf16_round(
+                ck_moe_silu_f32(gate_value));
+            activation[intermediate] = ck_moe_bf16_round(silu * up_value);
+        }
+
+        float router_sum = 0.0f;
+        for (int hidden_col = 0; hidden_col < hidden_dim; ++hidden_col) {
+            router_sum += bf16_to_float(shared_router[hidden_col]) *
+                ck_moe_bf16_round(x[hidden_col]);
+        }
+        const float shared_scale = ck_moe_bf16_round(
+            ck_moe_sigmoid_f32(ck_moe_bf16_round(router_sum)));
+
+        for (int hidden_col = 0; hidden_col < hidden_dim; ++hidden_col) {
+            float down_sum = 0.0f;
+            const size_t weight_base =
+                (size_t)hidden_col * (size_t)intermediate_dim;
+            for (int intermediate = 0; intermediate < intermediate_dim;
+                 ++intermediate) {
+                down_sum += bf16_to_float(
+                    shared_down[weight_base + (size_t)intermediate]) *
+                    activation[intermediate];
+            }
+            const float shared = ck_moe_bf16_round(down_sum);
+            const float gated_shared = ck_moe_bf16_round(shared * shared_scale);
+            const float routed_value = route
+                ? ck_moe_bf16_round(route[hidden_col])
+                : 0.0f;
+            y[hidden_col] = ck_moe_bf16_round(routed_value + gated_shared);
+        }
+    }
+}
+
+void moe_swiglu_shared_forward_bf16_gated(
+    const float *hidden,
+    const float *routed,
+    const uint16_t *shared_gate,
+    const uint16_t *shared_up,
+    const uint16_t *shared_down,
+    const uint16_t *shared_router,
+    float *output,
+    int rows,
+    int hidden_dim,
+    int intermediate_dim)
+{
+    if (rows <= 0) return;
+    moe_swiglu_shared_forward_bf16_gated_row_range(
+        hidden, routed, shared_gate, shared_up, shared_down, shared_router,
+        output, rows, hidden_dim, intermediate_dim, 0, rows);
 }
 
 /*

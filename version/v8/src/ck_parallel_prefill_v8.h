@@ -65,6 +65,9 @@ void *ck_memcpy_parallel_dispatch(void *dst, const void *src, size_t size);
 void recurrent_norm_gate_llama_avx2_parallel_dispatch(
     const float *x, const float *gate, const float *weight, float *out,
     int rows, int num_heads, int head_dim, float eps);
+void recurrent_norm_sigmoid_gate_llama_avx2_parallel_dispatch(
+    const float *x, const float *gate, const float *weight, float *out,
+    int rows, int num_heads, int head_dim, float eps);
 
 /** Release lazily repacked Q4_K weights at model/test teardown. */
 void ck_q4k_packed_weight_cache_clear(void);

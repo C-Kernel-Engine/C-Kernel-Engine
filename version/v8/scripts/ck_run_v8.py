@@ -1431,6 +1431,106 @@ def step_codegen(output_dir: Path, ir_paths: dict[str, Path], *, force: bool = F
     return model_c_path
 
 
+def _selected_kernel_call_abis(
+    output_dir: Path,
+) -> dict[str, set[tuple[str, str, str]]]:
+    selected: dict[str, set[tuple[str, str, str]]] = {}
+
+    def visit(value: object, enclosing_op: str = "") -> None:
+        if isinstance(value, dict):
+            current_op = str(value.get("op", enclosing_op))
+            kernel_id = value.get("kernel_id")
+            if isinstance(kernel_id, str) and kernel_id:
+                owner = str(value.get("owner", ""))
+                source_file = str(value.get("source_file", ""))
+                selected.setdefault(kernel_id, set()).add(
+                    (current_op, owner, source_file)
+                )
+            for child in value.values():
+                visit(child, current_op)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child, enclosing_op)
+
+    for name in ("lowered_prefill_call.json", "lowered_decode_call.json"):
+        path = output_dir / name
+        if path.is_file():
+            visit(json.loads(path.read_text(encoding="utf-8")))
+    return selected
+
+
+def _selected_kernel_ids(output_dir: Path) -> set[str]:
+    return set(_selected_kernel_call_abis(output_dir))
+
+
+def _onednn_make_args() -> list[str]:
+    args = ["USE_ONEDNN=1", "USE_NATIVE="]
+    library_value = os.environ.get("CK_ONEDNN_LIBRARY", "").strip()
+    include_value = os.environ.get("CK_ONEDNN_INCLUDE", "").strip()
+    if not library_value:
+        return args
+
+    library = Path(library_value).expanduser().resolve()
+    if not library.is_file():
+        raise RuntimeError(f"CK_ONEDNN_LIBRARY does not identify a file: {library}")
+    args.append(f"DNNL_LIB={library.parent}")
+
+    if include_value:
+        args.append(f"DNNL_INC={include_value}")
+        return args
+
+    build_root = library.parent.parent
+    source_root = Path(str(build_root).removesuffix("-build") + "-src")
+    source_include = source_root / "include"
+    generated_include = build_root / "include"
+    if (source_include / "dnnl.h").is_file() and generated_include.is_dir():
+        args.append(f"DNNL_INC={source_include} -I{generated_include}")
+    return args
+
+
+def _selected_kernel_build_args(output_dir: Path) -> list[str]:
+    selected = _selected_kernel_call_abis(output_dir)
+    if not selected:
+        return []
+
+    registry = json.loads(KERNEL_REGISTRY_PATH.read_text(encoding="utf-8"))
+    kernels = {
+        entry.get("id"): entry
+        for entry in registry.get("kernels", [])
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+    }
+    compile_flags: set[str] = set()
+    for kernel_id, call_abis in selected.items():
+        entry = kernels.get(kernel_id)
+        if not entry:
+            details = ", ".join(
+                f"op={op or '<missing>'} owner={owner or '<missing>'} "
+                f"source={source or '<missing>'}"
+                for op, owner, source in sorted(call_abis)
+            )
+            raise RuntimeError(
+                f"Selected kernel is absent from the registry: {kernel_id} ({details})"
+            )
+        for variant in (entry.get("impl") or {}).get("variants", []):
+            if isinstance(variant, dict):
+                compile_flags.update(
+                    flag
+                    for flag in variant.get("compile_flags", [])
+                    if isinstance(flag, str)
+                )
+
+    supported = {"-DUSE_ONEDNN"}
+    unsupported = sorted(
+        flag for flag in compile_flags if flag.startswith("-D") and flag not in supported
+    )
+    if unsupported:
+        raise RuntimeError(
+            "Selected kernels require unsupported engine compile flags: "
+            + ", ".join(unsupported)
+        )
+    return _onednn_make_args() if "-DUSE_ONEDNN" in compile_flags else []
+
+
 def step_compile(
     model_c_path: Path,
     output_dir: Path,
@@ -1455,6 +1555,7 @@ def step_compile(
     omp_flag = "-qopenmp" if compiler == "icx" else "-fopenmp"
     extra_cflags = (os.environ.get("CK_V8_EXTRA_CFLAGS", "") or os.environ.get("CK_V7_EXTRA_CFLAGS", "")).strip()
     extra_ldflags = (os.environ.get("CK_V8_EXTRA_LDFLAGS", "") or os.environ.get("CK_V7_EXTRA_LDFLAGS", "")).strip()
+    kernel_build_args = _selected_kernel_build_args(output_dir)
     compile_inputs = {
         "schema": RUNTIME_BUNDLE_SCHEMA,
         "model_source": _file_identity(model_c_path),
@@ -1465,6 +1566,7 @@ def step_compile(
         "profile": bool(profile),
         "extra_cflags": extra_cflags,
         "extra_ldflags": extra_ldflags,
+        "kernel_build_args": kernel_build_args,
         "engine_sources": _tree_identity(
             [
                 PROJECT_ROOT / "Makefile",
@@ -1512,7 +1614,13 @@ def step_compile(
     # mtimes make the old libraries look newer. Force both runtime libraries
     # through Make so generated model code can never be paired with an engine
     # from another branch or worktree.
-    make_cmd = ["make", "-B", "--no-print-directory", f"CC={compiler}"]
+    make_cmd = [
+        "make",
+        "-B",
+        "--no-print-directory",
+        f"CC={compiler}",
+        *kernel_build_args,
+    ]
     run_cmd([*make_cmd, *targets], cwd=PROJECT_ROOT)
 
     include_dir = PROJECT_ROOT / "include"

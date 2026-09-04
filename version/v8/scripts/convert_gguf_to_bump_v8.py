@@ -2021,6 +2021,189 @@ def ggml_tensor_bytes(info: TensorInfo) -> int:
     return ggml_row_bytes(info.ggml_type, ne0) * n_rows
 
 
+def build_qwen4_exp_gguf_plan(
+    tensors: Dict[str, TensorInfo],
+    meta: Dict[str, object],
+) -> Dict[str, Any]:
+    """Build a fail-closed Qwen3.8 Flash Next conversion plan from its model map."""
+    arch = "qwen4exp"
+    contract = gguf_ck_arch_contract(arch)
+    if str(contract.get("conversion_family") or "") != "qwen4_exp":
+        raise GGUFError(f"{arch}: missing qwen4_exp conversion contract")
+
+    metadata_map = contract.get("metadata_map") or {}
+    tensor_map = contract.get("tensor_map") or {}
+    metadata_tensor_map = contract.get("metadata_tensor_map") or {}
+    if not all(isinstance(value, dict) for value in (metadata_map, tensor_map, metadata_tensor_map)):
+        raise GGUFError(f"{arch}: metadata and tensor maps must be objects")
+
+    def metadata_value(logical_name: str) -> object:
+        key = str(metadata_map.get(logical_name) or "")
+        if not key or key not in meta:
+            raise GGUFError(f"{arch}: missing metadata for {logical_name!r} ({key or 'undeclared'})")
+        return meta[key]
+
+    def positive_int(logical_name: str) -> int:
+        value = metadata_value(logical_name)
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or int(value) <= 0:
+            raise GGUFError(f"{arch}: {logical_name} must be a positive integer, got {value!r}")
+        return int(value)
+
+    num_layers = positive_int("block_count")
+    layer_kinds = gguf_ck_layer_kinds_from_map(arch, num_layers, meta)
+    if len(layer_kinds) != num_layers:
+        raise GGUFError(f"{arch}: layer kind plan does not cover all {num_layers} layers")
+
+    ple_layers_value = metadata_value("ple_layers")
+    if not isinstance(ple_layers_value, (list, tuple, np.ndarray)):
+        raise GGUFError(f"{arch}: ple_layers must be an integer array")
+    ple_layers = [int(value) for value in ple_layers_value]
+    if len(ple_layers) != 1 or not 0 <= ple_layers[0] < num_layers:
+        raise GGUFError(
+            f"{arch}: exactly one zero-based PLE owner layer is required, got {ple_layers}"
+        )
+    ple_owner = ple_layers[0]
+
+    required_global = contract.get("required_global_tensors") or []
+    required_common = contract.get("required_common_layer_suffixes") or []
+    required_ple = contract.get("required_ple_layer_suffixes") or []
+    for label, values in (
+        ("required_global_tensors", required_global),
+        ("required_common_layer_suffixes", required_common),
+        ("required_ple_layer_suffixes", required_ple),
+    ):
+        if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
+            raise GGUFError(f"{arch}: {label} must be a non-empty string list")
+
+    missing_global = sorted(set(required_global) - set(tensors))
+    if missing_global:
+        raise GGUFError(f"{arch}: missing required global tensors: {missing_global}")
+
+    for layer, expected_kind in enumerate(layer_kinds):
+        suffixes = _layer_tensor_suffixes(tensors, layer)
+        missing_common = sorted(set(required_common) - suffixes)
+        if missing_common:
+            raise GGUFError(
+                f"{arch}: layer {layer} is missing common tensors: {missing_common}"
+            )
+        actual_kind = gguf_ck_layer_kind_from_map(arch, suffixes, {
+            suffix: tensors[f"blk.{layer}.{suffix}"] for suffix in suffixes
+        })
+        if actual_kind != expected_kind:
+            raise GGUFError(
+                f"{arch}: layer {layer} metadata selects {expected_kind!r}, "
+                f"but its tensor contract is {actual_kind or 'unrecognized'!r}"
+            )
+        missing_ple = sorted(set(required_ple) - suffixes)
+        if layer == ple_owner and missing_ple:
+            raise GGUFError(f"{arch}: PLE owner layer {layer} is missing tensors: {missing_ple}")
+        unexpected_ple = sorted(set(required_ple) & suffixes)
+        if layer != ple_owner and unexpected_ple:
+            raise GGUFError(
+                f"{arch}: non-owner layer {layer} unexpectedly contains PLE tensors: {unexpected_ple}"
+            )
+
+    plan: list[Dict[str, Any]] = []
+    consumed: set[str] = set()
+
+    def add_source(src_name: str, dst_name: str, *, layer_kind: str = "") -> None:
+        info = tensors.get(src_name)
+        if info is None:
+            raise GGUFError(f"{arch}: conversion map references missing tensor {src_name!r}")
+        dtype_id = ck_dtype_from_ggml_type(info.ggml_type)
+        entry: Dict[str, Any] = {
+            "name": dst_name,
+            "dtype": ck_dtype_name(dtype_id).lower(),
+            "shape": [int(value) for value in reversed(info.dims)] if len(info.dims) > 1 else [int(info.ne0)],
+            "source_dtype": ggml_type_name(info.ggml_type),
+            "source_name": src_name,
+            "_info": info,
+            "_dtype_id": dtype_id,
+            "_size": ggml_tensor_bytes(info),
+        }
+        if len(info.dims) > 1:
+            entry["gguf_dims"] = [int(value) for value in info.dims]
+        if layer_kind:
+            entry["layer_kind"] = layer_kind
+        plan.append(entry)
+        consumed.add(src_name)
+
+    for src_pattern, dst_pattern in tensor_map.items():
+        src_pattern = str(src_pattern)
+        dst_pattern = str(dst_pattern)
+        if "{L}" in src_pattern:
+            continue
+        src_name = src_pattern
+        dst_name = dst_pattern.replace("{PLE}", str(ple_owner))
+        add_source(src_name, dst_name)
+
+    for layer, layer_kind in enumerate(layer_kinds):
+        for src_pattern, dst_pattern in tensor_map.items():
+            src_pattern = str(src_pattern)
+            if "{L}" not in src_pattern:
+                continue
+            src_name = src_pattern.replace("{L}", str(layer))
+            if src_name not in tensors:
+                continue
+            dst_name = str(dst_pattern).replace("{L}", str(layer))
+            add_source(src_name, dst_name, layer_kind=layer_kind)
+
+    ngram_size = positive_int("ple_ngram_size")
+    heads_per_ngram = positive_int("ple_heads_per_ngram")
+    ple_head_count = (ngram_size - 1) * heads_per_ngram
+    metadata_lengths = {
+        "ple_layer_multipliers": ngram_size,
+        "ple_head_offsets": ple_head_count,
+        "ple_head_vocab_sizes": ple_head_count,
+    }
+    for logical_name, expected_length in metadata_lengths.items():
+        values = metadata_value(logical_name)
+        if not isinstance(values, (list, tuple, np.ndarray)):
+            raise GGUFError(f"{arch}: {logical_name} must be an integer array")
+        int_values = [int(value) for value in values]
+        if len(int_values) != expected_length:
+            raise GGUFError(
+                f"{arch}: {logical_name} has {len(int_values)} values; expected {expected_length}"
+            )
+        dst_pattern = str(metadata_tensor_map.get(logical_name) or "")
+        if not dst_pattern:
+            raise GGUFError(f"{arch}: no destination declared for metadata tensor {logical_name!r}")
+        payload = struct.pack(f"<{len(int_values)}q", *int_values)
+        plan.append({
+            "name": dst_pattern.replace("{PLE}", str(ple_owner)),
+            "dtype": "i64",
+            "shape": [len(int_values)],
+            "source_dtype": "gguf_metadata_i64",
+            "source_name": str(metadata_map[logical_name]),
+            "_info": None,
+            # BUMP's legacy dtype table has no integer-width tag. The manifest
+            # remains authoritative for i64 metadata tensors, matching the
+            # safetensors converter's established representation.
+            "_dtype_id": CK_DT_FP32,
+            "_size": len(payload),
+            "_payload": payload,
+        })
+
+    unconsumed = sorted(set(tensors) - consumed)
+    if unconsumed:
+        raise GGUFError(
+            f"{arch}: conversion plan left {len(unconsumed)} source tensors unconsumed: {unconsumed[:16]}"
+        )
+    return {
+        "plan": plan,
+        "layer_kinds": layer_kinds,
+        "ple_owner_layer": ple_owner,
+        "coverage": {
+            "arch": arch,
+            "total_source_tensors": len(tensors),
+            "consumed_source_tensors": len(consumed),
+            "unconsumed_source_tensors": unconsumed,
+            "pass": not unconsumed,
+            "map_path": str(GGUF_CK_MAP_PATH),
+        },
+    }
+
+
 def read_vector_f32(f: BinaryIO, base: int, info: TensorInfo) -> np.ndarray:
     if len(info.dims) != 1:
         raise GGUFError(f"Expected 1D tensor for {info.name}, got dims={info.dims}")
@@ -2717,6 +2900,7 @@ def main() -> None:
     ap.add_argument("--inspect", action="store_true", help="Print GGUF metadata/tensor dtypes and exit (no conversion)")
     ap.add_argument("--inspect-layers", action="store_true", help="Show per-layer quant types for ALL layers (use with --inspect)")
     ap.add_argument("--list", action="store_true", help="Print every tensor name/type/shape and exit (no conversion)")
+    ap.add_argument("--plan-only", action="store_true", help="Validate the complete conversion plan without writing weights")
     ap.add_argument("--verify", action="store_true", help="After conversion, verify parity between GGUF and bump file")
     ap.add_argument("--manifest-out", help="Output weights manifest JSON path with tensor offsets")
     ap.add_argument("--extract-vocab", help="Extract tokenizer to JSON file (runs scripts/extract_gguf_vocab.py)")
@@ -2727,8 +2911,8 @@ def main() -> None:
                    help=f"BUMP format version (default: {BUMP_VERSION_V5}). V5 adds embedded metadata.")
     args = ap.parse_args()
 
-    if not args.output and not (args.inspect or args.list or args.extract_vocab):
-        ap.error("--output is required unless --inspect/--list/--extract-vocab is set")
+    if not args.output and not (args.inspect or args.list or args.plan_only or args.extract_vocab):
+        ap.error("--output is required unless --inspect/--list/--plan-only/--extract-vocab is set")
 
     # Support multiple architectures (llama, qwen2, mistral3, deepseek2, etc.)
     wanted_meta = {
@@ -4705,9 +4889,7 @@ def main() -> None:
         aligned_intermediate = intermediate
         aligned_context = align_up_elems(context_len, 4, CACHE_ALIGN)
 
-        required = {
-            "output_norm.weight",
-        }
+        required = set() if arch == "qwen4exp" else {"output_norm.weight"}
         for name in required:
             if name not in tensors:
                 raise GGUFError(f"Missing required tensor: {name}")
@@ -4769,6 +4951,378 @@ def main() -> None:
         token_dtype = weight_dtype(tok, "token_emb")
         output_dtype = weight_dtype(out_weight, "output.weight") if out_weight is not None else token_dtype
         needs_k_quant = token_dtype in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K) or output_dtype in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K)
+
+        if arch == "qwen4exp":
+            qwen4_plan = build_qwen4_exp_gguf_plan(tensors, meta)
+            if args.plan_only:
+                dtype_counts: Dict[str, int] = {}
+                for entry in qwen4_plan["plan"]:
+                    dtype = str(entry["dtype"])
+                    dtype_counts[dtype] = dtype_counts.get(dtype, 0) + 1
+                coverage = qwen4_plan["coverage"]
+                print(
+                    "[qwen4exp-plan] "
+                    f"source={coverage['consumed_source_tensors']}/{coverage['total_source_tensors']} "
+                    f"entries={len(qwen4_plan['plan'])} "
+                    f"layers={len(qwen4_plan['layer_kinds'])} "
+                    f"ple_owner={qwen4_plan['ple_owner_layer']} "
+                    f"dtypes={dict(sorted(dtype_counts.items()))}"
+                )
+                return
+
+            metadata_key_map = gguf_ck_arch_contract(arch)["metadata_map"]
+
+            def q4_meta(logical_name: str) -> object:
+                return meta[metadata_key_map[logical_name]]
+
+            compress_ratios = [int(value) for value in q4_meta("attention_compress_ratios")]
+            if len(compress_ratios) != int(num_layers):
+                raise GGUFError(
+                    f"qwen4exp attention_compress_ratios covers {len(compress_ratios)} layers; "
+                    f"expected {num_layers}"
+                )
+            ple_owner = int(qwen4_plan["ple_owner_layer"])
+            source_layer_kinds = list(qwen4_plan["layer_kinds"])
+            circuit_layer_kinds: list[str] = []
+            layer_attention_policy: list[str] = []
+            layer_kv_policy: list[str] = []
+            layer_recurrent_policy: list[str] = []
+            layer_state_policy: list[str] = []
+            layer_execution_plan: list[Dict[str, Any]] = []
+            for layer, source_kind in enumerate(source_layer_kinds):
+                if source_kind == "recurrent":
+                    circuit_kind = "recurrent"
+                    attention_policy = "none"
+                    kv_policy = "none"
+                    recurrent_policy = "deltanet"
+                    state_policy = "recurrent_state"
+                elif compress_ratios[layer] > 0:
+                    circuit_kind = "sparse_attention"
+                    attention_policy = "qsa_sparse"
+                    kv_policy = "produce"
+                    recurrent_policy = "none"
+                    state_policy = "kv_cache"
+                else:
+                    circuit_kind = "full_attention"
+                    attention_policy = "full_attention"
+                    kv_policy = "produce"
+                    recurrent_policy = "none"
+                    state_policy = "kv_cache"
+                if layer == ple_owner:
+                    circuit_kind += "_ple"
+                circuit_layer_kinds.append(circuit_kind)
+                layer_attention_policy.append(attention_policy)
+                layer_kv_policy.append(kv_policy)
+                layer_recurrent_policy.append(recurrent_policy)
+                layer_state_policy.append(state_policy)
+                layer_execution_plan.append({
+                    "layer": layer,
+                    "kind": source_kind,
+                    "ple": layer == ple_owner,
+                    "attention_policy": attention_policy,
+                    "kv_policy": kv_policy,
+                    "recurrent_policy": recurrent_policy,
+                    "state_policy": state_policy,
+                })
+
+            hc_count = int(q4_meta("hyper_connection_count"))
+            hc_lowrank = int(q4_meta("hyper_connection_low_rank"))
+            n_experts = int(q4_meta("expert_count"))
+            experts_per_tok = int(q4_meta("expert_used_count"))
+            moe_intermediate = int(q4_meta("expert_feed_forward_length"))
+            shared_intermediate = int(q4_meta("expert_shared_feed_forward_length"))
+            ssm_conv_kernel = int(q4_meta("ssm_conv_kernel"))
+            ssm_state_size = int(q4_meta("ssm_state_size"))
+            ssm_group_count = int(q4_meta("ssm_group_count"))
+            ssm_inner_size = int(q4_meta("ssm_inner_size"))
+            ssm_time_step_rank = int(q4_meta("ssm_time_step_rank"))
+            indexer_n_heads = int(q4_meta("indexer_head_count"))
+            indexer_head_dim = int(q4_meta("indexer_key_length"))
+            indexer_budget = int(q4_meta("indexer_top_k"))
+            ngram_size = int(q4_meta("ple_ngram_size"))
+            heads_per_ngram = int(q4_meta("ple_heads_per_ngram"))
+            ple_ngram_heads = (ngram_size - 1) * heads_per_ngram
+            ple_ngram_head_dim = int(q4_meta("ple_embedding_length"))
+            ple_embed_dim = ple_ngram_heads * ple_ngram_head_dim
+            ple_conv_kernel = int(q4_meta("ple_conv_kernel"))
+            nonzero_compress = [value for value in compress_ratios if value > 0]
+            indexer_compress_ratio = max(nonzero_compress) if nonzero_compress else 0
+            recurrent_qkv = tensors["blk.0.attn_qkv.weight"]
+
+            qwen4_config = _inject_runtime_config_defaults({
+                "model": "qwen4_exp",
+                "arch": "qwen4_exp",
+                "model_type": "qwen4_exp",
+                "source_arch": arch,
+                "artifact_scope": "text_decoder",
+                "embed_dim": int(embed_dim),
+                "hidden_size": int(embed_dim),
+                "attn_out_dim": int(num_heads * head_dim),
+                "attn_q_gate_proj_dim": int(2 * num_heads * head_dim),
+                "q_dim": int(num_heads * head_dim),
+                "k_dim": int(num_kv_heads * head_dim),
+                "v_dim": int(num_kv_heads * int(value_length_meta or head_dim)),
+                "num_layers": int(num_layers),
+                "num_hidden_layers": int(num_layers),
+                "num_heads": int(num_heads),
+                "num_attention_heads": int(num_heads),
+                "num_kv_heads": int(num_kv_heads),
+                "num_key_value_heads": int(num_kv_heads),
+                "head_dim": int(head_dim),
+                "intermediate_dim": int(moe_intermediate),
+                "intermediate_size": int(moe_intermediate),
+                "moe_intermediate_size": int(moe_intermediate),
+                "shared_expert_intermediate_size": int(shared_intermediate),
+                "n_routed_experts": int(n_experts),
+                "num_experts": int(n_experts),
+                "experts_per_tok": int(experts_per_tok),
+                "num_experts_per_tok": int(experts_per_tok),
+                "norm_topk_prob": True,
+                "vocab_size": int(vocab_size),
+                "max_seq_len": int(context_len),
+                "context_length": int(context_len),
+                "rope_theta": float(rope_theta),
+                "rotary_dim": int(rotary_dim),
+                "rope_layout": "multi_section_1d",
+                "rope_param_mode": "per_layer_direct",
+                "mrope_sections": [int(value) for value in q4_meta("rope_dimension_sections")],
+                "mrope_n_dims": int(rotary_dim),
+                "mrope_interleaved": True,
+                "rms_eps": float(rms_eps),
+                "rms_norm_eps": float(rms_eps),
+                "tie_word_embeddings": bool(tie_word_embeddings),
+                "has_qk_norm": True,
+                "has_attention_biases": False,
+                "hc_count": int(hc_count),
+                "hc_lowrank": int(hc_lowrank),
+                "layer_types": [
+                    "linear_attention" if kind == "recurrent" else "qwen_sparse_attention"
+                    for kind in source_layer_kinds
+                ],
+                "layer_kinds": source_layer_kinds,
+                "circuit_layer_kinds": circuit_layer_kinds,
+                "layer_attention_policy": layer_attention_policy,
+                "layer_kv_policy": layer_kv_policy,
+                "layer_recurrent_policy": layer_recurrent_policy,
+                "layer_state_policy": layer_state_policy,
+                "layer_execution_plan": layer_execution_plan,
+                "full_attention_interval": int(q4_meta("full_attention_interval")),
+                "linear_num_key_heads": int(ssm_group_count),
+                "linear_num_value_heads": int(ssm_time_step_rank),
+                "linear_key_head_dim": int(ssm_state_size),
+                "linear_value_head_dim": int(ssm_state_size),
+                "recurrent_num_heads": int(ssm_time_step_rank),
+                "recurrent_head_dim": int(ssm_state_size),
+                "ssm_conv_kernel": int(ssm_conv_kernel),
+                "ssm_conv_channels": int(2 * ssm_group_count * ssm_state_size + ssm_inner_size),
+                "ssm_group_count": int(ssm_group_count),
+                "ssm_inner_size": int(ssm_inner_size),
+                "ssm_state_size": int(ssm_state_size),
+                "ssm_time_step_rank": int(ssm_time_step_rank),
+                "recurrent_state_physical_layout": "head_key_value_contiguous",
+                "recurrent_qkv_weight_dtype": get_quant_type_name(recurrent_qkv.ggml_type),
+                "indexer_budget": int(indexer_budget),
+                "indexer_compress_ratio": int(indexer_compress_ratio),
+                "indexer_head_dim": int(indexer_head_dim),
+                "indexer_n_heads": int(indexer_n_heads),
+                "indexer_kv_heads": 1,
+                "qsa_block_topk": int(indexer_budget // indexer_compress_ratio) if indexer_compress_ratio else 0,
+                "qsa_index_proj_dim": int((indexer_n_heads + 1) * indexer_head_dim),
+                "qsa_selection_width": int(indexer_budget + indexer_compress_ratio - 1) if indexer_compress_ratio else int(context_len),
+                "attention_compress_ratios": compress_ratios,
+                "ngram_size": int(ngram_size),
+                "heads_per_ngram": int(heads_per_ngram),
+                "ple_ngram_heads": int(ple_ngram_heads),
+                "ple_ngram_head_dim": int(ple_ngram_head_dim),
+                "ple_embed_dim": int(ple_embed_dim),
+                "ple_conv_kernel_size": int(ple_conv_kernel),
+                "ple_token_history": int(ngram_size - 1),
+                "ple_conv_history": int((ple_conv_kernel - 1) * ngram_size),
+                "ple_layer_ids": [int(ple_owner + 1)],
+                "ple_owner_layers": [int(ple_owner)],
+                "ple_eos_token_id": int(q4_meta("ple_eos_token_id")),
+                "ple_image_token_id": int(q4_meta("ple_image_token_id")),
+                "moe_expert_weight_layout": "separate_gate_up",
+                "indexer_projection_layout": "separate_q_k",
+                "ple_embedding_weight_dtype": get_quant_type_name(tensors["per_layer_token_embd.weight"].ggml_type),
+                "ple_conv_weight_dtype": get_quant_type_name(tensors[f"blk.{ple_owner}.ple_conv1d.weight"].ggml_type),
+                "decode_kv_cache_dtype": "fp32",
+                "decoder_norm_storage_boundary": "fp32",
+                "decoder_residual_storage_boundary": "fp32",
+                "prefill_policy": "sequential_decode",
+            }, "qwen4_exp")
+            if tokenizer_contract:
+                qwen4_config["tokenizer_contract"] = tokenizer_contract
+            chat_template = meta.get("tokenizer.chat_template")
+            if isinstance(chat_template, str) and chat_template.strip():
+                qwen4_config["chat_template"] = chat_template
+
+            if template_data is None:
+                template_data = load_template_for_arch("qwen4_exp")
+            qwen4_config = apply_circuit_runtime_defaults(qwen4_config, template_data)
+            template_data = apply_model_contract_overrides(
+                template_data,
+                tie_word_embeddings=bool(tie_word_embeddings),
+                has_untied_output_weight=out_weight is not None,
+            )
+            if tokenizer_contract:
+                template_data = _apply_tokenizer_contract_overrides(
+                    template_data,
+                    str(tokenizer_contract.get("tokenizer_type") or "").strip().lower(),
+                )
+            special_tokens = _apply_special_tokenizer_overrides(
+                _extract_special_tokens_from_meta(meta), tokenizer_contract
+            )
+            chat_contract = _extract_chat_contract(template_data, meta)
+            if chat_contract:
+                qwen4_config["chat_contract"] = chat_contract
+
+            if args.config_out:
+                os.makedirs(os.path.dirname(args.config_out) or ".", exist_ok=True)
+                with open(args.config_out, "w", encoding="utf-8") as config_file:
+                    json.dump(qwen4_config, config_file, indent=2)
+                    config_file.write("\n")
+
+            quant_summary: Dict[str, Any] = {
+                "source": "gguf",
+                "token_emb": get_quant_type_name(tok.ggml_type),
+                "lm_head": get_quant_type_name(out_weight.ggml_type) if out_weight is not None else get_quant_type_name(tok.ggml_type),
+            }
+            for entry in qwen4_plan["plan"]:
+                name = str(entry["name"])
+                match = re.match(r"^(layer\.\d+)\.(.+)$", name)
+                if match:
+                    quant_summary.setdefault(match.group(1), {})[match.group(2)] = str(entry["dtype"])
+
+            dtype_table_bytes = bytes(int(entry["_dtype_id"]) for entry in qwen4_plan["plan"])
+            os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+            manifest_entries: list[Dict[str, Any]] = []
+            current_offset = DATA_START
+
+            def record_qwen4_entry(entry: Dict[str, Any]) -> None:
+                nonlocal current_offset
+                public_entry = {key: value for key, value in entry.items() if not key.startswith("_")}
+                public_entry["file_offset"] = current_offset
+                public_entry["size"] = int(entry["_size"])
+                manifest_entries.append(public_entry)
+                current_offset += int(entry["_size"])
+
+            with open(args.output, "w+b") as out_f:
+                out_f.write(b"\x00" * HEADER_SIZE)
+                out_f.write(b"\x00" * EXT_METADATA_SIZE)
+                writer = HashingWriter(out_f)
+                current_offset += 4 + len(dtype_table_bytes)
+                writer.write(struct.pack("<I", len(dtype_table_bytes)))
+                writer.write(dtype_table_bytes)
+                for entry in qwen4_plan["plan"]:
+                    record_qwen4_entry(entry)
+                    payload = entry.get("_payload")
+                    if payload is not None:
+                        writer.write(payload)
+                        continue
+                    info = entry.get("_info")
+                    if info is None:
+                        raise GGUFError(f"qwen4exp entry {entry['name']} has no source")
+                    copy_bytes_stream(f, data_start + info.offset, int(entry["_size"]), writer)
+
+                if vocab_offsets is not None and vocab_strings is not None:
+                    tokenizer_payloads: list[tuple[str, str, bytes]] = [
+                        ("vocab_offsets", "i32", struct.pack(f"<{len(vocab_offsets)}i", *vocab_offsets)),
+                        ("vocab_strings", "u8", vocab_strings),
+                    ]
+                    if vocab_scores is not None:
+                        tokenizer_payloads.append(("vocab_scores", "f32", struct.pack(f"<{len(vocab_scores)}f", *vocab_scores)))
+                    if vocab_types is not None:
+                        tokenizer_payloads.append(("vocab_types", "u8", struct.pack(f"<{len(vocab_types)}B", *vocab_types)))
+                    merges_payload = struct.pack(f"<{len(vocab_merges)}i", *vocab_merges) if vocab_merges else b""
+                    tokenizer_payloads.append(("vocab_merges", "i32", merges_payload))
+                    for name, dtype, payload in tokenizer_payloads:
+                        manifest_entries.append({
+                            "name": name,
+                            "dtype": dtype,
+                            "file_offset": current_offset,
+                            "size": len(payload),
+                            "source_name": "gguf_tokenizer_metadata",
+                        })
+                        current_offset += len(payload)
+                        writer.write(payload)
+
+                checksum = writer.digest()
+                manifest_dict = {
+                    "version": 5,
+                    "model": "qwen4_exp",
+                    "bump_layout": {
+                        "header_size": HEADER_SIZE,
+                        "ext_metadata_size": EXT_METADATA_SIZE,
+                        "data_start": DATA_START,
+                    },
+                    "config": qwen4_config,
+                    "template": template_data,
+                    "quant_summary": quant_summary,
+                    "special_tokens": special_tokens if special_tokens else None,
+                    "tokenizer_contract": tokenizer_contract if tokenizer_contract else None,
+                    "chat_contract": chat_contract if chat_contract else None,
+                    "num_layers": int(num_layers),
+                    "embed_dim": int(embed_dim),
+                    "num_heads": int(num_heads),
+                    "num_kv_heads": int(num_kv_heads),
+                    "head_dim": int(head_dim),
+                    "intermediate_size": int(moe_intermediate),
+                    "vocab_size": int(vocab_size),
+                    "context_length": int(context_len),
+                    "has_attention_biases": False,
+                    "has_qk_norm": True,
+                    "num_merges": int(num_merges),
+                    "total_vocab_bytes": int(total_vocab_bytes),
+                    "source_tensor_coverage": qwen4_plan["coverage"],
+                    "entries": manifest_entries,
+                }
+                if args.bump_version == BUMP_VERSION_V5:
+                    metadata = build_bumpv5_metadata(
+                        template_data=template_data,
+                        config=qwen4_config,
+                        quant_summary=quant_summary,
+                        manifest_hash=calculate_manifest_hash(manifest_dict),
+                        created_by=f"convert_gguf_to_bump_v8.py v{BUMP_VERSION_V5}",
+                    )
+                    metadata["template_hash"] = calculate_template_hash(template_data)
+                    metadata_bytes = _canonical_json_bytes(metadata)
+                    metadata_hash = calculate_metadata_hash(metadata)
+                else:
+                    metadata_bytes = b""
+                    metadata_hash = b""
+
+                out_f.flush()
+                out_f.seek(0, os.SEEK_SET)
+                out_f.write(b"BUMPWGT5" if args.bump_version == BUMP_VERSION_V5 else b"BUMPWGT4")
+                out_f.write(struct.pack("<I", int(args.bump_version)))
+                out_f.write(struct.pack("<I", 1))
+                for value in (
+                    num_layers, vocab_size, embed_dim, moe_intermediate,
+                    context_len, num_heads, num_kv_heads, head_dim,
+                ):
+                    out_f.write(struct.pack("<I", int(value)))
+                for value in (aligned_embed_dim, aligned_head_dim, moe_intermediate, aligned_context):
+                    out_f.write(struct.pack("<Q", int(value)))
+                out_f.write(struct.pack("<I", int(num_merges)))
+                out_f.write(struct.pack("<I", int(total_vocab_bytes)))
+                out_f.write(checksum)
+                if args.bump_version == BUMP_VERSION_V5:
+                    out_f.seek(0, os.SEEK_END)
+                    out_f.write(metadata_bytes)
+                    write_bumpv5_footer(out_f, len(metadata_bytes), metadata_hash)
+
+            if args.manifest_out:
+                os.makedirs(os.path.dirname(args.manifest_out) or ".", exist_ok=True)
+                with open(args.manifest_out, "w", encoding="utf-8") as manifest_file:
+                    json.dump(manifest_dict, manifest_file, indent=2)
+                    manifest_file.write("\n")
+            print(
+                f"[gguf->bump] version={args.bump_version} arch=qwen4_exp layers={num_layers} "
+                f"hidden={embed_dim} heads={num_heads}/{num_kv_heads} experts={n_experts}/{experts_per_tok} "
+                f"vocab={vocab_size} ctx={context_len} -> {args.output}"
+            )
+            return
 
         if arch in {"qwen35", "qwen35moe"}:
             def _qwen35_shape(info: TensorInfo) -> list[int]:
