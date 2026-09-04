@@ -2087,7 +2087,7 @@ attn = softmax(Q K^T / sqrt(d_k)) V
 
 <div class="card card-green">
     <h3 style="margin-top: 0;">Current CK Coverage</h3>
-    <p>Nightly validates the log-Mel frontend against PyTorch, the audio transformer primitives (resampling, FFT, Conv1D, GELU, layout transforms, self-attention, cross-attention), and the portable <code>v8</code> audio circuit/codegen regression. Full model-and-WAV transcription is an opt-in artifact gate: the JFK sample matches the Hugging Face reference token for token. See <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram and evidence, the <a href="v8-runbook.html">v8 Runbook</a> for the operator commands, and the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> for the per-kernel math of every stage above.</p>
+    <p>Nightly validates the log-Mel frontend against PyTorch, the audio transformer primitives (resampling, FFT, Conv1D, GELU, layout transforms, self-attention, cross-attention), and the portable <code>v8</code> audio circuit/codegen regression. Scheduled CI also runs a non-skippable five-minute MIC1 corpus through the declared Whisper size matrix, checking transcript quality, complete window progress, bounded timestamps, and generated-runtime evidence. The short JFK artifact gate remains the token-exact oracle. See <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram and evidence, the <a href="v8-runbook.html">v8 Runbook</a> for the operator commands, and the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> for the per-kernel math of every stage above.</p>
 </div>
 
 <hr>
@@ -2428,7 +2428,7 @@ With weight tying: W = E  (same matrix!)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-31</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-04</p>
             </div>
         </div>
     </footer>

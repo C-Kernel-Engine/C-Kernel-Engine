@@ -1570,6 +1570,18 @@ ask what you can do for your country.</code></pre>
 
 <h2>Regression Gates</h2>
 
+<pre><code>make test-whisper-long-audio-nightly \
+  V8_WHISPER_LONG_AUDIO_MODEL=base</code></pre>
+
+<p>
+  The scheduled five-minute corpus runs the same published MIC1 recording
+  through Tiny, Base, Small, Medium, and Large-v3. Each model must build and
+  consume the full recording with monotonic bounded timestamps, forward
+  window progress, sufficient transcript content, and its declared word-error
+  ceiling. Missing models, missing reports, and unavailable artifacts fail the
+  model job rather than becoming skips.
+</p>
+
 <pre><code>make test-audio
 
 CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
@@ -1591,11 +1603,12 @@ make test-whisper-pytorch-e2e-auto</code></pre>
 
 <p>
   Nightly publishes separate PyTorch-backed audio frontend and transformer
-  primitive rows, plus a portable v8 audio circuit/codegen row. Together
-  they fix the Slaney filter identity, forced decoder prefix, projection
-  extents, phase-specific attention providers, and generated call
-  arguments. The artifact gate requires the full reference token sequence
-  and EOS without tolerance relaxation.
+  primitive rows, plus a portable v8 audio circuit/codegen row. Scheduled
+  runs additionally execute the non-skippable five-minute model matrix.
+  Together they fix the Slaney filter identity, forced decoder prefix,
+  projection extents, phase-specific attention providers, generated call
+  arguments, long-audio window progress, and timestamp bounds. The short JFK
+  artifact gate remains available for exact token and EOS comparison.
 </p>
     </main>
 
@@ -1827,7 +1840,7 @@ make test-whisper-pytorch-e2e-auto</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-31</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-04</p>
             </div>
         </div>
     </footer>

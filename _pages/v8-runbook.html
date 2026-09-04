@@ -801,11 +801,10 @@ jq -r '.decoder.transcript_text' \
 </div>
 
 <div class="card">
-    <h3 style="margin-top: 0;">Opt-In E2E Artifact Gate</h3>
+    <h3 style="margin-top: 0;">Short Exact And Long Nightly Gates</h3>
     <p>
         Nightly already covers the log-Mel frontend against PyTorch, the audio transformer primitives, and the portable v8 audio
-        circuit/codegen regression. Full model-and-WAV transcription stays an opt-in artifact test, because CI runners do not
-        carry the generated Whisper artifacts:
+        circuit/codegen regression. The short JFK token-exact check remains available for local artifact directories:
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -819,11 +818,19 @@ make test-whisper-e2e-auto</pre>
     <p style="margin-bottom: 0;">
         The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.
     </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make test-whisper-long-audio-nightly \
+  V8_WHISPER_LONG_AUDIO_MODEL=base</pre>
+    </div>
     <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
-        Certified scope: Whisper Tiny, Base, and Small FP32 on the public JFK
-        fixture, plus a 33-second Base long-form fixture. Longer recordings use
-        sequential windows; arbitrary recordings are functional rather than
-        corpus-certified.
+        Scheduled CI uses a published five-minute MIC1 recording and a
+        human-corrected transcript across Tiny, Base, Small, Medium, and
+        Large-v3. Every model job is fail-closed: it verifies the lossless
+        fixture, builds generated runtimes, requires complete sequential-window
+        progress, bounds timestamps to the recording, and enforces its WER
+        ceiling. The same manifest can add future audio model families without
+        changing the evidence contract.
     </p>
 </div>
 
