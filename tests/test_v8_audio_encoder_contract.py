@@ -463,6 +463,15 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertEqual(attention_args["query"]["buffer_ref"], "q_scratch")
         self.assertEqual(attention_args["key"]["buffer_ref"], "k_scratch")
         self.assertEqual(attention_args["value"]["buffer_ref"], "v_scratch")
+        for projection in ("q_proj", "k_proj", "v_proj"):
+            with self.subTest(projection_input=projection):
+                call = next(
+                    row
+                    for row in call_ir["operations"]
+                    if row.get("op") == projection and row.get("layer") == 0
+                )
+                call_args = {arg["name"]: arg for arg in call["args"]}
+                self.assertEqual(call_args["A"]["buffer_ref"], "embedded_input")
 
     def test_encoder_only_codegen_contract_is_capability_scoped_and_fail_closed(self):
         manifest = _make_audio_encoder_manifest()

@@ -12429,12 +12429,21 @@ def generate_ir_lower_2(
                 # paths.  Older code forced FP32 kernels back to embedded_input,
                 # bypassing block_rmsnorm for safetensors models.
                 dataflow_name = {"A": "x", "x_q8": "x", "x": "x", "input": "x"}.get(input_name, input_name)
-                planned = get_planned_buffer(op_id, "inputs", dataflow_name)
-                if not planned:
+                exact_slot = _get_declared_dataflow_slot(
+                    ir_op, "inputs", input_name, input_name
+                )
+                if exact_slot:
                     planned = get_planned_buffer(op_id, "inputs", input_name)
+                    declared_slot = exact_slot
+                else:
+                    planned = get_planned_buffer(op_id, "inputs", dataflow_name)
+                    if not planned:
+                        planned = get_planned_buffer(op_id, "inputs", input_name)
+                    declared_slot = _get_declared_dataflow_slot(
+                        ir_op, "inputs", dataflow_name, input_name
+                    )
                 if planned:
                     planner_buf = planned.get("buffer", default_buf_name)
-                    declared_slot = _get_declared_dataflow_slot(ir_op, "inputs", dataflow_name, input_name)
                     buf_name = _resolve_logical_buffer_name(
                         planner_buf,
                         declared_slot or input_info.get("slot"),
