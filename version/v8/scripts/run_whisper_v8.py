@@ -378,6 +378,19 @@ def timestamp_seek_consumed_frames(
     return consumed if 0 < consumed <= window_frames else window_frames
 
 
+def consume_timestamp_sized_tail(
+    consumed_end_frame: int,
+    source_frames: int,
+    source_rate: int,
+) -> int:
+    """Avoid a padded 30-second decode for at most 100 ms of trailing audio."""
+    timestamp_tail_frames = max(1, source_rate // 10)
+    remaining_frames = source_frames - consumed_end_frame
+    if 0 < remaining_frames <= timestamp_tail_frames:
+        return source_frames
+    return consumed_end_frame
+
+
 def apply_timestamp_logits_contract(
     logits: np.ndarray,
     generated_tokens: list[int],
@@ -697,6 +710,12 @@ def _run_parent(args: argparse.Namespace) -> int:
                 source_frames,
                 window_start_frame + consumed_frames,
             )
+            if args.timestamps:
+                consumed_end_frame = consume_timestamp_sized_tail(
+                    consumed_end_frame,
+                    source_frames,
+                    source_rate,
+                )
             end_seconds = consumed_end_frame / source_rate
             segment = {
                 "index": len(segments),

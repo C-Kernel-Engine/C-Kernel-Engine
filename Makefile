@@ -1351,6 +1351,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_long_audio_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_benchmark.py
 	$(MAKE) --no-print-directory test-whisper-pytorch-e2e-auto
 
@@ -1368,6 +1369,16 @@ test-native-session-v8: $(BUILD_DIR)/libckernel_engine.so ck-cli-v8 ck-session-v
 test-whisper-e2e-auto:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py \
 		-k exact_transcript
+
+.PHONY: test-whisper-long-audio-nightly
+V8_WHISPER_LONG_AUDIO_MODEL ?= base
+V8_WHISPER_LONG_AUDIO_WORK_ROOT ?= $(HOME)/.cache/ck-engine-v8/nightly/whisper-long-audio
+V8_WHISPER_LONG_AUDIO_REPORT_ROOT ?= build/whisper-long-audio
+test-whisper-long-audio-nightly:
+	$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_whisper_long_audio_nightly_v8.py \
+		--model "$(V8_WHISPER_LONG_AUDIO_MODEL)" \
+		--work-root "$(V8_WHISPER_LONG_AUDIO_WORK_ROOT)" \
+		--output-root "$(V8_WHISPER_LONG_AUDIO_REPORT_ROOT)"
 
 .PHONY: test-whisper-pytorch-e2e-auto
 test-whisper-pytorch-e2e-auto:

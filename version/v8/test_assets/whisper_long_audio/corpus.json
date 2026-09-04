@@ -1,0 +1,43 @@
+{
+  "schema": "cke.whisper.long_audio_corpus.v1",
+  "fixture": {
+    "audio": "kernel2_mic1_5min.flac",
+    "reference": "kernel2_mic1_5min.txt",
+    "flac_sha256": "c9c53a1833916072d327fac654bee77bb2d9fe3be7b168205c4ee7d6f8292d2d",
+    "pcm_s16le_sha256": "2c8f4695908e622938bba7791874cce5cb456b537e8917d1aa24ac9bc905583c",
+    "duration_seconds": 300.0,
+    "sample_rate": 16000,
+    "channels": 1,
+    "language": "en",
+    "task": "transcribe",
+    "minimum_words": 650,
+    "minimum_windows": 10
+  },
+  "models": {
+    "tiny": {
+      "checkpoint": "openai/whisper-tiny",
+      "maximum_wer": 0.35,
+      "runner": "hosted"
+    },
+    "base": {
+      "checkpoint": "openai/whisper-base",
+      "maximum_wer": 0.28,
+      "runner": "hosted"
+    },
+    "small": {
+      "checkpoint": "openai/whisper-small",
+      "maximum_wer": 0.22,
+      "runner": "hosted"
+    },
+    "medium": {
+      "checkpoint": "openai/whisper-medium",
+      "maximum_wer": 0.20,
+      "runner": "hosted"
+    },
+    "large-v3": {
+      "checkpoint": "openai/whisper-large-v3",
+      "maximum_wer": 0.18,
+      "runner": "hosted"
+    }
+  }
+}

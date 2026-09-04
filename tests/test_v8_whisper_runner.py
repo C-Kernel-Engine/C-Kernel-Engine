@@ -297,6 +297,17 @@ def test_whisper_timestamp_seek_matches_reference_segment_rules() -> None:
     ) == 176000
 
 
+def test_whisper_timestamp_window_consumes_only_timestamp_sized_tail() -> None:
+    runner = _module()
+    source_frames = 4_800_000
+    assert runner.consume_timestamp_sized_tail(
+        source_frames - 640, source_frames, 16000
+    ) == source_frames
+    assert runner.consume_timestamp_sized_tail(
+        source_frames - 1920, source_frames, 16000
+    ) == source_frames - 1920
+
+
 def test_whisper_timestamp_contract_matches_transformers_masks() -> None:
     torch = pytest.importorskip("torch")
     generation_module = pytest.importorskip(

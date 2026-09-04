@@ -860,3 +860,75 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build/nightly-pages
           keep_files: true
+
+  whisper-long-audio:
+    name: Whisper ${{ matrix.model }} five-minute E2E
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: tiny
+            timeout: 90
+          - model: base
+            timeout: 120
+          - model: small
+            timeout: 180
+          - model: medium
+            timeout: 300
+          - model: large-v3
+            timeout: 350
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c .github/requirements-nightly-constraints.txt -r requirements.txt
+          pip install -c .github/requirements-nightly-constraints.txt -r version/v8/requirements.txt
+          command -v ffmpeg >/dev/null || sudo apt-get update
+          command -v ffmpeg >/dev/null || sudo apt-get install -y ffmpeg
+
+      - name: Cache model and generated runtime
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.cache/whisper-long-audio
+          key: whisper-long-audio-${{ matrix.model }}-${{ hashFiles('version/v8/scripts/**', 'version/v8/circuits/audio_*', 'version/v8/kernel_maps/**', 'version/v8/test_assets/whisper_long_audio/corpus.json') }}
+
+      - name: Run non-skippable five-minute certification
+        env:
+          HF_HOME: ${{ github.workspace }}/.cache/huggingface
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          CK_CACHE_DIR: ${{ github.workspace }}/.cache/whisper-long-audio/model-cache
+          CK_V8_PYTHON: python
+          CK_NUM_THREADS: 4
+        run: |
+          make test-whisper-long-audio-nightly \
+            PYTHON=python \
+            V8_WHISPER_LONG_AUDIO_MODEL=${{ matrix.model }} \
+            V8_WHISPER_LONG_AUDIO_WORK_ROOT=${{ github.workspace }}/.cache/whisper-long-audio/work \
+            V8_WHISPER_LONG_AUDIO_REPORT_ROOT=build/whisper-long-audio
+
+      - name: Upload Whisper evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-${{ matrix.model }}-five-minute-evidence
+          path: build/whisper-long-audio/*.json
+          if-no-files-found: error
+          retention-days: 14
