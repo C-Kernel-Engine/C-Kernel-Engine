@@ -89,8 +89,8 @@ guard this schedule.
 
 - Layer 0 recurrent X-Ray: 641 comparable checkpoints exact across 40 real chat
   prompt rows; no value divergence.
-- Layer 3 sparse-attention X-Ray: 600 comparable checkpoints exact across the
-  same 40 rows; no value divergence.
+- Historical layer 3 attention X-Ray: 600 comparable checkpoints exact in a
+  one-token-prefix replay; this was not a 40-token prompt certification.
 - Greedy trajectory: 256/256 steps bit-exact across all 248,320 vocabulary
   logits, with identical top-5 sets and no first divergence.
 - Real-chat trajectory: a 40-token batched prompt followed by 64 persistent
@@ -112,7 +112,7 @@ adding the missing exports remains observability work.
 
 ## Remaining certification work
 
-0. Rebuild with explicit batched prefill and compare the real chat prompt again.
+0. Resolve the remaining batched-prompt logit drift after the explicit rebuild.
    The post-contract runtime had no compiled batched-prefill capability. X-Ray
    rejected it, while the trajectory runner incorrectly labeled its execution
    hybrid. The trajectory runner now checks that capability before model loading
@@ -147,3 +147,37 @@ declare its allocation helper so the audit retains that debt. There remain
 51 production allocator call sites; three mapped provider entries now expose
 allocation debt, including the new versioned provider. No allocation reduction
 is claimed from extracting that shared implementation.
+
+## Completed all-layer capture (September 4)
+
+The native Ryzen runtime was rebuilt with generated batched prefill. The
+matched-schedule 40-token prompt plus 64 decode comparisons still matched all
+64 greedy choices but none of the full-vocabulary rows bit-exactly. Step zero
+had maximum absolute logit difference 0.951632738 and RMSE 0.174499848.
+Fixing schedule validation was necessary, but did not resolve numerical drift.
+
+One CKE capture and one llama.cpp capture then covered requested boundaries
+across all 48 layers, using the same 40-token prompt and two decode tokens.
+Context capacity was 8192, not 8192 consumed tokens. Runtime binary provenance
+was verified before capture.
+
+- Layers 0-5: all comparable checkpoint rows exact; missing/incompatible
+  checkpoints remain untested and are not counted as passes.
+- Earliest observed mismatch by layer: layer 6, logical token 10,
+  `moe_combined_output`, maximum absolute difference 1.932727173e-6.
+- Layer 7: additional combined-MoE differences and a material `q_proj`
+  mismatch at logical token 10. Later layers show accumulated drift.
+- This localizes the next investigation to the layer-6 expert combination
+  and its inputs; it does not yet prove the underlying cause.
+
+Artifacts on Ryzen: `xray-chat40-all-layers-main-e87/summary.json` and
+`layer-00.json` through `layer-47.json` under
+`/home/antshiv/.cache/cke-nvme/qwen38-flash-next/`.
+Capture wall times were 134.37 seconds for CKE and 19.98 seconds for the oracle.
+These include loading and diagnostic dumps, so are not matched inference
+throughput measurements. Capture is complete; no background certification run
+is implied by these results.
+
+Commit hooks completed v7 and v8 fast regression targets. The v8 report's
+overall PASS still contains a Nanbeige coherence FAIL; it must not be described
+as an all-model coherence pass.
