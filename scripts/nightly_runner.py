@@ -842,6 +842,12 @@ MAKE_TARGETS = {
         "target": "test-v8-cohere-laguna-contracts",
         "timeout_sec": 300,
     },
+    "v8_qwen38_dense_contracts": {
+        "name": "Qwen3.6/3.8 Dense Metadata and Chat Contracts",
+        "category": "inference",
+        "target": "test-v8-qwen38-dense-contracts",
+        "timeout_sec": 300,
+    },
     "v8_qwen38_flash_contracts": {
         "name": "Qwen3.8 Flash Circuit and Numerical Providers",
         "category": "parity",
@@ -1096,6 +1102,7 @@ NIGHTLY_PROFILES = {
         "v8_model_memory_plans",
         "v8_numerical_contracts",
         "v8_cohere_laguna_contracts",
+        "v8_qwen38_dense_contracts",
         "v8_command_a_plus_nvfp4",
         "v8_dsl_policy",
         "v8_template_circuit_audit",

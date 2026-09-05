@@ -1562,7 +1562,11 @@ class NumericalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             requirement["selector"],
             {
-                "config_equals": {"ssm_time_step_rank": 48},
+                "config_equals": {
+                    "ssm_time_step_rank": 48,
+                    "layer_weight_dtypes.ssm_alpha": "fp32",
+                    "layer_weight_dtypes.ssm_beta": "fp32",
+                },
                 "config_not_equals": {"recurrent_qkv_weight_dtype": "bf16"},
             },
         )
@@ -1586,6 +1590,7 @@ class NumericalExecutionContractTests(unittest.TestCase):
                 {
                     "ssm_time_step_rank": 48,
                     "recurrent_qkv_weight_dtype": "q6_k",
+                    "layer_weight_dtypes": {"ssm_alpha": "fp32", "ssm_beta": "fp32"},
                 },
                 operation,
             )

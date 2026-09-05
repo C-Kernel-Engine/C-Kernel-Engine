@@ -18,6 +18,72 @@ import codegen_prefill_v8  # type: ignore
 
 
 class Qwen38ContractTests(unittest.TestCase):
+    def test_packed_weights_cannot_reach_a_float_provider(self) -> None:
+        for dtype in ("q8_0", "q4_k", "q6_k"):
+            with self.subTest(dtype=dtype):
+                lowered = {"operations": [{
+                    "op": "recurrent_alpha_proj", "layer": 0,
+                    "kernel": "gemm_nt_f32_llama_production",
+                    "weights": {"B": {"dtype": dtype}},
+                }]}
+                with self.assertRaisesRegex(RuntimeError, "Weight/kernel dtype mismatch"):
+                    build_ir_v8.validate_buffer_assignments(lowered)
+
+    def test_scalar_projection_contract_requires_manifest_fp32_weights(self) -> None:
+        for family in ("qwen35", "qwen38"):
+            circuit = converter.load_template_for_arch(family)
+            selector = circuit["required_numerical_contracts"][
+                "decoder.recurrent_gate_scalar_projections_llama"
+            ]["selector"]
+            for alpha, beta, expected in (
+                ("fp32", "fp32", True), ("q8_0", "q8_0", False),
+                ("fp32", "q8_0", False), ("bf16", "bf16", False),
+            ):
+                with self.subTest(family=family, alpha=alpha, beta=beta):
+                    manifest = {
+                        "config": {"ssm_time_step_rank": 48, "recurrent_qkv_weight_dtype": "q8_0"},
+                        "entries": [
+                            {"name": "layer.0.ssm_alpha", "dtype": alpha},
+                            {"name": "layer.0.ssm_beta", "dtype": beta},
+                        ],
+                    }
+                    config = build_ir_v8._manifest_contract_config(manifest)
+                    self.assertEqual(build_ir_v8._contract_selector_matches(selector, config, "scalar"), expected)
+                    manifest["entries"].append({"name": "layer.1.ssm_alpha", "dtype": "q6_k"})
+                    config = build_ir_v8._manifest_contract_config(manifest)
+                    self.assertFalse(build_ir_v8._contract_selector_matches(selector, config, "scalar"))
+
+    def test_ggml_org_without_basename_selects_bounded_dense_circuit(self) -> None:
+        metadata = {
+            "general.architecture": "qwen35",
+            "general.name": "Qwen3.8-27B",
+            "general.size_label": "27B",
+        }
+        contract = converter.gguf_ck_artifact_contract("qwen35", metadata)
+        self.assertEqual(contract["artifact_variant"], "qwen38-27b-ggml-org")
+        template = converter.load_template_for_arch("qwen35", metadata)
+        config = converter.apply_circuit_runtime_defaults({}, template)
+        self.assertEqual(template["name"], "qwen38")
+        self.assertEqual(config["prefill_chunk_length"], 4096)
+        self.assertEqual(config["logits_layout"], "last")
+        metadata["general.basename"] = "Qwen3.8-27B"
+        self.assertEqual(
+            converter.gguf_ck_artifact_contract("qwen35", metadata)["artifact_variant"],
+            "qwen38-27b-unsloth",
+        )
+        metadata.pop("general.basename")
+        metadata["general.name"] = "Qwen3.6-27B"
+        self.assertNotIn("artifact_variant", converter.gguf_ck_artifact_contract("qwen35", metadata))
+
+    def test_source_architecture_alias_preserves_variant_chat_contract(self) -> None:
+        template = converter.load_template_for_arch("qwen38")
+        contract = converter._extract_chat_contract(template, {
+            "general.architecture": "qwen35",
+            "tokenizer.chat_template": "<|im_start|>user\n{{ text }}<|im_end|>",
+        })
+        self.assertEqual(contract["name"], "qwen38")
+        self.assertEqual(contract["thinking_mode_default"], "visible")
+
     def test_exact_artifact_metadata_selects_qwen38(self) -> None:
         metadata = {
             "general.architecture": "qwen35",

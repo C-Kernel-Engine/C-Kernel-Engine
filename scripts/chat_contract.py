@@ -319,7 +319,14 @@ def build_chat_contract(
             else load_template_chat_contract(explicit_name)
         )
         if explicit_contract is not None:
-            contract = explicit_contract
+            # A source architecture alias must not replace a variant's declared
+            # policy when both use the same wire protocol (for example ChatML).
+            same_protocol = declared_contract is not None and all(
+                declared_contract.get(key) == explicit_contract.get(key)
+                for key in ("turn_prefix", "turn_suffix", "role_labels")
+            )
+            if not same_protocol:
+                contract = explicit_contract
 
     if contract is None:
         return None

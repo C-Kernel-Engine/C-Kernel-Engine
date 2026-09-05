@@ -318,6 +318,21 @@ def _contract_selector_matches(selector: Any, config: Dict[str, Any], operation:
     return True
 
 
+def _manifest_contract_config(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    config = dict(manifest.get("config") or {})
+    dtypes: Dict[str, set] = {}
+    for entry in manifest.get("entries", []):
+        parts = str(entry.get("name", "")).split(".", 2)
+        if len(parts) == 3 and parts[0] == "layer" and parts[1].isdigit():
+            dtypes.setdefault(parts[2], set()).add(str(entry.get("dtype", "")).lower())
+    # Only uniform, manifest-proven storage types can select a global contract.
+    config["layer_weight_dtypes"] = {
+        key: next(iter(values)) for key, values in dtypes.items()
+        if len(values) == 1 and "" not in values
+    }
+    return config
+
+
 def _resolve_manifest_numerical_contracts(
     manifest: Dict[str, Any],
     mode: str,
@@ -333,7 +348,7 @@ def _resolve_manifest_numerical_contracts(
     circuit_name = str(circuit.get("name", "")).strip()
     source_path = V8_ROOT / "circuits" / f"{circuit_name}.json" if circuit_name else None
     plans: List[Dict[str, Any]] = []
-    config = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    config = _manifest_contract_config(manifest)
     for operation, operation_doc in required.items():
         selector = operation_doc.get("selector") if isinstance(operation_doc, dict) else None
         if not _contract_selector_matches(selector, config, str(operation)):
@@ -376,7 +391,7 @@ def _resolve_manifest_execution_contracts(
     source_path = V8_ROOT / "circuits" / f"{circuit_name}.json" if circuit_name else None
     resolution_mode = str((manifest.get("config") or {}).get("numerical_contract_mode", "bringup"))
     plans: List[Dict[str, Any]] = []
-    config = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    config = _manifest_contract_config(manifest)
     for operation, operation_doc in required.items():
         selector = operation_doc.get("selector") if isinstance(operation_doc, dict) else None
         if not _contract_selector_matches(selector, config, str(operation)):
@@ -12970,6 +12985,15 @@ def generate_ir_lower_2(
             if not isinstance(circuit_projection_inputs, dict):
                 circuit_projection_inputs = {}
             declared_inputs = graph_inputs or circuit_projection_inputs
+            # Graph construction canonicalizes provider A/C ports to operation
+            # x/y ports. Consume that same mapping without changing slot ownership.
+            interface_validation = ir_op.get("interface_validation")
+            if isinstance(interface_validation, dict) and interface_validation.get("status") == "validated":
+                declared_inputs = dict(interface_validation.get("inputs", {}))
+            else:
+                declared_inputs = _canonical_graph_slot_overrides(
+                    op_type, "inputs", declared_inputs
+                )
             if not declared_inputs:
                 raise RuntimeError(
                     "HARD CIRCUIT DATAFLOW FAULT: "
@@ -14451,6 +14475,13 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
             for weight_name, weight_info in op.get("weights", {}).items():
                 weight_dtype = str(weight_info.get("dtype", "")).lower()
                 expected_weight_dtype = str(per_weight_contract.get(weight_name, kernel_weight_dtype)).lower()
+                if weight_dtype.startswith(("q", "iq", "nvfp", "mxfp")) and expected_weight_dtype in {"fp32", "f32", "fp16", "f16", "bf16"}:
+                    raise RuntimeError(
+                        "HARD FAULT: Weight/kernel dtype mismatch: "
+                        f"op={op_name} layer={layer} kernel={kernel_id} "
+                        f"weight={weight_name} dtype={weight_dtype} "
+                        f"provider expects {expected_weight_dtype}; packed weights cannot be read as floats"
+                    )
                 if weight_dtype == "bf16" and expected_weight_dtype != "bf16":
                     raise RuntimeError(
                         f"\n❌ HARD FAULT: Weight/kernel dtype mismatch\n"

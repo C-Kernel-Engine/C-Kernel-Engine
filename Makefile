@@ -1629,6 +1629,13 @@ test-v8-xeon-family-contracts:
 		tests.test_v8_template_circuit_audit \
 		-v
 
+.PHONY: test-v8-qwen38-dense-contracts
+test-v8-qwen38-dense-contracts:
+	@$(PYTHON) -m pytest -q \
+		tests/test_v8_qwen38_contract.py \
+		tests/test_v8_qwen36_contract.py \
+		tests/test_ck_chat_runtime_contract.py
+
 .PHONY: test-v8-qwen38-flash-contracts
 test-v8-qwen38-flash-contracts: $(BUILD_DIR)/libckernel_engine.so
 	@$(PYTHON) -m pytest -q \
