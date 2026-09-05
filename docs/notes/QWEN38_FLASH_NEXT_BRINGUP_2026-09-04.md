@@ -242,3 +242,19 @@ all 267 differences. Matching this row-dependent reduction schedule and
 teaching X-Ray about explicit output-row selection remain open. Do not relax
 the exact gate or label missing comparisons as passes. Full BF16 and long
 context certification remain separate work.
+
+The expanded hyper-export capture completed on Ryzen after a fresh rebuild:
+45276 exact comparisons, 680 missing/incompatible, and zero reported value
+differences. The unresolved final-row comparisons remain explicitly untested
+by the automatic row loader; the direct probes above supply that diagnosis.
+All 248320 final logits are bit-exact with the pre-instrumentation CKE capture,
+confirming capture neutrality for this run. Artifacts are in
+`xray-chat40-hyper-exports/` beneath the same Ryzen experiment root.
+
+The next execution-plan change should represent requested output rows as a
+generic contract and propagate that demand only through the stateless terminal
+suffix. Attention/KV/recurrent updates still consume the full prefix. Preserve
+full-row behavior for all-logits consumers, validate pointer offsets and scratch
+bounds, and test both single-output and all-output schedules. Merely forcing the
+last Qwen router into GEMV with a model-name conditional would hide this contract
+rather than implement it.
