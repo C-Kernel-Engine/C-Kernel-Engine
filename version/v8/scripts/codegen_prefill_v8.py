@@ -1039,7 +1039,39 @@ def emit_prefill_op(
         lines.append(f'        ck_debug_export_hidden(model, {layer}, "{label}_last", _ck_{safe_label}_last, _ck_{safe_label}_heads * _ck_{safe_label}_dim);')
         lines.append("    }")
 
-    if op_type == "residual_save":
+    if op_type in {"hyper_mix_attn", "hyper_mix_mlp", "hyper_mix_final"}:
+        prefix, mixed_label, injection_label = {
+            "hyper_mix_attn": ("attn_hyper", "attn_mixed_input", "attn_injection_weights"),
+            "hyper_mix_mlp": ("mlp_hyper", "mlp_mixed_input", "mlp_injection_weights"),
+            "hyper_mix_final": ("final_hyper", "final_hidden", "final_injection_weights"),
+        }[op_type]
+        rows = _hidden_arg("rows", "tokens")
+        hidden = _hidden_arg("hidden_dim", "embed_dim")
+        streams = _hidden_arg("streams")
+        wide = _hidden_mul(streams, hidden)
+        checkpoints = [
+            (_hidden_arg("normalized_scratch"), f"{prefix}_norm", wide),
+            (_hidden_arg("dynamic_scratch"), f"{prefix}_dynamic", _hidden_arg("dynamic_dim")),
+            (_hidden_arg("mix_scratch"), f"{prefix}_gate", wide),
+            (_hidden_arg("mixed_output", "output", "out"), mixed_label, hidden),
+        ]
+        injection = _hidden_arg("injection_output")
+        if injection and injection.strip() != "NULL":
+            checkpoints.append((injection, injection_label, streams))
+        for expr, label, width in checkpoints:
+            _emit_hidden_full(expr, label, _hidden_mul(rows, width))
+            _emit_hidden_last(expr, label, width)
+    elif op_type in {"hyper_stream_expand", "hyper_inject_attn", "hyper_inject_mlp"}:
+        label = {
+            "hyper_stream_expand": "hyper_stream",
+            "hyper_inject_attn": "after_attn_hyper",
+            "hyper_inject_mlp": "layer_out",
+        }[op_type]
+        width = _hidden_mul(_hidden_arg("streams"), _hidden_arg("hidden_dim", "embed_dim"))
+        output = _hidden_arg("output", "out")
+        _emit_hidden_full(output, label, _hidden_mul(_hidden_arg("rows", "tokens"), width))
+        _emit_hidden_last(output, label, width)
+    elif op_type == "residual_save":
         checkpoint = "layer_input" if op_instance_idx == 0 else "after_attn"
         _emit_hidden_full(
             _hidden_arg("src", "input", "x"),

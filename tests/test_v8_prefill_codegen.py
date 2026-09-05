@@ -27,6 +27,26 @@ codegen_prefill_v8 = _load_module("codegen_prefill_v8_tests", CODEGEN_PREFILL_PA
 
 
 class TestV8PrefillCodegen(unittest.TestCase):
+    def test_hyper_prefill_exports_wide_boundaries_and_last_rows(self):
+        args = {"rows": "num_tokens", "streams": "4", "hidden_dim": "2560",
+                "dynamic_dim": "320", "normalized_scratch": "norm",
+                "dynamic_scratch": "dynamic", "mix_scratch": "gate",
+                "mixed_output": "mixed", "injection_output": "NULL", "output": "wide"}
+        for op_name, label in [("hyper_mix_attn", "attn_hyper_norm"),
+                               ("hyper_mix_mlp", "mlp_hyper_norm"),
+                               ("hyper_mix_final", "final_hyper_norm"),
+                               ("hyper_stream_expand", "hyper_stream"),
+                               ("hyper_inject_attn", "after_attn_hyper"),
+                               ("hyper_inject_mlp", "layer_out")]:
+            with self.subTest(op=op_name):
+                op = {"function": "test_provider", "op": op_name, "layer": 7,
+                      "args": [{"name": k, "expr": v} for k, v in args.items()]}
+                emitted = codegen_prefill_v8.emit_prefill_op(op, 0, {})
+                self.assertIn(f'"{label}"', emitted)
+                self.assertIn(f'"{label}_last"', emitted)
+                self.assertIn("(4) * (2560)", emitted)
+                self.assertNotIn('"final_injection_weights"', emitted)
+
     @staticmethod
     def _q4_segmented_projection_op(op_name: str = "recurrent_gate_proj") -> dict:
         return {

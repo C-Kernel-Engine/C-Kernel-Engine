@@ -211,3 +211,34 @@ Those used capacity 128, eight CKE threads, OMP=1, and five output tokens.
 The first repeated run included a rebuild (60.35 seconds); subsequent runs
 took approximately 2.17 seconds each. Its original cause is not established,
 so this is successful revalidation, not proof of a repaired timeout bug.
+
+## Strict replay follow-up (2026-09-05)
+
+After the shared-expert fix, the real 40-token prompt followed by 64 full-logit
+comparisons has 63 exact rows. Only the initial prefill logit row differs:
+maximum absolute error 2.86102294921875e-6, RMSE 3.523921538602865e-7.
+All 64 greedy choices match, but the strict harness correctly returns FAIL.
+Capacity is 8192; this is not an 8K consumed-context test.
+
+The first follow-up all-layer capture contained 30116 exact comparisons,
+15840 missing/incompatible comparisons, and no reported value differences.
+That does NOT certify every boundary: prefill lacked the hyper exports present
+in decode, and the row loader cannot interpret the oracle's final-layer
+last-row-only tensors as full batches. Prefill now emits corresponding hyper
+checkpoints, with full and last-row widths checked by codegen tests.
+
+Direct final-layer replay bypassing that diagnostic shape limitation isolates
+the remaining first mismatch to the FP32 router: its input is exact, but 267
+of 512 router logits differ by at most 1.9073486328125e-6. All ten routing
+weights differ slightly. The routed output differs by at most
+4.470348358154297e-8 and the combined expert output by 5.960464477539063e-8.
+The hyper-stream input and injection weights match; reconstructing injection
+with the captured expert output reproduces CKE's final hyper stream exactly.
+
+The oracle prunes to its requested last row after final attention; CKE retains
+the 40-row final MLP batch. An isolated replay with identical input and weights
+confirms that M=1 matches all 512 router logits exactly, while M=40 reproduces
+all 267 differences. Matching this row-dependent reduction schedule and
+teaching X-Ray about explicit output-row selection remain open. Do not relax
+the exact gate or label missing comparisons as passes. Full BF16 and long
+context certification remain separate work.
