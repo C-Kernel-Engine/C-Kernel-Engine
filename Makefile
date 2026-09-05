@@ -1632,6 +1632,7 @@ test-v8-xeon-family-contracts:
 .PHONY: test-v8-qwen38-flash-contracts
 test-v8-qwen38-flash-contracts: $(BUILD_DIR)/libckernel_engine.so
 	@$(PYTHON) -m pytest -q \
+		tests/test_v8_terminal_rows.py \
 		tests/test_v8_qwen4_exp_contract.py \
 		tests/test_v8_runtime_kernel_build_requirements.py \
 		tests/test_compare_multitoken_logits_v8.py \

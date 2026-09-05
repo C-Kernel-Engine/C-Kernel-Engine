@@ -590,6 +590,30 @@ class TextRecurrentXRayTests(unittest.TestCase):
             row = XRAY._load_oracle_row(root, "attn_norm", 0, 1, 3, 4)
             np.testing.assert_array_equal(row, values[1])
 
+    def test_selected_oracle_row_requires_shape_and_final_position(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / "ffn_moe_logits-47-token-000039-occ-000.bin"
+            values = np.arange(512, dtype=np.float32)
+            values.tofile(path)
+            path.with_suffix(".json").write_text(json.dumps({"type": 0, "ne": [512, 1, 1, 1]}))
+            self.assertEqual(XRAY._infer_oracle_row_count(root, "moe_router_logits", 47, 39, 40), 512)
+            np.testing.assert_array_equal(
+                XRAY._load_oracle_row(root, "moe_router_logits", 47, 39, 40, 512), values)
+            with self.assertRaisesRegex(ValueError, "only for the final"):
+                XRAY._infer_oracle_row_count(root, "moe_router_logits", 47, 0, 40)
+            path.with_suffix(".json").write_text(json.dumps({"type": 0, "ne": [256, 1, 1, 1]}))
+            with self.assertRaisesRegex(ValueError, "shape/storage mismatch"):
+                XRAY._infer_oracle_row_count(root, "moe_router_logits", 47, 39, 40)
+
+    def test_selected_hyper_row_not_divided_by_prompt_count(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / "l_last-47-token-000039-occ-000.bin"
+            np.zeros(10240, dtype=np.float32).tofile(path)
+            path.with_suffix(".json").write_text(json.dumps({"type": 0, "ne": [2560, 4, 1, 1]}))
+            self.assertEqual(XRAY._infer_oracle_row_count(root, "layer_out_hyper", 47, 39, 40), 10240)
+
     def test_schedule_metadata_is_mandatory_in_analysis(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

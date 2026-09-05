@@ -15735,6 +15735,8 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         "errors": all_errors,
     }
 
+    from plan_terminal_rows_v8 import plan_terminal_prefill_rows
+    plan_terminal_prefill_rows(lowered_call, _contract_selector_matches)
     return lowered_call
 
 

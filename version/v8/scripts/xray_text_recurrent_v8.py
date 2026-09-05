@@ -597,6 +597,36 @@ def classify(
     return None
 
 
+# Token axes for these exported graph nodes (GGML ne order). Shape metadata,
+# not divisibility by prompt length, distinguishes a selected final row.
+ORACLE_TOKEN_AXES = {
+    "hc_norm": 2, "hc_gate": 1, "hc_mixed": 1, "hc_combine": 2,
+    "ffn_moe_logits": 1, "ffn_moe_weights_norm": 1,
+    "ffn_moe_out": 1, "ffn_out": 1, "l_last": 2,
+}
+
+
+def _oracle_selected_row_width(path: Path, name: str, logical_token: int, prompt_tokens: int):
+    metadata_path = path.with_suffix(".json")
+    if name not in ORACLE_TOKEN_AXES or not metadata_path.is_file():
+        return None
+    metadata = json.loads(metadata_path.read_text())
+    dims = metadata.get("ne", [])
+    axis = ORACLE_TOKEN_AXES[name]
+    if len(dims) != 4 or any(not isinstance(n, int) or n <= 0 for n in dims):
+        raise ValueError(f"invalid oracle shape for {name}")
+    elements = int(np.prod(dims))
+    if elements * 4 != path.stat().st_size or metadata.get("type") != 0:
+        raise ValueError(f"oracle shape/storage mismatch for {name}")
+    if dims[axis] == prompt_tokens:
+        return None
+    if dims[axis] != 1 or any(n != 1 for n in dims[axis + 1:]):
+        raise ValueError(f"unsupported oracle token extent for {name}: {dims}")
+    if logical_token != prompt_tokens - 1:
+        raise ValueError("oracle selected output exists only for the final prompt row")
+    return elements
+
+
 def _load_oracle_row(
     root: Path,
     name: str,
@@ -612,6 +642,11 @@ def _load_oracle_row(
     path = root / f"{name}-{layer}-token-{physical_token:06d}-occ-{occurrence:03d}.bin"
     data = np.fromfile(path, dtype=np.float32)
     if logical_token < prompt_tokens and name != "new_state":
+        selected_width = _oracle_selected_row_width(path, name, logical_token, prompt_tokens)
+        if selected_width is not None:
+            if selected_width != expected_count:
+                raise ValueError(f"selected oracle row width mismatch for {name}")
+            return data
         if data.size != prompt_tokens * expected_count:
             raise ValueError(f"batched oracle extent mismatch for {name}: {data.size} != {prompt_tokens}*{expected_count}")
         return data.reshape(prompt_tokens, expected_count)[logical_token]
@@ -719,6 +754,9 @@ def _infer_oracle_row_count(
     path = root / f"{name}-{layer}-token-{physical_token:06d}-occ-{occurrence:03d}.bin"
     elements = path.stat().st_size // np.dtype(np.float32).itemsize
     if logical_token < prompt_tokens and name != "new_state":
+        selected_width = _oracle_selected_row_width(path, name, logical_token, prompt_tokens)
+        if selected_width is not None:
+            return selected_width
         if elements % prompt_tokens != 0:
             raise ValueError(f"cannot infer oracle row width for {name}: {elements} is not divisible by {prompt_tokens}")
         return int(elements // prompt_tokens)

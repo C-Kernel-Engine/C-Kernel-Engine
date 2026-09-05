@@ -57,6 +57,25 @@ from codegen_capabilities_v8 import (
 )
 
 
+def _emit_terminal_row_selection(op: Dict) -> str:
+    plan = op.get("prefill_row_selection")
+    if not plan:
+        return ""
+    if plan.get("version") != 1 or plan.get("selection") != "last" or not plan.get("copies"):
+        raise ValueError("Invalid terminal row selection plan")
+    lines = ["    /* Compact planner-declared live inputs for the terminal suffix. */"]
+    for copy in plan["copies"]:
+        define = copy["define"]
+        width = copy["row_elements"]
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", define) or not isinstance(width, int) or width <= 0:
+            raise ValueError("Invalid terminal row copy")
+        lines.append(f"    memmove((void*)(model->bump + {define}), "
+                     f"(const float*)(model->bump + {define}) + (size_t)(num_tokens - 1) * {width}, "
+                     f"(size_t){width} * sizeof(float));")
+    lines.extend(["    model->pos = prefill_start_pos + num_tokens - 1;", "    num_tokens = 1;"])
+    return "\n".join(lines)
+
+
 def _annotate_kv_transpose_roles(ops: List[Dict]) -> None:
     """Mark synthetic transpose ops with K/V role and per-layer head geometry."""
 
@@ -1676,6 +1695,10 @@ static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_toke
     prologue = prologue.replace("CK_Q4_GATEUP_SWIGLU_X16_DEFAULT", str(q4_gateup_swiglu_x16_default))
     lines.append(prologue)
 
+    terminal_rows = any(op.get("prefill_row_selection") for op in ops)
+    if terminal_rows:
+        lines.append("    const int prefill_original_num_tokens = num_tokens;")
+
     if profile:
         lines.append("    CK_PROFILE_VARS();")
         lines.append("")
@@ -1690,6 +1713,8 @@ static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_toke
     swiglu_q8k_fusion_call: Optional[str] = None
 
     for seq_idx, op in enumerate(ops):
+        if op.get("prefill_row_selection"):
+            lines.append(_emit_terminal_row_selection(op))
         op_type_for_instance = str(op.get("op", ""))
         quantization_emission = resolved_activation_quantization_emission(op)
         if swiglu_q8k_fusion_guard and op_type_for_instance != "quantize_mlp_down_input":
@@ -1794,6 +1819,8 @@ static void ck_prefill_range(CKModel *model, const int32_t *tokens, int num_toke
             embed_scale_emitted = True
         lines.append("")
 
+    if terminal_rows:
+        lines.append("    num_tokens = prefill_original_num_tokens;")
     lines.append("    model->pos = prefill_start_pos + num_tokens;")
     lines.append("    model->rope_pos = prefill_start_pos + num_tokens;")
     if bool(config.get("_template_uses_persistent_cross_kv_cache", False)):
@@ -2636,6 +2663,10 @@ static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int p
 """
         )
 
+    terminal_rows = any(op.get("prefill_row_selection") for op in ops)
+    if terminal_rows:
+        lines.append("    const int prefill_original_num_tokens = num_tokens;")
+
     if profile:
         lines.append("    CK_PROFILE_VARS();")
         lines.append("")
@@ -2650,6 +2681,8 @@ static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int p
     swiglu_q8k_fusion_guard: Optional[str] = None
     swiglu_q8k_fusion_call: Optional[str] = None
     for seq_idx, op in enumerate(ops):
+        if op.get("prefill_row_selection"):
+            lines.append(_emit_terminal_row_selection(op))
         op_type = str(op.get("op", ""))
         if skip_swiglu_guard and op_type not in {"silu_mul", "swiglu"}:
             skip_swiglu_guard = None
@@ -2863,6 +2896,8 @@ static void ck_prefill_from_embedded_range(CKModel *model, int num_tokens, int p
                     lines.append(f"    ck_multimodal_prefill_deepstack_add(model, {deepstack_layer}, num_tokens);")
         lines.append("")
 
+    if terminal_rows:
+        lines.append("    num_tokens = prefill_original_num_tokens;")
     lines.append("    model->pos = prefill_start_pos + num_tokens;")
     if has_decoder_multimodal_bridge:
         lines.append("    model->rope_pos = ck_multimodal_prefill_bridge_is_active() ? ck_multimodal_prefill_bridge_next_text_pos() : prefill_rope_start_pos + num_tokens;")

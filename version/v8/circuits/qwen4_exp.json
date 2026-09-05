@@ -62,6 +62,24 @@
     "mlp_topology": "packed_moe_plus_gated_shared_expert"
   },
   "contract": {
+    "prefill_terminal_rows": {
+      "version": 1,
+      "selector": {
+        "config_not_equals": {"recurrent_qkv_weight_dtype": "bf16"}
+      },
+      "start_before": "moe_router",
+      "suffix": [
+        ["moe_router"], ["full_softmax_topk_router"],
+        ["moe_swiglu_expert_mlp", "moe_swiglu_packed_expert_mlp"],
+        ["gated_shared_swiglu_expert_mlp"], ["hyper_inject_mlp"],
+        ["hyper_mix_final"], ["quantize_final_output"], ["logits"]
+      ],
+      "live_inputs": [
+        {"op":"moe_router","argument":"A","width_args":["K"]},
+        {"op":"hyper_inject_mlp","argument":"hyper_input","width_args":["streams","hidden_dim"]},
+        {"op":"hyper_inject_mlp","argument":"injection_weight","width_args":["streams"]}
+      ]
+    },
     "weight_policy": {
       "ignore": [
         {

@@ -258,3 +258,57 @@ full-row behavior for all-logits consumers, validate pointer offsets and scratch
 bounds, and test both single-output and all-output schedules. Merely forcing the
 last Qwen router into GEMV with a model-name conditional would hide this contract
 rather than implement it.
+
+## Terminal-row execution fix (2026-09-05)
+
+The Q4_K_M replay now passes all 64 full-vocabulary comparisons, including
+the initial prefill row: a real 40-token prompt, 8192 configured capacity,
+16 Ryzen worker threads, and strict bit-exact trajectory acceptance. Evidence:
+`q4-chat40-terminal-row-fix.json` under the Ryzen experiment root. This is
+short-prompt numerical evidence, not 8K or 128K consumed-context certification.
+
+The circuit declares a stateless terminal suffix and its three live inputs.
+`plan_terminal_rows_v8.py` validates the suffix, dependencies, FP32 row widths,
+buffer bases, and capacity. Codegen compacts the requested last rows, executes
+the suffix with one row, and restores the original consumed count for position
+bookkeeping. All attention, KV-cache, and recurrent work retains the full prefix.
+The existing circuit selector excludes the BF16/PyTorch execution path; decode
+and all-logits requests are unchanged. No model-name conditional was added to
+the planner or emitter.
+
+X-Ray now interprets explicitly declared graph-node token axes using oracle
+shape metadata. A last-row-only export is unavailable for earlier prompt rows;
+it is never counted as an exact match for those rows. Full encoder/decoder
+coverage and longer trajectories must still be audited independently.
+
+Local validation: 127 Flash component tests passed, two ISA-dependent skips,
+and two subtests passed; 78 combined planner/codegen/circuit tests and 11
+subtests passed; 46 recurrent X-Ray tests passed. DSL policy and template
+circuit/dataflow audits passed. The earlier Gemma timeout remains a successfully
+revalidated, unreproduced failure, not an established root-cause repair.
+
+### Next: long-context evidence and visible artifacts
+
+Use the existing long-context certification harness, not a second benchmark
+framework. First validate the memory plan at 131072 capacity on the 160 GB
+Ryzen. Preserve the short certified runtime and its provenance separately.
+
+1. Numerical ladder: real repository-source prefixes at 2K, 8K, 32K, then
+   64K/128K consumed tokens where the plan fits. Compare identical token prefixes
+   and full logits against the same llama.cpp build. Record actual consumption,
+   not merely the allocated context. Keep BF16/PyTorch certification separate.
+2. Practical generation: provide a curated CKE source dossier, request a C
+   kernel with explanation and tests, then request a detailed standalone SVG
+   explaining that generated code. Preserve prompt, response, C, and SVG files
+   even when structural checks fail. Generated code is not trusted or promoted
+   into CKE by this demonstration.
+3. Give generation the remaining configured context until EOS, without an
+   arbitrary smaller output cap. A 128K input needs a larger supported capacity
+   to leave room for output; do not describe capacity as input plus extra space.
+4. Record model/weight and runtime hashes, input hash/count, chunk length,
+   output count and stop reason, prefill/decode times and throughput, peak RAM,
+   selected ISA/providers, and timestamped per-thread CPU occupancy. Keep model
+   quality, numerical parity, and performance as separate report columns.
+
+Until that ladder completes, announce experimental Q4_K_M execution with the
+specific short parity result, not fully certified 128K support or BF16 parity.
