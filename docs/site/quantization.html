@@ -1044,6 +1044,31 @@
     /* SVG Viewer */
     .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+
+    /* Inline SVG expand overlay */
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #nv-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #nv-svg-overlay .nv-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #nv-svg-overlay .nv-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #nv-svg-overlay .nv-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #nv-svg-overlay .nv-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #nv-svg-overlay .nv-ov-stage img { max-width: none; height: auto; }
 </style>
 
 <div class="hero">
@@ -1065,7 +1090,7 @@
     <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 250px;">
             <h3 style="color: #ffffff; margin: 0 0 0.5rem 0;">Visual Format Reference</h3>
-            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.95rem;">See byte-level structure, bit packing, and dequantization math for all supported formats: Q4_0, Q4_1, Q5_0, Q5_1, Q5_K, Q8_0, Q4_K, Q6_K, Q8_K. Activations run in BF16/FP32 with Q8_0/Q8_K quantized paths.</p>
+            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.95rem;">See byte-level structure, bit packing, and dequantization math for all supported formats: Q4_0, Q4_1, Q5_0, Q5_1, Q5_K, Q8_0, Q4_K, Q6_K, Q8_K, plus NVFP4 (MoE expert weights). Activations run in BF16/FP32 with Q8_0/Q8_K quantized paths.</p>
         </div>
         <a href="quant-formats.html" style="background: #ffffff; color: #0071c5; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 600; white-space: nowrap;">View Infographic</a>
     </div>
@@ -1085,6 +1110,7 @@
     <li><a href="#dequantization">Dequantization in Registers</a></li>
     <li><a href="#amx-int8">AMX-INT8: The Hardware Reality</a></li>
     <li><a href="#q4k-detail">Q4_K: K-Quants Deep Dive</a></li>
+    <li><a href="#nvfp4">NVFP4: E2M1 Weights with FP Sub-Scales</a></li>
     <li><a href="#blockwise-dequant">How Blockwise Dequant Works</a></li>
     <li><a href="#bump-integration">Bump Allocator Integration</a></li>
     <li><a href="#practical">Practical Implementation</a></li>
@@ -1371,7 +1397,7 @@ Bits per value: 292 * 8 / 256 = 9.125 bits
     </pre>
 
     <h4>Why This Exists</h4>
-    <p><code>Q8_K</code> is the activation-side companion for mixed K-quant kernels like <code>gemv_q4_k_q8_k</code>, <code>gemv_q6_k_q8_k</code>, and <code>gemm_nt_q4_k_q8_k</code>. In the current v7 runtime, the relevant path is often <code>FP32 hidden -&gt; quantize_row_q8_k -&gt; Q4_K/Q6_K matvec</code>.</p>
+    <p><code>Q8_K</code> is the activation-side companion for mixed K-quant kernels like <code>gemv_q4_k_q8_k</code>, <code>gemv_q6_k_q8_k</code>, and <code>gemm_nt_q4_k_q8_k</code>. In the v8 generated runtimes (the inference engine; v7 is now the training lane), the relevant path is often <code>FP32 hidden -&gt; quantize_row_q8_k -&gt; Q4_K/Q6_K matvec</code>.</p>
 
     <h4>Recent Bug Fix (2026-03-09)</h4>
     <p>We fixed a subtle parity bug in the SSE implementation of <code>quantize_row_q8_k</code>. The fix restored the exact signed-max selection and <code>bsums</code> contract expected by llama.cpp/ref. See <a href="https://github.com/antshiv/C-Kernel-Engine/commit/224a4d30e0309ee7a1a9d4f3ca46bcedf0ced905" style="color: #00c7fd;">commit 224a4d30</a>.</p>
@@ -1913,6 +1939,135 @@ Dequantization:
 
 <hr>
 
+<h2 id="nvfp4">NVFP4: E2M1 Weights with Floating-Point Sub-Scales</h2>
+
+<p>NVFP4 is the newest weight family in the runtime (PR #442, Command A+ bring-up). Unlike the integer K-quants, both the weights and the sub-block scales are small floating-point formats: E2M1 weights with one unsigned E4M3 scale per 16 weights, plus a per-tensor/expert FP32 scale that stays a <strong>separate runtime operand</strong> — so converting a checkpoint never expands or re-encodes the packed weights.</p>
+
+<div class="card card-purple">
+    <h4 style="margin-top: 0;">Structure (64 weights per block)</h4>
+    <pre>
+typedef struct {
+    uint8_t d[4];        // 4 bytes: one unsigned E4M3 scale per 16-weight sub-block
+    uint8_t qs[32];      // 32 bytes: 64 x E2M1 weights (2 per byte)
+} block_nvfp4;           // Total: 36 bytes per 64 weights, ABI-locked
+
+Bits per weight: 36 * 8 / 64 = 4.5 bits
+    </pre>
+    <p>The struct is ABI-locked with a <code>_Static_assert(sizeof(block_nvfp4) == 36)</code> in <code>include/ckernel_quant.h</code>, same as Q8_0 and Q8_K.</p>
+
+    <h4>Nibble Order: Split-Half, Not Interleaved</h4>
+    <p>Within a sub-block, 16 weights pack into 8 bytes: the <strong>low nibble</strong> of each byte maps to lanes 0-7 and the <strong>high nibble</strong> to lanes 8-15. This differs from GGML-style interleaved nibble formats — get the order wrong and every other weight lands in the wrong lane.</p>
+
+    <h4>Dequantization</h4>
+    <pre>
+// Doubled-value E2M1 LUT; the 0.5 factor is folded into the UE4M3 table
+e2m1_x2 = {0, +/-1, +/-2, +/-3, +/-4, +/-6, +/-8, +/-12}
+
+w = ue4m3(d[sub]) * weight_scale * e2m1_x2[nibble]
+
+// ue4m3(): 128-entry table lookup (ck_nvfp4_ue4m3), includes the 0.5
+// weight_scale: FP32 per-tensor/expert operand, passed at call time
+    </pre>
+</div>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 524" width="100%" role="img" tabindex="0" data-svg-title="NVFP4 block anatomy and dequant pipeline"
+     aria-label="NVFP4 block anatomy and dequant pipeline. Storage: one 36-byte block holds 64 weights as 4 unsigned E4M3 sub-scale bytes plus 32 packed bytes of E2M1 nibbles; the FP32 per-tensor or per-expert weight scale is a separate runtime operand, not stored in the block. Decode: each sub-block of 16 weights comes from 8 packed bytes in split-half order, low nibble to lanes 0 through 7 and high nibble to lanes 8 through 15, through a doubled E2M1 lookup table with the one-half factor folded into the UE4M3 scale table; a weight equals the UE4M3 sub-scale times the external weight scale times the doubled E2M1 value. Dot product: one NVFP4 block pairs with two Q8_0 activation blocks, the combined sub-block scale is UE4M3 times the FP16 Q8_0 scale times the weight scale, and the AVX2 kernel uses a shuffle-based nibble LUT, a sign-magnitude maddubs trick, madd widening, and a per-sub-block FMA rescale."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <style>
+    .nv-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .nv-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .nv-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nv-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nv-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nv-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nv-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+    .nv-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="nv-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="34" class="nv-band">1 - Storage: one block_nvfp4 covers 64 weights (36 bytes, 4.5 bpw)</text>
+  <rect class="nv-box" x="24" y="48" width="200" height="76" rx="10"/>
+  <text x="44" y="74" class="nv-title" font-size="13">d[0..3] (4 bytes)</text>
+  <text x="44" y="94" class="nv-sub">one unsigned E4M3 scale</text>
+  <text x="44" y="112" class="nv-sub">per 16-weight sub-block</text>
+  <rect class="nv-box" x="248" y="48" width="520" height="76" rx="10"/>
+  <text x="268" y="74" class="nv-title" font-size="13">qs[0..31] (32 bytes)</text>
+  <text x="268" y="94" class="nv-sub">64 x E2M1 weights, 2 per byte</text>
+  <text x="268" y="112" class="nv-sub">split-half nibble order (see step 2)</text>
+  <rect x="824" y="48" width="332" height="76" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="844" y="74" class="nv-title" font-size="13">weight_scale (FP32)</text>
+  <text x="844" y="94" class="nv-sub">per tensor/expert - separate runtime</text>
+  <text x="844" y="112" class="nv-sub">operand, never stored in the block</text>
+
+  <path d="M508,124 L508,190" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nv-arrow)"/>
+  <path d="M124,124 L124,160 L560,160 L560,190" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nv-arrow)"/>
+  <path d="M990,124 L990,190" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nv-arrow)"/>
+
+  <text x="24" y="186" class="nv-band">2 - Decode one sub-block (16 weights from 8 packed bytes)</text>
+  <rect class="nv-box" x="24" y="200" width="300" height="92" rx="10"/>
+  <text x="44" y="226" class="nv-title" font-size="13">split-half nibbles</text>
+  <text x="44" y="246" class="nv-sub">low nibble -&gt; lanes 0..7</text>
+  <text x="44" y="264" class="nv-sub">high nibble -&gt; lanes 8..15</text>
+  <text x="44" y="282" class="nv-warn">not GGML-style interleaved</text>
+  <rect class="nv-box" x="364" y="200" width="380" height="92" rx="10"/>
+  <text x="384" y="226" class="nv-title" font-size="13">doubled E2M1 LUT</text>
+  <text x="384" y="246" class="nv-sub">e2m1_x2 = {0, +/-1, +/-2, +/-3,</text>
+  <text x="384" y="264" class="nv-sub">           +/-4, +/-6, +/-8, +/-12}</text>
+  <text x="384" y="282" class="nv-sub">0.5 factor folded into UE4M3 table</text>
+  <rect class="nv-box" x="784" y="200" width="372" height="92" rx="10"/>
+  <text x="804" y="226" class="nv-title" font-size="13">per-weight dequant</text>
+  <text x="804" y="248" class="nv-hi">w = UE4M3(d[sub]) x weight_scale</text>
+  <text x="804" y="268" class="nv-hi">    x e2m1_x2[nibble]</text>
+
+  <path d="M174,292 L174,330" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nv-arrow)"/>
+  <path d="M970,292 L970,330" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nv-arrow)"/>
+
+  <text x="24" y="326" class="nv-band">3 - Dot product: NVFP4 weights x Q8_0 activations</text>
+  <rect class="nv-box" x="24" y="340" width="340" height="76" rx="10"/>
+  <text x="44" y="366" class="nv-title" font-size="13">activation pairing</text>
+  <text x="44" y="386" class="nv-sub">2 Q8_0 blocks (2 x 34 bytes)</text>
+  <text x="44" y="404" class="nv-sub">per 64-weight NVFP4 block</text>
+  <rect class="nv-box" x="404" y="340" width="380" height="76" rx="10"/>
+  <text x="424" y="366" class="nv-title" font-size="13">combined sub-block scale</text>
+  <text x="424" y="388" class="nv-hi">UE4M3(d[sub]) x fp16(q8.d)</text>
+  <text x="424" y="406" class="nv-hi">x weight_scale</text>
+  <rect class="nv-box" x="824" y="340" width="332" height="76" rx="10"/>
+  <text x="844" y="366" class="nv-title" font-size="13">AVX2 kernel</text>
+  <text x="844" y="386" class="nv-sub">shuffle nibble LUT, maddubs sign trick,</text>
+  <text x="844" y="404" class="nv-sub">madd + per-sub-block FMA rescale</text>
+
+  <text x="24" y="446" class="nv-cap">Evidence (PR #442): Command A+ 218B/25B-active at 130.9 GB runtime, 675/675 weights mapped; coherent short generation on Ryzen.</text>
+  <text x="24" y="466" class="nv-cap">Packed-row validation matches the compressed-tensors formula within 4.66e-10.</text>
+  <text x="24" y="490" class="nv-cap">Caveats: candidate-status and MoE-only - only routed and shared SwiGLU expert maps exist; no dense NVFP4 GEMM/GEMV provider.</text>
+  <text x="24" y="510" class="nv-cap">Short-context bring-up is not performance or long-context certification.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h4 style="margin-top: 0;">Dot Path and Dispatch</h4>
+        <p>NVFP4 weights pair with Q8_0 activations (two Q8_0 blocks per NVFP4 block). The scalar reference <code>vec_dot_nvfp4_q8_0_ref</code> defines the math; the AVX2 path (<code>src/kernels/gemm_kernels_nvfp4.c</code>) decodes nibbles with a <code>_mm_shuffle_epi8</code> LUT, multiplies with a sign-magnitude <code>_mm256_maddubs_epi16</code> trick, widens with <code>_mm256_madd_epi16</code>, and rescales per sub-block with FMA. Non-AVX2 builds fall back to the scalar reference.</p>
+        <p><code>gemv_nvfp4_q8_0_uniform</code> partitions output rows over the persistent global threadpool — grain <code>rows / (threads * 4)</code>, minimum 8, serial below 64 rows.</p>
+    </div>
+    <div class="card card-blue">
+        <h4 style="margin-top: 0;">Where It Runs: MoE Experts Only</h4>
+        <p>Exactly two v8 kernel maps provide NVFP4, both <strong>candidate</strong> status at priority 180, phases prefill + decode:</p>
+        <ul>
+            <li><code>moe_swiglu_expert_forward_nvfp4</code> — routed experts, interface <code>moe_swiglu_expert.nvfp4_q8_0.fp32.v1</code>, group <code>nvfp4_q8_0_routed_swiglu_fp32</code></li>
+            <li><code>moe_swiglu_shared_forward_nvfp4</code> — shared expert, group <code>nvfp4_q8_0_shared_swiglu_fp32</code></li>
+        </ul>
+        <p>Both run through workspace-sized entry points (<code>moe_swiglu_nvfp4_workspace_bytes</code>). There is no dense NVFP4 GEMM/GEMV map — treat NVFP4 as an MoE-expert storage contract, not a general format.</p>
+    </div>
+</div>
+
+<hr>
+
 <h2 id="blockwise-dequant">How Blockwise Dequant Works</h2>
 
 <p>For weight-only quantization, the key performance trick is to avoid a full dequantization pass. Instead, dequantize a small block in registers and immediately consume it in the dot-product/FMA loop.</p>
@@ -2188,10 +2343,14 @@ void matmul_q4(float* out, const float* x, const tensor* W) {
         <tr><th>Format</th><th>Bytes/32 Weights</th><th>Structure</th><th>Best For</th></tr>
         <tr><td>Q4_0</td><td>18</td><td>scale + 32x4bit</td><td>General use, fastest</td></tr>
         <tr><td>Q4_1</td><td>20</td><td>scale + min + 32x4bit</td><td>Asymmetric distributions</td></tr>
+        <tr><td>Q5_0</td><td>22</td><td>scale + 32x1bit (qh) + 32x4bit</td><td>Q/K/O projections</td></tr>
+        <tr><td>Q5_1</td><td>24</td><td>scale + min + 32x1bit (qh) + 32x4bit</td><td>Asymmetric 5-bit ranges</td></tr>
         <tr><td>Q8_0</td><td>34</td><td>scale + 32x8bit</td><td>High quality requirements</td></tr>
+        <tr><td>Q4_K</td><td>144/256</td><td>Nested superblock</td><td>Best quality/size ratio</td></tr>
+        <tr><td>Q5_K</td><td>176/256</td><td>K-quant + 32B high bits (qh)</td><td>Gemma MLP / proj</td></tr>
         <tr><td>Q6_K</td><td>210/256</td><td>K-quant with int8 sub-scales</td><td>Sensitive MLP / output weights</td></tr>
         <tr><td>Q8_K</td><td>292/256</td><td>FP32 scale + 256x8bit + bsums</td><td>Mixed K-quant activation path</td></tr>
-        <tr><td>Q4_K</td><td>144/256</td><td>Nested superblock</td><td>Best quality/size ratio</td></tr>
+        <tr><td>NVFP4</td><td>36/64</td><td>4x UE4M3 sub-scales + 64xE2M1, external FP32 scale</td><td>MoE expert weights (candidate)</td></tr>
     </table>
 </div>
 
@@ -2203,6 +2362,59 @@ void matmul_q4(float* out, const float* x, const tensor* W) {
     <li><a href="gemm-optimization.html">GEMM Optimization</a> - Microkernel, packing, 1.44x faster than MKL</li>
     <li><a href="concepts.html">Deep Dive: LLM Concepts</a> - Transformer architecture</li>
 </ul>
+
+<div id="nv-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="nv-ov-bar">
+      <span class="nv-ov-title" id="nv-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="nv-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="nv-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="nv-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="nv-ov-stage" id="nv-ov-stage"><img id="nv-ov-img" alt=""></div>
+</div>
+
+<script>
+    (function() {
+      var overlay = document.getElementById('nv-svg-overlay');
+      var stage = document.getElementById('nv-ov-stage');
+      var img = document.getElementById('nv-ov-img');
+      var title = document.getElementById('nv-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('nv-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('nv-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('nv-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('nv-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -2433,7 +2645,7 @@ void matmul_q4(float* out, const float* x, const tensor* W) {
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-05</p>
             </div>
         </div>
     </footer>
