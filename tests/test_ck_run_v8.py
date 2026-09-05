@@ -99,6 +99,8 @@ def test_refresh_manifest_circuit_snapshot_replaces_stale_graph_policy(
     )
     original_entries = manifest_path_data(manifest_path)["entries"]
     monkeypatch.setattr(ck_run_v8, "V8_ROOT", v8_root)
+    import build_ir_v8
+    monkeypatch.setattr(build_ir_v8, "V8_ROOT", v8_root)
 
     assert ck_run_v8._refresh_manifest_circuit_snapshot(manifest_path)
     refreshed = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -109,6 +111,26 @@ def test_refresh_manifest_circuit_snapshot_replaces_stale_graph_policy(
 
 def manifest_path_data(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_ir_fingerprint_includes_terminal_row_planner(tmp_path: Path, monkeypatch) -> None:
+    manifest = tmp_path / "weights_manifest.json"
+    manifest.write_text("{}")
+    monkeypatch.setattr(ck_run_v8, "step_regenerate_kernel_registry", lambda **kwargs: None)
+    monkeypatch.setattr(ck_run_v8, "_refresh_manifest_circuit_snapshot", lambda path: False)
+    captured = []
+
+    class FingerprintCaptured(Exception):
+        pass
+
+    def capture(paths):
+        captured.extend(paths)
+        raise FingerprintCaptured()
+
+    monkeypatch.setattr(ck_run_v8, "_tree_identity", capture)
+    with pytest.raises(FingerprintCaptured):
+        ck_run_v8.step_build_ir(manifest, tmp_path)
+    assert ck_run_v8.SCRIPTS_DIR / "plan_terminal_rows_v8.py" in captured
 
 
 def test_bundle_stamp_rejects_changed_inputs_and_outputs(tmp_path: Path) -> None:

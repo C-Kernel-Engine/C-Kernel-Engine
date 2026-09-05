@@ -1277,6 +1277,7 @@ def step_build_ir(
         "planner_sources": _tree_identity(
             [
                 SCRIPTS_DIR / "build_ir_v8.py",
+                SCRIPTS_DIR / "plan_terminal_rows_v8.py",
                 SCRIPTS_DIR / "memory_planner_v8.py",
                 SCRIPTS_DIR / "validate_circuit_interfaces_v8.py",
                 SCRIPTS_DIR / "resolve_layout_chain_v8.py",
@@ -2123,6 +2124,7 @@ def _whisper_build_inputs(
             [
                 SCRIPTS_DIR / "convert_safetensors_to_bump_v8.py",
                 SCRIPTS_DIR / "build_ir_v8.py",
+                SCRIPTS_DIR / "plan_terminal_rows_v8.py",
                 SCRIPTS_DIR / "codegen_v8.py",
                 SCRIPTS_DIR / "codegen_core_v8.py",
                 SCRIPTS_DIR / "codegen_prefill_v8.py",
