@@ -312,3 +312,25 @@ Ryzen. Preserve the short certified runtime and its provenance separately.
 
 Until that ladder completes, announce experimental Q4_K_M execution with the
 specific short parity result, not fully certified 128K support or BF16 parity.
+
+The follow-up all-layer prefill capture completes with 45285 exact comparisons,
+zero value differences, and 671 unavailable comparisons. Of those unavailable
+entries, 320 are eight missing internal PLE exports across 40 rows; 351 are nine
+terminal oracle boundaries absent for the earlier 39 prompt rows. Final-row
+comparisons now pass instead of being misread as smaller full-batch rows.
+The oracle normalizes flattened hyper-stream features (`[10240, tokens, 1, 1]`),
+while combined hyper streams use `[2560, 4, tokens, 1]`; regression coverage
+checks both layouts. The updated X-Ray suite passes 47 tests.
+
+The separate 131072-capacity/4096-transient-row compiler plan succeeds with
+arena size 136175473216 bytes (126.8 GiB). Runtime libraries, prepared weights,
+and other process/OS allocations need additional headroom. This remains a
+planner result, not an executed 128K test. Evidence: `plan-128k-terminal/` and
+`xray-chat40-terminal-row-fix/` under the same Ryzen experiment root.
+
+The execution-plan commit passed staged v7 and v8 fast regression. Gemma,
+Qwen2, Qwen3, and Qwen3.5 passed build/smoke/coherence/contracts. Nanbeige still
+has its existing coherence FAIL despite the suite's aggregate PASS. The
+subsequent diagnostic-only flattened-axis correction passed all 47 X-Ray
+tests; the duplicate full-model pre-commit rebuild was omitted for that
+correction. It does not alter the certified generated runtime.

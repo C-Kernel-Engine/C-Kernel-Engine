@@ -600,7 +600,7 @@ def classify(
 # Token axes for these exported graph nodes (GGML ne order). Shape metadata,
 # not divisibility by prompt length, distinguishes a selected final row.
 ORACLE_TOKEN_AXES = {
-    "hc_norm": 2, "hc_gate": 1, "hc_mixed": 1, "hc_combine": 2,
+    "hc_norm": 1, "hc_gate": 1, "hc_mixed": 1, "hc_combine": 2,
     "ffn_moe_logits": 1, "ffn_moe_weights_norm": 1,
     "ffn_moe_out": 1, "ffn_out": 1, "l_last": 2,
 }

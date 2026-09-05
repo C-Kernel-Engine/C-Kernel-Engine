@@ -614,6 +614,16 @@ class TextRecurrentXRayTests(unittest.TestCase):
             path.with_suffix(".json").write_text(json.dumps({"type": 0, "ne": [2560, 4, 1, 1]}))
             self.assertEqual(XRAY._infer_oracle_row_count(root, "layer_out_hyper", 47, 39, 40), 10240)
 
+    def test_normalized_hyper_stream_has_flattened_feature_axis(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / "hc_norm-0-token-000039-occ-000.bin"
+            values = np.arange(10240 * 40, dtype=np.float32).reshape(40, 10240)
+            values.tofile(path)
+            path.with_suffix(".json").write_text(json.dumps({"type": 0, "ne": [10240, 40, 1, 1]}))
+            self.assertEqual(XRAY._infer_oracle_row_count(root, "attn_hyper_norm", 0, 17, 40), 10240)
+            np.testing.assert_array_equal(XRAY._load_oracle_row(root, "attn_hyper_norm", 0, 17, 40, 10240), values[17])
+
     def test_schedule_metadata_is_mandatory_in_analysis(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
