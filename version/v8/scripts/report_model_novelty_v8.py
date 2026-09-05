@@ -16,6 +16,13 @@ Two modes:
   JSON, the operations used, how many are shared with other circuits vs
   unique to this one, the providers bound, provider status counts, and
   declared vs undeclared numerical boundaries when that metadata exists.
+  Composite circuits (components + stitch edges, e.g. multimodal encoder /
+  decoder compositions) are resolved recursively the same way
+  build_ir_v8.py resolves them: ``extends`` parents are deep-merged,
+  component circuits are loaded with cycle detection, and stitch edge
+  ops/providers are aggregated with per-component attribution. Any
+  composition form this resolver cannot understand raises an explicit
+  "unsupported composition" error; zeros are never silently reported.
 
 This report is ADVISORY only. It is not a CI gate and never fails the tree.
 Missing metadata is reported as an explicit null with a "not tracked yet"
@@ -27,6 +34,7 @@ Stdlib only. Runnable from the repo root.
 from __future__ import annotations
 
 import argparse
+import copy
 import fnmatch
 import json
 import subprocess
@@ -221,6 +229,212 @@ def _extract_circuit_ops(doc: dict[str, Any]) -> set[str]:
     return ops
 
 
+class UnsupportedCompositionError(RuntimeError):
+    """Raised when a circuit's composition cannot be resolved faithfully.
+
+    The report must never silently report zeros for a composition form it
+    does not understand, so unresolvable references fail loudly here and
+    are surfaced as a clear error by build_circuit_report().
+    """
+
+
+def _merge_circuit_docs(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
+    """Deep-merge child over parent, mirroring build_ir_v8._merge_template_defaults."""
+    merged = copy.deepcopy(parent)
+    for key, value in child.items():
+        if value is None:
+            continue
+        if isinstance(merged.get(key), dict) and isinstance(value, dict):
+            merged[key] = _merge_circuit_docs(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _resolve_circuit_doc(name: str, stack: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Load a circuit with extends parents and components resolved.
+
+    Mirrors build_ir_v8._load_builtin_template_doc: ``extends`` chains are
+    deep-merged child-over-parent, component circuits are loaded
+    recursively, and cyclic references raise. The resolved component docs
+    are attached under ``_resolved_components`` for aggregation.
+    """
+    if name in stack:
+        chain = " -> ".join((*stack, name))
+        raise UnsupportedCompositionError(f"cyclic circuit reference: {chain}")
+    path = CIRCUITS_DIR / f"{name}.json"
+    if not path.exists():
+        raise UnsupportedCompositionError(
+            f"unsupported composition: circuit {name!r} referenced by "
+            f"{' -> '.join(stack) or name} has no JSON at {path}"
+        )
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise UnsupportedCompositionError(
+            f"unsupported composition: circuit {name!r} is not readable JSON: {exc}"
+        )
+    if not isinstance(doc, dict):
+        raise UnsupportedCompositionError(
+            f"unsupported composition: circuit {name!r} JSON must be an object"
+        )
+
+    parent_name = str(doc.get("extends", "") or "").strip().lower()
+    if parent_name:
+        parent_doc = _resolve_circuit_doc(parent_name, (*stack, name))
+        overrides = copy.deepcopy(doc)
+        overrides.pop("extends", None)
+        doc = _merge_circuit_docs(parent_doc, overrides)
+
+    components = doc.get("components")
+    if components is None:
+        return doc
+    if not isinstance(components, dict) or not components:
+        raise UnsupportedCompositionError(
+            f"unsupported composition: {name} components must be a non-empty object"
+        )
+    sequence = doc.get("sequence")
+    if not isinstance(sequence, list) or set(map(str, sequence)) != set(map(str, components)):
+        raise UnsupportedCompositionError(
+            f"unsupported composition: {name} sequence must name every component exactly; "
+            f"sequence={sequence!r} components={sorted(map(str, components))!r}"
+        )
+    resolved: dict[str, Any] = {}
+    for component_name in map(str, sequence):
+        ref = components.get(component_name)
+        if not isinstance(ref, dict):
+            raise UnsupportedCompositionError(
+                f"unsupported composition: {name} component {component_name!r} must be an object"
+            )
+        circuit_name = str(ref.get("circuit", "") or "").strip().lower()
+        block_name = str(ref.get("block", "") or "").strip()
+        if not circuit_name or not block_name:
+            raise UnsupportedCompositionError(
+                f"unsupported composition: {name} component {component_name!r} "
+                "must explicitly name circuit and block"
+            )
+        component_doc = _resolve_circuit_doc(circuit_name, (*stack, name))
+        if component_doc.get("components") is None:
+            block_types = component_doc.get("block_types") or {}
+            if not isinstance(block_types, dict) or block_name not in block_types:
+                raise UnsupportedCompositionError(
+                    f"unsupported composition: {name} component {component_name!r} references "
+                    f"missing block {circuit_name}.{block_name}"
+                )
+        resolved[component_name] = {
+            "circuit": circuit_name,
+            "block": block_name,
+            "doc": component_doc,
+        }
+    doc["_resolved_components"] = resolved
+    return doc
+
+
+def _stitch_edges(doc: dict[str, Any], circuit_name: str) -> list[dict[str, Any]]:
+    """Validate and return the stitch edges declared by a resolved circuit."""
+    stitch = doc.get("stitch")
+    if stitch is None:
+        return []
+    if not isinstance(stitch, list):
+        raise UnsupportedCompositionError(
+            f"unsupported composition: {circuit_name} stitch must be a list of edges"
+        )
+    edges: list[dict[str, Any]] = []
+    for index, edge in enumerate(stitch):
+        if not isinstance(edge, dict):
+            raise UnsupportedCompositionError(
+                f"unsupported composition: {circuit_name} stitch[{index}] must be an object"
+            )
+        edge_id = str(edge.get("id", "") or "").strip()
+        op = str(edge.get("op", "") or "").strip()
+        if not edge_id or not op:
+            raise UnsupportedCompositionError(
+                f"unsupported composition: {circuit_name} stitch[{index}] must declare id and op"
+            )
+        providers = (edge.get("required_contract") or {}).get("providers") or {}
+        if not isinstance(providers, dict):
+            raise UnsupportedCompositionError(
+                f"unsupported composition: {circuit_name} stitch {edge_id!r} providers must be an object"
+            )
+        provider_map: dict[str, dict[str, str]] = {}
+        for binding, reference in providers.items():
+            if not isinstance(reference, dict):
+                raise UnsupportedCompositionError(
+                    f"unsupported composition: {circuit_name} stitch {edge_id!r} provider "
+                    f"{binding!r} must be an object"
+                )
+            kernel_id = str(reference.get("kernel_id", "") or "").strip()
+            provider_op = str(reference.get("op", "") or "").strip()
+            if not kernel_id or not provider_op:
+                raise UnsupportedCompositionError(
+                    f"unsupported composition: {circuit_name} stitch {edge_id!r} provider "
+                    f"{binding!r} must declare kernel_id and op"
+                )
+            provider_map[str(binding)] = {"kernel_id": kernel_id, "op": provider_op}
+        edges.append(
+            {
+                "id": edge_id,
+                "from": str(edge.get("from", "") or ""),
+                "to": str(edge.get("to", "") or ""),
+                "op": op,
+                "providers": provider_map,
+            }
+        )
+    return edges
+
+
+def _collect_circuit_ops(doc: dict[str, Any], circuit_name: str) -> set[str]:
+    """Aggregate ops from a resolved circuit: own blocks, components, stitch."""
+    ops = _extract_circuit_ops(doc)
+    for component in (doc.get("_resolved_components") or {}).values():
+        ops |= _collect_circuit_ops(component["doc"], component["circuit"])
+    for edge in _stitch_edges(doc, circuit_name):
+        ops.add(edge["op"])
+        for provider in edge["providers"].values():
+            ops.add(provider["op"])
+    return ops
+
+
+def _collect_circuit_providers(
+    doc: dict[str, Any], circuit_name: str, prefix: str = ""
+) -> dict[str, str]:
+    """Aggregate binding -> provider id with per-source qualified keys.
+
+    A binding may map to a dispatch table (variant -> provider id) instead
+    of a plain string; every variant provider is reported under
+    ``binding[variant]`` so bound candidates are never dropped.
+    """
+    bindings: dict[str, str] = {}
+    own = doc.get("kernels") or {}
+    if isinstance(own, dict):
+        for binding, provider_ref in own.items():
+            key = prefix + str(binding)
+            if isinstance(provider_ref, str):
+                bindings[key] = provider_ref
+            elif isinstance(provider_ref, dict):
+                for variant, provider_id in provider_ref.items():
+                    if not isinstance(provider_id, str):
+                        raise UnsupportedCompositionError(
+                            f"unsupported composition: {circuit_name} binding {binding!r} "
+                            f"variant {variant!r} must name a provider id string"
+                        )
+                    bindings[f"{key}[{variant}]"] = provider_id
+            else:
+                raise UnsupportedCompositionError(
+                    f"unsupported composition: {circuit_name} binding {binding!r} must be "
+                    "a provider id string or a dispatch table of variant -> provider id"
+                )
+    for component_name, component in (doc.get("_resolved_components") or {}).items():
+        for binding, provider_id in _collect_circuit_providers(
+            component["doc"], component["circuit"]
+        ).items():
+            bindings[f"{prefix}{component_name}.{binding}"] = provider_id
+    for edge in _stitch_edges(doc, circuit_name):
+        for binding, provider in edge["providers"].items():
+            bindings[f"{prefix}stitch.{edge['id']}.{binding}"] = provider["kernel_id"]
+    return bindings
+
+
 def _load_registry() -> dict[str, dict[str, Any]]:
     if not REGISTRY_PATH.exists():
         return {}
@@ -283,28 +497,84 @@ def build_circuit_report(circuit: str) -> dict[str, Any]:
         raise SystemExit(
             f"error: unknown circuit {circuit!r}; available: {', '.join(available)}"
         )
-    doc = json.loads(circuit_path.read_text(encoding="utf-8"))
+    try:
+        return _build_circuit_report(circuit, circuit_path)
+    except UnsupportedCompositionError as exc:
+        raise SystemExit(f"error: {exc}")
+
+
+def _build_circuit_report(circuit: str, circuit_path: Path) -> dict[str, Any]:
+    doc = _resolve_circuit_doc(circuit)
     registry = _load_registry()
 
-    ops_used = _extract_circuit_ops(doc)
+    composite = bool(doc.get("components"))
+    composition: dict[str, Any] | None = None
+    if composite:
+        component_reports = []
+        for component_name, component in sorted(
+            (doc.get("_resolved_components") or {}).items()
+        ):
+            component_doc = component["doc"]
+            component_ops = _collect_circuit_ops(component_doc, component["circuit"])
+            component_providers = _collect_circuit_providers(
+                component_doc, component["circuit"]
+            )
+            component_reports.append(
+                {
+                    "name": component_name,
+                    "circuit": component["circuit"],
+                    "block": component["block"],
+                    "operations": sorted(component_ops),
+                    "operation_count": len(component_ops),
+                    "providers": dict(sorted(component_providers.items())),
+                    "provider_count": len(component_providers),
+                }
+            )
+        stitch_reports = [
+            {
+                "id": edge["id"],
+                "from": edge["from"],
+                "to": edge["to"],
+                "op": edge["op"],
+                "providers": {
+                    binding: provider["kernel_id"]
+                    for binding, provider in sorted(edge["providers"].items())
+                },
+                "provider_ops": {
+                    binding: provider["op"]
+                    for binding, provider in sorted(edge["providers"].items())
+                },
+            }
+            for edge in _stitch_edges(doc, circuit)
+        ]
+        composition = {
+            "components": component_reports,
+            "stitch": stitch_reports,
+            "component_count": len(component_reports),
+            "stitch_edge_count": len(stitch_reports),
+        }
+
+    ops_used = _collect_circuit_ops(doc, circuit)
     circuits_compared = 0
+    circuits_skipped: list[str] = []
     ops_elsewhere: dict[str, int] = {}
     for other_path in sorted(CIRCUITS_DIR.glob("*.json")):
         if other_path.stem == circuit:
             continue
         try:
-            other_doc = json.loads(other_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            other_doc = _resolve_circuit_doc(other_path.stem)
+        except UnsupportedCompositionError:
+            # A broken unrelated circuit must not sink this report; record
+            # the skip explicitly instead of silently dropping it.
+            circuits_skipped.append(other_path.stem)
             continue
         circuits_compared += 1
-        for op in _extract_circuit_ops(other_doc):
+        for op in _collect_circuit_ops(other_doc, other_path.stem):
             ops_elsewhere[op] = ops_elsewhere.get(op, 0) + 1
     shared = sorted(op for op in ops_used if op in ops_elsewhere)
     unique = sorted(op for op in ops_used if op not in ops_elsewhere)
 
-    bindings = doc.get("kernels") or {}
-    if not isinstance(bindings, dict):
-        bindings = {}
+    bindings = _collect_circuit_providers(doc, circuit)
     provider_detail = []
     status_counts = {"validated": 0, "observed": 0, "not_tracked": 0, "missing_from_registry": 0}
     for binding, provider_id in sorted(bindings.items()):
@@ -331,6 +601,8 @@ def build_circuit_report(circuit: str) -> dict[str, Any]:
         "mode": "circuit",
         "circuit": circuit,
         "circuit_path": str(circuit_path.relative_to(ROOT)),
+        "composite": composite,
+        "composition": composition,
         "operations": {
             "used": sorted(ops_used),
             "total": len(ops_used),
@@ -339,6 +611,7 @@ def build_circuit_report(circuit: str) -> dict[str, Any]:
             "unique_to_circuit": unique,
             "unique_count": len(unique),
             "circuits_compared": circuits_compared,
+            "circuits_skipped": circuits_skipped,
         },
         "providers": {
             "bindings": dict(sorted(bindings.items())),
@@ -407,6 +680,19 @@ def _render_circuit_markdown(report: dict[str, Any]) -> str:
         ADVISORY_BANNER,
         "",
         f"Mode: circuit `{report['circuit']}` (`{report['circuit_path']}`)",
+    ]
+    if report.get("composite"):
+        composition = report["composition"] or {}
+        component_count = composition.get("component_count", 0)
+        edge_count = composition.get("stitch_edge_count", 0)
+        lines.append(
+            f"Composite circuit: yes ({component_count} "
+            f"component{'s' if component_count != 1 else ''}, "
+            f"{edge_count} stitch edge{'s' if edge_count != 1 else ''})"
+        )
+    else:
+        lines.append("Composite circuit: no")
+    lines += [
         "",
         "## Operations",
         "",
@@ -415,8 +701,46 @@ def _render_circuit_markdown(report: dict[str, Any]) -> str:
         f"- Unique to this circuit: {ops['unique_count']}",
         f"- Circuits compared: {ops['circuits_compared']}",
     ]
+    if ops.get("circuits_skipped"):
+        lines.append(
+            "- Circuits skipped (unresolvable composition): "
+            + ", ".join(f"`{name}`" for name in ops["circuits_skipped"])
+        )
     if ops["unique_to_circuit"]:
         lines.append("- Unique ops: " + ", ".join(f"`{op}`" for op in ops["unique_to_circuit"]))
+    if report.get("composite"):
+        composition = report["composition"] or {}
+        lines += [
+            "",
+            "## Composition (per-component attribution)",
+            "",
+            "| Component | Circuit | Block | Ops | Providers |",
+            "| --- | --- | --- | ---: | ---: |",
+        ]
+        for component in composition.get("components", []):
+            lines.append(
+                f"| `{component['name']}` | `{component['circuit']}` | "
+                f"`{component['block']}` | {component['operation_count']} | "
+                f"{component['provider_count']} |"
+            )
+        stitch_edges = composition.get("stitch", [])
+        if stitch_edges:
+            lines += [
+                "",
+                "### Stitch edges",
+                "",
+                "| Edge | From | To | Op | Providers |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+            for edge in stitch_edges:
+                provider_list = ", ".join(
+                    f"`{binding}` -> `{kernel_id}`"
+                    for binding, kernel_id in edge["providers"].items()
+                ) or "-"
+                lines.append(
+                    f"| `{edge['id']}` | `{edge['from']}` | `{edge['to']}` | "
+                    f"`{edge['op']}` | {provider_list} |"
+                )
     counts = providers["status_counts"]
     lines += [
         "",

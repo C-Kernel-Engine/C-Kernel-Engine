@@ -176,9 +176,246 @@ class V8ModelNoveltyCircuitTests(unittest.TestCase):
         self.assertIsNone(self.report["provider_provenance"])
         self.assertIn("not track", self.report["provider_provenance_note"])
 
+    def test_flat_circuit_is_not_composite(self) -> None:
+        self.assertFalse(self.report["composite"])
+        self.assertIsNone(self.report["composition"])
+
     def test_unknown_circuit_errors(self) -> None:
         with self.assertRaises(SystemExit):
             report.build_circuit_report("no_such_circuit_v8")
+
+
+class V8ModelNoveltyCompositeCircuitTests(unittest.TestCase):
+    """Mode B must resolve components + stitch for composite circuits."""
+
+    @staticmethod
+    def _circuit_json(name: str) -> dict:
+        return json.loads(
+            (ROOT / "version" / "v8" / "circuits" / f"{name}.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+    def test_cohere_compass_reports_nonzero_with_attribution(self) -> None:
+        result = report.build_circuit_report("cohere_compass")
+        self.assertTrue(result["composite"])
+        composition = result["composition"]
+        self.assertEqual(composition["component_count"], 2)
+        self.assertEqual(composition["stitch_edge_count"], 1)
+        self.assertGreater(result["operations"]["total"], 0)
+        self.assertGreater(result["providers"]["total"], 0)
+
+        components = {c["name"]: c for c in composition["components"]}
+        self.assertEqual(set(components), {"vision_encoder", "decoder"})
+        self.assertEqual(components["vision_encoder"]["circuit"], "cohere_compass_vision")
+        self.assertEqual(components["decoder"]["circuit"], "cohere_compass_text")
+        self.assertGreater(components["vision_encoder"]["operation_count"], 0)
+        self.assertGreater(components["decoder"]["operation_count"], 0)
+
+        # Per-component ops come from the real component circuits: the
+        # decoder inherits cohere2's block ops via extends, the vision
+        # encoder inherits qwen3_vl_vision's.
+        cohere2_ops = report._extract_circuit_ops(self._circuit_json("cohere2"))
+        vision_ops = report._extract_circuit_ops(self._circuit_json("qwen3_vl_vision"))
+        self.assertTrue(cohere2_ops)
+        self.assertTrue(cohere2_ops <= set(components["decoder"]["operations"]))
+        self.assertTrue(vision_ops <= set(components["vision_encoder"]["operations"]))
+
+        # Providers keep their component attribution and respect extends
+        # overrides: cohere_compass_text overrides rope_qk from cohere2.
+        bindings = result["providers"]["bindings"]
+        cohere2_kernels = self._circuit_json("cohere2")["kernels"]
+        for binding, provider_id in cohere2_kernels.items():
+            if binding in ("rope_qk", "rope_qk_decode"):
+                continue  # overridden by cohere_compass_text
+            self.assertEqual(bindings[f"decoder.{binding}"], provider_id)
+        self.assertEqual(bindings["decoder.rope_qk"], "mrope_qk_text_imrope")
+        vision_kernels = self._circuit_json("qwen3_vl_vision")["kernels"]
+        for binding, provider_id in vision_kernels.items():
+            if binding == "position_embeddings":
+                continue  # overridden by cohere_compass_vision
+            self.assertEqual(bindings[f"vision_encoder.{binding}"], provider_id)
+        self.assertEqual(
+            bindings["vision_encoder.position_embeddings"],
+            "position_embeddings_add_tiled_2d_align_corners_fp32_interp_bf16",
+        )
+
+        # Stitch edge ops and providers are aggregated with attribution.
+        stitch = composition["stitch"]
+        self.assertEqual(len(stitch), 1)
+        edge = stitch[0]
+        self.assertEqual(edge["id"], "vision_embeddings_to_decoder_prefix")
+        self.assertEqual(edge["op"], "multimodal_prefix_stitch")
+        self.assertEqual(
+            edge["providers"],
+            {
+                "prefix_insert": "multimodal_prefix_insert_f32",
+                "position_builder": "multimodal_mrope_positions_2d",
+                "position_transform": "mrope_qk_imrope_positions",
+            },
+        )
+        ops_used = set(result["operations"]["used"])
+        self.assertIn("multimodal_prefix_stitch", ops_used)
+        self.assertIn("multimodal_prefix_insert", ops_used)
+        self.assertIn("multimodal_position_builder", ops_used)
+        for binding, provider_id in edge["providers"].items():
+            self.assertEqual(
+                bindings[f"stitch.vision_embeddings_to_decoder_prefix.{binding}"],
+                provider_id,
+            )
+
+        # Every aggregated provider still resolves in the registry.
+        self.assertEqual(
+            result["providers"]["status_counts"]["missing_from_registry"], 0
+        )
+        self.assertEqual(
+            sum(result["providers"]["status_counts"].values()),
+            result["providers"]["total"],
+        )
+
+    def test_qwen36vl_reports_nonzero_with_attribution(self) -> None:
+        result = report.build_circuit_report("qwen36vl")
+        self.assertTrue(result["composite"])
+        composition = result["composition"]
+        self.assertGreater(result["operations"]["total"], 0)
+        self.assertGreater(result["providers"]["total"], 0)
+
+        components = {c["name"]: c for c in composition["components"]}
+        self.assertEqual(components["vision_encoder"]["circuit"], "qwen3_vl_vision")
+        self.assertEqual(components["decoder"]["circuit"], "qwen35")
+
+        qwen35_ops = report._extract_circuit_ops(self._circuit_json("qwen35"))
+        self.assertTrue(qwen35_ops <= set(components["decoder"]["operations"]))
+        qwen35_kernels = self._circuit_json("qwen35")["kernels"]
+        bindings = result["providers"]["bindings"]
+        for binding, provider_id in qwen35_kernels.items():
+            self.assertEqual(bindings[f"decoder.{binding}"], provider_id)
+
+        edge = composition["stitch"][0]
+        self.assertEqual(edge["op"], "multimodal_prefix_stitch")
+        self.assertIn("multimodal_prefix_stitch", result["operations"]["used"])
+        self.assertEqual(
+            result["providers"]["status_counts"]["missing_from_registry"], 0
+        )
+
+    def test_composite_cli_markdown(self) -> None:
+        proc = subprocess.run(
+            ["python3", str(SCRIPT), "--circuit", "cohere_compass"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("Composite circuit: yes (2 components, 1 stitch edge)", proc.stdout)
+        self.assertIn("multimodal_prefix_stitch", proc.stdout)
+        self.assertIn("`decoder` | `cohere_compass_text`", proc.stdout)
+
+
+class V8ModelNoveltyCompositionFaultTests(unittest.TestCase):
+    """Unresolvable compositions must fail loudly, never report zeros."""
+
+    def _run_with_circuits(self, fixtures: dict[str, dict], circuit: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = pathlib.Path(tmp)
+            for name, doc in fixtures.items():
+                (tmp_path / f"{name}.json").write_text(
+                    json.dumps(doc), encoding="utf-8"
+                )
+            original = report.CIRCUITS_DIR
+            report.CIRCUITS_DIR = tmp_path
+            try:
+                report.build_circuit_report(circuit)
+            finally:
+                report.CIRCUITS_DIR = original
+
+    def test_extends_cycle_fails_loudly(self) -> None:
+        fixtures = {
+            "cycle_a": {"version": 1, "name": "cycle_a", "extends": "cycle_b"},
+            "cycle_b": {"version": 1, "name": "cycle_b", "extends": "cycle_a"},
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_circuits(fixtures, "cycle_a")
+        self.assertIn("cyclic circuit reference", str(ctx.exception))
+
+    def test_component_cycle_fails_loudly(self) -> None:
+        def composite(name: str, other: str) -> dict:
+            return {
+                "version": 1,
+                "name": name,
+                "sequence": ["part"],
+                "components": {
+                    "part": {
+                        "runtime_role": "decoder",
+                        "circuit": other,
+                        "block": "decoder",
+                    }
+                },
+            }
+
+        fixtures = {
+            "cycle_c": composite("cycle_c", "cycle_d"),
+            "cycle_d": composite("cycle_d", "cycle_c"),
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_circuits(fixtures, "cycle_c")
+        self.assertIn("cyclic circuit reference", str(ctx.exception))
+
+    def test_missing_component_circuit_fails_loudly(self) -> None:
+        fixtures = {
+            "broken": {
+                "version": 1,
+                "name": "broken",
+                "sequence": ["part"],
+                "components": {
+                    "part": {
+                        "runtime_role": "encoder",
+                        "circuit": "no_such_component_circuit",
+                        "block": "vision_encoder",
+                    }
+                },
+            }
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_circuits(fixtures, "broken")
+        self.assertIn("unsupported composition", str(ctx.exception))
+
+    def test_missing_component_block_fails_loudly(self) -> None:
+        fixtures = {
+            "leaf": {
+                "version": 1,
+                "name": "leaf",
+                "block_types": {"decoder": {"header": ["layernorm"]}},
+            },
+            "broken": {
+                "version": 1,
+                "name": "broken",
+                "sequence": ["part"],
+                "components": {
+                    "part": {
+                        "runtime_role": "decoder",
+                        "circuit": "leaf",
+                        "block": "no_such_block",
+                    }
+                },
+            },
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_circuits(fixtures, "broken")
+        self.assertIn("unsupported composition", str(ctx.exception))
+        self.assertIn("missing block", str(ctx.exception))
+
+    def test_malformed_stitch_edge_fails_loudly(self) -> None:
+        fixtures = {
+            "broken": {
+                "version": 1,
+                "name": "broken",
+                "block_types": {"decoder": {"header": ["layernorm"]}},
+                "stitch": [{"id": "edge_without_op"}],
+            }
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_circuits(fixtures, "broken")
+        self.assertIn("unsupported composition", str(ctx.exception))
 
 
 if __name__ == "__main__":
