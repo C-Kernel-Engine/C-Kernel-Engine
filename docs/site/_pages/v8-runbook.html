@@ -330,6 +330,36 @@ python -m pip install -r version/v8/requirements.txt</pre>
     <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
     <p class="mini-note">These raw CLI examples use the shell wrapper so a first-time user can be prompted to create <code>.venv</code> and install <code>version/v8/requirements.txt</code> if the repo-local environment is missing.</p>
 
+    <h3 id="qwen38-dense-quickstart">Qwen3.8 27B Dense Q4_K_M</h3>
+    <p>Run from the repository root. This command uses the standard GGUF, not an Unsloth UD mixed-quant artifact.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf \
+  --context-len 16384 \
+  --force-convert --force-compile \
+  --chat-template auto \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">16384 is context capacity, not consumed prompt length. This is a short generation check; allocate only what fits available RAM.</p>
+
+    <h3 id="qwen38-flash-quickstart">Qwen3.8 Flash Next Q4_K_M</h3>
+    <p>Experimental text inference. The example uses the local GGUF path on the 160 GB Ryzen test node. On another machine, replace that path with your matching local artifact. The tested file is 119,150,722,112 bytes; this command does not download it or certify other Flash quantizations.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  "$HOME/.cache/cke-nvme/qwen38-flash-next/gguf/qwen3.8-flash-next-Q4_K_M.gguf" \
+  --context-len 8192 \
+  --force-convert --force-compile \
+  --chat-template auto \
+  --prompt 'Give me a detailed example of C, Python and SQL code.' \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">The Flash example is for a high-memory host, not the 64 GB P3. 8192 is capacity, not an 8K-input certification. See the evidence table above for numerical and long-context limits.</p>
+
     <h3 style="margin-top: 0;">Gemma 3 270M</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
