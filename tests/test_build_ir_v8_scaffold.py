@@ -32,6 +32,9 @@ def _normalized_template_doc(doc: dict) -> dict:
     normalized = json.loads(json.dumps(doc))
     normalized.pop("required_contracts", None)
     normalized.pop("required_numerical_contracts", None)
+    # v8 makes the seed's implicit projection source explicit. Validate these
+    # declarations separately before comparing the inherited graph topology.
+    normalized.pop("projection_inputs", None)
     contract = normalized.get("contract")
     if isinstance(contract, dict):
         # Runtime preferences moved out of circuit flags in v8. They are not
@@ -73,6 +76,17 @@ class BuildIrV8ScaffoldTests(unittest.TestCase):
             with self.subTest(template=name):
                 v7_doc = json.loads((ROOT / "version" / "v7" / "templates" / f"{name}.json").read_text(encoding="utf-8"))
                 v8_doc = json.loads((ROOT / "version" / "v8" / "circuits" / f"{name}.json").read_text(encoding="utf-8"))
+                projections = {"q_proj", "k_proj", "v_proj"}
+                if name == "qwen35":
+                    projections.remove("q_proj")
+                    projections.update({
+                        "q_gate_proj", "recurrent_qkv_proj", "recurrent_gate_proj",
+                        "recurrent_alpha_proj", "recurrent_beta_proj",
+                    })
+                self.assertEqual(
+                    v8_doc.get("projection_inputs"),
+                    {op: {"x": "main_stream_q8"} for op in projections},
+                )
                 self.assertEqual(_normalized_template_doc(v8_doc), _normalized_template_doc(v7_doc))
 
     def test_v8_seeded_templates_do_not_embed_runtime_policy_flags(self) -> None:

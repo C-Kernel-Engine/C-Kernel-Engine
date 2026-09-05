@@ -38454,8 +38454,8 @@
           "alignment": 64,
           "lifetime": "kernel_call",
           "size_resolution": "required",
-          "size_bytes": "64 * (align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_0_row_bytes(I)) + align64(H * 4))",
-          "desc": "Per-worker hidden Q8_K, gate/up, Q8_0 activation, and shared-output storage."
+          "size_bytes": "align64(4 * q8_k_row_bytes(H)) + 2 * align64(4 * I * 4) + align64(4 * q8_0_row_bytes(I)) + align64(4 * H * 4)",
+          "desc": "Four-row hidden Q8_K, gate/up, Q8_0 activation, and shared-output storage matching the prefill reduction boundary."
         }
       ],
       "dims": [
@@ -38487,12 +38487,13 @@
         "threading": {
           "runtime": "ck_threadpool",
           "work_partition": [
-            "independent_rows"
+            "independent_rows",
+            "output_tiles"
           ],
           "dispatch": [
-            "ck_threadpool_dispatch_n"
+            "internal_threaded"
           ],
-          "reduction_order_effect": "none"
+          "reduction_order_effect": "contract_defined"
         }
       },
       "call_abi": {

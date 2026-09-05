@@ -180,6 +180,23 @@ class MixedQ4KQ80MoETest(unittest.TestCase):
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
 
     def test_gated_shared_uses_four_row_prefill_reduction_groups(self) -> None:
+        self._check_shared_prefill_groups('q8_0', self.shared_down)
+
+    def test_q5_down_shared_uses_same_four_row_prefill_groups(self) -> None:
+        rng = np.random.default_rng(4350)
+        count = self.hidden * (self.intermediate // 32)
+        raw = bytearray(rng.integers(0, 256, size=count * 22, dtype=np.uint8).tobytes())
+        for block in range(count):
+            struct.pack_into('<H', raw, block * 22, 0x211F + block % 7)
+        down = ctypes.create_string_buffer(bytes(raw), len(raw))
+        self._check_shared_prefill_groups('q5_0', down)
+
+    def _check_shared_prefill_groups(self, dtype, down) -> None:
+        down_fn = getattr(LIB, f'gemv_{dtype}_q8_0')
+        down_fn.argtypes = LIB.gemv_q8_0_q8_0.argtypes
+        fn = getattr(LIB, f'moe_swiglu_shared_forward_q4k_{dtype}_gated_workspace')
+        fn.argtypes = self.shared_args
+        fn.restype = ctypes.c_int
         rows = self.rows
         q8_k_row_bytes = (self.hidden // QK_K) * 292
         q8_0_row_bytes = (self.intermediate // 32) * Q8_0_BYTES
@@ -216,8 +233,8 @@ class MixedQ4KQ80MoETest(unittest.TestCase):
                 ctypes.c_void_p(activation_q8[row].ctypes.data),
                 self.intermediate,
             )
-            LIB.gemv_q8_0_q8_0(
-                _f32(shared[row]), self.shared_down,
+            down_fn(
+                _f32(shared[row]), down,
                 ctypes.c_void_p(activation_q8[row].ctypes.data),
                 self.hidden, self.intermediate,
             )
@@ -226,17 +243,22 @@ class MixedQ4KQ80MoETest(unittest.TestCase):
         zero_router = np.zeros_like(self.router)
         actual = np.empty_like(self.x)
         workspace = ctypes.create_string_buffer(self.shared_stride)
-        fn = LIB.moe_swiglu_shared_forward_q4k_q8_0_gated_workspace
         self.assertEqual(
             fn(
                 _f32(self.x), _f32(zeros), self.shared_gate, self.shared_up,
-                self.shared_down, _f32(zero_router), _f32(actual), rows,
+                down, _f32(zero_router), _f32(actual), rows,
                 self.hidden, self.intermediate, workspace, self.shared_stride,
             ),
             0,
         )
         expected = np.ascontiguousarray(shared * np.float32(0.5))
         np.testing.assert_array_equal(actual.view(np.uint32), expected.view(np.uint32))
+        self.assertEqual(
+            fn(_f32(self.x), _f32(zeros), self.shared_gate, self.shared_up,
+               down, _f32(zero_router), _f32(actual), rows,
+               self.hidden, self.intermediate, workspace, self.shared_stride - 1),
+            -1,
+        )
 
 
 if __name__ == "__main__":

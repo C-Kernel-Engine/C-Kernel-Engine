@@ -181,3 +181,33 @@ is implied by these results.
 Commit hooks completed v7 and v8 fast regression targets. The v8 report's
 overall PASS still contains a Nanbeige coherence FAIL; it must not be described
 as an all-model coherence pass.
+
+## Shared-expert and contract follow-up
+
+Layer 6 uses Q4_K gate/up and Q5_0 down weights. Its scalar gate projection
+and sigmoid matched the oracle, as did routed experts. Replaying the captured
+MLP input through the shared expert reproduced the row-10 discrepancy alone.
+The Q5_0-down implementation still invoked the Q4_K projections one row at a
+time; only the Q8_0-down variant had received the four-row prefill schedule.
+
+Both variants now use one shared implementation, selecting only the down
+projection function. Kernel maps declare the matching four-row workspace and
+internal output-parallel dispatch. No model-name branch was added to lowering.
+The isolated 40-by-2560 shared output now matches all 102400 values exactly,
+both gated and ungated. This is kernel-level evidence; the full trajectory is
+being rerun separately. The new staged test covers both down formats and rejects
+an undersized workspace. Eight mixed-MoE tests passed; the complete Flash
+component target passed 113 tests, two subtests, and two P3 ISA skips.
+
+The scaffold test now separately checks the exact projection input declarations
+before comparing v8 graph topology with its v7 seed. This retains both checks
+instead of treating explicit v8 metadata as a topology regression. The combined
+scaffold/audio tests passed 33 tests and 59 subtests; the complete
+`v8-kernel-map-contracts` target passed, including 168 map tests and 1199 subtests.
+
+The earlier Gemma 270M timeout did not reproduce in two direct attempts or six
+additional fresh-process smoke runs alternating the two pre-push prompts.
+Those used capacity 128, eight CKE threads, OMP=1, and five output tokens.
+The first repeated run included a rebuild (60.35 seconds); subsequent runs
+took approximately 2.17 seconds each. Its original cause is not established,
+so this is successful revalidation, not proof of a repaired timeout bug.

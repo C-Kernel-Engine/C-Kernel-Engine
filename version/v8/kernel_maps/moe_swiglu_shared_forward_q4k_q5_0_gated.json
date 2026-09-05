@@ -20,11 +20,11 @@
     {"name":"moe_shared_router","dtype":"fp32","shape":[1,"H"],"layout":"feature_contiguous","access":"read","storage_class":"weight","consumption":"required"}
   ],
   "outputs":[{"name":"output","dtype":"fp32","shape":["R","H"],"layout":"token_major_contiguous","access":"write","storage_class":"activation","consumption":"required"}],
-  "scratch":[{"name":"workspace","dtype":"u8","alignment":64,"lifetime":"kernel_call","size_resolution":"required","size_bytes":"64 * (align64(q8_k_row_bytes(H)) + align64(2 * I * 4) + align64(q8_0_row_bytes(I)) + align64(H * 4))","desc":"Per-worker hidden Q8_K, gate/up, Q8_0 activation, and shared-output storage."}],
+  "scratch":[{"name":"workspace","dtype":"u8","alignment":64,"lifetime":"kernel_call","size_resolution":"required","size_bytes":"align64(4 * q8_k_row_bytes(H)) + 2 * align64(4 * I * 4) + align64(4 * q8_0_row_bytes(I)) + align64(4 * H * 4)","desc":"Four-row hidden Q8_K, gate/up, Q8_0 activation, and shared-output storage matching the prefill reduction boundary."}],
   "dims":["R","H","I"],
   "constraints":{"alignment":{"H":256,"I":256}},
   "impl":{"function":"moe_swiglu_shared_forward_q4k_q5_0_gated_parallel_workspace","c_declaration":"int moe_swiglu_shared_forward_q4k_q5_0_gated_parallel_workspace(const float *hidden, const float *routed, const void *shared_gate, const void *shared_up, const void *shared_down, const float *shared_gate_input, float *output, int rows, int hidden_dim, int intermediate_dim, void *workspace, size_t workspace_bytes);","sources":["src/kernels/axpy_kernels.c","src/kernels/gemm_kernels_q4k_q8k.c","src/kernels/gemm_kernels_q4k_q8k_vnni.c","src/kernels/gemm_kernels_q5_0.c","src/kernels/gemm_kernels.c","src/kernels/swiglu_kernels.c","version/v8/src/ck_parallel_prefill_v8.c"]},
-  "implementation":{"isa_dispatch":"runtime","threading":{"runtime":"ck_threadpool","work_partition":["independent_rows"],"dispatch":["ck_threadpool_dispatch_n"],"reduction_order_effect":"none"}},
+  "implementation":{"isa_dispatch":"runtime","threading":{"runtime":"ck_threadpool","work_partition":["independent_rows","output_tiles"],"dispatch":["internal_threaded"],"reduction_order_effect":"contract_defined"}},
   "call_abi":{"version":1,"params":[
     {"name":"hidden","source":"activation:hidden","cast":"const float*","ports":["input:hidden"]},
     {"name":"routed","source":"activation:routed","cast":"const float*","ports":["input:routed"]},

@@ -50,6 +50,8 @@ class MixedQ4KQ50MoETest(unittest.TestCase):
             ctypes.c_int,
         ]
         LIB.moe_swiglu_expert_q4k_q8_0_workspace_bytes.restype = ctypes.c_size_t
+        LIB.moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes.argtypes = [ctypes.c_int, ctypes.c_int]
+        LIB.moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes.restype = ctypes.c_size_t
         cls.expert_args = [
             F32P, I32P, F32P, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
             F32P, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -184,12 +186,13 @@ class MixedQ4KQ50MoETest(unittest.TestCase):
             _f32(self.x), _f32(self.routed), self.shared_gate, self.shared_up,
             self.shared_down, _f32(self.router),
         )
-        serial_workspace = ctypes.create_string_buffer(self.stride)
-        parallel_workspace = ctypes.create_string_buffer(self.stride * 64)
+        size = LIB.moe_swiglu_shared_q4k_q8_0_gated_workspace_bytes(self.hidden, self.intermediate)
+        serial_workspace = ctypes.create_string_buffer(size)
+        parallel_workspace = ctypes.create_string_buffer(size)
         self.assertEqual(
             serial(
                 *common, _f32(expected), self.rows, self.hidden,
-                self.intermediate, serial_workspace, self.stride,
+                self.intermediate, serial_workspace, size,
             ),
             0,
         )
