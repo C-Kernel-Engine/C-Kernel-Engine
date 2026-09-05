@@ -59,6 +59,7 @@ def _invoke(
     output: np.ndarray,
     *,
     baseline: bool,
+    cpu_samples: list[float] | None = None,
 ) -> float:
     previous = os.environ.get("CK_DISABLE_F16_GEMM_M4N2")
     try:
@@ -66,6 +67,7 @@ def _invoke(
             os.environ["CK_DISABLE_F16_GEMM_M4N2"] = "1"
         else:
             os.environ.pop("CK_DISABLE_F16_GEMM_M4N2", None)
+        cpu_start = time.process_time()
         start = time.perf_counter()
         lib.gemm_nt_f16(
             activation.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -76,7 +78,11 @@ def _invoke(
             weights.shape[0],
             activation.shape[1],
         )
-        return time.perf_counter() - start
+        elapsed = time.perf_counter() - start
+        cpu_elapsed = time.process_time() - cpu_start
+        if cpu_samples is not None:
+            cpu_samples.append(cpu_elapsed)
+        return elapsed
     finally:
         if previous is None:
             os.environ.pop("CK_DISABLE_F16_GEMM_M4N2", None)
@@ -122,6 +128,8 @@ def main() -> int:
             optimized_output = np.empty_like(baseline_output)
             baseline_times: list[float] = []
             optimized_times: list[float] = []
+            baseline_cpu: list[float] = []
+            optimized_cpu: list[float] = []
 
             if args.mode in ("compare", "baseline"):
                 _invoke(lib, activation, weights, baseline_output, baseline=True)
@@ -131,11 +139,13 @@ def main() -> int:
             for _ in range(args.repeats):
                 if args.mode in ("compare", "baseline"):
                     baseline_times.append(
-                        _invoke(lib, activation, weights, baseline_output, baseline=True)
+                        _invoke(lib, activation, weights, baseline_output, baseline=True,
+                                cpu_samples=baseline_cpu)
                     )
                 if args.mode in ("compare", "m4n2"):
                     optimized_times.append(
-                        _invoke(lib, activation, weights, optimized_output, baseline=False)
+                        _invoke(lib, activation, weights, optimized_output, baseline=False,
+                                cpu_samples=optimized_cpu)
                     )
 
             case: dict[str, object] = {
@@ -146,6 +156,14 @@ def main() -> int:
                 case["baseline_median_seconds"] = statistics.median(baseline_times)
             if optimized_times:
                 case["m4n2_median_seconds"] = statistics.median(optimized_times)
+            for provider, wall, cpu in (
+                ("baseline", baseline_times, baseline_cpu),
+                ("m4n2", optimized_times, optimized_cpu),
+            ):
+                if wall:
+                    case[f"{provider}_wall_seconds"] = wall
+                    case[f"{provider}_cpu_seconds"] = cpu
+                    case[f"{provider}_core_equivalents"] = sum(cpu) / sum(wall)
             if args.mode == "compare":
                 exact = bool(np.array_equal(baseline_output, optimized_output))
                 speedup = statistics.median(baseline_times) / statistics.median(optimized_times)

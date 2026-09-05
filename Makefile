@@ -1366,6 +1366,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_long_audio_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_benchmark.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_whisper_f16_gemm_benchmark.py
 	$(MAKE) --no-print-directory test-whisper-pytorch-e2e-auto
 
 .PHONY: test-server-schema
