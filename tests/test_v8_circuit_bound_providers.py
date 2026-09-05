@@ -94,6 +94,23 @@ def _lower_decode_ops(manifest: dict) -> list:
     return build_ir_v8.generate_ir_lower_1(ops, registry, manifest, "decode")
 
 
+@contextlib.contextmanager
+def _registry_with_added_providers(providers: list):
+    """Register extra test-double providers during a resolution run."""
+    original_loader = build_ir_v8.load_kernel_registry
+
+    def patched_loader():
+        registry = copy.deepcopy(original_loader())
+        registry.setdefault("kernels", []).extend(copy.deepcopy(providers))
+        return registry
+
+    build_ir_v8.load_kernel_registry = patched_loader
+    try:
+        yield
+    finally:
+        build_ir_v8.load_kernel_registry = original_loader
+
+
 class CircuitBoundProviderTests(unittest.TestCase):
     def test_in_tree_circuits_declare_every_bound_provider(self) -> None:
         registry = build_ir_v8.load_kernel_registry()
@@ -191,6 +208,82 @@ class CircuitBoundProviderTests(unittest.TestCase):
         self.assertIn("HARD KERNEL RESOLUTION FAULT", message)
         self.assertIn("mla_kv_cache_store", message)
         self.assertIn("no_such_provider_f32", message)
+
+    def test_wrong_class_binding_fails_for_sequence_ops(self) -> None:
+        # memcpy is a registered provider, but it implements residual_save,
+        # not partial_rope_concat.
+        manifest = _tiny_kimi_manifest()
+        with _binding_overridden(manifest, "partial_rope_concat", "memcpy"):
+            with self.assertRaises(RuntimeError) as ctx:
+                build_ir_v8.build_ir1_direct(
+                    manifest, ROOT / "tests" / "binding.synthetic.json", mode="decode"
+                )
+        message = str(ctx.exception)
+        self.assertIn("HARD KERNEL RESOLUTION FAULT", message)
+        self.assertIn("partial_rope_concat", message)
+        self.assertIn("memcpy", message)
+        self.assertIn("wrong operation class", message)
+        self.assertIn("expected='partial_rope_concat'", message)
+        self.assertIn("actual='residual_save'", message)
+
+    def test_wrong_class_binding_fails_for_auto_inserted_store_op(self) -> None:
+        manifest = _tiny_kimi_manifest()
+        with _binding_overridden(manifest, "mla_kv_cache_store", "memcpy"):
+            with self.assertRaises(RuntimeError) as ctx:
+                _lower_decode_ops(manifest)
+        message = str(ctx.exception)
+        self.assertIn("HARD KERNEL RESOLUTION FAULT", message)
+        self.assertIn("mla_kv_cache_store", message)
+        self.assertIn("memcpy", message)
+        self.assertIn("wrong operation class", message)
+        self.assertIn("expected='mla_kv_cache_store'", message)
+        self.assertIn("actual='residual_save'", message)
+
+    def test_wrong_phase_binding_fails_for_sequence_ops(self) -> None:
+        double = {
+            "id": "test_prefill_only_rope_concat_f32",
+            "op": "partial_rope_concat",
+            "selection": {"status": "production", "phases": ["prefill"]},
+            "impl": {"function": "test_prefill_only_rope_concat_f32"},
+        }
+        manifest = _tiny_kimi_manifest()
+        with _binding_overridden(
+            manifest, "partial_rope_concat", "test_prefill_only_rope_concat_f32"
+        ):
+            with _registry_with_added_providers([double]):
+                with self.assertRaises(RuntimeError) as ctx:
+                    build_ir_v8.build_ir1_direct(
+                        manifest,
+                        ROOT / "tests" / "binding.synthetic.json",
+                        mode="decode",
+                    )
+        message = str(ctx.exception)
+        self.assertIn("HARD KERNEL RESOLUTION FAULT", message)
+        self.assertIn("partial_rope_concat", message)
+        self.assertIn("test_prefill_only_rope_concat_f32", message)
+        self.assertIn("does not support the active phase", message)
+        self.assertIn("phase='decode'", message)
+
+    def test_store_function_name_comes_from_kernel_map(self) -> None:
+        # The provider ID deliberately differs from impl.function; the
+        # inserted store op must take its C function name from the map.
+        double = {
+            "id": "test_mla_store_provider_alias",
+            "op": "mla_kv_cache_store",
+            "selection": {"status": "production", "phases": ["prefill", "decode"]},
+            "impl": {"function": "test_mla_store_c_impl_fn"},
+        }
+        manifest = _tiny_kimi_manifest()
+        with _binding_overridden(
+            manifest, "mla_kv_cache_store", "test_mla_store_provider_alias"
+        ):
+            with _registry_with_added_providers([double]):
+                ops = _lower_decode_ops(manifest)
+        stores = [op for op in ops if op.get("op") == "mla_kv_cache_store"]
+        self.assertTrue(stores, "expected auto-inserted mla_kv_cache_store ops")
+        for op in stores:
+            self.assertEqual(op.get("kernel"), "test_mla_store_provider_alias")
+            self.assertEqual(op.get("function"), "test_mla_store_c_impl_fn")
 
 
 if __name__ == "__main__":

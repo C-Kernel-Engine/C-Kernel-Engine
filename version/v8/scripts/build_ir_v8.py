@@ -4081,6 +4081,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "rope_qk": "rope",
     "mrope_qk": "rope",
     "kv_cache_store": "kv_cache_store",  # Store K,V to KV cache at pos
+    "mla_kv_cache_store": "mla_kv_cache_store",  # Circuit-bound MLA KV store
+    "mla_kv_cache_batch_store": "mla_kv_cache_batch_store",
     "attn": "attention",
     "cross_attn": "attention",
     "cross_attn_norm": "layernorm",
@@ -6827,6 +6829,47 @@ def _require_circuit_kernel_mapping(
     return kernel_id
 
 
+def _validate_circuit_bound_provider(
+    provider: Optional[Dict[str, Any]],
+    *,
+    op: str,
+    provider_id: str,
+    circuit_name: str = "",
+    phase: str = "",
+    fault: str = "HARD KERNEL RESOLUTION FAULT",
+) -> Dict[str, Any]:
+    """Fail closed unless a circuit-bound provider matches its operation class.
+
+    Shared by the template provider-override path and the circuit-bound MLA
+    provider path: the binding must name a registered provider that implements
+    the operation class the template op maps to, and when the provider
+    declares phase metadata it must support the active phase.
+    """
+    circuit = str(circuit_name or "").strip() or "<unnamed>"
+    if provider is None:
+        raise RuntimeError(
+            f"{fault}: "
+            f"circuit kernel mapping for {op} names an unknown provider {provider_id!r}."
+        )
+    expected_op = TEMPLATE_TO_KERNEL_OP.get(op)
+    provider_op = str(provider.get("op", "") or "").strip()
+    if expected_op is None or provider_op != expected_op:
+        raise RuntimeError(
+            f"{fault}: circuit {circuit!r} binds op {op!r} to provider "
+            f"{provider_id!r}, which implements the wrong operation class: "
+            f"expected={expected_op!r}, actual={provider_op!r}."
+        )
+    selection = provider.get("selection")
+    phases = selection.get("phases") if isinstance(selection, dict) else None
+    if phase and isinstance(phases, list) and phase not in phases:
+        raise RuntimeError(
+            f"{fault}: circuit {circuit!r} binds op {op!r} to provider "
+            f"{provider_id!r}, which does not support the active phase: "
+            f"phase={phase!r}, supported={phases!r}."
+        )
+    return provider
+
+
 def _attention_contract_is_causal(template: Dict[str, Any], config: Dict[str, Any]) -> bool:
     contract = template.get("contract", {}) if isinstance(template.get("contract"), dict) else {}
     attention_contract = contract.get("attention_contract", {}) if isinstance(contract.get("attention_contract"), dict) else {}
@@ -8498,11 +8541,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 op,
                 circuit_name=str(template.get("name", "") or ""),
             )
-            if kernel_id not in registry_by_id:
-                raise RuntimeError(
-                    "HARD KERNEL RESOLUTION FAULT: "
-                    f"circuit kernel mapping for {op} names an unknown provider {kernel_id!r}."
-                )
+            _validate_circuit_bound_provider(
+                registry_by_id.get(kernel_id),
+                op=op,
+                provider_id=kernel_id,
+                circuit_name=str(template.get("name", "") or ""),
+                phase=mode,
+            )
             return [kernel_id]
 
         if op in ("attn_shared_kv", "attn_sliding_shared_kv"):
@@ -8832,28 +8877,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         if not explicit_kernel:
             return resolved
 
-        provider = registry_by_id.get(explicit_kernel)
-        if provider is None:
-            raise RuntimeError(
-                "HARD CIRCUIT KERNEL FAULT: explicit provider is absent from "
-                f"the kernel registry: op={op!r}, provider={explicit_kernel!r}."
-            )
-        expected_op = TEMPLATE_TO_KERNEL_OP.get(op)
-        provider_op = str(provider.get("op", "") or "").strip()
-        if expected_op is None or provider_op != expected_op:
-            raise RuntimeError(
-                "HARD CIRCUIT KERNEL FAULT: explicit provider implements the "
-                f"wrong operation class: op={op!r}, expected={expected_op!r}, "
-                f"provider={explicit_kernel!r}, actual={provider_op!r}."
-            )
-        selection = provider.get("selection")
-        phases = selection.get("phases") if isinstance(selection, dict) else None
-        if isinstance(phases, list) and mode not in phases:
-            raise RuntimeError(
-                "HARD CIRCUIT KERNEL FAULT: explicit provider does not support "
-                f"the active phase: op={op!r}, provider={explicit_kernel!r}, "
-                f"phase={mode!r}, supported={phases!r}."
-            )
+        _validate_circuit_bound_provider(
+            registry_by_id.get(explicit_kernel),
+            op=op,
+            provider_id=explicit_kernel,
+            circuit_name=str(template.get("name", "") or ""),
+            phase=mode,
+            fault="HARD CIRCUIT KERNEL FAULT",
+        )
         if numerical_contract_by_template_op.get(op) is not None and resolved != [explicit_kernel]:
             raise RuntimeError(
                 "HARD CIRCUIT KERNEL FAULT: explicit provider conflicts with "
@@ -10417,6 +10448,11 @@ def generate_ir_lower_1(
     # Build kernel map index by loading individual kernel map files
     # KERNEL_REGISTRY.json is only used for validation, not as source of truth
     kernel_maps_dir = V8_ROOT / "kernel_maps"
+    registry_by_id = {
+        str(kernel.get("id")): kernel
+        for kernel in registry.get("kernels", [])
+        if isinstance(kernel, dict) and kernel.get("id")
+    }
     kernel_map_index = {}
     for kernel in registry.get("kernels", []):
         kernel_id = kernel["id"]
@@ -10785,19 +10821,29 @@ def generate_ir_lower_1(
     def _make_mla_kv_store_op(anchor_op: Dict[str, Any], *, batch: bool) -> Dict[str, Any]:
         layer = int(anchor_op["layer"])
         store_op = "mla_kv_cache_batch_store" if batch else "mla_kv_cache_store"
-        function = _require_circuit_kernel_mapping(
+        provider_id = _require_circuit_kernel_mapping(
             template_kernels,
             store_op,
             circuit_name=str(template.get("name", "") or ""),
         )
-        if function not in kernel_map_index:
+        _validate_circuit_bound_provider(
+            registry_by_id.get(provider_id),
+            op=store_op,
+            provider_id=provider_id,
+            circuit_name=str(template.get("name", "") or ""),
+            phase=mode,
+        )
+        kernel_map = kernel_map_index.get(provider_id)
+        impl = kernel_map.get("impl") if isinstance(kernel_map.get("impl"), dict) else {}
+        function = str(impl.get("function", "") or "").strip()
+        if not function:
             raise RuntimeError(
                 "HARD KERNEL RESOLUTION FAULT: "
-                f"circuit kernel mapping for {store_op} names an unknown provider {function!r}."
+                f"circuit-bound provider {provider_id!r} for {store_op} has no impl.function."
             )
         return {
             "idx": len(final_ops),  # Will be renumbered
-            "kernel": function,
+            "kernel": provider_id,
             "op": store_op,
             "layer": layer,
             "section": anchor_op["section"],
