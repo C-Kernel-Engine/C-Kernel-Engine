@@ -147,6 +147,10 @@ Functions</h2></td></tr>
 <tr class="separator:ae1de275281122fbf7bc73b947e36a62d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab3ec906e662a3c9b9a81e931d3c8cd20" id="r_ab3ec906e662a3c9b9a81e931d3c8cd20"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__norm__kernels_8c.html#ab3ec906e662a3c9b9a81e931d3c8cd20">recurrent_norm_gate_pytorch_bf16_storage</a> (const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps)</td></tr>
 <tr class="separator:ab3ec906e662a3c9b9a81e931d3c8cd20"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1f3ed08a1c84e576dfaf9b1d80a61567" id="r_a1f3ed08a1c84e576dfaf9b1d80a61567"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__norm__kernels_8c.html#a1f3ed08a1c84e576dfaf9b1d80a61567">recurrent_norm_sigmoid_gate_llama_avx2_forward</a> (const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps)</td></tr>
+<tr class="separator:a1f3ed08a1c84e576dfaf9b1d80a61567"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f6f541d6771c72b4e9f00d48e43bb25" id="r_a6f6f541d6771c72b4e9f00d48e43bb25"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__norm__kernels_8c.html#a6f6f541d6771c72b4e9f00d48e43bb25">recurrent_norm_sigmoid_gate_pytorch_bf16_storage</a> (const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps)</td></tr>
+<tr class="separator:a6f6f541d6771c72b4e9f00d48e43bb25"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aad079560beb20153fff9425727c2cf16" id="r_aad079560beb20153fff9425727c2cf16"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a> (float x)</td></tr>
 <tr class="separator:aad079560beb20153fff9425727c2cf16"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
@@ -231,54 +235,54 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00120">120</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  130</span>                                             {</div>
-<div class="line"><span class="lineno">  131</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
-<div class="line"><span class="lineno">  132</span>    memset(d_weight, 0, (<span class="keywordtype">size_t</span>) head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  133</span> </div>
-<div class="line"><span class="lineno">  134</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  135</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
-<div class="line"><span class="lineno">  136</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
-<div class="line"><span class="lineno">  137</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
-<div class="line"><span class="lineno">  138</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
-<div class="line"><span class="lineno">  139</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
-<div class="line"><span class="lineno">  140</span> </div>
-<div class="line"><span class="lineno">  141</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
-<div class="line"><span class="lineno">  142</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x_head = x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">  143</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">  144</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_head = d_out_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">  145</span>            <span class="keywordtype">float</span> *d_x_head = d_x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">  146</span>            <span class="keywordtype">float</span> *d_gate_head = d_gate_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
-<div class="line"><span class="lineno">  147</span> </div>
-<div class="line"><span class="lineno">  148</span>            <span class="keywordtype">float</span> ms = 0.0f;</div>
-<div class="line"><span class="lineno">  149</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">  150</span>                ms += x_head[col] * x_head[col];</div>
-<div class="line"><span class="lineno">  151</span>            }</div>
-<div class="line"><span class="lineno">  152</span>            ms /= (float) head_dim;</div>
-<div class="line"><span class="lineno">  153</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf(ms + eps);</div>
-<div class="line"><span class="lineno">  154</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms3_over_dim = (inv_rms * inv_rms * inv_rms) / (<span class="keywordtype">float</span>) head_dim;</div>
-<div class="line"><span class="lineno">  155</span> </div>
-<div class="line"><span class="lineno">  156</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno">  157</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">  158</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> g = gate_head[col];</div>
-<div class="line"><span class="lineno">  159</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a>(g);</div>
-<div class="line"><span class="lineno">  160</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = g * sig;</div>
-<div class="line"><span class="lineno">  161</span>                dot += d_out_head[col] * weight[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> * x_head[col];</div>
-<div class="line"><span class="lineno">  162</span>            }</div>
-<div class="line"><span class="lineno">  163</span> </div>
-<div class="line"><span class="lineno">  164</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">  165</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> g = gate_head[col];</div>
-<div class="line"><span class="lineno">  166</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a>(g);</div>
-<div class="line"><span class="lineno">  167</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = g * sig;</div>
-<div class="line"><span class="lineno">  168</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> scaled = inv_rms * weight[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
-<div class="line"><span class="lineno">  169</span>                d_x_head[col] = d_out_head[col] * scaled - x_head[col] * inv_rms3_over_dim * dot;</div>
-<div class="line"><span class="lineno">  170</span>                d_weight[col] += d_out_head[col] * (x_head[col] * inv_rms) * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
-<div class="line"><span class="lineno">  171</span>                d_gate_head[col] = d_out_head[col] * (x_head[col] * inv_rms * weight[col]) *</div>
-<div class="line"><span class="lineno">  172</span>                                   (sig + g * sig * (1.0f - sig));</div>
-<div class="line"><span class="lineno">  173</span>            }</div>
-<div class="line"><span class="lineno">  174</span>        }</div>
-<div class="line"><span class="lineno">  175</span>    }</div>
-<div class="line"><span class="lineno">  176</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00182">182</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  192</span>                                             {</div>
+<div class="line"><span class="lineno">  193</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
+<div class="line"><span class="lineno">  194</span>    memset(d_weight, 0, (<span class="keywordtype">size_t</span>) head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  195</span> </div>
+<div class="line"><span class="lineno">  196</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  197</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
+<div class="line"><span class="lineno">  198</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
+<div class="line"><span class="lineno">  199</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
+<div class="line"><span class="lineno">  200</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
+<div class="line"><span class="lineno">  201</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim;</div>
+<div class="line"><span class="lineno">  202</span> </div>
+<div class="line"><span class="lineno">  203</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">  204</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *x_head = x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  205</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  206</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_head = d_out_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  207</span>            <span class="keywordtype">float</span> *d_x_head = d_x_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  208</span>            <span class="keywordtype">float</span> *d_gate_head = d_gate_row + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  209</span> </div>
+<div class="line"><span class="lineno">  210</span>            <span class="keywordtype">float</span> ms = 0.0f;</div>
+<div class="line"><span class="lineno">  211</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  212</span>                ms += x_head[col] * x_head[col];</div>
+<div class="line"><span class="lineno">  213</span>            }</div>
+<div class="line"><span class="lineno">  214</span>            ms /= (float) head_dim;</div>
+<div class="line"><span class="lineno">  215</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf(ms + eps);</div>
+<div class="line"><span class="lineno">  216</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms3_over_dim = (inv_rms * inv_rms * inv_rms) / (<span class="keywordtype">float</span>) head_dim;</div>
+<div class="line"><span class="lineno">  217</span> </div>
+<div class="line"><span class="lineno">  218</span>            <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  219</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  220</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> g = gate_head[col];</div>
+<div class="line"><span class="lineno">  221</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a>(g);</div>
+<div class="line"><span class="lineno">  222</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = g * sig;</div>
+<div class="line"><span class="lineno">  223</span>                dot += d_out_head[col] * weight[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> * x_head[col];</div>
+<div class="line"><span class="lineno">  224</span>            }</div>
+<div class="line"><span class="lineno">  225</span> </div>
+<div class="line"><span class="lineno">  226</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  227</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> g = gate_head[col];</div>
+<div class="line"><span class="lineno">  228</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a>(g);</div>
+<div class="line"><span class="lineno">  229</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = g * sig;</div>
+<div class="line"><span class="lineno">  230</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> scaled = inv_rms * weight[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
+<div class="line"><span class="lineno">  231</span>                d_x_head[col] = d_out_head[col] * scaled - x_head[col] * inv_rms3_over_dim * dot;</div>
+<div class="line"><span class="lineno">  232</span>                d_weight[col] += d_out_head[col] * (x_head[col] * inv_rms) * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>;</div>
+<div class="line"><span class="lineno">  233</span>                d_gate_head[col] = d_out_head[col] * (x_head[col] * inv_rms * weight[col]) *</div>
+<div class="line"><span class="lineno">  234</span>                                   (sig + g * sig * (1.0f - sig));</div>
+<div class="line"><span class="lineno">  235</span>            }</div>
+<div class="line"><span class="lineno">  236</span>        }</div>
+<div class="line"><span class="lineno">  237</span>    }</div>
+<div class="line"><span class="lineno">  238</span>}</div>
 <div class="ttc" id="arecurrent__norm__kernels_8c_html_aad079560beb20153fff9425727c2cf16"><div class="ttname"><a href="recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16">recurrent_sigmoid_local</a></div><div class="ttdeci">static float recurrent_sigmoid_local(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__norm__kernels_8c_source.html#l00007">recurrent_norm_kernels.c:7</a></div></div>
 <div class="ttc" id="av6_85__simple_8c_html_a49cac1d218fc2817ed1f679a37f25f41"><div class="ttname"><a href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a></div><div class="ttdeci">static void silu(float *x, int n)</div><div class="ttdef"><b>Definition</b> <a href="v6_85__simple_8c_source.html#l00159">v6.5_simple.c:159</a></div></div>
 </div><!-- fragment -->
@@ -468,9 +472,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   79</span>    }</div>
 <div class="line"><span class="lineno">   80</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a21313e5d9f149097d8059085232aabe9"><div class="ttname"><a href="ckernel__engine_8h.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a></div><div class="ttdeci">void rmsnorm_forward_llama_production(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_kernels.c:196</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a68d1de609142507727987cabe36fe7a6"><div class="ttname"><a href="ckernel__engine_8h.html#a68d1de609142507727987cabe36fe7a6">recurrent_silu_forward_ggml</a></div><div class="ttdeci">void recurrent_silu_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00344">recurrent_gate_kernels.c:344</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a68d1de609142507727987cabe36fe7a6"><div class="ttname"><a href="ckernel__engine_8h.html#a68d1de609142507727987cabe36fe7a6">recurrent_silu_forward_ggml</a></div><div class="ttdeci">void recurrent_silu_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00468">recurrent_gate_kernels.c:468</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00344">recurrent_silu_forward_ggml()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00468">recurrent_silu_forward_ggml()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
 </div>
 </div>
@@ -536,42 +540,225 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00082">82</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   90</span>{</div>
-<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || num_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">   92</span>        head_dim &lt;= 0 || head_dim &gt; 4096) {</div>
-<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   94</span>    }</div>
-<div class="line"><span class="lineno">   95</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
-<div class="line"><span class="lineno">   96</span>    <span class="keywordtype">float</span> normalized[4096];</div>
-<div class="line"><span class="lineno">   97</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>[4096];</div>
-<div class="line"><span class="lineno">   98</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   99</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
-<div class="line"><span class="lineno">  100</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim +</div>
-<div class="line"><span class="lineno">  101</span>                (size_t)head * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  102</span>            <span class="comment">/*</span></div>
-<div class="line"><span class="lineno">  103</span><span class="comment">             * Qwen3Next order:</span></div>
-<div class="line"><span class="lineno">  104</span><span class="comment">             * FP32 RMS statistics -&gt; BF16 normalized value -&gt; BF16 weight</span></div>
-<div class="line"><span class="lineno">  105</span><span class="comment">             * multiply -&gt; FP32 SiLU(gate) -&gt; BF16 final output.</span></div>
-<div class="line"><span class="lineno">  106</span><span class="comment">             */</span></div>
-<div class="line"><span class="lineno">  107</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
-<div class="line"><span class="lineno">  108</span>                x + offset, weight, normalized, NULL,</div>
-<div class="line"><span class="lineno">  109</span>                1, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  110</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a>(</div>
-<div class="line"><span class="lineno">  111</span>                gate + offset, <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, 1, head_dim);</div>
-<div class="line"><span class="lineno">  112</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
-<div class="line"><span class="lineno">  113</span>                out[offset + (size_t)col] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(</div>
-<div class="line"><span class="lineno">  114</span>                    normalized[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>[col]));</div>
-<div class="line"><span class="lineno">  115</span>            }</div>
-<div class="line"><span class="lineno">  116</span>        }</div>
-<div class="line"><span class="lineno">  117</span>    }</div>
-<div class="line"><span class="lineno">  118</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00111">111</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  119</span>{</div>
+<div class="line"><span class="lineno">  120</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || num_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  121</span>        head_dim &lt;= 0 || head_dim &gt; 4096) {</div>
+<div class="line"><span class="lineno">  122</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  123</span>    }</div>
+<div class="line"><span class="lineno">  124</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
+<div class="line"><span class="lineno">  125</span>    <span class="keywordtype">float</span> normalized[4096];</div>
+<div class="line"><span class="lineno">  126</span>    <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>[4096];</div>
+<div class="line"><span class="lineno">  127</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  128</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">  129</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim +</div>
+<div class="line"><span class="lineno">  130</span>                (size_t)head * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  131</span>            <span class="comment">/*</span></div>
+<div class="line"><span class="lineno">  132</span><span class="comment">             * Qwen3Next order:</span></div>
+<div class="line"><span class="lineno">  133</span><span class="comment">             * FP32 RMS statistics -&gt; BF16 normalized value -&gt; BF16 weight</span></div>
+<div class="line"><span class="lineno">  134</span><span class="comment">             * multiply -&gt; FP32 SiLU(gate) -&gt; BF16 final output.</span></div>
+<div class="line"><span class="lineno">  135</span><span class="comment">             */</span></div>
+<div class="line"><span class="lineno">  136</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  137</span>                x + offset, weight, normalized, NULL,</div>
+<div class="line"><span class="lineno">  138</span>                1, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  139</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a>(</div>
+<div class="line"><span class="lineno">  140</span>                gate + offset, <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, 1, head_dim);</div>
+<div class="line"><span class="lineno">  141</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  142</span>                out[offset + (size_t)col] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(</div>
+<div class="line"><span class="lineno">  143</span>                    normalized[col] * <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>[col]));</div>
+<div class="line"><span class="lineno">  144</span>            }</div>
+<div class="line"><span class="lineno">  145</span>        }</div>
+<div class="line"><span class="lineno">  146</span>    }</div>
+<div class="line"><span class="lineno">  147</span>}</div>
 <div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
 <div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a500cf70fc074fd75ae5b691103de1df3"><div class="ttname"><a href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00217">recurrent_gate_kernels.c:217</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a500cf70fc074fd75ae5b691103de1df3"><div class="ttname"><a href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00299">recurrent_gate_kernels.c:299</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a84e08713e6234a99c0559a1538fa7a0c"><div class="ttname"><a href="ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a></div><div class="ttdeci">void rmsnorm_forward_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_kernels.c:395</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00217">recurrent_silu_forward_pytorch_bf16_input_fp32_output()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00299">recurrent_silu_forward_pytorch_bf16_input_fp32_output()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+
+</div>
+</div>
+<a id="a1f3ed08a1c84e576dfaf9b1d80a61567" name="a1f3ed08a1c84e576dfaf9b1d80a61567"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1f3ed08a1c84e576dfaf9b1d80a61567">&#9670;&#160;</a></span>recurrent_norm_sigmoid_gate_llama_avx2_forward()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void recurrent_norm_sigmoid_gate_llama_avx2_forward </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>weight</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00082">82</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   89</span>                                                                {</div>
+<div class="line"><span class="lineno">   90</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || num_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">   91</span>        head_dim &lt;= 0 || head_dim &gt; 4096) {</div>
+<div class="line"><span class="lineno">   92</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   93</span>    }</div>
+<div class="line"><span class="lineno">   94</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
+<div class="line"><span class="lineno">   95</span>    <span class="keywordtype">float</span> normalized[4096];</div>
+<div class="line"><span class="lineno">   96</span>    <span class="keywordtype">float</span> sigmoid[4096];</div>
+<div class="line"><span class="lineno">   97</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   98</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">   99</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t) row * (<span class="keywordtype">size_t</span>) inner_dim</div>
+<div class="line"><span class="lineno">  100</span>                                + (size_t) head * (<span class="keywordtype">size_t</span>) head_dim;</div>
+<div class="line"><span class="lineno">  101</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a>(</div>
+<div class="line"><span class="lineno">  102</span>                x + offset, weight, normalized, NULL, 1, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  103</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a33632320e455741062d562d8aca62627">recurrent_sigmoid_forward_ggml</a>(gate + offset, sigmoid, 1, head_dim);</div>
+<div class="line"><span class="lineno">  104</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  105</span>                out[offset + (size_t) col] = normalized[col] * sigmoid[col];</div>
+<div class="line"><span class="lineno">  106</span>            }</div>
+<div class="line"><span class="lineno">  107</span>        }</div>
+<div class="line"><span class="lineno">  108</span>    }</div>
+<div class="line"><span class="lineno">  109</span>}</div>
+<div class="ttc" id="ackernel__engine_8h_html_a33632320e455741062d562d8aca62627"><div class="ttname"><a href="ckernel__engine_8h.html#a33632320e455741062d562d8aca62627">recurrent_sigmoid_forward_ggml</a></div><div class="ttdeci">void recurrent_sigmoid_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00501">recurrent_gate_kernels.c:501</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00501">recurrent_sigmoid_forward_ggml()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>.</p>
+
+</div>
+</div>
+<a id="a6f6f541d6771c72b4e9f00d48e43bb25" name="a6f6f541d6771c72b4e9f00d48e43bb25"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6f6f541d6771c72b4e9f00d48e43bb25">&#9670;&#160;</a></span>recurrent_norm_sigmoid_gate_pytorch_bf16_storage()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void recurrent_norm_sigmoid_gate_pytorch_bf16_storage </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gate</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>weight</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>out</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__norm__kernels_8c_source.html#l00149">149</a> of file <a class="el" href="recurrent__norm__kernels_8c_source.html">recurrent_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  157</span>{</div>
+<div class="line"><span class="lineno">  158</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || num_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  159</span>        head_dim &lt;= 0 || head_dim &gt; 4096) {</div>
+<div class="line"><span class="lineno">  160</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  161</span>    }</div>
+<div class="line"><span class="lineno">  162</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> inner_dim = num_heads * head_dim;</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keywordtype">float</span> normalized[4096];</div>
+<div class="line"><span class="lineno">  164</span>    <span class="keywordtype">float</span> sigmoid[4096];</div>
+<div class="line"><span class="lineno">  165</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  166</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">  167</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> offset = (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim +</div>
+<div class="line"><span class="lineno">  168</span>                (size_t)head * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  169</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  170</span>                x + offset, weight, normalized, NULL,</div>
+<div class="line"><span class="lineno">  171</span>                1, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  172</span>            <a class="code hl_function" href="ckernel__engine_8h.html#a66184da8c8aaf47ea6f4c1ddb6fb1e7d">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output</a>(</div>
+<div class="line"><span class="lineno">  173</span>                gate + offset, sigmoid, 1, head_dim);</div>
+<div class="line"><span class="lineno">  174</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; head_dim; ++col) {</div>
+<div class="line"><span class="lineno">  175</span>                out[offset + (size_t)col] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(</div>
+<div class="line"><span class="lineno">  176</span>                    normalized[col] * sigmoid[col]));</div>
+<div class="line"><span class="lineno">  177</span>            }</div>
+<div class="line"><span class="lineno">  178</span>        }</div>
+<div class="line"><span class="lineno">  179</span>    }</div>
+<div class="line"><span class="lineno">  180</span>}</div>
+<div class="ttc" id="ackernel__engine_8h_html_a66184da8c8aaf47ea6f4c1ddb6fb1e7d"><div class="ttname"><a href="ckernel__engine_8h.html#a66184da8c8aaf47ea6f4c1ddb6fb1e7d">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00339">recurrent_gate_kernels.c:339</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00339">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -611,7 +798,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   15</span>    }</div>
 <div class="line"><span class="lineno">   16</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__norm__kernels_8c_source.html#l00120">recurrent_norm_gate_backward()</a>, and <a class="el" href="recurrent__norm__kernels_8c_source.html#l00018">recurrent_norm_gate_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__norm__kernels_8c_source.html#l00182">recurrent_norm_gate_backward()</a>, and <a class="el" href="recurrent__norm__kernels_8c_source.html#l00018">recurrent_norm_gate_forward()</a>.</p>
 
 </div>
 </div>

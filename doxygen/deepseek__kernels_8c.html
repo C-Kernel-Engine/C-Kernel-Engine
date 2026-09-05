@@ -594,9 +594,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  170</span>                              key_count,</div>
 <div class="line"><span class="lineno">  171</span>                              top_k);</div>
 <div class="line"><span class="lineno">  172</span>}</div>
-<div class="ttc" id="adeepseek__kernels_8c_html_a4882861ab445aaffa944b4b8ce3c633d"><div class="ttname"><a href="deepseek__kernels_8c.html#a4882861ab445aaffa944b4b8ce3c633d">topk_softmax_backward_f32</a></div><div class="ttdeci">void topk_softmax_backward_f32(const int *indices, const float *weights, const float *d_weights, float *d_scores, int num_tokens, int n_experts_or_keys, int k)</div><div class="ttdoc">Backward for hard top-k followed by softmax over selected values.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00338">topk_kernels.c:338</a></div></div>
+<div class="ttc" id="adeepseek__kernels_8c_html_a4882861ab445aaffa944b4b8ce3c633d"><div class="ttname"><a href="deepseek__kernels_8c.html#a4882861ab445aaffa944b4b8ce3c633d">topk_softmax_backward_f32</a></div><div class="ttdeci">void topk_softmax_backward_f32(const int *indices, const float *weights, const float *d_weights, float *d_scores, int num_tokens, int n_experts_or_keys, int k)</div><div class="ttdoc">Backward for hard top-k followed by softmax over selected values.</div><div class="ttdef"><b>Definition</b> <a href="topk__kernels_8c_source.html#l00408">topk_kernels.c:408</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00338">topk_softmax_backward_f32()</a>.</p>
+<p class="reference">References <a class="el" href="topk__kernels_8c_source.html#l00408">topk_softmax_backward_f32()</a>.</p>
 
 </div>
 </div>
@@ -3401,40 +3401,40 @@ Functions</h2></td></tr>
 <p>Matches PyTorch behavior for: values, indices = torch.topk(scores, k, dim=-1) weights = torch.softmax(values, dim=-1)</p>
 <p>The hard selected indices are treated as fixed for this backward pass. Gradients are scattered only to selected scores; unselected scores are zero. </p>
 
-<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00338">338</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  345</span>{</div>
-<div class="line"><span class="lineno">  346</span>    <span class="keywordflow">if</span> (!indices || !weights || !d_weights || !d_scores ||</div>
-<div class="line"><span class="lineno">  347</span>        num_tokens &lt;= 0 || n_experts_or_keys &lt;= 0 || k &lt;= 0) {</div>
-<div class="line"><span class="lineno">  348</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  349</span>    }</div>
-<div class="line"><span class="lineno">  350</span> </div>
-<div class="line"><span class="lineno">  351</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)n_experts_or_keys;</div>
-<div class="line"><span class="lineno">  352</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
-<div class="line"><span class="lineno">  353</span>        d_scores[i] = 0.0f;</div>
-<div class="line"><span class="lineno">  354</span>    }</div>
-<div class="line"><span class="lineno">  355</span> </div>
-<div class="line"><span class="lineno">  356</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno">  357</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> *row_indices = indices + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
-<div class="line"><span class="lineno">  358</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_weights = weights + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
-<div class="line"><span class="lineno">  359</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_d_weights = d_weights + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
-<div class="line"><span class="lineno">  360</span>        <span class="keywordtype">float</span> *row_d_scores = d_scores + (size_t)t * (<span class="keywordtype">size_t</span>)n_experts_or_keys;</div>
-<div class="line"><span class="lineno">  361</span> </div>
-<div class="line"><span class="lineno">  362</span>        <span class="keywordtype">float</span> dot = 0.0f;</div>
-<div class="line"><span class="lineno">  363</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
-<div class="line"><span class="lineno">  364</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
-<div class="line"><span class="lineno">  365</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
-<div class="line"><span class="lineno">  366</span>                dot += row_weights[i] * row_d_weights[i];</div>
-<div class="line"><span class="lineno">  367</span>            }</div>
-<div class="line"><span class="lineno">  368</span>        }</div>
-<div class="line"><span class="lineno">  369</span> </div>
-<div class="line"><span class="lineno">  370</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
-<div class="line"><span class="lineno">  371</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
-<div class="line"><span class="lineno">  372</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
-<div class="line"><span class="lineno">  373</span>                row_d_scores[idx] += row_weights[i] * (row_d_weights[i] - dot);</div>
-<div class="line"><span class="lineno">  374</span>            }</div>
-<div class="line"><span class="lineno">  375</span>        }</div>
-<div class="line"><span class="lineno">  376</span>    }</div>
-<div class="line"><span class="lineno">  377</span>}</div>
+<p class="definition">Definition at line <a class="el" href="topk__kernels_8c_source.html#l00408">408</a> of file <a class="el" href="topk__kernels_8c_source.html">topk_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  415</span>{</div>
+<div class="line"><span class="lineno">  416</span>    <span class="keywordflow">if</span> (!indices || !weights || !d_weights || !d_scores ||</div>
+<div class="line"><span class="lineno">  417</span>        num_tokens &lt;= 0 || n_experts_or_keys &lt;= 0 || k &lt;= 0) {</div>
+<div class="line"><span class="lineno">  418</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  419</span>    }</div>
+<div class="line"><span class="lineno">  420</span> </div>
+<div class="line"><span class="lineno">  421</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> total = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)n_experts_or_keys;</div>
+<div class="line"><span class="lineno">  422</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; total; ++i) {</div>
+<div class="line"><span class="lineno">  423</span>        d_scores[i] = 0.0f;</div>
+<div class="line"><span class="lineno">  424</span>    }</div>
+<div class="line"><span class="lineno">  425</span> </div>
+<div class="line"><span class="lineno">  426</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno">  427</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> *row_indices = indices + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
+<div class="line"><span class="lineno">  428</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_weights = weights + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
+<div class="line"><span class="lineno">  429</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row_d_weights = d_weights + (size_t)t * (<span class="keywordtype">size_t</span>)k;</div>
+<div class="line"><span class="lineno">  430</span>        <span class="keywordtype">float</span> *row_d_scores = d_scores + (size_t)t * (<span class="keywordtype">size_t</span>)n_experts_or_keys;</div>
+<div class="line"><span class="lineno">  431</span> </div>
+<div class="line"><span class="lineno">  432</span>        <span class="keywordtype">float</span> dot = 0.0f;</div>
+<div class="line"><span class="lineno">  433</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
+<div class="line"><span class="lineno">  434</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
+<div class="line"><span class="lineno">  435</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
+<div class="line"><span class="lineno">  436</span>                dot += row_weights[i] * row_d_weights[i];</div>
+<div class="line"><span class="lineno">  437</span>            }</div>
+<div class="line"><span class="lineno">  438</span>        }</div>
+<div class="line"><span class="lineno">  439</span> </div>
+<div class="line"><span class="lineno">  440</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; k; ++i) {</div>
+<div class="line"><span class="lineno">  441</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> idx = row_indices[i];</div>
+<div class="line"><span class="lineno">  442</span>            <span class="keywordflow">if</span> (idx &gt;= 0 &amp;&amp; idx &lt; n_experts_or_keys) {</div>
+<div class="line"><span class="lineno">  443</span>                row_d_scores[idx] += row_weights[i] * (row_d_weights[i] - dot);</div>
+<div class="line"><span class="lineno">  444</span>            }</div>
+<div class="line"><span class="lineno">  445</span>        }</div>
+<div class="line"><span class="lineno">  446</span>    }</div>
+<div class="line"><span class="lineno">  447</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="deepseek__kernels_8c_source.html#l00153">deepseek_dsa_topk_softmax_backward_f32()</a>.</p>
 

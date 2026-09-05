@@ -154,6 +154,8 @@ Functions</h2></td></tr>
 <tr class="separator:a7a9a469a61f3fd75a4d60bef404efc82"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5384b2acb8d206d25ddb3cdfbfc78b02" id="r_a5384b2acb8d206d25ddb3cdfbfc78b02"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="kv__cache__kernels_8c.html#a5384b2acb8d206d25ddb3cdfbfc78b02">kv_cache_store_batch_f16</a> (uint16_t *__restrict kv_cache_k, uint16_t *__restrict kv_cache_v, const float *__restrict k, const float *__restrict v, int start_pos, int num_tokens, int num_kv_heads, int head_dim, int max_seq_len)</td></tr>
 <tr class="separator:a5384b2acb8d206d25ddb3cdfbfc78b02"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5e0ee8642bcb3eb671d4e0bf08d09b7b" id="r_a5e0ee8642bcb3eb671d4e0bf08d09b7b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="kv__cache__kernels_8c.html#a5e0ee8642bcb3eb671d4e0bf08d09b7b">kv_cache_store_batch_f32</a> (float *__restrict kv_cache_k, float *__restrict kv_cache_v, const float *__restrict k, const float *__restrict v, int start_pos, int num_tokens, int num_kv_heads, int head_dim, int max_seq_len)</td></tr>
+<tr class="separator:a5e0ee8642bcb3eb671d4e0bf08d09b7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0a5e440c99ba12c4e2127421949520dc" id="r_a0a5e440c99ba12c4e2127421949520dc"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="kv__cache__kernels_8c.html#a0a5e440c99ba12c4e2127421949520dc">kv_cache_store_bf16</a> (uint16_t *__restrict kv_cache_k, uint16_t *__restrict kv_cache_v, const float *__restrict k, const float *__restrict v, int layer, int pos, int num_kv_heads, int head_dim, int max_seq_len)</td></tr>
 <tr class="separator:a0a5e440c99ba12c4e2127421949520dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0bdfc34cc1a36f4f499478f9b6038af1" id="r_a0bdfc34cc1a36f4f499478f9b6038af1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="kv__cache__kernels_8c.html#a0bdfc34cc1a36f4f499478f9b6038af1">kv_cache_store_f16</a> (uint16_t *__restrict kv_cache_k, uint16_t *__restrict kv_cache_v, const float *__restrict k, const float *__restrict v, int layer, int pos, int num_kv_heads, int head_dim, int max_seq_len)</td></tr>
@@ -235,7 +237,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="kv__cache__kernels_8c_source.html#l00259">kv_cache_store_batch_bf16()</a>, and <a class="el" href="kv__cache__kernels_8c_source.html#l00195">kv_cache_store_bf16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="kv__cache__kernels_8c_source.html#l00291">kv_cache_store_batch_bf16()</a>, and <a class="el" href="kv__cache__kernels_8c_source.html#l00195">kv_cache_store_bf16()</a>.</p>
 
 </div>
 </div>
@@ -292,7 +294,7 @@ CK-ENGINE KERNEL RULES:</h1>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ckernel__quant_8h_source.html#l00441">CK_FP32_TO_FP16</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="kv__cache__kernels_8c_source.html#l00223">kv_cache_store_batch_f16()</a>, and <a class="el" href="kv__cache__kernels_8c_source.html#l00161">kv_cache_store_f16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="kv__cache__kernels_8c_source.html#l00255">kv_cache_store_batch_f16()</a>, and <a class="el" href="kv__cache__kernels_8c_source.html#l00161">kv_cache_store_f16()</a>.</p>
 
 </div>
 </div>
@@ -525,30 +527,30 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00259">259</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  268</span>{</div>
-<div class="line"><span class="lineno">  269</span>    <span class="keywordflow">if</span> (!kv_cache_k || !kv_cache_v || !k || !v ||</div>
-<div class="line"><span class="lineno">  270</span>        start_pos &lt; 0 || num_tokens &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  271</span>        head_dim &lt;= 0 || max_seq_len &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  272</span>        start_pos &gt; max_seq_len - num_tokens) {</div>
-<div class="line"><span class="lineno">  273</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  274</span>    }</div>
-<div class="line"><span class="lineno">  275</span> </div>
-<div class="line"><span class="lineno">  276</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> compact_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  277</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> cache_head_stride = (size_t)max_seq_len * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  278</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno">  279</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * compact_head_stride;</div>
-<div class="line"><span class="lineno">  280</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * compact_head_stride;</div>
-<div class="line"><span class="lineno">  281</span>        uint16_t *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride;</div>
-<div class="line"><span class="lineno">  282</span>        uint16_t *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride;</div>
-<div class="line"><span class="lineno">  283</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno">  284</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_offset = (size_t)t * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  285</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_offset = (size_t)(start_pos + t) * (size_t)head_dim;</div>
-<div class="line"><span class="lineno">  286</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#a56088b793cb6f2b6dd453f32172abfb8">ck_local_fp32_to_bf16_row</a>(k_head + src_offset, k_head_cache + dst_offset, head_dim);</div>
-<div class="line"><span class="lineno">  287</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#a56088b793cb6f2b6dd453f32172abfb8">ck_local_fp32_to_bf16_row</a>(v_head + src_offset, v_head_cache + dst_offset, head_dim);</div>
-<div class="line"><span class="lineno">  288</span>        }</div>
-<div class="line"><span class="lineno">  289</span>    }</div>
-<div class="line"><span class="lineno">  290</span>}</div>
+<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00291">291</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  300</span>{</div>
+<div class="line"><span class="lineno">  301</span>    <span class="keywordflow">if</span> (!kv_cache_k || !kv_cache_v || !k || !v ||</div>
+<div class="line"><span class="lineno">  302</span>        start_pos &lt; 0 || num_tokens &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  303</span>        head_dim &lt;= 0 || max_seq_len &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  304</span>        start_pos &gt; max_seq_len - num_tokens) {</div>
+<div class="line"><span class="lineno">  305</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  306</span>    }</div>
+<div class="line"><span class="lineno">  307</span> </div>
+<div class="line"><span class="lineno">  308</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> compact_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  309</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> cache_head_stride = (size_t)max_seq_len * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  310</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno">  311</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  312</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  313</span>        uint16_t *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride;</div>
+<div class="line"><span class="lineno">  314</span>        uint16_t *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride;</div>
+<div class="line"><span class="lineno">  315</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno">  316</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_offset = (size_t)t * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  317</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_offset = (size_t)(start_pos + t) * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  318</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#a56088b793cb6f2b6dd453f32172abfb8">ck_local_fp32_to_bf16_row</a>(k_head + src_offset, k_head_cache + dst_offset, head_dim);</div>
+<div class="line"><span class="lineno">  319</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#a56088b793cb6f2b6dd453f32172abfb8">ck_local_fp32_to_bf16_row</a>(v_head + src_offset, v_head_cache + dst_offset, head_dim);</div>
+<div class="line"><span class="lineno">  320</span>        }</div>
+<div class="line"><span class="lineno">  321</span>    }</div>
+<div class="line"><span class="lineno">  322</span>}</div>
 <div class="ttc" id="akv__cache__kernels_8c_html_a56088b793cb6f2b6dd453f32172abfb8"><div class="ttname"><a href="kv__cache__kernels_8c.html#a56088b793cb6f2b6dd453f32172abfb8">ck_local_fp32_to_bf16_row</a></div><div class="ttdeci">static void ck_local_fp32_to_bf16_row(const float *src, uint16_t *dst, int n)</div><div class="ttdef"><b>Definition</b> <a href="kv__cache__kernels_8c_source.html#l00039">kv_cache_kernels.c:39</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="kv__cache__kernels_8c_source.html#l00039">ck_local_fp32_to_bf16_row()</a>.</p>
@@ -623,37 +625,131 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00223">223</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  232</span>{</div>
-<div class="line"><span class="lineno">  233</span>    <span class="keywordflow">if</span> (!kv_cache_k || !kv_cache_v || !k || !v) {</div>
-<div class="line"><span class="lineno">  234</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  235</span>    }</div>
-<div class="line"><span class="lineno">  236</span>    <span class="keywordflow">if</span> (start_pos &lt; 0 || num_tokens &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  237</span>        head_dim &lt;= 0 || max_seq_len &lt;= 0 ||</div>
-<div class="line"><span class="lineno">  238</span>        start_pos &gt; max_seq_len - num_tokens) {</div>
-<div class="line"><span class="lineno">  239</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  240</span>    }</div>
-<div class="line"><span class="lineno">  241</span> </div>
-<div class="line"><span class="lineno">  242</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> compact_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> cache_head_stride = (size_t)max_seq_len * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  244</span> </div>
-<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
-<div class="line"><span class="lineno">  246</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * compact_head_stride;</div>
-<div class="line"><span class="lineno">  247</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * compact_head_stride;</div>
-<div class="line"><span class="lineno">  248</span>        uint16_t *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride;</div>
-<div class="line"><span class="lineno">  249</span>        uint16_t *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride;</div>
-<div class="line"><span class="lineno">  250</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
-<div class="line"><span class="lineno">  251</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_offset = (size_t)t * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  252</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_offset = (size_t)(start_pos + t) * (size_t)head_dim;</div>
-<div class="line"><span class="lineno">  253</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#aefe7591c26721dd0a0d5f44ce26620ab">ck_local_fp32_to_fp16_row</a>(k_head + src_offset, k_head_cache + dst_offset, head_dim);</div>
-<div class="line"><span class="lineno">  254</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#aefe7591c26721dd0a0d5f44ce26620ab">ck_local_fp32_to_fp16_row</a>(v_head + src_offset, v_head_cache + dst_offset, head_dim);</div>
-<div class="line"><span class="lineno">  255</span>        }</div>
-<div class="line"><span class="lineno">  256</span>    }</div>
-<div class="line"><span class="lineno">  257</span>}</div>
+<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00255">255</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  264</span>{</div>
+<div class="line"><span class="lineno">  265</span>    <span class="keywordflow">if</span> (!kv_cache_k || !kv_cache_v || !k || !v) {</div>
+<div class="line"><span class="lineno">  266</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  267</span>    }</div>
+<div class="line"><span class="lineno">  268</span>    <span class="keywordflow">if</span> (start_pos &lt; 0 || num_tokens &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  269</span>        head_dim &lt;= 0 || max_seq_len &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  270</span>        start_pos &gt; max_seq_len - num_tokens) {</div>
+<div class="line"><span class="lineno">  271</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  272</span>    }</div>
+<div class="line"><span class="lineno">  273</span> </div>
+<div class="line"><span class="lineno">  274</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> compact_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  275</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> cache_head_stride = (size_t)max_seq_len * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  276</span> </div>
+<div class="line"><span class="lineno">  277</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno">  278</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  279</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  280</span>        uint16_t *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride;</div>
+<div class="line"><span class="lineno">  281</span>        uint16_t *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride;</div>
+<div class="line"><span class="lineno">  282</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; num_tokens; ++t) {</div>
+<div class="line"><span class="lineno">  283</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> src_offset = (size_t)t * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  284</span>            <span class="keyword">const</span> <span class="keywordtype">size_t</span> dst_offset = (size_t)(start_pos + t) * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  285</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#aefe7591c26721dd0a0d5f44ce26620ab">ck_local_fp32_to_fp16_row</a>(k_head + src_offset, k_head_cache + dst_offset, head_dim);</div>
+<div class="line"><span class="lineno">  286</span>            <a class="code hl_function" href="kv__cache__kernels_8c.html#aefe7591c26721dd0a0d5f44ce26620ab">ck_local_fp32_to_fp16_row</a>(v_head + src_offset, v_head_cache + dst_offset, head_dim);</div>
+<div class="line"><span class="lineno">  287</span>        }</div>
+<div class="line"><span class="lineno">  288</span>    }</div>
+<div class="line"><span class="lineno">  289</span>}</div>
 <div class="ttc" id="akv__cache__kernels_8c_html_aefe7591c26721dd0a0d5f44ce26620ab"><div class="ttname"><a href="kv__cache__kernels_8c.html#aefe7591c26721dd0a0d5f44ce26620ab">ck_local_fp32_to_fp16_row</a></div><div class="ttdeci">static void ck_local_fp32_to_fp16_row(const float *src, uint16_t *dst, int n)</div><div class="ttdef"><b>Definition</b> <a href="kv__cache__kernels_8c_source.html#l00029">kv_cache_kernels.c:29</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="kv__cache__kernels_8c_source.html#l00029">ck_local_fp32_to_fp16_row()</a>.</p>
 
+</div>
+</div>
+<a id="a5e0ee8642bcb3eb671d4e0bf08d09b7b" name="a5e0ee8642bcb3eb671d4e0bf08d09b7b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5e0ee8642bcb3eb671d4e0bf08d09b7b">&#9670;&#160;</a></span>kv_cache_store_batch_f32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void kv_cache_store_batch_f32 </td>
+          <td>(</td>
+          <td class="paramtype">float *__restrict&#160;</td>
+          <td class="paramname"><em>kv_cache_k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *__restrict&#160;</td>
+          <td class="paramname"><em>kv_cache_v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *__restrict&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *__restrict&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>start_pos</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>max_seq_len</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00223">223</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  232</span>{</div>
+<div class="line"><span class="lineno">  233</span>    <span class="keywordflow">if</span> (!kv_cache_k || !kv_cache_v || !k || !v ||</div>
+<div class="line"><span class="lineno">  234</span>        start_pos &lt; 0 || num_tokens &lt;= 0 || num_kv_heads &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  235</span>        head_dim &lt;= 0 || max_seq_len &lt;= 0 ||</div>
+<div class="line"><span class="lineno">  236</span>        start_pos &gt; max_seq_len - num_tokens) {</div>
+<div class="line"><span class="lineno">  237</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  238</span>    }</div>
+<div class="line"><span class="lineno">  239</span> </div>
+<div class="line"><span class="lineno">  240</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> compact_head_stride = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  241</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> cache_head_stride = (size_t)max_seq_len * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  242</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> token_bytes = (size_t)num_tokens * (<span class="keywordtype">size_t</span>)head_dim * <span class="keyword">sizeof</span>(float);</div>
+<div class="line"><span class="lineno">  243</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_kv_heads; ++h) {</div>
+<div class="line"><span class="lineno">  244</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  245</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v + (size_t)h * compact_head_stride;</div>
+<div class="line"><span class="lineno">  246</span>        <span class="keywordtype">float</span> *k_head_cache = kv_cache_k + (size_t)h * cache_head_stride</div>
+<div class="line"><span class="lineno">  247</span>                            + (<span class="keywordtype">size_t</span>)start_pos * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  248</span>        <span class="keywordtype">float</span> *v_head_cache = kv_cache_v + (size_t)h * cache_head_stride</div>
+<div class="line"><span class="lineno">  249</span>                            + (<span class="keywordtype">size_t</span>)start_pos * (size_t)head_dim;</div>
+<div class="line"><span class="lineno">  250</span>        memcpy(k_head_cache, k_head, token_bytes);</div>
+<div class="line"><span class="lineno">  251</span>        memcpy(v_head_cache, v_head, token_bytes);</div>
+<div class="line"><span class="lineno">  252</span>    }</div>
+<div class="line"><span class="lineno">  253</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 <a id="a0a5e440c99ba12c4e2127421949520dc" name="a0a5e440c99ba12c4e2127421949520dc"></a>
@@ -1079,17 +1175,17 @@ CK-ENGINE KERNEL RULES:</h1>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00305">305</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  309</span>{</div>
-<div class="line"><span class="lineno">  310</span>    <span class="keywordflow">if</span> (!src || !dst || position &lt; 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
-<div class="line"><span class="lineno">  311</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  312</span>    }</div>
-<div class="line"><span class="lineno">  313</span> </div>
-<div class="line"><span class="lineno">  314</span>    <span class="comment">// Copy logits to dst[position * vocab_size : (position+1) * vocab_size]</span></div>
-<div class="line"><span class="lineno">  315</span>    <span class="comment">// Use memmove for safety in case src and dst overlap (e.g., src == dst)</span></div>
-<div class="line"><span class="lineno">  316</span>    <span class="keywordtype">float</span> *dst_pos = dst + (size_t)position * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
-<div class="line"><span class="lineno">  317</span>    memmove(dst_pos, src, (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  318</span>}</div>
+<p class="definition">Definition at line <a class="el" href="kv__cache__kernels_8c_source.html#l00337">337</a> of file <a class="el" href="kv__cache__kernels_8c_source.html">kv_cache_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  341</span>{</div>
+<div class="line"><span class="lineno">  342</span>    <span class="keywordflow">if</span> (!src || !dst || position &lt; 0 || <a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> &lt;= 0) {</div>
+<div class="line"><span class="lineno">  343</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  344</span>    }</div>
+<div class="line"><span class="lineno">  345</span> </div>
+<div class="line"><span class="lineno">  346</span>    <span class="comment">// Copy logits to dst[position * vocab_size : (position+1) * vocab_size]</span></div>
+<div class="line"><span class="lineno">  347</span>    <span class="comment">// Use memmove for safety in case src and dst overlap (e.g., src == dst)</span></div>
+<div class="line"><span class="lineno">  348</span>    <span class="keywordtype">float</span> *dst_pos = dst + (size_t)position * (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a>;</div>
+<div class="line"><span class="lineno">  349</span>    memmove(dst_pos, src, (<span class="keywordtype">size_t</span>)<a class="code hl_variable" href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a> * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  350</span>}</div>
 <div class="ttc" id="atrue__bpe_8h_html_aa47c8f70dd1f7e8ed4d6c282015f9697"><div class="ttname"><a href="true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697">vocab_size</a></div><div class="ttdeci">int vocab_size</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00193">true_bpe.h:193</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00193">vocab_size</a>.</p>

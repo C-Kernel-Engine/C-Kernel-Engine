@@ -175,6 +175,8 @@ Functions</h2></td></tr>
 <tr class="separator:a6b18327fb094891e5bdbcf8e8a4f16ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e8e7f59cda7dc65eaf5b9754f10d293" id="r_a6e8e7f59cda7dc65eaf5b9754f10d293"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#a6e8e7f59cda7dc65eaf5b9754f10d293">qk_norm_forward_pytorch_bf16_storage</a> (float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</td></tr>
 <tr class="separator:a6e8e7f59cda7dc65eaf5b9754f10d293"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1e4aa032daec4edf7d43666760f22f1a" id="r_a1e4aa032daec4edf7d43666760f22f1a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#a1e4aa032daec4edf7d43666760f22f1a">qk_norm_forward_qwen4_pytorch_bf16_storage</a> (float *q, float *k, const float *q_gamma, const float *k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</td></tr>
+<tr class="separator:a1e4aa032daec4edf7d43666760f22f1a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a141fe803bb692418ec43cf1b21c9f765" id="r_a141fe803bb692418ec43cf1b21c9f765"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765">qk_norm_isa_compiled</a> (<a class="el" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a> isa)</td></tr>
 <tr class="separator:a141fe803bb692418ec43cf1b21c9f765"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae67acb71f1be377608b0f2ccc63361c7" id="r_ae67acb71f1be377608b0f2ccc63361c7"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7">qk_norm_parse_forced_isa</a> (void)</td></tr>
@@ -191,6 +193,8 @@ Functions</h2></td></tr>
 <tr class="separator:a21313e5d9f149097d8059085232aabe9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a84e08713e6234a99c0559a1538fa7a0c" id="r_a84e08713e6234a99c0559a1538fa7a0c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a> (const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</td></tr>
 <tr class="separator:a84e08713e6234a99c0559a1538fa7a0c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1eac561e5f84ca18385a9489e1a6d01b" id="r_a1eac561e5f84ca18385a9489e1a6d01b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="qk__norm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b">rmsnorm_forward_qwen3next_pytorch_bf16_storage</a> (const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</td></tr>
+<tr class="separator:a1eac561e5f84ca18385a9489e1a6d01b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="var-members" name="var-members"></a>
 Variables</h2></td></tr>
@@ -234,20 +238,20 @@ CK-ENGINE KERNEL RULES:</h1>
 <tr><td class="fieldname"><a id="a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20" name="a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20"></a>QK_NORM_ISA_AUTO&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00092">92</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   92</span>             {</div>
-<div class="line"><span class="lineno">   93</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a> = 0,</div>
-<div class="line"><span class="lineno">   94</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a> = 1,</div>
-<div class="line"><span class="lineno">   95</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a> = 2,</div>
-<div class="line"><span class="lineno">   96</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a> = 3,</div>
-<div class="line"><span class="lineno">   97</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a> = -1</div>
-<div class="line"><span class="lineno">   98</span>} <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a>;</div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a></div><div class="ttdeci">QKNormISA</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00092">qk_norm_kernels.c:92</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX_VNNI</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00096">qk_norm_kernels.c:96</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX2</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00095">qk_norm_kernels.c:95</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a></div><div class="ttdeci">@ QK_NORM_ISA_AUTO</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00098">qk_norm_kernels.c:97</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a></div><div class="ttdeci">@ QK_NORM_ISA_SCALAR</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00093">qk_norm_kernels.c:93</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00094">qk_norm_kernels.c:94</a></div></div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00101">101</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  101</span>             {</div>
+<div class="line"><span class="lineno">  102</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a> = 0,</div>
+<div class="line"><span class="lineno">  103</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a> = 1,</div>
+<div class="line"><span class="lineno">  104</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a> = 2,</div>
+<div class="line"><span class="lineno">  105</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a> = 3,</div>
+<div class="line"><span class="lineno">  106</span>    <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a> = -1</div>
+<div class="line"><span class="lineno">  107</span>} <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a>;</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a></div><div class="ttdeci">QKNormISA</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00101">qk_norm_kernels.c:101</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX_VNNI</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00105">qk_norm_kernels.c:105</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX2</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00104">qk_norm_kernels.c:104</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a></div><div class="ttdeci">@ QK_NORM_ISA_AUTO</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00107">qk_norm_kernels.c:106</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a></div><div class="ttdeci">@ QK_NORM_ISA_SCALAR</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00102">qk_norm_kernels.c:102</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac"><div class="ttname"><a href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a></div><div class="ttdeci">@ QK_NORM_ISA_AVX</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00103">qk_norm_kernels.c:103</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -304,11 +308,11 @@ CK-ENGINE KERNEL RULES:</h1>
 <p>Forward pass for Gemma4-assistant q-only per-head RMSNorm.</p>
 <p>Some Gemma4 assistant/drafter checkpoints project only Q and then reuse Q as the shared K/V stream. This wrapper keeps that public kernel contract explicit while reusing the same row-wise RMSNorm implementation as qk_norm_forward. </p>
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00379">379</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  385</span>{</div>
-<div class="line"><span class="lineno">  386</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(q, q_gamma, q, NULL,</div>
-<div class="line"><span class="lineno">  387</span>                    num_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  388</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00405">405</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  411</span>{</div>
+<div class="line"><span class="lineno">  412</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  413</span>                    num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  414</span>}</div>
 <div class="ttc" id="aqk__norm__kernels_8c_html_a9a068ed02d809a81a23f09e61b820baf"><div class="ttname"><a href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a></div><div class="ttdeci">void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00621">rmsnorm_kernels.c:621</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00621">rmsnorm_forward()</a>.</p>
@@ -425,29 +429,29 @@ CK-ENGINE KERNEL RULES:</h1>
 </ul>
 <p>Implementation is reference-first and deterministic: 1) recompute row rstd values from saved q/k inputs 2) call rmsnorm_backward on flattened [rows, head_dim] views </p>
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00401">401</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  408</span>{</div>
-<div class="line"><span class="lineno">  409</span>    <span class="keywordtype">int</span> q_rows = num_heads * num_tokens;</div>
-<div class="line"><span class="lineno">  410</span>    <span class="keywordtype">int</span> k_rows = num_kv_heads * num_tokens;</div>
-<div class="line"><span class="lineno">  411</span> </div>
-<div class="line"><span class="lineno">  412</span>    <span class="keywordflow">if</span> (q_rows &gt; 0) {</div>
-<div class="line"><span class="lineno">  413</span>        <span class="keywordtype">float</span> q_rstd_cache[q_rows];</div>
-<div class="line"><span class="lineno">  414</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a>(q_in, q_rstd_cache, q_rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  415</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0">rmsnorm_backward</a>(d_q_out, q_in, q_gamma, q_rstd_cache,</div>
-<div class="line"><span class="lineno">  416</span>                         d_q_in, d_q_gamma, q_rows, head_dim, head_dim);</div>
-<div class="line"><span class="lineno">  417</span>    }</div>
-<div class="line"><span class="lineno">  418</span> </div>
-<div class="line"><span class="lineno">  419</span>    <span class="keywordflow">if</span> (k_rows &gt; 0) {</div>
-<div class="line"><span class="lineno">  420</span>        <span class="keywordtype">float</span> k_rstd_cache[k_rows];</div>
-<div class="line"><span class="lineno">  421</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a>(k_in, k_rstd_cache, k_rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  422</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0">rmsnorm_backward</a>(d_k_out, k_in, k_gamma, k_rstd_cache,</div>
-<div class="line"><span class="lineno">  423</span>                         d_k_in, d_k_gamma, k_rows, head_dim, head_dim);</div>
-<div class="line"><span class="lineno">  424</span>    }</div>
-<div class="line"><span class="lineno">  425</span>}</div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a48e379366322fa62710bcaf06de7b816"><div class="ttname"><a href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a></div><div class="ttdeci">static void qk_norm_compute_rstd(const float *input, float *rstd_cache, int rows, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00270">qk_norm_kernels.c:270</a></div></div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00427">427</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  434</span>{</div>
+<div class="line"><span class="lineno">  435</span>    <span class="keywordtype">int</span> q_rows = num_heads * num_tokens;</div>
+<div class="line"><span class="lineno">  436</span>    <span class="keywordtype">int</span> k_rows = num_kv_heads * num_tokens;</div>
+<div class="line"><span class="lineno">  437</span> </div>
+<div class="line"><span class="lineno">  438</span>    <span class="keywordflow">if</span> (q_rows &gt; 0) {</div>
+<div class="line"><span class="lineno">  439</span>        <span class="keywordtype">float</span> q_rstd_cache[q_rows];</div>
+<div class="line"><span class="lineno">  440</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a>(q_in, q_rstd_cache, q_rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  441</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0">rmsnorm_backward</a>(d_q_out, q_in, q_gamma, q_rstd_cache,</div>
+<div class="line"><span class="lineno">  442</span>                         d_q_in, d_q_gamma, q_rows, head_dim, head_dim);</div>
+<div class="line"><span class="lineno">  443</span>    }</div>
+<div class="line"><span class="lineno">  444</span> </div>
+<div class="line"><span class="lineno">  445</span>    <span class="keywordflow">if</span> (k_rows &gt; 0) {</div>
+<div class="line"><span class="lineno">  446</span>        <span class="keywordtype">float</span> k_rstd_cache[k_rows];</div>
+<div class="line"><span class="lineno">  447</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a>(k_in, k_rstd_cache, k_rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  448</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0">rmsnorm_backward</a>(d_k_out, k_in, k_gamma, k_rstd_cache,</div>
+<div class="line"><span class="lineno">  449</span>                         d_k_in, d_k_gamma, k_rows, head_dim, head_dim);</div>
+<div class="line"><span class="lineno">  450</span>    }</div>
+<div class="line"><span class="lineno">  451</span>}</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a48e379366322fa62710bcaf06de7b816"><div class="ttname"><a href="qk__norm__kernels_8c.html#a48e379366322fa62710bcaf06de7b816">qk_norm_compute_rstd</a></div><div class="ttdeci">static void qk_norm_compute_rstd(const float *input, float *rstd_cache, int rows, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00279">qk_norm_kernels.c:279</a></div></div>
 <div class="ttc" id="aqk__norm__kernels_8c_html_aca68d7dda1a7de9ff926920804751db0"><div class="ttname"><a href="qk__norm__kernels_8c.html#aca68d7dda1a7de9ff926920804751db0">rmsnorm_backward</a></div><div class="ttdeci">void rmsnorm_backward(const float *d_output, const float *input, const float *gamma, const float *rstd_cache, float *d_input, float *d_gamma, int tokens, int d_model, int aligned_embed_dim)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00715">rmsnorm_kernels.c:715</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00270">qk_norm_compute_rstd()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00715">rmsnorm_backward()</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00279">qk_norm_compute_rstd()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00715">rmsnorm_backward()</a>.</p>
 
 </div>
 </div>
@@ -467,13 +471,13 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00102">102</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  103</span>{</div>
-<div class="line"><span class="lineno">  104</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a>;</div>
-<div class="line"><span class="lineno">  105</span>}</div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a9d288461faa85bf5221bd23ec71650f1"><div class="ttname"><a href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a></div><div class="ttdeci">static int g_qk_norm_last_isa</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00100">qk_norm_kernels.c:100</a></div></div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00111">111</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  112</span>{</div>
+<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a>;</div>
+<div class="line"><span class="lineno">  114</span>}</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a9d288461faa85bf5221bd23ec71650f1"><div class="ttname"><a href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a></div><div class="ttdeci">static int g_qk_norm_last_isa</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00109">qk_norm_kernels.c:109</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00100">g_qk_norm_last_isa</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00109">g_qk_norm_last_isa</a>.</p>
 
 </div>
 </div>
@@ -529,39 +533,39 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00270">270</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  275</span>{</div>
-<div class="line"><span class="lineno">  276</span>    <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a> selected = <a class="code hl_function" href="qk__norm__kernels_8c.html#af86dc450313b9669b3fff9d6b3f01e71">qk_norm_select_isa</a>();</div>
-<div class="line"><span class="lineno">  277</span>    <a class="code hl_variable" href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a> = (int)selected;</div>
-<div class="line"><span class="lineno">  278</span>    <span class="keywordflow">switch</span> (selected) {</div>
-<div class="line"><span class="lineno">  279</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
-<div class="line"><span class="lineno">  280</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>:</div>
-<div class="line"><span class="lineno">  281</span>        qk_norm_compute_rstd_avx_vnni(input, rstd_cache, rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  282</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  283</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  284</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  285</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>:</div>
-<div class="line"><span class="lineno">  286</span>        qk_norm_compute_rstd_avx2(input, rstd_cache, rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  287</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  288</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  289</span><span class="preprocessor">#if defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  290</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>:</div>
-<div class="line"><span class="lineno">  291</span>        qk_norm_compute_rstd_avx(input, rstd_cache, rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  292</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  293</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  294</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>:</div>
-<div class="line"><span class="lineno">  295</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>:</div>
-<div class="line"><span class="lineno">  296</span>    <span class="keywordflow">default</span>:</div>
-<div class="line"><span class="lineno">  297</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a1510a0e84bb99232ccce7b8198d2855f">qk_norm_compute_rstd_scalar</a>(input, rstd_cache, rows, head_dim, eps);</div>
-<div class="line"><span class="lineno">  298</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  299</span>    }</div>
-<div class="line"><span class="lineno">  300</span>}</div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a1510a0e84bb99232ccce7b8198d2855f"><div class="ttname"><a href="qk__norm__kernels_8c.html#a1510a0e84bb99232ccce7b8198d2855f">qk_norm_compute_rstd_scalar</a></div><div class="ttdeci">static void qk_norm_compute_rstd_scalar(const float *input, float *rstd_cache, int rows, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00169">qk_norm_kernels.c:169</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_af86dc450313b9669b3fff9d6b3f01e71"><div class="ttname"><a href="qk__norm__kernels_8c.html#af86dc450313b9669b3fff9d6b3f01e71">qk_norm_select_isa</a></div><div class="ttdeci">static QKNormISA qk_norm_select_isa(void)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00151">qk_norm_kernels.c:151</a></div></div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00279">279</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  284</span>{</div>
+<div class="line"><span class="lineno">  285</span>    <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a> selected = <a class="code hl_function" href="qk__norm__kernels_8c.html#af86dc450313b9669b3fff9d6b3f01e71">qk_norm_select_isa</a>();</div>
+<div class="line"><span class="lineno">  286</span>    <a class="code hl_variable" href="qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1">g_qk_norm_last_isa</a> = (int)selected;</div>
+<div class="line"><span class="lineno">  287</span>    <span class="keywordflow">switch</span> (selected) {</div>
+<div class="line"><span class="lineno">  288</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
+<div class="line"><span class="lineno">  289</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>:</div>
+<div class="line"><span class="lineno">  290</span>        qk_norm_compute_rstd_avx_vnni(input, rstd_cache, rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  292</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  293</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  294</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>:</div>
+<div class="line"><span class="lineno">  295</span>        qk_norm_compute_rstd_avx2(input, rstd_cache, rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  296</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  297</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  298</span><span class="preprocessor">#if defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  299</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>:</div>
+<div class="line"><span class="lineno">  300</span>        qk_norm_compute_rstd_avx(input, rstd_cache, rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  301</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  302</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  303</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>:</div>
+<div class="line"><span class="lineno">  304</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>:</div>
+<div class="line"><span class="lineno">  305</span>    <span class="keywordflow">default</span>:</div>
+<div class="line"><span class="lineno">  306</span>        <a class="code hl_function" href="qk__norm__kernels_8c.html#a1510a0e84bb99232ccce7b8198d2855f">qk_norm_compute_rstd_scalar</a>(input, rstd_cache, rows, head_dim, eps);</div>
+<div class="line"><span class="lineno">  307</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  308</span>    }</div>
+<div class="line"><span class="lineno">  309</span>}</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a1510a0e84bb99232ccce7b8198d2855f"><div class="ttname"><a href="qk__norm__kernels_8c.html#a1510a0e84bb99232ccce7b8198d2855f">qk_norm_compute_rstd_scalar</a></div><div class="ttdeci">static void qk_norm_compute_rstd_scalar(const float *input, float *rstd_cache, int rows, int head_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00178">qk_norm_kernels.c:178</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_af86dc450313b9669b3fff9d6b3f01e71"><div class="ttname"><a href="qk__norm__kernels_8c.html#af86dc450313b9669b3fff9d6b3f01e71">qk_norm_select_isa</a></div><div class="ttdeci">static QKNormISA qk_norm_select_isa(void)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00160">qk_norm_kernels.c:160</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00100">g_qk_norm_last_isa</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00169">qk_norm_compute_rstd_scalar()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00097">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00094">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00095">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00096">QK_NORM_ISA_AVX_VNNI</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00093">QK_NORM_ISA_SCALAR</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00151">qk_norm_select_isa()</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00109">g_qk_norm_last_isa</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00178">qk_norm_compute_rstd_scalar()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00106">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00103">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00104">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00105">QK_NORM_ISA_AVX_VNNI</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00102">QK_NORM_ISA_SCALAR</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00160">qk_norm_select_isa()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00401">qk_norm_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00427">qk_norm_backward()</a>.</p>
 
 </div>
 </div>
@@ -617,21 +621,21 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00169">169</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  174</span>{</div>
-<div class="line"><span class="lineno">  175</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">  176</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)r * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  177</span>        <span class="keywordtype">double</span> sum_sq = 0.0;</div>
-<div class="line"><span class="lineno">  178</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
-<div class="line"><span class="lineno">  179</span>            <span class="keywordtype">double</span> v = (double)x[d];</div>
-<div class="line"><span class="lineno">  180</span>            sum_sq += v * v;</div>
-<div class="line"><span class="lineno">  181</span>        }</div>
-<div class="line"><span class="lineno">  182</span>        <span class="keywordtype">float</span> mean_sq = (float)(sum_sq / (<span class="keywordtype">double</span>)head_dim);</div>
-<div class="line"><span class="lineno">  183</span>        rstd_cache[r] = 1.0f / sqrtf(mean_sq + eps);</div>
-<div class="line"><span class="lineno">  184</span>    }</div>
-<div class="line"><span class="lineno">  185</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00178">178</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  183</span>{</div>
+<div class="line"><span class="lineno">  184</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">  185</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x = input + (size_t)r * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  186</span>        <span class="keywordtype">double</span> sum_sq = 0.0;</div>
+<div class="line"><span class="lineno">  187</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> d = 0; d &lt; head_dim; ++d) {</div>
+<div class="line"><span class="lineno">  188</span>            <span class="keywordtype">double</span> v = (double)x[d];</div>
+<div class="line"><span class="lineno">  189</span>            sum_sq += v * v;</div>
+<div class="line"><span class="lineno">  190</span>        }</div>
+<div class="line"><span class="lineno">  191</span>        <span class="keywordtype">float</span> mean_sq = (float)(sum_sq / (<span class="keywordtype">double</span>)head_dim);</div>
+<div class="line"><span class="lineno">  192</span>        rstd_cache[r] = 1.0f / sqrtf(mean_sq + eps);</div>
+<div class="line"><span class="lineno">  193</span>    }</div>
+<div class="line"><span class="lineno">  194</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00270">qk_norm_compute_rstd()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00279">qk_norm_compute_rstd()</a>.</p>
 
 </div>
 </div>
@@ -719,18 +723,18 @@ CK-ENGINE KERNEL RULES:</h1>
 </dl>
 <dl class="test"><dt><b><a class="el" href="test.html#_test000018">Test:</a></b></dt><dd>unittest/test_qk_norm.py </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00317">317</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  321</span>{</div>
-<div class="line"><span class="lineno">  322</span>    <span class="comment">/* Q norm: [num_heads * num_tokens] rows of [head_dim]</span></div>
-<div class="line"><span class="lineno">  323</span><span class="comment">     * Each row is one head&#39;s vector for one token. */</span></div>
-<div class="line"><span class="lineno">  324</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(q, q_gamma, q, NULL,</div>
-<div class="line"><span class="lineno">  325</span>                    num_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  326</span> </div>
-<div class="line"><span class="lineno">  327</span>    <span class="comment">/* K norm: [num_kv_heads * num_tokens] rows of [head_dim]</span></div>
-<div class="line"><span class="lineno">  328</span><span class="comment">     * Same logic, fewer rows when using GQA. */</span></div>
-<div class="line"><span class="lineno">  329</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(k, k_gamma, k, NULL,</div>
-<div class="line"><span class="lineno">  330</span>                    num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  331</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00326">326</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  330</span>{</div>
+<div class="line"><span class="lineno">  331</span>    <span class="comment">/* Q norm: [num_heads * num_tokens] rows of [head_dim]</span></div>
+<div class="line"><span class="lineno">  332</span><span class="comment">     * Each row is one head&#39;s vector for one token. */</span></div>
+<div class="line"><span class="lineno">  333</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  334</span>                    num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  335</span> </div>
+<div class="line"><span class="lineno">  336</span>    <span class="comment">/* K norm: [num_kv_heads * num_tokens] rows of [head_dim]</span></div>
+<div class="line"><span class="lineno">  337</span><span class="comment">     * Same logic, fewer rows when using GQA. */</span></div>
+<div class="line"><span class="lineno">  338</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf">rmsnorm_forward</a>(k, k_gamma, k, NULL,</div>
+<div class="line"><span class="lineno">  339</span>                    num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  340</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00621">rmsnorm_forward()</a>.</p>
 
@@ -804,13 +808,13 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00333">333</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  337</span>{</div>
-<div class="line"><span class="lineno">  338</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701">rmsnorm_forward_fp64_sum</a>(q, q_gamma, q, NULL,</div>
-<div class="line"><span class="lineno">  339</span>                             num_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  340</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701">rmsnorm_forward_fp64_sum</a>(k, k_gamma, k, NULL,</div>
-<div class="line"><span class="lineno">  341</span>                             num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  342</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00342">342</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  346</span>{</div>
+<div class="line"><span class="lineno">  347</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701">rmsnorm_forward_fp64_sum</a>(q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  348</span>                             num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  349</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701">rmsnorm_forward_fp64_sum</a>(k, k_gamma, k, NULL,</div>
+<div class="line"><span class="lineno">  350</span>                             num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  351</span>}</div>
 <div class="ttc" id="aqk__norm__kernels_8c_html_a1a31e0326acc7c3cda2eb4013c23d701"><div class="ttname"><a href="qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701">rmsnorm_forward_fp64_sum</a></div><div class="ttdeci">void rmsnorm_forward_fp64_sum(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00137">rmsnorm_kernels.c:137</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00137">rmsnorm_forward_fp64_sum()</a>.</p>
@@ -885,15 +889,15 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00344">344</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  348</span>{</div>
-<div class="line"><span class="lineno">  349</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a>(</div>
-<div class="line"><span class="lineno">  350</span>        q, q_gamma, q, NULL,</div>
-<div class="line"><span class="lineno">  351</span>        num_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  352</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a>(</div>
-<div class="line"><span class="lineno">  353</span>        k, k_gamma, k, NULL,</div>
-<div class="line"><span class="lineno">  354</span>        num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  355</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00353">353</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  357</span>{</div>
+<div class="line"><span class="lineno">  358</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a>(</div>
+<div class="line"><span class="lineno">  359</span>        q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  360</span>        num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  361</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a>(</div>
+<div class="line"><span class="lineno">  362</span>        k, k_gamma, k, NULL,</div>
+<div class="line"><span class="lineno">  363</span>        num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  364</span>}</div>
 <div class="ttc" id="aqk__norm__kernels_8c_html_a21313e5d9f149097d8059085232aabe9"><div class="ttname"><a href="qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a></div><div class="ttdeci">void rmsnorm_forward_llama_production(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_kernels.c:196</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>.</p>
@@ -968,18 +972,101 @@ CK-ENGINE KERNEL RULES:</h1>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00357">357</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  363</span>{</div>
-<div class="line"><span class="lineno">  364</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
-<div class="line"><span class="lineno">  365</span>        q, q_gamma, q, NULL,</div>
-<div class="line"><span class="lineno">  366</span>        num_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  367</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
-<div class="line"><span class="lineno">  368</span>        k, k_gamma, k, NULL,</div>
-<div class="line"><span class="lineno">  369</span>        num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
-<div class="line"><span class="lineno">  370</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00366">366</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  372</span>{</div>
+<div class="line"><span class="lineno">  373</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  374</span>        q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  375</span>        num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  376</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  377</span>        k, k_gamma, k, NULL,</div>
+<div class="line"><span class="lineno">  378</span>        num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  379</span>}</div>
 <div class="ttc" id="aqk__norm__kernels_8c_html_a84e08713e6234a99c0559a1538fa7a0c"><div class="ttname"><a href="qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a></div><div class="ttdeci">void rmsnorm_forward_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_kernels.c:395</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>.</p>
+
+</div>
+</div>
+<a id="a1e4aa032daec4edf7d43666760f22f1a" name="a1e4aa032daec4edf7d43666760f22f1a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1e4aa032daec4edf7d43666760f22f1a">&#9670;&#160;</a></span>qk_norm_forward_qwen4_pytorch_bf16_storage()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void qk_norm_forward_qwen4_pytorch_bf16_storage </td>
+          <td>(</td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>q_gamma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>k_gamma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>head_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00381">381</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  389</span>{</div>
+<div class="line"><span class="lineno">  390</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b">rmsnorm_forward_qwen3next_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  391</span>        q, q_gamma, q, NULL,</div>
+<div class="line"><span class="lineno">  392</span>        num_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  393</span>    <a class="code hl_function" href="qk__norm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b">rmsnorm_forward_qwen3next_pytorch_bf16_storage</a>(</div>
+<div class="line"><span class="lineno">  394</span>        k, k_gamma, k, NULL,</div>
+<div class="line"><span class="lineno">  395</span>        num_kv_heads * num_tokens, head_dim, head_dim, eps);</div>
+<div class="line"><span class="lineno">  396</span>}</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a1eac561e5f84ca18385a9489e1a6d01b"><div class="ttname"><a href="qk__norm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b">rmsnorm_forward_qwen3next_pytorch_bf16_storage</a></div><div class="ttdeci">void rmsnorm_forward_qwen3next_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00424">rmsnorm_kernels.c:424</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00424">rmsnorm_forward_qwen3next_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -1007,31 +1094,31 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00129">129</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  130</span>{</div>
-<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">switch</span> (isa) {</div>
-<div class="line"><span class="lineno">  132</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>:</div>
-<div class="line"><span class="lineno">  133</span>        <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  134</span><span class="preprocessor">#if defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>:</div>
-<div class="line"><span class="lineno">  136</span>        <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  137</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  138</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  139</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>:</div>
-<div class="line"><span class="lineno">  140</span>        <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  141</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  142</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
-<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>:</div>
-<div class="line"><span class="lineno">  144</span>        <span class="keywordflow">return</span> 1;</div>
-<div class="line"><span class="lineno">  145</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  146</span>    <span class="keywordflow">default</span>:</div>
-<div class="line"><span class="lineno">  147</span>        <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">  148</span>    }</div>
-<div class="line"><span class="lineno">  149</span>}</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00138">138</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  139</span>{</div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordflow">switch</span> (isa) {</div>
+<div class="line"><span class="lineno">  141</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>:</div>
+<div class="line"><span class="lineno">  142</span>        <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  143</span><span class="preprocessor">#if defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>:</div>
+<div class="line"><span class="lineno">  145</span>        <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  146</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  147</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  148</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>:</div>
+<div class="line"><span class="lineno">  149</span>        <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  150</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  151</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
+<div class="line"><span class="lineno">  152</span>    <span class="keywordflow">case</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>:</div>
+<div class="line"><span class="lineno">  153</span>        <span class="keywordflow">return</span> 1;</div>
+<div class="line"><span class="lineno">  154</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  155</span>    <span class="keywordflow">default</span>:</div>
+<div class="line"><span class="lineno">  156</span>        <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  157</span>    }</div>
+<div class="line"><span class="lineno">  158</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00094">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00095">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00096">QK_NORM_ISA_AVX_VNNI</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00093">QK_NORM_ISA_SCALAR</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00103">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00104">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00105">QK_NORM_ISA_AVX_VNNI</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00102">QK_NORM_ISA_SCALAR</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00151">qk_norm_select_isa()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00160">qk_norm_select_isa()</a>.</p>
 
 </div>
 </div>
@@ -1059,31 +1146,31 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00107">107</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  108</span>{</div>
-<div class="line"><span class="lineno">  109</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *forced = getenv(<span class="stringliteral">&quot;CK_QK_NORM_BACKWARD_ISA&quot;</span>);</div>
-<div class="line"><span class="lineno">  110</span>    <span class="keywordflow">if</span> (!forced || forced[0] == <span class="charliteral">&#39;\0&#39;</span> || strcmp(forced, <span class="stringliteral">&quot;auto&quot;</span>) == 0) {</div>
-<div class="line"><span class="lineno">  111</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>;</div>
-<div class="line"><span class="lineno">  112</span>    }</div>
-<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;scalar&quot;</span>) == 0) {</div>
-<div class="line"><span class="lineno">  114</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
-<div class="line"><span class="lineno">  115</span>    }</div>
-<div class="line"><span class="lineno">  116</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx&quot;</span>) == 0) {</div>
-<div class="line"><span class="lineno">  117</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>;</div>
-<div class="line"><span class="lineno">  118</span>    }</div>
-<div class="line"><span class="lineno">  119</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx2&quot;</span>) == 0) {</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>;</div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00116">116</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  117</span>{</div>
+<div class="line"><span class="lineno">  118</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *forced = getenv(<span class="stringliteral">&quot;CK_QK_NORM_BACKWARD_ISA&quot;</span>);</div>
+<div class="line"><span class="lineno">  119</span>    <span class="keywordflow">if</span> (!forced || forced[0] == <span class="charliteral">&#39;\0&#39;</span> || strcmp(forced, <span class="stringliteral">&quot;auto&quot;</span>) == 0) {</div>
+<div class="line"><span class="lineno">  120</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>;</div>
 <div class="line"><span class="lineno">  121</span>    }</div>
-<div class="line"><span class="lineno">  122</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx_vnni&quot;</span>) == 0) {</div>
-<div class="line"><span class="lineno">  123</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>;</div>
+<div class="line"><span class="lineno">  122</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;scalar&quot;</span>) == 0) {</div>
+<div class="line"><span class="lineno">  123</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
 <div class="line"><span class="lineno">  124</span>    }</div>
-<div class="line"><span class="lineno">  125</span>    <span class="comment">/* Unknown value -&gt; keep behavior deterministic by falling back. */</span></div>
-<div class="line"><span class="lineno">  126</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
-<div class="line"><span class="lineno">  127</span>}</div>
+<div class="line"><span class="lineno">  125</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx&quot;</span>) == 0) {</div>
+<div class="line"><span class="lineno">  126</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>;</div>
+<div class="line"><span class="lineno">  127</span>    }</div>
+<div class="line"><span class="lineno">  128</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx2&quot;</span>) == 0) {</div>
+<div class="line"><span class="lineno">  129</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>;</div>
+<div class="line"><span class="lineno">  130</span>    }</div>
+<div class="line"><span class="lineno">  131</span>    <span class="keywordflow">if</span> (strcmp(forced, <span class="stringliteral">&quot;avx_vnni&quot;</span>) == 0) {</div>
+<div class="line"><span class="lineno">  132</span>        <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>;</div>
+<div class="line"><span class="lineno">  133</span>    }</div>
+<div class="line"><span class="lineno">  134</span>    <span class="comment">/* Unknown value -&gt; keep behavior deterministic by falling back. */</span></div>
+<div class="line"><span class="lineno">  135</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
+<div class="line"><span class="lineno">  136</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00097">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00094">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00095">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00096">QK_NORM_ISA_AVX_VNNI</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00093">QK_NORM_ISA_SCALAR</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00106">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00103">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00104">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00105">QK_NORM_ISA_AVX_VNNI</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00102">QK_NORM_ISA_SCALAR</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00151">qk_norm_select_isa()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00160">qk_norm_select_isa()</a>.</p>
 
 </div>
 </div>
@@ -1111,29 +1198,29 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00151">151</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  152</span>{</div>
-<div class="line"><span class="lineno">  153</span>    <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a> forced = <a class="code hl_function" href="qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7">qk_norm_parse_forced_isa</a>();</div>
-<div class="line"><span class="lineno">  154</span>    <span class="keywordflow">if</span> (forced != <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>) {</div>
-<div class="line"><span class="lineno">  155</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765">qk_norm_isa_compiled</a>(forced) ? forced : <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
-<div class="line"><span class="lineno">  156</span>    }</div>
-<div class="line"><span class="lineno">  157</span> </div>
-<div class="line"><span class="lineno">  158</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
-<div class="line"><span class="lineno">  159</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>;</div>
-<div class="line"><span class="lineno">  160</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  161</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>;</div>
-<div class="line"><span class="lineno">  162</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  163</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>;</div>
-<div class="line"><span class="lineno">  164</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  165</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
-<div class="line"><span class="lineno">  166</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  167</span>}</div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_a141fe803bb692418ec43cf1b21c9f765"><div class="ttname"><a href="qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765">qk_norm_isa_compiled</a></div><div class="ttdeci">static int qk_norm_isa_compiled(QKNormISA isa)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00129">qk_norm_kernels.c:129</a></div></div>
-<div class="ttc" id="aqk__norm__kernels_8c_html_ae67acb71f1be377608b0f2ccc63361c7"><div class="ttname"><a href="qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7">qk_norm_parse_forced_isa</a></div><div class="ttdeci">static QKNormISA qk_norm_parse_forced_isa(void)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00107">qk_norm_kernels.c:107</a></div></div>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00160">160</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  161</span>{</div>
+<div class="line"><span class="lineno">  162</span>    <a class="code hl_enumeration" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755">QKNormISA</a> forced = <a class="code hl_function" href="qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7">qk_norm_parse_forced_isa</a>();</div>
+<div class="line"><span class="lineno">  163</span>    <span class="keywordflow">if</span> (forced != <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ab4f9a76a24692e46a07cf57d949b8b20">QK_NORM_ISA_AUTO</a>) {</div>
+<div class="line"><span class="lineno">  164</span>        <span class="keywordflow">return</span> <a class="code hl_function" href="qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765">qk_norm_isa_compiled</a>(forced) ? forced : <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
+<div class="line"><span class="lineno">  165</span>    }</div>
+<div class="line"><span class="lineno">  166</span> </div>
+<div class="line"><span class="lineno">  167</span><span class="preprocessor">#if defined(__AVXVNNI__)</span></div>
+<div class="line"><span class="lineno">  168</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a6dfe01b97d97594c7bcce0f35a87bb65">QK_NORM_ISA_AVX_VNNI</a>;</div>
+<div class="line"><span class="lineno">  169</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  170</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755a8ef9597b7f47de9209de4f8aa4e58368">QK_NORM_ISA_AVX2</a>;</div>
+<div class="line"><span class="lineno">  171</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  172</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755afae38bc9c5a9cf69e1a17e4ce09c54ac">QK_NORM_ISA_AVX</a>;</div>
+<div class="line"><span class="lineno">  173</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  174</span>    <span class="keywordflow">return</span> <a class="code hl_enumvalue" href="qk__norm__kernels_8c.html#a11413abf502326b875f2afcbeabe0755ae8a33096f06a0b90497f7b81c5fc024f">QK_NORM_ISA_SCALAR</a>;</div>
+<div class="line"><span class="lineno">  175</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  176</span>}</div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_a141fe803bb692418ec43cf1b21c9f765"><div class="ttname"><a href="qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765">qk_norm_isa_compiled</a></div><div class="ttdeci">static int qk_norm_isa_compiled(QKNormISA isa)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00138">qk_norm_kernels.c:138</a></div></div>
+<div class="ttc" id="aqk__norm__kernels_8c_html_ae67acb71f1be377608b0f2ccc63361c7"><div class="ttname"><a href="qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7">qk_norm_parse_forced_isa</a></div><div class="ttdeci">static QKNormISA qk_norm_parse_forced_isa(void)</div><div class="ttdef"><b>Definition</b> <a href="qk__norm__kernels_8c_source.html#l00116">qk_norm_kernels.c:116</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00097">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00094">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00095">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00096">QK_NORM_ISA_AVX_VNNI</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00129">qk_norm_isa_compiled()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00093">QK_NORM_ISA_SCALAR</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00107">qk_norm_parse_forced_isa()</a>.</p>
+<p class="reference">References <a class="el" href="qk__norm__kernels_8c_source.html#l00106">QK_NORM_ISA_AUTO</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00103">QK_NORM_ISA_AVX</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00104">QK_NORM_ISA_AVX2</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00105">QK_NORM_ISA_AVX_VNNI</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00138">qk_norm_isa_compiled()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00102">QK_NORM_ISA_SCALAR</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00116">qk_norm_parse_forced_isa()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00270">qk_norm_compute_rstd()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00279">qk_norm_compute_rstd()</a>.</p>
 
 </div>
 </div>
@@ -1394,7 +1481,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
 <div class="ttc" id="armsnorm__kernels_8c_html_ac429025594088a6caf98de6d42095692"><div class="ttname"><a href="rmsnorm__kernels_8c.html#ac429025594088a6caf98de6d42095692">rmsnorm_backward_strict_scalar</a></div><div class="ttdeci">static void rmsnorm_backward_strict_scalar(const float *d_output, const float *input, const float *gamma, const float *rstd_cache, float *d_input, float *d_gamma, int tokens, int d_model, int aligned_embed_dim)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00439">rmsnorm_kernels.c:439</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00401">qk_norm_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00427">qk_norm_backward()</a>.</p>
 
 </div>
 </div>
@@ -1476,7 +1563,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  641</span>}</div>
 <div class="ttc" id="armsnorm__kernels_8c_html_aae8ede0a82b914bbd6191d39c29b4e76"><div class="ttname"><a href="rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76">rmsnorm_forward_strided_f32</a></div><div class="ttdeci">void rmsnorm_forward_strided_f32(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00492">rmsnorm_kernels.c:492</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00379">q_norm_forward()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00317">qk_norm_forward()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00643">rmsnorm_forward_kv_lora()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00405">q_norm_forward()</a>, <a class="el" href="qk__norm__kernels_8c_source.html#l00326">qk_norm_forward()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00643">rmsnorm_forward_kv_lora()</a>.</p>
 
 </div>
 </div>
@@ -1570,7 +1657,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  169</span>    }</div>
 <div class="line"><span class="lineno">  170</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00333">qk_norm_forward_fp64_sum()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00342">qk_norm_forward_fp64_sum()</a>.</p>
 
 </div>
 </div>
@@ -1669,7 +1756,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  233</span>}</div>
 <div class="ttc" id="armsnorm__kernels_8c_html_adc6b003cb5d9f1c2977a6b9b209b84b7"><div class="ttname"><a href="rmsnorm__kernels_8c.html#adc6b003cb5d9f1c2977a6b9b209b84b7">rmsnorm_llama_production_rstd</a></div><div class="ttdeci">static float rmsnorm_llama_production_rstd(float mean_eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00172">rmsnorm_kernels.c:172</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00344">qk_norm_forward_llama_production()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00353">qk_norm_forward_llama_production()</a>.</p>
 
 </div>
 </div>
@@ -1743,7 +1830,80 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  407</span>}</div>
 <div class="ttc" id="armsnorm__kernels_8c_html_aa3e926b5602cbb608fc1be6c6a9bf725"><div class="ttname"><a href="rmsnorm__kernels_8c.html#aa3e926b5602cbb608fc1be6c6a9bf725">rmsnorm_forward_pytorch_bf16_storage_impl</a></div><div class="ttdeci">static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps, int qwen3next_weight_order)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00254">rmsnorm_kernels.c:254</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00357">qk_norm_forward_pytorch_bf16_storage()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00366">qk_norm_forward_pytorch_bf16_storage()</a>.</p>
+
+</div>
+</div>
+<a id="a1eac561e5f84ca18385a9489e1a6d01b" name="a1eac561e5f84ca18385a9489e1a6d01b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1eac561e5f84ca18385a9489e1a6d01b">&#9670;&#160;</a></span>rmsnorm_forward_qwen3next_pytorch_bf16_storage()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rmsnorm_forward_qwen3next_pytorch_bf16_storage </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>gamma</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>rstd_cache</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>tokens</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>d_model</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>aligned_embed_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>eps</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rmsnorm__kernels_8c_source.html#l00424">424</a> of file <a class="el" href="rmsnorm__kernels_8c_source.html">rmsnorm_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  433</span>{</div>
+<div class="line"><span class="lineno">  434</span>    <a class="code hl_function" href="rmsnorm__kernels_8c.html#aa3e926b5602cbb608fc1be6c6a9bf725">rmsnorm_forward_pytorch_bf16_storage_impl</a>(</div>
+<div class="line"><span class="lineno">  435</span>        input, gamma, output, rstd_cache, tokens, d_model,</div>
+<div class="line"><span class="lineno">  436</span>        aligned_embed_dim, aligned_embed_dim, eps, 1);</div>
+<div class="line"><span class="lineno">  437</span>}</div>
+</div><!-- fragment -->
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00381">qk_norm_forward_qwen4_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -1768,9 +1928,9 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00100">100</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="qk__norm__kernels_8c_source.html#l00109">109</a> of file <a class="el" href="qk__norm__kernels_8c_source.html">qk_norm_kernels.c</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00102">qk_norm_backward_last_isa()</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00270">qk_norm_compute_rstd()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="qk__norm__kernels_8c_source.html#l00111">qk_norm_backward_last_isa()</a>, and <a class="el" href="qk__norm__kernels_8c_source.html#l00279">qk_norm_compute_rstd()</a>.</p>
 
 </div>
 </div>

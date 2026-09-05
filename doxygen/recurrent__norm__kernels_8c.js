@@ -4,5 +4,7 @@ var recurrent__norm__kernels_8c =
     [ "recurrent_norm_gate_forward", "recurrent__norm__kernels_8c.html#af5e77e21034b56a01b56dc25809fef8a", null ],
     [ "recurrent_norm_gate_llama_avx2_forward", "recurrent__norm__kernels_8c.html#ae1de275281122fbf7bc73b947e36a62d", null ],
     [ "recurrent_norm_gate_pytorch_bf16_storage", "recurrent__norm__kernels_8c.html#ab3ec906e662a3c9b9a81e931d3c8cd20", null ],
+    [ "recurrent_norm_sigmoid_gate_llama_avx2_forward", "recurrent__norm__kernels_8c.html#a1f3ed08a1c84e576dfaf9b1d80a61567", null ],
+    [ "recurrent_norm_sigmoid_gate_pytorch_bf16_storage", "recurrent__norm__kernels_8c.html#a6f6f541d6771c72b4e9f00d48e43bb25", null ],
     [ "recurrent_sigmoid_local", "recurrent__norm__kernels_8c.html#aad079560beb20153fff9425727c2cf16", null ]
 ];

@@ -16,6 +16,7 @@ var qk__norm__kernels_8c =
     [ "qk_norm_forward_fp64_sum", "qk__norm__kernels_8c.html#a78420e30999558da045c41f3a26f6a7e", null ],
     [ "qk_norm_forward_llama_production", "qk__norm__kernels_8c.html#a6b18327fb094891e5bdbcf8e8a4f16ea", null ],
     [ "qk_norm_forward_pytorch_bf16_storage", "qk__norm__kernels_8c.html#a6e8e7f59cda7dc65eaf5b9754f10d293", null ],
+    [ "qk_norm_forward_qwen4_pytorch_bf16_storage", "qk__norm__kernels_8c.html#a1e4aa032daec4edf7d43666760f22f1a", null ],
     [ "qk_norm_isa_compiled", "qk__norm__kernels_8c.html#a141fe803bb692418ec43cf1b21c9f765", null ],
     [ "qk_norm_parse_forced_isa", "qk__norm__kernels_8c.html#ae67acb71f1be377608b0f2ccc63361c7", null ],
     [ "qk_norm_select_isa", "qk__norm__kernels_8c.html#af86dc450313b9669b3fff9d6b3f01e71", null ],
@@ -24,5 +25,6 @@ var qk__norm__kernels_8c =
     [ "rmsnorm_forward_fp64_sum", "qk__norm__kernels_8c.html#a1a31e0326acc7c3cda2eb4013c23d701", null ],
     [ "rmsnorm_forward_llama_production", "qk__norm__kernels_8c.html#a21313e5d9f149097d8059085232aabe9", null ],
     [ "rmsnorm_forward_pytorch_bf16_storage", "qk__norm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c", null ],
+    [ "rmsnorm_forward_qwen3next_pytorch_bf16_storage", "qk__norm__kernels_8c.html#a1eac561e5f84ca18385a9489e1a6d01b", null ],
     [ "g_qk_norm_last_isa", "qk__norm__kernels_8c.html#a9d288461faa85bf5221bd23ec71650f1", null ]
 ];

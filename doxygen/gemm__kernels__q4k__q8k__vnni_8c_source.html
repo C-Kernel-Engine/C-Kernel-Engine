@@ -615,7 +615,7 @@ $(document).ready(function(){initNavTree('gemm__kernels__q4k__q8k__vnni_8c_sourc
 </div>
 <div class="line"><a id="l00463" name="l00463"></a><span class="lineno">  463</span> </div>
 <div class="foldopen" id="foldopen00464" data-start="{" data-end="}">
-<div class="line"><a id="l00464" name="l00464"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4">  464</a></span><span class="keywordtype">size_t</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4">q4_k_packed_meta_x8_block_size</a>(<span class="keywordtype">void</span>)</div>
+<div class="line"><a id="l00464" name="l00464"></a><span class="lineno"><a class="line" href="axpy__kernels_8c.html#a699f6dd54c706d77667704edecb7a8a4">  464</a></span><span class="keywordtype">size_t</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#a699f6dd54c706d77667704edecb7a8a4">q4_k_packed_meta_x8_block_size</a>(<span class="keywordtype">void</span>)</div>
 <div class="line"><a id="l00465" name="l00465"></a><span class="lineno">  465</span>{</div>
 <div class="line"><a id="l00466" name="l00466"></a><span class="lineno">  466</span>    <span class="keywordflow">return</span> <span class="keyword">sizeof</span>(block_q4_K_packed_meta_x8);</div>
 <div class="line"><a id="l00467" name="l00467"></a><span class="lineno">  467</span>}</div>
@@ -686,7 +686,7 @@ $(document).ready(function(){initNavTree('gemm__kernels__q4k__q8k__vnni_8c_sourc
 </div>
 <div class="line"><a id="l00524" name="l00524"></a><span class="lineno">  524</span> </div>
 <div class="foldopen" id="foldopen00525" data-start="{" data-end="}">
-<div class="line"><a id="l00525" name="l00525"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__q8k__vnni_8c.html#ad1a60aab0e504db17f6af651850c6e59">  525</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#ad1a60aab0e504db17f6af651850c6e59">pack_q4_k_to_packed_meta_x8</a>(<span class="keyword">const</span> <span class="keywordtype">void</span> *src, <span class="keywordtype">void</span> *dst, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
+<div class="line"><a id="l00525" name="l00525"></a><span class="lineno"><a class="line" href="axpy__kernels_8c.html#a3b4c0d182eacdca83e8a41d3d828a169">  525</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#ad1a60aab0e504db17f6af651850c6e59">pack_q4_k_to_packed_meta_x8</a>(<span class="keyword">const</span> <span class="keywordtype">void</span> *src, <span class="keywordtype">void</span> *dst, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
 <div class="line"><a id="l00526" name="l00526"></a><span class="lineno">  526</span>{</div>
 <div class="line"><a id="l00527" name="l00527"></a><span class="lineno">  527</span>    <span class="keywordflow">if</span> (!src || !dst || N &lt;= 0 || K &lt;= 0 || (K % <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>) != 0) {</div>
 <div class="line"><a id="l00528" name="l00528"></a><span class="lineno">  528</span>        <span class="keywordflow">return</span>;</div>
@@ -2270,7 +2270,7 @@ $(document).ready(function(){initNavTree('gemm__kernels__q4k__q8k__vnni_8c_sourc
 </div>
 <div class="line"><a id="l02054" name="l02054"></a><span class="lineno"> 2054</span> </div>
 <div class="foldopen" id="foldopen02055" data-start="{" data-end="}">
-<div class="line"><a id="l02055" name="l02055"></a><span class="lineno"><a class="line" href="gemm__kernels__q4k__q8k__vnni_8c.html#a5c4e0dcbc1e9733deb44031b4e08c503"> 2055</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#a5c4e0dcbc1e9733deb44031b4e08c503">gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order</a>(</div>
+<div class="line"><a id="l02055" name="l02055"></a><span class="lineno"><a class="line" href="axpy__kernels_8c.html#ab9450aba197960356ce9b78278e3b4b1"> 2055</a></span><span class="keywordtype">void</span> <a class="code hl_function" href="gemm__kernels__q4k__q8k__vnni_8c.html#a5c4e0dcbc1e9733deb44031b4e08c503">gemm_nt_q4_k_packed_meta_x8_q8_k_gemv_order</a>(</div>
 <div class="line"><a id="l02056" name="l02056"></a><span class="lineno"> 2056</span>        <span class="keyword">const</span> <span class="keywordtype">void</span> *A_q8, <span class="keyword">const</span> <span class="keywordtype">void</span> *B_packed_x8, <span class="keyword">const</span> <span class="keywordtype">float</span> *bias, <span class="keywordtype">float</span> *<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
 <div class="line"><a id="l02057" name="l02057"></a><span class="lineno"> 2057</span>        <span class="keywordtype">int</span> M, <span class="keywordtype">int</span> N, <span class="keywordtype">int</span> K)</div>
 <div class="line"><a id="l02058" name="l02058"></a><span class="lineno"> 2058</span>{</div>

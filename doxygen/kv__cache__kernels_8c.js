@@ -6,6 +6,7 @@ var kv__cache__kernels_8c =
     [ "kv_cache_store", "kv__cache__kernels_8c.html#ae9fc8e88b12cec4fcfbdb30b602bf7ef", null ],
     [ "kv_cache_store_batch_bf16", "kv__cache__kernels_8c.html#a7a9a469a61f3fd75a4d60bef404efc82", null ],
     [ "kv_cache_store_batch_f16", "kv__cache__kernels_8c.html#a5384b2acb8d206d25ddb3cdfbfc78b02", null ],
+    [ "kv_cache_store_batch_f32", "kv__cache__kernels_8c.html#a5e0ee8642bcb3eb671d4e0bf08d09b7b", null ],
     [ "kv_cache_store_bf16", "kv__cache__kernels_8c.html#a0a5e440c99ba12c4e2127421949520dc", null ],
     [ "kv_cache_store_f16", "kv__cache__kernels_8c.html#a0bdfc34cc1a36f4f499478f9b6038af1", null ],
     [ "kv_cache_store_shared_q", "kv__cache__kernels_8c.html#a4e5cc9d027ac44cf2f1893799edc8cd8", null ],

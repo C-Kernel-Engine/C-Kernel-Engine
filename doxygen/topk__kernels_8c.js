@@ -6,6 +6,7 @@ var topk__kernels_8c =
     [ "group_limited_topk_router_f32_impl", "topk__kernels_8c.html#afa77249829b65634e0e0a03ee5b4d3c3", null ],
     [ "group_limited_topk_router_sigmoid_f32", "topk__kernels_8c.html#a5d8341d6bceeb7209f19bf99f1720b77", null ],
     [ "moe_softmax_topk_router_llama_f32_workspace", "topk__kernels_8c.html#a5f3477ab2e309912c261704e62b0923b", null ],
+    [ "moe_softmax_topk_router_pytorch_bf16_workspace", "topk__kernels_8c.html#aef6f6d076d35008ec1e385829b11d92f", null ],
     [ "moe_softmax_topk_router_workspace_bytes", "topk__kernels_8c.html#aa39a6196baec8d9bf9e3eeca3687c41c", null ],
     [ "nemotron_group_limited_topk_router_f32", "topk__kernels_8c.html#ab9b2fb1513e1e2f6ac7637be48021ff1", null ],
     [ "speculative_commit_one_i32", "topk__kernels_8c.html#ae9070cfb82f7058378d853e59fddc89c", null ],
