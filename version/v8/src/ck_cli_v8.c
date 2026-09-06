@@ -61,6 +61,7 @@
 
 static volatile sig_atomic_t g_exit_requested = 0;
 static volatile sig_atomic_t g_generation_active = 0;
+static volatile sig_atomic_t *g_session_cancel_ptr = NULL;
 
 /* Timing globals */
 static double g_prefill_time_ms = 0.0;
@@ -2492,6 +2493,10 @@ static int run_generation_loop(ModelAPI *api, CLIOptions *opt) {
 
         generated_history_count = emitted_tokens;
 
+        if (opt->cancel_requested && *opt->cancel_requested) {
+            stop_reason = CK_SESSION_STOP_CANCELLED;
+            break;
+        }
         clock_gettime(CLOCK_MONOTONIC, &t0);
         if (api->decode(next_token, NULL) != 0) {
             fprintf(stderr, "\n[Model] decode failed\n");
@@ -2499,12 +2504,24 @@ static int run_generation_loop(ModelAPI *api, CLIOptions *opt) {
             break;
         }
         clock_gettime(CLOCK_MONOTONIC, &t1);
+        if (opt->cancel_requested && *opt->cancel_requested) {
+            stop_reason = CK_SESSION_STOP_CANCELLED;
+            break;
+        }
         g_decode_time_ms += (t1.tv_sec - t0.tv_sec) * 1000.0 +
                             (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
         g_decode_count++;
 
+        if (opt->cancel_requested && *opt->cancel_requested) {
+            stop_reason = CK_SESSION_STOP_CANCELLED;
+            break;
+        }
         /* Sample next token */
         SAMPLE_NEXT_TOKEN();
+        if (opt->cancel_requested && *opt->cancel_requested) {
+            stop_reason = CK_SESSION_STOP_CANCELLED;
+            break;
+        }
     }
 
     #undef SAMPLE_NEXT_TOKEN
@@ -5572,6 +5589,8 @@ struct CKSessionV8 {
     ModelAPI api;
     pthread_mutex_t generation_lock;
     volatile sig_atomic_t cancel_requested;
+    pthread_t generation_thread;
+    volatile sig_atomic_t generation_thread_valid;
     int context_length;
     char last_error[256];
 };
@@ -5769,8 +5788,9 @@ int ck_session_v8_generate(
     }
 
     memset((char *)result + 2 * sizeof(uint32_t), 0,
-           sizeof(*result) - 2 * sizeof(uint32_t));
+            sizeof(*result) - 2 * sizeof(uint32_t));
     session->cancel_requested = 0;
+    g_session_cancel_ptr = &session->cancel_requested;
     session->last_error[0] = '\0';
     g_exit_requested = 0;
     if (!(request->flags & CK_SESSION_REQUEST_CONTINUE_STATE) &&
@@ -5802,12 +5822,18 @@ int ck_session_v8_generate(
         session_error(session, CK_SESSION_V8_ERROR_RUNTIME,
                       "native generation failed");
     }
+    g_session_cancel_ptr = NULL;
     pthread_mutex_unlock(&session->generation_lock);
     return status == 0 ? CK_SESSION_V8_OK : CK_SESSION_V8_ERROR_RUNTIME;
 }
 
 void ck_session_v8_cancel(CKSessionV8 *session) {
-    if (session) session->cancel_requested = 1;
+    if (session) {
+        session->cancel_requested = 1;
+        // Also signal the generation loop via globals for faster exit
+        // when the loop is stuck in a long decode/forward.
+        g_generation_active = 0;
+    }
 }
 
 int ck_session_v8_reset(CKSessionV8 *session) {

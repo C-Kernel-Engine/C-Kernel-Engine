@@ -116,12 +116,12 @@ _SESSION_STATUS_EXCEPTIONS: dict[int, type[SessionError]] = {
 # (--help / pipeline) works even without the server extras. They must live at
 # module scope so FastAPI/Pydantic can resolve route annotations.
 try:
-    from fastapi import APIRouter, FastAPI, HTTPException
+    from fastapi import APIRouter, FastAPI, HTTPException, Request
     from fastapi.responses import HTMLResponse, StreamingResponse
 
     _FASTAPI_AVAILABLE = True
 except ImportError:
-    APIRouter = FastAPI = HTTPException = StreamingResponse = None
+    APIRouter = FastAPI = HTTPException = StreamingResponse = Request = None
     _FASTAPI_AVAILABLE = False
 
 try:
@@ -338,7 +338,7 @@ class SessionV8:
         max_tokens: int,
         temperature: float,
         top_p: float,
-        on_token: Callable[[int, str], None],
+        on_token: Callable[[int, str], int],
         flags: int = 0,
         stop_on_text: Sequence[str] = (),
         stop_at_eos: bool = False,
@@ -362,18 +362,55 @@ class SessionV8:
             stop_markers.append("<eos>")
 
         emitted: list[str] = []
+        visible_len = 0
+        callback_stopped = False
+        last_token_id = -1
 
         @_TOKEN_CALLBACK
         def callback(_user_data, token_id, text_bytes, text_len, _sequence_index):
+            nonlocal callback_stopped, last_token_id, visible_len
+            last_token_id = int(token_id)
             text = ctypes.string_at(text_bytes, text_len).decode("utf-8", "replace")
             emitted.append(text)
-            if stop_markers:
-                lowered = "".join(emitted).lower()
-                for marker in stop_markers:
-                    if marker.lower() in lowered:
-                        on_token(int(token_id), text)
-                        return 1
-            on_token(int(token_id), text)
+            joined = "".join(emitted)
+            truncated = (
+                _truncate_stop_markers(joined, stop_markers) if stop_markers else joined
+            )
+            hit = len(truncated) < len(joined)
+            if hit:
+                delta = truncated[visible_len:]
+            else:
+                hold = (
+                    _longest_marker_prefix_len(joined, stop_markers)
+                    if stop_markers
+                    else 0
+                )
+                # Don't hold more than the not-yet-emitted tail
+                hold = min(hold, len(joined) - visible_len)
+                target = len(joined) - hold
+                delta = joined[visible_len:target] if target > visible_len else ""
+            rc = 0
+            if delta:
+                try:
+                    rc = int(on_token(int(token_id), delta) or 0)
+                except Exception:
+                    rc = 0
+            else:
+                # No visible delta (buffered prefix or marker consumed the whole token);
+                # still allow cancellation to propagate via on_token.
+                try:
+                    rc = int(on_token(int(token_id), "") or 0)
+                    # Empty delta should not enqueue SSE; caller handles empty string as no-op.
+                except Exception:
+                    rc = 0
+                if rc == 0 and hit:
+                    return 1
+            visible_len += len(delta)
+            if rc != 0:
+                callback_stopped = True
+                return rc
+            if hit:
+                return 1
             return 0
 
         status = self.lib.ck_session_v8_generate(
@@ -383,6 +420,14 @@ class SessionV8:
             None,
             ctypes.byref(result),
         )
+        if status == self.CK_OK and not callback_stopped:
+            final_text = _truncate_stop_markers("".join(emitted), stop_markers)
+            pending = final_text[visible_len:]
+            if pending:
+                try:
+                    on_token(last_token_id, pending)
+                except Exception:
+                    pass
         if status != self.CK_OK:
             msg = f"ck_session_v8_generate failed ({_SESSION_STATUS_NAMES.get(status, f'status={status}')})"
             native_msg = _last_error(self.lib, self.session)
@@ -472,6 +517,31 @@ def _truncate_stop_markers(text: str, markers: Sequence[str]) -> str:
     if not hits:
         return text
     return text[: min(hits)]
+
+
+def _longest_marker_prefix_len(text: str, markers: Sequence[str]) -> int:
+    """Longest suffix of text that is a proper prefix of any marker (case-insensitive).
+
+    Used to buffer a split-boundary stop marker so the prefix is not
+    emitted as a delta before the next token proves whether the marker
+    completes.
+    """
+    if not markers or not text:
+        return 0
+    low = text.lower()
+    best = 0
+    for raw in markers:
+        m = str(raw).lower()
+        if not m:
+            continue
+        # proper prefix only (k < len(m)); full match is a hit, not a hold
+        upper = len(m) - 1
+        # cap by text length
+        upper = min(upper, len(low))
+        for k in range(1, upper + 1):
+            if low.endswith(m[:k]) and k > best:
+                best = k
+    return best
 
 
 # --- Thinking separation (text-generation only) -------------------------------
@@ -873,6 +943,9 @@ def create_app(
     response_store_lock = threading.Lock()
     response_store_limit = 256
     _flight_lock = threading.Lock()
+    # Per-response cancellation registry: response_id -> {cancelled, finished, thread}
+    active_streams: dict[str, dict[str, Any]] = {}
+    active_streams_lock = threading.Lock()
 
     stop_markers = [str(m) for m in (stop_on_text or ()) if str(m)]
     all_stop_markers = list(stop_markers)
@@ -959,6 +1032,7 @@ def create_app(
         reasoning_tokens: int = 0,
         result: dict[str, Any] | None = None,
         error: dict[str, Any] | None = None,
+        incomplete_details: dict[str, Any] | None = None,
         completed_at: int | None = None,
         item_status: str = "completed",
         reasoning_item_id: str | None = None,
@@ -1001,7 +1075,7 @@ def create_app(
             "completed_at": completed_at,
             "status": status,
             "error": error,
-            "incomplete_details": None,
+            "incomplete_details": incomplete_details,
             "instructions": body.instructions,
             "metadata": body.metadata or {},
             "model": body.model or model,
@@ -1049,11 +1123,26 @@ def create_app(
         }
         if result is not None:
             resp["performance"] = _performance_profile(result)
-        _store_response(response_id, resp)
+        # Respect store:false → ephemeral (OpenAI spec) — do not persist
+        should_store = True
+        try:
+            if getattr(body, "store", None) is False:
+                should_store = False
+        except Exception:
+            pass
+        if should_store:
+            _store_response(response_id, resp)
         return resp
 
     def stream_events(
-        body, prompt, *, max_tokens, temperature, top_p, effective_flags=None
+        body,
+        prompt,
+        *,
+        max_tokens,
+        temperature,
+        top_p,
+        effective_flags=None,
+        request=None,
     ):
         think_enabled = body.reasoning is not None
         response_id = f"resp_{uuid.uuid4().hex[:24]}"
@@ -1093,16 +1182,19 @@ def create_app(
         cancelled = threading.Event()
         worker_finished = threading.Event()
         splitter = _StreamThinkSplitter() if think_enabled else None
+        # Will register after worker_thread is created (needs thread ref)
+        worker_thread_ref: list[threading.Thread | None] = [None]
 
         def on_token(_tid, text):
-            complete.append(text)
-            if splitter is not None:
-                for state, delta in splitter.feed(text):
-                    events.put(
-                        ("reasoning_text" if state == "thinking" else "text", delta)
-                    )
-            else:
-                events.put(("text", text))
+            if text:
+                complete.append(text)
+                if splitter is not None:
+                    for state, delta in splitter.feed(text):
+                        events.put(
+                            ("reasoning_text" if state == "thinking" else "text", delta)
+                        )
+                else:
+                    events.put(("text", text))
             return -1 if cancelled.is_set() else 0
 
         def worker():
@@ -1136,10 +1228,19 @@ def create_app(
             events.put(terminal_event)
 
         worker_thread = threading.Thread(target=worker, daemon=True)
+        worker_thread_ref[0] = worker_thread
+        # Register per-response cancellation state before starting
+        with active_streams_lock:
+            active_streams[response_id] = {
+                "cancelled": cancelled,
+                "finished": worker_finished,
+                "thread": worker_thread,
+            }
         worker_thread.start()
 
         reasoning_started = False
         message_started = False
+        message_content_part_added = False
 
         def emit(kind, data):
             nonlocal seq
@@ -1149,7 +1250,44 @@ def create_app(
 
         try:
             while True:
-                kind, payload = events.get()
+                try:
+                    kind, payload = events.get(timeout=0.2)
+                except queue.Empty:
+                    # Poll for client disconnect / cancellation
+                    if request is not None:
+                        try:
+                            # Starlette Request.is_disconnected is async; try sync poll
+                            import asyncio as _asyncio
+
+                            try:
+                                is_disc = _asyncio.run(request.is_disconnected())  # type: ignore
+                            except RuntimeError:
+                                # Already in event loop — schedule check via loop
+                                loop = _asyncio.get_event_loop()
+                                if loop.is_running():
+                                    # Cannot block; fallback to GeneratorExit handling
+                                    is_disc = False
+                                else:
+                                    is_disc = loop.run_until_complete(
+                                        request.is_disconnected()
+                                    )  # type: ignore
+                            if is_disc:
+                                if not cancelled.is_set():
+                                    cancelled.set()
+                                    try:
+                                        session.cancel()
+                                    except Exception:
+                                        pass
+                                # Keep looping to drain terminal event
+                        except Exception:
+                            pass
+                    if cancelled.is_set() and worker_finished.is_set():
+                        # Worker cancelled, terminal event should be next
+                        continue
+                    if worker_finished.is_set():
+                        # No more events expected but queue empty
+                        continue
+                    continue
                 if kind == "reasoning_text":
                     if not reasoning_started:
                         yield from emit(
@@ -1177,12 +1315,14 @@ def create_app(
                         },
                     )
                 elif kind == "text":
+                    # B parity: message at 1 when reasoning requested (even if empty)
+                    msg_idx = 1 if think_enabled else 0
                     if not message_started:
                         yield from emit(
                             "response.output_item.added",
                             {
                                 "type": "response.output_item.added",
-                                "output_index": 1 if reasoning_started else 0,
+                                "output_index": msg_idx,
                                 "item": ResponseOutputMessage(
                                     id=message_id,
                                     content=[],
@@ -1192,18 +1332,38 @@ def create_app(
                             },
                         )
                         message_started = True
+                        # OpenAI streams content_part lifecycle for text
+                        yield from emit(
+                            "response.content_part.added",
+                            {
+                                "type": "response.content_part.added",
+                                "item_id": message_id,
+                                "output_index": msg_idx,
+                                "content_index": 0,
+                                "part": {
+                                    "type": "output_text",
+                                    "text": "",
+                                    "annotations": [],
+                                },
+                            },
+                        )
+                        message_content_part_added = True
                     yield from emit(
                         "response.output_text.delta",
                         {
                             "type": "response.output_text.delta",
                             "item_id": message_id,
-                            "output_index": 1 if reasoning_started else 0,
+                            "output_index": msg_idx,
                             "content_index": 0,
                             "delta": payload,
+                            "logprobs": None,
                         },
                     )
                 elif kind == "done":
                     result = payload or {}
+                    # If cancellation was requested, prefer cancelled status
+                    stop_reason_val = int(result.get("stop_reason") or 0)
+                    is_cancelled = cancelled.is_set() or stop_reason_val == 3
                     text = _truncate_stop_markers("".join(complete), all_stop_markers)
                     thinking = None
                     reasoning_tokens = 0
@@ -1213,37 +1373,72 @@ def create_app(
                         reasoning_tokens = 0
                     input_tokens = int(result.get("prompt_tokens") or 0)
                     output_tokens = int(result.get("generated_tokens") or len(complete))
-                    message_index = 1 if reasoning_started else 0
+                    message_index = 1 if think_enabled else 0
 
-                    if reasoning_started:
-                        if thinking is not None:
+                    if think_enabled:
+                        if reasoning_started:
+                            if thinking is not None:
+                                yield from emit(
+                                    "response.reasoning_text.done",
+                                    {
+                                        "type": "response.reasoning_text.done",
+                                        "item_id": reasoning_item_id,
+                                        "output_index": 0,
+                                        "content_index": 0,
+                                        "text": thinking,
+                                    },
+                                )
+                            item_status_cancel = (
+                                "incomplete" if is_cancelled else "completed"
+                            )
                             yield from emit(
-                                "response.reasoning_text.done",
+                                "response.output_item.done",
                                 {
-                                    "type": "response.reasoning_text.done",
-                                    "item_id": reasoning_item_id,
+                                    "type": "response.output_item.done",
                                     "output_index": 0,
-                                    "content_index": 0,
-                                    "text": thinking,
+                                    "item": ReasoningItem(
+                                        id=reasoning_item_id,
+                                        status=item_status_cancel,
+                                        content=(
+                                            [ReasoningTextContent(text=thinking)]
+                                            if thinking is not None
+                                            else []
+                                        ),
+                                        summary=[],
+                                    ).model_dump(),
                                 },
                             )
-                        yield from emit(
-                            "response.output_item.done",
-                            {
-                                "type": "response.output_item.done",
-                                "output_index": 0,
-                                "item": ReasoningItem(
-                                    id=reasoning_item_id,
-                                    status="completed",
-                                    content=(
-                                        [ReasoningTextContent(text=thinking)]
-                                        if thinking is not None
-                                        else []
-                                    ),
-                                    summary=[],
-                                ).model_dump(),
-                            },
-                        )
+                        else:
+                            # B: empty reasoning when no markers but reasoning requested
+                            item_status_cancel = (
+                                "incomplete" if is_cancelled else "completed"
+                            )
+                            yield from emit(
+                                "response.output_item.added",
+                                {
+                                    "type": "response.output_item.added",
+                                    "output_index": 0,
+                                    "item": ReasoningItem(
+                                        id=reasoning_item_id,
+                                        status="in_progress",
+                                        content=[],
+                                        summary=[],
+                                    ).model_dump(),
+                                },
+                            )
+                            yield from emit(
+                                "response.output_item.done",
+                                {
+                                    "type": "response.output_item.done",
+                                    "output_index": 0,
+                                    "item": ReasoningItem(
+                                        id=reasoning_item_id,
+                                        status=item_status_cancel,
+                                        content=[],
+                                        summary=[],
+                                    ).model_dump(),
+                                },
+                            )
                     if not message_started:
                         yield from emit(
                             "response.output_item.added",
@@ -1258,6 +1453,38 @@ def create_app(
                                 ).model_dump(),
                             },
                         )
+                        message_started = True
+                        yield from emit(
+                            "response.content_part.added",
+                            {
+                                "type": "response.content_part.added",
+                                "item_id": message_id,
+                                "output_index": message_index,
+                                "content_index": 0,
+                                "part": {
+                                    "type": "output_text",
+                                    "text": "",
+                                    "annotations": [],
+                                },
+                            },
+                        )
+                        message_content_part_added = True
+                    # Content part done before output_text.done (OpenAI order)
+                    if message_content_part_added:
+                        yield from emit(
+                            "response.content_part.done",
+                            {
+                                "type": "response.content_part.done",
+                                "item_id": message_id,
+                                "output_index": message_index,
+                                "content_index": 0,
+                                "part": {
+                                    "type": "output_text",
+                                    "text": text,
+                                    "annotations": [],
+                                },
+                            },
+                        )
                     yield from emit(
                         "response.output_text.done",
                         {
@@ -1268,6 +1495,19 @@ def create_app(
                             "text": text,
                         },
                     )
+                    # Determine final status: cancelled > incomplete (token_limit) > completed
+                    # OpenAI uses incomplete with reason max_output_tokens when stop_reason token_limit
+                    incomplete_details = None
+                    if is_cancelled:
+                        final_status = ResponseStatus.cancelled
+                        msg_status = "incomplete"
+                    elif stop_reason_val == 2:  # token_limit
+                        final_status = ResponseStatus.incomplete
+                        msg_status = "incomplete"
+                        incomplete_details = {"reason": "max_output_tokens"}
+                    else:
+                        final_status = ResponseStatus.completed
+                        msg_status = "completed"
                     yield from emit(
                         "response.output_item.done",
                         {
@@ -1277,32 +1517,48 @@ def create_app(
                                 id=message_id,
                                 content=[ResponseOutputText(text=text)],
                                 role="assistant",
-                                status="completed",
+                                status=msg_status,
                             ).model_dump(),
                         },
                     )
+                    # Reasoning tokens approximated as len(thinking)//4 when thinking present
+                    if thinking is not None:
+                        reasoning_tokens = max(0, len(thinking) // 4)
                     final = build_response(
                         body,
                         response_id=response_id,
                         message_id=message_id,
                         created_at=created_at,
                         completed_at=int(time.time()),
-                        status=ResponseStatus.completed,
+                        status=final_status,
                         text=text,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         thinking=thinking,
                         reasoning_tokens=reasoning_tokens,
                         result=result,
+                        incomplete_details=incomplete_details,
                         reasoning_item_id=reasoning_item_id,
-                        include_empty_reasoning=reasoning_started,
+                        include_empty_reasoning=think_enabled,
+                        item_status=msg_status,
                     )
                     if stats:
                         _log_performance(model, final.get("performance"))
-                    yield from emit(
-                        "response.completed",
-                        {"type": "response.completed", "response": final},
-                    )
+                    if is_cancelled:
+                        yield from emit(
+                            "response.cancelled",
+                            {"type": "response.cancelled", "response": final},
+                        )
+                    elif final_status == ResponseStatus.incomplete:
+                        yield from emit(
+                            "response.incomplete",
+                            {"type": "response.incomplete", "response": final},
+                        )
+                    else:
+                        yield from emit(
+                            "response.completed",
+                            {"type": "response.completed", "response": final},
+                        )
                     return
                 elif kind == "busy":
                     final = build_response(
@@ -1316,6 +1572,16 @@ def create_app(
                         input_tokens=0,
                         output_tokens=0,
                         error={"code": "session_busy", "message": str(payload)},
+                    )
+                    # Emit top-level error event for SDK compatibility (rate_limit_exceeded is OpenAI standard for busy)
+                    yield from emit(
+                        "error",
+                        {
+                            "type": "error",
+                            "code": "rate_limit_exceeded",
+                            "message": str(payload),
+                            "param": None,
+                        },
                     )
                     yield from emit(
                         "response.failed",
@@ -1340,6 +1606,15 @@ def create_app(
                         error={"code": "server_error", "message": str(payload)},
                     )
                     yield from emit(
+                        "error",
+                        {
+                            "type": "error",
+                            "code": "server_error",
+                            "message": str(payload),
+                            "param": None,
+                        },
+                    )
+                    yield from emit(
                         "response.failed",
                         {
                             "type": "response.failed",
@@ -1349,20 +1624,38 @@ def create_app(
                     )
                     return
         finally:
+            # Client disconnect or generator close -> cancel if still running
             if not worker_finished.is_set():
                 cancelled.set()
-                session.cancel()
-                worker_thread.join(timeout=5.0)
+                try:
+                    session.cancel()
+                except Exception:
+                    pass
+                # Give native loop a chance to notice cancel_requested / callback -1
+                worker_thread.join(timeout=10.0)
+            # Now unregister (allow cancel endpoint to find entry while worker was still running)
+            with active_streams_lock:
+                active_streams.pop(response_id, None)
             if worker_finished.is_set():
-                _flight_lock.release()
+                try:
+                    _flight_lock.release()
+                except RuntimeError:
+                    pass
             else:
                 log_error(
-                    "generation worker did not stop after cancellation; "
+                    "generation worker did not stop after cancellation (10s); "
                     "keeping the single-flight guard locked to protect the native session"
                 )
+                # Still pop and release after timeout to avoid permanent 429;
+                # native mutex will still be held until worker exits, next request will get native busy.
+                # Release python lock so cancel endpoint's wait can proceed and next request gets native 429 instead of deadlock.
+                try:
+                    _flight_lock.release()
+                except RuntimeError:
+                    pass
 
     @router.post("/responses", response_model=None)
-    def create_response(body: CreateResponseRequest):
+    def create_response(body: CreateResponseRequest, request: Request):
         (
             prompt,
             tok_limit,
@@ -1387,20 +1680,37 @@ def create_app(
                     temperature=temperature_eff,
                     top_p=top_p_eff,
                     effective_flags=effective_flags,
+                    request=request,
                 ),
                 media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
             )
 
         chunks: list[str] = []
+        result: dict[str, Any] | None = None
+        # Non-stream reasoning id mirrors streaming stable id for parity (option B)
+        non_stream_reasoning_id = (
+            f"rsn_{uuid.uuid4().hex[:24]}" if think_enabled else None
+        )
         try:
             try:
+
+                def _collect(_tid, text):
+                    if text:
+                        chunks.append(text)
+                    return 0
+
                 result = session.generate(
                     None,
                     prompt,
                     max_tokens=tok_limit,
                     temperature=temperature_eff,
                     top_p=top_p_eff,
-                    on_token=lambda _tid, text: chunks.append(text),
+                    on_token=_collect,
                     flags=effective_flags,
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
@@ -1410,6 +1720,42 @@ def create_app(
                     status_code=429,
                     detail="Session busy: another request is in progress. Retry later.",
                 )
+            except Exception as e:
+                # Map generic failures to OpenAI-style Response with status:failed (200, not 500)
+                err_text = _truncate_stop_markers("".join(chunks), all_stop_markers)
+                err_thinking: str | None = None
+                err_reasoning_tokens = 0
+                if think_enabled:
+                    err_thinking, err_text = split_thinking(err_text)
+                    err_thinking = err_thinking or None
+                    if err_thinking is not None:
+                        err_reasoning_tokens = max(0, len(err_thinking) // 4)
+                err_input = int(result.get("prompt_tokens") or 0) if result else 0
+                err_output = (
+                    int(result.get("generated_tokens") or len(chunks))
+                    if result
+                    else len(chunks)
+                )
+                resp = build_response(
+                    body,
+                    response_id=f"resp_{uuid.uuid4().hex[:24]}",
+                    message_id=f"msg_{uuid.uuid4().hex[:24]}",
+                    created_at=int(time.time()),
+                    completed_at=int(time.time()),
+                    status=ResponseStatus.failed,
+                    text=err_text,
+                    input_tokens=err_input,
+                    output_tokens=err_output,
+                    thinking=err_thinking,
+                    reasoning_tokens=err_reasoning_tokens,
+                    result=result,
+                    error={"code": "server_error", "message": str(e)},
+                    reasoning_item_id=non_stream_reasoning_id,
+                    include_empty_reasoning=think_enabled,  # B: parity with streaming empty reasoning
+                )
+                if stats:
+                    _log_performance(model, resp.get("performance"))
+                return resp
         finally:
             _flight_lock.release()
         text = _truncate_stop_markers("".join(chunks), all_stop_markers)
@@ -1418,22 +1764,42 @@ def create_app(
         if think_enabled:
             thinking, text = split_thinking(text)
             thinking = thinking or None
-            reasoning_tokens = 0
-        input_tokens = int(result.get("prompt_tokens") or 0)
-        output_tokens = int(result.get("generated_tokens") or len(chunks))
+            if thinking is not None:
+                reasoning_tokens = max(0, len(thinking) // 4)
+        input_tokens = int(result.get("prompt_tokens") or 0) if result else 0
+        output_tokens = (
+            int(result.get("generated_tokens") or len(chunks))
+            if result
+            else len(chunks)
+        )
+        stop_reason_val = int(result.get("stop_reason") or 0) if result else 0
+        incomplete_details = None
+        final_status = ResponseStatus.completed
+        item_status = "completed"
+        if stop_reason_val == 3:  # cancelled
+            final_status = ResponseStatus.cancelled
+            item_status = "incomplete"
+        elif stop_reason_val == 2:  # token_limit → incomplete
+            final_status = ResponseStatus.incomplete
+            incomplete_details = {"reason": "max_output_tokens"}
+            item_status = "incomplete"
         resp = build_response(
             body,
             response_id=f"resp_{uuid.uuid4().hex[:24]}",
             message_id=f"msg_{uuid.uuid4().hex[:24]}",
             created_at=int(time.time()),
             completed_at=int(time.time()),
-            status=ResponseStatus.completed,
+            status=final_status,
             text=text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             thinking=thinking,
             reasoning_tokens=reasoning_tokens,
             result=result,
+            incomplete_details=incomplete_details,
+            item_status=item_status,
+            reasoning_item_id=non_stream_reasoning_id,
+            include_empty_reasoning=think_enabled,  # B: empty reasoning when reasoning requested but no markers
         )
         if stats:
             _log_performance(model, resp.get("performance"))
@@ -1457,16 +1823,70 @@ def create_app(
                 raise HTTPException(
                     status_code=409, detail="Response is not in progress"
                 )
-        session.cancel()
+        # Per-response cancellation: only cancel if id is active
+        entry = None
+        with active_streams_lock:
+            entry = active_streams.get(response_id)
+        if entry is not None:
+            try:
+                entry["cancelled"].set()
+            except Exception:
+                pass
+            try:
+                session.cancel()
+            except Exception:
+                pass
+            # Wait for worker to notice cancellation and exit (so next POST won't get 429)
+            try:
+                finished: threading.Event = entry["finished"]
+                # Wait up to 10s for native loop to break (one decode latency)
+                finished.wait(timeout=10.0)
+            except Exception:
+                pass
+        else:
+            # Stale: store says in_progress but no active stream entry.
+            # Do not call process-wide session.cancel() - it would cancel the
+            # wrong (currently active) stream. Aligns with mock/live/OpenAI 409.
+            raise HTTPException(status_code=409, detail="Response is not in progress")
         with response_store_lock:
-            response["status"] = ResponseStatus.cancelled
+            # Re-check status under lock to avoid flipping a just-completed response
+            cur = response_store.get(response_id)
+            if cur is not None and cur["status"] == ResponseStatus.in_progress:
+                cur["status"] = ResponseStatus.cancelled
+                return cur
+            # If status changed concurrently to completed/failed/cancelled, honour that
+            if cur is not None:
+                return cur
             return response
+
+    model_created_at = int(time.time())
+
+    def _model_obj(mid: str) -> dict[str, Any]:
+        return {
+            "id": mid,
+            "object": "model",
+            "created": model_created_at,
+            "owned_by": "cke",
+        }
+
+    @router.get("/models")
+    def list_models():
+        return {"object": "list", "data": [_model_obj(model)]}
+
+    @router.get("/models/{model_id}")
+    def retrieve_model(model_id: str):
+        if model_id != model:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model {model_id!r} not found; available model: {model!r}",
+            )
+        return _model_obj(model_id)
 
     @router.get("/health")
     def health():
         return {"status": "ok", "mode": "live", "inference": True}
 
-    app = FastAPI(title="CKE v2 live inference server", version="0.2.0")
+    app = FastAPI(title="CKE v3 live inference server", version="0.3.0")
     app.include_router(router, prefix="/v1")
     app.include_router(conversations_router, prefix="/v1")
 
@@ -1475,6 +1895,14 @@ def create_app(
         @app.get("/viz", response_class=HTMLResponse)
         def viz_page():
             return HTMLResponse(viz_html)
+
+    # Expose internal state for testing / debugging
+    app.state.response_store = response_store
+    app.state.response_store_lock = response_store_lock
+    app.state.active_streams = active_streams
+    app.state.active_streams_lock = active_streams_lock
+    app.state.flight_lock = _flight_lock
+    app.state.session = session
 
     return app
 

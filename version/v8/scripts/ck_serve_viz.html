@@ -18,6 +18,7 @@
   .toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
   button { margin-top: 14px; padding: 9px 18px; border: 0; border-radius: 6px; background: #2f8f6b; color: #0b0f14; font-weight: 700; cursor: pointer; }
   button:disabled { opacity: .5; cursor: wait; }
+  #cancel { background: #d45d5d; color: #1a0b0b; margin-left: 8px; }
   .thinking { margin-top: 16px; border: 1px dashed #5a4a2a; background: #201d14; border-radius: 6px; }
   .thinking summary { padding: 8px 12px; cursor: pointer; color: #c9a86a; font-weight: 700; }
   .thinking .body { padding: 8px 12px 12px; color: #8a8f7a; white-space: pre-wrap; }
@@ -54,6 +55,7 @@
   </div>
 
   <button id="run">Generate</button>
+  <button id="cancel" disabled>Cancel</button>
 
   <details class="thinking" id="thinking-box" open>
     <summary>Thinking</summary>
@@ -71,13 +73,47 @@
 
   const $ = (id) => document.getElementById(id);
   const runBtn = $("run");
+  const cancelBtn = $("cancel");
   const thinkingBox = $("thinking-box");
   const thinkingEl = $("thinking");
   const answerEl = $("answer");
   const statusEl = $("status");
   const perfEl = $("perf");
 
+  let currentResponseId = null;
+  let currentAbort = null;
+
   runBtn.addEventListener("click", run);
+  cancelBtn.addEventListener("click", cancelCurrent);
+
+  async function cancelCurrent() {
+    // Prefer explicit POST /cancel first so server finds active_streams entry
+    // before we abort the streaming fetch (which would trigger disconnect pop).
+    if (currentResponseId) {
+      try {
+        const r = await fetch("/v1/responses/" + encodeURIComponent(currentResponseId) + "/cancel", {
+          method: "POST",
+        });
+        if (r.ok) {
+          statusEl.textContent = "cancelled";
+        } else if (r.status === 409) {
+          statusEl.textContent = "cancel: already completed";
+        } else if (r.status === 404) {
+          statusEl.textContent = "cancel: not found";
+        } else {
+          statusEl.textContent = "cancel: HTTP " + r.status;
+        }
+      } catch (e) {
+        statusEl.textContent = "cancel error: " + e.message;
+      }
+    } else {
+      statusEl.textContent = "cancelled";
+    }
+    if (currentAbort) {
+      try { currentAbort.abort(); } catch (e) {}
+    }
+    cancelBtn.disabled = true;
+  }
 
   async function run() {
     const prompt = $("prompt").value;
@@ -90,6 +126,7 @@
     thinkingEl.textContent = "";
     perfEl.textContent = "";
     thinkingBox.open = true;
+    currentResponseId = null;
 
     const body = {
       model: "ck-v8",
@@ -102,30 +139,45 @@
     if (reasoning) body.reasoning = reasoning;
 
     runBtn.disabled = true;
+    cancelBtn.disabled = false;
     statusEl.textContent = "requesting...";
+    currentAbort = new AbortController();
 
     try {
       const res = await fetch("/v1/responses", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
+        signal: currentAbort.signal,
       });
       if (!res.ok) {
         statusEl.textContent = "HTTP " + res.status;
+        try {
+          const j = await res.json();
+          if (j.detail) statusEl.textContent += ": " + j.detail;
+        } catch (e) {}
         return;
       }
       if (stream && res.body) {
         await consumeStream(res);
       } else {
         const response = await res.json();
-        renderCompleted(response.response || response);
-        statusEl.textContent = "done";
+        const respObj = response.response || response;
+        if (respObj && respObj.id) currentResponseId = respObj.id;
+        renderCompleted(respObj);
+        statusEl.textContent = respObj && respObj.status === "cancelled" ? "cancelled" : "done";
       }
     } catch (err) {
-      statusEl.textContent = "error: " + err.message;
-      perfEl.textContent = "";
+      if (err && err.name === "AbortError") {
+        statusEl.textContent = "cancelled";
+      } else {
+        statusEl.textContent = "error: " + err.message;
+        perfEl.textContent = "";
+      }
     } finally {
       runBtn.disabled = false;
+      cancelBtn.disabled = true;
+      currentAbort = null;
     }
 
     async function consumeStream(res) {
@@ -192,15 +244,67 @@
         if (line.startsWith("event: ")) event = line.slice("event: ".length);
         else if (line.startsWith("data: ")) dataLines.push(line.slice("data: ".length));
       }
-      if (event === "response.completed") {
+      if (!dataLines.length && event !== "response.cancelled" && event !== "response.completed" && event !== "response.failed") return;
+      // Capture response id for cancel button
+      if (dataLines.length) {
+        try {
+          const peek = JSON.parse(dataLines.join("\n"));
+          if (peek.response && peek.response.id) currentResponseId = peek.response.id;
+          if (peek.response_id) currentResponseId = peek.response_id;
+        } catch (e) {}
+      }
+      if (event === "response.created" || event === "response.in_progress" || event === "response.queued") {
         try {
           const payload = JSON.parse(dataLines.join("\n"));
-          renderCompleted(payload.response || {});
+          if (payload.response && payload.response.id) currentResponseId = payload.response.id;
+          if (event === "response.queued") statusEl.textContent = "queued";
         } catch (e) { /* ignore */ }
         return;
       }
+      if (event === "response.completed" || event === "response.incomplete") {
+        try {
+          const payload = JSON.parse(dataLines.join("\n"));
+          renderCompleted(payload.response || {});
+          if (event === "response.incomplete") {
+            const reason = payload.response && payload.response.incomplete_details ? payload.response.incomplete_details.reason : "incomplete";
+            statusEl.textContent = "incomplete: " + reason;
+          } else {
+            statusEl.textContent = "done";
+          }
+          cancelBtn.disabled = true;
+        } catch (e) { /* ignore */ }
+        return;
+      }
+      if (event === "response.cancelled") {
+        try {
+          const payload = JSON.parse(dataLines.join("\n"));
+          renderCompleted(payload.response || {});
+        } catch (e) {}
+        statusEl.textContent = "cancelled";
+        cancelBtn.disabled = true;
+        return;
+      }
       if (event === "response.failed") {
-        statusEl.textContent = "failed";
+        try {
+          const payload = JSON.parse(dataLines.join("\n"));
+          if (payload.response) renderCompleted(payload.response);
+          if (payload.error) statusEl.textContent = "failed: " + (payload.error.message || payload.error.code);
+          else statusEl.textContent = "failed";
+        } catch (e) {}
+        cancelBtn.disabled = true;
+        return;
+      }
+      if (event === "error") {
+        try {
+          const payload = JSON.parse(dataLines.join("\n"));
+          statusEl.textContent = "error: " + (payload.message || payload.code);
+        } catch (e) {}
+        return;
+      }
+      if (event === "response.content_part.added" || event === "response.content_part.done" ||
+          event === "response.output_item.added" || event === "response.output_item.done" ||
+          event === "response.reasoning_text.done" || event === "response.output_text.done") {
+        // Structural events — handled via deltas and renderCompleted; keep id capture
         return;
       }
       if (!dataLines.length) return;

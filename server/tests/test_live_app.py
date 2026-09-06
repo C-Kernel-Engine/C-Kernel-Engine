@@ -11,7 +11,9 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / "scripts"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / "scripts")
+)
 
 import pytest
 from fastapi.testclient import TestClient
@@ -248,7 +250,9 @@ def test_stream_thinking_split_emits_thinking_and_answer():
         if event == "response.output_text.delta"
     ]
     completed = next(
-        payload["response"] for event, payload in events if event == "response.completed"
+        payload["response"]
+        for event, payload in events
+        if event == "response.completed"
     )
     reasoning_item = next(i for i in completed["output"] if i["type"] == "reasoning")
     assert "".join(thinking_deltas) == "Let me think"
@@ -275,7 +279,9 @@ def test_stream_response_id_is_stable_across_lifecycle():
         payload["response"] for event, payload in events if event == "response.created"
     )
     completed = next(
-        payload["response"] for event, payload in events if event == "response.completed"
+        payload["response"]
+        for event, payload in events
+        if event == "response.completed"
     )
     assert created["id"] == completed["id"]
     gotten = client.get(f"/v1/responses/{completed['id']}")
@@ -313,7 +319,9 @@ def test_completed_response_echoes_standard_fields():
         "cached_tokens": 0,
     }
 
+
 def test_stream_reasoning_no_markers_reconciles_to_message():
+    # B: reasoning requested but no markers → empty reasoning item + message (parity with non-stream)
     client, _ = make_client(chunks=("plain", " ", "answer"))
     resp = client.post(
         "/v1/responses",
@@ -331,7 +339,9 @@ def test_stream_reasoning_no_markers_reconciles_to_message():
         if event == "response.reasoning_text.delta"
     ]
     completed = next(
-        payload["response"] for event, payload in events if event == "response.completed"
+        payload["response"]
+        for event, payload in events
+        if event == "response.completed"
     )
     answer_deltas = [
         payload["delta"]
@@ -340,8 +350,9 @@ def test_stream_reasoning_no_markers_reconciles_to_message():
     ]
     assert reasoning_deltas == []
     assert "".join(answer_deltas) == "plain answer"
-    assert [i["type"] for i in completed["output"]] == ["message"]
-    assert completed["output"][0]["content"][0]["text"] == "plain answer"
+    assert [i["type"] for i in completed["output"]] == ["reasoning", "message"]
+    assert completed["output"][0]["content"] == []
+    assert completed["output"][1]["content"][0]["text"] == "plain answer"
     assert completed["output_text"] == "plain answer"
 
 
@@ -405,7 +416,10 @@ def test_busy_non_stream_returns_429():
     client = _make_busy_client()
     resp = client.post("/v1/responses", json={"model": "busy-model", "input": "hi"})
     assert resp.status_code == 429
-    assert resp.json()["detail"] == "Session busy: another request is in progress. Retry later."
+    assert (
+        resp.json()["detail"]
+        == "Session busy: another request is in progress. Retry later."
+    )
 
 
 def test_busy_stream_returns_429():
@@ -453,7 +467,10 @@ def test_busy_stream_returns_429():
             "/v1/responses", json={"model": "busy-model", "input": "hi", "stream": True}
         )
         assert resp.status_code == 429
-        assert resp.json()["detail"] == "Session busy: another request is in progress. Retry later."
+        assert (
+            resp.json()["detail"]
+            == "Session busy: another request is in progress. Retry later."
+        )
 
         # Unblock the first request
         lock_release.set()
@@ -507,9 +524,7 @@ def test_visible_thinking_preserves_markers():
 
 def test_no_chat_contract_falls_back_to_c_path():
     session = FakeSession(chunks=("answer",))
-    client = TestClient(
-        create_app(session, model="fake-model", chat_contract=None)
-    )
+    client = TestClient(create_app(session, model="fake-model", chat_contract=None))
     resp = client.post("/v1/responses", json={"model": "fake-model", "input": "hi"})
     assert resp.status_code == 200
     assert not (session.last_flags & CK_SESSION_REQUEST_RAW_PROMPT)
@@ -566,7 +581,9 @@ def test_load_builtin_chat_contract_returns_dict():
 
 
 def test_composite_circuit_inherits_decoder_chat_contract():
-    assert _load_builtin_chat_contract("qwen36vl") == _load_builtin_chat_contract("qwen35")
+    assert _load_builtin_chat_contract("qwen36vl") == _load_builtin_chat_contract(
+        "qwen35"
+    )
 
 
 def test_load_builtin_chat_contract_unknown_name():
@@ -595,9 +612,7 @@ def test_runtime_manifest_contract_precedes_legacy_nested_copies(tmp_path):
             {
                 "chat_contract": expected,
                 "config": {"chat_contract": {"name": "config"}},
-                "template": {
-                    "contract": {"chat_contract": {"name": "template"}}
-                },
+                "template": {"contract": {"chat_contract": {"name": "template"}}},
             }
         ),
         encoding="utf-8",
@@ -617,19 +632,25 @@ def test_resolve_contract_thinking_overrides_visible():
 
 
 def test_resolve_contract_thinking_overrides_suppressed():
-    prefix, last_user = _resolve_contract_thinking_overrides(QWEN3_CONTRACT, "suppressed")
+    prefix, last_user = _resolve_contract_thinking_overrides(
+        QWEN3_CONTRACT, "suppressed"
+    )
     assert "<think>" in prefix
     assert "/no_think" in last_user
 
 
 def test_format_prompt_with_chat_contract_suppressed():
-    prompt = _format_prompt_with_chat_contract("hi", QWEN3_CONTRACT, thinking_mode="suppressed")
+    prompt = _format_prompt_with_chat_contract(
+        "hi", QWEN3_CONTRACT, thinking_mode="suppressed"
+    )
     assert "/no_think" in prompt
     assert "<think>" in prompt
 
 
 def test_format_prompt_with_chat_contract_visible():
-    prompt = _format_prompt_with_chat_contract("hi", QWEN3_CONTRACT, thinking_mode="visible")
+    prompt = _format_prompt_with_chat_contract(
+        "hi", QWEN3_CONTRACT, thinking_mode="visible"
+    )
     assert "/no_think" not in prompt
     assert "<|im_start|>assistant\n" in prompt
 
@@ -671,3 +692,194 @@ def test_request_rejects_unimplemented_tools():
         },
     )
     assert response.status_code == 501
+
+
+# --- Split-boundary stop-marker regression --------------------------------
+
+
+def test_stop_marker_split_boundary_streaming_no_leak():
+    """Regression for SessionV8.generate split-boundary leak.
+
+    Marker END split as ("hello EN", "D rest") must not leak "EN" into
+    SSE deltas. The callback buffers the longest marker prefix.
+    """
+    import ctypes
+
+    from ck_serve_v8 import SessionV8, _truncate_stop_markers
+
+    class MockLib:
+        def __init__(self, chunks):
+            self.chunks = chunks
+
+        def ck_session_v8_generate(self, session, req_ptr, callback, user_data, result_ptr):
+            for i, c in enumerate(self.chunks):
+                b = c.encode()
+                buf = ctypes.create_string_buffer(b)
+                rc = callback(user_data, i, buf, len(b), 0)
+                if rc != 0:
+                    break
+            from ck_serve_v8 import _GenerateResult
+
+            res = ctypes.cast(result_ptr, ctypes.POINTER(_GenerateResult)).contents
+            res.prompt_tokens = 1
+            res.generated_tokens = len(self.chunks)
+            res.stop_reason = 1
+            res.prefill_time_ms = 0
+            res.decode_time_ms = 0
+            return 0
+
+        def ck_session_v8_last_error(self, session):
+            return b""
+
+        def ck_session_v8_cancel(self, session):
+            pass
+
+        def ck_session_v8_close(self, session):
+            pass
+
+    # split END across callbacks
+    s = SessionV8.__new__(SessionV8)
+    s.lib = MockLib(["hello EN", "D rest"])
+    s.session = ctypes.c_void_p(1)
+    deltas: list[str] = []
+
+    def on_token(tid, txt):
+        deltas.append(txt)
+        return 0
+
+    s.generate(None, "hi", max_tokens=10, temperature=0.7, top_p=1.0, on_token=on_token, stop_on_text=["END"])
+    # No delta should contain marker text
+    assert "".join(deltas) == "hello "
+    assert "EN" not in "".join(deltas)
+    assert _truncate_stop_markers("hello END rest", ["END"]) == "hello "
+
+    # non-marker split must flush buffered prefix
+    s2 = SessionV8.__new__(SessionV8)
+    s2.lib = MockLib(["hello EN", "X rest"])
+    s2.session = ctypes.c_void_p(1)
+    deltas2: list[str] = []
+    s2.generate(None, "hi", max_tokens=10, temperature=0.7, top_p=1.0, on_token=lambda tid, txt: deltas2.append(txt) or 0, stop_on_text=["END"])
+    assert "".join(deltas2) == "hello ENX rest"
+
+    # A natural end must flush a suffix that only resembles a marker prefix.
+    s3 = SessionV8.__new__(SessionV8)
+    s3.lib = MockLib(["hello EN"])
+    s3.session = ctypes.c_void_p(1)
+    deltas3: list[str] = []
+    s3.generate(
+        None,
+        "hi",
+        max_tokens=10,
+        temperature=0.7,
+        top_p=1.0,
+        on_token=lambda tid, txt: deltas3.append(txt) or 0,
+        stop_on_text=["END"],
+    )
+    assert "".join(deltas3) == "hello EN"
+
+
+def test_cancel_stale_does_not_cancel_active():
+    """Regression for stale no-entry fallback.
+
+    A stale in_progress response (store only, no active_streams entry)
+    must return 409 and must NOT call session.cancel() on the active
+    stream.
+    """
+    import threading
+    import time
+    import uuid
+    import concurrent.futures
+
+    from server.schemas.common import ResponseStatus
+
+    class BlockingSession:
+        def __init__(self):
+            self.cancel_called = False
+
+        def generate(self, system, user, *, max_tokens, temperature, top_p, on_token, flags=0, stop_on_text=(), stop_at_eos=False):
+            for i in range(5):
+                rc = on_token(i, f"chunk{i} ")
+                if rc != 0:
+                    break
+                time.sleep(0.05)
+            return {"prompt_tokens": 1, "generated_tokens": 5, "stop_reason": 1, "prefill_time_ms": 0, "decode_time_ms": 0}
+
+        def cancel(self):
+            self.cancel_called = True
+
+        def close(self):
+            pass
+
+    session = BlockingSession()
+    app = create_app(session, model="fake-model")
+    client = TestClient(app)
+
+    # Start an active streaming generation
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        fut = pool.submit(client.post, "/v1/responses", json={"model": "fake-model", "input": "hi", "stream": True})
+        for _ in range(20):
+            with app.state.active_streams_lock:
+                if app.state.active_streams:
+                    break
+            time.sleep(0.05)
+        assert app.state.active_streams, "active stream not registered"
+        active_id = next(iter(app.state.active_streams))
+
+        # Create stale store entry without active_streams
+        stale_id = f"resp_{uuid.uuid4().hex[:24]}"
+        with app.state.response_store_lock:
+            app.state.response_store[stale_id] = {
+                "id": stale_id,
+                "object": "response",
+                "created_at": int(time.time()),
+                "completed_at": None,
+                "status": ResponseStatus.in_progress,
+                "error": None,
+                "incomplete_details": None,
+                "instructions": None,
+                "metadata": {},
+                "model": "fake-model",
+                "output": [],
+                "output_text": "",
+                "parallel_tool_calls": True,
+                "temperature": 0.7,
+                "top_p": 1.0,
+                "top_logprobs": None,
+                "tool_choice": None,
+                "tools": [],
+                "truncation": None,
+                "text": None,
+                "user": None,
+                "background": False,
+                "conversation": None,
+                "max_output_tokens": 512,
+                "max_tool_calls": None,
+                "moderation": None,
+                "previous_response_id": None,
+                "prompt": None,
+                "prompt_cache_key": None,
+                "prompt_cache_options": None,
+                "prompt_cache_retention": None,
+                "reasoning": None,
+                "safety_identifier": None,
+                "service_tier": None,
+                "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 0}},
+            }
+
+        # Stale cancel must be 409 and must not touch active session
+        session.cancel_called = False
+        resp = client.post(f"/v1/responses/{stale_id}/cancel")
+        assert resp.status_code == 409
+        assert session.cancel_called is False, "stale cancel must not cancel active stream"
+        assert app.state.response_store[stale_id]["status"] == ResponseStatus.in_progress
+
+        # Active cancel must succeed
+        resp2 = client.post(f"/v1/responses/{active_id}/cancel")
+        assert resp2.status_code == 200
+        assert session.cancel_called is True
+
+        # Clean up streaming thread
+        try:
+            fut.result(timeout=5)
+        except Exception:
+            pass

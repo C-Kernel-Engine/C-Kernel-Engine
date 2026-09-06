@@ -59,12 +59,25 @@ def test_get_response_not_found():
 
 
 def test_cancel_response():
+    # Mock store creates responses as completed; flip to in_progress to test successful cancel.
+    from server.routes.responses import _response_store
+    from server.schemas.common import ResponseStatus
+
     create_resp = client.post("/v1/responses", json={"model": "gpt-4o"})
     resp_id = create_resp.json()["id"]
+    _response_store[resp_id].status = ResponseStatus.in_progress
 
     cancel_resp = client.post(f"/v1/responses/{resp_id}/cancel")
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "cancelled"
+
+
+def test_cancel_completed_is_rejected():
+    create_resp = client.post("/v1/responses", json={"model": "gpt-4o"})
+    resp_id = create_resp.json()["id"]
+    # Stored status is completed → cancel should be 409
+    cancel_resp = client.post(f"/v1/responses/{resp_id}/cancel")
+    assert cancel_resp.status_code == 409
 
 
 def test_cancel_response_not_found():

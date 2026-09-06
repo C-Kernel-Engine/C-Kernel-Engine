@@ -107,6 +107,8 @@ class ErrorCode(StrEnum):
 class IncompleteReason(StrEnum):
     max_output_tokens = "max_output_tokens"
     content_filter = "content_filter"
+    # Additional OpenAI values for completeness (token_limit -> max_output_tokens alias elsewhere)
+    max_tool_calls = "max_tool_calls"
 
 
 class FileSearchStatus(StrEnum):
