@@ -1670,6 +1670,12 @@ test-v8-cohere-laguna-contracts:
 		tests.test_v8_laguna_contract \
 		-v
 
+.PHONY: test-v8-capability-cases
+test-v8-capability-cases:
+	@$(PYTHON) -m pytest -q tests/test_v8_capability_cases.py
+	@$(PYTHON) version/v8/scripts/audit_capability_cases_v8.py \
+		--report $(BUILD_DIR)/v8/capability-case-audit.json
+
 test-v8-model-smoke: test-v8-template-circuit-audit v8-regression-fast test-v8-qwen36-highmem test-v8-gemma4-highmem test-v8-nemotron9-highmem test-v8-glm4-highmem test-v8-kimi-highmem
 
 test-v8-xeon-highmem: test-v8-xeon-family-contracts test-v8-qwen36-highmem test-v8-gemma4-highmem test-v8-nemotron9-highmem test-v8-glm4-highmem test-v8-kimi-highmem

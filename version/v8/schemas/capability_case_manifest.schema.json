@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cke.v8.capability_case_manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "cases"],
+  "properties": {
+    "schema": {"const": "cke.v8.capability_case_manifest"},
+    "schema_version": {"const": 1},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family",
+          "circuits",
+          "evidence_level",
+          "phases",
+          "oracle",
+          "artifact",
+          "entrypoint",
+          "schedule",
+          "evidence_paths"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+          },
+          "family": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+          },
+          "circuits": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+            }
+          },
+          "evidence_level": {
+            "enum": [
+              "contract",
+              "generated_execution",
+              "component_oracle",
+              "small_model_e2e",
+              "full_artifact"
+            ]
+          },
+          "phases": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "conversion",
+                "lowering",
+                "compile",
+                "load",
+                "prefill",
+                "decode",
+                "quality",
+                "training"
+              ]
+            }
+          },
+          "oracle": {
+            "enum": ["none", "scalar", "llama.cpp", "pytorch"]
+          },
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": {"enum": ["synthetic_fixture", "real_model"]},
+              "catalog_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+              }
+            },
+            "allOf": [
+              {
+                "if": {"properties": {"kind": {"const": "real_model"}}},
+                "then": {"required": ["catalog_id"]}
+              }
+            ]
+          },
+          "entrypoint": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "target"],
+            "properties": {
+              "kind": {"const": "make"},
+              "target": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+              },
+              "args": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["events", "resource_class"],
+            "properties": {
+              "events": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"enum": ["pull_request", "nightly", "hardware"]}
+              },
+              "resource_class": {
+                "enum": ["portable", "model_cache", "high_memory"]
+              }
+            }
+          },
+          "evidence_paths": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}

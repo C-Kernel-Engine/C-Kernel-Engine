@@ -1,0 +1,121 @@
+{
+  "schema": "cke.v8.capability_case_manifest",
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "cohere2.compiler-circuit",
+      "family": "cohere2",
+      "circuits": ["cohere2"],
+      "evidence_level": "contract",
+      "phases": ["conversion", "lowering"],
+      "oracle": "none",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-cohere-laguna-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": ["tests/test_v8_cohere2_contract.py"]
+    },
+    {
+      "id": "laguna.compiler-circuit",
+      "family": "laguna",
+      "circuits": ["laguna"],
+      "evidence_level": "contract",
+      "phases": ["conversion", "lowering"],
+      "oracle": "none",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-cohere-laguna-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": ["tests/test_v8_laguna_contract.py"]
+    },
+    {
+      "id": "qwen38-dense.storage-lowering",
+      "family": "qwen38",
+      "circuits": ["qwen38"],
+      "evidence_level": "contract",
+      "phases": ["conversion", "lowering"],
+      "oracle": "none",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-qwen38-dense-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": ["tests/test_v8_qwen38_contract.py"]
+    },
+    {
+      "id": "qwen38-flash.provider-oracles",
+      "family": "qwen38_flash",
+      "circuits": ["qwen4_exp"],
+      "evidence_level": "component_oracle",
+      "phases": ["prefill", "decode"],
+      "oracle": "scalar",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-qwen38-flash-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": [
+        "tests/test_v8_qwen4_exp_contract.py",
+        "unittest/test_qwen4_exp_packed_moe_bf16.py"
+      ]
+    },
+    {
+      "id": "command-a-plus.nvfp4-oracle",
+      "family": "command_a_plus",
+      "circuits": ["cohere_command_a_plus_text"],
+      "evidence_level": "component_oracle",
+      "phases": ["lowering", "prefill", "decode"],
+      "oracle": "scalar",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-command-a-plus-nvfp4"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": [
+        "tests/test_v8_command_a_plus_contract.py",
+        "tests/test_v8_command_a_plus_xray_contract.py",
+        "unittest/test_nvfp4_q8_0.py"
+      ]
+    },
+    {
+      "id": "laguna-s.long-context",
+      "family": "laguna",
+      "circuits": ["laguna"],
+      "evidence_level": "full_artifact",
+      "phases": ["conversion", "lowering", "compile", "load", "prefill", "decode", "quality"],
+      "oracle": "llama.cpp",
+      "artifact": {"kind": "real_model", "catalog_id": "laguna_s_2_1"},
+      "entrypoint": {
+        "kind": "make",
+        "target": "certify-v8-long-context",
+        "args": ["--models", "laguna_s_2_1"]
+      },
+      "schedule": {"events": ["hardware"], "resource_class": "high_memory"},
+      "evidence_paths": ["version/v8/scripts/run_long_context_certification_v8.py"]
+    },
+    {
+      "id": "cohere2-command-r7b.long-context",
+      "family": "cohere2",
+      "circuits": ["cohere2"],
+      "evidence_level": "full_artifact",
+      "phases": ["conversion", "lowering", "compile", "load", "prefill", "decode", "quality"],
+      "oracle": "llama.cpp",
+      "artifact": {"kind": "real_model", "catalog_id": "cohere2_command_r7b"},
+      "entrypoint": {
+        "kind": "make",
+        "target": "certify-v8-long-context",
+        "args": ["--models", "cohere2_command_r7b"]
+      },
+      "schedule": {"events": ["hardware"], "resource_class": "high_memory"},
+      "evidence_paths": ["version/v8/scripts/run_long_context_certification_v8.py"]
+    },
+    {
+      "id": "qwen38-dense.long-context",
+      "family": "qwen38",
+      "circuits": ["qwen38"],
+      "evidence_level": "full_artifact",
+      "phases": ["conversion", "lowering", "compile", "load", "prefill", "decode", "quality"],
+      "oracle": "llama.cpp",
+      "artifact": {"kind": "real_model", "catalog_id": "qwen38_27b"},
+      "entrypoint": {
+        "kind": "make",
+        "target": "certify-v8-long-context",
+        "args": ["--models", "qwen38_27b"]
+      },
+      "schedule": {"events": ["hardware"], "resource_class": "high_memory"},
+      "evidence_paths": ["version/v8/scripts/run_long_context_certification_v8.py"]
+    }
+  ]
+}
