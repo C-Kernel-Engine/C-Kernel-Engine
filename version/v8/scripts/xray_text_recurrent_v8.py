@@ -205,6 +205,15 @@ RECURRENT_BOUNDARIES = (
     "layer_out",
 )
 
+MOE_RECURRENT_BOUNDARIES = (
+    *RECURRENT_BOUNDARIES[: RECURRENT_BOUNDARIES.index("mlp_gate")],
+    "moe_router_logits",
+    "moe_routing_weights",
+    "moe_routed_output",
+    "moe_combined_output",
+    "layer_out",
+)
+
 HYPER_MOE_RECURRENT_BOUNDARIES = (
     "attn_hyper_norm",
     "attn_hyper_gate",
@@ -264,6 +273,15 @@ FULL_ATTENTION_BOUNDARIES = (
     "mlp_up",
     "mlp_swiglu",
     "mlp_down",
+    "layer_out",
+)
+
+MOE_ATTENTION_BOUNDARIES = (
+    *FULL_ATTENTION_BOUNDARIES[: FULL_ATTENTION_BOUNDARIES.index("mlp_gate")],
+    "moe_router_logits",
+    "moe_routing_weights",
+    "moe_routed_output",
+    "moe_combined_output",
     "layer_out",
 )
 
@@ -360,23 +378,28 @@ def boundaries_for_layer(config: dict[str, Any], layer: int) -> tuple[str, ...]:
         )
     kind = str(layer_kinds[layer])
     if kind == "recurrent":
-        if int(config.get("hc_count", 1)) > 1 and int(
-            config.get("num_experts", 0)
-        ) > 0:
+        has_moe = int(config.get("num_experts", 0)) > 0
+        if int(config.get("hc_count", 1)) > 1 and has_moe:
             ple_owner_layers = config.get("ple_owner_layers", [])
             if isinstance(ple_owner_layers, list) and layer in {
                 int(owner) for owner in ple_owner_layers
             }:
                 return PLE_HYPER_MOE_RECURRENT_BOUNDARIES
             return HYPER_MOE_RECURRENT_BOUNDARIES
+        if has_moe:
+            return MOE_RECURRENT_BOUNDARIES
         return RECURRENT_BOUNDARIES
     if kind == "full_attention":
+        if int(config.get("num_experts", 0)) > 0:
+            return MOE_ATTENTION_BOUNDARIES
         return FULL_ATTENTION_BOUNDARIES
     if kind == "sparse_attention":
         if int(config.get("hc_count", 1)) > 1 and int(
             config.get("num_experts", 0)
         ) > 0:
             return HYPER_MOE_ATTENTION_BOUNDARIES
+        if int(config.get("num_experts", 0)) > 0:
+            return MOE_ATTENTION_BOUNDARIES
         return FULL_ATTENTION_BOUNDARIES
     raise ValueError(f"unsupported X-ray layer kind at layer {layer}: {kind}")
 

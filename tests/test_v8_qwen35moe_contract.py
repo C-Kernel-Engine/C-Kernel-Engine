@@ -28,6 +28,9 @@ from build_ir_v8 import (  # type: ignore
     _kernel_scratch_size_bytes,
     _resolve_body_ops_for_layer,
     _validate_lowered_activation_memory,
+    load_kernel_registry,
+    resolve_storage_aware_circuit_provider,
+    resolve_weighted_composite_provider,
 )
 from resolve_attention_contracts_v8 import load_kernel_execution_capabilities  # type: ignore
 
@@ -178,6 +181,62 @@ class Qwen35MoeContractTests(unittest.TestCase):
             TEMPLATE_OP_WEIGHTS["gated_shared_swiglu_expert_mlp"],
             ["moe_shared_gate", "moe_shared_up", "moe_shared_down", "moe_shared_router"],
         )
+
+    def test_layer_storage_tuple_overrides_incompatible_moe_default(self) -> None:
+        provider = resolve_weighted_composite_provider(
+            load_kernel_registry(),
+            template_op="moe_swiglu_expert_mlp",
+            kernel_op="moe_swiglu_expert_mlp",
+            layer_quant={
+                "moe_expert_gate": "q4_k",
+                "moe_expert_up": "q4_k",
+                "moe_expert_down": "q6_k",
+            },
+            header_quant={},
+            mode="decode",
+            prefer_q8_activation=True,
+        )
+        self.assertEqual(provider, "moe_swiglu_expert_forward_q4k_q6k")
+
+    def test_storage_aware_precedence_is_scoped_to_routed_swiglu(self) -> None:
+        provider = resolve_storage_aware_circuit_provider(
+            load_kernel_registry(),
+            template_op="moe_swiglu_packed_expert_mlp",
+            kernel_op="moe_swiglu_packed_expert_mlp",
+            explicit_kernel="moe_swiglu_packed_expert_forward_bf16",
+            weight_keys=["moe_expert_gate_up", "moe_expert_down"],
+            layer_quant={
+                "moe_expert_gate_up": "bf16",
+                "moe_expert_down": "bf16",
+            },
+            header_quant={},
+            mode="decode",
+            prefer_q8_activation=False,
+            bf16_dense_matmul=False,
+        )
+        self.assertEqual(provider, "moe_swiglu_packed_expert_forward_bf16")
+
+        provider = resolve_storage_aware_circuit_provider(
+            load_kernel_registry(),
+            template_op="moe_swiglu_expert_mlp",
+            kernel_op="moe_swiglu_expert_mlp",
+            explicit_kernel="moe_swiglu_expert_forward_q4k_q5k_bucketed",
+            weight_keys=[
+                "moe_expert_gate",
+                "moe_expert_up",
+                "moe_expert_down",
+            ],
+            layer_quant={
+                "moe_expert_gate": "q4_k",
+                "moe_expert_up": "q4_k",
+                "moe_expert_down": "q6_k",
+            },
+            header_quant={},
+            mode="decode",
+            prefer_q8_activation=True,
+            bf16_dense_matmul=False,
+        )
+        self.assertEqual(provider, "moe_swiglu_expert_forward_q4k_q6k")
 
     def test_bucketed_provider_satisfies_execution_capability_schema(self) -> None:
         capabilities = load_kernel_execution_capabilities(

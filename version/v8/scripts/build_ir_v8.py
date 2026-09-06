@@ -7536,6 +7536,15 @@ def resolve_weighted_composite_provider(
             header_quant=header_quant,
             mode=mode,
         )
+    if template_op == "moe_swiglu_expert_mlp":
+        return resolve_swiglu_moe_provider(
+            registry,
+            kernel_op=kernel_op,
+            layer_quant=layer_quant,
+            weight_prefix="moe_expert",
+            mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
+        )
     if template_op == "moe_swiglu_packed_expert_mlp":
         packed_dtype = str(layer_quant.get("moe_expert_gate_up", "")).lower()
         down_dtype = str(layer_quant.get("moe_expert_down", "")).lower()
@@ -7601,6 +7610,47 @@ def resolve_explicit_kernel_override(
         if weight_dtype == "bf16":
             return "gemm_nt_bf16" if mode == "prefill" else "gemv_bf16"
     return explicit_kernel
+
+
+def resolve_storage_aware_circuit_provider(
+    registry: Dict,
+    *,
+    template_op: str,
+    kernel_op: Optional[str],
+    explicit_kernel: str,
+    weight_keys: Any,
+    layer_quant: Dict[str, Any],
+    header_quant: Dict[str, Any],
+    mode: str,
+    prefer_q8_activation: bool,
+    bf16_dense_matmul: bool,
+) -> Optional[str]:
+    """Resolve storage-sensitive composites before circuit provider defaults."""
+    if (
+        template_op == "moe_swiglu_expert_mlp"
+        and kernel_op
+        and isinstance(weight_keys, list)
+        and weight_keys
+    ):
+        composite_provider = resolve_weighted_composite_provider(
+            registry,
+            template_op=template_op,
+            kernel_op=kernel_op,
+            layer_quant=layer_quant,
+            header_quant=header_quant,
+            mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
+        )
+        if composite_provider is not None:
+            return composite_provider
+    return resolve_explicit_kernel_override(
+        explicit_kernel=explicit_kernel,
+        weight_keys=weight_keys,
+        layer_quant=layer_quant,
+        header_quant=header_quant,
+        mode=mode,
+        bf16_dense_matmul=bf16_dense_matmul,
+    )
 
 
 def kernel_needs_q8_activation(registry: Dict, kernel_id: str) -> bool:
@@ -8491,22 +8541,30 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if op == "attn" and mode == "prefill" and not _attention_contract_is_causal(template, config):
                 return ["attention_forward_full_head_major_gqa_flash_strided"]
 
-        explicit_kernel = resolve_explicit_kernel_override(
+        kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
+        weight_info = OP_TO_WEIGHT_KEYS.get(op)
+
+        # Composite providers own several independently quantized tensors. Their
+        # concrete provider must follow the layer's complete storage tuple before
+        # a circuit default is considered; otherwise a Q5_K default can be bound
+        # to a Q6_K tensor and interpret every following row at the wrong stride.
+        explicit_kernel = resolve_storage_aware_circuit_provider(
+            registry,
+            template_op=op,
+            kernel_op=kernel_op,
             explicit_kernel=str(template_kernels.get(op, "") or "").strip(),
-            weight_keys=OP_TO_WEIGHT_KEYS.get(op),
+            weight_keys=weight_info,
             layer_quant=layer_quant,
             header_quant=header_quant,
             mode=mode,
+            prefer_q8_activation=prefer_q8_activation,
             bf16_dense_matmul=op in BF16_DENSE_MATMUL_OPS,
         )
         if explicit_kernel is not None:
             return [explicit_kernel]
 
-        kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
         if not kernel_op:
             return []
-
-        weight_info = OP_TO_WEIGHT_KEYS.get(op)
 
         # Metadata ops - no kernel
         if weight_info == "metadata":
@@ -8553,15 +8611,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             )
             if composite_provider is not None:
                 return [composite_provider]
-            if op == "moe_swiglu_expert_mlp":
-                return [resolve_swiglu_moe_provider(
-                    registry,
-                    kernel_op=kernel_op,
-                    layer_quant=layer_quant,
-                    weight_prefix="moe_expert",
-                    mode=mode,
-                    prefer_q8_activation=prefer_q8_activation,
-                )]
             if op == "shared_swiglu_expert_mlp":
                 return [resolve_swiglu_moe_provider(
                     registry,
@@ -8580,6 +8629,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                     mode=mode,
                     prefer_q8_activation=prefer_q8_activation,
                 )]
+
             if op == "farskip_routed_shared_combine":
                 gate_dtype = str(layer_quant.get("moe_shared_gate", "")).lower()
                 up_dtype = str(layer_quant.get("moe_shared_up", "")).lower()

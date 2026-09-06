@@ -155,6 +155,31 @@ class TextRecurrentXRayTests(unittest.TestCase):
             XRAY.ck_capture_names(("layer_out_hyper",)), ("layer_out",)
         )
 
+    def test_moe_profiles_do_not_require_hyper_connections(self) -> None:
+        recurrent = XRAY.boundaries_for_layer(
+            {
+                "num_experts": 256,
+                "layer_kinds": ["recurrent", "full_attention"],
+            },
+            0,
+        )
+        attention = XRAY.boundaries_for_layer(
+            {
+                "num_experts": 256,
+                "layer_kinds": ["recurrent", "full_attention"],
+            },
+            1,
+        )
+
+        for boundaries in (recurrent, attention):
+            self.assertIn("moe_router_logits", boundaries)
+            self.assertIn("moe_routed_output", boundaries)
+            self.assertIn("moe_combined_output", boundaries)
+            self.assertNotIn("mlp_gate", boundaries)
+            self.assertNotIn("attn_hyper_norm", boundaries)
+        self.assertIn("new_state", recurrent)
+        self.assertIn("q_proj", attention)
+
     def test_ple_hyper_moe_profile_observes_ple_before_hyper_mix(self) -> None:
         boundaries = XRAY.boundaries_for_layer(
             {
