@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "version" / "v8" / "scripts"
@@ -177,3 +179,25 @@ def test_native_nvfp4_providers_survive_call_lowering() -> None:
     assert combination["expr"] == "0.5"
     shared_workspace = next(arg for arg in shared["args"] if arg["name"] == "workspace_bytes")
     assert int(shared_workspace["expr"]) == 6016
+
+
+def test_native_nvfp4_circuit_binding_rejects_wrong_provider_class() -> None:
+    manifest = _tiny_manifest()
+    layer_quant = manifest["quant_summary"]["layer.0"]
+    with pytest.raises(RuntimeError, match="wrong operation class"):
+        build_ir_v8.resolve_storage_aware_circuit_provider(
+            build_ir_v8.load_kernel_registry(),
+            template_op="moe_swiglu_expert_mlp",
+            kernel_op="moe_swiglu_expert_mlp",
+            explicit_kernel="memcpy",
+            weight_keys=[
+                "moe_expert_gate",
+                "moe_expert_up",
+                "moe_expert_down",
+            ],
+            layer_quant=layer_quant,
+            header_quant=manifest["quant_summary"],
+            mode="decode",
+            prefer_q8_activation=True,
+            bf16_dense_matmul=False,
+        )

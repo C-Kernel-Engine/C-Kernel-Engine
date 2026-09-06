@@ -7670,23 +7670,59 @@ def resolve_storage_aware_circuit_provider(
     bf16_dense_matmul: bool,
 ) -> Optional[str]:
     """Resolve storage-sensitive composites before circuit provider defaults."""
-    if (
-        template_op == "moe_swiglu_expert_mlp"
-        and kernel_op
-        and isinstance(weight_keys, list)
-        and weight_keys
-    ):
-        composite_provider = resolve_weighted_composite_provider(
+    swiglu_prefixes = {
+        "moe_swiglu_expert_mlp": "moe_expert",
+        "shared_swiglu_expert_mlp": "moe_shared",
+        "gated_shared_swiglu_expert_mlp": "moe_shared",
+    }
+    weight_prefix = swiglu_prefixes.get(template_op)
+    if weight_prefix and kernel_op and isinstance(weight_keys, list) and weight_keys:
+        gate_dtype = str(layer_quant.get(f"{weight_prefix}_gate", "")).lower()
+        up_dtype = str(layer_quant.get(f"{weight_prefix}_up", "")).lower()
+        down_dtype = str(layer_quant.get(f"{weight_prefix}_down", "")).lower()
+
+        if explicit_kernel:
+            provider = next(
+                (
+                    item
+                    for item in registry.get("kernels", [])
+                    if item.get("id") == explicit_kernel
+                ),
+                None,
+            )
+            _validate_circuit_bound_provider(
+                provider,
+                op=template_op,
+                provider_id=explicit_kernel,
+                phase=mode,
+                fault="HARD CIRCUIT KERNEL FAULT",
+            )
+            provider_quant = provider.get("quant", {})
+            requested = {
+                "gate_weight": gate_dtype,
+                "up_weight": up_dtype,
+                "down_weight": down_dtype,
+            }
+            roles_match = all(
+                dtype in str(provider_quant.get(role, "none")).split("|")
+                for role, dtype in requested.items()
+            )
+            generic_weight = str(provider_quant.get("weight", "none"))
+            generic_match = (
+                gate_dtype == up_dtype == down_dtype
+                and gate_dtype in generic_weight.split("|")
+            )
+            if roles_match or generic_match:
+                return explicit_kernel
+
+        return resolve_swiglu_moe_provider(
             registry,
-            template_op=template_op,
             kernel_op=kernel_op,
             layer_quant=layer_quant,
-            header_quant=header_quant,
+            weight_prefix=weight_prefix,
             mode=mode,
             prefer_q8_activation=prefer_q8_activation,
         )
-        if composite_provider is not None:
-            return composite_provider
     return resolve_explicit_kernel_override(
         explicit_kernel=explicit_kernel,
         weight_keys=weight_keys,
