@@ -138,8 +138,13 @@ def main(argv: list[str] | None = None) -> int:
     failures: list[str] = []
 
     if not has_avx512 and not args.allow_non_avx512:
+        reason = "AVX-512F is not visible; pass --allow-non-avx512 for compatibility testing"
+        if args.mode in {"all", "q4"}:
+            report["phases"]["q8_mmproj_llamacpp"] = _phase("skip", reason=reason)
+        if args.mode in {"all", "bf16"}:
+            report["phases"]["bf16_pytorch"] = _phase("skip", reason=reason)
         report["status"] = "skip"
-        report["skip_reason"] = "AVX-512F is not visible; pass --allow-non-avx512 for compatibility testing"
+        report["skip_reason"] = reason
         (out_dir / "summary.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(report["skip_reason"])
         return 1 if args.require_artifacts else 0

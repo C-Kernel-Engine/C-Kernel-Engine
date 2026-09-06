@@ -253,6 +253,18 @@ class VisionEncoderAccuracyGateTests(unittest.TestCase):
             self.assertEqual(report["status"], "fail")
             self.assertTrue(report["failures"])
 
+    def test_non_avx512_skip_is_recorded_for_requested_phase(self) -> None:
+        gate = _load_gate()
+        with tempfile.TemporaryDirectory(prefix="vision_encoder_gate_isa_") as tmp:
+            output = Path(tmp) / "bf16"
+            with mock.patch.object(gate, "_cpu_flags", return_value=set()):
+                rc = gate.main(["--mode", "bf16", "--output-dir", str(output)])
+            report = json.loads((output / "summary.json").read_text())
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["status"], "skip")
+        self.assertEqual(report["phases"]["bf16_pytorch"]["status"], "skip")
+        self.assertIn("AVX-512F", report["phases"]["bf16_pytorch"]["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

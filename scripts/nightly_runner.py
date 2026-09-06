@@ -1508,15 +1508,27 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
         artifact_reason = ""
         if status_artifact:
             artifact_payload = _load_json_if_fresh(ROOT / status_artifact, start_ts=start)
-            status_phase = target_info.get("status_phase")
-            if status_phase:
-                phase = ((artifact_payload or {}).get("phases") or {}).get(status_phase) or {}
-                artifact_status = str(phase.get("status") or "").lower()
-                artifact_reason = str(phase.get("reason") or "")
+            if artifact_payload is None:
+                artifact_status = ""
+                artifact_reason = f"Missing or stale required status artifact: {status_artifact}"
             else:
-                artifact_status = str((artifact_payload or {}).get("status") or "").lower()
-            if artifact_status in {"pass", "fail", "skip"}:
+                status_phase = target_info.get("status_phase")
+                if status_phase:
+                    phase = (artifact_payload.get("phases") or {}).get(status_phase) or {}
+                    artifact_status = str(phase.get("status") or "").lower()
+                    artifact_reason = str(phase.get("reason") or "")
+                else:
+                    artifact_status = str(artifact_payload.get("status") or "").lower()
+            if result.returncode != 0:
+                status = "fail"
+            elif artifact_status in {"pass", "fail", "skip"}:
                 status = artifact_status
+            else:
+                status = "fail"
+                if not artifact_reason:
+                    artifact_reason = (
+                        f"Required status artifact has invalid status: {status_artifact}"
+                    )
         error_msg = ""
         if status == "skip":
             error_msg = artifact_reason or explicit_skip
@@ -1533,7 +1545,13 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
                     clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
                     if clean_line and clean_line not in error_lines:
                         error_lines.append(clean_line)
-            error_msg = "\n".join(error_lines[-10:]) if error_lines else f"Exit code {result.returncode}"
+            error_msg = (
+                "\n".join(error_lines[-10:])
+                if error_lines
+                else ("" if artifact_reason else f"Exit code {result.returncode}")
+            )
+            if artifact_reason:
+                error_msg = f"{error_msg}\n{artifact_reason}" if error_msg else artifact_reason
             artifact_summary = _summarize_make_failure_artifact(target_info["target"], start_ts=start)
             if artifact_summary:
                 error_msg = f"{error_msg}\n{artifact_summary}" if error_msg else artifact_summary

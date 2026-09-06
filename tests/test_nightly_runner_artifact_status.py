@@ -294,6 +294,63 @@ class NightlyArtifactStatusTests(unittest.TestCase):
                         result = runner.run_make_target(target)
                 self.assertEqual(result.status, artifact_status)
 
+    def test_passing_artifact_cannot_mask_nonzero_process_exit(self) -> None:
+        runner = _load_runner()
+        target = {
+            "name": "artifact gate",
+            "category": "bf16",
+            "target": "fake-gate",
+            "timeout_sec": 10,
+            "status_artifact": "build/fake/summary.json",
+        }
+        completed = subprocess.CompletedProcess(
+            ["make", "fake-gate"], 1, stdout="", stderr="lowering failed"
+        )
+        with mock.patch.object(runner.subprocess, "run", return_value=completed):
+            with mock.patch.object(
+                runner, "_load_json_if_fresh", return_value={"status": "pass"}
+            ):
+                result = runner.run_make_target(target)
+        self.assertEqual(result.status, "fail")
+
+    def test_missing_required_status_artifact_fails(self) -> None:
+        runner = _load_runner()
+        target = {
+            "name": "artifact gate",
+            "category": "bf16",
+            "target": "fake-gate",
+            "timeout_sec": 10,
+            "status_artifact": "build/fake/summary.json",
+        }
+        completed = subprocess.CompletedProcess(
+            ["make", "fake-gate"], 0, stdout="", stderr=""
+        )
+        with mock.patch.object(runner.subprocess, "run", return_value=completed):
+            with mock.patch.object(runner, "_load_json_if_fresh", return_value=None):
+                result = runner.run_make_target(target)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("Missing or stale required status artifact", result.error_msg)
+
+    def test_malformed_required_status_artifact_fails(self) -> None:
+        runner = _load_runner()
+        target = {
+            "name": "artifact gate",
+            "category": "bf16",
+            "target": "fake-gate",
+            "timeout_sec": 10,
+            "status_artifact": "build/fake/summary.json",
+        }
+        completed = subprocess.CompletedProcess(
+            ["make", "fake-gate"], 0, stdout="", stderr=""
+        )
+        with mock.patch.object(runner.subprocess, "run", return_value=completed):
+            with mock.patch.object(
+                runner, "_load_json_if_fresh", return_value={"status": "unknown"}
+            ):
+                result = runner.run_make_target(target)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("invalid status", result.error_msg)
+
     def test_methodical_qwen3vl_stage_lines_are_visible_subtests(self) -> None:
         runner = _load_runner()
         names = [
