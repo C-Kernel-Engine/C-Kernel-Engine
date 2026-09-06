@@ -842,6 +842,13 @@ MAKE_TARGETS = {
         "target": "test-v8-cohere-laguna-contracts",
         "timeout_sec": 300,
     },
+    "v8_capability_cases": {
+        "name": "v8 Capability Case Coverage",
+        "category": "inference",
+        "target": "test-v8-capability-cases",
+        "timeout_sec": 120,
+        "status_artifact": "build/v8/capability-case-audit.json",
+    },
     "v8_qwen38_dense_contracts": {
         "name": "Qwen3.6/3.8 Dense Metadata and Chat Contracts",
         "category": "inference",
