@@ -1004,7 +1004,7 @@
 
 <p>The active v8 inference compiler consumes three authoritative inputs: model weights, an architecture circuit, and executable kernel maps. The circuit owns graph structure and required semantics. Kernel maps own ABI and implementation capability. The DSL resolves and stitches; generated C does not guess.</p>
 
-<p>This boundary is executable policy, not only documentation. The v8 and v7 DSL audits reject new model-family dispatch in generic compiler/codegen functions, including dispatch hidden behind local aliases. Exact kernel operations do not fall back to broader families, malformed per-layer dimensions fail, and circuit weight policies are schema validated. New-model support must therefore extend a circuit, a kernel map, or a tested kernel instead of accumulating another compiler conditional.</p>
+<p>This boundary is executable policy, not only documentation. The v8 and v7 DSL audits reject new model-family dispatch in generic compiler/codegen functions, including dispatch hidden behind local aliases. Exact kernel operations do not fall back to broader families, malformed per-layer dimensions fail, and circuit weight policies are schema validated. New-model support must therefore extend a circuit, a kernel map, or a tested kernel instead of accumulating another compiler conditional. Multimodal families go further and compose circuits — see <a href="kernel-architecture.html#composite-circuits">Kernel Architecture — Composite Circuits</a> for the extends / components / stitch mechanism.</p>
 
 <div class="img-container svg-viewer" data-title="v8 Numerical Contract Architecture">
     <img src="assets/v8-numerical-contracts.svg" alt="v8 weights, circuits, kernel maps, numerical contract resolution, IR lowering and generated C">
@@ -1304,7 +1304,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-09-06 05:28</span>
+        <span class="folder-updated">Updated: 2026-09-06 13:45</span>
     </div>
     <pre class="tree-output">
 src/kernels

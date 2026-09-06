@@ -160,6 +160,31 @@
     .back-link:hover {
         color: var(--orange);
     }
+
+    /* Inline SVG expand overlay (same pattern as quantization.html / kernel-architecture.html) */
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #rf-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #rf-svg-overlay .rf-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #rf-svg-overlay .rf-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #rf-svg-overlay .rf-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #rf-svg-overlay .rf-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #rf-svg-overlay .rf-ov-stage img { max-width: none; height: auto; }
 </style>
 
 <a href="quantization.html" class="back-link">
@@ -306,6 +331,125 @@
             <li><a href="quantization.html" style="color: #00c7fd; text-decoration: none;">Quantization Deep Dive</a> — theory and dequantization math</li>
             <li><a href="xray.html" style="color: #00c7fd; text-decoration: none;">X-Ray</a> — see which provider ran and why others were rejected</li>
         </ul>
+    </div>
+</div>
+
+<!-- Recipes vs Formats: the mixed-quant story -->
+<div class="key-concepts" id="recipes-vs-formats">
+    <h2>Recipes vs Formats</h2>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+        A GGUF label like <code>Q5_K_M</code> or <code>UD-Q4_K_XL</code> is a <strong>recipe</strong> &mdash; a
+        per-tensor format assignment &mdash; not a single format. The converter records each tensor's actual dtype
+        in the weights manifest, and the runtime dispatches <em>per tensor</em>: every weight carries its own dtype
+        through lowering, and the kernel map selects a provider for that dtype's numerical contract. The practical
+        consequence: a new recipe needs <strong>zero new kernels</strong> when providers for the constituent formats
+        already exist &mdash; only the assignment changes, not the arithmetic.
+    </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 684" width="100%" role="img" tabindex="0" data-svg-title="One artifact, many formats - the Q5_K_M recipe census"
+         aria-label="One artifact, many formats. A GGUF label such as Q5_K_M names a per-tensor recipe, not a single format. Left panel: one decoder layer of gemma-3-270m-it repeated 18 times, with wq and wk and the ffn up-projection w1 in q5_1, wv in q8_0 on 9 layers and q5_1 on 9, wo in q5_k, w2 in q6_k on 9 layers and q5_k on 9, and twelve norm and bias tensors in fp32; the token embedding is q8_0 and the tokenizer tables are i32, u8, and f32. Right panel: the converter records each tensor's actual dtype in the weights manifest, the runtime kernel map selects a provider per tensor dtype, so a new recipe needs zero new kernels when providers for the constituent formats exist; the tested Unsloth Gemma3 UD-Q4_K_XL artifact is a mixed Q4_K, Q5_0, Q5_K, Q6_K, Q8_0 recipe, not a distinct UD arithmetic format. Census table of 332 weight tensors: q5_1 63, q5_k 27, q8_0 10, q6_k 9, fp32 218, plus 5 tokenizer tables."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .rf-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .rf-panel{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+        .rf-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .rf-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .rf-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .rf-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .rf-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .rf-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;}
+        .rf-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="rf-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="32" class="rf-band">ONE ARTIFACT, MANY FORMATS - "Q5_K_M" NAMES A PER-TENSOR RECIPE, NOT A FORMAT</text>
+
+      <!-- left: one decoder layer, colored by format -->
+      <rect class="rf-panel" x="24" y="48" width="470" height="300" rx="12"/>
+      <text x="44" y="76" class="rf-title" font-size="13">One decoder layer (stack repeats 18x)</text>
+      <text x="44" y="94" class="rf-sub">the recipe assigns a format per tensor</text>
+      <rect x="44" y="110" width="14" height="14" rx="3" fill="#7fd8ec"/><text x="70" y="122" class="rf-sub">wq  - q5_1</text>
+      <rect x="44" y="134" width="14" height="14" rx="3" fill="#7fd8ec"/><text x="70" y="146" class="rf-sub">wk  - q5_1</text>
+      <rect x="44" y="158" width="14" height="14" rx="3" fill="#7fd4a3"/><rect x="62" y="158" width="14" height="14" rx="3" fill="#7fd8ec"/><text x="88" y="170" class="rf-sub">wv  - q8_0 on 9 layers, q5_1 on 9</text>
+      <rect x="44" y="182" width="14" height="14" rx="3" fill="#07adf8"/><text x="70" y="194" class="rf-sub">wo  - q5_k</text>
+      <rect x="44" y="206" width="14" height="14" rx="3" fill="#7fd8ec"/><text x="70" y="218" class="rf-sub">w1 (ffn up/gate) - q5_1</text>
+      <rect x="44" y="230" width="14" height="14" rx="3" fill="#ffd38a"/><rect x="62" y="230" width="14" height="14" rx="3" fill="#07adf8"/><text x="88" y="242" class="rf-sub">w2 (ffn down) - q6_k on 9, q5_k on 9</text>
+      <rect x="44" y="254" width="14" height="14" rx="3" fill="#b0b0b0"/><text x="70" y="266" class="rf-sub">norms + biases (12 tensors) - fp32</text>
+      <text x="44" y="302" class="rf-sub">outside the stack: token_emb q8_0</text>
+      <text x="44" y="322" class="rf-sub">tokenizer tables: i32 / u8 / f32 (5)</text>
+
+      <!-- arrow to dispatch -->
+      <path d="M494,198 L598,198" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#rf-arrow)"/>
+      <text x="512" y="184" class="rf-sub">per-tensor</text>
+      <text x="508" y="222" class="rf-sub">dtype</text>
+
+      <!-- right: per-tensor dispatch -->
+      <rect class="rf-panel" x="604" y="48" width="552" height="300" rx="12"/>
+      <text x="624" y="76" class="rf-title" font-size="13">Dispatch is per tensor, not per recipe</text>
+      <rect class="rf-box" x="624" y="94" width="230" height="70" rx="10"/>
+      <text x="644" y="120" class="rf-title" font-size="13">converter</text>
+      <text x="644" y="140" class="rf-sub">records each tensor's actual</text>
+      <text x="644" y="156" class="rf-sub">dtype in the weights manifest</text>
+      <path d="M854,129 L878,129" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#rf-arrow)"/>
+      <rect class="rf-box" x="884" y="94" width="252" height="70" rx="10"/>
+      <text x="904" y="120" class="rf-title" font-size="13">runtime</text>
+      <text x="904" y="140" class="rf-sub">kernel map selects a provider</text>
+      <text x="904" y="156" class="rf-sub">per tensor dtype x contract</text>
+      <text x="624" y="204" class="rf-good">a new recipe (Q5_K_M, UD-Q4_K_XL, ...) needs</text>
+      <text x="624" y="224" class="rf-good">ZERO new kernels when providers for the</text>
+      <text x="624" y="244" class="rf-good">constituent formats already exist</text>
+      <rect class="rf-box" x="624" y="262" width="512" height="70" rx="10"/>
+      <text x="644" y="288" class="rf-title" font-size="13">Unsloth UD-Q4_K_XL (tested Gemma3 artifact, PR #463)</text>
+      <text x="644" y="308" class="rf-hi">= a mixed Q4_K / Q5_0 / Q5_K / Q6_K / Q8_0 recipe,</text>
+      <text x="644" y="324" class="rf-hi">not a distinct UD arithmetic format</text>
+
+      <!-- census table -->
+      <text x="24" y="380" class="rf-band">CENSUS - gemma-3-270m-it-Q5_K_M : 332 weight tensors, 18 layers (layout_prefill.json)</text>
+      <rect class="rf-panel" x="24" y="392" width="1132" height="192" rx="12"/>
+      <text x="64" y="418" class="rf-title" font-size="12">format</text>
+      <text x="176" y="418" class="rf-title" font-size="12">tensors</text>
+      <text x="280" y="418" class="rf-title" font-size="12">assigned to</text>
+      <rect x="44" y="430" width="14" height="14" rx="3" fill="#7fd8ec"/><text x="64" y="442" class="rf-sub">q5_1</text><text x="176" y="442" class="rf-sub">63</text><text x="280" y="442" class="rf-sub">wq + wk + w1 (all 18 layers) + wv on 9 layers</text>
+      <rect x="44" y="454" width="14" height="14" rx="3" fill="#07adf8"/><text x="64" y="466" class="rf-sub">q5_k</text><text x="176" y="466" class="rf-sub">27</text><text x="280" y="466" class="rf-sub">wo (all 18 layers) + w2 on 9 layers</text>
+      <rect x="44" y="478" width="14" height="14" rx="3" fill="#7fd4a3"/><text x="64" y="490" class="rf-sub">q8_0</text><text x="176" y="490" class="rf-sub">10</text><text x="280" y="490" class="rf-sub">wv on 9 layers + token_emb</text>
+      <rect x="44" y="502" width="14" height="14" rx="3" fill="#ffd38a"/><text x="64" y="514" class="rf-sub">q6_k</text><text x="176" y="514" class="rf-sub">9</text><text x="280" y="514" class="rf-sub">w2 on 9 layers</text>
+      <rect x="44" y="526" width="14" height="14" rx="3" fill="#b0b0b0"/><text x="64" y="538" class="rf-sub">fp32</text><text x="176" y="538" class="rf-sub">218</text><text x="280" y="538" class="rf-sub">norms, q_norm/k_norm, biases - 12 per layer x 18 + final norm</text>
+      <rect x="44" y="550" width="14" height="14" rx="3" fill="#555555"/><text x="64" y="562" class="rf-sub">misc</text><text x="176" y="562" class="rf-sub">5</text><text x="280" y="562" class="rf-sub">tokenizer tables (vocab_merges/offsets i32, scores f32, strings/types u8)</text>
+
+      <text x="24" y="612" class="rf-cap">Evidence (artifact census + PR #463): per-tensor dtypes counted from the artifact's layout_prefill.json (memory.weights.entries);</text>
+      <text x="24" y="632" class="rf-cap">PR #463's tested Unsloth Gemma3 UD-Q4_K_XL artifact matched 256/256 complete-vocabulary rows bit-exactly to llama.cpp.</text>
+      <text x="24" y="656" class="rf-cap">Caveats: the census is one 270M artifact shown as an illustration, not a universal distribution; per PR #463 the</text>
+      <text x="24" y="676" class="rf-cap">520-token layer-0 boundary differs at five rows - longer-context bit-exact certification remains open.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+
+    <div class="concept-grid" style="margin-top: 1rem;">
+        <div class="concept">
+            <h3>One label, four quant formats</h3>
+            <p>The gemma-3-270m-it-Q5_K_M artifact above is really a four-format mix &mdash; q5_1, q5_k, q8_0, q6_k
+            &mdash; plus fp32 norms and biases (218 of the 332 weight tensors: tiny, but numerous). Even within a
+            single layer role the recipe alternates: <code>wv</code> is q8_0 on 9 layers and q5_1 on 9;
+            <code>w2</code> is q6_k on 9 and q5_k on 9.</p>
+        </div>
+        <div class="concept">
+            <h3>Unsloth UD artifacts (PR #463)</h3>
+            <p>PR #463 tested an Unsloth Gemma3 <code>UD-Q4_K_XL</code> artifact: it is a mixed
+            Q4_K/Q5_0/Q5_K/Q6_K/Q8_0 recipe, not a distinct UD arithmetic format, and it matched 256/256
+            complete-vocabulary rows bit-exactly to llama.cpp. The 520-token layer-0 boundary differs at five rows,
+            so longer-context bit-exact certification remains open.</p>
+        </div>
+        <div class="concept">
+            <h3>Run the census yourself</h3>
+            <p><code>python3 version/v8/tools/open_ir_visualizer_v8.py --generate &lt;model&gt; --html-only</code>
+            writes <code>ir_report.html</code> into the model cache dir; its <strong>Weight Dtype Audit</strong> tab
+            lists the per-tensor dtype breakdown for your own artifacts.</p>
+        </div>
     </div>
 </div>
 
@@ -529,3 +673,56 @@
         <li><a href="simd-architecture.html" style="color: #00c7fd; text-decoration: none;">SIMD Architecture</a> - AVX-512, VNNI, AMX</li>
     </ul>
 </div>
+
+<div id="rf-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="rf-ov-bar">
+      <span class="rf-ov-title" id="rf-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="rf-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="rf-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="rf-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="rf-ov-stage" id="rf-ov-stage"><img id="rf-ov-img" alt=""></div>
+</div>
+
+<script>
+    (function() {
+      var overlay = document.getElementById('rf-svg-overlay');
+      var stage = document.getElementById('rf-ov-stage');
+      var img = document.getElementById('rf-ov-img');
+      var title = document.getElementById('rf-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('rf-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('rf-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('rf-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('rf-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+</script>
