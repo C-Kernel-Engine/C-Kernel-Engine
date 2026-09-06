@@ -1,0 +1,99 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding",
+  "name": "Gemma regular FP32 causal GQA sliding prefill",
+  "op": "attention_sliding",
+  "operation_interface": "attention.causal_gqa.compact_kv.fp32_output.v1",
+  "selection": {
+    "status": "production",
+    "priority": 320,
+    "equivalence_group": "attention.fp32_llama_regular_sliding.v1",
+    "phases": ["prefill"]
+  },
+  "physical_contract_version": 1,
+  "variant": "causal_llama_regular_fp32_sliding",
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "provides": {
+    "execution.phase": ["prefill"],
+    "tensor.q.dtype": ["fp32"],
+    "tensor.kv.dtype": ["fp32"],
+    "tensor.layout": ["head_major"],
+    "numerics.attention_reduction": ["fp32_llama_regular"]
+  },
+  "supported_reductions": {
+    "fp32_llama_regular": {
+      "status": "validated",
+      "function": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace",
+      "explicit_selector": true,
+      "notes": "Matches llama.cpp regular-attention FP16 KV-cache operand rounding and its batched GEMM reduction schedule."
+    }
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": ["serial"],
+      "dispatch": ["inline"],
+      "reduction_order_effect": "contract_defined"
+    }
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "read", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
+  ],
+  "scratch": [
+    {"name": "scores", "dtype": "fp32", "shape": ["S"], "size_resolution": "required", "lifetime": "kernel_call"},
+    {"name": "value_columns", "dtype": "fp32", "shape": ["D", "S"], "size_resolution": "required", "lifetime": "kernel_call"},
+    {"name": "scaled_scores", "dtype": "fp32", "shape": ["S"], "size_resolution": "required", "lifetime": "kernel_call"}
+  ],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32"},
+    {"name": "head_dim", "dtype": "int32"},
+    {"name": "aligned_head_dim", "dtype": "int32"},
+    {"name": "sliding_window", "dtype": "int32"}
+  ],
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window, float *scores, size_t scores_bytes, float *value_columns, size_t value_columns_bytes, float *scaled_scores, size_t scaled_scores_bytes);",
+    "sources": ["src/kernels/attention_kernels.c", "src/kernels/softmax_kernels.c"]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"name": "q", "source": "scratch:q_scratch", "cast": "const float*", "ports": ["input:q"]},
+      {"name": "k", "source": "scratch:k_scratch", "cast": "const float*", "ports": ["input:k"]},
+      {"name": "v", "source": "scratch:v_scratch", "cast": "const float*", "ports": ["input:v"]},
+      {"name": "output", "source": "output:out", "cast": "float*", "ports": ["output:out"]},
+      {"name": "num_heads", "source": "dim:num_heads"},
+      {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+      {"name": "num_tokens", "source": "dim:seq_len"},
+      {"name": "head_dim", "source": "dim:head_dim"},
+      {"name": "aligned_head_dim", "source": "dim:head_dim"},
+      {"name": "kv_stride_tokens", "source": "dim:max_seq_len"},
+      {"name": "sliding_window", "source": "dim:sliding_window"},
+      {"name": "scores", "source": "scratch:scores", "cast": "float*"},
+      {"name": "scores_bytes", "source": "scratch_size:scores"},
+      {"name": "value_columns", "source": "scratch:value_columns", "cast": "float*"},
+      {"name": "value_columns_bytes", "source": "scratch_size:value_columns"},
+      {"name": "scaled_scores", "source": "scratch:scaled_scores", "cast": "float*"},
+      {"name": "scaled_scores_bytes", "source": "scratch_size:scaled_scores"}
+    ]
+  },
+  "numerical_capabilities": {
+    "input_dtype": "fp32_rounded_to_fp16_operands",
+    "accumulation_dtype": "fp32",
+    "reduction_order": "llama_regular_padded_256",
+    "output_dtype": "fp32"
+  },
+  "tests": {"unit": ["unittest/test_attention_llama_regular.py"]},
+  "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity."
+}

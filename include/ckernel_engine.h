@@ -1607,6 +1607,8 @@ void gelu_backward_fast_bf16(const uint16_t *input,
 // Input shape: [tokens, 2 * dim], Output shape: [tokens, dim]
 void geglu_forward_fp32(const float *x, float *out, int tokens, int dim);
 void geglu_forward_exact(const float *x, float *out, int tokens, int dim);
+void geglu_forward_ggml_native(const float *x, float *out, int tokens, int dim);
+void gelu_ggml_native_inplace(float *data, size_t n);
 void geglu_forward_bf16(const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch);
 void geglu_backward_fp32(const float *x,
                          const float *d_out,
@@ -2381,6 +2383,20 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
     int aligned_head_dim,
     int kv_stride_tokens,
     int sliding_window);
+void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens, int sliding_window,
+    float *scores, size_t scores_bytes,
+    float *value_columns, size_t value_columns_bytes,
+    float *scaled_scores, size_t scaled_scores_bytes);
+void attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int live_tokens, int kv_stride_tokens,
+    int head_dim, int aligned_head_dim, int sliding_window,
+    float *scores, size_t scores_bytes,
+    float *value_columns, size_t value_columns_bytes,
+    float *scaled_scores, size_t scaled_scores_bytes);
 
 void attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4(
     const float *q,
@@ -4593,6 +4609,12 @@ void rope_forward_qk_with_rotary_dim(float *q,
                                      int aligned_head_dim,
                                      int pos_offset,
                                      int rotary_dim);
+
+void rope_forward_qk_split_llama_token_range_f32(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base,
+    int token_begin, int token_end);
 
 void rope_forward_qk_split_direct_f32(float *q,
                                       float *k,

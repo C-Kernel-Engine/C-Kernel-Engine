@@ -168,6 +168,32 @@ static int test_multi_dispatch(void)
     return 1;
 }
 
+static int test_dispatch_width_transitions(void)
+{
+    printf("  [3c] Repeated narrow/wide dispatch publication...\n");
+    ck_threadpool_t *pool = ck_threadpool_create(MAX_TEST_THREADS);
+    TEST_ASSERT(pool != NULL, "create width-transition pool");
+    const int capacity = ck_threadpool_n_threads(pool);
+    for (int repeat = 0; repeat < 20000; repeat++) {
+        int active = repeat % 3 == 0 ? capacity : (capacity > 1 ? 2 : 1);
+        for (int i = 0; i < MAX_TEST_THREADS; i++) {
+            atomic_store(&g_thread_seen[i], 0);
+        }
+        ck_threadpool_dispatch_n(pool, active, multi_work, &active);
+        for (int i = 0; i < MAX_TEST_THREADS; i++) {
+            if (atomic_load(&g_thread_seen[i]) != (i < active)) {
+                fprintf(stderr, "width transition=%d active=%d worker=%d visits=%d\n",
+                        repeat, active, i, atomic_load(&g_thread_seen[i]));
+                ck_threadpool_destroy(pool);
+                TEST_ASSERT(0, "dispatch visits exactly its active worker subset");
+            }
+        }
+    }
+    ck_threadpool_destroy(pool);
+    TEST_ASSERT(1, "dispatch visits exactly its active worker subset");
+    return 1;
+}
+
 static int test_capacity_dispatch(void)
 {
     printf("  [3b] Default width versus explicit capacity...\n");
@@ -620,6 +646,7 @@ int main(int argc, char **argv)
         ok &= test_dispatch_profile();
         ok &= test_multi_dispatch();
         ok &= test_capacity_dispatch();
+        ok &= test_dispatch_width_transitions();
         ok &= test_barrier();
         ok &= test_sequential_dispatch();
         ok &= test_pause_resume();

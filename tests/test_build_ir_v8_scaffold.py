@@ -43,7 +43,18 @@ def _normalized_template_doc(doc: dict) -> dict:
     kernels = normalized.get("kernels")
     if isinstance(kernels, dict):
         for key in list(kernels):
-            if key.startswith("attn") or key == "rope_qk":
+            if (
+                key.startswith("attn")
+                or key in {
+                    "ffn_norm",
+                    "final_rmsnorm",
+                    "geglu",
+                    "post_attention_norm",
+                    "post_ffn_norm",
+                    "qk_norm",
+                    "rope_qk",
+                }
+            ):
                 kernels.pop(key)
         if not kernels:
             normalized.pop("kernels", None)
@@ -60,6 +71,8 @@ def _normalized_template_doc(doc: dict) -> dict:
             "state_policy_config_key",
             "attention_policy_config_key",
             "recurrent_policy_config_key",
+            "rope_kind_config_key",
+            "rope_param_mode",
             "kv_policy_config_key",
         ):
             attention_contract.pop(key, None)

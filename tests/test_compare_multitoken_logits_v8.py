@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -156,6 +158,34 @@ class PersistentTrajectoryParityTests(unittest.TestCase):
                         logits_sequence_out=output,
                         load_logits=False,
                     )
+
+    def test_llama_trajectory_disables_flash_attention_by_default(self) -> None:
+        function_globals = runner.run_llama_greedy_trajectory.__globals__
+        seen: dict[str, list[str]] = {}
+
+        def fake_run(cmd, **_kwargs):
+            seen["cmd"] = cmd
+            logits_path = Path(cmd[cmd.index("--logits-out") + 1])
+            sequence_path = Path(cmd[cmd.index("--logits-seq-out") + 1])
+            np.zeros(4, dtype=np.float32).tofile(logits_path)
+            np.zeros(4, dtype=np.float32).tofile(sequence_path)
+            return subprocess.CompletedProcess(
+                cmd,
+                0,
+                stdout=json.dumps({"n_vocab": 4, "greedy_generated": [0], "ok": True}),
+                stderr="",
+            )
+
+        with mock.patch.dict(
+            function_globals,
+            {"ensure_llama_helper": lambda: Path("/tmp/helper"), "_run": fake_run},
+        ):
+            runner.run_llama_greedy_trajectory(
+                Path("/tmp/model.gguf"), [7], 1, 128, 3, 1
+            )
+
+        cmd = seen["cmd"]
+        self.assertEqual(cmd[cmd.index("--flash-attn") + 1], "disabled")
 
     def test_trajectory_size_estimate_reads_runtime_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as td:

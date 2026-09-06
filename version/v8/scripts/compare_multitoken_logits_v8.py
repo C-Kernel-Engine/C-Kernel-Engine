@@ -854,6 +854,7 @@ def run_multitoken_trajectory_parity(
     llama_profile_layers_out: Path | None = None,
     append_on_divergence: str = "stop",
     diagnose_single_thread: bool = False,
+    llama_flash_attention: str = "disabled",
 ) -> dict[str, Any]:
     stops = {int(token) for token in (stop_token_ids or set())}
     if append_on_divergence not in {"stop", "llama"}:
@@ -902,6 +903,7 @@ def run_multitoken_trajectory_parity(
         dump_names=llama_dump_names,
         dump_flash_inputs=llama_dump_flash_inputs,
         profile_layers_out=llama_profile_layers_out,
+        flash_attention_mode=llama_flash_attention,
     )
     # Teacher forcing needs the oracle sequence before CKE starts. Both model
     # mappings are still isolated in separate processes; only the small token
@@ -1004,6 +1006,7 @@ def run_multitoken_trajectory_parity(
         "ck_prefill_mode": "hybrid",
         "llama_decode_mode": "hybrid",
         "llama_no_repack": bool(llama_no_repack),
+        "llama_flash_attention": str(llama_flash_attention),
         "stop_token_ids": sorted(stops),
         "matched_stop_token": matched_stop_token,
         "first_divergence": first_divergence,
@@ -1026,6 +1029,7 @@ def run_multitoken_trajectory_parity_streaming(
     ck_runtime_so: Path | None = None,
     llama_profile_layers_out: Path | None = None,
     append_on_divergence: str = "stop",
+    llama_flash_attention: str = "disabled",
 ) -> dict[str, Any]:
     """Compare a persistent trajectory with bounded resident logits memory.
 
@@ -1053,6 +1057,7 @@ def run_multitoken_trajectory_parity_streaming(
             profile_layers_out=llama_profile_layers_out,
             logits_sequence_out=sequence_path,
             load_logits=False,
+            flash_attention_mode=llama_flash_attention,
         )
         teacher = [int(token) for token in llama["generated_tokens"]]
         ck = load_ck_greedy_trajectory_isolated(
@@ -1278,6 +1283,16 @@ def main() -> int:
         help="Disable llama.cpp CPU tensor repacking in the replay helper for accumulation-order attribution.",
     )
     ap.add_argument(
+        "--llama-flash-attention",
+        choices=["disabled", "auto", "enabled"],
+        default="disabled",
+        help=(
+            "llama.cpp attention implementation for trajectory parity. "
+            "Numerical certification defaults to disabled so unfused attention "
+            "boundaries and reduction order remain observable."
+        ),
+    )
+    ap.add_argument(
         "--append-on-divergence",
         choices=["stop", "llama", "ck"],
         default="stop",
@@ -1437,6 +1452,7 @@ def main() -> int:
             "top_k": int(args.top_k),
             "threads": int(args.threads),
             "llama_no_repack": bool(args.llama_no_repack),
+            "llama_flash_attention": str(args.llama_flash_attention),
             "stop_token_ids": stop_tokens,
             "ck_runtime_so": args.ck_runtime_so,
             "llama_profile_layers_out": args.llama_profile_layers_out,

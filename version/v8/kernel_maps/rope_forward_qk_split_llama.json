@@ -1,0 +1,215 @@
+{
+  "id": "rope_forward_qk_split_llama",
+  "op": "rope",
+  "operation_interface": "rope.split_direct.llama_cpu.fp32.v1",
+  "selection": {
+    "status": "production",
+    "priority": 100,
+    "equivalence_group": "rope.split_direct.llama_cpu.fp32.v1",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "variant": "fp32_head_major_split_half_recursive_cpu",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "layout": "head_major_contiguous",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "layout": "head_major_contiguous",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
+    }
+  ],
+  "weights": [
+    {
+      "name": "rope_freqs",
+      "dtype": "fp32",
+      "shape": [
+        "rotary_dim/2"
+      ],
+      "layout": "feature_contiguous",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "optional",
+      "desc": "Optional proportional RoPE frequency factors; ignored when use_rope_freq_factors=0"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "layout": "head_major_contiguous",
+      "access": "write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "alias_of": "input:q",
+      "desc": "Query tensor after split-half RoPE application"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "layout": "head_major_contiguous",
+      "access": "write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "alias_of": "input:k",
+      "desc": "Key tensor after split-half RoPE application"
+    }
+  ],
+  "dims": [
+    "H",
+    "KV",
+    "T",
+    "D",
+    "rotary_dim"
+  ],
+  "params": [
+    {
+      "name": "aligned_head_dim",
+      "dtype": "int32",
+      "desc": "Aligned head dimension for SIMD"
+    },
+    {
+      "name": "pos_offset",
+      "dtype": "int32",
+      "desc": "Absolute position offset"
+    },
+    {
+      "name": "rotary_dim",
+      "dtype": "int32",
+      "desc": "RoPE rotary dimensions (only rotate first rotary_dim channels)"
+    },
+    {
+      "name": "freq_base",
+      "dtype": "float32",
+      "source": "dim:rope_freq_base",
+      "desc": "Per-layer RoPE theta/base"
+    }
+  ],
+  "impl": {
+    "function": "rope_forward_qk_split_llama_parallel_dispatch",
+    "c_declaration": "void rope_forward_qk_split_llama_parallel_dispatch(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
+    "sources": [
+      "src/kernels/rope_kernels.c",
+      "version/v8/src/ck_parallel_prefill_v8.c"
+    ],
+    "variants": [
+      {
+        "name": "parallel_token_rows",
+        "requires": [],
+        "compile_flags": [],
+        "work_partition": "independent_token_rows"
+      }
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "q",
+        "source": "scratch:q_scratch",
+        "cast": "float*",
+        "ports": [
+          "input:q",
+          "output:q"
+        ]
+      },
+      {
+        "name": "k",
+        "source": "scratch:k_scratch",
+        "cast": "float*",
+        "ports": [
+          "input:k",
+          "output:k"
+        ]
+      },
+      {
+        "name": "freq_factors",
+        "source": "weight_f:rope_freqs",
+        "cast": "const float*",
+        "ports": [
+          "weight:rope_freqs"
+        ]
+      },
+      {
+        "name": "use_freq_factors",
+        "source": "dim:use_rope_freq_factors"
+      },
+      {
+        "name": "num_heads",
+        "source": "dim:num_heads"
+      },
+      {
+        "name": "num_kv_heads",
+        "source": "dim:num_kv_heads"
+      },
+      {
+        "name": "num_tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "aligned_head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "pos_offset",
+        "source": "runtime:pos"
+      },
+      {
+        "name": "rotary_dim",
+        "source": "dim:rotary_dim"
+      },
+      {
+        "name": "freq_base",
+        "source": "dim:rope_freq_base"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_rope_split_direct_parallel.py"
+    ]
+  },
+  "notes": "Explicit ggml CPU recursive frequency stepping and FMA ordering; separate from the direct independent-frequency provider. Full-model certification pending."
+}

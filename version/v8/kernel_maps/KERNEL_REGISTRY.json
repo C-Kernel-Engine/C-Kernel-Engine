@@ -5,14 +5,14 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 346,
+      "total": 350,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
         "attention": 33,
         "attention_projection": 1,
-        "attention_sliding": 7,
+        "attention_sliding": 9,
         "attn_gate_sigmoid_mul": 2,
         "attn_gate_sigmoid_mul_backward": 1,
         "attn_gate_softplus_mul": 1,
@@ -47,7 +47,7 @@
         "fused_qkv_block": 1,
         "gated_deltanet": 7,
         "gated_shared_swiglu_expert_mlp": 4,
-        "geglu": 4,
+        "geglu": 5,
         "gelu": 7,
         "gemm": 23,
         "gemm_backward": 1,
@@ -111,7 +111,7 @@
         "residual_add": 2,
         "residual_save": 1,
         "rmsnorm": 10,
-        "rope": 17,
+        "rope": 18,
         "rope_backward": 2,
         "rope_init": 3,
         "rowwise_bias_add": 1,
@@ -3254,6 +3254,298 @@
       "_source_file": "attention_forward_causal_head_major_gqa_flash_strided_token_output.json"
     },
     {
+      "id": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding",
+      "name": "Gemma regular FP32 causal GQA sliding prefill",
+      "op": "attention_sliding",
+      "operation_interface": "attention.causal_gqa.compact_kv.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 320,
+        "equivalence_group": "attention.fp32_llama_regular_sliding.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "physical_contract_version": 1,
+      "variant": "causal_llama_regular_fp32_sliding",
+      "mode": "prefill",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "prefill"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp32"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "fp32_llama_regular"
+        ]
+      },
+      "supported_reductions": {
+        "fp32_llama_regular": {
+          "status": "validated",
+          "function": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace",
+          "explicit_selector": true,
+          "notes": "Matches llama.cpp regular-attention FP16 KV-cache operand rounding and its batched GEMM reduction schedule."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scores",
+          "dtype": "fp32",
+          "shape": [
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        },
+        {
+          "name": "value_columns",
+          "dtype": "fp32",
+          "shape": [
+            "D",
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        },
+        {
+          "name": "scaled_scores",
+          "dtype": "fp32",
+          "shape": [
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "sliding_window",
+          "dtype": "int32"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace",
+        "c_declaration": "void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window, float *scores, size_t scores_bytes, float *value_columns, size_t value_columns_bytes, float *scaled_scores, size_t scaled_scores_bytes);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:k"
+            ]
+          },
+          {
+            "name": "v",
+            "source": "scratch:v_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:v"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          },
+          {
+            "name": "scores",
+            "source": "scratch:scores",
+            "cast": "float*"
+          },
+          {
+            "name": "scores_bytes",
+            "source": "scratch_size:scores"
+          },
+          {
+            "name": "value_columns",
+            "source": "scratch:value_columns",
+            "cast": "float*"
+          },
+          {
+            "name": "value_columns_bytes",
+            "source": "scratch_size:value_columns"
+          },
+          {
+            "name": "scaled_scores",
+            "source": "scratch:scaled_scores",
+            "cast": "float*"
+          },
+          {
+            "name": "scaled_scores_bytes",
+            "source": "scratch_size:scaled_scores"
+          }
+        ]
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_rounded_to_fp16_operands",
+        "accumulation_dtype": "fp32",
+        "reduction_order": "llama_regular_padded_256",
+        "output_dtype": "fp32"
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_llama_regular.py"
+        ]
+      },
+      "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity.",
+      "_source_file": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding.json"
+    },
+    {
       "id": "attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract",
       "op": "attention",
       "variant": "causal_head_major_gqa_prefill_append_bf16cache_pytorch",
@@ -5218,6 +5510,290 @@
       "notes": "Gemma4 no-scale decode sliding-window attention. Gemma4 uses attention_scale=1.0 in llama.cpp, not 1/sqrt(head_dim).",
       "name": "attention_forward_decode_head_major_gqa_flash_sliding_gemma4",
       "_source_file": "attention_forward_decode_head_major_gqa_flash_sliding_gemma4.json"
+    },
+    {
+      "id": "attention_forward_decode_head_major_gqa_llama_regular_sliding",
+      "name": "Gemma regular FP32 causal GQA sliding decode",
+      "op": "attention_sliding",
+      "operation_interface": "attention.causal_gqa.fp32_cache.fp32_output.v1",
+      "selection": {
+        "status": "production",
+        "priority": 320,
+        "equivalence_group": "attention.fp32_llama_regular_sliding.v1",
+        "phases": [
+          "decode"
+        ]
+      },
+      "physical_contract_version": 1,
+      "variant": "decode_llama_regular_fp32_sliding",
+      "mode": "decode",
+      "contract_schema_version": 1,
+      "provides": {
+        "execution.phase": [
+          "decode"
+        ],
+        "tensor.q.dtype": [
+          "fp32"
+        ],
+        "tensor.kv.dtype": [
+          "fp32"
+        ],
+        "tensor.layout": [
+          "head_major"
+        ],
+        "numerics.attention_reduction": [
+          "fp32_llama_regular"
+        ]
+      },
+      "supported_reductions": {
+        "fp32_llama_regular": {
+          "status": "validated",
+          "function": "attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace",
+          "explicit_selector": true,
+          "notes": "Matches llama.cpp regular-attention FP16 KV-cache operand rounding and its decode matvec reduction schedule."
+        }
+      },
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q_token",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required"
+        },
+        {
+          "name": "k_cache",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "runtime",
+          "consumption": "required"
+        },
+        {
+          "name": "v_cache",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "layout": "head_major_strided",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "runtime",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [],
+      "outputs": [
+        {
+          "name": "out_token",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scores",
+          "dtype": "fp32",
+          "shape": [
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        },
+        {
+          "name": "value_columns",
+          "dtype": "fp32",
+          "shape": [
+            "D",
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        },
+        {
+          "name": "scaled_scores",
+          "dtype": "fp32",
+          "shape": [
+            "S"
+          ],
+          "size_resolution": "required",
+          "lifetime": "kernel_call"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32"
+        },
+        {
+          "name": "sliding_window",
+          "dtype": "int32"
+        }
+      ],
+      "impl": {
+        "function": "attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace",
+        "c_declaration": "void attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int live_tokens, int kv_stride_tokens, int head_dim, int aligned_head_dim, int sliding_window, float *scores, size_t scores_bytes, float *value_columns, size_t value_columns_bytes, float *scaled_scores, size_t scaled_scores_bytes);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "const float*",
+            "ports": [
+              "input:q_token"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "runtime:kv_cache_k_layer",
+            "cast": "const float*",
+            "ports": [
+              "input:k_cache"
+            ]
+          },
+          {
+            "name": "v",
+            "source": "runtime:kv_cache_v_layer",
+            "cast": "const float*",
+            "ports": [
+              "input:v_cache"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:out",
+            "cast": "float*",
+            "ports": [
+              "output:out_token"
+            ]
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "live_tokens",
+            "source": "runtime:kv_tokens"
+          },
+          {
+            "name": "kv_stride_tokens",
+            "source": "dim:max_seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "sliding_window",
+            "source": "dim:sliding_window"
+          },
+          {
+            "name": "scores",
+            "source": "scratch:scores",
+            "cast": "float*"
+          },
+          {
+            "name": "scores_bytes",
+            "source": "scratch_size:scores"
+          },
+          {
+            "name": "value_columns",
+            "source": "scratch:value_columns",
+            "cast": "float*"
+          },
+          {
+            "name": "value_columns_bytes",
+            "source": "scratch_size:value_columns"
+          },
+          {
+            "name": "scaled_scores",
+            "source": "scratch:scaled_scores",
+            "cast": "float*"
+          },
+          {
+            "name": "scaled_scores_bytes",
+            "source": "scratch_size:scaled_scores"
+          }
+        ]
+      },
+      "numerical_capabilities": {
+        "input_dtype": "fp32_rounded_to_fp16_operands",
+        "accumulation_dtype": "fp32",
+        "reduction_order": "llama_regular_padded_256",
+        "output_dtype": "fp32"
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_llama_regular.py"
+        ]
+      },
+      "notes": "Single-token causal/sliding attention matching llama.cpp CPU non-flash matvec reduction order.",
+      "_source_file": "attention_forward_decode_head_major_gqa_llama_regular_sliding.json"
     },
     {
       "id": "attention_forward_decode_head_major_gqa_regular",
@@ -18177,6 +18753,110 @@
       "_source_file": "geglu_forward_fp32.json"
     },
     {
+      "id": "geglu_forward_ggml_native",
+      "op": "geglu",
+      "operation_interface": "geglu.fp32_compacting.v1",
+      "variant": "geglu_fp16_table_fp32_product",
+      "selection": {
+        "status": "candidate",
+        "priority": 200,
+        "equivalence_group": "geglu_fp16_table_fp32_product",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "tokens",
+            "2*dim"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "Input tensor [tokens, 2*dim], split into [gate, up] along last dim"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "tokens",
+            "dim"
+          ],
+          "layout": "token_major_contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required",
+          "desc": "FP16-rounded GELU table value times FP32 up input"
+        }
+      ],
+      "memory_contract": {
+        "input_output_overlap": "allowed_with_ascending_serial_compaction",
+        "disjoint_buffers": "serial_independent_rows"
+      },
+      "dims": [
+        "tokens",
+        "dim"
+      ],
+      "params": [],
+      "impl": {
+        "function": "geglu_forward_ggml_native",
+        "c_declaration": "void geglu_forward_ggml_native(const float *x, float *out, int tokens, int dim);",
+        "sources": [
+          "src/kernels/geglu_kernels.c",
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "x",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:x"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:output",
+            "cast": "float*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "dim",
+            "source": "dim:intermediate_size"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_geglu_ggml_native.cpp"
+        ]
+      },
+      "notes": "Native C table generation; never loads llama.cpp. Ascending in-place compaction. Performance and full-model certification pending.",
+      "name": "geglu_forward_ggml_native",
+      "_source_file": "geglu_forward_ggml_native.json"
+    },
+    {
       "id": "gelu_erf_bf16_storage",
       "op": "gelu",
       "operation_interface": "gelu.fp32_bf16_values_inplace.v1",
@@ -23587,6 +24267,7 @@
       ],
       "call_abi": {
         "version": 1,
+        "last_token_dispatch": "preserve_provider",
         "params": [
           {
             "name": "A",
@@ -56351,6 +57032,223 @@
       "notes": "Generic split-half direct RoPE for models that need per-layer theta/rotary_dim and optional frequency factors instead of one precomputed cache. Gemma4 is the first v8 user, but the contract is model-neutral.",
       "name": "rope_forward_qk_split_direct",
       "_source_file": "rope_forward_qk_split_direct.json"
+    },
+    {
+      "id": "rope_forward_qk_split_llama",
+      "op": "rope",
+      "operation_interface": "rope.split_direct.llama_cpu.fp32.v1",
+      "selection": {
+        "status": "production",
+        "priority": 100,
+        "equivalence_group": "rope.split_direct.llama_cpu.fp32.v1",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "variant": "fp32_head_major_split_half_recursive_cpu",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "read",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
+        }
+      ],
+      "weights": [
+        {
+          "name": "rope_freqs",
+          "dtype": "fp32",
+          "shape": [
+            "rotary_dim/2"
+          ],
+          "layout": "feature_contiguous",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "optional",
+          "desc": "Optional proportional RoPE frequency factors; ignored when use_rope_freq_factors=0"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "alias_of": "input:q",
+          "desc": "Query tensor after split-half RoPE application"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "layout": "head_major_contiguous",
+          "access": "write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "alias_of": "input:k",
+          "desc": "Key tensor after split-half RoPE application"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D",
+        "rotary_dim"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Absolute position offset"
+        },
+        {
+          "name": "rotary_dim",
+          "dtype": "int32",
+          "desc": "RoPE rotary dimensions (only rotate first rotary_dim channels)"
+        },
+        {
+          "name": "freq_base",
+          "dtype": "float32",
+          "source": "dim:rope_freq_base",
+          "desc": "Per-layer RoPE theta/base"
+        }
+      ],
+      "impl": {
+        "function": "rope_forward_qk_split_llama_parallel_dispatch",
+        "c_declaration": "void rope_forward_qk_split_llama_parallel_dispatch(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
+        "sources": [
+          "src/kernels/rope_kernels.c",
+          "version/v8/src/ck_parallel_prefill_v8.c"
+        ],
+        "variants": [
+          {
+            "name": "parallel_token_rows",
+            "requires": [],
+            "compile_flags": [],
+            "work_partition": "independent_token_rows"
+          }
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "q",
+            "source": "scratch:q_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:q",
+              "output:q"
+            ]
+          },
+          {
+            "name": "k",
+            "source": "scratch:k_scratch",
+            "cast": "float*",
+            "ports": [
+              "input:k",
+              "output:k"
+            ]
+          },
+          {
+            "name": "freq_factors",
+            "source": "weight_f:rope_freqs",
+            "cast": "const float*",
+            "ports": [
+              "weight:rope_freqs"
+            ]
+          },
+          {
+            "name": "use_freq_factors",
+            "source": "dim:use_rope_freq_factors"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "num_kv_heads",
+            "source": "dim:num_kv_heads"
+          },
+          {
+            "name": "num_tokens",
+            "source": "dim:seq_len"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "aligned_head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "pos_offset",
+            "source": "runtime:pos"
+          },
+          {
+            "name": "rotary_dim",
+            "source": "dim:rotary_dim"
+          },
+          {
+            "name": "freq_base",
+            "source": "dim:rope_freq_base"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_rope_split_direct_parallel.py"
+        ]
+      },
+      "notes": "Explicit ggml CPU recursive frequency stepping and FMA ordering; separate from the direct independent-frequency provider. Full-model certification pending.",
+      "name": "rope_forward_qk_split_llama",
+      "_source_file": "rope_forward_qk_split_llama.json"
     },
     {
       "id": "rope_precompute_cache",

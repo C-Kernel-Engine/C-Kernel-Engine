@@ -437,6 +437,7 @@ def run_llama_greedy_trajectory(
     profile_layers_out: Path | None = None,
     logits_sequence_out: Path | None = None,
     load_logits: bool = True,
+    flash_attention_mode: str = "disabled",
 ) -> dict[str, Any]:
     capture_step = None if dump_step is None else int(dump_step)
     if capture_step is not None:
@@ -471,6 +472,9 @@ def run_llama_greedy_trajectory(
                     f"refusing stale evidence: {sequence_path}"
                 )
             sequence_path.parent.mkdir(parents=True, exist_ok=True)
+        attention_mode = str(flash_attention_mode).strip().lower()
+        if attention_mode not in {"disabled", "auto", "enabled"}:
+            raise ValueError(f"unsupported llama flash-attention mode: {flash_attention_mode}")
         cmd = [
             str(helper),
             "--model", str(gguf_path),
@@ -482,6 +486,7 @@ def run_llama_greedy_trajectory(
             "--greedy-steps", str(int(max_new_tokens)),
             "--prefix-decode-mode", "batched",
             "--decode-mode", "sequential",
+            "--flash-attn", attention_mode,
         ]
         if no_repack:
             cmd.append("--no-repack")

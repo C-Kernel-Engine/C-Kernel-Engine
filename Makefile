@@ -744,6 +744,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_attention.py \
             unittest/test_attention_full.py \
             unittest/test_attention_sliding_contract.py \
+            unittest/test_attention_llama_regular.py \
             unittest/test_attention_backward.py \
             unittest/test_kv_cache_attention.py \
             unittest/test_kv_cache_layer_decode.py \
@@ -3686,6 +3687,14 @@ $(MROPE_TEXT_LLAMA_PRODUCTION_BIN): $(LIB) unittest/test_mrope_text_llama_produc
 		-o $(MROPE_TEXT_LLAMA_PRODUCTION_BIN)
 
 .PHONY: test-rmsnorm-llama-production
+.PHONY: test-geglu-ggml-native
+test-geglu-ggml-native: $(LIB)
+	$(CXX) -O2 -I$(Q4Q6_LLAMA_CPP_DIR)/ggml/include unittest/test_geglu_ggml_native.cpp \
+		-Lbuild -lckernel_engine -L$(Q4Q6_LLAMA_CPP_BIN_DIR) -lggml-cpu -lggml-base -lggml \
+		-lm -lpthread -ldl -Wl,-rpath,$(CURDIR)/build \
+		-Wl,-rpath,$(abspath $(Q4Q6_LLAMA_CPP_BIN_DIR)) -o build/test_geglu_ggml_native
+	./build/test_geglu_ggml_native
+
 test-rmsnorm-llama-production: $(RMSNORM_LLAMA_PRODUCTION_BIN)
 	@echo "Running RMSNorm against llama.cpp fused production graph..."
 	@set -e; for threads in $${CK_RMSNORM_ORACLE_THREADS:-1 16 20 24}; do \
@@ -4157,6 +4166,9 @@ test-numerical-contracts: $(LIB)
 	@PYTHONPATH=unittest $(PYTHON) -m pytest -q unittest/test_attention_f16kv_parallel.py
 	@$(PYTHON) -m pytest -q unittest/test_q5_0_q8_0_prefill_tiles.py
 	@if [ -n "$${CK_LLAMA_CPP_ROOT:-}" ] && [ -d "$${CK_LLAMA_CPP_ROOT}/build/bin" ]; then \
+		$(MAKE) --no-print-directory test-geglu-ggml-native \
+			Q4Q6_LLAMA_CPP_DIR="$${CK_LLAMA_CPP_ROOT}" \
+			Q4Q6_LLAMA_CPP_BIN_DIR="$${CK_LLAMA_CPP_ROOT}/build/bin" || exit $$?; \
 		$(MAKE) --no-print-directory test-rmsnorm-llama-production \
 			Q4Q6_LLAMA_CPP_DIR="$${CK_LLAMA_CPP_ROOT}" \
 			Q4Q6_LLAMA_CPP_BIN_DIR="$${CK_LLAMA_CPP_ROOT}/build/bin"; \

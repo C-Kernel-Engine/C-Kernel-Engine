@@ -27,6 +27,7 @@
 #include <ggml.h>
 #endif
 #include <dlfcn.h>
+#include <limits.h>
 #ifndef RTLD_DEFAULT
 #define RTLD_DEFAULT ((void *)0)
 #endif
@@ -5722,6 +5723,268 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
         v_columns, column_elements * sizeof(float),
         probability_row, (size_t) num_tokens * sizeof(float));
     free(workspace);
+}
+
+static inline int ck_llama_kv_pad_256(int live_tokens, int capacity)
+{
+    if (live_tokens <= 0 || capacity < live_tokens) return 0;
+    int padded = live_tokens < 256 ? 256 : ((live_tokens + 255) / 256) * 256;
+    return padded < capacity ? padded : capacity;
+}
+
+#if defined(__AVX512F__)
+static inline __m512 ck_llama_regular_round_f16x16(__m512 value)
+{
+    return _mm512_cvtph_ps(_mm512_cvtps_ph(value, _MM_FROUND_TO_NEAREST_INT));
+}
+#endif
+
+static inline float ck_llama_regular_dot_f16(const float *a, const float *b, int count)
+{
+    int i = 0;
+#if defined(__AVX512F__)
+    __m512 acc[4] = {
+        _mm512_setzero_ps(), _mm512_setzero_ps(),
+        _mm512_setzero_ps(), _mm512_setzero_ps()
+    };
+    for (; i + 64 <= count; i += 64) {
+        for (int lane = 0; lane < 4; ++lane) {
+            acc[lane] = _mm512_fmadd_ps(
+                ck_llama_regular_round_f16x16(_mm512_loadu_ps(a + i + lane * 16)),
+                ck_llama_regular_round_f16x16(_mm512_loadu_ps(b + i + lane * 16)),
+                acc[lane]);
+        }
+    }
+    acc[0] = _mm512_add_ps(acc[0], acc[2]);
+    acc[1] = _mm512_add_ps(acc[1], acc[3]);
+    float sum = _mm512_reduce_add_ps(_mm512_add_ps(acc[0], acc[1]));
+#elif defined(__AVX__)
+    __m256 acc[4] = {
+        _mm256_setzero_ps(), _mm256_setzero_ps(),
+        _mm256_setzero_ps(), _mm256_setzero_ps()
+    };
+    for (; i + 32 <= count; i += 32) {
+        for (int lane = 0; lane < 4; ++lane) {
+#if defined(__FMA__)
+            acc[lane] = _mm256_fmadd_ps(
+                _mm256_cvtph_ps(_mm256_cvtps_ph(
+                    _mm256_loadu_ps(a + i + lane * 8), _MM_FROUND_TO_NEAREST_INT)),
+                _mm256_cvtph_ps(_mm256_cvtps_ph(
+                    _mm256_loadu_ps(b + i + lane * 8), _MM_FROUND_TO_NEAREST_INT)),
+                acc[lane]);
+#else
+            acc[lane] = _mm256_add_ps(acc[lane], _mm256_mul_ps(
+                _mm256_cvtph_ps(_mm256_cvtps_ph(
+                    _mm256_loadu_ps(a + i + lane * 8), _MM_FROUND_TO_NEAREST_INT)),
+                _mm256_cvtph_ps(_mm256_cvtps_ph(
+                    _mm256_loadu_ps(b + i + lane * 8), _MM_FROUND_TO_NEAREST_INT))));
+#endif
+        }
+    }
+    acc[0] = _mm256_add_ps(acc[0], acc[2]);
+    acc[1] = _mm256_add_ps(acc[1], acc[3]);
+    const __m256 merged = _mm256_add_ps(acc[0], acc[1]);
+    __m128 halves = _mm_add_ps(
+        _mm256_extractf128_ps(merged, 1), _mm256_castps256_ps128(merged));
+    halves = _mm_add_ps(halves, _mm_movehl_ps(halves, halves));
+    halves = _mm_add_ss(halves, _mm_movehdup_ps(halves));
+    float sum = _mm_cvtss_f32(halves);
+#else
+    float sums[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    for (; i + 4 <= count; i += 4) {
+        for (int lane = 0; lane < 4; ++lane) {
+            const float av = CK_FP16_TO_FP32(CK_FP32_TO_FP16(a[i + lane]));
+            const float bv = CK_FP16_TO_FP32(CK_FP32_TO_FP16(b[i + lane]));
+            sums[lane] = fmaf(av, bv, sums[lane]);
+        }
+    }
+    float sum = (sums[0] + sums[2]) + (sums[1] + sums[3]);
+#endif
+    for (; i < count; ++i) {
+        const float av = CK_FP16_TO_FP32(CK_FP32_TO_FP16(a[i]));
+        const float bv = CK_FP16_TO_FP32(CK_FP32_TO_FP16(b[i]));
+        sum = fmaf(av, bv, sum);
+    }
+    return sum;
+}
+
+static inline float ck_llama_regular_gemm_f16(
+    const float *probability, const float *value_column, int count)
+{
+    int i = 0;
+#if defined(__AVX512F__)
+    __m512 acc = _mm512_setzero_ps();
+    for (; i + 16 <= count; i += 16) {
+        acc = _mm512_fmadd_ps(
+            ck_llama_regular_round_f16x16(_mm512_loadu_ps(value_column + i)),
+            ck_llama_regular_round_f16x16(_mm512_loadu_ps(probability + i)), acc);
+    }
+    float sum = _mm512_reduce_add_ps(acc);
+#elif defined(__AVX__)
+    __m256 acc = _mm256_setzero_ps();
+    for (; i + 8 <= count; i += 8) {
+#if defined(__FMA__)
+        acc = _mm256_fmadd_ps(
+            _mm256_cvtph_ps(_mm256_cvtps_ph(
+                _mm256_loadu_ps(value_column + i), _MM_FROUND_TO_NEAREST_INT)),
+            _mm256_cvtph_ps(_mm256_cvtps_ph(
+                _mm256_loadu_ps(probability + i), _MM_FROUND_TO_NEAREST_INT)), acc);
+#else
+        acc = _mm256_add_ps(acc, _mm256_mul_ps(
+            _mm256_cvtph_ps(_mm256_cvtps_ph(
+                _mm256_loadu_ps(value_column + i), _MM_FROUND_TO_NEAREST_INT)),
+            _mm256_cvtph_ps(_mm256_cvtps_ph(
+                _mm256_loadu_ps(probability + i), _MM_FROUND_TO_NEAREST_INT))));
+#endif
+    }
+    __m128 halves = _mm_add_ps(
+        _mm256_extractf128_ps(acc, 1), _mm256_castps256_ps128(acc));
+    halves = _mm_add_ps(halves, _mm_movehl_ps(halves, halves));
+    halves = _mm_add_ss(halves, _mm_movehdup_ps(halves));
+    float sum = _mm_cvtss_f32(halves);
+#else
+    float sum = 0.0f;
+#endif
+    for (; i < count; ++i) {
+        const float value = CK_FP16_TO_FP32(CK_FP32_TO_FP16(value_column[i]));
+        const float probability_value = CK_FP16_TO_FP32(CK_FP32_TO_FP16(probability[i]));
+        sum = fmaf(value, probability_value, sum);
+    }
+    return sum;
+}
+
+static void ck_attention_llama_regular_query(
+    const float *query, const float *key_head, const float *value_columns,
+    float *output, float *scores, float *scaled_scores,
+    int live_tokens, int padded_tokens, int query_position,
+    int head_dim, int aligned_head_dim, int sliding_window,
+    int batched_prefill)
+{
+    const int first = sliding_window > 0 && query_position >= sliding_window
+        ? query_position - sliding_window + 1 : 0;
+    const int last = query_position < live_tokens ? query_position : live_tokens - 1;
+    for (int token = 0; token < padded_tokens; ++token) scores[token] = -INFINITY;
+    for (int token = first; token <= last; ++token) {
+        const float *key = key_head + (size_t)token * (size_t)aligned_head_dim;
+        scores[token] = batched_prefill
+            ? ck_llama_regular_gemm_f16(query, key, head_dim)
+            : ck_llama_regular_dot_f16(query, key, head_dim);
+    }
+
+    memcpy(scaled_scores, scores, (size_t)padded_tokens * sizeof(float));
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    ck_vec_scale_f32_inplace(scaled_scores, padded_tokens, scale);
+    const float maximum = ck_vec_max_f32_contig(scaled_scores, padded_tokens);
+    const double total = ck_ggml_vec_soft_max_row(
+        padded_tokens, scores, scaled_scores, maximum);
+    if (total > 0.0) {
+        ck_vec_scale_f32_inplace(scores, padded_tokens, (float)(1.0 / total));
+        for (int dim = 0; dim < head_dim; ++dim) {
+            const float *column = value_columns + (size_t)dim * (size_t)padded_tokens;
+            output[dim] = batched_prefill
+                ? ck_llama_regular_gemm_f16(scores, column, padded_tokens)
+                : ck_llama_regular_dot_f16(scores, column, padded_tokens);
+        }
+    } else {
+        memset(output, 0, (size_t)head_dim * sizeof(float));
+    }
+    for (int dim = head_dim; dim < aligned_head_dim; ++dim) output[dim] = 0.0f;
+}
+
+static void ck_attention_llama_regular_impl(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int query_tokens, int live_tokens,
+    int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window,
+    float *scores, size_t scores_bytes,
+    float *value_columns, size_t value_columns_bytes,
+    float *scaled_scores, size_t scaled_scores_bytes,
+    int batched_prefill)
+{
+    if (!q || !k || !v || !output || !scores || !value_columns || !scaled_scores ||
+        num_heads <= 0 || num_kv_heads <= 0 || query_tokens <= 0 || live_tokens <= 0 ||
+        head_dim <= 0 || aligned_head_dim < head_dim || kv_stride_tokens < live_tokens) return;
+    size_t scratch_capacity = scores_bytes / sizeof(float);
+    const size_t scaled_capacity = scaled_scores_bytes / sizeof(float);
+    const size_t value_capacity = value_columns_bytes /
+        ((size_t)head_dim * sizeof(float));
+    if (scaled_capacity < scratch_capacity) scratch_capacity = scaled_capacity;
+    if (value_capacity < scratch_capacity) scratch_capacity = value_capacity;
+    if (!batched_prefill && (size_t)kv_stride_tokens < scratch_capacity) {
+        scratch_capacity = (size_t)kv_stride_tokens;
+    }
+    const int padded = scratch_capacity > (size_t)INT_MAX ? 0 :
+        ck_llama_kv_pad_256(live_tokens, (int)scratch_capacity);
+    if (padded <= 0 || scores_bytes < (size_t)padded * sizeof(float) ||
+        scaled_scores_bytes < (size_t)padded * sizeof(float) ||
+        value_columns_bytes < (size_t)head_dim * (size_t)padded * sizeof(float)) return;
+
+    const size_t kv_head_stride = (size_t)kv_stride_tokens * (size_t)aligned_head_dim;
+    const int debug_layer_id = ck_attention_vec_dump_enabled()
+        ? ck_attention_vec_dump_next_layer_id() : -1;
+    int packed_kv_head = -1;
+    for (int head = 0; head < num_heads; ++head) {
+        const int kv_head = (int)((long long)head * num_kv_heads / num_heads);
+        const float *key_head = k + (size_t)kv_head * kv_head_stride;
+        const float *value_head = v + (size_t)kv_head * kv_head_stride;
+        if (kv_head != packed_kv_head) {
+            for (int dim = 0; dim < head_dim; ++dim) {
+                float *column = value_columns + (size_t)dim * (size_t)padded;
+                int token = 0;
+                for (; token < live_tokens; ++token) {
+                    column[token] = value_head[(size_t)token * aligned_head_dim + dim];
+                }
+                for (; token < padded; ++token) column[token] = 0.0f;
+            }
+            packed_kv_head = kv_head;
+        }
+        for (int query = 0; query < query_tokens; ++query) {
+            const int position = batched_prefill ? query : live_tokens - 1;
+            ck_attention_llama_regular_query(
+                q + ((size_t)head * query_tokens + query) * aligned_head_dim,
+                key_head, value_columns,
+                output + ((size_t)head * query_tokens + query) * aligned_head_dim,
+                scores, scaled_scores, live_tokens, padded, position,
+                head_dim, aligned_head_dim, sliding_window, batched_prefill);
+            if (debug_layer_id >= 0 &&
+                ck_attention_vec_dump_should_emit(debug_layer_id, head, query)) {
+                ck_attention_vec_dump_selected_query(
+                    scaled_scores, scores,
+                    output + ((size_t)head * query_tokens + query) * aligned_head_dim,
+                    value_columns, padded, head_dim,
+                    debug_layer_id, head, query);
+            }
+        }
+    }
+}
+
+void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens, int sliding_window,
+    float *scores, size_t scores_bytes,
+    float *value_columns, size_t value_columns_bytes,
+    float *scaled_scores, size_t scaled_scores_bytes)
+{
+    ck_attention_llama_regular_impl(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
+        head_dim, aligned_head_dim, kv_stride_tokens, sliding_window,
+        scores, scores_bytes, value_columns, value_columns_bytes,
+        scaled_scores, scaled_scores_bytes, 1);
+}
+
+void attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int live_tokens, int kv_stride_tokens,
+    int head_dim, int aligned_head_dim, int sliding_window,
+    float *scores, size_t scores_bytes,
+    float *value_columns, size_t value_columns_bytes,
+    float *scaled_scores, size_t scaled_scores_bytes)
+{
+    ck_attention_llama_regular_impl(
+        q, k, v, output, num_heads, num_kv_heads, 1, live_tokens,
+        head_dim, aligned_head_dim, kv_stride_tokens, sliding_window,
+        scores, scores_bytes, value_columns, value_columns_bytes,
+        scaled_scores, scaled_scores_bytes, 0);
 }
 
 /**

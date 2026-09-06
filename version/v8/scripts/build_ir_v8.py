@@ -2642,16 +2642,9 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
             mask_id = special_tokens.get("mask_token_id")
 
         tokenizer_model_lc = tokenizer_model.strip().lower() if isinstance(tokenizer_model, str) else ""
-        model_type_lc = model_type.strip().lower() if isinstance(model_type, str) else ""
-        template_name_lc = template_name.strip().lower() if isinstance(template_name, str) else ""
-        is_gemma_family = model_type_lc.startswith("gemma") or ("gemma" in template_name_lc)
-
-        # GGUF metadata may report tokenizer_model="llama" for Gemma-family models
-        # even though the SentencePiece behavior should be unigram. Keep an
-        # explicit override here so codegen does not silently select llama mode.
+        # The artifact declares its tokenizer algorithm independently of the
+        # neural architecture. Merge ranks are not unigram log probabilities.
         effective_spm_model = tokenizer_model_lc
-        if tokenizer_model_lc == "llama" and is_gemma_family:
-            effective_spm_model = "unigram"
 
         # IMPORTANT: SPM add_space_prefix is model-family dependent.
         # If metadata is missing this flag, default to:
@@ -6093,7 +6086,15 @@ def apply_layer_attention_dims(op_name: str, params: Dict, layer: int, config: D
         if isinstance(rope_kinds, list):
             use_freq_factors = 1 if rope_kind == "full" else 0
         params["use_rope_freq_factors"] = use_freq_factors if op_name in ("rope_qk", "rope_q") else 0
-        if sliding_window > 0:
+        if op_name in (
+            "attn",
+            "attn_sliding",
+            "attn_shared_kv",
+            "attn_sliding_shared_kv",
+        ):
+            # Always overwrite the model-wide default. A zero in the
+            # per-layer schedule denotes global attention and must clear a
+            # stale sliding-window value inherited from an earlier IR pass.
             params["sliding_window"] = sliding_window
     elif op_name == "v_norm":
         params["head_dim"] = v_head_dim
@@ -8871,11 +8872,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         header_quant: Dict,
         explicit_kernel: Optional[str] = None,
     ) -> List[str]:
-        """Apply a validated circuit provider override around generic resolution."""
-        resolved = map_op_to_kernel(op, layer_quant, mode, header_quant)
+        """Resolve and validate an authoritative circuit provider override."""
         explicit_kernel = str(explicit_kernel or "").strip()
         if not explicit_kernel:
-            return resolved
+            return map_op_to_kernel(op, layer_quant, mode, header_quant)
 
         _validate_circuit_bound_provider(
             registry_by_id.get(explicit_kernel),
@@ -8885,12 +8885,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             phase=mode,
             fault="HARD CIRCUIT KERNEL FAULT",
         )
-        if numerical_contract_by_template_op.get(op) is not None and resolved != [explicit_kernel]:
-            raise RuntimeError(
-                "HARD CIRCUIT KERNEL FAULT: explicit provider conflicts with "
-                f"the resolved numerical contract for {op!r}: "
-                f"circuit={explicit_kernel!r}, contract={resolved!r}."
-            )
+        if numerical_contract_by_template_op.get(op) is not None:
+            resolved = map_op_to_kernel(op, layer_quant, mode, header_quant)
+            if resolved != [explicit_kernel]:
+                raise RuntimeError(
+                    "HARD CIRCUIT KERNEL FAULT: explicit provider conflicts with "
+                    f"the resolved numerical contract for {op!r}: "
+                    f"circuit={explicit_kernel!r}, contract={resolved!r}."
+                )
         return [explicit_kernel]
 
     # ═══════════════════════════════════════════════════════════

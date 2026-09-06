@@ -32,6 +32,7 @@ struct Args {
     std::vector<std::string> dump_names;
     std::string decode_mode = "batched";
     std::string prefix_decode_mode = "batched";
+    std::string flash_attention_mode = "disabled";
     int ctx_len = 256;
     int top_k = 16;
     int threads = 0;
@@ -282,6 +283,18 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             }
             continue;
         }
+        if (a == "--flash-attn") {
+            const char * v = need_value("--flash-attn");
+            if (!v) return false;
+            args.flash_attention_mode = v;
+            if (args.flash_attention_mode != "disabled" &&
+                args.flash_attention_mode != "auto" &&
+                args.flash_attention_mode != "enabled") {
+                err = "invalid --flash-attn (expected disabled, auto, or enabled)";
+                return false;
+            }
+            continue;
+        }
         if (a == "--no-repack") {
             args.no_repack = true;
             continue;
@@ -293,6 +306,7 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
                 << "--logits-out <path.bin> [--logits-seq-out <path.bin> --greedy-steps N] [--embeddings-out <path.f32>] [--prefix-f32 <path.f32>] "
                 << "[--prefix-grid-x N --prefix-grid-y N] [--prefix-row-dim N] [--prefix-text-pos N] [--ctx N] [--top-k K] [--threads N] "
                 << "[--decode-mode batched|sequential] [--prefix-decode-mode batched|sequential] "
+                << "[--flash-attn disabled|auto|enabled] "
                 << "[--dump-dir dir --dump-names a,b,c] [--dump-greedy-decode-step N] "
                 << "[--profile-layers-out path.csv] "
                 << "[--dump-list-only] [--no-repack]\n";
@@ -1056,11 +1070,13 @@ int main(int argc, char ** argv) {
                    name.rfind("kq_soft_max-", 0) == 0 ||
                    name.rfind("kqv-", 0) == 0;
         });
-    if (dump_attention_internals) {
+    if (dump_attention_internals || args.flash_attention_mode == "disabled") {
         // Flash attention intentionally hides scores and probabilities as one
         // fused node. Use llama.cpp's unfused reference graph only for a
         // diagnostic capture that explicitly requests those boundaries.
         cparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    } else if (args.flash_attention_mode == "enabled") {
+        cparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
     }
     DumpState dump_state;
     dump_state.requested_greedy_decode_step = args.dump_greedy_decode_step;
@@ -1394,7 +1410,7 @@ int main(int argc, char ** argv) {
     std::cout << "],";
     std::cout << "\"decode_mode\":\"" << args.decode_mode << "\",";
     std::cout << "\"flash_attention_mode\":\""
-              << (dump_attention_internals ? "disabled_for_internal_dump" : "auto")
+              << (dump_attention_internals ? "disabled_for_internal_dump" : args.flash_attention_mode)
               << "\",";
     std::cout << "\"greedy_steps\":" << args.greedy_steps << ",";
     std::cout << "\"dump_greedy_decode_step\":" << args.dump_greedy_decode_step << ",";

@@ -106,6 +106,11 @@ class RegressionHarnessV8Tests(unittest.TestCase):
         self.assertEqual(by_id["gemma"].runtime_expect.get("config", {}).get("rope_layout"), "split")
         self.assertEqual(by_id["gemma"].repeatability.get("prompt"), "hello")
         self.assertEqual(by_id["gemma"].repeatability.get("runs"), 5)
+        gemma_lowered = by_id["gemma"].runtime_expect.get("lowered_ops", [])
+        self.assertEqual(
+            gemma_lowered[0].get("function_prefix"),
+            "rope_forward_qk_split_llama_parallel_dispatch",
+        )
         qwen35_lowered = by_id["qwen35"].runtime_expect.get("lowered_ops", [])
         self.assertEqual(qwen35_lowered[0].get("function_prefix"), "mrope_qk_text")
 

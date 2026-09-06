@@ -120,6 +120,33 @@ class RoPESplitDirectParallelTests(unittest.TestCase):
             np.testing.assert_array_equal(q_candidate, q_reference)
             np.testing.assert_array_equal(k_candidate, k_reference)
 
+    def test_recursive_provider_matches_existing_llama_cache(self) -> None:
+        p = ctypes.POINTER(ctypes.c_float)
+        direct = self.lib.rope_forward_qk_split_llama_parallel_dispatch
+        direct.argtypes = self.parallel.argtypes
+        cache = self.lib.rope_precompute_cache_llama_cpu
+        cache.argtypes = [p, p, ctypes.c_int, ctypes.c_int, ctypes.c_float,
+                          ctypes.c_int, ctypes.c_char_p, ctypes.c_float]
+        cached = self.lib.rope_forward_qk_with_rotary_dim
+        cached.argtypes = [p]*4 + [ctypes.c_int]*7
+        rng = np.random.default_rng(47)
+        for tokens, offset, base in ((1, 0, 10000.0), (26, 37, 10000.0),
+                                     (19, 512, 1000000.0)):
+            with self.subTest(tokens=tokens, offset=offset, base=base):
+                q = rng.standard_normal((4, tokens, 256), dtype=np.float32)
+                k = rng.standard_normal((1, tokens, 256), dtype=np.float32)
+                qr, kr = q.copy(), k.copy()
+                cos = np.zeros((offset + tokens, 128), np.float32)
+                sin = np.zeros_like(cos)
+                cache(cos.ctypes.data_as(p), sin.ctypes.data_as(p), offset+tokens,
+                      256, base, 256, b"none", 1.0)
+                cached(qr.ctypes.data_as(p), kr.ctypes.data_as(p), cos.ctypes.data_as(p),
+                       sin.ctypes.data_as(p), 4, 1, tokens, 256, 256, offset, 256)
+                direct(q.ctypes.data_as(p), k.ctypes.data_as(p), None, 0,
+                       4, 1, tokens, 256, 256, offset, 256, base)
+                np.testing.assert_array_equal(q.view(np.uint32), qr.view(np.uint32))
+                np.testing.assert_array_equal(k.view(np.uint32), kr.view(np.uint32))
+
 
 if __name__ == "__main__":
     unittest.main()

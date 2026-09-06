@@ -14,6 +14,24 @@
     "partition"
   ],
   "contracts": {
+    "fp32_llama_regular": {
+      "status": "validated",
+      "q_compute": "fp16_rounded",
+      "k_compute": "fp16_rounded",
+      "score_accumulator": "fp32",
+      "softmax_statistics": "fp32",
+      "value_compute": "fp16_rounded",
+      "value_accumulator": "fp32",
+      "partial_storage": "none",
+      "partial_merge": "none",
+      "partition": {"kind": "single_range"},
+      "description": "llama.cpp CPU non-flash attention with FP16 KV-cache operand rounding, 256-position KV padding, and phase-specific GEMM/matvec reduction order.",
+      "validation": {
+        "test": "unittest/test_attention_llama_regular.py and Gemma3 teacher-forced trajectory certification",
+        "cases": ["compact prefill K/V stride with 256-position reduction", "Q4_K_M 256-row full-logit trajectory", "UD-Q4_K_XL 256-row full-logit trajectory", "520-token batched prompt across the 512-position sliding-window boundary"],
+        "reference": "llama.cpp CPU regular attention with FP16 KV cache and flash attention disabled"
+      }
+    },
     "fp32_online": {
       "status": "validated",
       "q_compute": "fp32",

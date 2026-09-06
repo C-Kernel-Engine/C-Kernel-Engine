@@ -186,6 +186,18 @@ def test_qwen4exp_gguf_plan_is_complete_and_materializes_ple_metadata() -> None:
     ]
 
 
+def test_qwen4exp_quant_summary_groups_layer_entries() -> None:
+    tensors, meta = _qwen4exp_plan_fixture()
+    plan = gguf_converter.build_qwen4_exp_gguf_plan(tensors, meta)["plan"]
+    summary = gguf_converter.build_qwen4_exp_quant_summary(plan, "Q4_K", "Q6_K")
+
+    assert summary["source"] == "gguf"
+    assert summary["token_emb"] == "Q4_K"
+    assert summary["lm_head"] == "Q6_K"
+    assert summary["layer.0"]
+    assert "attn_qkv" in summary["layer.0"]
+
+
 def test_qwen4exp_gguf_plan_rejects_ple_tensor_on_non_owner_layer() -> None:
     tensors, meta = _qwen4exp_plan_fixture()
     name = "blk.0.ple_key.weight"

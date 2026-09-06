@@ -183,10 +183,21 @@ static void *worker_main(void *arg)
             int current = atomic_load_explicit(&pool->n_dispatch, memory_order_acquire);
             active = atomic_load_explicit(&pool->active_threads, memory_order_acquire);
             if (current != last_dispatch) {
-                last_dispatch = current;
-                if (ith < active) {
-                    break;
+                /* Snapshot the epoch and descriptor together. An inactive
+                 * worker may still be catching up with an older dispatch. */
+                pthread_mutex_lock(&pool->mutex);
+                current = atomic_load_explicit(&pool->n_dispatch, memory_order_acquire);
+                active = atomic_load_explicit(&pool->active_threads, memory_order_acquire);
+                if (current != last_dispatch) {
+                    last_dispatch = current;
+                    if (ith < active) {
+                        fn = pool->work_fn;
+                        args = pool->work_args;
+                        pthread_mutex_unlock(&pool->mutex);
+                        break;
+                    }
                 }
+                pthread_mutex_unlock(&pool->mutex);
                 spins = 0;
             }
 
@@ -203,6 +214,8 @@ static void *worker_main(void *arg)
                     if (current != last_dispatch) {
                         last_dispatch = current;
                         if (ith < active) {
+                            fn = pool->work_fn;
+                            args = pool->work_args;
                             pthread_mutex_unlock(&pool->mutex);
                             goto worker_have_work;
                         }
@@ -217,8 +230,6 @@ static void *worker_main(void *arg)
 
 worker_have_work:
         /* Execute work */
-        fn = pool->work_fn;
-        args = pool->work_args;
         if (fn) {
             fn(ith, active, args);
         }
@@ -397,6 +408,7 @@ void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work
     barrier_init(&pool->barrier, active_threads);
 
     /* Set work descriptor */
+    pthread_mutex_lock(&pool->mutex);
     pool->work_fn = fn;
     pool->work_args = args;
     atomic_store_explicit(&pool->active_threads, active_threads, memory_order_release);
@@ -406,7 +418,6 @@ void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work
     atomic_fetch_add_explicit(&pool->n_dispatch, 1, memory_order_release);
 
     /* Also signal condvar for sleeping workers */
-    pthread_mutex_lock(&pool->mutex);
     pthread_cond_broadcast(&pool->cond_dispatch);
     pthread_mutex_unlock(&pool->mutex);
 

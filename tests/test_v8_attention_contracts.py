@@ -419,8 +419,8 @@ class AttentionContractV8Tests(unittest.TestCase):
 
     def test_supported_v8_circuits_resolve_without_legacy_attention(self) -> None:
         cases = (
-            ("gemma3", "decoder.sliding_attention", "prefill", "attention_forward_causal_head_major_gqa_flash_strided_sliding"),
-            ("gemma3", "decoder.sliding_attention", "decode", "attention_forward_decode_head_major_gqa_flash_sliding"),
+            ("gemma3", "decoder.sliding_attention", "prefill", "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding"),
+            ("gemma3", "decoder.sliding_attention", "decode", "attention_forward_decode_head_major_gqa_llama_regular_sliding"),
             ("qwen2", "decoder.attention", "prefill", "attention_forward_causal_head_major_gqa_flash_strided"),
             ("qwen2", "decoder.attention", "decode", "attention_forward_decode_head_major_gqa_flash"),
             ("qwen3", "decoder.attention", "prefill", "attention_forward_causal_head_major_gqa_flash_strided"),

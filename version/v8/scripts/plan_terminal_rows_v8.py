@@ -39,9 +39,11 @@ def plan_terminal_prefill_rows(ir, selector_matches):
     buffers = {b["name"]: b for b in ir["memory"]["activations"]["buffers"]}
     copies = []
     available = set()
-    extent = int(config.get("prefill_chunk_length") or config.get("context_length") or 0)
-    if extent <= 0:
+    context_extent = int(config.get("context_length") or 0)
+    chunk_extent = int(config.get("prefill_chunk_length") or context_extent)
+    if context_extent <= 0 or chunk_extent <= 0:
         fault("missing positive prefill extent")
+    extent = min(context_extent, chunk_extent)
     if not isinstance(contract["live_inputs"], list) or not contract["live_inputs"]:
         fault("live inputs must be declared")
     for item in contract["live_inputs"]:
@@ -72,8 +74,15 @@ def plan_terminal_prefill_rows(ir, selector_matches):
                 fault("row widths must resolve from positive dimension arguments")
             factors.append(int(value))
         width = math.prod(factors)
-        if width * extent * 4 > int(buf.get("size", 0)):
-            fault("live input exceeds planned buffer capacity")
+        required_bytes = width * extent * 4
+        planned_bytes = int(buf.get("size", 0))
+        if required_bytes > planned_bytes:
+            fault(
+                "live input exceeds planned buffer capacity: "
+                f"{item['op']}.{item['argument']} buffer={name} "
+                f"requires={required_bytes} planned={planned_bytes} "
+                f"rows={extent} row_elements={width}"
+            )
         if name in available:
             fault("duplicate live input buffer")
         available.add(name)

@@ -1262,6 +1262,42 @@ void rope_forward_qk_split_direct_token_range_f32(
     }
 }
 
+void rope_forward_qk_split_llama_token_range_f32(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base,
+    int token_begin, int token_end)
+{
+    if ((!q && !k) || num_tokens <= 0 || head_dim <= 0 ||
+        aligned_head_dim < head_dim || token_begin < 0 ||
+        token_begin >= token_end || token_end > num_tokens) return;
+    if (rotary_dim <= 0 || rotary_dim > head_dim) rotary_dim = head_dim;
+    if (freq_base <= 0.0f) freq_base = 10000.0f;
+    const int half = rotary_dim / 2;
+    const size_t stride = (size_t)num_tokens * aligned_head_dim;
+    const float scale = ck_rope_reference_powf(freq_base, -2.0f / rotary_dim);
+    for (int t = token_begin; t < token_end; ++t) {
+        /* The rounded recurrence is part of the ggml CPU numerical contract. */
+        volatile float theta = (float)(pos_offset + t);
+        for (int i = 0; i < half; ++i) {
+            const float ff = use_freq_factors && freq_factors ? freq_factors[i] : 1.0f;
+            const float angle = theta / ff;
+            const float c = ck_rope_reference_cosf(angle);
+            const float s = ck_rope_reference_sinf(angle);
+            for (int h = 0; h < num_heads + num_kv_heads; ++h) {
+                float *base = h < num_heads ? q : k;
+                if (!base) continue;
+                const int head = h < num_heads ? h : h - num_heads;
+                float *row = base + (size_t)head * stride + (size_t)t * aligned_head_dim;
+                const float x0 = row[i], x1 = row[i + half];
+                row[i] = fmaf(x0, c, -(x1 * s));
+                row[i + half] = fmaf(x0, s, x1 * c);
+            }
+            theta *= scale;
+        }
+    }
+}
+
 void rope_forward_q_split_direct_f32(float *q,
                                      const float *freq_factors,
                                      int use_freq_factors,

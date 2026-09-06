@@ -17,7 +17,7 @@
   "contract": {
     "runtime_defaults": {
       "prefer_q8_0_contract": true,
-      "prefer_fp32_logits": true
+      "prefer_fp32_logits": false
     },
     "tokenizer_contract": {
       "tokenizer_type": "sentencepiece",
@@ -56,7 +56,9 @@
       "rope_type": "rope",
       "qk_norm": true,
       "kv_layout": "layer_major_kv_cache",
-      "attn_variant": "sliding_window"
+      "attn_variant": "sliding_window",
+      "rope_kind_config_key": "layer_rope_kind",
+      "rope_param_mode": "per_layer_direct"
     },
     "block_contract": {
       "norm_type": "rmsnorm",
@@ -87,7 +89,16 @@
     }
   },
   "kernels": {
-    "rope_qk": "rope_forward_qk",
+    "attn_norm": "rmsnorm_forward_llama_production",
+    "qk_norm": "qk_norm_forward_llama_production",
+    "post_attention_norm": "rmsnorm_forward_llama_production",
+    "ffn_norm": "rmsnorm_forward_llama_production",
+    "post_ffn_norm": "rmsnorm_forward_llama_production",
+    "final_rmsnorm": "rmsnorm_forward_llama_production",
+    "geglu": "geglu_forward_ggml_native",
+    "rope_qk": "rope_forward_qk_split_llama",
+    "attn_sliding_prefill": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding",
+    "attn_sliding_decode": "attention_forward_decode_head_major_gqa_llama_regular_sliding",
     "rope_init": "rope_precompute_cache_split"
   },
   "required_contracts": {
@@ -96,12 +107,12 @@
       "template_ops": ["attn_sliding"],
       "phases": {
         "prefill": {
-          "requires": {"execution.phase": "prefill", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp32", "tensor.layout": "head_major", "numerics.attention_reduction": "fp32_online"},
+          "requires": {"execution.phase": "prefill", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp32", "tensor.layout": "head_major", "numerics.attention_reduction": "fp32_llama_regular"},
           "validation": "validated",
           "evidence": "Sliding prefill contract tests and v8 Gemma3 E2E regression pass."
         },
         "decode": {
-          "requires": {"execution.phase": "decode", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp32", "tensor.layout": "head_major", "numerics.attention_reduction": "fp32_online"},
+          "requires": {"execution.phase": "decode", "tensor.q.dtype": "fp32", "tensor.kv.dtype": "fp32", "tensor.layout": "head_major", "numerics.attention_reduction": "fp32_llama_regular"},
           "validation": "validated",
           "evidence": "Sliding decode contract tests and v8 Gemma3 E2E regression pass."
         }

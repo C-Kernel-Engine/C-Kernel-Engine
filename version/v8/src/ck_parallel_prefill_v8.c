@@ -2962,6 +2962,22 @@ static void work_geglu_exact_range(int begin, int end, void *args)
         end - begin, a->dim);
 }
 
+extern void rope_forward_qk_split_llama_token_range_f32(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base,
+    int token_begin, int token_end);
+
+static void work_rope_split_llama_token_range(int begin, int end, void *userdata)
+{
+    const rope_split_direct_args_t *a = (const rope_split_direct_args_t *)userdata;
+    rope_forward_qk_split_llama_token_range_f32(
+        a->q, a->k, a->freq_factors, a->use_freq_factors,
+        a->num_heads, a->num_kv_heads, a->num_tokens,
+        a->head_dim, a->aligned_head_dim, a->pos_offset,
+        a->rotary_dim, a->freq_base, begin, end);
+}
+
 static void work_rope_split_direct_token_range(
     int begin, int end, void *userdata)
 {
@@ -3730,6 +3746,29 @@ void geglu_forward_exact_parallel_dispatch(
         ck_threadpool_dispatch_n(
             pool, active, work_geglu_exact_rows, &args);
     }
+}
+
+void rope_forward_qk_split_llama_parallel_dispatch(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)
+{
+    rope_split_direct_args_t args = {
+        .q=q, .k=k, .freq_factors=freq_factors, .use_freq_factors=use_freq_factors,
+        .num_heads=num_heads, .num_kv_heads=num_kv_heads, .num_tokens=num_tokens,
+        .head_dim=head_dim, .aligned_head_dim=aligned_head_dim, .pos_offset=pos_offset,
+        .rotary_dim=rotary_dim, .freq_base=freq_base,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || num_tokens <= 1) {
+        work_rope_split_llama_token_range(0, num_tokens, &args);
+        return;
+    }
+    const int active = ck_independent_row_active_threads(pool, num_tokens, 1);
+    int grain = num_tokens / (active * 4);
+    if (grain < 1) grain = 1;
+    ck_threadpool_parallel_for_n(pool, active, 0, num_tokens, grain,
+                               work_rope_split_llama_token_range, &args);
 }
 
 void rope_forward_qk_split_direct_parallel_dispatch(

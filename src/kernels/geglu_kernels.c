@@ -12,6 +12,23 @@
 
 /* Reuse existing optimized GELU implementation from gelu_kernels.c. */
 extern void gelu_fast_inplace(float *data, size_t n);
+extern void gelu_ggml_native_inplace(float *data, size_t n);
+
+void geglu_forward_ggml_native(const float *x, float *out, int tokens, int dim)
+{
+    if (!x || !out || tokens <= 0 || dim <= 0) return;
+    /* Preserve ascending compaction when output aliases the gate/up input. */
+    for (int t = 0; t < tokens; ++t) {
+        const float *row = x + (size_t)t * (size_t)dim * 2;
+        float *dst = out + (size_t)t * dim;
+        for (int d = 0; d < dim; ++d) {
+            const float gate = row[d], up = row[dim + d];
+            float value = gate;
+            gelu_ggml_native_inplace(&value, 1);
+            dst[d] = gate <= -10.0f ? 0.0f : value * up;
+        }
+    }
+}
 
 static inline float ck_gelu_tanh_parity_f32(float x)
 {

@@ -57,6 +57,16 @@ def test_selects_last_layer_and_is_repeatable():
         {"buffer": "hidden", "define": "A_HIDDEN", "row_elements": 4}]
 
 
+def test_capacity_uses_context_when_default_chunk_is_larger():
+    ir = fixture()
+    ir["config"]["context_length"] = 8
+    ir["config"]["prefill_chunk_length"] = 4096
+    plan(ir)
+    assert ir["operations"][0]["prefill_row_selection"]["copies"] == [
+        {"buffer": "hidden", "define": "A_HIDDEN", "row_elements": 4}
+    ]
+
+
 @pytest.mark.parametrize("change", ["full", "decode", "bf16", "no_contract"])
 def test_unselected_paths_remove_stale_plan(change):
     ir = fixture()

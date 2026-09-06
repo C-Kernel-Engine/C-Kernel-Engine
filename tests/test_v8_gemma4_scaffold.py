@@ -13,11 +13,15 @@ sys.path.insert(0, str((REPO_ROOT / "version" / "v8" / "scripts").resolve()))
 from scripts.chat_contract import build_chat_contract, load_template_chat_contract  # type: ignore
 from convert_gguf_to_bump_v8 import (  # type: ignore
     TensorInfo,
+    GGUFError,
+    build_gemma3_rope_plan,
     build_gemma4_attention_plan,
     classify_layer_contract,
     describe_layer_contract,
+    select_gguf_tokenizer_source,
 )
 from build_ir_v8 import (  # type: ignore
+    _generate_tokenizer_c_code,
     _apply_circuit_runtime_defaults,
     _load_builtin_template_doc,
     apply_layer_attention_dims,
@@ -26,6 +30,105 @@ from build_ir_v8 import (  # type: ignore
     find_kernel,
     load_kernel_registry,
 )
+
+
+class Gemma3RopeMetadataTests(unittest.TestCase):
+    def test_gemma3_selects_existing_matched_norm_providers(self):
+        gemma3 = _load_builtin_template_doc("gemma3")
+        self.assertEqual(gemma3["kernels"]["attn_norm"], "rmsnorm_forward_llama_production")
+        self.assertEqual(gemma3["kernels"]["qk_norm"], "qk_norm_forward_llama_production")
+        self.assertEqual(gemma3["kernels"]["geglu"], "geglu_forward_ggml_native")
+        registry = load_kernel_registry()
+        ggml_geglu = next(
+            kernel
+            for kernel in registry["kernels"]
+            if kernel["id"] == "geglu_forward_ggml_native"
+        )
+        self.assertEqual(ggml_geglu["selection"]["status"], "candidate")
+        gemma4 = _load_builtin_template_doc("gemma4")
+        self.assertNotEqual(gemma4.get("kernels", {}).get("attn_norm"),
+                            "rmsnorm_forward_llama_production")
+        self.assertNotEqual(
+            gemma4.get("kernels", {}).get("geglu"),
+            "geglu_forward_ggml_native",
+        )
+
+    def test_artifact_spm_algorithm_is_not_overridden_by_family(self):
+        for family in ("gemma3", "gemma4", "llama"):
+            for algorithm, expected in (("llama", "CK_SPM_MODE_LLAMA"),
+                                        ("unigram", "CK_SPM_MODE_UNIGRAM")):
+                with self.subTest(family=family, algorithm=algorithm):
+                    code = _generate_tokenizer_c_code(
+                        "sentencepiece", 32, 0,
+                        special_tokens={"tokenizer_model": algorithm, "add_space_prefix": False},
+                        model_type=family, template_name=family)
+                    rendered = json.dumps(code)
+                    self.assertIn("spm_mode = " + expected, rendered)
+                    self.assertIn("add_space_prefix = false", rendered)
+
+    def test_missing_local_base_does_not_inherit_global_base(self):
+        plan = build_gemma3_rope_plan({
+            "gemma3.attention.sliding_window": 512,
+            "gemma3.rope.freq_base": 1000000.0,
+        }, 12)
+        self.assertEqual(plan["rope_theta_swa"], 10000.0)
+        self.assertEqual(plan["layer_rope_kind"], (["swa"] * 5 + ["full"]) * 2)
+        self.assertEqual(plan["layer_sliding_window"], ([512] * 5 + [0]) * 2)
+
+    def test_explicit_local_base_and_period_are_preserved(self):
+        plan = build_gemma3_rope_plan({
+            "gemma3.attention.sliding_window": 512,
+            "gemma3.attention.sliding_window_pattern": 2,
+            "gemma3.rope.freq_base_swa": 20000.0,
+        }, 3)
+        self.assertEqual(plan["rope_theta_swa"], 20000.0)
+        self.assertEqual(plan["layer_rope_kind"], ["swa", "full", "swa"])
+        self.assertEqual(plan["layer_sliding_window"], [512, 0, 512])
+
+    def test_global_layer_clears_stale_model_wide_sliding_window(self):
+        params = {"sliding_window": 512}
+        apply_layer_attention_dims(
+            "attn_sliding",
+            params,
+            1,
+            {
+                "embed_dim": 640,
+                "num_heads": 4,
+                "num_kv_heads": 1,
+                "head_dim": 256,
+                "layer_sliding_window": [512, 0],
+                "layer_rope_kind": ["swa", "full"],
+            },
+        )
+        self.assertEqual(params["sliding_window"], 0)
+
+    def test_embedded_spm_precedes_automatically_staged_bpe_json(self):
+        meta = {
+            "tokenizer.ggml.model": "llama",
+            "tokenizer.ggml.tokens": ["<unk>", "<s>", "</s>", "test"],
+        }
+        json_info = {"model_type": "bpe", "path": "/tmp/tokenizer.json"}
+        self.assertEqual(
+            select_gguf_tokenizer_source(
+                meta, json_info, explicit_tokenizer_json=False
+            ),
+            "gguf_metadata",
+        )
+        self.assertEqual(
+            select_gguf_tokenizer_source(
+                meta, json_info, explicit_tokenizer_json=True
+            ),
+            "tokenizer_json",
+        )
+
+    def test_without_sliding_attention_no_local_override(self):
+        self.assertEqual(build_gemma3_rope_plan({}, 18), {})
+
+    def test_reject_invalid_local_base(self):
+        for base in (0, -1, float("inf"), float("nan")):
+            with self.subTest(base=base), self.assertRaises(GGUFError):
+                build_gemma3_rope_plan({"gemma3.attention.sliding_window": 512,
+                                       "gemma3.rope.freq_base_swa": base}, 18)
 
 
 def _write_tiny_bpe_tokenizer(checkpoint: Path, vocab_size: int) -> None:
@@ -214,7 +317,7 @@ class V8Gemma4ScaffoldTests(unittest.TestCase):
             {}, _load_builtin_template_doc("gemma3"), source="gemma3"
         )
         self.assertNotIn("prefer_fp32_logits", gemma4)
-        self.assertTrue(gemma3["prefer_fp32_logits"])
+        self.assertFalse(gemma3["prefer_fp32_logits"])
 
     def test_build_chat_contract_detects_gemma4_markers(self) -> None:
         chat_template = "<|turn>user\nHello<turn|>\n<|turn>model\n"

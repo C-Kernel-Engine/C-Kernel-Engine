@@ -202,6 +202,28 @@ class LayoutProviderSelectionTests(unittest.TestCase):
                 self.assertEqual(execution["provider_id"], physical)
                 self.assertEqual(execution["output_layout"], "token_major_contiguous")
 
+    def test_gemma3_regular_attention_accepts_local_head_major_conversion(self):
+        registry = json.loads(
+            (ROOT / "version" / "v8" / "kernel_maps" / "KERNEL_REGISTRY.json").read_text()
+        )
+        for consumer_port in ("k", "v"):
+            with self.subTest(consumer_port=consumer_port):
+                managed, converter, execution = build_ir._resolve_layout_edge(
+                    registry,
+                    producer_kernel="gemm_nt_q5_1",
+                    producer_port="C",
+                    consumer_kernel=(
+                        "attention_forward_causal_head_major_gqa_"
+                        "llama_regular_strided_sliding"
+                    ),
+                    consumer_port=consumer_port,
+                )
+                self.assertTrue(managed)
+                self.assertEqual(converter, "layout_convert_token_to_head_f32")
+                self.assertEqual(execution["provider_id"], "gemm_nt_q5_1")
+                self.assertEqual(execution["output_layout"], "token_major_contiguous")
+                self.assertEqual(execution["consumer_layout"], "head_major_contiguous")
+
     def test_direct_layout_provider_explicitly_aliases_numerical_owner(self):
         provider_map = json.loads(
             (ROOT / "version" / "v8" / "kernel_maps" /

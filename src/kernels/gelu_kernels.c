@@ -738,6 +738,18 @@ void gelu_pytorch_erf_sleef_bf16_storage(float *data, size_t n)
 #endif
 }
 
+void gelu_ggml_native_inplace(float *data, size_t n)
+{
+    pthread_once(&ck_gelu_ggml_table_once, ck_gelu_ggml_table_init);
+    for (size_t i = 0; i < n; ++i) {
+        const float x = data[i];
+        if (x <= -10.0f) data[i] = 0.0f;
+        else if (x >= 10.0f) data[i] = x;
+        else data[i] = ggml_fp16_to_fp32(
+            ck_gelu_ggml_table_f16[(uint16_t)ggml_fp32_to_fp16(x)]);
+    }
+}
+
 void gelu_ggml_inplace(float *data, size_t n)
 {
     pthread_once(&ck_gelu_ggml_runtime_once, ck_gelu_ggml_runtime_init);

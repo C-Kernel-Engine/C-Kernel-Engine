@@ -93,11 +93,12 @@ import hashlib
 import json
 import math
 import os
+import re
 import struct
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, Optional, Sequence, Tuple
+from typing import Any, BinaryIO, Dict, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -641,7 +642,8 @@ def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
         })
     elif arch_lc == "gemma3":
         config.setdefault("prefer_q8_0_contract", True)
-        config.setdefault("prefer_fp32_logits", True)
+        # ggml evaluates Q8_0 tied heads with a quantized Q8_0 activation.
+        config.setdefault("prefer_fp32_logits", False)
     elif arch_lc == "gemma4":
         config.setdefault("prefer_q8_0_contract", True)
         # Gemma4's 262k-token vocab makes the FP32-activation logits GEMV the
@@ -813,6 +815,31 @@ def inspect_tokenizer_json(path: str) -> dict[str, object]:
         "pretokenizer": _tokenizer_pretokenizer_profile(data),
         "path": str(path),
     }
+
+
+def select_gguf_tokenizer_source(
+    meta: dict,
+    tokenizer_json_info: Optional[dict[str, object]],
+    *,
+    explicit_tokenizer_json: bool,
+) -> str:
+    """Choose the authoritative tokenizer representation for GGUF conversion.
+
+    A sibling tokenizer.json is a convenience asset staged by the runner. It
+    must not replace a complete tokenizer contract embedded in the GGUF. An
+    explicitly supplied --tokenizer-json remains an intentional override.
+    """
+    json_type = str((tokenizer_json_info or {}).get("model_type") or "").strip().lower()
+    if explicit_tokenizer_json and json_type in {"bpe", "wordpiece"}:
+        return "tokenizer_json"
+
+    gguf_type = _normalize_tokenizer_type_name(meta.get("tokenizer.ggml.model"))
+    has_gguf_vocab = isinstance(meta.get("tokenizer.ggml.tokens"), list)
+    if gguf_type and has_gguf_vocab:
+        return "gguf_metadata"
+    if json_type in {"bpe", "wordpiece"}:
+        return "tokenizer_json"
+    return "gguf_metadata"
 
 
 def _tokenizer_pretokenizer_profile(data: dict) -> Optional[str]:
@@ -1775,6 +1802,26 @@ def build_gemma4_attention_plan(meta: Dict[str, object], num_layers: int) -> Dic
     }
 
 
+def build_gemma3_rope_plan(meta: Dict[str, object], num_layers: int) -> Dict[str, object]:
+    """Keep local RoPE frequencies separate from the global GGUF base."""
+    if int(meta.get("gemma3.attention.sliding_window", 0) or 0) <= 0:
+        return {}
+    period = int(meta.get("gemma3.attention.sliding_window_pattern", 6))
+    if period <= 0:
+        raise GGUFError("gemma3 sliding window pattern must be positive")
+    theta = float(meta.get("gemma3.rope.freq_base_swa", 10000.0))
+    if not math.isfinite(theta) or theta <= 0:
+        raise GGUFError("gemma3 sliding RoPE base must be finite and positive")
+    window = int(meta.get("gemma3.attention.sliding_window", 0) or 0)
+    layer_rope_kind = ["full" if (i + 1) % period == 0 else "swa" for i in range(num_layers)]
+    return {
+        "layer_rope_kind": layer_rope_kind,
+        "layer_sliding_window": [0 if kind == "full" else window for kind in layer_rope_kind],
+        "rope_theta_swa": theta,
+        "rope_param_mode": "per_layer_direct",
+    }
+
+
 def build_qwen35_execution_plan(layer_kinds: list[str]) -> Dict[str, object]:
     """Resolve Qwen3.5 layer state/cache ownership from layer kinds.
 
@@ -2202,6 +2249,21 @@ def build_qwen4_exp_gguf_plan(
             "map_path": str(GGUF_CK_MAP_PATH),
         },
     }
+
+
+def build_qwen4_exp_quant_summary(
+    plan: Sequence[Mapping[str, Any]], token_dtype: str, lm_head_dtype: str
+) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {
+        "source": "gguf",
+        "token_emb": token_dtype,
+        "lm_head": lm_head_dtype,
+    }
+    for entry in plan:
+        match = re.match(r"^(layer\.\d+)\.(.+)$", str(entry["name"]))
+        if match:
+            summary.setdefault(match.group(1), {})[match.group(2)] = str(entry["dtype"])
+    return summary
 
 
 def read_vector_f32(f: BinaryIO, base: int, info: TensorInfo) -> np.ndarray:
@@ -3124,7 +3186,9 @@ def main() -> None:
         "gemma3.attention.value_length",
         "gemma3.attention.layer_norm_rms_epsilon",
         "gemma3.attention.sliding_window",
+        "gemma3.attention.sliding_window_pattern",
         "gemma3.rope.freq_base",
+        "gemma3.rope.freq_base_swa",
         # Gemma4-style keys
         "gemma4.block_count",
         "gemma4.context_length",
@@ -4499,7 +4563,12 @@ def main() -> None:
             tokenizer_json_info = inspect_tokenizer_json(str(tokenizer_json_path))
 
         tokenizer_json_type = str(tokenizer_json_info.get("model_type") or "").strip().lower() if tokenizer_json_info else ""
-        use_tokenizer_json = tokenizer_json_type in {"bpe", "wordpiece"}
+        tokenizer_source = select_gguf_tokenizer_source(
+            meta,
+            tokenizer_json_info,
+            explicit_tokenizer_json=bool(args.tokenizer_json),
+        )
+        use_tokenizer_json = tokenizer_source == "tokenizer_json"
 
         if use_tokenizer_json and tokenizer_json_path is not None:
             vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = load_tokenizer_json(str(tokenizer_json_path), vocab_size)
@@ -5183,16 +5252,13 @@ def main() -> None:
                     json.dump(qwen4_config, config_file, indent=2)
                     config_file.write("\n")
 
-            quant_summary: Dict[str, Any] = {
-                "source": "gguf",
-                "token_emb": get_quant_type_name(tok.ggml_type),
-                "lm_head": get_quant_type_name(out_weight.ggml_type) if out_weight is not None else get_quant_type_name(tok.ggml_type),
-            }
-            for entry in qwen4_plan["plan"]:
-                name = str(entry["name"])
-                match = re.match(r"^(layer\.\d+)\.(.+)$", name)
-                if match:
-                    quant_summary.setdefault(match.group(1), {})[match.group(2)] = str(entry["dtype"])
+            quant_summary = build_qwen4_exp_quant_summary(
+                qwen4_plan["plan"],
+                get_quant_type_name(tok.ggml_type),
+                get_quant_type_name(out_weight.ggml_type)
+                if out_weight is not None
+                else get_quant_type_name(tok.ggml_type),
+            )
 
             dtype_table_bytes = bytes(int(entry["_dtype_id"]) for entry in qwen4_plan["plan"])
             os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
@@ -7267,6 +7333,7 @@ def main() -> None:
                     config["rope_layout"] = rope_layout
                 if arch == "gemma3":
                     config["prefill_policy"] = "batched"
+                    config.update(build_gemma3_rope_plan(meta, num_layers))
                 finetune = meta.get("general.finetune")
                 if isinstance(finetune, str) and finetune.strip():
                     config["finetune"] = finetune
@@ -7478,6 +7545,8 @@ def main() -> None:
                 cfg["mrope_n_dims"] = int(mrope_n_dims)
         if sliding_window and sliding_window > 0:
             cfg["sliding_window"] = int(sliding_window)
+        if arch == "gemma3":
+            cfg.update(build_gemma3_rope_plan(meta, num_layers))
         if rope_layout:
             cfg["rope_layout"] = rope_layout
         if arch == "gemma3":

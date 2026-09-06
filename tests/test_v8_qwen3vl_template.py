@@ -1066,7 +1066,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             {}, build_ir_v8._load_builtin_template_doc("gemma3"), source="gemma3"
         )
         self.assertTrue(gemma_cfg["prefer_q8_0_contract"])
-        self.assertTrue(gemma_cfg["prefer_fp32_logits"])
+        self.assertFalse(gemma_cfg["prefer_fp32_logits"])
 
         vision_cfg = build_ir_v8._apply_circuit_runtime_defaults(
             {}, build_ir_v8._load_builtin_template_doc("qwen3_vl_vision"), source="vision"
