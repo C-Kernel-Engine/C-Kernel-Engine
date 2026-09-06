@@ -62,6 +62,7 @@ var rope__kernels_8c =
     [ "rope_forward_qk_pairwise_with_rotary_dim", "rope__kernels_8c.html#a911fad1085d2300a7aa2ad506b2136c3", null ],
     [ "rope_forward_qk_split_direct_f32", "rope__kernels_8c.html#ad6b670bd710a898edf4af57914eaca9d", null ],
     [ "rope_forward_qk_split_direct_token_range_f32", "rope__kernels_8c.html#aa4a9c1eda2334b7c76c87b622d6faacb", null ],
+    [ "rope_forward_qk_split_llama_token_range_f32", "rope__kernels_8c.html#a0ad5b7fb9a1ca5657f3c0922ba82e62c", null ],
     [ "rope_forward_qk_strided", "rope__kernels_8c.html#a0c3b8a23b665607b44ca3100ad11f09d", null ],
     [ "rope_forward_qk_strided_with_rotary_dim", "rope__kernels_8c.html#a4756a1d3ed09d64c10f09ccea44ad8bb", null ],
     [ "rope_forward_qk_with_rotary_dim", "rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c", null ],

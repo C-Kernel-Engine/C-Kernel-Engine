@@ -312,7 +312,7 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  128</span>    b-&gt;n_threads = n_threads;</div>
 <div class="line"><span class="lineno">  129</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00260">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00271">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00375">ck_threadpool_dispatch_n()</a>.</p>
 
 </div>
 </div>
@@ -369,7 +369,7 @@ Variables</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00036">CK_SPIN_PAUSE</a>, and <a class="el" href="ck__threadpool_8h_source.html#l00051">CK_THREADPOOL_SPIN_COUNT</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00509">ck_threadpool_barrier()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00520">ck_threadpool_barrier()</a>.</p>
 
 </div>
 </div>
@@ -397,23 +397,23 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00597">597</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  598</span>{</div>
-<div class="line"><span class="lineno">  599</span><span class="preprocessor">#ifdef __linux__</span></div>
-<div class="line"><span class="lineno">  600</span>    cpu_set_t allowed;</div>
-<div class="line"><span class="lineno">  601</span>    <span class="keywordflow">if</span> (sched_getaffinity(0, <span class="keyword">sizeof</span>(allowed), &amp;allowed) == 0) {</div>
-<div class="line"><span class="lineno">  602</span>        <span class="keywordtype">int</span> count = 0;</div>
-<div class="line"><span class="lineno">  603</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cpu = 0; cpu &lt; CPU_SETSIZE; ++cpu) {</div>
-<div class="line"><span class="lineno">  604</span>            <span class="keywordflow">if</span> (CPU_ISSET(cpu, &amp;allowed)) ++count;</div>
-<div class="line"><span class="lineno">  605</span>        }</div>
-<div class="line"><span class="lineno">  606</span>        <span class="keywordflow">if</span> (count &gt; 0) <span class="keywordflow">return</span> count;</div>
-<div class="line"><span class="lineno">  607</span>    }</div>
-<div class="line"><span class="lineno">  608</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  609</span>    <span class="keyword">const</span> <span class="keywordtype">long</span> online = sysconf(_SC_NPROCESSORS_ONLN);</div>
-<div class="line"><span class="lineno">  610</span>    <span class="keywordflow">return</span> online &gt; 0 ? (int)online : 1;</div>
-<div class="line"><span class="lineno">  611</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00608">608</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  609</span>{</div>
+<div class="line"><span class="lineno">  610</span><span class="preprocessor">#ifdef __linux__</span></div>
+<div class="line"><span class="lineno">  611</span>    cpu_set_t allowed;</div>
+<div class="line"><span class="lineno">  612</span>    <span class="keywordflow">if</span> (sched_getaffinity(0, <span class="keyword">sizeof</span>(allowed), &amp;allowed) == 0) {</div>
+<div class="line"><span class="lineno">  613</span>        <span class="keywordtype">int</span> count = 0;</div>
+<div class="line"><span class="lineno">  614</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> cpu = 0; cpu &lt; CPU_SETSIZE; ++cpu) {</div>
+<div class="line"><span class="lineno">  615</span>            <span class="keywordflow">if</span> (CPU_ISSET(cpu, &amp;allowed)) ++count;</div>
+<div class="line"><span class="lineno">  616</span>        }</div>
+<div class="line"><span class="lineno">  617</span>        <span class="keywordflow">if</span> (count &gt; 0) <span class="keywordflow">return</span> count;</div>
+<div class="line"><span class="lineno">  618</span>    }</div>
+<div class="line"><span class="lineno">  619</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  620</span>    <span class="keyword">const</span> <span class="keywordtype">long</span> online = sysconf(_SC_NPROCESSORS_ONLN);</div>
+<div class="line"><span class="lineno">  621</span>    <span class="keywordflow">return</span> online &gt; 0 ? (int)online : 1;</div>
+<div class="line"><span class="lineno">  622</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -514,7 +514,7 @@ Variables</h2></td></tr>
 <div class="ttc" id="ackernel__strict_8c_html_a3bf77bbe5d25ed7435e759b80410546f"><div class="ttname"><a href="ckernel__strict_8c.html#a3bf77bbe5d25ed7435e759b80410546f">g_num_threads</a></div><div class="ttdeci">static int g_num_threads</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00150">ckernel_strict.c:150</a></div></div>
 <div class="ttc" id="ackernel__strict_8c_html_adcc8293c7a06a4f12c2acfccb8d3cac0"><div class="ttname"><a href="ckernel__strict_8c.html#adcc8293c7a06a4f12c2acfccb8d3cac0">g_threads_initialized</a></div><div class="ttdeci">static int g_threads_initialized</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00151">ckernel_strict.c:151</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -653,7 +653,7 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  278</span>}</div>
 <div class="ttc" id="ackernel__strict_8c_html_ad94b76f11ab5b09db24682947452e946"><div class="ttname"><a href="ckernel__strict_8c.html#ad94b76f11ab5b09db24682947452e946">CK_ADD_PAIR</a></div><div class="ttdeci">#define CK_ADD_PAIR(pid, cid)</div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ckernel__strict_8c_source.html#l00280">ck_set_num_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00260">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__strict_8c_source.html#l00280">ck_set_num_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00271">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -697,25 +697,25 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00468">468</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  469</span>{</div>
-<div class="line"><span class="lineno">  470</span>    (void)ith;</div>
-<div class="line"><span class="lineno">  471</span>    (void)nth;</div>
-<div class="line"><span class="lineno">  472</span>    ck_parallel_for_work_t *work = (ck_parallel_for_work_t *)opaque;</div>
-<div class="line"><span class="lineno">  473</span>    <span class="keywordflow">for</span> (;;) {</div>
-<div class="line"><span class="lineno">  474</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> begin = atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  475</span>            &amp;work-&gt;next, work-&gt;grain_size, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  476</span>        <span class="keywordflow">if</span> (begin &gt;= work-&gt;end) <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  477</span>        <span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = begin + work-&gt;grain_size;</div>
-<div class="line"><span class="lineno">  478</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &gt; work-&gt;end) <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = work-&gt;end;</div>
-<div class="line"><span class="lineno">  479</span>        work-&gt;fn(begin, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, work-&gt;args);</div>
-<div class="line"><span class="lineno">  480</span>    }</div>
-<div class="line"><span class="lineno">  481</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00479">479</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  480</span>{</div>
+<div class="line"><span class="lineno">  481</span>    (void)ith;</div>
+<div class="line"><span class="lineno">  482</span>    (void)nth;</div>
+<div class="line"><span class="lineno">  483</span>    ck_parallel_for_work_t *work = (ck_parallel_for_work_t *)opaque;</div>
+<div class="line"><span class="lineno">  484</span>    <span class="keywordflow">for</span> (;;) {</div>
+<div class="line"><span class="lineno">  485</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> begin = atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  486</span>            &amp;work-&gt;next, work-&gt;grain_size, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  487</span>        <span class="keywordflow">if</span> (begin &gt;= work-&gt;end) <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  488</span>        <span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = begin + work-&gt;grain_size;</div>
+<div class="line"><span class="lineno">  489</span>        <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &gt; work-&gt;end) <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = work-&gt;end;</div>
+<div class="line"><span class="lineno">  490</span>        work-&gt;fn(begin, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, work-&gt;args);</div>
+<div class="line"><span class="lineno">  491</span>    }</div>
+<div class="line"><span class="lineno">  492</span>}</div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00483">ck_threadpool_parallel_for_n()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00494">ck_threadpool_parallel_for_n()</a>.</p>
 
 </div>
 </div>
@@ -776,11 +776,11 @@ Variables</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00509">509</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  510</span>{</div>
-<div class="line"><span class="lineno">  511</span>    <span class="keywordflow">if</span> (!pool || pool-&gt;n_threads &lt;= 1) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  512</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a1dcf1b7c2fd4bc9276f0aa642333db2a">barrier_wait</a>(&amp;pool-&gt;barrier);</div>
-<div class="line"><span class="lineno">  513</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00520">520</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  521</span>{</div>
+<div class="line"><span class="lineno">  522</span>    <span class="keywordflow">if</span> (!pool || pool-&gt;n_threads &lt;= 1) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  523</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a1dcf1b7c2fd4bc9276f0aa642333db2a">barrier_wait</a>(&amp;pool-&gt;barrier);</div>
+<div class="line"><span class="lineno">  524</span>}</div>
 <div class="ttc" id="ack__threadpool_8c_html_a1dcf1b7c2fd4bc9276f0aa642333db2a"><div class="ttname"><a href="ck__threadpool_8c.html#a1dcf1b7c2fd4bc9276f0aa642333db2a">barrier_wait</a></div><div class="ttdeci">static void barrier_wait(ck_barrier_t *b)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00135">ck_threadpool.c:135</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00135">barrier_wait()</a>.</p>
@@ -814,25 +814,25 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Compute the bounded capacity for an SMT-safe provider. The default width is preserved and at most half of the additional logical CPUs are reserved. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00245">245</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  246</span>{</div>
-<div class="line"><span class="lineno">  247</span>    <span class="keywordflow">if</span> (default_threads &lt; 1) default_threads = 1;</div>
-<div class="line"><span class="lineno">  248</span>    <span class="keywordflow">if</span> (default_threads &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
-<div class="line"><span class="lineno">  249</span>        default_threads = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
-<div class="line"><span class="lineno">  250</span>    }</div>
-<div class="line"><span class="lineno">  251</span>    <span class="keywordflow">if</span> (logical_threads &lt;= default_threads) <span class="keywordflow">return</span> default_threads;</div>
-<div class="line"><span class="lineno">  252</span> </div>
-<div class="line"><span class="lineno">  253</span>    <span class="keywordtype">int</span> capacity = default_threads + (logical_threads - default_threads) / 2;</div>
-<div class="line"><span class="lineno">  254</span>    <span class="keywordflow">if</span> (capacity &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
-<div class="line"><span class="lineno">  255</span>        capacity = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
-<div class="line"><span class="lineno">  256</span>    }</div>
-<div class="line"><span class="lineno">  257</span>    <span class="keywordflow">return</span> capacity;</div>
-<div class="line"><span class="lineno">  258</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00256">256</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  257</span>{</div>
+<div class="line"><span class="lineno">  258</span>    <span class="keywordflow">if</span> (default_threads &lt; 1) default_threads = 1;</div>
+<div class="line"><span class="lineno">  259</span>    <span class="keywordflow">if</span> (default_threads &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
+<div class="line"><span class="lineno">  260</span>        default_threads = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
+<div class="line"><span class="lineno">  261</span>    }</div>
+<div class="line"><span class="lineno">  262</span>    <span class="keywordflow">if</span> (logical_threads &lt;= default_threads) <span class="keywordflow">return</span> default_threads;</div>
+<div class="line"><span class="lineno">  263</span> </div>
+<div class="line"><span class="lineno">  264</span>    <span class="keywordtype">int</span> capacity = default_threads + (logical_threads - default_threads) / 2;</div>
+<div class="line"><span class="lineno">  265</span>    <span class="keywordflow">if</span> (capacity &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
+<div class="line"><span class="lineno">  266</span>        capacity = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
+<div class="line"><span class="lineno">  267</span>    }</div>
+<div class="line"><span class="lineno">  268</span>    <span class="keywordflow">return</span> capacity;</div>
+<div class="line"><span class="lineno">  269</span>}</div>
 <div class="ttc" id="ack__threadpool_8h_html_a38f1782864a6bd5318d8cc54d00be0e5"><div class="ttname"><a href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a></div><div class="ttdeci">#define CK_THREADPOOL_MAX_THREADS</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8h_source.html#l00048">ck_threadpool.h:48</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8h_source.html#l00048">CK_THREADPOOL_MAX_THREADS</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -853,10 +853,10 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Get the maximum worker capacity available to explicit dispatch_n calls. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00545">545</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  546</span>{</div>
-<div class="line"><span class="lineno">  547</span>    <span class="keywordflow">return</span> pool ? pool-&gt;n_threads : 1;</div>
-<div class="line"><span class="lineno">  548</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00556">556</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  557</span>{</div>
+<div class="line"><span class="lineno">  558</span>    <span class="keywordflow">return</span> pool ? pool-&gt;n_threads : 1;</div>
+<div class="line"><span class="lineno">  559</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03070">gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m()</a>, and <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>.</p>
 
@@ -886,13 +886,13 @@ Variables</h2></td></tr>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Pool handle, or NULL on failure. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00331">331</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  332</span>{</div>
-<div class="line"><span class="lineno">  333</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a>(n_threads, n_threads);</div>
-<div class="line"><span class="lineno">  334</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a9b22300f26b5089af7e9ef0e27a5ee73"><div class="ttname"><a href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_create_capacity(int default_threads, int capacity_threads)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00260">ck_threadpool.c:260</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00342">342</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  343</span>{</div>
+<div class="line"><span class="lineno">  344</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a>(n_threads, n_threads);</div>
+<div class="line"><span class="lineno">  345</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a9b22300f26b5089af7e9ef0e27a5ee73"><div class="ttname"><a href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_create_capacity(int default_threads, int capacity_threads)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00271">ck_threadpool.c:271</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00260">ck_threadpool_create_capacity()</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00271">ck_threadpool_create_capacity()</a>.</p>
 
 </div>
 </div>
@@ -923,75 +923,75 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Create a pool whose ordinary dispatch width is smaller than its worker capacity. Exact providers may opt into the additional workers with <a class="el" href="ck__threadpool_8h.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n()</a>; ordinary dispatch remains at default_threads. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00260">260</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  262</span>{</div>
-<div class="line"><span class="lineno">  263</span>    <span class="keywordflow">if</span> (default_threads &lt;= 0) {</div>
-<div class="line"><span class="lineno">  264</span>        default_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a>();</div>
-<div class="line"><span class="lineno">  265</span>        <span class="keywordflow">if</span> (default_threads &lt;= 0) default_threads = 1;</div>
-<div class="line"><span class="lineno">  266</span>        <span class="comment">/* Cap at reasonable default for memory-bound workloads */</span></div>
-<div class="line"><span class="lineno">  267</span>        <span class="keywordflow">if</span> (default_threads &gt; 8) default_threads = 8;</div>
-<div class="line"><span class="lineno">  268</span>    }</div>
-<div class="line"><span class="lineno">  269</span>    <span class="keywordflow">if</span> (capacity_threads &lt; default_threads) {</div>
-<div class="line"><span class="lineno">  270</span>        capacity_threads = default_threads;</div>
-<div class="line"><span class="lineno">  271</span>    }</div>
-<div class="line"><span class="lineno">  272</span>    <span class="keywordflow">if</span> (capacity_threads &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
-<div class="line"><span class="lineno">  273</span>        capacity_threads = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
-<div class="line"><span class="lineno">  274</span>    }</div>
-<div class="line"><span class="lineno">  275</span>    <span class="keywordflow">if</span> (default_threads &gt; capacity_threads) {</div>
-<div class="line"><span class="lineno">  276</span>        default_threads = capacity_threads;</div>
-<div class="line"><span class="lineno">  277</span>    }</div>
-<div class="line"><span class="lineno">  278</span> </div>
-<div class="line"><span class="lineno">  279</span>    ck_threadpool_t *pool = aligned_alloc(<a class="code hl_define" href="ck__threadpool_8h.html#a452e44b0d33892f36e77c590eba38daf">CK_CACHE_LINE</a>, <span class="keyword">sizeof</span>(ck_threadpool_t));</div>
-<div class="line"><span class="lineno">  280</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span> NULL;</div>
-<div class="line"><span class="lineno">  281</span>    memset(pool, 0, <span class="keyword">sizeof</span>(*pool));</div>
-<div class="line"><span class="lineno">  282</span> </div>
-<div class="line"><span class="lineno">  283</span>    pool-&gt;n_threads = capacity_threads;</div>
-<div class="line"><span class="lineno">  284</span>    pool-&gt;default_threads = default_threads;</div>
-<div class="line"><span class="lineno">  285</span>    atomic_store(&amp;pool-&gt;n_dispatch, 0);</div>
-<div class="line"><span class="lineno">  286</span>    atomic_store(&amp;pool-&gt;n_complete, 0);</div>
-<div class="line"><span class="lineno">  287</span>    atomic_store(&amp;pool-&gt;active_threads, default_threads);</div>
-<div class="line"><span class="lineno">  288</span>    atomic_store(&amp;pool-&gt;stop, 0);</div>
-<div class="line"><span class="lineno">  289</span>    atomic_store(&amp;pool-&gt;paused, 0);</div>
-<div class="line"><span class="lineno">  290</span>    atomic_store(&amp;pool-&gt;profile_enabled, 0);</div>
-<div class="line"><span class="lineno">  291</span>    pool-&gt;work_fn = NULL;</div>
-<div class="line"><span class="lineno">  292</span>    pool-&gt;work_args = NULL;</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00271">271</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  273</span>{</div>
+<div class="line"><span class="lineno">  274</span>    <span class="keywordflow">if</span> (default_threads &lt;= 0) {</div>
+<div class="line"><span class="lineno">  275</span>        default_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a>();</div>
+<div class="line"><span class="lineno">  276</span>        <span class="keywordflow">if</span> (default_threads &lt;= 0) default_threads = 1;</div>
+<div class="line"><span class="lineno">  277</span>        <span class="comment">/* Cap at reasonable default for memory-bound workloads */</span></div>
+<div class="line"><span class="lineno">  278</span>        <span class="keywordflow">if</span> (default_threads &gt; 8) default_threads = 8;</div>
+<div class="line"><span class="lineno">  279</span>    }</div>
+<div class="line"><span class="lineno">  280</span>    <span class="keywordflow">if</span> (capacity_threads &lt; default_threads) {</div>
+<div class="line"><span class="lineno">  281</span>        capacity_threads = default_threads;</div>
+<div class="line"><span class="lineno">  282</span>    }</div>
+<div class="line"><span class="lineno">  283</span>    <span class="keywordflow">if</span> (capacity_threads &gt; <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>) {</div>
+<div class="line"><span class="lineno">  284</span>        capacity_threads = <a class="code hl_define" href="ck__threadpool_8h.html#a38f1782864a6bd5318d8cc54d00be0e5">CK_THREADPOOL_MAX_THREADS</a>;</div>
+<div class="line"><span class="lineno">  285</span>    }</div>
+<div class="line"><span class="lineno">  286</span>    <span class="keywordflow">if</span> (default_threads &gt; capacity_threads) {</div>
+<div class="line"><span class="lineno">  287</span>        default_threads = capacity_threads;</div>
+<div class="line"><span class="lineno">  288</span>    }</div>
+<div class="line"><span class="lineno">  289</span> </div>
+<div class="line"><span class="lineno">  290</span>    ck_threadpool_t *pool = aligned_alloc(<a class="code hl_define" href="ck__threadpool_8h.html#a452e44b0d33892f36e77c590eba38daf">CK_CACHE_LINE</a>, <span class="keyword">sizeof</span>(ck_threadpool_t));</div>
+<div class="line"><span class="lineno">  291</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span> NULL;</div>
+<div class="line"><span class="lineno">  292</span>    memset(pool, 0, <span class="keyword">sizeof</span>(*pool));</div>
 <div class="line"><span class="lineno">  293</span> </div>
-<div class="line"><span class="lineno">  294</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, default_threads);</div>
-<div class="line"><span class="lineno">  295</span> </div>
-<div class="line"><span class="lineno">  296</span>    pthread_mutex_init(&amp;pool-&gt;mutex, NULL);</div>
-<div class="line"><span class="lineno">  297</span>    pthread_cond_init(&amp;pool-&gt;cond_dispatch, NULL);</div>
-<div class="line"><span class="lineno">  298</span>    pthread_cond_init(&amp;pool-&gt;cond_done, NULL);</div>
-<div class="line"><span class="lineno">  299</span> </div>
-<div class="line"><span class="lineno">  300</span>    <span class="comment">/* Thread 0 = main thread (no pthread created) */</span></div>
-<div class="line"><span class="lineno">  301</span>    pool-&gt;workers[0].id = 0;</div>
-<div class="line"><span class="lineno">  302</span>    pool-&gt;workers[0].pool = pool;</div>
-<div class="line"><span class="lineno">  303</span>    pool-&gt;workers[0].thread = pthread_self();</div>
+<div class="line"><span class="lineno">  294</span>    pool-&gt;n_threads = capacity_threads;</div>
+<div class="line"><span class="lineno">  295</span>    pool-&gt;default_threads = default_threads;</div>
+<div class="line"><span class="lineno">  296</span>    atomic_store(&amp;pool-&gt;n_dispatch, 0);</div>
+<div class="line"><span class="lineno">  297</span>    atomic_store(&amp;pool-&gt;n_complete, 0);</div>
+<div class="line"><span class="lineno">  298</span>    atomic_store(&amp;pool-&gt;active_threads, default_threads);</div>
+<div class="line"><span class="lineno">  299</span>    atomic_store(&amp;pool-&gt;stop, 0);</div>
+<div class="line"><span class="lineno">  300</span>    atomic_store(&amp;pool-&gt;paused, 0);</div>
+<div class="line"><span class="lineno">  301</span>    atomic_store(&amp;pool-&gt;profile_enabled, 0);</div>
+<div class="line"><span class="lineno">  302</span>    pool-&gt;work_fn = NULL;</div>
+<div class="line"><span class="lineno">  303</span>    pool-&gt;work_args = NULL;</div>
 <div class="line"><span class="lineno">  304</span> </div>
-<div class="line"><span class="lineno">  305</span>    <span class="comment">/* Spawn N-1 worker threads */</span></div>
-<div class="line"><span class="lineno">  306</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; capacity_threads; i++) {</div>
-<div class="line"><span class="lineno">  307</span>        pool-&gt;workers[i].id = i;</div>
-<div class="line"><span class="lineno">  308</span>        pool-&gt;workers[i].pool = pool;</div>
-<div class="line"><span class="lineno">  309</span> </div>
-<div class="line"><span class="lineno">  310</span>        <span class="keywordtype">int</span> rc = pthread_create(&amp;pool-&gt;workers[i].thread, NULL,</div>
-<div class="line"><span class="lineno">  311</span>                                <a class="code hl_function" href="ck__threadpool_8c.html#ab50c928126740940413626fd7ab7ce72">worker_main</a>, &amp;pool-&gt;workers[i]);</div>
-<div class="line"><span class="lineno">  312</span>        <span class="keywordflow">if</span> (rc != 0) {</div>
-<div class="line"><span class="lineno">  313</span>            fprintf(stderr, <span class="stringliteral">&quot;[CK threadpool] Failed to create worker %d: %s\n&quot;</span>,</div>
-<div class="line"><span class="lineno">  314</span>                    i, strerror(rc));</div>
-<div class="line"><span class="lineno">  315</span>            <span class="comment">/* Reduce thread count to what we managed to create */</span></div>
-<div class="line"><span class="lineno">  316</span>            pool-&gt;n_threads = i;</div>
-<div class="line"><span class="lineno">  317</span>            <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, i);</div>
-<div class="line"><span class="lineno">  318</span>            <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  319</span>        }</div>
-<div class="line"><span class="lineno">  320</span>    }</div>
-<div class="line"><span class="lineno">  321</span> </div>
-<div class="line"><span class="lineno">  322</span>    <span class="keywordflow">if</span> (pool-&gt;n_threads &gt; 1) {</div>
-<div class="line"><span class="lineno">  323</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  324</span>                <span class="stringliteral">&quot;[CK threadpool] Created %d threads (default=%d, 1 main + %d workers)\n&quot;</span>,</div>
-<div class="line"><span class="lineno">  325</span>                pool-&gt;n_threads, pool-&gt;default_threads, pool-&gt;n_threads - 1);</div>
-<div class="line"><span class="lineno">  326</span>    }</div>
-<div class="line"><span class="lineno">  327</span> </div>
-<div class="line"><span class="lineno">  328</span>    <span class="keywordflow">return</span> pool;</div>
-<div class="line"><span class="lineno">  329</span>}</div>
+<div class="line"><span class="lineno">  305</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, default_threads);</div>
+<div class="line"><span class="lineno">  306</span> </div>
+<div class="line"><span class="lineno">  307</span>    pthread_mutex_init(&amp;pool-&gt;mutex, NULL);</div>
+<div class="line"><span class="lineno">  308</span>    pthread_cond_init(&amp;pool-&gt;cond_dispatch, NULL);</div>
+<div class="line"><span class="lineno">  309</span>    pthread_cond_init(&amp;pool-&gt;cond_done, NULL);</div>
+<div class="line"><span class="lineno">  310</span> </div>
+<div class="line"><span class="lineno">  311</span>    <span class="comment">/* Thread 0 = main thread (no pthread created) */</span></div>
+<div class="line"><span class="lineno">  312</span>    pool-&gt;workers[0].id = 0;</div>
+<div class="line"><span class="lineno">  313</span>    pool-&gt;workers[0].pool = pool;</div>
+<div class="line"><span class="lineno">  314</span>    pool-&gt;workers[0].thread = pthread_self();</div>
+<div class="line"><span class="lineno">  315</span> </div>
+<div class="line"><span class="lineno">  316</span>    <span class="comment">/* Spawn N-1 worker threads */</span></div>
+<div class="line"><span class="lineno">  317</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; capacity_threads; i++) {</div>
+<div class="line"><span class="lineno">  318</span>        pool-&gt;workers[i].id = i;</div>
+<div class="line"><span class="lineno">  319</span>        pool-&gt;workers[i].pool = pool;</div>
+<div class="line"><span class="lineno">  320</span> </div>
+<div class="line"><span class="lineno">  321</span>        <span class="keywordtype">int</span> rc = pthread_create(&amp;pool-&gt;workers[i].thread, NULL,</div>
+<div class="line"><span class="lineno">  322</span>                                <a class="code hl_function" href="ck__threadpool_8c.html#ab50c928126740940413626fd7ab7ce72">worker_main</a>, &amp;pool-&gt;workers[i]);</div>
+<div class="line"><span class="lineno">  323</span>        <span class="keywordflow">if</span> (rc != 0) {</div>
+<div class="line"><span class="lineno">  324</span>            fprintf(stderr, <span class="stringliteral">&quot;[CK threadpool] Failed to create worker %d: %s\n&quot;</span>,</div>
+<div class="line"><span class="lineno">  325</span>                    i, strerror(rc));</div>
+<div class="line"><span class="lineno">  326</span>            <span class="comment">/* Reduce thread count to what we managed to create */</span></div>
+<div class="line"><span class="lineno">  327</span>            pool-&gt;n_threads = i;</div>
+<div class="line"><span class="lineno">  328</span>            <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, i);</div>
+<div class="line"><span class="lineno">  329</span>            <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  330</span>        }</div>
+<div class="line"><span class="lineno">  331</span>    }</div>
+<div class="line"><span class="lineno">  332</span> </div>
+<div class="line"><span class="lineno">  333</span>    <span class="keywordflow">if</span> (pool-&gt;n_threads &gt; 1) {</div>
+<div class="line"><span class="lineno">  334</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  335</span>                <span class="stringliteral">&quot;[CK threadpool] Created %d threads (default=%d, 1 main + %d workers)\n&quot;</span>,</div>
+<div class="line"><span class="lineno">  336</span>                pool-&gt;n_threads, pool-&gt;default_threads, pool-&gt;n_threads - 1);</div>
+<div class="line"><span class="lineno">  337</span>    }</div>
+<div class="line"><span class="lineno">  338</span> </div>
+<div class="line"><span class="lineno">  339</span>    <span class="keywordflow">return</span> pool;</div>
+<div class="line"><span class="lineno">  340</span>}</div>
 <div class="ttc" id="ack__threadpool_8c_html_a19111881b2bff4a1ddd3bfb5f8074686"><div class="ttname"><a href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a></div><div class="ttdeci">static void barrier_init(ck_barrier_t *b, int n_threads)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00124">ck_threadpool.c:124</a></div></div>
 <div class="ttc" id="ack__threadpool_8c_html_a7ff78bf68a9657c2d6858b64df79f7ae"><div class="ttname"><a href="ck__threadpool_8c.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a></div><div class="ttdeci">int ck_get_physical_cores(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00170">ckernel_strict.c:170</a></div></div>
 <div class="ttc" id="ack__threadpool_8c_html_ab50c928126740940413626fd7ab7ce72"><div class="ttname"><a href="ck__threadpool_8c.html#ab50c928126740940413626fd7ab7ce72">worker_main</a></div><div class="ttdeci">static void * worker_main(void *arg)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00163">ck_threadpool.c:163</a></div></div>
@@ -999,7 +999,7 @@ Variables</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00124">barrier_init()</a>, <a class="el" href="ck__threadpool_8h_source.html#l00054">CK_CACHE_LINE</a>, <a class="el" href="ckernel__strict_8c_source.html#l00170">ck_get_physical_cores()</a>, <a class="el" href="ck__threadpool_8h_source.html#l00048">CK_THREADPOOL_MAX_THREADS</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00163">worker_main()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00331">ck_threadpool_create()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00342">ck_threadpool_create()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -1020,31 +1020,31 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Destroy the thread pool. Signals all workers to exit and joins them. Safe to call with NULL. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00336">336</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  337</span>{</div>
-<div class="line"><span class="lineno">  338</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  339</span> </div>
-<div class="line"><span class="lineno">  340</span>    <span class="comment">/* Signal shutdown */</span></div>
-<div class="line"><span class="lineno">  341</span>    atomic_store_explicit(&amp;pool-&gt;stop, 1, memory_order_release);</div>
-<div class="line"><span class="lineno">  342</span> </div>
-<div class="line"><span class="lineno">  343</span>    <span class="comment">/* Wake all sleeping workers */</span></div>
-<div class="line"><span class="lineno">  344</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  345</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
-<div class="line"><span class="lineno">  346</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  347</span> </div>
-<div class="line"><span class="lineno">  348</span>    <span class="comment">/* Join all worker threads */</span></div>
-<div class="line"><span class="lineno">  349</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; pool-&gt;n_threads; i++) {</div>
-<div class="line"><span class="lineno">  350</span>        pthread_join(pool-&gt;workers[i].thread, NULL);</div>
-<div class="line"><span class="lineno">  351</span>    }</div>
-<div class="line"><span class="lineno">  352</span> </div>
-<div class="line"><span class="lineno">  353</span>    pthread_cond_destroy(&amp;pool-&gt;cond_dispatch);</div>
-<div class="line"><span class="lineno">  354</span>    pthread_cond_destroy(&amp;pool-&gt;cond_done);</div>
-<div class="line"><span class="lineno">  355</span>    pthread_mutex_destroy(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  356</span> </div>
-<div class="line"><span class="lineno">  357</span>    free(pool);</div>
-<div class="line"><span class="lineno">  358</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00347">347</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  348</span>{</div>
+<div class="line"><span class="lineno">  349</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  350</span> </div>
+<div class="line"><span class="lineno">  351</span>    <span class="comment">/* Signal shutdown */</span></div>
+<div class="line"><span class="lineno">  352</span>    atomic_store_explicit(&amp;pool-&gt;stop, 1, memory_order_release);</div>
+<div class="line"><span class="lineno">  353</span> </div>
+<div class="line"><span class="lineno">  354</span>    <span class="comment">/* Wake all sleeping workers */</span></div>
+<div class="line"><span class="lineno">  355</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  356</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
+<div class="line"><span class="lineno">  357</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  358</span> </div>
+<div class="line"><span class="lineno">  359</span>    <span class="comment">/* Join all worker threads */</span></div>
+<div class="line"><span class="lineno">  360</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; pool-&gt;n_threads; i++) {</div>
+<div class="line"><span class="lineno">  361</span>        pthread_join(pool-&gt;workers[i].thread, NULL);</div>
+<div class="line"><span class="lineno">  362</span>    }</div>
+<div class="line"><span class="lineno">  363</span> </div>
+<div class="line"><span class="lineno">  364</span>    pthread_cond_destroy(&amp;pool-&gt;cond_dispatch);</div>
+<div class="line"><span class="lineno">  365</span>    pthread_cond_destroy(&amp;pool-&gt;cond_done);</div>
+<div class="line"><span class="lineno">  366</span>    pthread_mutex_destroy(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  367</span> </div>
+<div class="line"><span class="lineno">  368</span>    free(pool);</div>
+<div class="line"><span class="lineno">  369</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00646">ck_threadpool_global_destroy()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00657">ck_threadpool_global_destroy()</a>.</p>
 
 </div>
 </div>
@@ -1096,14 +1096,14 @@ Variables</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00454">454</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  455</span>{</div>
-<div class="line"><span class="lineno">  456</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  457</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, pool-&gt;default_threads, fn, args);</div>
-<div class="line"><span class="lineno">  458</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a4554995880b7a47e275f9b10511b5e43"><div class="ttname"><a href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a></div><div class="ttdeci">void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00364">ck_threadpool.c:364</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00465">465</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  466</span>{</div>
+<div class="line"><span class="lineno">  467</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  468</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(pool, pool-&gt;default_threads, fn, args);</div>
+<div class="line"><span class="lineno">  469</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a4554995880b7a47e275f9b10511b5e43"><div class="ttname"><a href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a></div><div class="ttdeci">void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00375">ck_threadpool.c:375</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00375">ck_threadpool_dispatch_n()</a>.</p>
 
 </div>
 </div>
@@ -1156,100 +1156,100 @@ Variables</h2></td></tr>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00364">364</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  365</span>{</div>
-<div class="line"><span class="lineno">  366</span>    <span class="keywordflow">if</span> (!pool || !fn) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  367</span>    <span class="keywordflow">if</span> (active_threads &lt;= 0) {</div>
-<div class="line"><span class="lineno">  368</span>        active_threads = 1;</div>
-<div class="line"><span class="lineno">  369</span>    }</div>
-<div class="line"><span class="lineno">  370</span>    <span class="keywordflow">if</span> (active_threads &gt; pool-&gt;n_threads) {</div>
-<div class="line"><span class="lineno">  371</span>        active_threads = pool-&gt;n_threads;</div>
-<div class="line"><span class="lineno">  372</span>    }</div>
-<div class="line"><span class="lineno">  373</span> </div>
-<div class="line"><span class="lineno">  374</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> profile = atomic_load_explicit(</div>
-<div class="line"><span class="lineno">  375</span>        &amp;pool-&gt;profile_enabled, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  376</span>    <span class="keyword">const</span> uint64_t dispatch_start = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
-<div class="line"><span class="lineno">  377</span> </div>
-<div class="line"><span class="lineno">  378</span>    <span class="comment">/* Single-thread fast path: just call directly */</span></div>
-<div class="line"><span class="lineno">  379</span>    <span class="keywordflow">if</span> (active_threads == 1 || pool-&gt;n_threads == 1) {</div>
-<div class="line"><span class="lineno">  380</span>        fn(0, 1, args);</div>
-<div class="line"><span class="lineno">  381</span>        <span class="keywordflow">if</span> (profile) {</div>
-<div class="line"><span class="lineno">  382</span>            <span class="keyword">const</span> uint64_t dispatch_end = <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>();</div>
-<div class="line"><span class="lineno">  383</span>            atomic_fetch_add_explicit(&amp;pool-&gt;profile_dispatch_count, 1, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  384</span>            atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  385</span>                &amp;pool-&gt;profile_dispatch_total_ns,</div>
-<div class="line"><span class="lineno">  386</span>                dispatch_end - dispatch_start,</div>
-<div class="line"><span class="lineno">  387</span>                memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  388</span>            atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  389</span>                &amp;pool-&gt;profile_main_work_ns,</div>
-<div class="line"><span class="lineno">  390</span>                dispatch_end - dispatch_start,</div>
-<div class="line"><span class="lineno">  391</span>                memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  392</span>        }</div>
-<div class="line"><span class="lineno">  393</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  394</span>    }</div>
-<div class="line"><span class="lineno">  395</span> </div>
-<div class="line"><span class="lineno">  396</span>    <span class="comment">/* Reset barrier phase for this dispatch */</span></div>
-<div class="line"><span class="lineno">  397</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, active_threads);</div>
-<div class="line"><span class="lineno">  398</span> </div>
-<div class="line"><span class="lineno">  399</span>    <span class="comment">/* Set work descriptor */</span></div>
-<div class="line"><span class="lineno">  400</span>    pool-&gt;work_fn = fn;</div>
-<div class="line"><span class="lineno">  401</span>    pool-&gt;work_args = args;</div>
-<div class="line"><span class="lineno">  402</span>    atomic_store_explicit(&amp;pool-&gt;active_threads, active_threads, memory_order_release);</div>
-<div class="line"><span class="lineno">  403</span>    atomic_store_explicit(&amp;pool-&gt;n_complete, 0, memory_order_release);</div>
-<div class="line"><span class="lineno">  404</span> </div>
-<div class="line"><span class="lineno">  405</span>    <span class="comment">/* Wake workers by bumping dispatch counter */</span></div>
-<div class="line"><span class="lineno">  406</span>    atomic_fetch_add_explicit(&amp;pool-&gt;n_dispatch, 1, memory_order_release);</div>
-<div class="line"><span class="lineno">  407</span> </div>
-<div class="line"><span class="lineno">  408</span>    <span class="comment">/* Also signal condvar for sleeping workers */</span></div>
-<div class="line"><span class="lineno">  409</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  410</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
-<div class="line"><span class="lineno">  411</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  412</span> </div>
-<div class="line"><span class="lineno">  413</span>    <span class="comment">/* Main thread (ith=0) does its share */</span></div>
-<div class="line"><span class="lineno">  414</span>    <span class="keyword">const</span> uint64_t main_start = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
-<div class="line"><span class="lineno">  415</span>    fn(0, active_threads, args);</div>
-<div class="line"><span class="lineno">  416</span>    <span class="keyword">const</span> uint64_t main_end = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
-<div class="line"><span class="lineno">  417</span> </div>
-<div class="line"><span class="lineno">  418</span>    <span class="comment">/* Wait for all workers to complete */</span></div>
-<div class="line"><span class="lineno">  419</span>    <span class="keywordflow">if</span> (active_threads &gt; 1) {</div>
-<div class="line"><span class="lineno">  420</span>        <span class="keywordtype">int</span> spins = 0;</div>
-<div class="line"><span class="lineno">  421</span>        <span class="keywordflow">while</span> (atomic_load_explicit(&amp;pool-&gt;n_complete, memory_order_acquire)</div>
-<div class="line"><span class="lineno">  422</span>               &lt; active_threads - 1) {</div>
-<div class="line"><span class="lineno">  423</span>            <a class="code hl_define" href="ck__threadpool_8c.html#ae0445e61c7b90259729ee63b95ee3257">CK_SPIN_PAUSE</a>();</div>
-<div class="line"><span class="lineno">  424</span>            spins++;</div>
-<div class="line"><span class="lineno">  425</span>            <span class="keywordflow">if</span> (spins &gt;= <a class="code hl_define" href="ck__threadpool_8h.html#a4644600fdce88046ccbdf5089793819a">CK_THREADPOOL_SPIN_COUNT</a>) {</div>
-<div class="line"><span class="lineno">  426</span>                pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  427</span>                <span class="keywordflow">if</span> (atomic_load_explicit(&amp;pool-&gt;n_complete, memory_order_acquire)</div>
-<div class="line"><span class="lineno">  428</span>                    &lt; active_threads - 1) {</div>
-<div class="line"><span class="lineno">  429</span>                    pthread_cond_wait(&amp;pool-&gt;cond_done, &amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  430</span>                }</div>
-<div class="line"><span class="lineno">  431</span>                pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  432</span>                spins = 0;</div>
-<div class="line"><span class="lineno">  433</span>            }</div>
-<div class="line"><span class="lineno">  434</span>        }</div>
-<div class="line"><span class="lineno">  435</span>    }</div>
-<div class="line"><span class="lineno">  436</span>    <span class="keywordflow">if</span> (profile) {</div>
-<div class="line"><span class="lineno">  437</span>        <span class="keyword">const</span> uint64_t dispatch_end = <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>();</div>
-<div class="line"><span class="lineno">  438</span>        atomic_fetch_add_explicit(&amp;pool-&gt;profile_dispatch_count, 1, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  439</span>        atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  440</span>            &amp;pool-&gt;profile_dispatch_total_ns,</div>
-<div class="line"><span class="lineno">  441</span>            dispatch_end - dispatch_start,</div>
-<div class="line"><span class="lineno">  442</span>            memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  443</span>        atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  444</span>            &amp;pool-&gt;profile_main_work_ns,</div>
-<div class="line"><span class="lineno">  445</span>            main_end - main_start,</div>
-<div class="line"><span class="lineno">  446</span>            memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  447</span>        atomic_fetch_add_explicit(</div>
-<div class="line"><span class="lineno">  448</span>            &amp;pool-&gt;profile_completion_wait_ns,</div>
-<div class="line"><span class="lineno">  449</span>            dispatch_end - main_end,</div>
-<div class="line"><span class="lineno">  450</span>            memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  451</span>    }</div>
-<div class="line"><span class="lineno">  452</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00375">375</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  376</span>{</div>
+<div class="line"><span class="lineno">  377</span>    <span class="keywordflow">if</span> (!pool || !fn) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  378</span>    <span class="keywordflow">if</span> (active_threads &lt;= 0) {</div>
+<div class="line"><span class="lineno">  379</span>        active_threads = 1;</div>
+<div class="line"><span class="lineno">  380</span>    }</div>
+<div class="line"><span class="lineno">  381</span>    <span class="keywordflow">if</span> (active_threads &gt; pool-&gt;n_threads) {</div>
+<div class="line"><span class="lineno">  382</span>        active_threads = pool-&gt;n_threads;</div>
+<div class="line"><span class="lineno">  383</span>    }</div>
+<div class="line"><span class="lineno">  384</span> </div>
+<div class="line"><span class="lineno">  385</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> profile = atomic_load_explicit(</div>
+<div class="line"><span class="lineno">  386</span>        &amp;pool-&gt;profile_enabled, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  387</span>    <span class="keyword">const</span> uint64_t dispatch_start = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
+<div class="line"><span class="lineno">  388</span> </div>
+<div class="line"><span class="lineno">  389</span>    <span class="comment">/* Single-thread fast path: just call directly */</span></div>
+<div class="line"><span class="lineno">  390</span>    <span class="keywordflow">if</span> (active_threads == 1 || pool-&gt;n_threads == 1) {</div>
+<div class="line"><span class="lineno">  391</span>        fn(0, 1, args);</div>
+<div class="line"><span class="lineno">  392</span>        <span class="keywordflow">if</span> (profile) {</div>
+<div class="line"><span class="lineno">  393</span>            <span class="keyword">const</span> uint64_t dispatch_end = <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>();</div>
+<div class="line"><span class="lineno">  394</span>            atomic_fetch_add_explicit(&amp;pool-&gt;profile_dispatch_count, 1, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  395</span>            atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  396</span>                &amp;pool-&gt;profile_dispatch_total_ns,</div>
+<div class="line"><span class="lineno">  397</span>                dispatch_end - dispatch_start,</div>
+<div class="line"><span class="lineno">  398</span>                memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  399</span>            atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  400</span>                &amp;pool-&gt;profile_main_work_ns,</div>
+<div class="line"><span class="lineno">  401</span>                dispatch_end - dispatch_start,</div>
+<div class="line"><span class="lineno">  402</span>                memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  403</span>        }</div>
+<div class="line"><span class="lineno">  404</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  405</span>    }</div>
+<div class="line"><span class="lineno">  406</span> </div>
+<div class="line"><span class="lineno">  407</span>    <span class="comment">/* Reset barrier phase for this dispatch */</span></div>
+<div class="line"><span class="lineno">  408</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a19111881b2bff4a1ddd3bfb5f8074686">barrier_init</a>(&amp;pool-&gt;barrier, active_threads);</div>
+<div class="line"><span class="lineno">  409</span> </div>
+<div class="line"><span class="lineno">  410</span>    <span class="comment">/* Set work descriptor */</span></div>
+<div class="line"><span class="lineno">  411</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  412</span>    pool-&gt;work_fn = fn;</div>
+<div class="line"><span class="lineno">  413</span>    pool-&gt;work_args = args;</div>
+<div class="line"><span class="lineno">  414</span>    atomic_store_explicit(&amp;pool-&gt;active_threads, active_threads, memory_order_release);</div>
+<div class="line"><span class="lineno">  415</span>    atomic_store_explicit(&amp;pool-&gt;n_complete, 0, memory_order_release);</div>
+<div class="line"><span class="lineno">  416</span> </div>
+<div class="line"><span class="lineno">  417</span>    <span class="comment">/* Wake workers by bumping dispatch counter */</span></div>
+<div class="line"><span class="lineno">  418</span>    atomic_fetch_add_explicit(&amp;pool-&gt;n_dispatch, 1, memory_order_release);</div>
+<div class="line"><span class="lineno">  419</span> </div>
+<div class="line"><span class="lineno">  420</span>    <span class="comment">/* Also signal condvar for sleeping workers */</span></div>
+<div class="line"><span class="lineno">  421</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
+<div class="line"><span class="lineno">  422</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  423</span> </div>
+<div class="line"><span class="lineno">  424</span>    <span class="comment">/* Main thread (ith=0) does its share */</span></div>
+<div class="line"><span class="lineno">  425</span>    <span class="keyword">const</span> uint64_t main_start = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
+<div class="line"><span class="lineno">  426</span>    fn(0, active_threads, args);</div>
+<div class="line"><span class="lineno">  427</span>    <span class="keyword">const</span> uint64_t main_end = profile ? <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>() : 0;</div>
+<div class="line"><span class="lineno">  428</span> </div>
+<div class="line"><span class="lineno">  429</span>    <span class="comment">/* Wait for all workers to complete */</span></div>
+<div class="line"><span class="lineno">  430</span>    <span class="keywordflow">if</span> (active_threads &gt; 1) {</div>
+<div class="line"><span class="lineno">  431</span>        <span class="keywordtype">int</span> spins = 0;</div>
+<div class="line"><span class="lineno">  432</span>        <span class="keywordflow">while</span> (atomic_load_explicit(&amp;pool-&gt;n_complete, memory_order_acquire)</div>
+<div class="line"><span class="lineno">  433</span>               &lt; active_threads - 1) {</div>
+<div class="line"><span class="lineno">  434</span>            <a class="code hl_define" href="ck__threadpool_8c.html#ae0445e61c7b90259729ee63b95ee3257">CK_SPIN_PAUSE</a>();</div>
+<div class="line"><span class="lineno">  435</span>            spins++;</div>
+<div class="line"><span class="lineno">  436</span>            <span class="keywordflow">if</span> (spins &gt;= <a class="code hl_define" href="ck__threadpool_8h.html#a4644600fdce88046ccbdf5089793819a">CK_THREADPOOL_SPIN_COUNT</a>) {</div>
+<div class="line"><span class="lineno">  437</span>                pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  438</span>                <span class="keywordflow">if</span> (atomic_load_explicit(&amp;pool-&gt;n_complete, memory_order_acquire)</div>
+<div class="line"><span class="lineno">  439</span>                    &lt; active_threads - 1) {</div>
+<div class="line"><span class="lineno">  440</span>                    pthread_cond_wait(&amp;pool-&gt;cond_done, &amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  441</span>                }</div>
+<div class="line"><span class="lineno">  442</span>                pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  443</span>                spins = 0;</div>
+<div class="line"><span class="lineno">  444</span>            }</div>
+<div class="line"><span class="lineno">  445</span>        }</div>
+<div class="line"><span class="lineno">  446</span>    }</div>
+<div class="line"><span class="lineno">  447</span>    <span class="keywordflow">if</span> (profile) {</div>
+<div class="line"><span class="lineno">  448</span>        <span class="keyword">const</span> uint64_t dispatch_end = <a class="code hl_function" href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a>();</div>
+<div class="line"><span class="lineno">  449</span>        atomic_fetch_add_explicit(&amp;pool-&gt;profile_dispatch_count, 1, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  450</span>        atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  451</span>            &amp;pool-&gt;profile_dispatch_total_ns,</div>
+<div class="line"><span class="lineno">  452</span>            dispatch_end - dispatch_start,</div>
+<div class="line"><span class="lineno">  453</span>            memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  454</span>        atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  455</span>            &amp;pool-&gt;profile_main_work_ns,</div>
+<div class="line"><span class="lineno">  456</span>            main_end - main_start,</div>
+<div class="line"><span class="lineno">  457</span>            memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  458</span>        atomic_fetch_add_explicit(</div>
+<div class="line"><span class="lineno">  459</span>            &amp;pool-&gt;profile_completion_wait_ns,</div>
+<div class="line"><span class="lineno">  460</span>            dispatch_end - main_end,</div>
+<div class="line"><span class="lineno">  461</span>            memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  462</span>    }</div>
+<div class="line"><span class="lineno">  463</span>}</div>
 <div class="ttc" id="ack__threadpool_8c_html_aab1bc9c83bcedc83536e52adcae13bbf"><div class="ttname"><a href="ck__threadpool_8c.html#aab1bc9c83bcedc83536e52adcae13bbf">monotonic_ns</a></div><div class="ttdeci">static uint64_t monotonic_ns(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00113">ck_threadpool.c:113</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00124">barrier_init()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00036">CK_SPIN_PAUSE</a>, <a class="el" href="ck__threadpool_8h_source.html#l00051">CK_THREADPOOL_SPIN_COUNT</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00113">monotonic_ns()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05302">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l08333">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l06971">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06187">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="attention__kernels_8c_source.html#l04108">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l06912">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07240">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03485">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00152">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04869">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04895">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01713">ck_moe_q4k_mixed_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01412">ck_moe_q4k_q5k_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00454">ck_threadpool_dispatch()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00483">ck_threadpool_parallel_for_n()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00930">gemm_f16_input_fp16_threadpool()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03070">gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, and <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05303">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l08596">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07234">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06450">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="attention__kernels_8c_source.html#l04109">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l07175">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07503">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03486">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00153">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04870">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04896">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01713">ck_moe_q4k_mixed_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01412">ck_moe_q4k_q5k_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00465">ck_threadpool_dispatch()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00494">ck_threadpool_parallel_for_n()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00930">gemm_f16_input_fp16_threadpool()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03070">gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, and <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>.</p>
 
 </div>
 </div>
@@ -1271,18 +1271,18 @@ Variables</h2></td></tr>
 <p>Get or create the global thread pool. Thread-safe (uses pthread_once internally). Uses <a class="el" href="ckernel__engine_8h.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads()</a> for the default width. In automatic mode the pool may reserve a bounded subset of SMT siblings as explicit provider capacity; ordinary dispatch remains at the default width.</p>
 <dl class="section return"><dt>Returns</dt><dd>Global pool, never NULL after successful first call. </dd></dl>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00640">640</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  641</span>{</div>
-<div class="line"><span class="lineno">  642</span>    pthread_once(&amp;<a class="code hl_variable" href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a>, <a class="code hl_function" href="ck__threadpool_8c.html#a5787f410f04801389446b1cf43c79e15">global_pool_init</a>);</div>
-<div class="line"><span class="lineno">  643</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>;</div>
-<div class="line"><span class="lineno">  644</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a3dcd3040ab40fc1c79a7ea042b87b24f"><div class="ttname"><a href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a></div><div class="ttdeci">static pthread_once_t g_threadpool_once</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00593">ck_threadpool.c:593</a></div></div>
-<div class="ttc" id="ack__threadpool_8c_html_a5787f410f04801389446b1cf43c79e15"><div class="ttname"><a href="ck__threadpool_8c.html#a5787f410f04801389446b1cf43c79e15">global_pool_init</a></div><div class="ttdeci">static void global_pool_init(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00613">ck_threadpool.c:613</a></div></div>
-<div class="ttc" id="ack__threadpool_8c_html_a8d24c2ed3aa5c438f5d2e8c7782f32b5"><div class="ttname"><a href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a></div><div class="ttdeci">static ck_threadpool_t * g_threadpool</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00592">ck_threadpool.c:592</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00651">651</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  652</span>{</div>
+<div class="line"><span class="lineno">  653</span>    pthread_once(&amp;<a class="code hl_variable" href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a>, <a class="code hl_function" href="ck__threadpool_8c.html#a5787f410f04801389446b1cf43c79e15">global_pool_init</a>);</div>
+<div class="line"><span class="lineno">  654</span>    <span class="keywordflow">return</span> <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>;</div>
+<div class="line"><span class="lineno">  655</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a3dcd3040ab40fc1c79a7ea042b87b24f"><div class="ttname"><a href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a></div><div class="ttdeci">static pthread_once_t g_threadpool_once</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00604">ck_threadpool.c:604</a></div></div>
+<div class="ttc" id="ack__threadpool_8c_html_a5787f410f04801389446b1cf43c79e15"><div class="ttname"><a href="ck__threadpool_8c.html#a5787f410f04801389446b1cf43c79e15">global_pool_init</a></div><div class="ttdeci">static void global_pool_init(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00624">ck_threadpool.c:624</a></div></div>
+<div class="ttc" id="ack__threadpool_8c_html_a8d24c2ed3aa5c438f5d2e8c7782f32b5"><div class="ttname"><a href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a></div><div class="ttdeci">static ck_threadpool_t * g_threadpool</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00603">ck_threadpool.c:603</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00592">g_threadpool</a>, <a class="el" href="ck__threadpool_8c_source.html#l00593">g_threadpool_once</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00603">g_threadpool</a>, <a class="el" href="ck__threadpool_8c_source.html#l00604">g_threadpool_once</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05302">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l08333">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07072">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l06971">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06187">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="attention__kernels_8c_source.html#l04108">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01025">audio_conv2d_whc_grouped_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01115">audio_glu_split_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01173">audio_relative_shift_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l06912">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07240">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03485">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00152">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04869">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04895">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00207">ck_gemma4_prepare_parallel()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00350">ck_get_threadpool()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00330">ck_threadpool_init()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00308">deepseek_mla_kv_decompress_bf16_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00930">gemm_f16_input_fp16_threadpool()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l02010">gemm_nt_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00777">gemm_nt_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03070">gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00348">gemma4_per_layer_embed_forward()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00688">gemv_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00646">gemv_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__nvfp4_8c_source.html#l00244">gemv_nvfp4_q8_0_uniform()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>, <a class="el" href="ssm__kernels_8c_source.html#l00272">ssm_conv1d_forward_llama_fma()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05303">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00566">attention_forward_causal_head_major_gqa_flash_strided_sliding()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00668">attention_forward_causal_head_major_gqa_flash_strided_sliding_gemma4_impl()</a>, <a class="el" href="attention__kernels_8c_source.html#l08596">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07335">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07234">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06450">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="attention__kernels_8c_source.html#l04109">attention_forward_head_major_gqa_flash_impl()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01025">audio_conv2d_whc_grouped_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01115">audio_glu_split_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01173">audio_relative_shift_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l07175">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07503">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03486">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00153">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04870">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04896">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00207">ck_gemma4_prepare_parallel()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00350">ck_get_threadpool()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00330">ck_threadpool_init()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00308">deepseek_mla_kv_decompress_bf16_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00930">gemm_f16_input_fp16_threadpool()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l02010">gemm_nt_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00777">gemm_nt_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03070">gemm_nt_q4_k_packed_vnni_x16_q8_k_split_min_threaded_16m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00348">gemma4_per_layer_embed_forward()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00688">gemv_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00646">gemv_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__nvfp4_8c_source.html#l00244">gemv_nvfp4_q8_0_uniform()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>, <a class="el" href="ssm__kernels_8c_source.html#l00272">ssm_conv1d_forward_llama_fma()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>.</p>
 
 </div>
 </div>
@@ -1303,18 +1303,18 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Destroy the global thread pool. Called during engine shutdown. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00646">646</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  647</span>{</div>
-<div class="line"><span class="lineno">  648</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>) {</div>
-<div class="line"><span class="lineno">  649</span>        <a class="code hl_function" href="ck__threadpool_8c.html#a6026581009cf6a835026bba70ce9bcd4">ck_threadpool_destroy</a>(<a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>);</div>
-<div class="line"><span class="lineno">  650</span>        <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a> = NULL;</div>
-<div class="line"><span class="lineno">  651</span>        <span class="comment">/* Reset once control so pool can be re-created if needed */</span></div>
-<div class="line"><span class="lineno">  652</span>        <a class="code hl_variable" href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a> = PTHREAD_ONCE_INIT;</div>
-<div class="line"><span class="lineno">  653</span>    }</div>
-<div class="line"><span class="lineno">  654</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a6026581009cf6a835026bba70ce9bcd4"><div class="ttname"><a href="ck__threadpool_8c.html#a6026581009cf6a835026bba70ce9bcd4">ck_threadpool_destroy</a></div><div class="ttdeci">void ck_threadpool_destroy(ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00336">ck_threadpool.c:336</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00657">657</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  658</span>{</div>
+<div class="line"><span class="lineno">  659</span>    <span class="keywordflow">if</span> (<a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>) {</div>
+<div class="line"><span class="lineno">  660</span>        <a class="code hl_function" href="ck__threadpool_8c.html#a6026581009cf6a835026bba70ce9bcd4">ck_threadpool_destroy</a>(<a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a>);</div>
+<div class="line"><span class="lineno">  661</span>        <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a> = NULL;</div>
+<div class="line"><span class="lineno">  662</span>        <span class="comment">/* Reset once control so pool can be re-created if needed */</span></div>
+<div class="line"><span class="lineno">  663</span>        <a class="code hl_variable" href="ck__threadpool_8c.html#a3dcd3040ab40fc1c79a7ea042b87b24f">g_threadpool_once</a> = PTHREAD_ONCE_INIT;</div>
+<div class="line"><span class="lineno">  664</span>    }</div>
+<div class="line"><span class="lineno">  665</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a6026581009cf6a835026bba70ce9bcd4"><div class="ttname"><a href="ck__threadpool_8c.html#a6026581009cf6a835026bba70ce9bcd4">ck_threadpool_destroy</a></div><div class="ttdeci">void ck_threadpool_destroy(ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00347">ck_threadpool.c:347</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00336">ck_threadpool_destroy()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00592">g_threadpool</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00593">g_threadpool_once</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00347">ck_threadpool_destroy()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00603">g_threadpool</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00604">g_threadpool_once</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ckernel__strict_8c_source.html#l00341">ck_threadpool_shutdown()</a>.</p>
 
@@ -1337,12 +1337,12 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Get the ordinary/default dispatch width (including the main thread). </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00540">540</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  541</span>{</div>
-<div class="line"><span class="lineno">  542</span>    <span class="keywordflow">return</span> pool ? pool-&gt;default_threads : 1;</div>
-<div class="line"><span class="lineno">  543</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00551">551</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  552</span>{</div>
+<div class="line"><span class="lineno">  553</span>    <span class="keywordflow">return</span> pool ? pool-&gt;default_threads : 1;</div>
+<div class="line"><span class="lineno">  554</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05302">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l08333">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07072">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l06971">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06187">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01025">audio_conv2d_whc_grouped_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01115">audio_glu_split_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01173">audio_relative_shift_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l06912">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07240">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03485">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00152">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04869">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04895">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="attention__kernels_8c_source.html#l03999">ck_attention_pick_active_threads()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00913">ck_gemm_f16_pick_active_threads()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00207">ck_gemma4_prepare_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01713">ck_moe_q4k_mixed_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01412">ck_moe_q4k_q5k_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00308">deepseek_mla_kv_decompress_bf16_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l02010">gemm_nt_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00777">gemm_nt_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00348">gemma4_per_layer_embed_forward()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00688">gemv_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00646">gemv_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__nvfp4_8c_source.html#l00244">gemv_nvfp4_q8_0_uniform()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>, <a class="el" href="ssm__kernels_8c_source.html#l00272">ssm_conv1d_forward_llama_fma()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00638">adamw_clip_update_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00592">adamw_update_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l05303">attention_forward_causal_head_major_gqa_flash_strided_f16kv_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l08596">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07335">attention_forward_causal_head_major_gqa_prefill_append_f16cache_auto_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07234">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06450">attention_forward_decode_head_major_gqa_flash_f16cache_split_partitioned()</a>, <a class="el" href="audio__kernels_8c_source.html#l00902">audio_conv1d_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01025">audio_conv2d_whc_grouped_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01115">audio_glu_split_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01173">audio_relative_shift_f32()</a>, <a class="el" href="attention__kernels_8c_source.html#l07175">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07503">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l03486">ck_attention_forward_full_head_major_gqa_tiled_f16kv_fp32_strided()</a>, <a class="el" href="attention__kernels_8c_source.html#l00153">ck_attention_forward_query_key_head_major_f32_run()</a>, <a class="el" href="attention__kernels_8c_source.html#l04870">ck_attention_full_bf16_pytorch_flash()</a>, <a class="el" href="attention__kernels_8c_source.html#l04896">ck_attention_full_bf16_sdpa_tiled()</a>, <a class="el" href="attention__kernels_8c_source.html#l04000">ck_attention_pick_active_threads()</a>, <a class="el" href="gemm__kernels__f16_8c_source.html#l00913">ck_gemm_f16_pick_active_threads()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00207">ck_gemma4_prepare_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01781">ck_moe_q4k_mixed_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01713">ck_moe_q4k_mixed_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01412">ck_moe_q4k_q5k_route_parallel()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02897">ck_moe_shared_gated_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01996">ck_moe_shared_q4k_parallel_workspace()</a>, <a class="el" href="axpy__kernels_8c_source.html#l02419">ck_moe_swiglu_expert_forward_q4k_q5k_bucketed_impl()</a>, <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00839">deepseek_mla_attention_f32_parallel_dispatch()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00308">deepseek_mla_kv_decompress_bf16_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00610">gemm_backward_f32_train_parallel_dispatch()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00699">gemm_backward_f32_train_parallel_dispatch_v2()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00167">gemm_blocked_serial_train_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01258">gemm_nt_bf16_amx_bf16_storage_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l02010">gemm_nt_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01071">gemm_nt_bf16_native_bf16_storage()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00777">gemm_nt_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02247">gemm_nt_q4_k_packed_meta_q8_k_threaded()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02310">gemm_nt_q4_k_packed_meta_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03401">gemm_nt_q4_k_packed_meta_x16_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03228">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03273">gemm_nt_q4_k_packed_meta_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02947">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02987">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_8m()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02905">gemm_nt_q4_k_packed_meta_x8_q8_k_split_min_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02860">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mreuse()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02814">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l02381">gemm_nt_q4_k_packed_meta_x8_q8_k_threaded_nsplit()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03494">gemm_nt_q4_k_packed_u8_x16_q8_k_threaded_mtile()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03722">gemm_nt_q4_k_q8_k_gateup_swiglu_fused_vnni()</a>, <a class="el" href="gemm__kernels__q4k__q8k_8c_source.html#l00354">gemm_q4_k_q8_k()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00348">gemma4_per_layer_embed_forward()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00688">gemv_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00646">gemv_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__nvfp4_8c_source.html#l00244">gemv_nvfp4_q8_0_uniform()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00925">gradient_accumulate_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l00951">gradient_accumulate_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01169">gradient_clip_norm_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01207">gradient_global_norm_multi_f32()</a>, <a class="el" href="optimizer__kernels_8c_source.html#l01073">gradient_scale_f32()</a>, <a class="el" href="axpy__kernels_8c_source.html#l01470">moe_swiglu_expert_forward_q4k_q5k_parallel_workspace()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l01940">patch_projection_image_bf16_native_storage()</a>, <a class="el" href="ssm__kernels_8c_source.html#l00272">ssm_conv1d_forward_llama_fma()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>.</p>
 
 </div>
 </div>
@@ -1404,28 +1404,28 @@ Variables</h2></td></tr>
 <p>Dynamically distribute independent ranges through the persistent pool.</p>
 <p>Workers claim <code>grain_size</code> consecutive indices until [begin, end) is empty. This changes ownership only; callers remain responsible for ensuring that ranges write disjoint outputs and preserve each output's reduction order. Do not use this helper for unordered shared reductions. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00483">483</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  490</span>{</div>
-<div class="line"><span class="lineno">  491</span>    <span class="keywordflow">if</span> (!fn || begin &gt;= <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  492</span>    <span class="keywordflow">if</span> (grain_size &lt;= 0) grain_size = 1;</div>
-<div class="line"><span class="lineno">  493</span>    <span class="keywordflow">if</span> (!pool || active_threads &lt;= 1) {</div>
-<div class="line"><span class="lineno">  494</span>        fn(begin, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, args);</div>
-<div class="line"><span class="lineno">  495</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  496</span>    }</div>
-<div class="line"><span class="lineno">  497</span> </div>
-<div class="line"><span class="lineno">  498</span>    ck_parallel_for_work_t work = {</div>
-<div class="line"><span class="lineno">  499</span>        .end = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>,</div>
-<div class="line"><span class="lineno">  500</span>        .grain_size = grain_size,</div>
-<div class="line"><span class="lineno">  501</span>        .fn = fn,</div>
-<div class="line"><span class="lineno">  502</span>        .args = args,</div>
-<div class="line"><span class="lineno">  503</span>    };</div>
-<div class="line"><span class="lineno">  504</span>    atomic_init(&amp;work.next, begin);</div>
-<div class="line"><span class="lineno">  505</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(</div>
-<div class="line"><span class="lineno">  506</span>        pool, active_threads, <a class="code hl_function" href="ck__threadpool_8c.html#a8378ca6d1ebc90a1da4f287767818d47">ck_parallel_for_worker</a>, &amp;work);</div>
-<div class="line"><span class="lineno">  507</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a8378ca6d1ebc90a1da4f287767818d47"><div class="ttname"><a href="ck__threadpool_8c.html#a8378ca6d1ebc90a1da4f287767818d47">ck_parallel_for_worker</a></div><div class="ttdeci">static void ck_parallel_for_worker(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00468">ck_threadpool.c:468</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00494">494</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  501</span>{</div>
+<div class="line"><span class="lineno">  502</span>    <span class="keywordflow">if</span> (!fn || begin &gt;= <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  503</span>    <span class="keywordflow">if</span> (grain_size &lt;= 0) grain_size = 1;</div>
+<div class="line"><span class="lineno">  504</span>    <span class="keywordflow">if</span> (!pool || active_threads &lt;= 1) {</div>
+<div class="line"><span class="lineno">  505</span>        fn(begin, <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>, args);</div>
+<div class="line"><span class="lineno">  506</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  507</span>    }</div>
+<div class="line"><span class="lineno">  508</span> </div>
+<div class="line"><span class="lineno">  509</span>    ck_parallel_for_work_t work = {</div>
+<div class="line"><span class="lineno">  510</span>        .end = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>,</div>
+<div class="line"><span class="lineno">  511</span>        .grain_size = grain_size,</div>
+<div class="line"><span class="lineno">  512</span>        .fn = fn,</div>
+<div class="line"><span class="lineno">  513</span>        .args = args,</div>
+<div class="line"><span class="lineno">  514</span>    };</div>
+<div class="line"><span class="lineno">  515</span>    atomic_init(&amp;work.next, begin);</div>
+<div class="line"><span class="lineno">  516</span>    <a class="code hl_function" href="ck__threadpool_8c.html#a4554995880b7a47e275f9b10511b5e43">ck_threadpool_dispatch_n</a>(</div>
+<div class="line"><span class="lineno">  517</span>        pool, active_threads, <a class="code hl_function" href="ck__threadpool_8c.html#a8378ca6d1ebc90a1da4f287767818d47">ck_parallel_for_worker</a>, &amp;work);</div>
+<div class="line"><span class="lineno">  518</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a8378ca6d1ebc90a1da4f287767818d47"><div class="ttname"><a href="ck__threadpool_8c.html#a8378ca6d1ebc90a1da4f287767818d47">ck_parallel_for_worker</a></div><div class="ttdeci">static void ck_parallel_for_worker(int ith, int nth, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00479">ck_threadpool.c:479</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00468">ck_parallel_for_worker()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>, and <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00479">ck_parallel_for_worker()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00375">ck_threadpool_dispatch_n()</a>, and <a class="el" href="utf8_8c_source.html#l00215">end</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="audio__kernels_8c_source.html#l01025">audio_conv2d_whc_grouped_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01115">audio_glu_split_channel_major_f32()</a>, <a class="el" href="audio__kernels_8c_source.html#l01173">audio_relative_shift_f32()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00207">ck_gemma4_prepare_parallel()</a>, <a class="el" href="deepseek__kernels_8c_source.html#l00308">deepseek_mla_kv_decompress_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l02010">gemm_nt_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00777">gemm_nt_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels_8c_source.html#l00179">gemm_nt_fp32_exact_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__q4k__q8k__vnni_8c_source.html#l03027">gemm_nt_q4_k_packed_vnni_x8_q8_k_split_min_threaded_4m()</a>, <a class="el" href="gemma4__per__layer__embed_8c_source.html#l00348">gemma4_per_layer_embed_forward()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00688">gemv_bf16_bf16_storage_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__bf16_8c_source.html#l00646">gemv_bf16_parallel_dispatch()</a>, <a class="el" href="gemm__kernels__nvfp4_8c_source.html#l00244">gemv_nvfp4_q8_0_uniform()</a>, <a class="el" href="ssm__kernels_8c_source.html#l00272">ssm_conv1d_forward_llama_fma()</a>, and <a class="el" href="ssm__kernels_8c_source.html#l00207">ssm_conv1d_forward_llama_production()</a>.</p>
 
@@ -1448,11 +1448,11 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Pause workers — they sleep on condvar (0% CPU). Call between batches or during interactive waiting. Workers wake on next dispatch or resume. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00519">519</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  520</span>{</div>
-<div class="line"><span class="lineno">  521</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  522</span>    atomic_store_explicit(&amp;pool-&gt;paused, 1, memory_order_release);</div>
-<div class="line"><span class="lineno">  523</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00530">530</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  531</span>{</div>
+<div class="line"><span class="lineno">  532</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  533</span>    atomic_store_explicit(&amp;pool-&gt;paused, 1, memory_order_release);</div>
+<div class="line"><span class="lineno">  534</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1473,15 +1473,15 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Enable profiling and reset cumulative dispatch timing counters. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00562">562</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  563</span>{</div>
-<div class="line"><span class="lineno">  564</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  565</span>    atomic_store_explicit(&amp;pool-&gt;profile_dispatch_count, 0, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  566</span>    atomic_store_explicit(&amp;pool-&gt;profile_dispatch_total_ns, 0, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  567</span>    atomic_store_explicit(&amp;pool-&gt;profile_main_work_ns, 0, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  568</span>    atomic_store_explicit(&amp;pool-&gt;profile_completion_wait_ns, 0, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  569</span>    atomic_store_explicit(&amp;pool-&gt;profile_enabled, 1, memory_order_release);</div>
-<div class="line"><span class="lineno">  570</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00573">573</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  574</span>{</div>
+<div class="line"><span class="lineno">  575</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  576</span>    atomic_store_explicit(&amp;pool-&gt;profile_dispatch_count, 0, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  577</span>    atomic_store_explicit(&amp;pool-&gt;profile_dispatch_total_ns, 0, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  578</span>    atomic_store_explicit(&amp;pool-&gt;profile_main_work_ns, 0, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  579</span>    atomic_store_explicit(&amp;pool-&gt;profile_completion_wait_ns, 0, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  580</span>    atomic_store_explicit(&amp;pool-&gt;profile_enabled, 1, memory_order_release);</div>
+<div class="line"><span class="lineno">  581</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1512,20 +1512,20 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Snapshot cumulative dispatch timing counters without stopping workers. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00572">572</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  574</span>{</div>
-<div class="line"><span class="lineno">  575</span>    <span class="keywordflow">if</span> (!profile) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  576</span>    memset(profile, 0, <span class="keyword">sizeof</span>(*profile));</div>
-<div class="line"><span class="lineno">  577</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  578</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#a1e9f03ad82fa44b22da1b260206b70ee">dispatch_count</a> = atomic_load_explicit(</div>
-<div class="line"><span class="lineno">  579</span>        &amp;pool-&gt;profile_dispatch_count, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  580</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b">dispatch_total_ns</a> = atomic_load_explicit(</div>
-<div class="line"><span class="lineno">  581</span>        &amp;pool-&gt;profile_dispatch_total_ns, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  582</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#ad41c003f93d8a0942620e09d199b185b">main_work_ns</a> = atomic_load_explicit(</div>
-<div class="line"><span class="lineno">  583</span>        &amp;pool-&gt;profile_main_work_ns, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  584</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#a4176b2cc910fa5598fb925c423f2c3b1">completion_wait_ns</a> = atomic_load_explicit(</div>
-<div class="line"><span class="lineno">  585</span>        &amp;pool-&gt;profile_completion_wait_ns, memory_order_relaxed);</div>
-<div class="line"><span class="lineno">  586</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00583">583</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  585</span>{</div>
+<div class="line"><span class="lineno">  586</span>    <span class="keywordflow">if</span> (!profile) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  587</span>    memset(profile, 0, <span class="keyword">sizeof</span>(*profile));</div>
+<div class="line"><span class="lineno">  588</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  589</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#a1e9f03ad82fa44b22da1b260206b70ee">dispatch_count</a> = atomic_load_explicit(</div>
+<div class="line"><span class="lineno">  590</span>        &amp;pool-&gt;profile_dispatch_count, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  591</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b">dispatch_total_ns</a> = atomic_load_explicit(</div>
+<div class="line"><span class="lineno">  592</span>        &amp;pool-&gt;profile_dispatch_total_ns, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  593</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#ad41c003f93d8a0942620e09d199b185b">main_work_ns</a> = atomic_load_explicit(</div>
+<div class="line"><span class="lineno">  594</span>        &amp;pool-&gt;profile_main_work_ns, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  595</span>    profile-&gt;<a class="code hl_variable" href="structck__threadpool__profile__t.html#a4176b2cc910fa5598fb925c423f2c3b1">completion_wait_ns</a> = atomic_load_explicit(</div>
+<div class="line"><span class="lineno">  596</span>        &amp;pool-&gt;profile_completion_wait_ns, memory_order_relaxed);</div>
+<div class="line"><span class="lineno">  597</span>}</div>
 <div class="ttc" id="astructck__threadpool__profile__t_html_a1e9f03ad82fa44b22da1b260206b70ee"><div class="ttname"><a href="structck__threadpool__profile__t.html#a1e9f03ad82fa44b22da1b260206b70ee">ck_threadpool_profile_t::dispatch_count</a></div><div class="ttdeci">uint64_t dispatch_count</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8h_source.html#l00079">ck_threadpool.h:79</a></div></div>
 <div class="ttc" id="astructck__threadpool__profile__t_html_a4176b2cc910fa5598fb925c423f2c3b1"><div class="ttname"><a href="structck__threadpool__profile__t.html#a4176b2cc910fa5598fb925c423f2c3b1">ck_threadpool_profile_t::completion_wait_ns</a></div><div class="ttdeci">uint64_t completion_wait_ns</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8h_source.html#l00082">ck_threadpool.h:82</a></div></div>
 <div class="ttc" id="astructck__threadpool__profile__t_html_abe00d835b6f0d89c4d809d32921c4f7b"><div class="ttname"><a href="structck__threadpool__profile__t.html#abe00d835b6f0d89c4d809d32921c4f7b">ck_threadpool_profile_t::dispatch_total_ns</a></div><div class="ttdeci">uint64_t dispatch_total_ns</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8h_source.html#l00080">ck_threadpool.h:80</a></div></div>
@@ -1552,16 +1552,16 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Resume workers — transition from sleep to spin-wait. Call before starting a new batch of work. </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00525">525</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  526</span>{</div>
-<div class="line"><span class="lineno">  527</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  528</span>    atomic_store_explicit(&amp;pool-&gt;paused, 0, memory_order_release);</div>
-<div class="line"><span class="lineno">  529</span> </div>
-<div class="line"><span class="lineno">  530</span>    <span class="comment">/* Wake sleeping workers */</span></div>
-<div class="line"><span class="lineno">  531</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  532</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
-<div class="line"><span class="lineno">  533</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  534</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00536">536</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  537</span>{</div>
+<div class="line"><span class="lineno">  538</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  539</span>    atomic_store_explicit(&amp;pool-&gt;paused, 0, memory_order_release);</div>
+<div class="line"><span class="lineno">  540</span> </div>
+<div class="line"><span class="lineno">  541</span>    <span class="comment">/* Wake sleeping workers */</span></div>
+<div class="line"><span class="lineno">  542</span>    pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  543</span>    pthread_cond_broadcast(&amp;pool-&gt;cond_dispatch);</div>
+<div class="line"><span class="lineno">  544</span>    pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  545</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1582,19 +1582,19 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 <p>Get thread index for current thread (0 = main, -1 if not in pool) </p>
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00550">550</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  551</span>{</div>
-<div class="line"><span class="lineno">  552</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  553</span>    pthread_t self = pthread_self();</div>
-<div class="line"><span class="lineno">  554</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; pool-&gt;n_threads; i++) {</div>
-<div class="line"><span class="lineno">  555</span>        <span class="keywordflow">if</span> (pthread_equal(self, pool-&gt;workers[i].thread)) {</div>
-<div class="line"><span class="lineno">  556</span>            <span class="keywordflow">return</span> i;</div>
-<div class="line"><span class="lineno">  557</span>        }</div>
-<div class="line"><span class="lineno">  558</span>    }</div>
-<div class="line"><span class="lineno">  559</span>    <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">  560</span>}</div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00561">561</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  562</span>{</div>
+<div class="line"><span class="lineno">  563</span>    <span class="keywordflow">if</span> (!pool) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  564</span>    pthread_t self = pthread_self();</div>
+<div class="line"><span class="lineno">  565</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; pool-&gt;n_threads; i++) {</div>
+<div class="line"><span class="lineno">  566</span>        <span class="keywordflow">if</span> (pthread_equal(self, pool-&gt;workers[i].thread)) {</div>
+<div class="line"><span class="lineno">  567</span>            <span class="keywordflow">return</span> i;</div>
+<div class="line"><span class="lineno">  568</span>        }</div>
+<div class="line"><span class="lineno">  569</span>    }</div>
+<div class="line"><span class="lineno">  570</span>    <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  571</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l08333">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l06971">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l06912">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07240">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="attention__kernels_8c_source.html#l08596">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract_workspace()</a>, <a class="el" href="attention__kernels_8c_source.html#l07234">attention_forward_causal_head_major_gqa_prefill_append_f16cache_gqa_reuse_config()</a>, <a class="el" href="attention__kernels_8c_source.html#l07175">ck_attention_f16_prefill_qtile64_dispatch()</a>, <a class="el" href="attention__kernels_8c_source.html#l07503">ck_attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_schedule_workspace()</a>, and <a class="el" href="attention__kernels__sliding_8c_source.html#l00490">ck_sliding_attention_pick_threads()</a>.</p>
 
 </div>
 </div>
@@ -1622,39 +1622,39 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00613">613</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  614</span>{</div>
-<div class="line"><span class="lineno">  615</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a340a8258396825a69f3393e02fc9fa1c">ck_available_logical_cpus</a>();</div>
-<div class="line"><span class="lineno">  616</span>    <span class="keywordtype">int</span> physical_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a>();</div>
-<div class="line"><span class="lineno">  617</span>    <span class="keywordflow">if</span> (physical_threads &gt; available_threads) physical_threads = available_threads;</div>
-<div class="line"><span class="lineno">  618</span>    <span class="keywordtype">int</span> default_threads = <a class="code hl_function" href="ck__threadpool_8c.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a>();</div>
-<div class="line"><span class="lineno">  619</span>    <span class="keywordflow">if</span> (default_threads &gt; available_threads) {</div>
-<div class="line"><span class="lineno">  620</span>        default_threads = available_threads;</div>
-<div class="line"><span class="lineno">  621</span>    }</div>
-<div class="line"><span class="lineno">  622</span>    <span class="keywordtype">int</span> capacity_threads = default_threads;</div>
-<div class="line"><span class="lineno">  623</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *capacity_env = getenv(<span class="stringliteral">&quot;CK_THREADPOOL_CAPACITY&quot;</span>);</div>
-<div class="line"><span class="lineno">  624</span>    <span class="keywordflow">if</span> (capacity_env &amp;&amp; atoi(capacity_env) &gt; 0) {</div>
-<div class="line"><span class="lineno">  625</span>        capacity_threads = atoi(capacity_env);</div>
-<div class="line"><span class="lineno">  626</span>    } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (!getenv(<span class="stringliteral">&quot;CK_NUM_THREADS&quot;</span>) &amp;&amp;</div>
-<div class="line"><span class="lineno">  627</span>               default_threads == physical_threads) {</div>
-<div class="line"><span class="lineno">  628</span>        <span class="comment">/* Generated runtimes set OMP_NUM_THREADS=1 to keep OpenMP dormant and</span></div>
-<div class="line"><span class="lineno">  629</span><span class="comment">         * configure the CK pool separately. Do not mistake that isolation</span></div>
-<div class="line"><span class="lineno">  630</span><span class="comment">         * setting for a CK capacity cap. A non-physical default remains an</span></div>
-<div class="line"><span class="lineno">  631</span><span class="comment">         * explicit width and does not gain automatic SMT workers. */</span></div>
-<div class="line"><span class="lineno">  632</span>        capacity_threads = <a class="code hl_function" href="ck__threadpool_8c.html#ad8587e01d4b5cac581553d7d651e9b91">ck_threadpool_bounded_capacity</a>(</div>
-<div class="line"><span class="lineno">  633</span>                default_threads, available_threads);</div>
-<div class="line"><span class="lineno">  634</span>    }</div>
-<div class="line"><span class="lineno">  635</span>    <span class="keywordflow">if</span> (capacity_threads &gt; available_threads) capacity_threads = available_threads;</div>
-<div class="line"><span class="lineno">  636</span>    <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a> = <a class="code hl_function" href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a>(</div>
-<div class="line"><span class="lineno">  637</span>            default_threads, capacity_threads);</div>
-<div class="line"><span class="lineno">  638</span>}</div>
-<div class="ttc" id="ack__threadpool_8c_html_a340a8258396825a69f3393e02fc9fa1c"><div class="ttname"><a href="ck__threadpool_8c.html#a340a8258396825a69f3393e02fc9fa1c">ck_available_logical_cpus</a></div><div class="ttdeci">static int ck_available_logical_cpus(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00597">ck_threadpool.c:597</a></div></div>
-<div class="ttc" id="ack__threadpool_8c_html_ad8587e01d4b5cac581553d7d651e9b91"><div class="ttname"><a href="ck__threadpool_8c.html#ad8587e01d4b5cac581553d7d651e9b91">ck_threadpool_bounded_capacity</a></div><div class="ttdeci">int ck_threadpool_bounded_capacity(int default_threads, int logical_threads)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00245">ck_threadpool.c:245</a></div></div>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00624">624</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  625</span>{</div>
+<div class="line"><span class="lineno">  626</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> available_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a340a8258396825a69f3393e02fc9fa1c">ck_available_logical_cpus</a>();</div>
+<div class="line"><span class="lineno">  627</span>    <span class="keywordtype">int</span> physical_threads = <a class="code hl_function" href="ck__threadpool_8c.html#a7ff78bf68a9657c2d6858b64df79f7ae">ck_get_physical_cores</a>();</div>
+<div class="line"><span class="lineno">  628</span>    <span class="keywordflow">if</span> (physical_threads &gt; available_threads) physical_threads = available_threads;</div>
+<div class="line"><span class="lineno">  629</span>    <span class="keywordtype">int</span> default_threads = <a class="code hl_function" href="ck__threadpool_8c.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a>();</div>
+<div class="line"><span class="lineno">  630</span>    <span class="keywordflow">if</span> (default_threads &gt; available_threads) {</div>
+<div class="line"><span class="lineno">  631</span>        default_threads = available_threads;</div>
+<div class="line"><span class="lineno">  632</span>    }</div>
+<div class="line"><span class="lineno">  633</span>    <span class="keywordtype">int</span> capacity_threads = default_threads;</div>
+<div class="line"><span class="lineno">  634</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *capacity_env = getenv(<span class="stringliteral">&quot;CK_THREADPOOL_CAPACITY&quot;</span>);</div>
+<div class="line"><span class="lineno">  635</span>    <span class="keywordflow">if</span> (capacity_env &amp;&amp; atoi(capacity_env) &gt; 0) {</div>
+<div class="line"><span class="lineno">  636</span>        capacity_threads = atoi(capacity_env);</div>
+<div class="line"><span class="lineno">  637</span>    } <span class="keywordflow">else</span> <span class="keywordflow">if</span> (!getenv(<span class="stringliteral">&quot;CK_NUM_THREADS&quot;</span>) &amp;&amp;</div>
+<div class="line"><span class="lineno">  638</span>               default_threads == physical_threads) {</div>
+<div class="line"><span class="lineno">  639</span>        <span class="comment">/* Generated runtimes set OMP_NUM_THREADS=1 to keep OpenMP dormant and</span></div>
+<div class="line"><span class="lineno">  640</span><span class="comment">         * configure the CK pool separately. Do not mistake that isolation</span></div>
+<div class="line"><span class="lineno">  641</span><span class="comment">         * setting for a CK capacity cap. A non-physical default remains an</span></div>
+<div class="line"><span class="lineno">  642</span><span class="comment">         * explicit width and does not gain automatic SMT workers. */</span></div>
+<div class="line"><span class="lineno">  643</span>        capacity_threads = <a class="code hl_function" href="ck__threadpool_8c.html#ad8587e01d4b5cac581553d7d651e9b91">ck_threadpool_bounded_capacity</a>(</div>
+<div class="line"><span class="lineno">  644</span>                default_threads, available_threads);</div>
+<div class="line"><span class="lineno">  645</span>    }</div>
+<div class="line"><span class="lineno">  646</span>    <span class="keywordflow">if</span> (capacity_threads &gt; available_threads) capacity_threads = available_threads;</div>
+<div class="line"><span class="lineno">  647</span>    <a class="code hl_variable" href="ck__threadpool_8c.html#a8d24c2ed3aa5c438f5d2e8c7782f32b5">g_threadpool</a> = <a class="code hl_function" href="ck__threadpool_8c.html#a9b22300f26b5089af7e9ef0e27a5ee73">ck_threadpool_create_capacity</a>(</div>
+<div class="line"><span class="lineno">  648</span>            default_threads, capacity_threads);</div>
+<div class="line"><span class="lineno">  649</span>}</div>
+<div class="ttc" id="ack__threadpool_8c_html_a340a8258396825a69f3393e02fc9fa1c"><div class="ttname"><a href="ck__threadpool_8c.html#a340a8258396825a69f3393e02fc9fa1c">ck_available_logical_cpus</a></div><div class="ttdeci">static int ck_available_logical_cpus(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00608">ck_threadpool.c:608</a></div></div>
+<div class="ttc" id="ack__threadpool_8c_html_ad8587e01d4b5cac581553d7d651e9b91"><div class="ttname"><a href="ck__threadpool_8c.html#ad8587e01d4b5cac581553d7d651e9b91">ck_threadpool_bounded_capacity</a></div><div class="ttdeci">int ck_threadpool_bounded_capacity(int default_threads, int logical_threads)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00256">ck_threadpool.c:256</a></div></div>
 <div class="ttc" id="ack__threadpool_8c_html_aedf852ec498fe7db175f59f810886b9f"><div class="ttname"><a href="ck__threadpool_8c.html#aedf852ec498fe7db175f59f810886b9f">ck_get_num_threads</a></div><div class="ttdeci">int ck_get_num_threads(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00310">ckernel_strict.c:310</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00597">ck_available_logical_cpus()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00170">ck_get_physical_cores()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00245">ck_threadpool_bounded_capacity()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00260">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00592">g_threadpool</a>.</p>
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00608">ck_available_logical_cpus()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00310">ck_get_num_threads()</a>, <a class="el" href="ckernel__strict_8c_source.html#l00170">ck_get_physical_cores()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00256">ck_threadpool_bounded_capacity()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00271">ck_threadpool_create_capacity()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00603">g_threadpool</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00651">ck_threadpool_global()</a>.</p>
 
 </div>
 </div>
@@ -1689,7 +1689,7 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  117</span>    <span class="keywordflow">return</span> (uint64_t)now.tv_sec * UINT64_C(1000000000) + (uint64_t)now.tv_nsec;</div>
 <div class="line"><span class="lineno">  118</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00364">ck_threadpool_dispatch_n()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00375">ck_threadpool_dispatch_n()</a>.</p>
 
 </div>
 </div>
@@ -1740,63 +1740,74 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  183</span>            <span class="keywordtype">int</span> current = atomic_load_explicit(&amp;pool-&gt;n_dispatch, memory_order_acquire);</div>
 <div class="line"><span class="lineno">  184</span>            active = atomic_load_explicit(&amp;pool-&gt;active_threads, memory_order_acquire);</div>
 <div class="line"><span class="lineno">  185</span>            <span class="keywordflow">if</span> (current != last_dispatch) {</div>
-<div class="line"><span class="lineno">  186</span>                last_dispatch = current;</div>
-<div class="line"><span class="lineno">  187</span>                <span class="keywordflow">if</span> (ith &lt; active) {</div>
-<div class="line"><span class="lineno">  188</span>                    <span class="keywordflow">break</span>;</div>
-<div class="line"><span class="lineno">  189</span>                }</div>
-<div class="line"><span class="lineno">  190</span>                spins = 0;</div>
-<div class="line"><span class="lineno">  191</span>            }</div>
-<div class="line"><span class="lineno">  192</span> </div>
-<div class="line"><span class="lineno">  193</span>            <span class="comment">/* Threads outside the active subset sleep instead of spinning. */</span></div>
-<div class="line"><span class="lineno">  194</span>            <span class="keywordflow">if</span> (ith &gt;= active || spins &gt;= <a class="code hl_define" href="ck__threadpool_8h.html#a4644600fdce88046ccbdf5089793819a">CK_THREADPOOL_SPIN_COUNT</a>) {</div>
-<div class="line"><span class="lineno">  195</span>                pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  196</span>                <span class="keywordflow">for</span> (;;) {</div>
-<div class="line"><span class="lineno">  197</span>                    <span class="keywordflow">if</span> (atomic_load_explicit(&amp;pool-&gt;stop, memory_order_acquire)) {</div>
-<div class="line"><span class="lineno">  198</span>                        pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  199</span>                        <span class="keywordflow">return</span> NULL;</div>
-<div class="line"><span class="lineno">  200</span>                    }</div>
-<div class="line"><span class="lineno">  201</span>                    current = atomic_load_explicit(&amp;pool-&gt;n_dispatch, memory_order_acquire);</div>
-<div class="line"><span class="lineno">  202</span>                    active = atomic_load_explicit(&amp;pool-&gt;active_threads, memory_order_acquire);</div>
-<div class="line"><span class="lineno">  203</span>                    <span class="keywordflow">if</span> (current != last_dispatch) {</div>
-<div class="line"><span class="lineno">  204</span>                        last_dispatch = current;</div>
-<div class="line"><span class="lineno">  205</span>                        <span class="keywordflow">if</span> (ith &lt; active) {</div>
-<div class="line"><span class="lineno">  206</span>                            pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  207</span>                            <span class="keywordflow">goto</span> worker_have_work;</div>
-<div class="line"><span class="lineno">  208</span>                        }</div>
-<div class="line"><span class="lineno">  209</span>                    }</div>
-<div class="line"><span class="lineno">  210</span>                    pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  211</span>                }</div>
-<div class="line"><span class="lineno">  212</span>            }</div>
-<div class="line"><span class="lineno">  213</span> </div>
-<div class="line"><span class="lineno">  214</span>            <a class="code hl_define" href="ck__threadpool_8c.html#ae0445e61c7b90259729ee63b95ee3257">CK_SPIN_PAUSE</a>();</div>
-<div class="line"><span class="lineno">  215</span>            spins++;</div>
-<div class="line"><span class="lineno">  216</span>        }</div>
-<div class="line"><span class="lineno">  217</span> </div>
-<div class="line"><span class="lineno">  218</span>worker_have_work:</div>
-<div class="line"><span class="lineno">  219</span>        <span class="comment">/* Execute work */</span></div>
-<div class="line"><span class="lineno">  220</span>        fn = pool-&gt;work_fn;</div>
-<div class="line"><span class="lineno">  221</span>        args = pool-&gt;work_args;</div>
-<div class="line"><span class="lineno">  222</span>        <span class="keywordflow">if</span> (fn) {</div>
-<div class="line"><span class="lineno">  223</span>            fn(ith, active, args);</div>
-<div class="line"><span class="lineno">  224</span>        }</div>
-<div class="line"><span class="lineno">  225</span> </div>
-<div class="line"><span class="lineno">  226</span>        <span class="comment">/* Signal completion */</span></div>
-<div class="line"><span class="lineno">  227</span>        <span class="keywordflow">if</span> (atomic_fetch_add_explicit(&amp;pool-&gt;n_complete, 1, memory_order_acq_rel)</div>
-<div class="line"><span class="lineno">  228</span>            == active - 2) {</div>
-<div class="line"><span class="lineno">  229</span>            <span class="comment">/* Last worker done — wake main thread if it&#39;s waiting */</span></div>
-<div class="line"><span class="lineno">  230</span>            pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  231</span>            pthread_cond_signal(&amp;pool-&gt;cond_done);</div>
-<div class="line"><span class="lineno">  232</span>            pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
-<div class="line"><span class="lineno">  233</span>        }</div>
-<div class="line"><span class="lineno">  234</span>    }</div>
-<div class="line"><span class="lineno">  235</span> </div>
-<div class="line"><span class="lineno">  236</span>    <span class="keywordflow">return</span> NULL;</div>
-<div class="line"><span class="lineno">  237</span>}</div>
+<div class="line"><span class="lineno">  186</span>                <span class="comment">/* Snapshot the epoch and descriptor together. An inactive</span></div>
+<div class="line"><span class="lineno">  187</span><span class="comment">                 * worker may still be catching up with an older dispatch. */</span></div>
+<div class="line"><span class="lineno">  188</span>                pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  189</span>                current = atomic_load_explicit(&amp;pool-&gt;n_dispatch, memory_order_acquire);</div>
+<div class="line"><span class="lineno">  190</span>                active = atomic_load_explicit(&amp;pool-&gt;active_threads, memory_order_acquire);</div>
+<div class="line"><span class="lineno">  191</span>                <span class="keywordflow">if</span> (current != last_dispatch) {</div>
+<div class="line"><span class="lineno">  192</span>                    last_dispatch = current;</div>
+<div class="line"><span class="lineno">  193</span>                    <span class="keywordflow">if</span> (ith &lt; active) {</div>
+<div class="line"><span class="lineno">  194</span>                        fn = pool-&gt;work_fn;</div>
+<div class="line"><span class="lineno">  195</span>                        args = pool-&gt;work_args;</div>
+<div class="line"><span class="lineno">  196</span>                        pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  197</span>                        <span class="keywordflow">break</span>;</div>
+<div class="line"><span class="lineno">  198</span>                    }</div>
+<div class="line"><span class="lineno">  199</span>                }</div>
+<div class="line"><span class="lineno">  200</span>                pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  201</span>                spins = 0;</div>
+<div class="line"><span class="lineno">  202</span>            }</div>
+<div class="line"><span class="lineno">  203</span> </div>
+<div class="line"><span class="lineno">  204</span>            <span class="comment">/* Threads outside the active subset sleep instead of spinning. */</span></div>
+<div class="line"><span class="lineno">  205</span>            <span class="keywordflow">if</span> (ith &gt;= active || spins &gt;= <a class="code hl_define" href="ck__threadpool_8h.html#a4644600fdce88046ccbdf5089793819a">CK_THREADPOOL_SPIN_COUNT</a>) {</div>
+<div class="line"><span class="lineno">  206</span>                pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  207</span>                <span class="keywordflow">for</span> (;;) {</div>
+<div class="line"><span class="lineno">  208</span>                    <span class="keywordflow">if</span> (atomic_load_explicit(&amp;pool-&gt;stop, memory_order_acquire)) {</div>
+<div class="line"><span class="lineno">  209</span>                        pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  210</span>                        <span class="keywordflow">return</span> NULL;</div>
+<div class="line"><span class="lineno">  211</span>                    }</div>
+<div class="line"><span class="lineno">  212</span>                    current = atomic_load_explicit(&amp;pool-&gt;n_dispatch, memory_order_acquire);</div>
+<div class="line"><span class="lineno">  213</span>                    active = atomic_load_explicit(&amp;pool-&gt;active_threads, memory_order_acquire);</div>
+<div class="line"><span class="lineno">  214</span>                    <span class="keywordflow">if</span> (current != last_dispatch) {</div>
+<div class="line"><span class="lineno">  215</span>                        last_dispatch = current;</div>
+<div class="line"><span class="lineno">  216</span>                        <span class="keywordflow">if</span> (ith &lt; active) {</div>
+<div class="line"><span class="lineno">  217</span>                            fn = pool-&gt;work_fn;</div>
+<div class="line"><span class="lineno">  218</span>                            args = pool-&gt;work_args;</div>
+<div class="line"><span class="lineno">  219</span>                            pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  220</span>                            <span class="keywordflow">goto</span> worker_have_work;</div>
+<div class="line"><span class="lineno">  221</span>                        }</div>
+<div class="line"><span class="lineno">  222</span>                    }</div>
+<div class="line"><span class="lineno">  223</span>                    pthread_cond_wait(&amp;pool-&gt;cond_dispatch, &amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  224</span>                }</div>
+<div class="line"><span class="lineno">  225</span>            }</div>
+<div class="line"><span class="lineno">  226</span> </div>
+<div class="line"><span class="lineno">  227</span>            <a class="code hl_define" href="ck__threadpool_8c.html#ae0445e61c7b90259729ee63b95ee3257">CK_SPIN_PAUSE</a>();</div>
+<div class="line"><span class="lineno">  228</span>            spins++;</div>
+<div class="line"><span class="lineno">  229</span>        }</div>
+<div class="line"><span class="lineno">  230</span> </div>
+<div class="line"><span class="lineno">  231</span>worker_have_work:</div>
+<div class="line"><span class="lineno">  232</span>        <span class="comment">/* Execute work */</span></div>
+<div class="line"><span class="lineno">  233</span>        <span class="keywordflow">if</span> (fn) {</div>
+<div class="line"><span class="lineno">  234</span>            fn(ith, active, args);</div>
+<div class="line"><span class="lineno">  235</span>        }</div>
+<div class="line"><span class="lineno">  236</span> </div>
+<div class="line"><span class="lineno">  237</span>        <span class="comment">/* Signal completion */</span></div>
+<div class="line"><span class="lineno">  238</span>        <span class="keywordflow">if</span> (atomic_fetch_add_explicit(&amp;pool-&gt;n_complete, 1, memory_order_acq_rel)</div>
+<div class="line"><span class="lineno">  239</span>            == active - 2) {</div>
+<div class="line"><span class="lineno">  240</span>            <span class="comment">/* Last worker done — wake main thread if it&#39;s waiting */</span></div>
+<div class="line"><span class="lineno">  241</span>            pthread_mutex_lock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  242</span>            pthread_cond_signal(&amp;pool-&gt;cond_done);</div>
+<div class="line"><span class="lineno">  243</span>            pthread_mutex_unlock(&amp;pool-&gt;mutex);</div>
+<div class="line"><span class="lineno">  244</span>        }</div>
+<div class="line"><span class="lineno">  245</span>    }</div>
+<div class="line"><span class="lineno">  246</span> </div>
+<div class="line"><span class="lineno">  247</span>    <span class="keywordflow">return</span> NULL;</div>
+<div class="line"><span class="lineno">  248</span>}</div>
 <div class="ttc" id="ack__threadpool_8h_html_ab62fc130ff232f63cffe53fd072d0179"><div class="ttname"><a href="ck__threadpool_8h.html#ab62fc130ff232f63cffe53fd072d0179">ck_work_fn_t</a></div><div class="ttdeci">void(* ck_work_fn_t)(int ith, int nth, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8h_source.html#l00068">ck_threadpool.h:68</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00036">CK_SPIN_PAUSE</a>, and <a class="el" href="ck__threadpool_8h_source.html#l00051">CK_THREADPOOL_SPIN_COUNT</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00260">ck_threadpool_create_capacity()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00271">ck_threadpool_create_capacity()</a>.</p>
 
 </div>
 </div>
@@ -1847,9 +1858,9 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00592">592</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00603">603</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00646">ck_threadpool_global_destroy()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00613">global_pool_init()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00651">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00657">ck_threadpool_global_destroy()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00624">global_pool_init()</a>.</p>
 
 </div>
 </div>
@@ -1873,9 +1884,9 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00593">593</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
+<p class="definition">Definition at line <a class="el" href="ck__threadpool_8c_source.html#l00604">604</a> of file <a class="el" href="ck__threadpool_8c_source.html">ck_threadpool.c</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00640">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00646">ck_threadpool_global_destroy()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__threadpool_8c_source.html#l00651">ck_threadpool_global()</a>, and <a class="el" href="ck__threadpool_8c_source.html#l00657">ck_threadpool_global_destroy()</a>.</p>
 
 </div>
 </div>

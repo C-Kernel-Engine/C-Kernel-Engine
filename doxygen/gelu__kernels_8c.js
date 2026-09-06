@@ -22,6 +22,7 @@ var gelu__kernels_8c =
     [ "gelu_exact_inplace", "gelu__kernels_8c.html#a315f43ac44656b5d77360d9879c5f122", null ],
     [ "gelu_fast_inplace", "gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365", null ],
     [ "gelu_ggml_inplace", "gelu__kernels_8c.html#a2f0b0fab254b6af615754ac2eaf84ddb", null ],
+    [ "gelu_ggml_native_inplace", "gelu__kernels_8c.html#ab48a772c053be8dd3cc0f5e4ea1a1223", null ],
     [ "gelu_pytorch_erf_f32_inplace", "gelu__kernels_8c.html#a3781af580a3fe9c5c3df37db21a18ede", null ],
     [ "gelu_pytorch_erf_sleef_bf16_storage", "gelu__kernels_8c.html#ab02e6492df3fa0c77460a903b9b03fcc", null ],
     [ "gelu_pytorch_tanh_bf16_storage", "gelu__kernels_8c.html#afa19bdb5dd6cbe60bc106159d62d7327", null ],
