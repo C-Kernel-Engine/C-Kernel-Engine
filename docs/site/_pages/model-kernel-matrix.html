@@ -818,7 +818,7 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
       </div>
       <div class="source-note">
-        Fix detail: Gemma was applying RoPE with the wrong dimension pairing. Gemma expects split-half RoPE, where the first half of Q/K is paired with the second half during the rotation step. The runtime could still choose the other common layout, so attention drifted from the reference path. The fix was to read exported <code>rope_layout</code> metadata and select the matching <code>rope_qk</code> kernel automatically.
+        Fix detail: Gemma was applying RoPE with the wrong dimension pairing. Gemma expects split-half RoPE, where the first half of Q/K is paired with the second half during the rotation step. The runtime could still choose the other common layout, so attention drifted from the reference path. The fix was to read exported <code>rope_layout</code> metadata and select the matching <code>rope_qk</code> kernel automatically. PR #463 went further: the circuit now pins llama.cpp's numerical schedule (<code>fp32_llama_regular</code>), and 256/256 complete-vocabulary rows match llama.cpp bit-exactly for both Q4_K_M and the tested UD-Q4_K_XL artifact &mdash; see the <a href="v8-numerical-contracts.html#gemma3-schedule-case-study">v8 Numerical Contracts Gemma3 case study</a> for the contract mechanism and its open caveats.
       </div>
       <div class="model-tags">
         <span class="tag fixed">first-divergence @ rope_qk</span>

@@ -3,6 +3,13 @@
 
 <style>
 .contract-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin:1rem 0}.contract-card{border:1px solid var(--grey);border-left:4px solid var(--orange);border-radius:8px;padding:1rem;background:rgba(255,255,255,.02)}.contract-card h3{margin-top:0}.contract-flow{overflow-x:auto}.contract-flow img{display:block;width:100%;min-width:900px;height:auto}.contract-note{border:1px solid rgba(7,173,248,.45);border-radius:8px;padding:1rem;background:rgba(7,173,248,.06)}.contract-bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.06)}.contract-good{border-color:rgba(48,196,141,.55);background:rgba(48,196,141,.06)}.contract-table td:first-child{font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.svg-expand{position:relative}.svg-expand svg{cursor:zoom-in}.svg-expand svg:focus-visible{outline:2px solid var(--orange);outline-offset:3px}.svg-expand-hint{text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:-.6rem;margin-bottom:1rem;font-family:'JetBrains Mono',monospace}
+#nc-svg-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.95);padding:3.2rem 1rem 1rem}
+#nc-svg-overlay .nc-ov-bar{position:fixed;top:0;left:0;right:0;padding:.55rem 1rem;background:rgba(0,0,0,.9);border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;gap:.6rem}
+#nc-svg-overlay .nc-ov-title{color:#ccc;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#nc-svg-overlay .nc-ov-bar button{background:#333;color:#ffb400;border:1px solid #555;padding:.3rem .7rem;cursor:pointer;border-radius:4px;font-size:.85rem}
+#nc-svg-overlay .nc-ov-stage{width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
+#nc-svg-overlay .nc-ov-stage img{max-width:none;height:auto}
 </style>
 
 <h1>v8 Numerical Contracts</h1>
@@ -86,6 +93,143 @@
   <li>GraphIR records requirements and the resolved kernel/contract IDs. LoweredIR and call-ready IR carry that decision and hard-fail if a later stage changes it.</li>
   <li>Production promotion additionally requires validated circuit, contract definition, implementation route, stitched parity, and E2E evidence.</li>
 </ol>
+
+<h2 id="gemma3-schedule-case-study">Case Study: Matching a Reference Engine's Schedule Bit-Exactly (Gemma3)</h2>
+
+<p>Gemma3 is the strongest demonstration of why the schedule belongs in the contract. Before <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/463">PR #463</a>, Gemma3's regular attention, RoPE, GeGLU, terminal-row selection, and tied Q8_0 vocabulary projection each computed mathematically equivalent results with a <em>different reduction schedule</em> than the pinned llama.cpp oracle: different accumulation order, different padded reduction extent, different rounding points. The measured starting point was 0/256 exact complete-vocabulary rows (172/256 top-1, initial logit RMSE 6.7481). No single kernel was wrong in isolation &mdash; the stitched model simply did not execute the oracle's schedule, so values landed on opposite sides of quantization boundaries and diverged bit by bit.</p>
+
+<p>The fix did not change any shared arithmetic. The Gemma3 circuit declares the schedule as an explicit contract input: <code>required_contracts</code> requests <code>numerics.attention_reduction: fp32_llama_regular</code>, a validated entry in <code>version/v8/contracts/attention_reductions.json</code> that pins FP16-rounded Q/K operands, FP32 score/softmax/value accumulators, llama.cpp's 256-position KV padding, a single-range partition, and phase-specific GEMM/matvec reduction order. The resolver then binds circuit-selected providers that implement exactly that schedule &mdash; <code>rmsnorm_forward_llama_production</code> and <code>qk_norm_forward_llama_production</code> for the norm boundaries, <code>rope_forward_qk_split_llama</code> under the declared per-layer RoPE schedule (local layers use the 10,000 base, not the global 1,000,000), <code>geglu_forward_ggml_native</code> for the FP16-table GeGLU, and the Q8_0-activation contract for the tied vocabulary projection. Shared provider resolution, layout validation, terminal-row bounds, and thread-pool dispatch were hardened at the same time, and the selection is family-scoped: Gemma4 retains its own providers and tests assert it cannot inherit the Gemma3 normalization or GeGLU route. The full debugging sequence, artifact inventory, and measured trajectory are recorded in <code>docs/logs/gemma3-baseline-parity.md</code>.</p>
+
+<p>The evidence is CKE's strongest cross-engine claim to date. On a matched numerical run (identical 26-token input, FP32 KV cache, regular attention, oracle flash attention disabled, 256-row teacher-forced trajectory):</p>
+
+<ul>
+  <li>256/256 complete-vocabulary logit rows bit-exact to llama.cpp for the standard Gemma3 270M Q4_K_M artifact, including bit-exact repeatability and X-Ray capture neutrality.</li>
+  <li>256/256 complete-vocabulary rows bit-exact for the tested Unsloth UD-Q4_K_XL artifact &mdash; a mixed Q4_K/Q5_0/Q5_K/Q6_K/Q8_0 per-tensor recipe, not a distinct arithmetic format (see <a href="quant-formats.html#recipes-vs-formats">Recipes vs Formats</a>).</li>
+  <li>Shared-risk gates: <code>make test-threadpool</code> passes 308,713 assertions; <code>make test-kernel-maps</code> passes 169 tests and 1,216 subtests.</li>
+</ul>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 570" width="100%" role="img" tabindex="0" data-svg-title="Reduction order is a numerical contract - Gemma3 bit-exact schedule match (PR #463)"
+     aria-label="Reduction order is a numerical contract. Left panel: one dot product computed two ways with the same inputs and the same FP32 precision. Order A, a serial accumulation, evaluates (((p0 + p1) + p2) + p3) and yields 0.5000001. Order B, a pairwise SIMD-lane accumulation, evaluates ((p0 + p2) + (p1 + p3)) and yields 0.4999999. On a quantization boundary strip the two results straddle the boundary, so the quantized codes differ by 1 ulp of the quantized grid and the dequantized logits diverge. Right panel: the contract pins the schedule. The gemma3.json circuit's required_contracts requests the fp32_llama_regular contract, which pins FP16-rounded Q and K operands, FP32 score, softmax, and value accumulators, 256-position KV padding, a single-range partition, and phase-specific GEMM or matvec reduction order; the compiler then binds providers that implement exactly that schedule, including the llama production RMSNorm and QK-norm providers, rope_forward_qk_split_llama, geglu_forward_ggml_native, the llama regular sliding attention providers, and the Q8_0-activation vocabulary projection. Gemma4 keeps its own providers and tests assert it cannot inherit the Gemma3 route. Evidence strip for PR #463: standard Q4_K_M 256 of 256 complete-vocabulary rows bit-exact to llama.cpp, the tested Unsloth UD-Q4_K_XL mixed recipe also 256 of 256 bit-exact, make test-threadpool 308713 assertions, make test-kernel-maps 169 tests and 1216 subtests. Caveats: the 520-token layer-0 boundary differs at five rows so longer-context bit-exact certification remains open, the exact Qwen3.6 35B-A3B artifact fails at its first full-logit row and is not certified, and Flash long-context, BF16, and performance certification remain open."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <style>
+    .nc-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .nc-panel{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    .nc-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .nc-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nc-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nc-hi2{fill:#07adf8;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nc-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nc-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .nc-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;}
+    .nc-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="nc-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="nc-band">REDUCTION ORDER IS A NUMERICAL CONTRACT - SAME MATH, DIFFERENT ORDER, DIFFERENT BITS</text>
+
+  <!-- left: same dot product, two accumulation orders -->
+  <rect class="nc-panel" x="24" y="48" width="560" height="310" rx="12"/>
+  <text x="44" y="76" class="nc-title" font-size="13">One dot product, two accumulation orders</text>
+  <text x="44" y="94" class="nc-sub">same inputs, same fp32 - only the summation tree differs</text>
+
+  <text x="44" y="126" class="nc-hi">order A - serial (one-row-at-a-time)</text>
+  <rect class="nc-box" x="44" y="136" width="240" height="34" rx="8"/>
+  <text x="164" y="158" text-anchor="middle" class="nc-sub">(((p0+p1)+p2)+p3)</text>
+  <path d="M284,153 L322,153" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nc-arrow)"/>
+  <rect class="nc-box" x="328" y="136" width="150" height="34" rx="8"/>
+  <text x="403" y="158" text-anchor="middle" class="nc-hi">0.5000001</text>
+
+  <text x="44" y="206" class="nc-warn">order B - pairwise (SIMD lanes)</text>
+  <rect class="nc-box" x="44" y="216" width="240" height="34" rx="8"/>
+  <text x="164" y="238" text-anchor="middle" class="nc-sub">((p0+p2)+(p1+p3))</text>
+  <path d="M284,233 L322,233" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nc-arrow)"/>
+  <rect class="nc-box" x="328" y="216" width="150" height="34" rx="8"/>
+  <text x="403" y="238" text-anchor="middle" class="nc-warn">0.4999999</text>
+
+  <!-- quantization boundary strip -->
+  <text x="44" y="286" class="nc-sub">quantization boundary strip (quantized grid ticks)</text>
+  <path d="M60,318 L540,318" fill="none" stroke="#454545" stroke-width="1.4"/>
+  <path d="M120,312 L120,324 M200,312 L200,324 M380,312 L380,324 M460,312 L460,324" fill="none" stroke="#454545" stroke-width="1.4"/>
+  <path d="M300,296 L300,340" fill="none" stroke="#ffd38a" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="300" y="354" text-anchor="middle" class="nc-warn" font-size="10.5">boundary</text>
+  <circle cx="318" cy="318" r="6" fill="#7fd8ec"/>
+  <circle cx="282" cy="318" r="6" fill="#ffd38a"/>
+  <text x="336" y="306" class="nc-hi">sum_A -&gt; code N+1</text>
+  <text x="336" y="338" class="nc-warn">sum_B -&gt; code N</text>
+  <text x="44" y="344" class="nc-sub" font-size="10.5">the orders straddle the boundary:</text>
+
+  <!-- right: the contract pins the schedule -->
+  <rect class="nc-panel" x="608" y="48" width="548" height="310" rx="12"/>
+  <text x="628" y="76" class="nc-title" font-size="13">The contract pins the schedule</text>
+
+  <rect class="nc-box" x="628" y="92" width="184" height="66" rx="10"/>
+  <text x="646" y="116" class="nc-title" font-size="12">gemma3.json</text>
+  <text x="646" y="134" class="nc-sub">required_contracts:</text>
+  <text x="646" y="150" class="nc-sub">attention_reduction =</text>
+  <path d="M812,125 L838,125" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nc-arrow)"/>
+
+  <rect class="nc-box" x="844" y="88" width="292" height="150" rx="10" stroke="#07adf8"/>
+  <text x="862" y="112" class="nc-hi2" font-size="13" font-weight="700">fp32_llama_regular</text>
+  <text x="862" y="134" class="nc-sub">q/k compute: fp16_rounded</text>
+  <text x="862" y="152" class="nc-sub">score/softmax/value acc: fp32</text>
+  <text x="862" y="170" class="nc-sub">KV padding: 256 positions</text>
+  <text x="862" y="188" class="nc-sub">partition: single_range</text>
+  <text x="862" y="206" class="nc-sub">order: phase GEMM / matvec</text>
+  <text x="862" y="226" class="nc-sub" font-size="10.5">terminal rows + RoPE schedule bound too</text>
+
+  <path d="M990,238 L990,258" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#nc-arrow)"/>
+  <rect class="nc-box" x="844" y="264" width="292" height="78" rx="10"/>
+  <text x="862" y="286" class="nc-title" font-size="12">compiler binds exact providers</text>
+  <text x="862" y="304" class="nc-sub">rmsnorm/qk_norm llama_production,</text>
+  <text x="862" y="320" class="nc-sub">rope_qk_split_llama, geglu_ggml_native,</text>
+  <text x="862" y="336" class="nc-sub">llama_regular attn, q8_0-act lm_head</text>
+
+  <rect class="nc-box" x="628" y="264" width="184" height="78" rx="10"/>
+  <text x="646" y="286" class="nc-good" font-size="12">Gemma4 isolation</text>
+  <text x="646" y="304" class="nc-sub">keeps its own providers;</text>
+  <text x="646" y="320" class="nc-sub">tests assert no Gemma3</text>
+  <text x="646" y="336" class="nc-sub">route inheritance</text>
+
+  <!-- evidence strip -->
+  <text x="24" y="386" class="nc-band">EVIDENCE (PR #463) - 256/256 COMPLETE-VOCABULARY ROWS BIT-EXACT TO LLAMA.CPP</text>
+  <rect class="nc-panel" x="24" y="398" width="1132" height="84" rx="12"/>
+  <rect class="nc-box" x="44" y="416" width="262" height="48" rx="8"/>
+  <text x="60" y="436" class="nc-good" font-size="12">Q4_K_M (Gemma3 270M)</text>
+  <text x="60" y="454" class="nc-sub">256/256 rows bit-exact</text>
+  <rect class="nc-box" x="326" y="416" width="282" height="48" rx="8"/>
+  <text x="342" y="436" class="nc-good" font-size="12">UD-Q4_K_XL (mixed recipe)</text>
+  <text x="342" y="454" class="nc-sub">256/256 rows bit-exact</text>
+  <rect class="nc-box" x="628" y="416" width="252" height="48" rx="8"/>
+  <text x="644" y="436" class="nc-title" font-size="12">make test-threadpool</text>
+  <text x="644" y="454" class="nc-sub">308,713 assertions pass</text>
+  <rect class="nc-box" x="900" y="416" width="236" height="48" rx="8"/>
+  <text x="916" y="436" class="nc-title" font-size="12">make test-kernel-maps</text>
+  <text x="916" y="454" class="nc-sub">169 tests / 1,216 subtests</text>
+
+  <text x="24" y="510" class="nc-cap">Evidence (PR #463): identical 26-token input, FP32 KV, regular attention, oracle flash disabled, 256-row teacher-forced</text>
+  <text x="24" y="528" class="nc-cap">trajectory; UD-Q4_K_XL is a mixed Q4_K/Q5_0/Q5_K/Q6_K/Q8_0 per-tensor recipe; repeatability + capture neutrality exact.</text>
+  <text x="24" y="548" class="nc-cap">Caveats: 520-token layer-0 boundary differs at five rows (longer-context bit-exact OPEN); exact Qwen3.6 35B-A3B artifact</text>
+  <text x="24" y="566" class="nc-cap">fails at its first full-logit row (NOT certified); Flash long-context, BF16, and performance certification remain open.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="contract-note contract-bad">
+  <strong>Caveats &mdash; what PR #463 does not certify:</strong>
+  <ul style="margin: 0.5rem 0 0;">
+    <li>The 520-token layer-0 boundary differs at five rows (positions 152, 380, 430, 509, 514) &mdash; longer-context bit-exact certification remains <strong>open</strong>.</li>
+    <li>The exact <code>Qwen3.6-35B-A3B-UD-Q4_K_M.gguf</code> artifact still fails at its first full-logit row and is explicitly <strong>not certified</strong>; the planner fix that exposed that failure does not solve it.</li>
+    <li>Flash long-context, BF16, and performance certification remain open; the certified configuration is FP32 KV with regular attention and oracle flash attention disabled.</li>
+    <li>The claim covers the two tested artifacts. UD recipes containing IQ formats without registered providers and oracle coverage are not implied.</li>
+  </ul>
+</div>
+
+<p>The same principle &mdash; reduction order as a numerical contract &mdash; fixed Qwen3.8 Flash Next's M=4 shared-expert staging divergence; see <a href="concepts.html">Kernel Concepts</a>. Together the two stories bracket the claim: schedules that cross engine boundaries (llama.cpp) and schedules that cross shape boundaries (GEMV vs four-row staging) are both contract inputs, not implementation details.</p>
 
 <h2>Compatibility and Migration</h2>
 
@@ -289,3 +433,56 @@ make v8-regression-fast</code></pre>
 </ul>
 
 <p>Related: <a href="architecture.html">System Architecture</a>, <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>, <a href="ir-pipeline.html">IR Pipeline</a>, <a href="v8-vision-encoder.html">v8 Vision Encoder</a>, and <a href="kernel-tuning-methodology.html">Kernel Tuning Methodology</a>.</p>
+
+<div id="nc-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+  <div class="nc-ov-bar">
+    <span class="nc-ov-title" id="nc-ov-title">Diagram</span>
+    <span>
+      <button type="button" id="nc-ov-out" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="nc-ov-in" aria-label="Zoom in">+</button>
+      <button type="button" id="nc-ov-close" aria-label="Close">&times;</button>
+    </span>
+  </div>
+  <div class="nc-ov-stage" id="nc-ov-stage"><img id="nc-ov-img" alt=""></div>
+</div>
+
+<script>
+  (function() {
+    var overlay = document.getElementById('nc-svg-overlay');
+    var stage = document.getElementById('nc-ov-stage');
+    var img = document.getElementById('nc-ov-img');
+    var title = document.getElementById('nc-ov-title');
+    var scale = 1;
+    function applyScale() {
+      var base = Math.max(stage.clientWidth - 32, 280);
+      img.style.width = Math.round(base * scale) + 'px';
+    }
+    function open(svg) {
+      var xml = new XMLSerializer().serializeToString(svg);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+      img.alt = svg.getAttribute('aria-label') || 'diagram';
+      title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+      scale = 1;
+      overlay.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      img.onload = applyScale;
+      applyScale();
+      document.getElementById('nc-ov-close').focus();
+    }
+    function close() {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+      svg.addEventListener('click', function() { open(svg); });
+      svg.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+      });
+    });
+    document.getElementById('nc-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+    document.getElementById('nc-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+    document.getElementById('nc-ov-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+  })();
+</script>
