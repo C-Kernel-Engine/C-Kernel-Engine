@@ -93,7 +93,7 @@
   </style>
 
   <div class="ck-section">
-    <h2>1. Cohere2 Command R (PR #401): the reuse story</h2>
+    <h2 id="cohere2-reuse">1. Cohere2 Command R: the reuse story</h2>
     <p style="color: var(--text-secondary);">
       Command R is structurally novel &mdash; a single shared pre-block LayerNorm feeds the attention and MLP
       branches in parallel, layers alternate sliding and full attention 3:1, the LM head is weight-tied, and
@@ -192,7 +192,7 @@
   </div>
 
   <div class="ck-section">
-    <h2>2. Cohere North (MoE, PR #426): zero new C kernels</h2>
+    <h2>2. Cohere North (MoE): zero new C kernels</h2>
     <p style="color: var(--text-secondary);">
       North (North Mini Code, <code>cohere2_moe.json</code>) is a Cohere2-family MoE: alternating full/sliding
       attention, a leading dense layer, sigmoid top-8 routing, tied embedding head. It required
@@ -207,7 +207,7 @@
   </div>
 
   <div class="ck-section">
-    <h2>3. North Micro Vision / Compass (PR #434): the BF16 frontend</h2>
+    <h2>3. North Micro Vision / Compass: the BF16 frontend</h2>
     <p style="color: var(--text-secondary);">
       North Micro Vision keeps Cohere2 text semantics and adds a Qwen3-VL-derived vision tower, expressed as three
       circuits &mdash; <code>cohere_compass.json</code> (stitch), <code>cohere_compass_text.json</code>,
@@ -242,7 +242,7 @@
   </div>
 
   <div class="ck-section">
-    <h2>4. Cohere Transcribe (PRs #433, #436, #441): the audio stack</h2>
+    <h2>4. Cohere Transcribe: the audio stack</h2>
     <div class="alert alert-warning" style="margin: 0.4rem 0 0.8rem;">
       <div class="alert-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71 3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
