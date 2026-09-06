@@ -1079,21 +1079,31 @@
 
 <h2 id="gemma3-schedule-case-study">Case Study: Matching a Reference Engine's Schedule Bit-Exactly (Gemma3)</h2>
 
+<p><strong>The insight first: summation order is part of the numerical contract.</strong> One dot product, summed serially or in pairwise SIMD lanes over identical FP32 inputs, can produce different bits. When that result sits next to a quantization boundary, the two orders land on different quantized codes and every downstream value diverges. No kernel is "wrong" in isolation &mdash; but a stitched model that does not execute the oracle's reduction schedule cannot be bit-exact to it. The diagram below makes that concrete, then shows how the Gemma3 circuit pins the schedule as an explicit contract input.</p>
+
 <p>Gemma3 is the strongest demonstration of why the schedule belongs in the contract. Before <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/463">PR #463</a>, Gemma3's regular attention, RoPE, GeGLU, terminal-row selection, and tied Q8_0 vocabulary projection each computed mathematically equivalent results with a <em>different reduction schedule</em> than the pinned llama.cpp oracle: different accumulation order, different padded reduction extent, different rounding points. The measured starting point was 0/256 exact complete-vocabulary rows (172/256 top-1, initial logit RMSE 6.7481). No single kernel was wrong in isolation &mdash; the stitched model simply did not execute the oracle's schedule, so values landed on opposite sides of quantization boundaries and diverged bit by bit.</p>
 
 <p>The fix did not change any shared arithmetic. The Gemma3 circuit declares the schedule as an explicit contract input: <code>required_contracts</code> requests <code>numerics.attention_reduction: fp32_llama_regular</code>, a validated entry in <code>version/v8/contracts/attention_reductions.json</code> that pins FP16-rounded Q/K operands, FP32 score/softmax/value accumulators, llama.cpp's 256-position KV padding, a single-range partition, and phase-specific GEMM/matvec reduction order. The resolver then binds circuit-selected providers that implement exactly that schedule &mdash; <code>rmsnorm_forward_llama_production</code> and <code>qk_norm_forward_llama_production</code> for the norm boundaries, <code>rope_forward_qk_split_llama</code> under the declared per-layer RoPE schedule (local layers use the 10,000 base, not the global 1,000,000), <code>geglu_forward_ggml_native</code> for the FP16-table GeGLU, and the Q8_0-activation contract for the tied vocabulary projection. Shared provider resolution, layout validation, terminal-row bounds, and thread-pool dispatch were hardened at the same time, and the selection is family-scoped: Gemma4 retains its own providers and tests assert it cannot inherit the Gemma3 normalization or GeGLU route. The full debugging sequence, artifact inventory, and measured trajectory are recorded in <code>docs/logs/gemma3-baseline-parity.md</code>.</p>
 
-<p>The evidence is CKE's strongest cross-engine claim to date. On a matched numerical run (identical 26-token input, FP32 KV cache, regular attention, oracle flash attention disabled, 256-row teacher-forced trajectory):</p>
+<p>One clarification that is easy to misread: the run configuration says <em>FP32 KV</em> while the contract says <em>FP16-rounded operands</em> and the oracle reference says <em>FP16 KV cache</em>. These are three different layers of the story, and they are all true at once:</p>
 
-<ul>
-  <li>256/256 complete-vocabulary logit rows bit-exact to llama.cpp for the standard Gemma3 270M Q4_K_M artifact, including bit-exact repeatability and X-Ray capture neutrality.</li>
-  <li>256/256 complete-vocabulary rows bit-exact for the tested Unsloth UD-Q4_K_XL artifact &mdash; a mixed Q4_K/Q5_0/Q5_K/Q6_K/Q8_0 per-tensor recipe, not a distinct arithmetic format (see <a href="quant-formats.html#recipes-vs-formats">Recipes vs Formats</a>).</li>
-  <li>Shared-risk gates: <code>make test-threadpool</code> passes 308,713 assertions; <code>make test-kernel-maps</code> passes 169 tests and 1,216 subtests.</li>
-</ul>
+<table class="table">
+  <thead>
+    <tr><th>Stage</th><th>Precision</th><th>Owner</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>KV cache buffer storage (CKE)</td><td>FP32 buffers in the matched run</td><td>CKE runtime configuration (26-token input, 1024 capacity, regular attention)</td></tr>
+    <tr><td>Operand rounding (Q/K/V at the attention compute boundary)</td><td>FP16-rounded (<code>q_compute</code>/<code>k_compute</code>/<code>value_compute</code>: <code>fp16_rounded</code>)</td><td>Contract <code>fp32_llama_regular</code> in <code>version/v8/contracts/attention_reductions.json</code></td></tr>
+    <tr><td>Score, softmax-statistics, and value accumulators</td><td>FP32, single-range partition, 256-position KV padding</td><td>Contract <code>fp32_llama_regular</code></td></tr>
+    <tr><td>Oracle KV configuration</td><td>FP16 KV cache storage, flash attention disabled</td><td>Pinned llama.cpp oracle (the contract's declared reference)</td></tr>
+  </tbody>
+</table>
+
+<p>CKE keeps KV in FP32 buffers but rounds the Q/K/V operands through FP16 at the compute boundary, so the arithmetic reproduces exactly what the oracle's FP16 KV cache would feed its FP32 accumulators. Storage width and compute rounding are separate contract fields; conflating them is how "FP32 KV" and "FP16 KV" ends up describing the same certified run.</p>
 
 <div class="svg-expand">
 <svg viewBox="0 0 1180 570" width="100%" role="img" tabindex="0" data-svg-title="Reduction order is a numerical contract - Gemma3 bit-exact schedule match (PR #463)"
-     aria-label="Reduction order is a numerical contract. Left panel: one dot product computed two ways with the same inputs and the same FP32 precision. Order A, a serial accumulation, evaluates (((p0 + p1) + p2) + p3) and yields 0.5000001. Order B, a pairwise SIMD-lane accumulation, evaluates ((p0 + p2) + (p1 + p3)) and yields 0.4999999. On a quantization boundary strip the two results straddle the boundary, so the quantized codes differ by 1 ulp of the quantized grid and the dequantized logits diverge. Right panel: the contract pins the schedule. The gemma3.json circuit's required_contracts requests the fp32_llama_regular contract, which pins FP16-rounded Q and K operands, FP32 score, softmax, and value accumulators, 256-position KV padding, a single-range partition, and phase-specific GEMM or matvec reduction order; the compiler then binds providers that implement exactly that schedule, including the llama production RMSNorm and QK-norm providers, rope_forward_qk_split_llama, geglu_forward_ggml_native, the llama regular sliding attention providers, and the Q8_0-activation vocabulary projection. Gemma4 keeps its own providers and tests assert it cannot inherit the Gemma3 route. Evidence strip for PR #463: standard Q4_K_M 256 of 256 complete-vocabulary rows bit-exact to llama.cpp, the tested Unsloth UD-Q4_K_XL mixed recipe also 256 of 256 bit-exact, make test-threadpool 308713 assertions, make test-kernel-maps 169 tests and 1216 subtests. Caveats: the 520-token layer-0 boundary differs at five rows so longer-context bit-exact certification remains open, the exact Qwen3.6 35B-A3B artifact fails at its first full-logit row and is not certified, and Flash long-context, BF16, and performance certification remain open."
+     aria-label="Reduction order is a numerical contract. Left panel (illustrative values, not measured): one dot product computed two ways with the same inputs and the same FP32 precision. Order A, a serial accumulation, evaluates (((p0 + p1) + p2) + p3) and yields 0.5000001. Order B, a pairwise SIMD-lane accumulation, evaluates ((p0 + p2) + (p1 + p3)) and yields 0.4999999. On a quantization boundary strip the two results straddle the boundary, so the quantized codes differ by 1 ulp of the quantized grid and the dequantized logits diverge. Right panel: the contract pins the schedule. The gemma3.json circuit's required_contracts requests the fp32_llama_regular contract, which pins FP16-rounded Q and K operands, FP32 score, softmax, and value accumulators, 256-position KV padding, a single-range partition, and phase-specific GEMM or matvec reduction order; the compiler then binds providers that implement exactly that schedule, including the llama production RMSNorm and QK-norm providers, rope_forward_qk_split_llama, geglu_forward_ggml_native, the llama regular sliding attention providers, and the Q8_0-activation vocabulary projection. Gemma4 keeps its own providers and tests assert it cannot inherit the Gemma3 route. Evidence strip for PR #463 (measured): standard Q4_K_M 256 of 256 complete-vocabulary rows bit-exact to llama.cpp, the tested Unsloth UD-Q4_K_XL mixed recipe also 256 of 256 bit-exact, make test-threadpool 308713 assertions, make test-kernel-maps 169 tests and 1216 subtests. Caveats: the 520-token layer-0 boundary differs at five rows so longer-context bit-exact certification remains open, the exact Qwen3.6 35B-A3B artifact fails at its first full-logit row and is not certified, and Flash long-context, BF16, and performance certification remain open."
      style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
   <style>
     .nc-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
@@ -1119,6 +1129,7 @@
   <rect class="nc-panel" x="24" y="48" width="560" height="310" rx="12"/>
   <text x="44" y="76" class="nc-title" font-size="13">One dot product, two accumulation orders</text>
   <text x="44" y="94" class="nc-sub">same inputs, same fp32 - only the summation tree differs</text>
+  <text x="44" y="112" class="nc-warn" font-size="11.5">values in this panel are ILLUSTRATIVE, not measured</text>
 
   <text x="44" y="126" class="nc-hi">order A - serial (one-row-at-a-time)</text>
   <rect class="nc-box" x="44" y="136" width="240" height="34" rx="8"/>
@@ -1179,7 +1190,7 @@
   <text x="646" y="336" class="nc-sub">route inheritance</text>
 
   <!-- evidence strip -->
-  <text x="24" y="386" class="nc-band">EVIDENCE (PR #463) - 256/256 COMPLETE-VOCABULARY ROWS BIT-EXACT TO LLAMA.CPP</text>
+  <text x="24" y="386" class="nc-band">EVIDENCE (PR #463, MEASURED) - 256/256 COMPLETE-VOCABULARY ROWS BIT-EXACT TO LLAMA.CPP</text>
   <rect class="nc-panel" x="24" y="398" width="1132" height="84" rx="12"/>
   <rect class="nc-box" x="44" y="416" width="262" height="48" rx="8"/>
   <text x="60" y="436" class="nc-good" font-size="12">Q4_K_M (Gemma3 270M)</text>
@@ -1201,6 +1212,14 @@
 </svg>
 <div class="svg-expand-hint">click / tap the diagram to expand</div>
 </div>
+
+<p>With the schedule pinned, the measured evidence is CKE's strongest cross-engine claim to date. On a matched numerical run (identical 26-token input, FP32 KV cache, regular attention, oracle flash attention disabled, 256-row teacher-forced trajectory):</p>
+
+<ul>
+  <li>256/256 complete-vocabulary logit rows bit-exact to llama.cpp for the standard Gemma3 270M Q4_K_M artifact, including bit-exact repeatability and X-Ray capture neutrality.</li>
+  <li>256/256 complete-vocabulary rows bit-exact for the tested Unsloth UD-Q4_K_XL artifact &mdash; a mixed Q4_K/Q5_0/Q5_K/Q6_K/Q8_0 per-tensor recipe, not a distinct arithmetic format (see <a href="quant-formats.html#recipes-vs-formats">Recipes vs Formats</a>).</li>
+  <li>Shared-risk gates: <code>make test-threadpool</code> passes 308,713 assertions; <code>make test-kernel-maps</code> passes 169 tests and 1,216 subtests.</li>
+</ul>
 
 <div class="contract-note contract-bad">
   <strong>Caveats &mdash; what PR #463 does not certify:</strong>
