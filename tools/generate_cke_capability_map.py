@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the README capability map for C-Kernel-Engine."""
+"""Generate the C-Kernel-Engine capability map image (docs site asset)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "assets" / "cke-capability-map.png"
+OUT = ROOT / "docs" / "site" / "assets" / "cke-capability-map.png"
 
 
 def rounded_box(ax, xy, wh, title, body, fc, ec="#0f172a", tc="#f8fafc"):
