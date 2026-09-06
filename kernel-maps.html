@@ -1024,7 +1024,7 @@ main code{overflow-wrap:anywhere}
 
 <p class="lead">
     How CKE v8 decides <em>which physical C kernel</em> executes each logical operation — and why that decision
-    lives in 297 machine-checked JSON maps instead of in Python conditionals.
+    lives in 346 machine-checked JSON maps instead of in Python conditionals.
 </p>
 
 <div class="alert alert-warning">
@@ -1074,7 +1074,7 @@ main code{overflow-wrap:anywhere}
 </p>
 
 <div class="img-container svg-viewer km-flow" data-title="The three-level stack: circuit, DSL resolver, kernel map, C kernel, with what each level owns">
-  <img src="assets/kernel-maps-layers.svg" alt="Four-level stack. Level 1, the circuit in version/v8/circuits, owns what math is required: op instances, named port edges and required numerical contracts, and must not name physical provider IDs. Level 2, the DSL resolver in build_ir_v8.py, owns which provider runs: mechanical matching on contract, phase, dtype, shape, layout, ISA and alias safety, with no model-name checks. Level 3, the 297 kernel maps in version/v8/kernel_maps, own how the op is executed: numerical-contract identity, port dtype, layout, stride, storage, persistent-state and alias semantics, call ABI, lifecycle and priority. Level 4, the C kernel, owns nothing but the math.">
+  <img src="assets/kernel-maps-layers.svg" alt="Four-level stack. Level 1, the circuit in version/v8/circuits, owns what math is required: op instances, named port edges and required numerical contracts, and must not name physical provider IDs. Level 2, the DSL resolver in build_ir_v8.py, owns which provider runs: mechanical matching on contract, phase, dtype, shape, layout, ISA and alias safety, with no model-name checks. Level 3, the 346 kernel maps in version/v8/kernel_maps, own how the op is executed: numerical-contract identity, port dtype, layout, stride, storage, persistent-state and alias semantics, call ABI, lifecycle and priority. Level 4, the C kernel, owns nothing but the math.">
 </div>
 
 <div class="km-grid">
@@ -1084,7 +1084,7 @@ main code{overflow-wrap:anywhere}
   </div>
   <div class="km-card">
     <h3>Kernel maps own the physical</h3>
-    <p><code>version/v8/kernel_maps/*.json</code> — 297 maps — own the operation interface, numerical-contract identity, port dtype/layout/stride/storage, prefill/decode phase support, persistent-state and alias semantics, the C call ABI, lifecycle status, and priority.</p>
+    <p><code>version/v8/kernel_maps/*.json</code> — 346 maps — own the operation interface, numerical-contract identity, port dtype/layout/stride/storage, prefill/decode phase support, persistent-state and alias semantics, the C call ABI, lifecycle status, and priority.</p>
   </div>
   <div class="km-card">
     <h3>The DSL resolves mechanically</h3>
@@ -1538,7 +1538,7 @@ migration ratchet tracks.</p>
 </p>
 
 <div class="img-container svg-viewer km-flow" data-title="Resolver flow: compatibility filters before priority ranking, fail closed on tie or empty result, X-Ray evidence">
-  <img src="assets/kernel-maps-resolver-flow.svg" alt="Resolver flow. 297 candidate kernel maps enter compatibility filters — required numerical contracts, phase, dtype, shape, layout, ISA and alias safety — where any mismatch is rejected with a recorded reason and a missing equivalence group is a hard selection fault. Survivors rank by direction, activation preference, lifecycle with production first, then priority within one group only; candidate, diagnostic and deprecated never auto-select. Three outcomes: exactly one provider left is selected before GraphIR and preserved through generated C; no compatible provider fails closed as a compile-time error; an equal-priority production tie is a hard fault — ambiguous within a group, and priority cannot choose across groups. X-Ray records the selected provider plus every rejection reason, proving compatibility rejection precedes priority ranking.">
+  <img src="assets/kernel-maps-resolver-flow.svg" alt="Resolver flow. 346 candidate kernel maps enter compatibility filters — required numerical contracts, phase, dtype, shape, layout, ISA and alias safety — where any mismatch is rejected with a recorded reason and a missing equivalence group is a hard selection fault. Survivors rank by direction, activation preference, lifecycle with production first, then priority within one group only; candidate, diagnostic and deprecated never auto-select. Three outcomes: exactly one provider left is selected before GraphIR and preserved through generated C; no compatible provider fails closed as a compile-time error; an equal-priority production tie is a hard fault — ambiguous within a group, and priority cannot choose across groups. X-Ray records the selected provider plus every rejection reason, proving compatibility rejection precedes priority ranking.">
 </div>
 
 <ol>
@@ -1814,20 +1814,20 @@ migration ratchet tracks.</p>
 
 <table class="km-table">
   <tr><th>Metric</th><th>Now (audit)</th><th>Ratchet bound</th><th>Direction</th></tr>
-  <tr><td>hardened maps</td><td>54</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>interface + ABI cross-validated</td><td>54</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>map-owned call ABI</td><td>163</td><td>&ge; 153</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>selection-managed maps</td><td>69</td><td>&ge; 65</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>legacy-interface-ready maps</td><td>34</td><td>&ge; 33</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
-  <tr><td>contract-pending maps</td><td>51</td><td>&le; 51</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>legacy maps</td><td>188</td><td>&le; 188</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>legacy selection conditionals</td><td>67</td><td>&le; 69</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
-  <tr><td>operation-specific conditionals</td><td>33</td><td>&le; 33</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>hardened maps</td><td>82</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>interface + ABI cross-validated</td><td>82</td><td>&ge; 46</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>map-owned call ABI</td><td>219</td><td>&ge; 153</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>selection-managed maps</td><td>86</td><td>&ge; 65</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>legacy-interface-ready maps</td><td>55</td><td>&ge; 33</td><td><span class="km-dot floor"></span>floor — only rises</td></tr>
+  <tr><td>contract-pending maps</td><td>49</td><td>&le; 51</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy maps not interface-ready</td><td>154 (of 209 legacy)</td><td>&le; 155</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>legacy selection conditionals</td><td>61</td><td>&le; 64</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
+  <tr><td>operation-specific conditionals</td><td>29</td><td>&le; 29</td><td><span class="km-dot ceiling"></span>ceiling — only falls</td></tr>
 </table>
 
 <p class="km-prov">
-    Generated from <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (297 maps) +
-    <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code> at commit <code>b9712c383</code> (2026-08).
+    Generated from <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (346 maps) +
+    <code>version/v8/scripts/audit_kernel_map_interfaces_v8.py</code> at commit <code>28b321bb5</code> (2026-09).
     Intended direction: these metrics should be regenerated during the docs build rather than hand-maintained —
     that pipeline is not implemented yet, so until it is, this page is updated manually against audit output.
 </p>
@@ -1835,7 +1835,7 @@ migration ratchet tracks.</p>
 <h2>Is This Over-Engineered?</h2>
 
 <p>
-    Fair question — the project owner has asked it directly. 297 JSON maps, a schema for four fields, a ratchet
+    Fair question — the project owner has asked it directly. 346 JSON maps, a schema for four fields, a ratchet
     file, and an audit script can look like architecture for its own sake. The honest answer has three parts.
 </p>
 
@@ -1846,7 +1846,7 @@ migration ratchet tracks.</p>
   </div>
   <div class="km-card">
     <h3>The costs are real</h3>
-    <p>297 maps to maintain. 67 legacy selection conditionals still in the resolver. A migration still in flight, with named debt (RoPE, position embeddings, decode KV store) that has not yet moved into maps. Nobody should pretend this is finished or free.</p>
+    <p>346 maps to maintain. 61 legacy selection conditionals still in the resolver. A migration still in flight, with named debt (RoPE, position embeddings, decode KV store) that has not yet moved into maps. Nobody should pretend this is finished or free.</p>
   </div>
   <div class="km-card">
     <h3>Why it is not ceremony</h3>

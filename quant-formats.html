@@ -1019,6 +1019,7 @@
 
     .simple-formats .format-card { border-left-color: var(--blue); }
     .k-quant-formats .format-card { border-left-color: var(--orange); }
+    .fp4-formats .format-card { border-left-color: #47b475; }
 
     .section-label {
         color: var(--text-muted);
@@ -1176,7 +1177,7 @@
         </div>
         <div class="concept">
             <h3>Format support boundary</h3>
-            <p>Supported: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, Q6_K, Q8_K. Not supported: Q2_K, Q3_K, and the IQ imatrix family — the runbook's model table lists tested artifacts per family.</p>
+            <p>Supported: Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, Q6_K, Q8_K, plus NVFP4 (MoE expert weights only, candidate status). One nuance: Q4_0 and Q4_1 have C kernels and dtype IDs but no v8 kernel maps — they remain reachable through legacy v7 bindings only, so no v8 circuit selects them. Q5_K's block struct lives privately in <code>src/kernels/gemm_kernels_q5_k.c</code> rather than in the public header. Not supported: Q2_K, Q3_K, and the IQ imatrix family — the runbook's model table lists tested artifacts per family.</p>
         </div>
     </div>
 </div>
@@ -1231,6 +1232,16 @@
         <h3>Q8_K (Activations)</h3>
         <div class="bits">9.125 bits/weight</div>
         <div class="details">292 bytes = 36 (header) + 256x8/8</div>
+    </div>
+</div>
+
+<div class="section-label">FP4 Formats (64 weights/block)</div>
+<div class="format-summary fp4-formats">
+    <div class="format-card">
+        <h3>NVFP4 (MoE-only, candidate)</h3>
+        <div class="bits">4.5 bits/weight</div>
+        <div class="details">36 bytes = 4 (unsigned E4M3 sub-scales) + 64x4/8; the FP32 per-tensor/expert scale is a separate runtime operand, never stored in the block</div>
+        <div class="details">E2M1 nibbles in split-half order (low nibble = sub-block lanes 0-7, high = lanes 8-15). Only two v8 kernel maps exist (routed + shared MoE SwiGLU experts), both candidate status — not a general GEMM format. Block anatomy and dequant pipeline: <a href="quantization.html#nvfp4" style="color: #00c7fd;">Quantization Deep Dive — NVFP4</a>.</div>
     </div>
 </div>
 

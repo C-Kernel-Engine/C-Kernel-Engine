@@ -3,6 +3,32 @@
 
 <h1>Deep Dive: LLM Concepts</h1>
 
+<style>
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #qf-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #qf-svg-overlay .qf-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #qf-svg-overlay .qf-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #qf-svg-overlay .qf-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #qf-svg-overlay .qf-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #qf-svg-overlay .qf-ov-stage img { max-width: none; height: auto; }
+</style>
+
 <p>This page explains the key concepts, algorithms, and computational techniques used in modern Large Language Models. Understanding these fundamentals helps you know <em>why</em> each kernel exists and how they fit together.</p>
 
 <div class="alert alert-info">
@@ -27,6 +53,7 @@
     <li><a href="#recurrent-attention">Recurrent Attention and Gated DeltaNet</a></li>
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
+    <li><a href="#qsa">Sparse / Query-Selected Attention (QSA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
     <li><a href="#nemotron-h-hybrid">Nemotron-H Hybrid Circuit</a></li>
     <li><a href="#mamba2-reference">Mamba2 Reference Kernels</a></li>
@@ -37,6 +64,8 @@
     <li><a href="#audio-frontend">Audio Frontend: WAV to Log-Mel to Conv Stem</a></li>
     <li><a href="#audio-cross-attention">&mdash; Cross-Attention: Decoder Queries, Encoder Memory</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
+    <li><a href="#hyper-connections">Hyper-Connections (Multi-Stream Residuals)</a></li>
+    <li><a href="#per-layer-embedding">Per-Layer Embedding (PLE)</a></li>
 </ul>
 
 <hr>
@@ -429,6 +458,11 @@ Online (Flash):
     <p><small>Primary implementation: <code>src/kernels/deltanet_kernels.c</code>, exposed through <code>gated_deltanet_autoregressive_forward()</code>.</small></p>
 </div>
 
+<div class="card">
+    <h3 style="margin-top: 0;">A Second Hybrid Family: Qwen3.8 Flash Next</h3>
+    <p>Nemotron-H (below) was the first hybrid family; <strong>Qwen3.8 Flash Next</strong> (PR #456, GGUF architecture <code>qwen4exp</code>, circuit <code>version/v8/circuits/qwen4_exp.json</code>) is the second. Its 48 layers interleave recurrent Gated DeltaNet layers with sparse full-attention layers (<code>attention_topology: deltanet_or_qsa_sparse</code>), wrap the residual path in a four-stream gated hyper-connection (<code>residual_topology: four_stream_gated_hyper_connection</code>), and replace the dense MLP with a packed MoE plus a gated shared expert (<code>mlp_topology: packed_moe_plus_gated_shared_expert</code>). See <a href="#qsa">QSA</a>, <a href="#hyper-connections">Hyper-Connections</a>, and <a href="#per-layer-embedding">Per-Layer Embedding</a> below.</p>
+</div>
+
 <hr>
 
 <h2 id="sliding-window">Sliding-Window Attention</h2>
@@ -565,6 +599,33 @@ scores[i][j] = -inf if i - j >= W
         </tr>
     </table>
     <p>GQA is the sweet spot: 4x smaller KV cache with minimal quality loss.</p>
+</div>
+
+<hr>
+
+<h2 id="qsa">Sparse / Query-Selected Attention (QSA)</h2>
+
+<p>Qwen3.8 Flash Next (PR #456) introduces a second way to avoid full-prefix attention: instead of restricting each query to a fixed recent window, a cheap <strong>indexing pass</strong> scores blocks of the prefix and attention runs over only the selected token indices. This is content-based selection, complementary to sliding windows.</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">The Two-Stage Pipeline</h3>
+    <ol>
+        <li><strong>Index scoring</strong> (<code>qwen4_qsa_index_select_bf16</code>, <code>src/kernels/qwen4_exp_kernels.c</code>): a small per-head RMSNorm + partial-RoPE index Q/K projection, with its own index-key cache, mean-pools keys into blocks (<code>compress_ratio</code>), scores the blocks, and keeps the top-k blocks — emitting a <code>token_budget</code>-sized list of selected token indices.</li>
+        <li><strong>Sparse attention</strong> (map <code>qsa_attention_bf16</code>, interface <code>qsa.sparse_attention.bf16.v1</code>): GQA flash attention over <em>only the gathered indices</em> — online softmax over a BF16 cache, with an AVX-512F path in <code>src/kernels/attention_kernels.c</code>.</li>
+    </ol>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Why It Saves Work</h3>
+    <pre>
+Full causal attention at position t:   O(t)   score+softmax+V reads
+QSA at position t:                     O(token_budget)  (+ cheap index scoring)
+
+KV bytes read per query drop from the full prefix
+to token_budget gathered entries — decode stays fast
+long after a full KV cache would be bandwidth-bound.
+    </pre>
+    <p>The trade-off: selection is approximate. The index pass must rank blocks well enough that the dropped tokens were safe to skip, so the index Q/K path has its own cache and normalization contract.</p>
 </div>
 
 <hr>
@@ -730,6 +791,16 @@ for selected expert e:
         <li><code>make test-nemotron-router</code>, <code>make test-moe-relu2-expert</code>, and <code>make test-moe-relu2-expert-perf</code> for parity and speed checks.</li>
     </ul>
     <p>On local AVX2 validation, the group-limited router microbenchmark measured CK at about <strong>3.5x faster</strong> than the PyTorch reference, and the ReLU2 expert benchmark measured roughly <strong>28-32x faster</strong> for the tested shapes. That does not mean full Nemotron inference is solved; it means these specific MoE primitives are now isolated, tested, and fast enough to build on.</p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Packed and Mixed-Quant Experts (Qwen3.8 Flash Next)</h3>
+    <p>Qwen3.8 Flash Next (PR #456) adds two dispatch wrinkles beyond the classic router + dense-expert shape:</p>
+    <ul>
+        <li><strong>Packed expert storage:</strong> <code>moe_swiglu_packed_expert_forward_bf16</code> (<code>src/kernels/axpy_kernels.c</code>) keeps gate and up in one packed tensor per expert (stride <code>2*I*H</code>, up at offset <code>I*H</code>), runs BF16-rounded gate/up GEMV, SwiGLU, down GEMV, then route-weighted accumulate. A candidate router map <code>moe_softmax_topk_router_pytorch_bf16</code> (priority 220, group <code>pytorch_full_softmax_topk_selected_renorm_bf16_storage</code>) matches the PyTorch BF16 storage contract.</li>
+        <li><strong>Mixed-quant routed experts:</strong> <code>moe_swiglu_expert_forward_q4k_q8_0</code> and <code>moe_swiglu_expert_forward_q4k_q5_0</code> pair Q4_K gate/up with Q8_0 or Q5_0 down projections — the weight format is selected per tensor by the kernel map, not hard-coded per model. See <a href="quant-formats.html">Quantization Formats</a> for the byte layouts and <a href="v8-moe-expert-kernels.html">MoE Expert Kernels</a> for the provider-level walk.</li>
+    </ul>
+    <p><strong>Reduction order is a numerical contract.</strong> During bring-up, the Q5_0-down shared expert still drove its Q4_K gate/up projections one row at a time (GEMV schedule) while llama.cpp grouped four prompt rows — that alone caused a layer-6 divergence. Both down formats now share four-row projection staging, and the isolated shared-expert output matches all 102400 values exactly. Same math, same weights, different reduction schedule: that was the bug.</p>
 </div>
 
 <hr>
@@ -1141,6 +1212,134 @@ With weight tying: W = E  (same matrix!)
 
 <hr>
 
+<h2 id="hyper-connections">Hyper-Connections (Multi-Stream Residuals)</h2>
+
+<p>Qwen3.8 Flash Next (PR #456) replaces the single residual stream with <strong>S parallel hyper-streams</strong>: the hidden state is broadcast from <code>[R, D]</code> to <code>[R, S*D]</code> at layer entry, and each block writes back into selected streams instead of one shared residual. CK implements this as <code>residual_topology: four_stream_gated_hyper_connection</code> in the <code>qwen4_exp</code> circuit.</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 510" width="100%" role="img" tabindex="0" data-svg-title="Qwen3.8 Flash Next block anatomy"
+     aria-label="Qwen3.8 Flash Next block anatomy. One decoder layer: the hidden state expands into four hyper streams, a per-stream RMSNorm and low-rank dynamic mix combines static and dynamic stream mixing, then the per-layer kind runs either a recurrent DeltaNet layer or a QSA sparse attention layer, then a packed MoE with top-10 of 512 routed experts plus a gated shared expert, and finally the block output is injected back into selected hyper streams which carry forward to the next layer. A side input shows Per-Layer Embedding feeding a gated dilated conv into the streams. A provider strip lists the C entry points: hyper_stream_expand, hyper_connection_mix including quantized variants, qsa_index_select, sparse flash attention, packed and mixed-quant MoE experts, and hyper_stream_inject."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <style>
+    .qf-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .qf-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .qf-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .qf-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .qf-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .qf-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .qf-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+    .qf-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="qf-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="qf-band">One decoder layer - per-layer kind: recurrent or sparse attention</text>
+
+  <rect class="qf-box" x="24" y="44" width="210" height="88" rx="10"/>
+  <text x="44" y="70" class="qf-title" font-size="13">hyper streams x4</text>
+  <text x="44" y="90" class="qf-sub">residual carried as 4 streams</text>
+  <text x="44" y="108" class="qf-sub">expand [R,D] -&gt; [R,4D]</text>
+
+  <rect class="qf-box" x="274" y="44" width="250" height="88" rx="10"/>
+  <text x="294" y="70" class="qf-title" font-size="13">stream mix</text>
+  <text x="294" y="90" class="qf-sub">per-stream RMSNorm -&gt; low-rank</text>
+  <text x="294" y="108" class="qf-sub">dyn=norm*W_down; mix=dyn*W_up</text>
+
+  <rect class="qf-box" x="564" y="44" width="270" height="88" rx="10"/>
+  <text x="584" y="70" class="qf-title" font-size="13">layer op (per-layer kind)</text>
+  <text x="584" y="90" class="qf-hi">DeltaNet recurrent | QSA sparse</text>
+  <text x="584" y="108" class="qf-sub">interleaved across 48 layers</text>
+
+  <rect class="qf-box" x="874" y="44" width="282" height="88" rx="10"/>
+  <text x="894" y="70" class="qf-title" font-size="13">packed MoE + shared expert</text>
+  <text x="894" y="90" class="qf-sub">top-10 of 512, Q4_K x Q8_0/Q5_0</text>
+  <text x="894" y="108" class="qf-sub">plus gated shared expert</text>
+
+  <path d="M234,88 L268,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#qf-arrow)"/>
+  <path d="M524,88 L558,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#qf-arrow)"/>
+  <path d="M834,88 L868,88" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#qf-arrow)"/>
+
+  <rect x="24" y="180" width="520" height="84" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="206" class="qf-title" font-size="13">side input: Per-Layer Embedding (PLE)</text>
+  <text x="44" y="226" class="qf-sub">n-gram ring window -&gt; hashed per-layer tables,</text>
+  <text x="44" y="244" class="qf-sub">sigmoid gate -&gt; dilated causal depthwise conv</text>
+  <path d="M399,180 L399,138" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#qf-arrow)"/>
+
+  <rect class="qf-box" x="874" y="180" width="282" height="84" rx="10"/>
+  <text x="894" y="206" class="qf-title" font-size="13">inject</text>
+  <text x="894" y="226" class="qf-sub">block output added back into</text>
+  <text x="894" y="244" class="qf-sub">selected streams</text>
+  <path d="M1015,132 L1015,174" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#qf-arrow)"/>
+
+  <path d="M1015,264 L1015,300 L129,300 L129,138" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#qf-arrow)"/>
+  <text x="300" y="292" class="qf-sub">streams carry forward to the next layer; final_mix collapses at the end</text>
+
+  <rect x="24" y="336" width="1132" height="76" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="362" class="qf-good">providers: hyper_stream_expand_f32/bf16 - hyper_connection_mix_bf16 (+ q4k_q5_0_q4k, q6k_q5_0_q4k)</text>
+  <text x="44" y="382" class="qf-good">qwen4_qsa_index_select_bf16 - sparse flash attention (AVX-512F) - packed / mixed-quant MoE - hyper_stream_inject</text>
+
+  <text x="24" y="448" class="qf-cap">Evidence (PR #456): Q4_K_M, 48 layers, 512 routed experts top-10 + 1 shared; strict 40-token prompt + 64 full-vocab</text>
+  <text x="24" y="468" class="qf-cap">decode rows pass (terminal-row fix 2026-09-05); all-layer X-Ray: 45285 exact comparisons, zero value differences.</text>
+  <text x="24" y="492" class="qf-cap">Caveats: BF16 certification, the long-context ladder (128K is planner-only), and performance certification remain open.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">The Kernel Family</h3>
+        <ul>
+            <li><code>hyper_stream_expand_f32</code> / <code>_bf16</code> — broadcast hidden <code>[R,D]</code> into S streams <code>[R,S*D]</code>.</li>
+            <li><code>hyper_connection_mix_bf16</code> — per-stream RMSNorm, then a low-rank dynamic mix (<code>dyn = norm * W_down</code>, <code>mix = dyn * W_up</code>) combining static and dynamic stream mixing with optional injection logits. Quantized variants: <code>hyper_connection_mix_q4k_q5_0_q4k</code> and <code>_q6k_q5_0_q4k</code>.</li>
+            <li><code>hyper_stream_inject_bf16</code> / <code>_f32</code> — add the block output back into selected streams.</li>
+            <li><code>hyper_connection_final_mix_*</code> — collapse streams back to one hidden state.</li>
+        </ul>
+        <p><small>Source: <code>src/kernels/hyper_connection_kernels.c</code>.</small></p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Multi-Stream Residuals Help</h3>
+        <p>A single residual stream forces every block to read and write the same <code>D</code>-wide accumulator. Hyper-connections widen the <em>residual bandwidth</em> — information can route around a block on a stream the block does not touch — without widening every GEMM and attention op. The cost is a small low-rank mixing matrix per layer instead of a full <code>D x D</code> projection.</p>
+        <p>For the runtime this is a scheduling contract: stream ownership, mix order, and injection targets are declared per layer, and the quantized mix variants exist so the residual path does not silently change precision between circuits.</p>
+    </div>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Certification Status (Qwen3.8 Flash Next)</h3>
+    <p>Certified so far (Q4_K_M): the strict 40-token prompt plus 64 full-vocabulary decode comparisons all pass after the terminal-row fix (2026-09-05), and the follow-up all-layer X-Ray capture reports <strong>45,285 exact comparisons with zero value differences</strong> (671 unavailable entries are explicitly not counted). Still open: <strong>BF16 certification, the long-context ladder</strong> (the 128K run is planner-only — arena sized, not executed), and <strong>performance certification</strong>. Treat the current status as experimental Q4_K_M execution with short-prompt parity, not certified long-context support. Details: <code>docs/notes/QWEN38_FLASH_NEXT_BRINGUP_2026-09-04.md</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="per-layer-embedding">Per-Layer Embedding (PLE)</h2>
+
+<p>PLE gives every layer a cheap, token-context-sensitive input without running attention: a rolling n-gram window over recent token states is hashed into per-layer embedding tables, gated, smoothed by a causal conv, and injected into the hyper streams.</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">N-gram Table Lookup</h3>
+        <pre>
+ring window: last n token states (EOS-padded)
+hash n-gram -&gt; per-layer embedding table
+embed = table[hash] * layer_multipliers[layer]
+        </pre>
+        <p>Kernels: <code>qwen4_ple_ngram_embed_bf16</code> and <code>qwen4_ple_ngram_embed_q5_0</code> (<code>src/kernels/qwen4_exp_kernels.c</code>). The tables are per layer, so the same n-gram contributes a different vector at each depth, scaled by <code>layer_multipliers</code>.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Gated Conv Injection</h3>
+        <pre>
+group-RMSNorm(key/query) -&gt; sigmoid gate
+-&gt; dilated causal depthwise conv (persistent conv_state)
+-&gt; inject into hyper streams
+        </pre>
+        <p>Kernels: <code>qwen4_ple_gate_conv_inject_bf16</code>, <code>_fp16</code>, <code>_llama_fp16</code>. The conv is causal and dilated with persistent state, so decode updates it incrementally exactly like a recurrent conv state — the same ownership discipline as the DeltaNet and Mamba2 states above.</p>
+    </div>
+</div>
+
+<hr>
+
 <h2>Summary: What Each Config Field Controls</h2>
 
 <div class="card">
@@ -1215,3 +1414,56 @@ With weight tying: W = E  (same matrix!)
     <li><a href="codegen.html">Code Generation</a> - How we generate C from configs</li>
     <li><a href="doxygen/files.html">Source Code</a> - Browse the implementation</li>
 </ul>
+
+<div id="qf-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="qf-ov-bar">
+      <span class="qf-ov-title" id="qf-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="qf-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="qf-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="qf-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="qf-ov-stage" id="qf-ov-stage"><img id="qf-ov-img" alt=""></div>
+</div>
+
+<script>
+    (function() {
+      var overlay = document.getElementById('qf-svg-overlay');
+      var stage = document.getElementById('qf-ov-stage');
+      var img = document.getElementById('qf-ov-img');
+      var title = document.getElementById('qf-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('qf-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('qf-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('qf-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('qf-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+</script>
