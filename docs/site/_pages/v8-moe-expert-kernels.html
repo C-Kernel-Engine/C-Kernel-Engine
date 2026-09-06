@@ -11,6 +11,44 @@
     <code>version/v8/kernel_maps</code> and a function you can read in <code>src/kernels</code>.
   </p>
 
+  <div class="mx-table-wrap">
+    <table class="mx-table">
+      <thead><tr><th>Learning path</th><th>Question it answers</th><th>Where it is covered</th></tr></thead>
+      <tbody>
+        <tr><td>Routed experts</td>
+          <td>Which experts process this token, and with what routing weights?</td>
+          <td><a href="#moe-building-blocks">Section 1: routers and the SwiGLU expert shape</a></td></tr>
+        <tr><td>Grouped-bucketed prefill</td>
+          <td>How do same-expert tokens become efficient contiguous work?</td>
+          <td><a href="#moe-grouped-prefill">Section 2: grouped and bucketed expert prefill</a></td></tr>
+        <tr><td>Packed gate-up</td>
+          <td>How do two logical projections (gate and up) live in one storage tensor?</td>
+          <td><a href="#moe-grouped-prefill">Section 2: VNNI weight-preparation leaf</a>; the recipe-vs-format split is in
+            <a href="quant-formats.html#recipes-vs-formats">Quant Formats: recipes vs formats</a></td></tr>
+        <tr><td>Mixed down-projection formats</td>
+          <td>Why must the provider inspect every weight role, not just the layer?</td>
+          <td><a href="#laguna-mixed-quant">Section 3: Laguna mixed-quant experts</a></td></tr>
+        <tr><td>Shared expert</td>
+          <td>What runs for every token, independent of routing?</td>
+          <td><a href="#moe-grouped-prefill">Section 2: gated shared expert</a> and
+            <a href="#laguna-mixed-quant">Section 3: shared expert rows</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="mx-note" style="margin-top: 0.75rem;">
+    One concrete pass through the numbers, reusing the
+    <a href="quant-formats.html#recipes-vs-formats">recipe explanation</a> rather than re-teaching it: for
+    <strong>512 prompt tokens with top-8 routing over 256 experts</strong>, naive dispatch would run
+    512&times;8&nbsp;=&nbsp;4096 scattered expert calls and re-quantize the hidden state 4096 times; the bucketed
+    path quantizes to Q8_K <strong>once</strong> and runs at most 256 contiguous per-expert GEMM segments. Inside
+    each segment, one expert call is three legs with three storage contracts &mdash; gate <code>[H,I]</code> and up
+    <code>[H,I]</code> read Q4_K weights against the shared Q8_K activations, the ggml SwiGLU combines them in FP32,
+    and down <code>[I,H]</code> reads Q5_K before the routing-weighted FP32 accumulate. The same
+    recipe-over-format idea continues down to 4-bit floating point in
+    <a href="quantization.html#nvfp4">NVFP4</a>.
+  </p>
+
   <style>
     .mx-section {
       margin-top: 2rem;
@@ -93,7 +131,7 @@
   </style>
 
   <div class="mx-section">
-    <h2>1. The shared building blocks: routers and the SwiGLU expert shape</h2>
+    <h2 id="moe-building-blocks">1. The shared building blocks: routers and the SwiGLU expert shape</h2>
     <p style="color: var(--text-secondary);">
       Every MoE family in the registry is the same two pieces with different contracts: a <strong>router</strong>
       that picks experts and weights per token, and an <strong>expert SwiGLU</strong> that computes
@@ -132,7 +170,7 @@ moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
   </div>
 
   <div class="mx-section">
-    <h2>2. Qwen3.5-MoE: grouped and bucketed expert prefill (PR #376)</h2>
+    <h2 id="moe-grouped-prefill">2. Qwen3.5-MoE: grouped and bucketed expert prefill</h2>
     <p style="color: var(--text-secondary);">
       Qwen3.5-35B-A3B is a 40-layer hybrid MoE with <strong>256 routed experts and top-8 routing</strong>, Q4_K
       expert gate/up, Q5_K expert down, and a Q8_0 gated shared expert (real GGUF audit: 733 tensors). Naive
@@ -251,7 +289,7 @@ moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
   </div>
 
   <div class="mx-section">
-    <h2>3. Laguna: compact-MoE mixed-quant experts (PRs #404, #422)</h2>
+    <h2 id="laguna-mixed-quant">3. Laguna: compact-MoE mixed-quant experts</h2>
     <p style="color: var(--text-secondary);">
       Laguna-XS 2.1 keeps routed and shared experts in mixed compact storage: Q4_K gate/up with either Q4_K or
       Q6_K down. Activations are quantized fp32&rarr;Q8_K at the kernel boundary, the SwiGLU is the
@@ -358,13 +396,13 @@ moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
     </div>
     <p class="mx-note">
       The structural view (layer kinds, split RoPE, gated GQA) is in
-      <a href="architecture-variants.html">Architecture Variants &mdash; Laguna</a>; this page covers the provider
+      <a href="architecture-variants.html#laguna">Architecture Variants &mdash; Laguna</a>; this page covers the provider
       layer only.
     </p>
   </div>
 
   <div class="mx-section">
-    <h2>4. Throughput kernels beyond MoE</h2>
+    <h2 id="moe-throughput">4. Throughput kernels beyond MoE</h2>
     <p style="color: var(--text-secondary);">
       Two provider enhancements from the same window are not MoE, but they are the same engineering pattern:
       find the serialization point, partition the independent dimension across the persistent thread pool, and
@@ -451,7 +489,7 @@ moe_softmax_topk_router_llama_f32   (topk_kernels.c:269, candidate)
   </div>
 
   <div class="mx-section">
-    <h2>5. Why this matters</h2>
+    <h2 id="moe-why">5. Why this matters</h2>
     <p style="color: var(--text-secondary);">
       Everything on this page is the same expert-GEMM pattern specialized per quant contract: Q4_K/Q5_K for
       Qwen3.5-MoE, Q4_K/Q4_K and Q4_K/Q6_K for Laguna, Q8_0 for the gated shared expert. The performance work

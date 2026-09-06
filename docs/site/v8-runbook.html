@@ -1061,6 +1061,17 @@
     color: var(--text-muted);
     font-size: 0.88rem;
 }
+.v8-doorway {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    border-left: 3px solid rgba(7,173,248,0.5);
+    padding-left: 0.7rem;
+    margin: 0.2rem 0 0.9rem;
+    line-height: 1.6;
+}
+.v8-doorway strong {
+    color: var(--text-secondary);
+}
 .v8-artifact-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1285,7 +1296,7 @@ python -m pip install -r version/v8/requirements.txt</pre>
 <h2>Canonical Text Bring-Up</h2>
 
 <div class="card">
-    <h3 style="margin-top: 0;">Current Large-Model Evidence</h3>
+    <h3 style="margin-top: 0;" id="evidence-table">Current Large-Model Evidence</h3>
     <p>Support levels are intentionally separate: coherent execution does not imply bit-exact numerical parity, multimodal support, long-trajectory certification, or competitive performance.</p>
     <table class="table">
         <thead>
@@ -1314,6 +1325,7 @@ python -m pip install -r version/v8/requirements.txt</pre>
     <p class="mini-note">These raw CLI examples use the shell wrapper so a first-time user can be prompted to create <code>.venv</code> and install <code>version/v8/requirements.txt</code> if the repo-local environment is missing.</p>
 
     <h3 id="qwen38-dense-quickstart">Qwen3.8 27B Dense Q4_K_M</h3>
+    <p class="v8-doorway"><strong>Understand:</strong> <a href="concepts.html#recurrent-attention">recurrent + full-attention hybrid</a> &middot; <strong>Inspect:</strong> <a href="kernel-maps.html#model-family-ownership">how a family earns kernel-map support</a> &middot; <strong>Check:</strong> <a href="model-kernel-matrix.html#card-qwen38">Qwen3.8 evidence</a></p>
     <p>Run from the repository root. This command uses the standard GGUF, not an Unsloth UD mixed-quant artifact.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1329,6 +1341,7 @@ python -m pip install -r version/v8/requirements.txt</pre>
     <p class="mini-note">16384 is context capacity, not consumed prompt length. This is a short generation check; allocate only what fits available RAM.</p>
 
     <h3 id="qwen38-flash-quickstart">Qwen3.8 Flash Next Q4_K_M</h3>
+    <p class="v8-doorway"><strong>Understand:</strong> <a href="concepts.html#qsa">QSA</a>, <a href="concepts.html#hyper-connections">hyper-connections</a>, <a href="concepts.html#per-layer-embedding">PLE</a> &middot; <strong>Inspect:</strong> <a href="v8-moe-expert-kernels.html#moe-grouped-prefill">packed expert prefill</a> &middot; <strong>Check:</strong> <a href="#evidence-table">evidence table above</a></p>
     <p>Experimental text inference. The example uses the local GGUF path on the 160 GB Ryzen test node. On another machine, replace that path with your matching local artifact. The tested file is 119,150,722,112 bytes; this command does not download it or certify other Flash quantizations.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1428,6 +1441,7 @@ make test-v8-kimi-highmem</pre>
     <p class="mini-note">The official 32.8 GB sharded checkpoint now converts all text-decoder tensors, preserves the embedded TikToken protocol, and runs coherently on a 64 GB host. Three repeated Ryzen runs produced the same 32-token response hash. X-Ray matched PyTorch's first token and complete top-20 ranking, but internal BF16 drift becomes material around layer 7, so this is text E2E certification rather than bit-exact internal parity. MoonViT and the multimodal bridge remain outside the certified path. See <a href="v8-mla-kimi.html">v8 MLA / Kimi Decode Cache</a> for the architecture notes.</p>
 
     <h3>Laguna-XS 2.1</h3>
+    <p class="v8-doorway"><strong>Understand:</strong> <a href="architecture-variants.html#laguna">Laguna architecture variant</a> &middot; <strong>Inspect:</strong> <a href="v8-moe-expert-kernels.html#laguna-mixed-quant">mixed-quant expert providers</a> &middot; <strong>Check:</strong> <a href="model-kernel-matrix.html#card-laguna">Laguna evidence</a></p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
@@ -1444,6 +1458,7 @@ make test-v8-kimi-highmem</pre>
     <p class="mini-note">The tested 20.27 GB Q4_K_M artifact converts all 684 mapped entries and produces coherent text and compilable C on Ryzen. The circuit declares full versus sliding attention, RoPE width, softplus attention gating, and mixed Q4/Q6 expert providers without a Laguna branch in compiler or code generation. Visible thinking is supported but can consume more than 1,024 tokens before the final answer; use a larger output budget when testing that mode. This is coherent E2E bring-up with strong leaf evidence, not long-trajectory bit-exact certification.</p>
 
     <h3>Cohere2 Command R</h3>
+    <p class="v8-doorway"><strong>Understand:</strong> <a href="v8-cohere-kernels.html#cohere2-reuse">the Cohere2 reuse map</a> &middot; <strong>Inspect:</strong> <a href="architecture-variants.html#cohere2">Cohere2 architecture variant</a> &middot; <strong>Check:</strong> <a href="model-kernel-matrix.html#card-cohere2">Cohere2 evidence</a></p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>version/v8/scripts/cks-v8-run run \
@@ -1702,6 +1717,8 @@ version/v8/scripts/ck_run_v8.py run \
 </div>
 
 <h2>Canonical Whisper Audio Run</h2>
+
+<p class="v8-doorway"><strong>Understand:</strong> <a href="v8-whisper-tiny.html#pipeline">the audio pipeline</a> &middot; <strong>Inspect:</strong> <a href="audio-kernels-deep-dive.html#k1-wav">audio kernels, stage by stage</a> &middot; <strong>Check:</strong> <a href="model-kernel-matrix.html#card-whisper">Whisper evidence</a></p>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Audio Runbook &mdash; WAV To Transcript</h3>
@@ -2416,7 +2433,7 @@ make v8-visualizer-vision-artifacts</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-06</p>
             </div>
         </div>
     </footer>

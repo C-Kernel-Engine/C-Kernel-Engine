@@ -1027,6 +1027,7 @@
 <h2>Table of Contents</h2>
 <ul>
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
+    <li><a href="#dense-vs-flash">Dense vs Flash Next: One Decoder Block</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
     <li><a href="#glm4-rope">GLM-4 RoPE: Pairwise Partial Rotary</a></li>
@@ -1076,6 +1077,118 @@
         <li><strong>LM Head</strong>: Project back to vocabulary (often weight-tied with embedding)</li>
     </ol>
 </div>
+
+<hr>
+
+<h2 id="dense-vs-flash">Dense vs Flash Next: One Decoder Block Side by Side</h2>
+
+<p>Two promoted v8 families share the decoder-block skeleton but differ in almost every contract inside it. <strong>Qwen3.8 27B Dense</strong> keeps a single residual stream, alternates gated-DeltaNet recurrent layers with full-attention layers, and runs one dense SwiGLU MLP. <strong>Qwen3.8 Flash Next</strong> carries four hyper-streams, chooses a DeltaNet-recurrent or QSA-sparse branch per layer, routes tokens through packed experts plus a gated shared expert, and injects a Per-Layer Embedding side input. The block below is representative, not exhaustive &mdash; each box links (in the caption) to the concept section that teaches it.</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 740" width="100%" role="img" tabindex="0" data-svg-title="Dense vs Flash Next decoder block"
+     aria-label="Side-by-side comparison of one representative decoder block in two model families. Left column, Qwen3.8 27B Dense: a single residual stream flows through RMSNorm, then an attention branch that is gated DeltaNet recurrent on three of four layers or full causal attention on one of four, with a residual add back to the same stream, then RMSNorm and a dense SwiGLU MLP where all weights are active every token. Right column, Qwen3.8 Flash Next: the hidden state expands into four hyper-streams with per-stream normalization and low-rank mixing, then a per-layer-kind branch that is either DeltaNet recurrent or QSA sparse attention over index-selected tokens, then a packed MoE with top-10 of 512 routed experts active per token plus a gated shared expert, then injection back into selected streams; a Per-Layer Embedding side input hashes an n-gram ring into per-layer tables and injects through a gated convolution. A state strip records what persists across decode steps: dense keeps a KV cache on full-attention layers plus recurrent state; Flash keeps recurrent state, QSA KV and index caches, and the PLE n-gram ring and conv state; hyper-streams persist across layers within a token, not across decode steps. A caveat notes that Flash in the model name is not the Flash Attention algorithm."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <style>
+    .dvf-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .dvf-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .dvf-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .dvf-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .dvf-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .dvf-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .dvf-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+    .dvf-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+    .dvf-col{fill:#07adf8;font-size:13px;font-weight:700;letter-spacing:.04em;}
+  </style>
+  <defs>
+    <marker id="dvf-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="dvf-band">One representative decoder block - two promoted families</text>
+
+  <rect x="24" y="44" width="536" height="36" rx="8" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="68" class="dvf-col">DENSE - Qwen3.8 27B</text>
+  <rect x="620" y="44" width="536" height="36" rx="8" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="640" y="68" class="dvf-col">FLASH NEXT - Qwen3.8 Flash Next</text>
+
+  <!-- dense column -->
+  <rect class="dvf-box" x="120" y="100" width="340" height="60" rx="10"/>
+  <text x="140" y="126" class="dvf-title" font-size="13">RMSNorm</text>
+  <text x="140" y="146" class="dvf-sub">single residual stream [D]</text>
+
+  <rect class="dvf-box" x="120" y="184" width="340" height="92" rx="10"/>
+  <text x="140" y="210" class="dvf-title" font-size="13">attention (per-layer kind)</text>
+  <text x="140" y="230" class="dvf-hi">DeltaNet recurrent (3 of 4 layers)</text>
+  <text x="140" y="250" class="dvf-sub">full causal attention (1 of 4 layers)</text>
+  <text x="140" y="270" class="dvf-sub">+ residual add to the same stream</text>
+
+  <rect class="dvf-box" x="120" y="300" width="340" height="60" rx="10"/>
+  <text x="140" y="326" class="dvf-title" font-size="13">RMSNorm</text>
+  <text x="140" y="346" class="dvf-sub">pre-MLP norm</text>
+
+  <rect class="dvf-box" x="120" y="384" width="340" height="92" rx="10"/>
+  <text x="140" y="410" class="dvf-title" font-size="13">dense SwiGLU MLP</text>
+  <text x="140" y="430" class="dvf-sub">down(silu(gate) * up)</text>
+  <text x="140" y="450" class="dvf-hi">all MLP weights active every token</text>
+  <text x="140" y="470" class="dvf-sub">+ residual add to the same stream</text>
+
+  <path d="M290,160 L290,178" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+  <path d="M290,276 L290,294" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+  <path d="M290,360 L290,378" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+
+  <text x="120" y="512" class="dvf-sub">one stream in, one stream out - no side inputs</text>
+
+  <!-- flash column -->
+  <rect class="dvf-box" x="640" y="100" width="380" height="64" rx="10"/>
+  <text x="660" y="126" class="dvf-title" font-size="13">expand -&gt; 4 hyper-streams</text>
+  <text x="660" y="146" class="dvf-sub">[R,D] -&gt; [R,4D]; per-stream norm + low-rank mix</text>
+
+  <rect class="dvf-box" x="640" y="188" width="380" height="92" rx="10"/>
+  <text x="660" y="214" class="dvf-title" font-size="13">layer op (per-layer kind)</text>
+  <text x="660" y="234" class="dvf-hi">DeltaNet recurrent | QSA sparse</text>
+  <text x="660" y="254" class="dvf-sub">QSA: index pass scores prefix blocks,</text>
+  <text x="660" y="274" class="dvf-sub">attends over selected tokens only</text>
+
+  <rect class="dvf-box" x="640" y="304" width="380" height="100" rx="10"/>
+  <text x="660" y="330" class="dvf-title" font-size="13">packed MoE + gated shared expert</text>
+  <text x="660" y="350" class="dvf-hi">active per token: top-10 routed + 1 shared</text>
+  <text x="660" y="370" class="dvf-sub">stored: 512 routed experts per layer</text>
+  <text x="660" y="390" class="dvf-warn">selected work != total stored weights</text>
+
+  <rect class="dvf-box" x="640" y="428" width="380" height="60" rx="10"/>
+  <text x="660" y="454" class="dvf-title" font-size="13">inject into selected streams</text>
+  <text x="660" y="474" class="dvf-sub">streams carry forward to the next layer</text>
+
+  <rect class="dvf-box" x="640" y="512" width="380" height="64" rx="10"/>
+  <text x="660" y="538" class="dvf-title" font-size="13">PLE side input (every layer)</text>
+  <text x="660" y="558" class="dvf-sub">n-gram ring -&gt; hashed per-layer tables -&gt; gated conv</text>
+
+  <path d="M830,164 L830,182" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+  <path d="M830,280 L830,298" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+  <path d="M830,404 L830,422" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dvf-arrow)"/>
+  <path d="M1010,512 L1010,494" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#dvf-arrow)"/>
+
+  <!-- state persistence strip -->
+  <rect x="24" y="608" width="1132" height="80" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="634" class="dvf-good">persists across decode | dense: KV cache (full-attn layers) + DeltaNet recurrent state</text>
+  <text x="44" y="654" class="dvf-good">persists across decode | flash: recurrent state + QSA KV/index caches + PLE n-gram ring + conv state</text>
+  <text x="44" y="674" class="dvf-sub">hyper-streams persist across LAYERS within a token - they are not decode state</text>
+
+  <text x="24" y="716" class="dvf-cap">Caveats: one representative block; counts from the published family configs. &quot;Flash&quot; in the model name is NOT the Flash Attention algorithm.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<p class="mini-note" style="margin-top: 0.4rem;">
+    Read each box in depth: <a href="#recurrent-attention">recurrent attention / gated DeltaNet</a> &middot;
+    <a href="#attention">full attention</a> &middot; <a href="#activations">SwiGLU</a> &middot;
+    <a href="#hyper-connections">hyper-connections</a> &middot; <a href="#qsa">QSA</a> &middot;
+    <a href="#moe-routing">MoE routing</a> &middot; <a href="#per-layer-embedding">PLE</a>.
+    Naming caveat: <strong>&ldquo;Flash&rdquo; in &ldquo;Qwen3.8 Flash Next&rdquo; is the model family name, not the
+    <a href="#flash-attention">Flash Attention</a> algorithm</strong> &mdash; the full-attention algorithm on this
+    page is an unrelated, older idea.
+</p>
 
 <hr>
 
