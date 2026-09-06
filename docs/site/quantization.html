@@ -1310,6 +1310,8 @@ Now small values use full range!
 
 <p>The block formats below are widely used for weight-only quantized inference and are common in GGUF-style model files. We implement them to make the runtime compatible with those on-disk layouts.</p>
 
+<p>A GGUF label such as <code>Q5_K_M</code> or <code>UD-Q4_K_XL</code> is not one of these formats — it is a <strong>recipe</strong>, a per-tensor assignment across several of them. See <a href="quant-formats.html#recipes-vs-formats">Quant Format Reference — Recipes vs Formats</a> for a measured per-tensor census and why a new recipe needs zero new kernels when the constituent formats already have providers.</p>
+
 <h3>Q4_0: The Simplest 4-bit Format</h3>
 
 <div class="card card-accent">
@@ -2645,7 +2647,7 @@ void matmul_q4(float* out, const float* x, const tensor* W) {
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-05</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-06</p>
             </div>
         </div>
     </footer>

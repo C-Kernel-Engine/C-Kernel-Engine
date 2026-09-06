@@ -1502,6 +1502,131 @@ Mamba2 (per head, per state element):
     </div>
   </div>
 
+  <div class="ka-section" id="composite-circuits">
+    <h2>Composite Circuits — components + stitch</h2>
+    <p style="color: var(--text-secondary); margin-top: 0.4rem;">
+      Multimodal families are built by <em>composing</em> certified components rather than writing a monolithic new
+      circuit. Circuits compose three ways: <code>extends</code> (a child deep-merges over a parent circuit, e.g.
+      <code>cohere_compass_text</code> extends <code>cohere2</code>), <code>components</code> (a circuit embeds named
+      sub-circuits, e.g. <code>cohere_compass</code> embeds <code>decoder</code> &rarr; <code>cohere_compass_text</code>
+      and <code>vision_encoder</code> &rarr; <code>cohere_compass_vision</code>), and <code>stitch</code> edges
+      (declared tensor handoffs between components, each carrying its own
+      <code>required_contract.providers</code>). The compiler resolves <code>extends</code>/<code>components</code>
+      recursively and fails loudly on cycles or unresolvable references.
+    </p>
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 560" width="100%" role="img" tabindex="0" data-svg-title="Composite circuit anatomy - cohere_compass"
+         aria-label="Composite circuit anatomy of cohere_compass, family multimodal_composition with sequence vision encoder then decoder. The container holds two component boxes: vision_encoder, circuit cohere_compass_vision, 23 ops and 12 providers, exporting vision_embeddings with three deepstack injections; and decoder, circuit cohere_compass_text, which extends cohere2 by deep-merge, 16 ops and 9 providers, importing visual_prefix. Between them a stitch edge vision_embeddings_to_decoder_prefix, op multimodal_prefix_stitch, whose required contract binds three providers: prefix_insert to multimodal_prefix_insert_f32, position_builder to multimodal_mrope_positions_2d, and position_transform to mrope_qk_imrope_positions. Total: 37 ops, 24 providers. A side panel shows qwen36vl uses the same pattern with the qwen35 decoder (38 ops, 5 providers) plus qwen3_vl_vision (23 ops, 13 providers) plus the same stitch edge for 60 ops and 21 providers, while kimi_vl is flat with composite false at 22 ops and 13 providers, and that the compiler resolves extends and components recursively, failing loudly on cycles and unresolvable references."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <style>
+        .cc-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+        .cc-panel{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+        .cc-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+        .cc-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .cc-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .cc-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .cc-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+        .cc-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;}
+        .cc-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+      </style>
+      <defs>
+        <marker id="cc-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="32" class="cc-band">COMPOSITE CIRCUIT ANATOMY - cohere_compass = components + extends + stitch</text>
+
+      <!-- container circuit -->
+      <rect class="cc-panel" x="24" y="48" width="796" height="374" rx="12"/>
+      <text x="44" y="76" class="cc-title" font-size="13">cohere_compass.json</text>
+      <text x="44" y="94" class="cc-sub">family: multimodal_composition - sequence: [vision_encoder, decoder]</text>
+
+      <!-- vision component -->
+      <rect class="cc-box" x="64" y="108" width="310" height="150" rx="10"/>
+      <text x="84" y="134" class="cc-title" font-size="13">vision_encoder</text>
+      <text x="84" y="154" class="cc-sub">circuit: cohere_compass_vision</text>
+      <text x="84" y="174" class="cc-sub">23 ops / 12 providers</text>
+      <text x="84" y="194" class="cc-sub">exports vision_embeddings</text>
+      <text x="84" y="214" class="cc-sub">deepstack injection x3</text>
+
+      <!-- decoder component -->
+      <rect class="cc-box" x="446" y="108" width="310" height="150" rx="10"/>
+      <text x="466" y="134" class="cc-title" font-size="13">decoder</text>
+      <text x="466" y="154" class="cc-sub">circuit: cohere_compass_text</text>
+      <text x="466" y="174" class="cc-hi">extends cohere2 (deep-merge)</text>
+      <text x="466" y="194" class="cc-sub">16 ops / 9 providers</text>
+      <text x="466" y="214" class="cc-sub">imports visual_prefix</text>
+
+      <!-- stitch arrow between components -->
+      <path d="M374,183 L440,183" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#cc-arrow)"/>
+      <text x="388" y="172" class="cc-sub">stitch</text>
+
+      <!-- stitch edge detail strip -->
+      <path d="M219,258 L219,286" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#cc-arrow)"/>
+      <path d="M601,258 L601,286" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#cc-arrow)"/>
+      <rect class="cc-panel" x="64" y="286" width="692" height="120" rx="10"/>
+      <text x="84" y="312" class="cc-title" font-size="13">stitch edge: vision_embeddings_to_decoder_prefix</text>
+      <text x="84" y="332" class="cc-sub">op multimodal_prefix_stitch - required_contract.providers:</text>
+      <text x="84" y="352" class="cc-hi">prefix_insert -&gt; multimodal_prefix_insert_f32</text>
+      <text x="84" y="372" class="cc-hi">position_builder -&gt; multimodal_mrope_positions_2d</text>
+      <text x="84" y="392" class="cc-hi">position_transform -&gt; mrope_qk_imrope_positions</text>
+
+      <!-- side panel: same pattern elsewhere -->
+      <rect class="cc-panel" x="860" y="48" width="296" height="374" rx="12"/>
+      <text x="880" y="76" class="cc-title" font-size="13">same pattern, other families</text>
+      <text x="880" y="106" class="cc-hi">qwen36vl:</text>
+      <text x="880" y="126" class="cc-sub">qwen35 decoder 38 ops / 5</text>
+      <text x="880" y="144" class="cc-sub">+ qwen3_vl_vision 23 / 13</text>
+      <text x="880" y="162" class="cc-sub">+ same stitch edge</text>
+      <text x="880" y="182" class="cc-good">= 60 ops / 21 providers</text>
+      <line x1="880" y1="200" x2="1136" y2="200" stroke="#263242" stroke-width="1"/>
+      <text x="880" y="230" class="cc-hi">kimi_vl: flat</text>
+      <text x="880" y="250" class="cc-sub">composite = false</text>
+      <text x="880" y="268" class="cc-sub">22 ops / 13 providers</text>
+      <line x1="880" y1="286" x2="1136" y2="286" stroke="#263242" stroke-width="1"/>
+      <text x="880" y="316" class="cc-sub">the compiler resolves extends</text>
+      <text x="880" y="334" class="cc-sub">+ components recursively;</text>
+      <text x="880" y="354" class="cc-warn">cycles and unresolvable</text>
+      <text x="880" y="372" class="cc-warn">references fail loudly</text>
+      <text x="880" y="400" class="cc-sub">tool: report_model_novelty_v8.py</text>
+
+      <text x="24" y="452" class="cc-hi">cohere_compass total: 37 ops / 24 providers (decoder 16/9 + vision 23/12 + 1 stitch edge, 3 providers)</text>
+
+      <text x="24" y="482" class="cc-cap">Evidence (PRs #434, #462): measured with report_model_novelty_v8.py --circuit cohere_compass / qwen36vl / kimi_vl;</text>
+      <text x="24" y="502" class="cc-cap">the report is composite-aware since PR #462 (fix commit cbc8296a2), resolving components the way build_ir_v8.py does.</text>
+      <text x="24" y="526" class="cc-cap">Caveats: component certification is per-component (Compass vision vs PyTorch per #445, private-corpus certification</text>
+      <text x="24" y="546" class="cc-cap">per #447); composition itself does not certify end-to-end generation or OCR quality.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+    <div class="ka-grid">
+      <div class="ka-card"><strong>extends.</strong> The child circuit deep-merges over the parent &mdash;
+        <code>cohere_compass_text</code> inherits <code>cohere2</code>'s layer plan and overrides only what the
+        Compass decoder changes (M-RoPE text positions, the visual-prefix input). No copy of the parent graph, no
+        forked maintenance.</div>
+      <div class="ka-card"><strong>components.</strong> <code>cohere_compass.json</code> names two sub-circuits with
+        explicit <code>exports</code>/<code>imports</code>: the vision encoder publishes
+        <code>vision_embeddings</code>, the decoder consumes <code>visual_prefix</code>. Each component keeps its own
+        provider bindings and certification status.</div>
+      <div class="ka-card"><strong>stitch.</strong> The edge
+        <code>vision_embeddings_to_decoder_prefix</code> (op <code>multimodal_prefix_stitch</code>) declares the
+        handoff contract &mdash; token-major FP32 vision storage, M-RoPE 2D positions, mixed visual/text prefill
+        &mdash; and binds three providers: <code>multimodal_prefix_insert_f32</code>,
+        <code>multimodal_mrope_positions_2d</code>, <code>mrope_qk_imrope_positions</code>.</div>
+      <div class="ka-card"><strong>Measure it.</strong>
+        <code>python3 version/v8/scripts/report_model_novelty_v8.py --circuit cohere_compass</code> reports the
+        composite attribution above (37 ops / 24 providers; per-component rows; stitch edge providers); the report
+        has been composite-aware since PR #462 (fix commit <code>cbc8296a2</code>).</div>
+    </div>
+    <p class="ka-note">
+      Circuit sources: <code>version/v8/circuits/cohere_compass.json</code> (components + stitch),
+      <code>cohere_compass_text.json</code> (extends cohere2), <code>cohere_compass_vision.json</code>. The same
+      shape powers <code>qwen36vl.json</code>; <code>kimi_vl.json</code> is a flat circuit for contrast. Bring-up
+      story: <a href="v8-cohere-kernels.html">Cohere Kernel Story — North Micro Vision / Compass</a>.
+    </p>
+  </div>
+
   <div class="ka-section">
     <h2>Further Reading</h2>
     <div class="ka-grid">
@@ -1803,7 +1928,7 @@ Mamba2 (per head, per state element):
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-06</p>
             </div>
         </div>
     </footer>
