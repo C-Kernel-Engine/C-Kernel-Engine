@@ -1559,6 +1559,7 @@ void gelu_fast_inplace(float *data, size_t n);
 // Slower but provides maximum accuracy. Used by BF16 wrapper.
 void gelu_exact_inplace(float *data, size_t n);
 void gelu_erf_fp64_f32_inplace(float *data, size_t n);
+void gelu_erf_fp64_f32_parallel_dispatch(float *data, size_t n);
 void gelu_pytorch_erf_f32_inplace(float *data, size_t n);
 
 // GGML-compatible GELU forward matching llama.cpp's FP16 table semantics.

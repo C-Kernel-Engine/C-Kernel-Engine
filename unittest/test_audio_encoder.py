@@ -178,6 +178,8 @@ lib.audio_whisper_log_mel_window_wav_pcm16_f32.argtypes = [
 lib.audio_whisper_log_mel_window_wav_pcm16_f32.restype = ctypes.c_int
 gelu_lib.gelu_erf_fp64_f32_inplace.argtypes = [_FLOAT_P, ctypes.c_size_t]
 gelu_lib.gelu_erf_fp64_f32_inplace.restype = None
+gelu_lib.gelu_erf_fp64_f32_parallel_dispatch.argtypes = [_FLOAT_P, ctypes.c_size_t]
+gelu_lib.gelu_erf_fp64_f32_parallel_dispatch.restype = None
 
 
 def check_wav_pcm16() -> None:
@@ -744,6 +746,14 @@ def check_pytorch_erf_gelu() -> None:
     assert np.array_equal(actual, expected)
     print(
         "audio_erf_gelu_fp64_scalar max_diff=0 tol=0 [PASS]",
+        flush=True,
+    )
+
+    parallel = source.copy()
+    gelu_lib.gelu_erf_fp64_f32_parallel_dispatch(_fptr(parallel), parallel.size)
+    assert np.array_equal(parallel, expected)
+    print(
+        "audio_erf_gelu_fp64_parallel max_diff=0 tol=0 [PASS]",
         flush=True,
     )
 

@@ -708,6 +708,36 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertIn("const double scaled", function)
         self.assertIn("data[i] = (float)", function)
 
+    def test_audio_parallel_erf_gelu_preserves_scalar_arithmetic(self):
+        kernel = json.loads(
+            (
+                V8
+                / "kernel_maps"
+                / "gelu_erf_fp64_f32_parallel_dispatch.json"
+            ).read_text(encoding="utf-8")
+        )
+        capability = kernel["numerical_capabilities"][0]
+        self.assertEqual(
+            capability["contract_id"],
+            "gelu_erf_fp64_parallel_fp32_storage",
+        )
+        self.assertFalse(
+            capability["arithmetic"]["thread_count_changes_arithmetic_order"]
+        )
+        contract = json.loads(
+            (V8 / "contracts" / "numerical_execution.json").read_text(
+                encoding="utf-8"
+            )
+        )["contracts"]["gelu_erf_fp64_parallel_fp32_storage"]
+        self.assertEqual(contract["reduction"]["kind"], "none")
+        self.assertEqual(
+            contract["threading"]["work_partition"],
+            "output_tiles",
+        )
+        self.assertFalse(
+            contract["threading"]["thread_count_changes_arithmetic_order"]
+        )
+
     def test_bf16_erf_gelu_oracle_is_pytorch_version_scoped(self):
         source = (
             ROOT

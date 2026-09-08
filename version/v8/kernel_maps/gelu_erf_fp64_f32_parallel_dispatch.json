@@ -1,0 +1,79 @@
+{
+  "id": "gelu_erf_fp64_f32_parallel_dispatch",
+  "op": "gelu",
+  "operation_interface": "gelu.fp32_inplace.v1",
+  "variant": "pytorch_erf_inplace_fp32_threadpool",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "Input/output buffer (in-place)"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "layout": "contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "alias_of": "input:x",
+      "desc": "PyTorch approximate=none GELU output"
+    }
+  ],
+  "dims": ["N"],
+  "impl": {
+    "function": "gelu_erf_fp64_f32_parallel_dispatch",
+    "c_declaration": "void gelu_erf_fp64_f32_parallel_dispatch(float *data, size_t n);",
+    "sources": ["src/kernels/gelu_kernels.c", "src/ck_threadpool.c"]
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "gelu_erf_fp64_parallel_fp32_storage",
+      "status": "validated",
+      "phases": ["prefill", "decode"],
+      "function": "gelu_erf_fp64_f32_parallel_dispatch",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": ["output_tiles"],
+          "dispatch": ["ck_threadpool_dispatch_n"],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {"cast": "float*", "name": "data", "source": "output:out", "ports": ["input:x", "output:out"]},
+      {"name": "n", "source": "dim:gelu_elems"}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_audio_encoder.py"]
+  },
+  "notes": "Threadpool-dispatched FP32 ERF GELU. Each element preserves the scalar FP64 formula and one FP32 output rounding. Static disjoint ranges do not alter arithmetic order. Small or nested calls retain the serial provider."
+}
