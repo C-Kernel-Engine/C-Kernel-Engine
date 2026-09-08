@@ -97,6 +97,7 @@ var ckernel__engine_8h =
     [ "attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4", "ckernel__engine_8h.html#a3d995f9db7a093fa08caf8513947d7f8", null ],
     [ "attention_forward_mixed_visual_chunk_head_major_gqa_flash_strided_gemma4_token_output", "ckernel__engine_8h.html#ab783eb6ec6fb931af09267aa5353f999", null ],
     [ "attention_forward_query_key_head_major_f32", "ckernel__engine_8h.html#a5aedd742eb2be8a93870850c8a53eb8c", null ],
+    [ "attention_forward_query_key_head_major_f32_decode_heads", "ckernel__engine_8h.html#a2b937b86e89e160c33702ec28b63ff53", null ],
     [ "attention_forward_query_key_head_major_f32_packed_k", "ckernel__engine_8h.html#a4809e9c0fa0a7050b20c1cd669874859", null ],
     [ "attention_forward_query_key_head_major_tiled_f16kv_fp32", "ckernel__engine_8h.html#aa5e2810c521c23e5cb62ae940cec1656", null ],
     [ "attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract", "ckernel__engine_8h.html#aa2cb902e7b9acbe887d0bdf71be0c9f1", null ],

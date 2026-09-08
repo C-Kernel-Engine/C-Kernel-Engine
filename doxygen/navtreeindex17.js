@@ -1,5 +1,8 @@
 var NAVTREEINDEX17 =
 {
+"structCKIRNode.html#ac80c87853b9a0b35958d643481e95fc7":[1,0,26,3],
+"structCKIRV2Binding.html":[1,0,27],
+"structCKIRV2Binding.html#a0e50855a2852b3018c3b87ae5e53db19":[1,0,27,0],
 "structCKIRV2Binding.html#acbaa32705fa3caa147f63c8beecd6fe5":[1,0,27,1],
 "structCKIRV2Buffer.html":[1,0,28],
 "structCKIRV2Buffer.html#a22f159608ef2fbcdfdd84704ae3f5da4":[1,0,28,7],
@@ -246,8 +249,5 @@ var NAVTREEINDEX17 =
 "structCKLayerGradOffsets.html#a906b3cb61f4cea1d5c6c3c0c01eb3c99":[1,0,36,23],
 "structCKLayerGradOffsets.html#a961c5f51bc787cfd934f468f70536674":[1,0,36,54],
 "structCKLayerGradOffsets.html#a9c059da100ac4441f57b4dd356a2ff9b":[1,0,36,31],
-"structCKLayerGradOffsets.html#a9ebf98163fe350922fa9f97a9f9f7598":[1,0,36,24],
-"structCKLayerGradOffsets.html#aa093a6afe597f5b90196549170cb4aab":[1,0,36,15],
-"structCKLayerGradOffsets.html#aa506989780e0caad23abec7e635b8b08":[1,0,36,13],
-"structCKLayerGradOffsets.html#aa70642f467ced05a1ce8e4795c9ec152":[1,0,36,22]
+"structCKLayerGradOffsets.html#a9ebf98163fe350922fa9f97a9f9f7598":[1,0,36,24]
 };

@@ -1,5 +1,7 @@
 var NAVTREEINDEX3 =
 {
+"ck__parity__api_8c.html#a6b37e71eb014ef45b5c0c534a879f17a":[2,0,1,11,40],
+"ck__parity__api_8c.html#a6c5534c711d8306cf8973670bc9d3cfc":[2,0,1,11,21],
 "ck__parity__api_8c.html#a6dd447ca849e7c7924ee76fa71144fcb":[2,0,1,11,41],
 "ck__parity__api_8c.html#a70dc56b85050454040a47b2dc4e0f37f":[2,0,1,11,37],
 "ck__parity__api_8c.html#a7135e1b580a18f085b2d85b1e3fd0bf5":[2,0,1,11,14],
@@ -247,7 +249,5 @@ var NAVTREEINDEX3 =
 "ck__tokenizer_8h.html#aea40301f8452f2b4cc6ed912d0b724b1":[2,0,0,12,17],
 "ck__tokenizer_8h.html#aed1d9d02b4dfc4cafcea97d08c44964e":[2,0,0,12,22],
 "ck__tokenizer_8h_source.html":[2,0,0,12],
-"ck__tokenizer__v2_8c.html":[2,0,1,14],
-"ck__tokenizer__v2_8c.html#a4de5533c0e1c9f89bfb77bee05cf97fd":[2,0,1,14,0],
-"ck__tokenizer__v2_8c.html#a6f11f138126f83f02adef65dc6ceef4b":[2,0,1,14,1]
+"ck__tokenizer__v2_8c.html":[2,0,1,14]
 };
