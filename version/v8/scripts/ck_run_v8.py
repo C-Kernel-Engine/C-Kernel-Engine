@@ -2366,6 +2366,8 @@ def run_audio_pipeline(args: argparse.Namespace) -> int:
         argv.append("--timestamps")
     if args.output is not None:
         argv.extend(["--output", str(args.output)])
+    if args.temp_dir is not None:
+        argv.extend(["--temp-dir", str(args.temp_dir)])
     return int(module.main(argv))
 
 
@@ -2500,6 +2502,11 @@ Examples:
         help="Generate monotonic paired Whisper timestamp tokens",
     )
     audio_parser.add_argument("--output", type=Path)
+    audio_parser.add_argument(
+        "--temp-dir",
+        type=Path,
+        help="Temporary storage root for request-scoped audio artifacts",
+    )
     audio_parser.add_argument("--force-download", action="store_true")
     audio_parser.add_argument("--force-convert", action="store_true")
     audio_parser.add_argument("--force-compile", action="store_true")
