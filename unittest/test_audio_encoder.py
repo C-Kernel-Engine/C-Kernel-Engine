@@ -112,11 +112,22 @@ attention_lib.attention_forward_query_key_head_major_f32.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float,
 ]
 attention_lib.attention_forward_query_key_head_major_f32.restype = ctypes.c_int
+attention_lib.attention_forward_query_key_head_major_f32_decode_heads.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float,
+]
+attention_lib.attention_forward_query_key_head_major_f32_decode_heads.restype = ctypes.c_int
 attention_lib.attention_forward_query_key_head_major_f32_packed_k.argtypes = [
     _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float,
 ]
 attention_lib.attention_forward_query_key_head_major_f32_packed_k.restype = ctypes.c_int
+attention_lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+attention_lib.ck_set_num_threads.restype = None
+attention_lib.ck_get_num_threads.argtypes = []
+attention_lib.ck_get_num_threads.restype = ctypes.c_int
+attention_lib.ck_threadpool_global_destroy.argtypes = []
+attention_lib.ck_threadpool_global_destroy.restype = None
 attention_lib.attention_forward_query_key_head_major_tiled_f16kv_fp32.argtypes = [
     _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float,
@@ -776,19 +787,43 @@ def _check_cross_attention(name: str, heads: int, query_tokens: int, key_tokens:
     value = rng.normal(0.0, 0.12, (heads, key_tokens, dim)).astype(np.float32)
     actual = np.empty_like(query)
     packed_actual = np.empty_like(query)
-    scratch = np.empty((query_tokens, key_tokens), dtype=np.float32)
+    scratch = np.empty((heads, query_tokens, key_tokens), dtype=np.float32)
     key_transpose_scratch = np.empty((heads, dim, key_tokens), dtype=np.float32)
     scale = np.float32(1.0 / math.sqrt(dim))
+    serial = np.empty_like(query)
+    original_threads = attention_lib.ck_get_num_threads()
+    attention_lib.ck_threadpool_global_destroy()
+    attention_lib.ck_set_num_threads(1)
     assert attention_lib.attention_forward_query_key_head_major_f32(
-        _fptr(query), _fptr(key), _fptr(value), _fptr(actual), _fptr(scratch),
+        _fptr(query), _fptr(key), _fptr(value), _fptr(serial), _fptr(scratch),
         heads, query_tokens, key_tokens, dim, float(scale),
     ) == 0
+    attention_lib.ck_threadpool_global_destroy()
+    attention_lib.ck_set_num_threads(20)
+    if query_tokens == 1:
+        assert attention_lib.attention_forward_query_key_head_major_f32_decode_heads(
+            _fptr(query), _fptr(key), _fptr(value), _fptr(actual), _fptr(scratch),
+            heads, query_tokens, key_tokens, dim, float(scale),
+        ) == 0
+        for replay in range(8192):
+            actual.fill(np.nan)
+            assert attention_lib.attention_forward_query_key_head_major_f32_decode_heads(
+                _fptr(query), _fptr(key), _fptr(value), _fptr(actual), _fptr(scratch),
+                heads, query_tokens, key_tokens, dim, float(scale),
+            ) == 0
+            assert np.array_equal(actual, serial), (name, replay)
+    else:
+        assert attention_lib.attention_forward_query_key_head_major_f32(
+            _fptr(query), _fptr(key), _fptr(value), _fptr(actual), _fptr(scratch),
+            heads, query_tokens, key_tokens, dim, float(scale),
+        ) == 0
     assert attention_lib.attention_forward_query_key_head_major_f32_packed_k(
         _fptr(query), _fptr(key), _fptr(value), _fptr(packed_actual), _fptr(scratch),
         _fptr(key_transpose_scratch),
         heads, query_tokens, key_tokens, dim, float(scale),
     ) == 0
-    assert np.array_equal(packed_actual, actual), name
+    assert np.array_equal(actual, serial), name
+    assert np.array_equal(packed_actual, serial), name
     tq = torch.from_numpy(query)
     tk = torch.from_numpy(key)
     tv = torch.from_numpy(value)
@@ -797,6 +832,8 @@ def _check_cross_attention(name: str, heads: int, query_tokens: int, key_tokens:
     rmse = float(np.sqrt(np.mean((actual - expected) ** 2)))
     assert max_diff <= 2.0e-6, (name, max_diff)
     assert rmse <= 3.0e-7, (name, rmse)
+    attention_lib.ck_threadpool_global_destroy()
+    attention_lib.ck_set_num_threads(original_threads)
     print(
         f"{name} max_diff={max_diff:.8e} tol=2.0e-06 [PASS] "
         f"rmse={rmse:.8e} rmse_tol=3.0e-07"

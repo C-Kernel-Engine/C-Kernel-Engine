@@ -3066,7 +3066,7 @@ static void work_gemm_nt_f32_llama_production(int ith, int nth, void *args)
  * Parallel Dispatch Wrappers
  *
  * Same signature as serial GEMM functions. Pack args, dispatch to pool.
- * Fast path: M <= 1 or single thread -> call serial directly.
+ * Small workloads or a single thread call the serial provider directly.
  * ============================================================================ */
 
 void gemm_nt_q5_0_q8_0_parallel_dispatch(
@@ -3118,7 +3118,10 @@ void gemm_nt_f32_llama_production_parallel_dispatch(
 {
     ck_threadpool_t *pool = ck_threadpool_global();
     const int total = M > 0 && N > 0 ? M * N : 0;
-    if (!pool || ck_threadpool_n_threads(pool) <= 1 || M <= 1 || total < 96) {
+    const size_t decode_work = M == 1 && N > 0 && K > 0
+        ? (size_t)N * (size_t)K : 0;
+    if (!pool || ck_threadpool_n_threads(pool) <= 1 || total < 96 ||
+        (M == 1 && decode_work < 512u * 1024u)) {
         gemm_nt_f32_llama_production(A, B, bias, C, M, N, K);
         return;
     }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
@@ -121,6 +122,9 @@ def test_whisper_runner_measures_frontend_and_encoder_separately() -> None:
     assert encoder_seconds == 0.75
     source = SCRIPT.read_text(encoding="utf-8")
     assert '"frontend_seconds": sum(' in source
+    assert '"encoder_engine_sha256": _sha256(' in source
+    assert '"decoder_engine_sha256": _sha256(' in source
+    assert '"max_tokens_per_window": int(args.max_tokens)' in source
 
 
 def test_whisper_cached_frontend_slices_and_zero_pads_exactly() -> None:
@@ -154,6 +158,51 @@ def test_whisper_cached_frontend_slices_and_zero_pads_exactly() -> None:
             window_start_frame=3,
             hop_length=2,
         )
+
+
+def test_whisper_frontend_cache_capacity_accounts_for_outputs() -> None:
+    runner = _module()
+    config = {
+        "audio_feature_channels": 80,
+        "context_length": 1500,
+        "embed_dim": 512,
+    }
+    assert runner._frontend_cache_required_bytes(config, 3000) == (
+        80 * 3000 * 4 + 1500 * 512 * 4 + 8 * 1024 * 1024
+    )
+
+
+def test_whisper_frontend_cache_quota_failure_requests_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+
+    def fail_allocation(*_args) -> None:
+        raise OSError(errno.EDQUOT, "Disk quota exceeded")
+
+    monkeypatch.setattr(runner.os, "posix_fallocate", fail_allocation)
+    reason = runner._probe_cache_capacity(tmp_path, 128 * 1024 * 1024)
+    assert reason is not None
+    assert "cannot reserve" in reason
+    assert not (tmp_path / ".cke-whisper-capacity-probe").exists()
+
+
+@pytest.mark.parametrize(
+    ("returncode", "expected"),
+    [
+        (78, "rebuild to enable it"),
+        (79, "could not be stored"),
+    ],
+)
+def test_whisper_frontend_worker_expected_failures_request_fallback(
+    returncode: int, expected: str
+) -> None:
+    runner = _module()
+    reason = runner._frontend_reuse_worker_failure(returncode)
+    assert reason is not None
+    assert expected in reason
+    with pytest.raises(ValueError, match="unexpected frontend worker"):
+        runner._frontend_reuse_worker_failure(1)
 
 
 def test_whisper_workers_do_not_compete_with_numpy_blas_threads(

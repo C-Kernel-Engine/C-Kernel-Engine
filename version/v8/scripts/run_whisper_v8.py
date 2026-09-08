@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -21,6 +22,8 @@ import numpy as np
 
 _FLOAT_P = ctypes.POINTER(ctypes.c_float)
 _U8_P = ctypes.POINTER(ctypes.c_uint8)
+_FRONTEND_REUSE_UNAVAILABLE = 78
+_FRONTEND_REUSE_RESOURCE_ERROR = 79
 
 
 class CKAudioWavInfo(ctypes.Structure):
@@ -53,6 +56,49 @@ def _wav_geometry_for_cache(path: Path) -> tuple[int, int] | None:
             return wav_reader.getnframes(), wav_reader.getframerate()
     except (EOFError, OSError, wave.Error):
         return None
+
+
+def _probe_cache_capacity(directory: Path, required_bytes: int) -> str | None:
+    if required_bytes <= 0:
+        return "invalid cache-capacity request"
+    probe = directory / ".cke-whisper-capacity-probe"
+    try:
+        with probe.open("w+b") as handle:
+            os.posix_fallocate(handle.fileno(), 0, required_bytes)
+    except OSError as error:
+        if error.errno in (errno.EDQUOT, errno.ENOSPC, errno.EFBIG):
+            return f"temporary storage cannot reserve {required_bytes} bytes: {error}"
+        raise
+    finally:
+        probe.unlink(missing_ok=True)
+    return None
+
+
+def _frontend_reuse_worker_failure(returncode: int) -> str | None:
+    if returncode == 0:
+        return None
+    if returncode == _FRONTEND_REUSE_UNAVAILABLE:
+        return (
+            "generated encoder runtime does not provide full-feature reuse; "
+            "rebuild to enable it"
+        )
+    if returncode == _FRONTEND_REUSE_RESOURCE_ERROR:
+        return "temporary feature cache could not be stored"
+    raise ValueError(f"unexpected frontend worker return code: {returncode}")
+
+
+def _frontend_cache_required_bytes(
+    encoder_config: dict[str, Any], feature_frames: int
+) -> int:
+    feature_bytes = (
+        int(encoder_config["audio_feature_channels"]) * feature_frames * 4
+    )
+    encoder_output_bytes = (
+        int(encoder_config["context_length"])
+        * int(encoder_config["embed_dim"])
+        * 4
+    )
+    return feature_bytes + encoder_output_bytes + 8 * 1024 * 1024
 
 
 def _parse_cpu_list(value: str) -> set[int]:
@@ -221,9 +267,17 @@ def _frontend_worker(args: argparse.Namespace) -> int:
     config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     feature_channels = int(config["audio_feature_channels"])
     feature_frames = int(args.feature_frames)
-    features = np.empty((feature_channels, feature_frames), dtype=np.float32)
     model = _load_generated_model(run_dir)
-    model.ck_model_prepare_audio_wav_features.argtypes = [
+    try:
+        prepare_features = model.ck_model_prepare_audio_wav_features
+    except AttributeError:
+        print(
+            "frontend reuse unavailable: generated encoder runtime lacks "
+            "ck_model_prepare_audio_wav_features; rebuild to enable reuse",
+            file=sys.stderr,
+        )
+        return _FRONTEND_REUSE_UNAVAILABLE
+    prepare_features.argtypes = [
         _U8_P,
         ctypes.c_size_t,
         _FLOAT_P,
@@ -231,7 +285,8 @@ def _frontend_worker(args: argparse.Namespace) -> int:
         ctypes.POINTER(ctypes.c_int),
         ctypes.POINTER(CKAudioWavInfo),
     ]
-    model.ck_model_prepare_audio_wav_features.restype = ctypes.c_int
+    prepare_features.restype = ctypes.c_int
+    features = np.empty((feature_channels, feature_frames), dtype=np.float32)
     status = int(
         model.ck_model_init_with_manifest(
             str(run_dir / "weights.bump").encode(),
@@ -246,7 +301,7 @@ def _frontend_worker(args: argparse.Namespace) -> int:
         produced = ctypes.c_int()
         started = time.perf_counter()
         status = int(
-            model.ck_model_prepare_audio_wav_features(
+            prepare_features(
                 wav.ctypes.data_as(_U8_P),
                 wav.size,
                 _fptr(features),
@@ -266,7 +321,15 @@ def _frontend_worker(args: argparse.Namespace) -> int:
     finally:
         model.ck_model_free()
 
-    np.save(args.feature_output, features)
+    try:
+        np.save(args.feature_output, features)
+    except OSError as error:
+        args.feature_output.unlink(missing_ok=True)
+        print(
+            f"frontend reuse unavailable: cannot store feature cache: {error}",
+            file=sys.stderr,
+        )
+        return _FRONTEND_REUSE_RESOURCE_ERROR
     args.worker_report.write_text(
         json.dumps(
             {
@@ -839,12 +902,16 @@ def _run_parent(args: argparse.Namespace) -> int:
         (decoder_dir / "generation_config.json").read_text(encoding="utf-8")
     )
 
-    with tempfile.TemporaryDirectory(prefix="cke-whisper-") as temp_text:
+    temp_root = args.temp_dir.resolve() if args.temp_dir is not None else None
+    if temp_root is not None:
+        temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="cke-whisper-", dir=temp_root) as temp_text:
         temp = Path(temp_text)
         common = [sys.executable, str(Path(__file__).resolve())]
         full_features: Path | None = None
         frontend_report_path: Path | None = None
         frontend_report: dict[str, Any] | None = None
+        frontend_reuse_reason = "input is not eligible for native-rate long-audio reuse"
         wav_geometry = _wav_geometry_for_cache(wav_path)
         source_frames, source_rate = wav_geometry or (0, 0)
         if (
@@ -852,9 +919,15 @@ def _run_parent(args: argparse.Namespace) -> int:
             and source_rate == target_sample_rate
         ):
             feature_frames = source_frames // int(encoder_config["audio_hop_length"])
-            full_features = temp / "audio-features-full.npy"
-            frontend_report_path = temp / "audio-features-full.json"
-            subprocess.run(
+            required_bytes = _frontend_cache_required_bytes(
+                encoder_config, feature_frames
+            )
+            frontend_reuse_reason = _probe_cache_capacity(temp, required_bytes)
+            candidate_features = temp / "audio-features-full.npy"
+            candidate_report = temp / "audio-features-full.json"
+            completed = None
+            if frontend_reuse_reason is None:
+                completed = subprocess.run(
                 [
                     *common,
                     "_frontend",
@@ -865,16 +938,34 @@ def _run_parent(args: argparse.Namespace) -> int:
                     "--feature-frames",
                     str(feature_frames),
                     "--feature-output",
-                    str(full_features),
+                    str(candidate_features),
                     "--worker-report",
-                    str(frontend_report_path),
+                    str(candidate_report),
                 ],
-                check=True,
+                check=False,
                 env=worker_env,
             )
-            frontend_report = json.loads(
-                frontend_report_path.read_text(encoding="utf-8")
-            )
+            if completed is not None and completed.returncode == 0:
+                full_features = candidate_features
+                frontend_report_path = candidate_report
+                frontend_report = json.loads(
+                    frontend_report_path.read_text(encoding="utf-8")
+                )
+                frontend_reuse_reason = "enabled"
+            elif completed is not None:
+                try:
+                    frontend_reuse_reason = _frontend_reuse_worker_failure(
+                        completed.returncode
+                    )
+                except ValueError:
+                    raise subprocess.CalledProcessError(
+                        completed.returncode, completed.args
+                    ) from None
+            if frontend_report is None:
+                print(
+                    f"warning: frontend reuse disabled: {frontend_reuse_reason}",
+                    file=sys.stderr,
+                )
         segments: list[dict[str, Any]] = []
         window_start_frame = 0
         while True:
@@ -983,6 +1074,7 @@ def _run_parent(args: argparse.Namespace) -> int:
         "window_count": len(segments),
         "frontend_reuse": {
             "enabled": frontend_report is not None,
+            "reason": frontend_reuse_reason,
             "full_feature_seconds": float(
                 (frontend_report or {}).get("frontend_seconds", 0.0)
             ),
@@ -1018,7 +1110,7 @@ def _run_parent(args: argparse.Namespace) -> int:
     )
     report = {
         "schema": "cke.whisper_e2e",
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "ok",
         "wav": str(wav_path),
         "wav_sha256": _sha256(wav_path),
@@ -1026,6 +1118,11 @@ def _run_parent(args: argparse.Namespace) -> int:
         "decoder_run_dir": str(decoder_dir),
         "encoder_runtime_sha256": _sha256(encoder_dir / "libmodel.so"),
         "decoder_runtime_sha256": _sha256(decoder_dir / "libmodel.so"),
+        "encoder_engine_sha256": _sha256(encoder_dir / "libckernel_engine.so"),
+        "decoder_engine_sha256": _sha256(decoder_dir / "libckernel_engine.so"),
+        "request": {
+            "max_tokens_per_window": int(args.max_tokens),
+        },
         "provenance": {
             "encoder": {
                 "config_sha256": _sha256(encoder_dir / "config.json"),
@@ -1117,6 +1214,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Generate Whisper timestamp tokens using the model contract",
     )
     run.add_argument("--output", type=Path)
+    run.add_argument(
+        "--temp-dir",
+        type=Path,
+        help="Temporary storage root for request-scoped audio artifacts",
+    )
 
     encoder = subparsers.add_parser("_encoder", help=argparse.SUPPRESS)
     encoder.add_argument("--encoder-run-dir", type=Path, required=True)

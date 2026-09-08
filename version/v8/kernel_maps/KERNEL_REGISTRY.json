@@ -5,12 +5,12 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 351,
+      "total": 352,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
         "assistant_layer_scale": 1,
-        "attention": 33,
+        "attention": 34,
         "attention_projection": 1,
         "attention_sliding": 9,
         "attn_gate_sigmoid_mul": 2,
@@ -8303,6 +8303,174 @@
       },
       "name": "attention_forward_query_key_head_major_f32",
       "_source_file": "attention_forward_query_key_head_major_f32.json"
+    },
+    {
+      "id": "attention_forward_query_key_head_major_f32_decode_heads",
+      "op": "attention",
+      "variant": "single_query_head_major_query_scaled_fp32_parallel_heads",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "query",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tq",
+            "D"
+          ]
+        },
+        {
+          "name": "key",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tk",
+            "D"
+          ]
+        },
+        {
+          "name": "value",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tk",
+            "D"
+          ]
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tq",
+            "D"
+          ]
+        }
+      ],
+      "scratch": [
+        {
+          "name": "score_scratch",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "Tk"
+          ]
+        }
+      ],
+      "dims": [
+        "num_heads",
+        "query_tokens",
+        "key_tokens",
+        "head_dim",
+        "attention_scale"
+      ],
+      "impl": {
+        "function": "attention_forward_query_key_head_major_f32_decode_heads",
+        "c_declaration": "int attention_forward_query_key_head_major_f32_decode_heads(const float *query, const float *key, const float *value, float *output, float *score_scratch, int num_heads, int query_tokens, int key_tokens, int head_dim, float scale);",
+        "sources": [
+          "src/kernels/attention_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_query_key_scaled_ordered_fp32_decode_heads",
+          "status": "validated",
+          "phases": [
+            "decode"
+          ],
+          "function": "attention_forward_query_key_head_major_f32_decode_heads",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "ck_threadpool",
+              "work_partition": [
+                "independent_heads"
+              ],
+              "dispatch": [
+                "ck_threadpool_dispatch_n"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:query",
+            "cast": "const float*"
+          },
+          {
+            "name": "key",
+            "source": "activation:key",
+            "cast": "const float*"
+          },
+          {
+            "name": "value",
+            "source": "activation:value",
+            "cast": "const float*"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "float*"
+          },
+          {
+            "name": "score_scratch",
+            "source": "scratch:score_scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "num_heads",
+            "source": "dim:num_heads"
+          },
+          {
+            "name": "query_tokens",
+            "source": "dim:query_tokens"
+          },
+          {
+            "name": "key_tokens",
+            "source": "dim:key_tokens"
+          },
+          {
+            "name": "head_dim",
+            "source": "dim:head_dim"
+          },
+          {
+            "name": "scale",
+            "source": "dim:attention_scale"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ]
+      },
+      "name": "attention_forward_query_key_head_major_f32_decode_heads",
+      "_source_file": "attention_forward_query_key_head_major_f32_decode_heads.json"
     },
     {
       "id": "attention_forward_query_key_head_major_f32_packed_k",
@@ -21597,7 +21765,7 @@
             {
               "backend": "llama.cpp_ggml_cpu_graph",
               "status": "validated",
-              "evidence": "Bit exact for M=1,4,65, N=48, K=5120 and the Qwen3.5 router shape M=65, N=256, K=2048 across 1,16,20,24,32 threads."
+              "evidence": "Bit exact for Whisper decode shapes M=1 with N/K=512/512, 2048/512, 512/2048 and 51865/512; M=1,4,65, N=48, K=5120; and the Qwen3.5 router shape M=65, N=256, K=2048 across 1,16,20,24,32 threads."
             }
           ]
         }
@@ -21609,11 +21777,11 @@
         "parity": [
           {
             "oracle": "llama.cpp GGML_OP_MUL_MAT CPU graph",
-            "criteria": "bit exact for M=1,4,65, N=48, K=5120 and M=65, N=256, K=2048 across 1,16,20,24,32 threads"
+            "criteria": "bit exact for Whisper M=1 projection shapes, M=1,4,65 with N=48/K=5120, and M=65/N=256/K=2048 across 1,16,20,24,32 threads"
           }
         ]
       },
-      "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths. Independent prefill outputs are assigned to CKE's persistent thread pool; decode and small shapes retain the serial leaf.",
+      "notes": "Scoped FP32 projection provider matching llama.cpp's one-accumulator llamafile prefill, including its high/low then lane 0+2 and 1+3 horizontal reduction, and four-accumulator ggml_vec_dot_f32 decode paths. Independent outputs are assigned to CKE's persistent thread pool when the workload threshold is met; small shapes retain the serial leaf.",
       "name": "gemm_nt_f32_llama_production",
       "_source_file": "gemm_nt_f32_llama_production.json"
     },
