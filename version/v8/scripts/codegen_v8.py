@@ -373,7 +373,11 @@ CK_EXPORT int32_t ck_model_get_generation_eos_token(void) {{ return {eos}; }}
 """
 
 
-def _audio_call_expression(op: Dict[str, Any]) -> str:
+def _audio_call_expression(
+    op: Dict[str, Any],
+    *,
+    source_overrides: Dict[str, str] | None = None,
+) -> str:
     function = str(op.get("function", "") or "").strip()
     args = op.get("args")
     if not function or not isinstance(args, list) or op.get("errors"):
@@ -386,7 +390,10 @@ def _audio_call_expression(op: Dict[str, Any]) -> str:
             raise RuntimeError(
                 f"audio frontend call IR for {function} has an incomplete argument"
             )
-        expressions.append(str(arg["expr"]))
+        source = str(arg.get("source", "") or "")
+        expressions.append(
+            (source_overrides or {}).get(source, str(arg["expr"]))
+        )
     return f"{function}({', '.join(expressions)})"
 
 
@@ -410,10 +417,19 @@ def _emit_audio_wav_entrypoint(
     sample_rate = int(config.get("audio_sample_rate", 0) or 0)
     sample_extent = int(config.get("audio_sample_extent", 0) or 0)
     max_source_frames = int(config.get("audio_max_source_frames", 0) or 0)
-    if min(sample_rate, sample_extent, max_source_frames) <= 0:
+    hop_length = int(config.get("audio_hop_length", 0) or 0)
+    if min(sample_rate, sample_extent, max_source_frames, hop_length) <= 0:
         raise RuntimeError("audio frontend codegen requires explicit positive extents")
 
     calls = {name: _audio_call_expression(by_op[name]) for name in _AUDIO_FRONTEND_OPS}
+    full_feature_call = _audio_call_expression(
+        by_op["audio_feature_window"],
+        source_overrides={
+            "runtime:audio_window_start_frame": "0",
+            "dim:n_frames": "audio_feature_frame_capacity",
+            "output:log_mel": "audio_features",
+        },
+    )
     return f"""
 /* Generated from the resolved audio frontend call IR. Python must not select
  * or invoke individual frontend kernels. */
@@ -464,6 +480,31 @@ CK_EXPORT int ck_model_run_audio_wav_window(const uint8_t *audio_wav_bytes,
         audio_metadata);
     if (status != 0) return status;
     ck_prefill_from_embedded(g_model, {int(config.get("context_length", 0) or 0)});
+    return 0;
+}}
+
+CK_EXPORT int ck_model_prepare_audio_wav_features(
+    const uint8_t *audio_wav_bytes,
+    size_t audio_wav_byte_count,
+    float *audio_features,
+    int audio_feature_frame_capacity,
+    int *audio_feature_frames,
+    CKAudioWavInfo *audio_metadata) {{
+    if (!g_model || !audio_wav_bytes || audio_wav_byte_count == 0 ||
+        !audio_features || audio_feature_frame_capacity <= 0) return -1;
+    CKModel *model = g_model;
+    CKAudioWavInfo local_info;
+    CKAudioWavInfo *audio_wav_info = audio_metadata ? audio_metadata : &local_info;
+    if (audio_wav_parse_memory(
+            audio_wav_bytes, audio_wav_byte_count, audio_wav_info) != 0) return -2;
+    if (audio_wav_info->sample_rate != {sample_rate}) return -10;
+    const int required_frames = audio_wav_info->frames / {hop_length};
+    if (required_frames <= 0 || required_frames > audio_feature_frame_capacity) return -3;
+    if ({calls["audio_stft_tables"]} != 0) return -6;
+    if ({calls["audio_mel_filters"]} != 0) return -8;
+    const int produced_frames = {full_feature_call};
+    if (produced_frames != required_frames) return -11;
+    if (audio_feature_frames) *audio_feature_frames = produced_frames;
     return 0;
 }}
 

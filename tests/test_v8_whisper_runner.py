@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -66,7 +68,8 @@ def _frontend_xray_module():
 def test_whisper_runner_uses_generated_frontend_and_forced_prefix_is_stable() -> None:
     runner = _module()
     source = SCRIPT.read_text(encoding="utf-8")
-    assert "ck_model_run_audio_wav" in source
+    assert "ck_model_prepare_audio_wav_window" in source
+    assert "ck_model_run_encoder" in source
     assert "audio_resample_windowed_sinc_f32" not in source
     assert "audio_stft_power_fft400_f32" not in source
     assert "audio_whisper_log_mel_from_power_reference_f32" not in source
@@ -85,6 +88,72 @@ def test_whisper_runner_uses_generated_frontend_and_forced_prefix_is_stable() ->
     assert runner.forced_decoder_prefix(
         generation, "en", "transcribe", timestamps=True
     ) == [50258, 50259, 50359]
+
+
+def test_whisper_runner_measures_frontend_and_encoder_separately() -> None:
+    runner = _module()
+    calls: list[str] = []
+
+    def prepare(*_args) -> int:
+        calls.append("frontend")
+        return 0
+
+    def encode() -> int:
+        calls.append("encoder")
+        return 0
+
+    model = SimpleNamespace(
+        ck_model_prepare_audio_wav_window=prepare,
+        ck_model_run_encoder=encode,
+    )
+    wav = np.zeros(32, dtype=np.uint8)
+    with mock.patch.object(
+        runner.time,
+        "perf_counter",
+        side_effect=[1.0, 1.25, 2.0, 2.75],
+    ):
+        frontend_seconds, encoder_seconds = runner._run_audio_encoder_window(
+            model, wav, 0, runner.CKAudioWavInfo()
+        )
+
+    assert calls == ["frontend", "encoder"]
+    assert frontend_seconds == 0.25
+    assert encoder_seconds == 0.75
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert '"frontend_seconds": sum(' in source
+
+
+def test_whisper_cached_frontend_slices_and_zero_pads_exactly() -> None:
+    runner = _module()
+    full = np.arange(16, dtype=np.float32).reshape(2, 8)
+    output = np.full((2, 5), -1.0, dtype=np.float32)
+
+    valid = runner._copy_cached_feature_window(
+        full,
+        output,
+        window_start_frame=4,
+        hop_length=2,
+    )
+    assert valid == 5
+    np.testing.assert_array_equal(output, full[:, 2:7])
+
+    valid = runner._copy_cached_feature_window(
+        full,
+        output,
+        window_start_frame=12,
+        hop_length=2,
+    )
+    assert valid == 2
+    np.testing.assert_array_equal(output[:, :2], full[:, 6:8])
+    np.testing.assert_array_equal(output[:, 2:], np.zeros((2, 3), dtype=np.float32))
+
+    with pytest.raises(ValueError, match="hop-aligned"):
+        runner._copy_cached_feature_window(
+            full,
+            output,
+            window_start_frame=3,
+            hop_length=2,
+        )
 
 
 def test_whisper_workers_do_not_compete_with_numpy_blas_threads(
@@ -313,8 +382,6 @@ def test_whisper_timestamp_contract_matches_transformers_masks() -> None:
     generation_module = pytest.importorskip(
         "transformers.generation.logits_process"
     )
-    from types import SimpleNamespace
-
     runner = _module()
     generation = {
         "no_timestamps_token_id": 10,

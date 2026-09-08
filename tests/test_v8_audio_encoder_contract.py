@@ -423,6 +423,20 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertIn(
             "CK_EXPORT int ck_model_prepare_audio_wav_window(", entrypoint
         )
+        self.assertIn(
+            "CK_EXPORT int ck_model_prepare_audio_wav_features(", entrypoint
+        )
+        feature_window = frontend_calls["audio_feature_window"]
+        full_call = codegen._audio_call_expression(
+            feature_window,
+            source_overrides={
+                "runtime:audio_window_start_frame": "0",
+                "dim:n_frames": "audio_feature_frame_capacity",
+                "output:log_mel": "audio_features",
+            },
+        )
+        self.assertIn("audio_feature_frame_capacity", full_call)
+        self.assertTrue(full_call.endswith(", audio_features)"))
         for function in expected_frontend_functions.values():
             self.assertIn(function + "(", entrypoint)
         descriptor = codegen._emit_runtime_capability_api(
