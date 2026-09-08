@@ -1056,6 +1056,12 @@ MAKE_TARGETS = {
         "target": "test-v8-xeon-family-contracts",
         "timeout_sec": 1800,
     },
+    "v8_serve_localhost_e2e": {
+        "name": "v8 Serve Localhost E2E (Qwen3-0.6B)",
+        "category": "inference",
+        "target": "test-v8-serve-localhost-e2e",
+        "timeout_sec": 600,
+    },
 }
 
 # Benchmark targets with perf extraction

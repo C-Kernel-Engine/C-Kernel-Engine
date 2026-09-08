@@ -1374,6 +1374,10 @@ test-audio-v8-contracts:
 test-server-schema:
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q server/tests
 
+.PHONY: test-v8-serve-localhost-e2e
+test-v8-serve-localhost-e2e:
+	$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/test_serve_localhost_e2e.py
+
 .PHONY: test-native-session-v8
 test-native-session-v8: $(BUILD_DIR)/libckernel_engine.so ck-cli-v8 ck-session-v8
 	$(PYTHON) $(PYTHONFLAGS) -m unittest -v tests.test_v8_native_sampler
