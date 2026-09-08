@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cke.v8.capability_evidence_report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "scope", "source", "summary", "cases", "errors"],
+  "properties": {
+    "schema": {"const": "cke.v8.capability_evidence_report"},
+    "schema_version": {"const": 1},
+    "scope": {"const": "current_run"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_commit", "manifest_sha256", "event"],
+      "properties": {
+        "repository_commit": {"type": "string"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "event": {"type": "string"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed", "errors", "timeouts", "not_tested"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "errors": {"type": "integer", "minimum": 0},
+        "timeouts": {"type": "integer", "minimum": 0},
+        "not_tested": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "family", "circuits", "evidence_level", "phases", "oracle",
+          "artifact", "schedule", "status", "selected", "executed", "reason",
+          "execution"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "family": {"type": "string", "minLength": 1},
+          "circuits": {"type": "array", "items": {"type": "string"}},
+          "evidence_level": {
+            "enum": ["contract", "generated_execution", "component_oracle", "small_model_e2e", "full_artifact"]
+          },
+          "phases": {"type": "array", "items": {"type": "string"}},
+          "oracle": {"enum": ["none", "scalar", "llama.cpp", "pytorch"]},
+          "artifact": {"type": "object"},
+          "schedule": {"type": "object"},
+          "status": {"enum": ["pass", "fail", "error", "timeout", "not_tested"]},
+          "selected": {"type": "boolean"},
+          "executed": {"type": "boolean"},
+          "reason": {"type": "string"},
+          "execution": {
+            "type": ["object", "null"],
+            "properties": {
+              "kind": {"type": "string"},
+              "id": {"type": "string"},
+              "name": {"type": "string"},
+              "duration_sec": {"type": "number", "minimum": 0},
+              "error": {"type": "string"}
+            },
+            "required": ["kind", "id", "name", "duration_sec", "error"],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}}
+  }
+}

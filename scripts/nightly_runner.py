@@ -41,6 +41,11 @@ from typing import Optional
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from capability_evidence import build_report as build_capability_evidence_report
+
 UNITTEST_DIR = ROOT / "unittest"
 BF16_DIR = UNITTEST_DIR / "bf16"
 BASELINE_FILE = ROOT / ".test_baseline.json"
@@ -507,6 +512,8 @@ class TestResult:
     baseline_perf: Optional[float] = None
     perf_delta_pct: Optional[float] = None
     sub_tests: list = field(default_factory=list)  # List of SubTestResult
+    execution_kind: str = ""
+    execution_id: str = ""
 
 
 @dataclass
@@ -853,6 +860,12 @@ MAKE_TARGETS = {
         "name": "Qwen3.6/3.8 Dense Metadata and Chat Contracts",
         "category": "inference",
         "target": "test-v8-qwen38-dense-contracts",
+        "timeout_sec": 300,
+    },
+    "v8_routed_moe_contracts": {
+        "name": "Qwen3.5 Routed-MoE Storage and Execution Contracts",
+        "category": "parity",
+        "target": "test-v8-routed-moe-contracts",
         "timeout_sec": 300,
     },
     "v8_qwen38_flash_contracts": {
@@ -1768,6 +1781,7 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
 
     report = {
         "timestamp": start_time.isoformat(),
+        "event": os.environ.get("GITHUB_EVENT_NAME", "local"),
         "duration_sec": sum(r.duration_sec for r in results),
         "runner_python": {
             "executable": sys.executable,
@@ -1786,6 +1800,37 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
         },
         "results": results_dicts,
     }
+    capability_manifest = ROOT / "version" / "v8" / "testing" / "capability_cases.json"
+    try:
+        manifest_bytes = capability_manifest.read_bytes()
+        report["capability_evidence"] = build_capability_evidence_report(
+            json.loads(manifest_bytes),
+            results_dicts,
+            root=ROOT,
+            manifest_bytes=manifest_bytes,
+            event=report["event"],
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        report["capability_evidence"] = {
+            "schema": "cke.v8.capability_evidence_report",
+            "schema_version": 1,
+            "scope": "current_run",
+            "source": {
+                "repository_commit": "",
+                "manifest_sha256": "0" * 64,
+                "event": report["event"],
+            },
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 1,
+                "timeouts": 0,
+                "not_tested": 0,
+            },
+            "cases": [],
+            "errors": [f"cannot build capability evidence: {exc}"],
+        }
     architecture_contracts = _load_json_if_fresh(
         ROOT / "version" / "v8" / ".cache" / "reports" / "architecture_contracts_latest.json",
         start_ts=start_time.timestamp(),
@@ -2008,6 +2053,8 @@ def main():
         suite = TEST_SUITES[test_key]
         print(f"  [{i}/{len(tests_to_run)}] {suite.name}...", end=" ", flush=True)
         result = run_python_test(suite, verbose=args.verbose)
+        result.execution_kind = "python"
+        result.execution_id = test_key
         results.append(result)
 
         status_icon = {"pass": "✓", "fail": "✗", "skip": "○", "timeout": "⏱"}[result.status]
@@ -2069,6 +2116,8 @@ def main():
                         ) + f"Post-lane cache cleanup failed: {exc}"
         else:
             result = run_make_target(info, verbose=args.verbose)
+        result.execution_kind = "make"
+        result.execution_id = info["target"]
         results.append(result)
 
         status_icon = {"pass": "✓", "fail": "✗", "skip": "○", "timeout": "⏱"}[result.status]
@@ -2079,6 +2128,8 @@ def main():
         info = BENCH_TARGETS[bench_key]
         print(f"  [bench {i}/{len(bench_targets_to_run)}] {info['name']}...", end=" ", flush=True)
         result = run_make_target(info, verbose=args.verbose)
+        result.execution_kind = "make"
+        result.execution_id = info["target"]
         results.append(result)
 
         status_icon = {"pass": "✓", "fail": "✗", "skip": "○", "timeout": "⏱"}[result.status]

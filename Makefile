@@ -1638,6 +1638,12 @@ test-v8-qwen38-dense-contracts:
 		tests/test_v8_qwen36_contract.py \
 		tests/test_ck_chat_runtime_contract.py
 
+.PHONY: test-v8-routed-moe-contracts
+test-v8-routed-moe-contracts:
+	@$(PYTHON) -m pytest -q \
+		tests/test_v8_qwen35moe_contract.py \
+		unittest/test_moe_swiglu_q4k_mixed_parallel.py
+
 .PHONY: test-v8-qwen38-flash-contracts
 test-v8-qwen38-flash-contracts: $(BUILD_DIR)/libckernel_engine.so
 	@$(PYTHON) -m pytest -q \
@@ -1672,7 +1678,9 @@ test-v8-cohere-laguna-contracts:
 
 .PHONY: test-v8-capability-cases
 test-v8-capability-cases:
-	@$(PYTHON) -m pytest -q tests/test_v8_capability_cases.py
+	@$(PYTHON) -m pytest -q \
+		tests/test_v8_capability_cases.py \
+		tests/test_v8_capability_evidence.py
 	@$(PYTHON) version/v8/scripts/audit_capability_cases_v8.py \
 		--report $(BUILD_DIR)/v8/capability-case-audit.json
 

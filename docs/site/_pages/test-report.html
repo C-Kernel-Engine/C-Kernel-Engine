@@ -431,6 +431,7 @@
     }
 
     .regression-section {
+      min-width: 0;
       margin: 2rem 0;
       padding: 1.25rem;
       background: var(--dark-card);
@@ -543,6 +544,8 @@
        the wrapper scrolls as a last resort, and long code spans wrap in-cell. */
     .table-scroll {
       overflow-x: auto;
+      width: 100%;
+      max-width: 100%;
     }
     .table-scroll .results-table td code {
       overflow-wrap: anywhere;
@@ -662,6 +665,11 @@
     .status-legend .dot.warn { background: var(--orange); }
     .status-legend .dot.fail { background: #f56565; }
     .status-legend .dot.skip { background: #a0aec0; }
+    .capability-table { min-width: 980px; }
+    .capability-table th:nth-child(-n+3),
+    .capability-table td:nth-child(-n+3) { white-space: nowrap; }
+    .capability-table th:nth-child(4) { min-width: 250px; }
+    .capability-table th:nth-child(5) { min-width: 220px; }
   </style>
 
   <div id="loading-state" class="active">
@@ -741,6 +749,27 @@
         ⧉ Copy failed tests
       </button>
       <span class="copy-failures-hint">Copies a ready-to-paste Markdown report of failing suites, sub-tests, and runner hardware — hand it straight to an AI agent or issue.</span>
+    </div>
+
+    <div class="regression-section">
+      <h2>Current Capability Evidence</h2>
+      <p class="regression-meta" id="capability-evidence-meta">
+        No current-run capability evidence was published in this report.
+      </p>
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card passed"><div class="value" id="capability-passed">0</div><div class="label">Passed</div></div>
+        <div class="summary-card failed"><div class="value" id="capability-failed">0</div><div class="label">Failed / Error</div></div>
+        <div class="summary-card"><div class="value" id="capability-not-tested">0</div><div class="label">Not Tested</div></div>
+        <div class="summary-card"><div class="value" id="capability-total">0</div><div class="label">Registered Cases</div></div>
+      </div>
+      <div class="table-scroll">
+        <table class="results-table capability-table">
+          <thead><tr><th>Status</th><th>Family</th><th>Evidence</th><th>Phases</th><th>Case</th><th>Reason</th></tr></thead>
+          <tbody id="capability-evidence-tbody">
+            <tr><td colspan="6" class="updated-time">No current-run capability evidence was published.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="regression-section">
@@ -1614,6 +1643,7 @@ function renderResults(data) {
   document.getElementById('sub-tests-passed').textContent = subPassed;
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRunnerHardware(data.runner_hardware || null);
+  renderCapabilityEvidence(data.capability_evidence || null);
   renderRegressionFast(data.regression_fast || null);
   renderArchitectureContracts(data.architecture_contracts || null);
   renderV8DSLContracts(data.results || []);
@@ -1624,8 +1654,14 @@ function renderResults(data) {
   renderBackpropRegression(data.backprop_regression || null);
 
   const statusEl = document.getElementById('overall-status');
-  if (failed > 0) {
-    statusEl.textContent = failed + ' FAILED';
+  const timeout = summary.timeout || 0;
+  const capabilityFailures = countRequiredCapabilityFailures(data.capability_evidence, data.event);
+  const suiteFailures = failed + timeout;
+  if (suiteFailures > 0) {
+    statusEl.textContent = suiteFailures + ' FAILED';
+    statusEl.className = 'status-badge status-fail';
+  } else if (capabilityFailures > 0) {
+    statusEl.textContent = capabilityFailures + ' CAPABILITY GAPS';
     statusEl.className = 'status-badge status-fail';
   } else {
     statusEl.textContent = 'ALL PASS';
@@ -1702,6 +1738,60 @@ function renderResults(data) {
       tbody.appendChild(subTr);
     }
   });
+}
+
+function normalizedCapabilityEvent(eventName) {
+  if (eventName === 'pull_request') return 'pull_request';
+  if (['push', 'schedule', 'workflow_dispatch'].includes(eventName)) return 'nightly';
+  return '';
+}
+
+function countRequiredCapabilityFailures(data, eventName) {
+  if (!data || !Array.isArray(data.cases)) return 0;
+  const event = normalizedCapabilityEvent(eventName);
+  if (!event) return 0;
+  return data.cases.filter(row =>
+    ((row.schedule && row.schedule.events) || []).includes(event) && row.status !== 'pass'
+  ).length;
+}
+
+function renderCapabilityEvidence(data) {
+  const meta = document.getElementById('capability-evidence-meta');
+  const tbody = document.getElementById('capability-evidence-tbody');
+  const passed = document.getElementById('capability-passed');
+  const failed = document.getElementById('capability-failed');
+  const notTested = document.getElementById('capability-not-tested');
+  const total = document.getElementById('capability-total');
+  if (!data || !Array.isArray(data.cases)) {
+    meta.textContent = 'No current-run capability evidence was published in this report.';
+    tbody.innerHTML = '<tr><td colspan="6" class="updated-time">No current-run capability evidence was published.</td></tr>';
+    return;
+  }
+
+  const summary = data.summary || {};
+  passed.textContent = summary.passed || 0;
+  failed.textContent = (summary.failed || 0) + (summary.errors || 0) + (summary.timeouts || 0);
+  notTested.textContent = summary.not_tested || 0;
+  total.textContent = summary.total || data.cases.length;
+  const commit = (data.source && data.source.repository_commit) || '';
+  meta.textContent = `Current commit ${commit ? commit.slice(0, 12) : 'unknown'}; skipped and unavailable lanes remain NOT TESTED.`;
+
+  const order = {fail: 0, error: 0, timeout: 0, not_tested: 1, pass: 2};
+  const rows = [...data.cases].sort((a, b) =>
+    (order[a.status] ?? 3) - (order[b.status] ?? 3) || String(a.id).localeCompare(String(b.id))
+  );
+  tbody.innerHTML = rows.map(row => {
+    const status = String(row.status || 'error').toUpperCase();
+    const badge = row.status === 'pass' ? 'pass' : row.status === 'not_tested' ? 'skip' : 'fail';
+    return `<tr>
+      <td><span class="regression-badge ${badge}">${escapeHtml(status)}</span></td>
+      <td><code>${escapeHtml(row.family || '-')}</code></td>
+      <td>${escapeHtml(row.evidence_level || '-')}</td>
+      <td>${escapeHtml((row.phases || []).join(', '))}</td>
+      <td><code>${escapeHtml(row.id || '-')}</code></td>
+      <td class="regression-family-note">${escapeHtml(row.reason || '')}</td>
+    </tr>`;
+  }).join('');
 }
 
 function buildFailureReport() {

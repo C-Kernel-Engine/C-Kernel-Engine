@@ -27,6 +27,33 @@
       "evidence_paths": ["tests/test_v8_laguna_contract.py"]
     },
     {
+      "id": "qwen35-moe.storage-lowering",
+      "family": "qwen35",
+      "circuits": ["qwen35"],
+      "evidence_level": "component_oracle",
+      "phases": ["conversion", "lowering", "prefill", "decode"],
+      "oracle": "scalar",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-routed-moe-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": [
+        "tests/test_v8_qwen35moe_contract.py",
+        "unittest/test_moe_swiglu_q4k_mixed_parallel.py"
+      ]
+    },
+    {
+      "id": "qwen36-dense.storage-lowering",
+      "family": "qwen36",
+      "circuits": ["qwen35"],
+      "evidence_level": "contract",
+      "phases": ["conversion", "lowering"],
+      "oracle": "none",
+      "artifact": {"kind": "synthetic_fixture"},
+      "entrypoint": {"kind": "make", "target": "test-v8-qwen38-dense-contracts"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": ["tests/test_v8_qwen36_contract.py"]
+    },
+    {
       "id": "qwen38-dense.storage-lowering",
       "family": "qwen38",
       "circuits": ["qwen38"],

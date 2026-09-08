@@ -9,6 +9,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify_nightly_results.py"
+MANIFEST = ROOT / "version" / "v8" / "testing" / "capability_cases.json"
+EVIDENCE_SCRIPT = ROOT / "scripts" / "capability_evidence.py"
+
+
+def _evidence(event: str = "local", results: list[dict] | None = None) -> dict:
+    spec = importlib.util.spec_from_file_location(
+        "capability_evidence_verdict_test", EVIDENCE_SCRIPT
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {EVIDENCE_SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    manifest_bytes = MANIFEST.read_bytes()
+    return module.build_report(
+        json.loads(manifest_bytes),
+        results or [],
+        root=ROOT,
+        manifest_bytes=manifest_bytes,
+        event=event,
+    )
 
 
 def _load_verifier():
@@ -27,6 +47,7 @@ class NightlyVerdictTests(unittest.TestCase):
         results: list[dict],
         summary: dict | None = None,
         regression_fast: dict | None = None,
+        capability_evidence: dict | None = None,
     ) -> Path:
         counts = {
             "total": len(results),
@@ -38,8 +59,10 @@ class NightlyVerdictTests(unittest.TestCase):
         path = root / "latest.json"
         payload = {
             "timestamp": "2026-09-06T12:00:00+00:00",
+            "event": "local",
             "summary": summary or counts,
             "results": results,
+            "capability_evidence": capability_evidence or _evidence(),
         }
         if regression_fast is not None:
             payload["regression_fast"] = regression_fast
@@ -118,6 +141,63 @@ class NightlyVerdictTests(unittest.TestCase):
         self.assertTrue(any("summary path is missing" in error for error in failed))
         self.assertTrue(any("no family rows" in error for error in failed))
         self.assertEqual(passed, [])
+
+    def test_required_capability_must_execute_and_pass_on_pull_request(self) -> None:
+        verifier = _load_verifier()
+        evidence = _evidence("pull_request")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(Path(tmp), [{"name": "contracts", "status": "pass"}], capability_evidence=evidence)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["event"] = "pull_request"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            errors = verifier.verify_report(path)
+        self.assertTrue(any("required capability qwen38-dense" in error for error in errors))
+
+    def test_all_registered_pull_request_capabilities_can_satisfy_verdict(self) -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        targets = {
+            case["entrypoint"]["target"]
+            for case in manifest["cases"]
+            if "pull_request" in case["schedule"]["events"]
+        }
+        executions = [
+            {
+                "name": target,
+                "status": "pass",
+                "duration_sec": 1.0,
+                "execution_kind": "make",
+                "execution_id": target,
+            }
+            for target in targets
+        ]
+        evidence = _evidence("pull_request", executions)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(
+                Path(tmp),
+                [{"name": "contracts", "status": "pass"}],
+                capability_evidence=evidence,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["event"] = "pull_request"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            errors = _load_verifier().verify_report(path)
+        self.assertEqual(errors, [])
+
+    def test_capability_summary_mismatch_and_report_errors_fail_verdict(self) -> None:
+        verifier = _load_verifier()
+        evidence = _evidence()
+        evidence["summary"]["total"] = 9
+        evidence["errors"] = ["manifest could not be loaded"]
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = verifier.verify_report(
+                self._write(
+                    Path(tmp),
+                    [{"name": "contracts", "status": "pass"}],
+                    capability_evidence=evidence,
+                )
+            )
+        self.assertTrue(any("manifest could not be loaded" in error for error in errors))
+        self.assertTrue(any("capability summary total mismatch" in error for error in errors))
 
     def test_workflow_collects_evidence_before_required_verdict(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "nightly.yml").read_text(
