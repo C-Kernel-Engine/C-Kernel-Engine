@@ -227,6 +227,7 @@ var ckernel__engine_8h =
     [ "gelu_backward_scalar", "ckernel__engine_8h.html#ac4d3711dee095194f24437af73ad1763", null ],
     [ "gelu_erf_bf16_storage", "ckernel__engine_8h.html#ad893f7c7aae6db18a790555697561cfb", null ],
     [ "gelu_erf_fp64_f32_inplace", "ckernel__engine_8h.html#a24c201ff2eaeae00fd3fd0d0478388e5", null ],
+    [ "gelu_erf_fp64_f32_parallel_dispatch", "ckernel__engine_8h.html#aef13e1955fcd7a7367d82a5da0bd8492", null ],
     [ "gelu_exact_inplace", "ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122", null ],
     [ "gelu_fast_inplace", "ckernel__engine_8h.html#abc5977fca1e95c2406a779657c4d2365", null ],
     [ "gelu_fast_inplace_bf16", "ckernel__engine_8h.html#a9f5d586b285fab4efe8b7223748f9d00", null ],
