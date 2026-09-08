@@ -381,6 +381,9 @@ def _compile_mtmd_shim(output_dir: Path) -> Path:
     shim_src = V8_TOOLS / "mtmd_clip_shim.cpp"
     shim_so = output_dir / "libmtmd_clip_shim.so"
     stamp_path = output_dir / "libmtmd_clip_shim.so.build.json"
+    libmtmd = LLAMA_CPP_ROOT / "build" / "bin" / "libmtmd.so"
+    if not libmtmd.is_file():
+        raise FileNotFoundError(f"llama.cpp mtmd library not found: {libmtmd}")
 
     clip_header = (LLAMA_CPP_ROOT / "tools" / "mtmd" / "clip.h").read_text(
         encoding="utf-8", errors="ignore"
@@ -406,6 +409,7 @@ def _compile_mtmd_shim(output_dir: Path) -> Path:
         "shim_sha256": hashlib.sha256(shim_src.read_bytes()).hexdigest(),
         "clip_header_sha256": hashlib.sha256(clip_header.encode()).hexdigest(),
         "clip_impl_header_sha256": hashlib.sha256(clip_impl_header.encode()).hexdigest(),
+        "libmtmd_sha256": hashlib.sha256(libmtmd.read_bytes()).hexdigest(),
         "object_api": uses_object_api,
         "value_api": uses_value_api,
     }
@@ -430,6 +434,8 @@ def _compile_mtmd_shim(output_dir: Path) -> Path:
         str(shim_src),
         f"-L{LLAMA_CPP_ROOT / 'build' / 'bin'}",
         "-lmtmd",
+        "-lggml-base",
+        "-Wl,-z,defs",
         f"-Wl,-rpath,{LLAMA_CPP_ROOT / 'build' / 'bin'}",
         "-o",
         str(shim_so),
@@ -454,9 +460,14 @@ def _load_layout(layout_path: Path) -> dict[str, Any]:
 
 
 def _activation_runtime_base(layout: dict[str, Any]) -> int:
-    weights = layout.get("memory", {}).get("weights", {})
+    memory = layout.get("memory", {})
+    arena = memory.get("arena", {})
+    if "activations_base" in arena:
+        return int(arena["activations_base"])
+    weights = memory.get("weights", {})
     # layout.json stores activation offsets relative to the activation arena,
     # while generated C indexes from g_model->bump after the loaded weights.
+    # Legacy layouts did not record the aligned activation base explicitly.
     return int(weights.get("base_offset", 0)) + int(weights.get("size", 0))
 
 
@@ -651,28 +662,19 @@ def _load_generated_lib(model_so: Path) -> ctypes.CDLL:
 
 
 def _load_ggml_cpu_global() -> Path | None:
+    bin_dir = LLAMA_CPP_ROOT / "build" / "bin"
     ggml_libs = [
-        [
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-base.so.0.9.8",
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-base.so",
-        ],
-        [
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml.so.0.9.8",
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml.so",
-        ],
-        [
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-cpu.so.0.9.8",
-            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-cpu.so",
-        ],
+        bin_dir / "libggml-base.so",
+        bin_dir / "libggml.so",
+        bin_dir / "libggml-cpu.so",
     ]
     cpu_path: Path | None = None
-    for candidates in ggml_libs:
-        for path in candidates:
-            if path.exists():
-                ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
-                if "libggml-cpu" in path.name:
-                    cpu_path = path
-                break
+    for path in ggml_libs:
+        if not path.is_file():
+            continue
+        ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+        if path.name == "libggml-cpu.so":
+            cpu_path = path.resolve()
     if cpu_path is not None:
         return cpu_path
     return None

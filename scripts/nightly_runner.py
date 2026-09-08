@@ -975,12 +975,12 @@ MAKE_TARGETS = {
         "timeout_sec": 5400,
     },
     "v8_vision_encoder_accuracy": {
-        "name": "v8 Vision Encoder Accuracy (AVX-512 artifact gate)",
-        "category": "bf16",
+        "name": "v8 Qwen3-VL Q8 Encoder Accuracy (llama.cpp artifact gate)",
+        "category": "parity",
         "target": "vision-encoder-full",
         "timeout_sec": 21600,
         "status_artifact": "build/vision_encoder_accuracy/summary.json",
-        "status_phase": "bf16_pytorch",
+        "status_phase": "q8_mmproj_llamacpp",
     },
     "v8_gemma4_vision_smoke": {
         "name": "v8 Gemma4 Vision Smoke",

@@ -399,6 +399,21 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         self.assertEqual(result.status, "skip")
         self.assertEqual(result.error_msg, "missing BF16 checkpoint")
 
+    def test_nightly_vision_target_reports_the_q8_artifact_phase(self) -> None:
+        runner = _load_runner()
+        target = runner.MAKE_TARGETS["v8_vision_encoder_accuracy"]
+        self.assertEqual(target["category"], "parity")
+        self.assertEqual(target["status_phase"], "q8_mmproj_llamacpp")
+
+    def test_scheduled_vision_gate_matches_prepared_artifact_and_runner_size(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "nightly.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('echo "V8_VISION_ENCODER_MODE=q4"', workflow)
+        self.assertIn("vision_threads=$(nproc)", workflow)
+        self.assertIn('echo "V8_VISION_ENCODER_THREADS=${vision_threads}"', workflow)
+        self.assertIn("build/vision_encoder_accuracy/**", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

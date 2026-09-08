@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "version/v8/scripts/vision_encoder_accuracy_gate_v8.py"
+SUITE = ROOT / "version/v8/scripts/qwen3vl_encoder_prefix_parity_suite_v8.py"
 
 
 def _load_gate():
@@ -25,7 +26,41 @@ def _load_gate():
     return module
 
 
+def _load_suite():
+    spec = importlib.util.spec_from_file_location(
+        "qwen3vl_encoder_prefix_parity_suite_v8", SUITE
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {SUITE}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class VisionEncoderAccuracyGateTests(unittest.TestCase):
+    def test_nested_numeric_failure_is_preserved_in_summary_reason(self) -> None:
+        suite = _load_suite()
+        gate = _load_gate()
+        with tempfile.TemporaryDirectory(prefix="vision_failure_reason_") as tmp:
+            root = Path(tmp)
+            log = root / "sample.log"
+            log.write_text("setup\nfirst divergent checkpoint: layer_out@8\n")
+            reason = suite._log_failure_reason(log, 3)
+            self.assertIn("exited 3", reason)
+            self.assertIn("layer_out@8", reason)
+
+            summary = root / "summary.json"
+            summary.write_text(json.dumps({"failures": [reason]}), encoding="utf-8")
+            self.assertEqual(gate._suite_failure_reason(summary, "fallback"), reason)
+
+    def test_mtmd_shim_fingerprint_and_link_reject_stale_oracle_library(self) -> None:
+        source = (
+            ROOT / "version/v8/scripts/numeric_parity_qwen3vl_mmproj_v8.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"libmtmd_sha256"', source)
+        self.assertIn('"-lggml-base"', source)
+        self.assertIn('"-Wl,-z,defs"', source)
+
     def test_relative_rmse_is_scale_aware(self) -> None:
         import numpy as np
         spec = importlib.util.spec_from_file_location("compare_qwen3vl_bf16", ROOT / "version/v8/scripts/compare_qwen3vl_bf16_vision_hidden_v8.py")

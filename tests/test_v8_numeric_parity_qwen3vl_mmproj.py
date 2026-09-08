@@ -19,6 +19,54 @@ import qwen3vl_encoder_prefix_parity_suite_v8 as prefix_suite  # type: ignore  #
 
 
 class NumericParityQwen3VLMmprojV8Tests(unittest.TestCase):
+    def test_activation_runtime_base_uses_aligned_arena_boundary(self) -> None:
+        layout = {
+            "memory": {
+                "arena": {"activations_base": 752269632},
+                "weights": {"base_offset": 508, "size": 752269120},
+            }
+        }
+        image = {"offset": 80640}
+
+        self.assertEqual(npv8._activation_runtime_base(layout), 752269632)
+        self.assertEqual(npv8._activation_runtime_offset(layout, image), 752350272)
+
+    def test_activation_runtime_base_supports_legacy_layouts(self) -> None:
+        layout = {"memory": {"weights": {"base_offset": 508, "size": 752269120}}}
+
+        self.assertEqual(npv8._activation_runtime_base(layout), 752269628)
+
+    def test_strict_ggml_loader_uses_active_build_libraries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bin_dir = root / "build" / "bin"
+            bin_dir.mkdir(parents=True)
+            expected = [
+                bin_dir / "libggml-base.so",
+                bin_dir / "libggml.so",
+                bin_dir / "libggml-cpu.so",
+            ]
+            for path in expected:
+                path.write_bytes(b"library")
+            stale = bin_dir / "libggml-cpu.so.0.9.8"
+            stale.write_bytes(b"stale")
+
+            loaded: list[Path] = []
+
+            def fake_cdll(path: str, **_kwargs):
+                loaded.append(Path(path))
+                return object()
+
+            with (
+                mock.patch.object(npv8, "LLAMA_CPP_ROOT", root),
+                mock.patch.object(npv8.ctypes, "CDLL", side_effect=fake_cdll),
+            ):
+                cpu_path = npv8._load_ggml_cpu_global()
+
+        self.assertEqual(loaded, expected)
+        self.assertEqual(cpu_path, expected[-1].resolve())
+        self.assertNotIn(stale, loaded)
+
     def test_generated_engine_prefers_runtime_local_library(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             runtime = Path(tmpdir)
