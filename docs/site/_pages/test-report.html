@@ -1655,10 +1655,14 @@ function renderResults(data) {
 
   const statusEl = document.getElementById('overall-status');
   const timeout = summary.timeout || 0;
+  const capabilityIntegrity = capabilityEvidenceIntegrity(data.capability_evidence);
   const capabilityFailures = countRequiredCapabilityFailures(data.capability_evidence, data.event);
   const suiteFailures = failed + timeout;
   if (suiteFailures > 0) {
     statusEl.textContent = suiteFailures + ' FAILED';
+    statusEl.className = 'status-badge status-fail';
+  } else if (!capabilityIntegrity.complete) {
+    statusEl.textContent = 'EVIDENCE INCOMPLETE';
     statusEl.className = 'status-badge status-fail';
   } else if (capabilityFailures > 0) {
     statusEl.textContent = capabilityFailures + ' CAPABILITY GAPS';
@@ -1746,6 +1750,42 @@ function normalizedCapabilityEvent(eventName) {
   return '';
 }
 
+function capabilityEvidenceIntegrity(data) {
+  if (!data || !Array.isArray(data.cases)) {
+    return {complete: false, reason: 'No current-run capability evidence was published.'};
+  }
+  if (!data.summary || typeof data.summary !== 'object') {
+    return {complete: false, reason: 'Capability evidence has no valid summary.'};
+  }
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    return {complete: false, reason: `Capability evidence reported ${data.errors.length} generation error(s).`};
+  }
+  if (data.cases.length === 0) {
+    return {complete: false, reason: 'Capability evidence contains no registered cases.'};
+  }
+  const counts = {pass: 0, fail: 0, error: 0, timeout: 0, not_tested: 0};
+  for (const row of data.cases) {
+    if (!(row.status in counts)) {
+      return {complete: false, reason: `Capability evidence contains invalid status ${String(row.status)}.`};
+    }
+    counts[row.status] += 1;
+  }
+  const expected = {
+    total: data.cases.length,
+    passed: counts.pass,
+    failed: counts.fail,
+    errors: counts.error,
+    timeouts: counts.timeout,
+    not_tested: counts.not_tested,
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (data.summary[key] !== value) {
+      return {complete: false, reason: `Capability evidence summary ${key} is inconsistent.`};
+    }
+  }
+  return {complete: true, reason: ''};
+}
+
 function countRequiredCapabilityFailures(data, eventName) {
   if (!data || !Array.isArray(data.cases)) return 0;
   const event = normalizedCapabilityEvent(eventName);
@@ -1762,9 +1802,10 @@ function renderCapabilityEvidence(data) {
   const failed = document.getElementById('capability-failed');
   const notTested = document.getElementById('capability-not-tested');
   const total = document.getElementById('capability-total');
-  if (!data || !Array.isArray(data.cases)) {
-    meta.textContent = 'No current-run capability evidence was published in this report.';
-    tbody.innerHTML = '<tr><td colspan="6" class="updated-time">No current-run capability evidence was published.</td></tr>';
+  const integrity = capabilityEvidenceIntegrity(data);
+  if (!integrity.complete && (!data || !Array.isArray(data.cases) || data.cases.length === 0)) {
+    meta.textContent = integrity.reason;
+    tbody.innerHTML = `<tr><td colspan="6" class="updated-time">${escapeHtml(integrity.reason)}</td></tr>`;
     return;
   }
 
@@ -1774,7 +1815,9 @@ function renderCapabilityEvidence(data) {
   notTested.textContent = summary.not_tested || 0;
   total.textContent = summary.total || data.cases.length;
   const commit = (data.source && data.source.repository_commit) || '';
-  meta.textContent = `Current commit ${commit ? commit.slice(0, 12) : 'unknown'}; skipped and unavailable lanes remain NOT TESTED.`;
+  meta.textContent = integrity.complete
+    ? `Current commit ${commit ? commit.slice(0, 12) : 'unknown'}; skipped and unavailable lanes remain NOT TESTED.`
+    : `INCOMPLETE: ${integrity.reason}`;
 
   const order = {fail: 0, error: 0, timeout: 0, not_tested: 1, pass: 2};
   const rows = [...data.cases].sort((a, b) =>

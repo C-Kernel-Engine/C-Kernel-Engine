@@ -17,6 +17,17 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "version" / "v8" / "testing" / "capability_cases.json"
 
 
+def _execution_key(entrypoint: dict[str, Any]) -> tuple[str, str, tuple[str, ...]]:
+    args = entrypoint.get("args") or entrypoint.get("execution_args") or []
+    if not isinstance(args, list):
+        args = []
+    return (
+        str(entrypoint.get("kind") or entrypoint.get("execution_kind") or ""),
+        str(entrypoint.get("target") or entrypoint.get("execution_id") or ""),
+        tuple(str(arg) for arg in args),
+    )
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -58,17 +69,16 @@ def build_report(
     manifest_bytes: bytes | None = None,
     event: str = "",
 ) -> dict[str, Any]:
-    indexed: dict[tuple[str, str], dict[str, Any]] = {}
+    indexed: dict[tuple[str, str, tuple[str, ...]], dict[str, Any]] = {}
     for result in results:
-        kind = str(result.get("execution_kind") or "")
-        execution_id = str(result.get("execution_id") or "")
-        if kind and execution_id:
-            indexed[(kind, execution_id)] = result
+        key = _execution_key(result)
+        if key[0] and key[1]:
+            indexed[key] = result
 
     rows: list[dict[str, Any]] = []
     for case in manifest.get("cases", []):
         entrypoint = case["entrypoint"]
-        key = (str(entrypoint["kind"]), str(entrypoint["target"]))
+        key = _execution_key(entrypoint)
         result = indexed.get(key)
         status, executed, reason = _case_status(result)
         execution = None
@@ -76,6 +86,7 @@ def build_report(
             execution = {
                 "kind": key[0],
                 "id": key[1],
+                "args": list(key[2]),
                 "name": str(result.get("name") or ""),
                 "duration_sec": max(0.0, float(result.get("duration_sec") or 0.0)),
                 "error": str(result.get("error_msg") or ""),

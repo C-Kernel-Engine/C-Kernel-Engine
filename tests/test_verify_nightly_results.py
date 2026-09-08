@@ -174,7 +174,7 @@ class NightlyVerdictTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(
                 Path(tmp),
-                [{"name": "contracts", "status": "pass"}],
+                executions,
                 capability_evidence=evidence,
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -198,6 +198,46 @@ class NightlyVerdictTests(unittest.TestCase):
             )
         self.assertTrue(any("manifest could not be loaded" in error for error in errors))
         self.assertTrue(any("capability summary total mismatch" in error for error in errors))
+
+    def test_capability_pass_requires_matching_executed_result(self) -> None:
+        evidence = _evidence()
+        row = evidence["cases"][0]
+        row.update({"status": "pass", "selected": False, "executed": False, "execution": None})
+        evidence["summary"]["passed"] += 1
+        evidence["summary"]["not_tested"] -= 1
+
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = _load_verifier().verify_report(
+                self._write(
+                    Path(tmp),
+                    [{"name": "contracts", "status": "pass"}],
+                    capability_evidence=evidence,
+                )
+            )
+
+        self.assertTrue(any("unselected evidence must be not_tested" in error for error in errors))
+
+    def test_capability_execution_must_match_registered_arguments(self) -> None:
+        result = {
+            "name": "Laguna long context",
+            "status": "pass",
+            "duration_sec": 1.0,
+            "error_msg": "",
+            "execution_kind": "make",
+            "execution_id": "certify-v8-long-context",
+            "execution_args": ["--models", "laguna_s_2_1"],
+        }
+        evidence = _evidence("local", [result])
+        row = next(item for item in evidence["cases"] if item["id"] == "laguna-s.long-context")
+        row["execution"]["args"] = ["--models", "qwen38_27b"]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = _load_verifier().verify_report(
+                self._write(Path(tmp), [result], capability_evidence=evidence)
+            )
+
+        self.assertTrue(any("execution identity differs" in error for error in errors))
+        self.assertTrue(any("no matching nightly result" in error for error in errors))
 
     def test_workflow_collects_evidence_before_required_verdict(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "nightly.yml").read_text(

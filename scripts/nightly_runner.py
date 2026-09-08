@@ -514,6 +514,7 @@ class TestResult:
     sub_tests: list = field(default_factory=list)  # List of SubTestResult
     execution_kind: str = ""
     execution_id: str = ""
+    execution_args: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -2118,6 +2119,7 @@ def main():
             result = run_make_target(info, verbose=args.verbose)
         result.execution_kind = "make"
         result.execution_id = info["target"]
+        result.execution_args = [str(arg) for arg in info.get("args", [])]
         results.append(result)
 
         status_icon = {"pass": "✓", "fail": "✗", "skip": "○", "timeout": "⏱"}[result.status]
@@ -2130,6 +2132,7 @@ def main():
         result = run_make_target(info, verbose=args.verbose)
         result.execution_kind = "make"
         result.execution_id = info["target"]
+        result.execution_args = [str(arg) for arg in info.get("args", [])]
         results.append(result)
 
         status_icon = {"pass": "✓", "fail": "✗", "skip": "○", "timeout": "⏱"}[result.status]

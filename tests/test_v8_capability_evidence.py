@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -17,7 +18,13 @@ MANIFEST = ROOT / "version" / "v8" / "testing" / "capability_cases.json"
 SCHEMA = ROOT / "version" / "v8" / "schemas" / "capability_evidence_report.schema.json"
 
 
-def _result(target: str, status: str, *, error: str = "") -> dict:
+def _result(
+    target: str,
+    status: str,
+    *,
+    error: str = "",
+    args: list[str] | None = None,
+) -> dict:
     return {
         "name": target,
         "status": status,
@@ -25,6 +32,7 @@ def _result(target: str, status: str, *, error: str = "") -> dict:
         "error_msg": error,
         "execution_kind": "make",
         "execution_id": target,
+        "execution_args": args or [],
     }
 
 
@@ -86,6 +94,24 @@ def test_skipped_and_unselected_cases_are_not_tested_not_passed() -> None:
     assert hardware["status"] == "not_tested"
 
 
+def test_long_context_evidence_matches_exact_model_arguments() -> None:
+    report = _build([
+        _result(
+            "certify-v8-long-context",
+            "pass",
+            args=["--models", "laguna_s_2_1"],
+        )
+    ])
+
+    assert _row(report, "laguna-s.long-context")["status"] == "pass"
+    assert _row(report, "cohere2-command-r7b.long-context")["status"] == "not_tested"
+    assert _row(report, "qwen38-dense.long-context")["status"] == "not_tested"
+    assert _row(report, "laguna-s.long-context")["execution"]["args"] == [
+        "--models",
+        "laguna_s_2_1",
+    ]
+
+
 def test_test_report_renders_current_capability_evidence() -> None:
     page = (ROOT / "docs" / "site" / "_pages" / "test-report.html").read_text(
         encoding="utf-8"
@@ -93,3 +119,27 @@ def test_test_report_renders_current_capability_evidence() -> None:
     assert 'id="capability-evidence-tbody"' in page
     assert "renderCapabilityEvidence(data.capability_evidence || null)" in page
     assert "countRequiredCapabilityFailures" in page
+    assert "capabilityEvidenceIntegrity" in page
+    assert "EVIDENCE INCOMPLETE" in page
+
+
+def test_dashboard_rejects_missing_and_inconsistent_capability_evidence() -> None:
+    page = (ROOT / "docs" / "site" / "_pages" / "test-report.html").read_text(
+        encoding="utf-8"
+    )
+    start = page.index("function capabilityEvidenceIntegrity")
+    end = page.index("function countRequiredCapabilityFailures", start)
+    function_source = page[start:end]
+    script = f"""
+{function_source}
+const valid = {{
+  summary: {{total: 1, passed: 0, failed: 0, errors: 0, timeouts: 0, not_tested: 1}},
+  cases: [{{status: 'not_tested'}}],
+  errors: [],
+}};
+if (capabilityEvidenceIntegrity(null).complete) process.exit(1);
+if (capabilityEvidenceIntegrity({{summary: {{}}, cases: [], errors: ['failed']}}).complete) process.exit(2);
+if (capabilityEvidenceIntegrity({{...valid, summary: {{...valid.summary, passed: 1}}}}).complete) process.exit(3);
+if (!capabilityEvidenceIntegrity(valid).complete) process.exit(4);
+"""
+    subprocess.run(["node", "-e", script], check=True)

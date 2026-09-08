@@ -40,6 +40,26 @@ def _capability_event(event: object) -> str:
     return ""
 
 
+def _execution_key(record: dict) -> tuple[str, str, tuple[str, ...]]:
+    args = record.get("args") or record.get("execution_args") or []
+    if not isinstance(args, list):
+        args = []
+    return (
+        str(record.get("kind") or record.get("execution_kind") or ""),
+        str(record.get("target") or record.get("id") or record.get("execution_id") or ""),
+        tuple(str(arg) for arg in args),
+    )
+
+
+def _result_capability_state(result: dict) -> tuple[str, bool]:
+    status = str(result.get("status") or "").lower()
+    if status in {"pass", "fail", "timeout"}:
+        return status, True
+    if status == "skip":
+        return "not_tested", False
+    return "error", False
+
+
 def _verify_capability_evidence(payload: dict) -> list[str]:
     report = payload.get("capability_evidence")
     if not isinstance(report, dict):
@@ -98,6 +118,19 @@ def _verify_capability_evidence(payload: dict) -> list[str]:
     counts = {status: 0 for status in CAPABILITY_STATUSES}
     seen: set[str] = set()
     required_event = _capability_event(payload.get("event"))
+    result_index: dict[tuple[str, str, tuple[str, ...]], dict] = {}
+    for result in payload.get("results") or []:
+        if not isinstance(result, dict):
+            continue
+        key = _execution_key(result)
+        if not key[0] or not key[1]:
+            continue
+        if key in result_index:
+            errors.append(
+                "duplicate capability execution record: "
+                + " ".join((key[0], key[1], *key[2]))
+            )
+        result_index[key] = result
     for index, row in enumerate(cases):
         if not isinstance(row, dict):
             errors.append(f"capability row {index} is not an object")
@@ -130,6 +163,38 @@ def _verify_capability_evidence(payload: dict) -> list[str]:
                 if row.get(field) != expected_case.get(field):
                     errors.append(f"{case_id}: evidence {field} differs from manifest")
             events = expected_case["schedule"]["events"]
+            expected_key = _execution_key(expected_case["entrypoint"])
+            selected = row.get("selected") is True
+            executed = row.get("executed") is True
+            execution = row.get("execution")
+            if not selected:
+                if executed or execution is not None or status != "not_tested":
+                    errors.append(
+                        f"{case_id}: unselected evidence must be not_tested without execution"
+                    )
+            elif not isinstance(execution, dict):
+                errors.append(f"{case_id}: selected evidence has no execution record")
+            else:
+                actual_key = _execution_key(execution)
+                if actual_key != expected_key:
+                    errors.append(
+                        f"{case_id}: execution identity differs from registered entrypoint"
+                    )
+                result = result_index.get(actual_key)
+                if result is None:
+                    errors.append(f"{case_id}: execution has no matching nightly result")
+                else:
+                    result_status, result_executed = _result_capability_state(result)
+                    if status != result_status:
+                        errors.append(
+                            f"{case_id}: evidence status {status} contradicts "
+                            f"nightly result {result_status}"
+                        )
+                    if executed != result_executed:
+                        errors.append(
+                            f"{case_id}: executed={executed} contradicts "
+                            f"nightly result executed={result_executed}"
+                        )
         if required_event and required_event in events and status != "pass":
             errors.append(
                 f"required capability {case_id}: {status}"
