@@ -1018,7 +1018,7 @@ def _run_parent(args: argparse.Namespace) -> int:
     )
     report = {
         "schema": "cke.whisper_e2e",
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "ok",
         "wav": str(wav_path),
         "wav_sha256": _sha256(wav_path),
@@ -1026,6 +1026,11 @@ def _run_parent(args: argparse.Namespace) -> int:
         "decoder_run_dir": str(decoder_dir),
         "encoder_runtime_sha256": _sha256(encoder_dir / "libmodel.so"),
         "decoder_runtime_sha256": _sha256(decoder_dir / "libmodel.so"),
+        "encoder_engine_sha256": _sha256(encoder_dir / "libckernel_engine.so"),
+        "decoder_engine_sha256": _sha256(decoder_dir / "libckernel_engine.so"),
+        "request": {
+            "max_tokens_per_window": int(args.max_tokens),
+        },
         "provenance": {
             "encoder": {
                 "config_sha256": _sha256(encoder_dir / "config.json"),

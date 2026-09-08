@@ -121,6 +121,9 @@ def test_whisper_runner_measures_frontend_and_encoder_separately() -> None:
     assert encoder_seconds == 0.75
     source = SCRIPT.read_text(encoding="utf-8")
     assert '"frontend_seconds": sum(' in source
+    assert '"encoder_engine_sha256": _sha256(' in source
+    assert '"decoder_engine_sha256": _sha256(' in source
+    assert '"max_tokens_per_window": int(args.max_tokens)' in source
 
 
 def test_whisper_cached_frontend_slices_and_zero_pads_exactly() -> None:
