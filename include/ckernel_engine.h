@@ -1358,6 +1358,16 @@ void qk_norm_forward_parallel_dispatch(float *q,
                                        int num_tokens,
                                        int head_dim,
                                        float eps);
+void qk_norm_forward_llama_production_parallel_dispatch(
+    float *q,
+    float *k,
+    const float *q_gamma,
+    const float *k_gamma,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    float eps);
 void qk_norm_forward_fp64_sum(float *q,
                               float *k,
                               const float *q_gamma,

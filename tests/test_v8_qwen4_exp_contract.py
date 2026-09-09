@@ -866,16 +866,22 @@ def test_qwen4_exp_qsa_qk_norm_selects_storage_contract() -> None:
     cases = (
         (
             "decoder.qk_norm_llama_fp32",
-            "qk_norm_forward_llama_production",
+            {
+                "prefill": "qk_norm_forward_llama_production_parallel_prefill",
+                "decode": "qk_norm_forward_llama_production",
+            },
             "rmsnorm_llama_cpu_production_fp32_output",
         ),
         (
             "decoder.qk_norm_bf16_pytorch",
-            "qk_norm_forward_qwen4_pytorch_bf16_storage",
+            {
+                "prefill": "qk_norm_forward_qwen4_pytorch_bf16_storage",
+                "decode": "qk_norm_forward_qwen4_pytorch_bf16_storage",
+            },
             "rmsnorm_qwen3next_pytorch_avx2_bf16_storage",
         ),
     )
-    for operation, provider_id, contract_id in cases:
+    for operation, provider_by_phase, contract_id in cases:
         for phase in ("prefill", "decode"):
             plan = numerical_resolver.resolve_contract(
                 circuit,
@@ -885,7 +891,7 @@ def test_qwen4_exp_qsa_qk_norm_selects_storage_contract() -> None:
                 phase=phase,
                 source_circuit_path=CIRCUIT,
             )
-            assert plan["kernel"]["id"] == provider_id
+            assert plan["kernel"]["id"] == provider_by_phase[phase]
             assert plan["contract"]["id"] == contract_id
 
 

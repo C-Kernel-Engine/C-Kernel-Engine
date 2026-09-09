@@ -51,6 +51,9 @@ extern void mamba2_conv1d_decode_f32(
     const float *state_in, const float *x, const float *weight,
     const float *bias, float *conv_out, float *state_out,
     int rows, int conv_dim, int kernel_size);
+extern void qk_norm_forward_llama_production(
+    float *q, float *k, const float *q_gamma, const float *k_gamma,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps);
 extern void mamba2_conv1d_f32_channel_range(
     const float *state_in, const float *x, const float *weight,
     const float *bias, float *conv_out, float *state_out,
@@ -1092,6 +1095,26 @@ void qk_norm_forward_parallel_dispatch(
         q, q_gamma, q, NULL, num_heads * num_tokens,
         head_dim, head_dim, eps);
     rmsnorm_forward_parallel_dispatch(
+        k, k_gamma, k, NULL, num_kv_heads * num_tokens,
+        head_dim, head_dim, eps);
+}
+
+void qk_norm_forward_llama_production_parallel_dispatch(
+    float *q, float *k, const float *q_gamma, const float *k_gamma,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)
+{
+    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0 ||
+        head_dim <= 0 || num_tokens > INT_MAX / num_heads ||
+        num_tokens > INT_MAX / num_kv_heads) {
+        qk_norm_forward_llama_production(
+            q, k, q_gamma, k_gamma, num_heads, num_kv_heads,
+            num_tokens, head_dim, eps);
+        return;
+    }
+    rmsnorm_forward_llama_production_parallel_dispatch(
+        q, q_gamma, q, NULL, num_heads * num_tokens,
+        head_dim, head_dim, eps);
+    rmsnorm_forward_llama_production_parallel_dispatch(
         k, k_gamma, k, NULL, num_kv_heads * num_tokens,
         head_dim, head_dim, eps);
 }
