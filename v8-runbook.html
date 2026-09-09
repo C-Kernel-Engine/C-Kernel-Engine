@@ -1824,7 +1824,7 @@ jq -r '.decoder.transcript_text' \
     <ul>
         <li><code>stdout</code> prints the transcript text &mdash; the JFK sample matches the Hugging Face reference token for token.</li>
         <li><code>stderr</code> prints <code>frontend=...s encoder=...s prefill=...s decode=...s tokens=N stop=eos</code>.</li>
-        <li>The report JSON contains <code>"status": "ok"</code> with per-stage timings and runtime hashes.</li>
+        <li>The report JSON contains <code>"status": "ok"</code> with per-stage timings, runtime hashes, and worker-lifecycle counts.</li>
     </ul>
     <p style="margin-bottom: 0;">
         See <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a> for the pipeline diagram, kernel sources, and parity evidence.
@@ -1871,8 +1871,11 @@ make test-whisper-e2e-auto</pre>
     <h3 style="margin-top: 0;">Stage-Split Bridge Run</h3>
     <p>
         The audio bridge is the <code>encoder.npy</code> handoff: the generated encoder writes the cross-attention
-        conditioning, the generated decoder consumes it. The parent <code>run</code> command spawns exactly the two
-        worker stages below &mdash; running them yourself isolates which side of the bridge a failure lives on.
+        conditioning, the generated decoder consumes it. The parent <code>run</code> command keeps one isolated encoder
+        worker and one isolated decoder worker alive for the request. It resets generated decoder state and replaces
+        encoder memory for every window while retaining immutable weights, prepared constants, and thread pools.
+        Use <code>--worker-lifecycle per-window</code> to reproduce the older process-per-window control. Running the two
+        hidden worker stages below yourself isolates which side of the bridge a failure lives on.
         A clean encoder report with garbage decode means the seam; a failed encoder stage means the frontend or encoder.
     </p>
     <div class="cmd-block">
