@@ -1682,6 +1682,15 @@ test-v8-cohere-laguna-contracts:
 		tests.test_v8_laguna_contract \
 		-v
 
+.PHONY: test-v8-muse-glimmer-contracts
+test-v8-muse-glimmer-contracts: $(BUILD_DIR)/libckernel_engine.so
+	@echo "Running Muse-Glimmer text compiler and exact BF16 kernel contracts..."
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_muse_glimmer_text.py
+	@CK_ENGINE_SO=$(BUILD_DIR)/libckernel_engine.so \
+		CK_MUSE_SKIP_ONEDNN_ATTENTION=$(if $(filter 1,$(USE_ONEDNN)),0,1) \
+		LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH \
+		$(PYTHON) unittest/bf16/test_muse_glimmer_norms_bf16.py
+
 .PHONY: test-v8-capability-cases
 test-v8-capability-cases:
 	@$(PYTHON) -m pytest -q \

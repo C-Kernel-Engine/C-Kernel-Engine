@@ -75,6 +75,21 @@ class V8DSLNightlyRegistrationTests(unittest.TestCase):
             with self.subTest(test_file=test_file):
                 self.assertIn(f"@$(PYTHON) {test_file}", makefile)
 
+    def test_muse_compiler_and_numerical_contracts_are_a_visible_nightly_row(self) -> None:
+        entry = nightly.MAKE_TARGETS.get("v8_muse_glimmer_contracts")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["name"], "Muse-Glimmer Text Compiler/Kernel Contracts")
+        self.assertEqual(entry["category"], "parity")
+        self.assertEqual(entry["target"], "test-v8-muse-glimmer-contracts")
+        self.assertIn(
+            "v8_muse_glimmer_contracts",
+            nightly.NIGHTLY_PROFILES["demo-readiness"],
+        )
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("tests/test_v8_muse_glimmer_text.py", makefile)
+        self.assertIn("unittest/bf16/test_muse_glimmer_norms_bf16.py", makefile)
+        self.assertIn("CK_MUSE_SKIP_ONEDNN_ATTENTION", makefile)
+
     def test_full_dsl_gate_dependencies_are_explicit_nightly_rows(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         match = re.search(r"^test-v8-dsl:\s+([^\n]+)$", makefile, re.MULTILINE)
