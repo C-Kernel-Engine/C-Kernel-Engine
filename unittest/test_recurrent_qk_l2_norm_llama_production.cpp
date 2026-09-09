@@ -142,6 +142,7 @@ int main() {
         {"epsilon_clamp", 2, 32, 32, 8, 1.0e-6f, 1.0e-9f},
         {"qwen35_decode", 1, 2048, 2048, 128, 1.0e-6f, 1.0f},
         {"qwen35_prefill", 7, 2048, 2048, 128, 1.0e-6f, 1.0f},
+        {"qwen35_parallel_prefill", 65, 2048, 2048, 128, 1.0e-6f, 1.0f},
     };
     int passed = 0;
     for (const case_spec & spec : cases) {

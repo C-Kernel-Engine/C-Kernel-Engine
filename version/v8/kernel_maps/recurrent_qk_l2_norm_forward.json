@@ -29,9 +29,12 @@
     {"name": "eps", "dtype": "f32", "desc": "Minimum L2 denominator: 1 / max(sqrt(sum(x*x)), eps)"}
   ],
   "parallelization": {
-    "supported": ["row"],
-    "preferred": {"prefill": "row", "decode": "row"},
-    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+    "supported": ["head", "row"],
+    "preferred": {"prefill": "head", "decode": "row"},
+    "strategies": [
+      {"name": "head", "partition_dim": "(Q+K)/D*R", "param_style": "range", "range": {"min_chunk": 8}},
+      {"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}
+    ]
   },
   "impl": {
     "function": "recurrent_qk_l2_norm_forward",
@@ -49,9 +52,9 @@
       "implementation": {
         "isa_dispatch": "scalar",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows", "independent_heads"],
-          "dispatch": ["inline"],
+          "dispatch": ["inline", "ck_threadpool_parallel_for_n"],
           "reduction_order_effect": "none"
         }
       },

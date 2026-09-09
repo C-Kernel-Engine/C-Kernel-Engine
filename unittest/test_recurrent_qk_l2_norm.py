@@ -69,6 +69,10 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.c_float,
             ]
             pytorch_fwd.restype = None
+            lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+            lib.ck_set_num_threads.restype = None
+            lib.ck_threadpool_global_destroy.argtypes = []
+            lib.ck_threadpool_global_destroy.restype = None
             return lib
     return None
 
@@ -184,6 +188,34 @@ class TestRecurrentQKL2Norm(unittest.TestCase):
 
         np.testing.assert_array_equal(ck_q, q_ref.numpy())
         np.testing.assert_array_equal(ck_k, k_ref.numpy())
+
+    def test_llama_parallel_heads_are_bit_exact_and_repeatable(self) -> None:
+        rows, q_dim, k_dim, head_dim = 257, 17 * 128, 11 * 128, 128
+        eps = 1e-6
+        rng = np.random.default_rng(47)
+        q = rng.standard_normal((rows, q_dim)).astype(np.float32)
+        k = rng.standard_normal((rows, k_dim)).astype(np.float32)
+
+        def run(threads: int) -> tuple[np.ndarray, np.ndarray]:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(threads)
+            q_out = q.copy()
+            k_out = k.copy()
+            LIB.recurrent_qk_l2_norm_forward(
+                _as_ptr(q_out), _as_ptr(k_out), rows,
+                q_dim, k_dim, head_dim, eps,
+            )
+            return q_out, k_out
+
+        try:
+            serial_q, serial_k = run(1)
+            for _ in range(8):
+                parallel_q, parallel_k = run(4)
+                np.testing.assert_array_equal(parallel_q, serial_q)
+                np.testing.assert_array_equal(parallel_k, serial_k)
+        finally:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(0)
 
 
 if __name__ == "__main__":

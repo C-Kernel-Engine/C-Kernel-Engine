@@ -51714,13 +51714,22 @@
       ],
       "parallelization": {
         "supported": [
+          "head",
           "row"
         ],
         "preferred": {
-          "prefill": "row",
+          "prefill": "head",
           "decode": "row"
         },
         "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "(Q+K)/D*R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 8
+            }
+          },
           {
             "name": "row",
             "partition_dim": "R",
@@ -51758,13 +51767,14 @@
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
                 "independent_rows",
                 "independent_heads"
               ],
               "dispatch": [
-                "inline"
+                "inline",
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }

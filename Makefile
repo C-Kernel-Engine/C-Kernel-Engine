@@ -3408,7 +3408,6 @@ DELTANET_GROUPED_DECODE_BENCH_BIN := $(BUILD_DIR)/bench_deltanet_grouped_decode
 SSM_CONV_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_ssm_conv_llama_production
 RECURRENT_SILU_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_recurrent_silu_llama_production
 F32_GEMM_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_f32_gemm_llama_production
-RECURRENT_QK_L2_LLAMA_PRODUCTION_OBJ := $(BUILD_DIR)/recurrent_qk_norm_llama_production.o
 MROPE_TEXT_LLAMA_PRODUCTION_BIN := $(BUILD_DIR)/test_mrope_text_llama_production
 Q4Q6_LLAMA_CPP_DIR ?= $(LLAMA_CPP_DIR)
 Q4Q6_LLAMA_CPP_BIN_DIR ?= $(Q4Q6_LLAMA_CPP_DIR)/build/bin
@@ -3669,19 +3668,15 @@ $(RMSNORM_LLAMA_PRODUCTION_BIN): $(LIB) unittest/test_rmsnorm_llama_production.c
 		-Wl,-rpath,$(BUILD_DIR) -Wl,-rpath,$(Q4Q6_LLAMA_CPP_BIN_DIR) \
 		-o $(RMSNORM_LLAMA_PRODUCTION_BIN)
 
-$(RECURRENT_QK_L2_LLAMA_PRODUCTION_OBJ): src/kernels/recurrent_qk_norm_kernels.c
-	@mkdir -p $(BUILD_DIR)
-	$(CC) -O3 -fPIC $(AVX_FLAGS) -Iinclude -c $< -o $@
-
-$(RECURRENT_QK_L2_LLAMA_PRODUCTION_BIN): $(RECURRENT_QK_L2_LLAMA_PRODUCTION_OBJ) unittest/test_recurrent_qk_l2_norm_llama_production.cpp
+$(RECURRENT_QK_L2_LLAMA_PRODUCTION_BIN): $(LIB) unittest/test_recurrent_qk_l2_norm_llama_production.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) -O3 $(AVX_FLAGS) -Iinclude -I$(V8_SRC_DIR) \
 		-I$(Q4Q6_LLAMA_CPP_DIR)/ggml/include -I$(Q4Q6_LLAMA_CPP_DIR)/ggml/src \
 		unittest/test_recurrent_qk_l2_norm_llama_production.cpp \
-		$(RECURRENT_QK_L2_LLAMA_PRODUCTION_OBJ) \
+		-L$(BUILD_DIR) -lckernel_engine \
 		-L$(Q4Q6_LLAMA_CPP_BIN_DIR) -lggml-cpu -lggml-base -lggml \
 		-lm -lpthread -ldl \
-		-Wl,-rpath,$(Q4Q6_LLAMA_CPP_BIN_DIR) \
+		-Wl,-rpath,$(BUILD_DIR) -Wl,-rpath,$(Q4Q6_LLAMA_CPP_BIN_DIR) \
 		-o $(RECURRENT_QK_L2_LLAMA_PRODUCTION_BIN)
 
 .PHONY: test-mrope-text-llama-production

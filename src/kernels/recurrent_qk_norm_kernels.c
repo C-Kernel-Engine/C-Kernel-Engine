@@ -1,7 +1,10 @@
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
+#include "ck_threadpool.h"
 
+#include <limits.h>
 #include <math.h>
+#include <stdint.h>
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -12,27 +15,62 @@ static void recurrent_l2_norm_rows_forward_one(float *x,
                                                int dim,
                                                int head_dim,
                                                float eps) {
-    if (!x || rows <= 0 || dim <= 0 || head_dim <= 0) {
-        return;
-    }
     const int num_heads = dim / head_dim;
-    if (num_heads <= 0 || num_heads * head_dim != dim) {
-        return;
-    }
-
     for (int row = 0; row < rows; ++row) {
-        float *row_ptr = x + (size_t) row * (size_t) dim;
+        float *row_ptr = x + (size_t)row * (size_t)dim;
         for (int head = 0; head < num_heads; ++head) {
-            float *head_ptr = row_ptr + (size_t) head * (size_t) head_dim;
+            float *head_ptr = row_ptr + (size_t)head * (size_t)head_dim;
             double sum_sq = 0.0;
             for (int col = 0; col < head_dim; ++col) {
-                sum_sq += (double) (head_ptr[col] * head_ptr[col]);
+                sum_sq += (double)(head_ptr[col] * head_ptr[col]);
             }
-            const float norm = sqrtf((float) sum_sq);
+            const float norm = sqrtf((float)sum_sq);
             const float inv_norm = 1.0f / fmaxf(norm, eps);
             for (int col = 0; col < head_dim; ++col) {
                 head_ptr[col] *= inv_norm;
             }
+        }
+    }
+}
+
+typedef struct {
+    float *q;
+    float *k;
+    int q_heads;
+    int k_heads;
+    int head_dim;
+    float eps;
+} ck_recurrent_qk_l2_args_t;
+
+static void recurrent_qk_l2_norm_head_range(int begin,
+                                            int end,
+                                            void *opaque) {
+    const ck_recurrent_qk_l2_args_t *args =
+        (const ck_recurrent_qk_l2_args_t *)opaque;
+    const int heads_per_row = args->q_heads + args->k_heads;
+    for (int job = begin; job < end; ++job) {
+        const int row = job / heads_per_row;
+        const int local_head = job - row * heads_per_row;
+        float *head_ptr;
+        if (local_head < args->q_heads) {
+            head_ptr = args->q +
+                ((size_t)row * (size_t)args->q_heads +
+                 (size_t)local_head) * (size_t)args->head_dim;
+        } else {
+            head_ptr = args->k +
+                ((size_t)row * (size_t)args->k_heads +
+                 (size_t)(local_head - args->q_heads)) *
+                    (size_t)args->head_dim;
+        }
+
+        double sum_sq = 0.0;
+        for (int col = 0; col < args->head_dim; ++col) {
+            sum_sq += (double)(head_ptr[col] * head_ptr[col]);
+        }
+        const float norm = sqrtf((float)sum_sq);
+        const float inv_norm = 1.0f / fmaxf(norm, args->eps);
+        for (int col = 0; col < args->head_dim; ++col) {
+            head_ptr[col] *= inv_norm;
         }
     }
 }
@@ -90,8 +128,59 @@ void recurrent_qk_l2_norm_forward(float *q,
                                   int k_dim,
                                   int head_dim,
                                   float eps) {
-    recurrent_l2_norm_rows_forward_one(q, rows, q_dim, head_dim, eps);
-    recurrent_l2_norm_rows_forward_one(k, rows, k_dim, head_dim, eps);
+    if (!q || !k || rows <= 0 || q_dim <= 0 || k_dim <= 0 ||
+        head_dim <= 0 || q_dim % head_dim != 0 || k_dim % head_dim != 0) {
+        return;
+    }
+    const int q_heads = q_dim / head_dim;
+    const int k_heads = k_dim / head_dim;
+    if (q_heads > INT_MAX - k_heads) {
+        return;
+    }
+    const int heads_per_row = q_heads + k_heads;
+    if (rows > INT_MAX / heads_per_row) {
+        return;
+    }
+
+    ck_recurrent_qk_l2_args_t args = {
+        q, k, q_heads, k_heads, head_dim, eps,
+    };
+    const int jobs = rows * heads_per_row;
+    const size_t elements = (size_t)jobs * (size_t)head_dim;
+    const size_t minimum_elements_per_thread = 32768u;
+    const uintptr_t q_begin = (uintptr_t)q;
+    const uintptr_t q_end = q_begin +
+        (size_t)rows * (size_t)q_dim * sizeof(float);
+    const uintptr_t k_begin = (uintptr_t)k;
+    const uintptr_t k_end = k_begin +
+        (size_t)rows * (size_t)k_dim * sizeof(float);
+    const int ranges_overlap = q_begin < k_end && k_begin < q_end;
+    if (ranges_overlap || elements < 2u * minimum_elements_per_thread) {
+        recurrent_l2_norm_rows_forward_one(q, rows, q_dim, head_dim, eps);
+        recurrent_l2_norm_rows_forward_one(k, rows, k_dim, head_dim, eps);
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    size_t useful_threads =
+        (elements + minimum_elements_per_thread - 1u) /
+        minimum_elements_per_thread;
+    if ((size_t)active > useful_threads) {
+        active = (int)useful_threads;
+    }
+    if (active > jobs) {
+        active = jobs;
+    }
+
+    if (active > 1 && ck_threadpool_thread_id(pool) <= 0) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, jobs, 8,
+            recurrent_qk_l2_norm_head_range, &args);
+    } else {
+        recurrent_l2_norm_rows_forward_one(q, rows, q_dim, head_dim, eps);
+        recurrent_l2_norm_rows_forward_one(k, rows, k_dim, head_dim, eps);
+    }
 }
 
 static int recurrent_ceil_log2(int value)
