@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -13,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from typing import Any
 
 import numpy as np
@@ -20,6 +22,8 @@ import numpy as np
 
 _FLOAT_P = ctypes.POINTER(ctypes.c_float)
 _U8_P = ctypes.POINTER(ctypes.c_uint8)
+_FRONTEND_REUSE_UNAVAILABLE = 78
+_FRONTEND_REUSE_RESOURCE_ERROR = 79
 
 
 class CKAudioWavInfo(ctypes.Structure):
@@ -44,6 +48,57 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _wav_geometry_for_cache(path: Path) -> tuple[int, int] | None:
+    try:
+        with wave.open(str(path), "rb") as wav_reader:
+            return wav_reader.getnframes(), wav_reader.getframerate()
+    except (EOFError, OSError, wave.Error):
+        return None
+
+
+def _probe_cache_capacity(directory: Path, required_bytes: int) -> str | None:
+    if required_bytes <= 0:
+        return "invalid cache-capacity request"
+    probe = directory / ".cke-whisper-capacity-probe"
+    try:
+        with probe.open("w+b") as handle:
+            os.posix_fallocate(handle.fileno(), 0, required_bytes)
+    except OSError as error:
+        if error.errno in (errno.EDQUOT, errno.ENOSPC, errno.EFBIG):
+            return f"temporary storage cannot reserve {required_bytes} bytes: {error}"
+        raise
+    finally:
+        probe.unlink(missing_ok=True)
+    return None
+
+
+def _frontend_reuse_worker_failure(returncode: int) -> str | None:
+    if returncode == 0:
+        return None
+    if returncode == _FRONTEND_REUSE_UNAVAILABLE:
+        return (
+            "generated encoder runtime does not provide full-feature reuse; "
+            "rebuild to enable it"
+        )
+    if returncode == _FRONTEND_REUSE_RESOURCE_ERROR:
+        return "temporary feature cache could not be stored"
+    raise ValueError(f"unexpected frontend worker return code: {returncode}")
+
+
+def _frontend_cache_required_bytes(
+    encoder_config: dict[str, Any], feature_frames: int
+) -> int:
+    feature_bytes = (
+        int(encoder_config["audio_feature_channels"]) * feature_frames * 4
+    )
+    encoder_output_bytes = (
+        int(encoder_config["context_length"])
+        * int(encoder_config["embed_dim"])
+        * 4
+    )
+    return feature_bytes + encoder_output_bytes + 8 * 1024 * 1024
 
 
 def _parse_cpu_list(value: str) -> set[int]:
@@ -150,7 +205,157 @@ def _load_generated_model(run_dir: Path) -> ctypes.CDLL:
     return model
 
 
+def _run_audio_encoder_window(
+    model: ctypes.CDLL,
+    wav: np.ndarray,
+    window_start_frame: int,
+    info: CKAudioWavInfo,
+) -> tuple[float, float]:
+    started = time.perf_counter()
+    status = int(
+        model.ck_model_prepare_audio_wav_window(
+            wav.ctypes.data_as(_U8_P),
+            wav.size,
+            window_start_frame,
+            ctypes.byref(info),
+        )
+    )
+    frontend_seconds = time.perf_counter() - started
+    if status != 0:
+        raise RuntimeError(f"generated audio frontend failed with code {status}")
+
+    started = time.perf_counter()
+    status = int(model.ck_model_run_encoder())
+    encoder_seconds = time.perf_counter() - started
+    if status != 0:
+        raise RuntimeError(f"generated audio encoder failed with code {status}")
+    return frontend_seconds, encoder_seconds
+
+
+def _copy_cached_feature_window(
+    full_features: np.ndarray,
+    output: np.ndarray,
+    *,
+    window_start_frame: int,
+    hop_length: int,
+) -> int:
+    if full_features.ndim != 2 or output.ndim != 2:
+        raise ValueError("cached audio features must be two-dimensional")
+    if full_features.shape[0] != output.shape[0]:
+        raise ValueError("cached audio feature channel count does not match output")
+    if hop_length <= 0 or window_start_frame < 0:
+        raise ValueError("cached audio window geometry is invalid")
+    if window_start_frame % hop_length != 0:
+        raise ValueError("cached audio window start is not hop-aligned")
+    output.fill(0.0)
+    start_feature = window_start_frame // hop_length
+    valid_features = min(
+        output.shape[1],
+        max(0, full_features.shape[1] - start_feature),
+    )
+    if valid_features:
+        output[:, :valid_features] = full_features[
+            :, start_feature : start_feature + valid_features
+        ]
+    return valid_features
+
+
+def _frontend_worker(args: argparse.Namespace) -> int:
+    execution_topology = _apply_worker_affinity()
+    run_dir = args.encoder_run_dir.resolve()
+    _require_artifact(run_dir)
+    config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+    feature_channels = int(config["audio_feature_channels"])
+    feature_frames = int(args.feature_frames)
+    model = _load_generated_model(run_dir)
+    try:
+        prepare_features = model.ck_model_prepare_audio_wav_features
+    except AttributeError:
+        print(
+            "frontend reuse unavailable: generated encoder runtime lacks "
+            "ck_model_prepare_audio_wav_features; rebuild to enable reuse",
+            file=sys.stderr,
+        )
+        return _FRONTEND_REUSE_UNAVAILABLE
+    prepare_features.argtypes = [
+        _U8_P,
+        ctypes.c_size_t,
+        _FLOAT_P,
+        ctypes.c_int,
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(CKAudioWavInfo),
+    ]
+    prepare_features.restype = ctypes.c_int
+    features = np.empty((feature_channels, feature_frames), dtype=np.float32)
+    status = int(
+        model.ck_model_init_with_manifest(
+            str(run_dir / "weights.bump").encode(),
+            str(run_dir / "weights_manifest.map").encode(),
+        )
+    )
+    if status != 0:
+        raise RuntimeError(f"frontend initialization failed with code {status}")
+    try:
+        wav = np.frombuffer(args.wav.resolve().read_bytes(), dtype=np.uint8)
+        info = CKAudioWavInfo()
+        produced = ctypes.c_int()
+        started = time.perf_counter()
+        status = int(
+            prepare_features(
+                wav.ctypes.data_as(_U8_P),
+                wav.size,
+                _fptr(features),
+                feature_frames,
+                ctypes.byref(produced),
+                ctypes.byref(info),
+            )
+        )
+        frontend_seconds = time.perf_counter() - started
+        if status != 0:
+            raise RuntimeError(f"full audio frontend failed with code {status}")
+        if produced.value != feature_frames:
+            raise RuntimeError(
+                "full audio frontend frame mismatch: "
+                f"expected={feature_frames} actual={produced.value}"
+            )
+    finally:
+        model.ck_model_free()
+
+    try:
+        np.save(args.feature_output, features)
+    except OSError as error:
+        args.feature_output.unlink(missing_ok=True)
+        print(
+            f"frontend reuse unavailable: cannot store feature cache: {error}",
+            file=sys.stderr,
+        )
+        return _FRONTEND_REUSE_RESOURCE_ERROR
+    args.worker_report.write_text(
+        json.dumps(
+            {
+                "audio": {
+                    "source_sample_rate": info.sample_rate,
+                    "source_channels": info.channels,
+                    "source_frames": info.frames,
+                },
+                "features_shape": list(features.shape),
+                "frontend_seconds": frontend_seconds,
+                "feature_sha256": hashlib.sha256(features.tobytes()).hexdigest(),
+                "execution_topology": execution_topology,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return 0
+
+
 def _encoder_worker(args: argparse.Namespace) -> int:
+    if (args.full_features is None) != (args.frontend_report is None):
+        raise ValueError(
+            "--full-features and --frontend-report must be provided together"
+        )
     execution_topology = _apply_worker_affinity()
     run_dir = args.encoder_run_dir.resolve()
     _require_artifact(run_dir)
@@ -159,19 +364,15 @@ def _encoder_worker(args: argparse.Namespace) -> int:
     model.ck_model_get_named_activation_ptr.restype = ctypes.c_void_p
     model.ck_model_get_named_activation_nbytes.argtypes = [ctypes.c_char_p]
     model.ck_model_get_named_activation_nbytes.restype = ctypes.c_ssize_t
-    model.ck_model_run_audio_wav.argtypes = [
-        _U8_P,
-        ctypes.c_size_t,
-        ctypes.POINTER(CKAudioWavInfo),
-    ]
-    model.ck_model_run_audio_wav.restype = ctypes.c_int
-    model.ck_model_run_audio_wav_window.argtypes = [
+    model.ck_model_prepare_audio_wav_window.argtypes = [
         _U8_P,
         ctypes.c_size_t,
         ctypes.c_int,
         ctypes.POINTER(CKAudioWavInfo),
     ]
-    model.ck_model_run_audio_wav_window.restype = ctypes.c_int
+    model.ck_model_prepare_audio_wav_window.restype = ctypes.c_int
+    model.ck_model_run_encoder.argtypes = []
+    model.ck_model_run_encoder.restype = ctypes.c_int
     status = int(
         model.ck_model_init_with_manifest(
             str(run_dir / "weights.bump").encode(),
@@ -181,23 +382,67 @@ def _encoder_worker(args: argparse.Namespace) -> int:
     if status != 0:
         raise RuntimeError(f"encoder initialization failed with code {status}")
     try:
-        wav = np.frombuffer(args.wav.resolve().read_bytes(), dtype=np.uint8)
         info = CKAudioWavInfo()
-        started = time.perf_counter()
-        status = int(
-            model.ck_model_run_audio_wav_window(
-                wav.ctypes.data_as(_U8_P),
-                wav.size,
-                args.window_start_frame,
-                ctypes.byref(info),
-            )
-        )
-        encoder_seconds = time.perf_counter() - started
-        if status != 0:
-            raise RuntimeError(f"generated audio runtime failed with code {status}")
         config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
         target_rate = int(config["audio_sample_rate"])
         sample_extent = int(config["audio_sample_extent"])
+        hop_length = int(config["audio_hop_length"])
+        feature_channels = int(config["audio_feature_channels"])
+        feature_frames = int(config["audio_feature_frames"])
+        feature_ptr = int(
+            model.ck_model_get_named_activation_ptr(b"audio_features") or 0
+        )
+        feature_bytes = int(
+            model.ck_model_get_named_activation_nbytes(b"audio_features")
+        )
+        feature_required = feature_channels * feature_frames * 4
+        if feature_ptr == 0 or feature_bytes < feature_required:
+            raise RuntimeError("generated audio feature checkpoint is unavailable")
+        if args.full_features is not None:
+            started = time.perf_counter()
+            full_features = np.load(args.full_features, mmap_mode="r")
+            frontend_report = json.loads(
+                args.frontend_report.read_text(encoding="utf-8")
+            )
+            audio = frontend_report["audio"]
+            info.sample_rate = int(audio["source_sample_rate"])
+            info.channels = int(audio["source_channels"])
+            info.frames = int(audio["source_frames"])
+            if info.sample_rate != target_rate:
+                raise RuntimeError(
+                    "cached long-audio features require source sample rate "
+                    f"{target_rate}; source is {info.sample_rate}"
+                )
+            expected_shape = (feature_channels, info.frames // hop_length)
+            if tuple(full_features.shape) != expected_shape:
+                raise RuntimeError(
+                    "cached audio feature shape mismatch: "
+                    f"expected={expected_shape} actual={tuple(full_features.shape)}"
+                )
+            feature_view = np.ctypeslib.as_array(
+                ctypes.cast(feature_ptr, _FLOAT_P),
+                shape=(feature_channels * feature_frames,),
+            ).reshape(feature_channels, feature_frames)
+            _copy_cached_feature_window(
+                full_features,
+                feature_view,
+                window_start_frame=args.window_start_frame,
+                hop_length=hop_length,
+            )
+            frontend_seconds = time.perf_counter() - started
+            started = time.perf_counter()
+            status = int(model.ck_model_run_encoder())
+            encoder_seconds = time.perf_counter() - started
+            if status != 0:
+                raise RuntimeError(f"generated audio encoder failed with code {status}")
+        else:
+            wav = np.frombuffer(args.wav.resolve().read_bytes(), dtype=np.uint8)
+            frontend_seconds, encoder_seconds = _run_audio_encoder_window(
+                model,
+                wav,
+                args.window_start_frame,
+                info,
+            )
         if args.window_start_frame and info.sample_rate != target_rate:
             raise RuntimeError(
                 "long-audio windowing currently requires source sample rate "
@@ -212,17 +457,6 @@ def _encoder_worker(args: argparse.Namespace) -> int:
             window_source_capacity,
             info.frames - args.window_start_frame,
         )
-        feature_channels = int(config["audio_feature_channels"])
-        feature_frames = int(config["audio_feature_frames"])
-        feature_ptr = int(
-            model.ck_model_get_named_activation_ptr(b"audio_features") or 0
-        )
-        feature_bytes = int(
-            model.ck_model_get_named_activation_nbytes(b"audio_features")
-        )
-        feature_required = feature_channels * feature_frames * 4
-        if feature_ptr == 0 or feature_bytes < feature_required:
-            raise RuntimeError("generated audio feature checkpoint is unavailable")
         features = np.ctypeslib.as_array(
             ctypes.cast(feature_ptr, _FLOAT_P),
             shape=(feature_channels * feature_frames,),
@@ -262,8 +496,8 @@ def _encoder_worker(args: argparse.Namespace) -> int:
                 },
                 "features_shape": list(features.shape),
                 "encoder_shape": list(output.shape),
-                "frontend_seconds": None,
-                "audio_encoder_seconds": encoder_seconds,
+                "frontend_seconds": frontend_seconds,
+                "audio_encoder_seconds": frontend_seconds + encoder_seconds,
                 "encoder_seconds": encoder_seconds,
                 "feature_sha256": hashlib.sha256(features.tobytes()).hexdigest(),
                 "encoder_sha256": hashlib.sha256(output.tobytes()).hexdigest(),
@@ -590,6 +824,8 @@ def _run_segment(
     index: int,
     window_start_frame: int,
     worker_env: dict[str, str],
+    full_features: Path | None = None,
+    frontend_report: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     encoder_output = temp / f"encoder-{index:04d}.npy"
     encoder_report = temp / f"encoder-{index:04d}.json"
@@ -604,6 +840,16 @@ def _run_segment(
             str(wav_path),
             "--window-start-frame",
             str(window_start_frame),
+            *(
+                [
+                    "--full-features",
+                    str(full_features),
+                    "--frontend-report",
+                    str(frontend_report),
+                ]
+                if full_features is not None and frontend_report is not None
+                else []
+            ),
             "--encoder-output",
             str(encoder_output),
             "--worker-report",
@@ -656,9 +902,70 @@ def _run_parent(args: argparse.Namespace) -> int:
         (decoder_dir / "generation_config.json").read_text(encoding="utf-8")
     )
 
-    with tempfile.TemporaryDirectory(prefix="cke-whisper-") as temp_text:
+    temp_root = args.temp_dir.resolve() if args.temp_dir is not None else None
+    if temp_root is not None:
+        temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="cke-whisper-", dir=temp_root) as temp_text:
         temp = Path(temp_text)
         common = [sys.executable, str(Path(__file__).resolve())]
+        full_features: Path | None = None
+        frontend_report_path: Path | None = None
+        frontend_report: dict[str, Any] | None = None
+        frontend_reuse_reason = "input is not eligible for native-rate long-audio reuse"
+        wav_geometry = _wav_geometry_for_cache(wav_path)
+        source_frames, source_rate = wav_geometry or (0, 0)
+        if (
+            source_frames > int(encoder_config["audio_sample_extent"])
+            and source_rate == target_sample_rate
+        ):
+            feature_frames = source_frames // int(encoder_config["audio_hop_length"])
+            required_bytes = _frontend_cache_required_bytes(
+                encoder_config, feature_frames
+            )
+            frontend_reuse_reason = _probe_cache_capacity(temp, required_bytes)
+            candidate_features = temp / "audio-features-full.npy"
+            candidate_report = temp / "audio-features-full.json"
+            completed = None
+            if frontend_reuse_reason is None:
+                completed = subprocess.run(
+                [
+                    *common,
+                    "_frontend",
+                    "--encoder-run-dir",
+                    str(encoder_dir),
+                    "--wav",
+                    str(wav_path),
+                    "--feature-frames",
+                    str(feature_frames),
+                    "--feature-output",
+                    str(candidate_features),
+                    "--worker-report",
+                    str(candidate_report),
+                ],
+                check=False,
+                env=worker_env,
+            )
+            if completed is not None and completed.returncode == 0:
+                full_features = candidate_features
+                frontend_report_path = candidate_report
+                frontend_report = json.loads(
+                    frontend_report_path.read_text(encoding="utf-8")
+                )
+                frontend_reuse_reason = "enabled"
+            elif completed is not None:
+                try:
+                    frontend_reuse_reason = _frontend_reuse_worker_failure(
+                        completed.returncode
+                    )
+                except ValueError:
+                    raise subprocess.CalledProcessError(
+                        completed.returncode, completed.args
+                    ) from None
+            if frontend_report is None:
+                print(
+                    f"warning: frontend reuse disabled: {frontend_reuse_reason}",
+                    file=sys.stderr,
+                )
         segments: list[dict[str, Any]] = []
         window_start_frame = 0
         while True:
@@ -672,6 +979,8 @@ def _run_parent(args: argparse.Namespace) -> int:
                 index=len(segments),
                 window_start_frame=window_start_frame,
                 worker_env=worker_env,
+                full_features=full_features,
+                frontend_report=frontend_report_path,
             )
             audio = encoder["audio"]
             source_rate = int(audio["source_sample_rate"])
@@ -750,15 +1059,29 @@ def _run_parent(args: argparse.Namespace) -> int:
     )
     encoder = {
         **segments[0]["encoder"],
+        "frontend_seconds": sum(
+            float(segment["encoder"]["frontend_seconds"])
+            for segment in segments
+        ) + float((frontend_report or {}).get("frontend_seconds", 0.0)),
         "audio_encoder_seconds": sum(
             float(segment["encoder"]["audio_encoder_seconds"])
             for segment in segments
-        ),
+        ) + float((frontend_report or {}).get("frontend_seconds", 0.0)),
         "encoder_seconds": sum(
             float(segment["encoder"]["encoder_seconds"])
             for segment in segments
         ),
         "window_count": len(segments),
+        "frontend_reuse": {
+            "enabled": frontend_report is not None,
+            "reason": frontend_reuse_reason,
+            "full_feature_seconds": float(
+                (frontend_report or {}).get("frontend_seconds", 0.0)
+            ),
+            "full_feature_sha256": str(
+                (frontend_report or {}).get("feature_sha256", "")
+            ),
+        },
     }
     decoder = {
         **segments[0]["decoder"],
@@ -787,7 +1110,7 @@ def _run_parent(args: argparse.Namespace) -> int:
     )
     report = {
         "schema": "cke.whisper_e2e",
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "ok",
         "wav": str(wav_path),
         "wav_sha256": _sha256(wav_path),
@@ -795,6 +1118,11 @@ def _run_parent(args: argparse.Namespace) -> int:
         "decoder_run_dir": str(decoder_dir),
         "encoder_runtime_sha256": _sha256(encoder_dir / "libmodel.so"),
         "decoder_runtime_sha256": _sha256(decoder_dir / "libmodel.so"),
+        "encoder_engine_sha256": _sha256(encoder_dir / "libckernel_engine.so"),
+        "decoder_engine_sha256": _sha256(decoder_dir / "libckernel_engine.so"),
+        "request": {
+            "max_tokens_per_window": int(args.max_tokens),
+        },
         "provenance": {
             "encoder": {
                 "config_sha256": _sha256(encoder_dir / "config.json"),
@@ -854,9 +1182,10 @@ def _run_parent(args: argparse.Namespace) -> int:
         )
     print(decoder["text"])
     print(
-        "audio+encoder={:.3f}s prefill={:.3f}s decode={:.3f}s "
-        "tokens={} stop={}".format(
-            encoder["audio_encoder_seconds"],
+        "frontend={:.3f}s encoder={:.3f}s prefill={:.3f}s "
+        "decode={:.3f}s tokens={} stop={}".format(
+            encoder["frontend_seconds"],
+            encoder["encoder_seconds"],
             decoder["prefill_seconds"],
             decoder["decode_seconds"],
             decoder["generated_count"],
@@ -885,14 +1214,28 @@ def _parser() -> argparse.ArgumentParser:
         help="Generate Whisper timestamp tokens using the model contract",
     )
     run.add_argument("--output", type=Path)
+    run.add_argument(
+        "--temp-dir",
+        type=Path,
+        help="Temporary storage root for request-scoped audio artifacts",
+    )
 
     encoder = subparsers.add_parser("_encoder", help=argparse.SUPPRESS)
     encoder.add_argument("--encoder-run-dir", type=Path, required=True)
     encoder.add_argument("--wav", type=Path, required=True)
     encoder.add_argument("--window-start-frame", type=int, default=0)
+    encoder.add_argument("--full-features", type=Path)
+    encoder.add_argument("--frontend-report", type=Path)
     encoder.add_argument("--encoder-output", type=Path, required=True)
     encoder.add_argument("--feature-output", type=Path)
     encoder.add_argument("--worker-report", type=Path, required=True)
+
+    frontend = subparsers.add_parser("_frontend", help=argparse.SUPPRESS)
+    frontend.add_argument("--encoder-run-dir", type=Path, required=True)
+    frontend.add_argument("--wav", type=Path, required=True)
+    frontend.add_argument("--feature-frames", type=int, required=True)
+    frontend.add_argument("--feature-output", type=Path, required=True)
+    frontend.add_argument("--worker-report", type=Path, required=True)
 
     decoder = subparsers.add_parser("_decoder", help=argparse.SUPPRESS)
     decoder.add_argument("--decoder-run-dir", type=Path, required=True)
@@ -907,6 +1250,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "_frontend":
+        return _frontend_worker(args)
     if args.command == "_encoder":
         return _encoder_worker(args)
     if args.command == "_decoder":

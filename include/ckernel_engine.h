@@ -1559,6 +1559,7 @@ void gelu_fast_inplace(float *data, size_t n);
 // Slower but provides maximum accuracy. Used by BF16 wrapper.
 void gelu_exact_inplace(float *data, size_t n);
 void gelu_erf_fp64_f32_inplace(float *data, size_t n);
+void gelu_erf_fp64_f32_parallel_dispatch(float *data, size_t n);
 void gelu_pytorch_erf_f32_inplace(float *data, size_t n);
 
 // GGML-compatible GELU forward matching llama.cpp's FP16 table semantics.
@@ -4232,6 +4233,18 @@ void deepseek_csa_attention_f32(const float *q,
                                 float scale);
 
 int attention_forward_query_key_head_major_f32(
+    const float *query,
+    const float *key,
+    const float *value,
+    float *output,
+    float *score_scratch,
+    int num_heads,
+    int query_tokens,
+    int key_tokens,
+    int head_dim,
+    float scale);
+
+int attention_forward_query_key_head_major_f32_decode_heads(
     const float *query,
     const float *key,
     const float *value,

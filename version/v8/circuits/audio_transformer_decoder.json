@@ -148,14 +148,14 @@
       "template_ops": ["gelu"],
       "phases": {
         "prefill": {
-          "contract_id": "gelu_erf_fp64_scalar_fp32_storage",
+          "contract_id": "gelu_erf_fp64_parallel_fp32_storage",
           "validation": "validated",
-          "evidence": "unittest/test_audio_encoder.py byte-exact FP64 scalar ERF formula plus observed PyTorch comparison"
+          "evidence": "unittest/test_audio_encoder.py byte-exact parallel and scalar FP64 ERF formula plus observed PyTorch comparison"
         },
         "decode": {
-          "contract_id": "gelu_erf_fp64_scalar_fp32_storage",
+          "contract_id": "gelu_erf_fp64_parallel_fp32_storage",
           "validation": "validated",
-          "evidence": "unittest/test_audio_encoder.py byte-exact FP64 scalar ERF formula plus observed PyTorch comparison"
+          "evidence": "unittest/test_audio_encoder.py byte-exact parallel and scalar FP64 ERF formula plus observed PyTorch comparison"
         }
       },
       "checkpoint": {
@@ -175,9 +175,9 @@
           "evidence": "unittest/test_audio_encoder.py unequal-length PyTorch attention oracle"
         },
         "decode": {
-          "contract_id": "attention_query_key_scaled_ordered_fp32",
+          "contract_id": "attention_query_key_scaled_ordered_fp32_decode_heads",
           "validation": "validated",
-          "evidence": "unittest/test_audio_encoder.py Q=1 K=1500 Whisper decode oracle"
+          "evidence": "unittest/test_audio_encoder.py byte-exact serial/threaded Q=1 K=1500 Whisper decode oracle"
         }
       },
       "checkpoint": {

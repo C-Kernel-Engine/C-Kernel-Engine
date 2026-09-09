@@ -319,9 +319,15 @@ jobs:
 
           mmproj=$(python -c 'from huggingface_hub import hf_hub_download; print(hf_hub_download(repo_id="Qwen/Qwen3-VL-8B-Instruct-GGUF", filename="mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf"))')
           echo "V8_QWEN3VL_CACHED_MMPROJ=${mmproj}" >> "${GITHUB_ENV}"
+          echo "V8_VISION_ENCODER_MODE=q4" >> "${GITHUB_ENV}"
           echo "V8_VISION_ENCODER_ALLOW_NON_AVX512=1" >> "${GITHUB_ENV}"
+          vision_threads=$(nproc)
+          if [ "${vision_threads}" -gt 20 ]; then
+            vision_threads=20
+          fi
+          echo "V8_VISION_ENCODER_THREADS=${vision_threads}" >> "${GITHUB_ENV}"
           echo "CK_LLAMA_CPP_ROOT=${GITHUB_WORKSPACE}/llama.cpp" >> "${GITHUB_ENV}"
-          echo "Scheduled Q8_0 encoder parity enabled with ${mmproj}"
+          echo "Scheduled Q8_0 encoder parity enabled with ${mmproj} (${vision_threads} threads)"
 
           if [ "${avail_kb:-0}" -ge $((16 * 1024 * 1024)) ] && [ "${free_kb:-0}" -ge $((18 * 1024 * 1024)) ]; then
             decoder=$(python -c 'from huggingface_hub import hf_hub_download; print(hf_hub_download(repo_id="Qwen/Qwen3-VL-8B-Instruct-GGUF", filename="Qwen3VL-8B-Instruct-Q4_K_M.gguf"))')
@@ -801,6 +807,7 @@ jobs:
             build/*.log
             build/*.json
             build/v8_serve_e2e_last_failure/**
+            build/vision_encoder_accuracy/**
             build/regression-reports/**
             version/v7/.cache/reports/kernel_map_validation_latest.json
             version/v7/.cache/reports/backprop_family_matrix/**

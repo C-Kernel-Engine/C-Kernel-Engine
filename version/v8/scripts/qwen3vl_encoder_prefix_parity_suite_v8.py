@@ -140,6 +140,19 @@ def _run_one(
     return sample
 
 
+def _log_failure_reason(path: Path, returncode: int) -> str:
+    try:
+        lines = [
+            line.strip()
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+            if line.strip()
+        ]
+    except OSError:
+        lines = []
+    detail = lines[-1] if lines else "child process produced no diagnostic output"
+    return f"numeric parity process exited {returncode}: {detail}"
+
+
 def _evaluate_samples(samples: list[dict[str, Any]], args: argparse.Namespace) -> list[str]:
     failures: list[str] = []
     for sample in samples:
@@ -232,11 +245,19 @@ def main(argv: list[str] | None = None) -> int:
     env["OMP_NUM_THREADS"] = str(args.ck_threads)
 
     samples: list[dict[str, Any]] = []
+    execution_failures: list[str] = []
     for index, spec in enumerate(specs, 1):
         print(f"[{index}/{len(specs)}] encoder parity {spec['id']} -> {spec['image']}", flush=True)
-        samples.append(_run_one(spec=spec, index=index, args=args, env=env))
+        try:
+            samples.append(_run_one(spec=spec, index=index, args=args, env=env))
+        except subprocess.CalledProcessError as exc:
+            sample_name = f"{index:02d}_{_sanitize_id(spec['id'])}"
+            log_path = args.output_dir / "logs" / f"{sample_name}.log"
+            execution_failures.append(
+                f"{spec['id']}: {_log_failure_reason(log_path, exc.returncode)}"
+            )
 
-    failures = _evaluate_samples(samples, args)
+    failures = execution_failures + _evaluate_samples(samples, args)
     aggregate = {
         "min_cosine": min((_metric_value(sample, "cosine") for sample in samples), default=0.0),
         "max_rmse": max((_metric_value(sample, "rmse") for sample in samples), default=0.0),

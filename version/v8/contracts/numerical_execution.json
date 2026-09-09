@@ -289,6 +289,17 @@
       "position_transform": null,
       "description": "Equal- or unequal-length head-major query/key attention with explicit query scaling, ordered FP32 QK and PV products, and an FP64 softmax denominator."
     },
+    "attention_query_key_scaled_ordered_fp32_decode_heads": {
+      "operator_family": "attention",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "ascending_head_query_key_dim_qk_then_scale_then_max_exp_fp64_denominator_then_ascending_key_pv"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "normalization_scale", "vector_exponential", "denominator_add", "reciprocal", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_heads", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Single-query head-major FP32 attention with disjoint per-head score rows and unchanged ordered QK, softmax, and PV arithmetic."
+    },
     "attention_query_key_scaled_ordered_fp32_packed_k": {
       "operator_family": "attention",
       "status": "validated",
@@ -2537,6 +2548,41 @@
       },
       "position_transform": null,
       "description": "Standalone scalar ERF GELU over FP32 storage using FP64 libm evaluation and one FP32 output rounding. PyTorch comparison is observed separately because framework vector transcendental implementations vary by build and ISA."
+    },
+    "gelu_erf_fp64_parallel_fp32_storage": {
+      "operator_family": "gelu",
+      "status": "validated",
+      "storage": {
+        "input": "fp32",
+        "weight": "fp32",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "fp32",
+        "accumulator": "fp64",
+        "evaluation_order": "widen_fp32_to_fp64_erf_then_single_fp32_store"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "none",
+        "order": "none",
+        "partial_accumulator": "none",
+        "merge_order": "none"
+      },
+      "threading": {
+        "work_partition": "output_tiles",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "Threadpool ERF GELU over FP32 storage. Every element preserves the scalar FP64 libm evaluation and one FP32 output rounding; threading changes ownership only."
     },
     "gelu_erf_bf16_storage": {
       "operator_family": "gelu",

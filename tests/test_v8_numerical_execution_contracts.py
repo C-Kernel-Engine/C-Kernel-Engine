@@ -290,14 +290,14 @@ class NumericalExecutionContractTests(unittest.TestCase):
                 "audio.encoder.activation",
                 "prefill",
                 "gelu.fp32_inplace.v1",
-                "gelu_erf_fp64_f32_inplace",
+                "gelu_erf_fp64_f32_parallel_dispatch",
             ),
             (
                 "audio_transformer_decoder.json",
                 "audio.decoder.activation",
                 "decode",
                 "gelu.fp32_inplace.v1",
-                "gelu_erf_fp64_f32_inplace",
+                "gelu_erf_fp64_f32_parallel_dispatch",
             ),
             (
                 "qwen3_vl_vision.json",
@@ -578,15 +578,15 @@ class NumericalExecutionContractTests(unittest.TestCase):
         report = audit.build_report()
         baseline = audit._load(audit.BASELINE)
         audit.validate_ratchet(report, baseline)
-        self.assertEqual(report["counts"]["kernel_maps"], 350)
+        self.assertEqual(report["counts"]["kernel_maps"], 352)
         self.assertEqual(report["counts"]["physical_layout_maps"], 6)
-        self.assertEqual(report["counts"]["resolver_governed_maps"], 133)
-        self.assertEqual(report["counts"]["interface_hardened_maps"], 84)
+        self.assertEqual(report["counts"]["resolver_governed_maps"], 135)
+        self.assertEqual(report["counts"]["interface_hardened_maps"], 85)
         self.assertEqual(
-            report["counts"]["interface_abi_crossvalidated_maps"], 84
+            report["counts"]["interface_abi_crossvalidated_maps"], 85
         )
-        self.assertEqual(report["counts"]["contract_pending_maps"], 49)
-        self.assertEqual(report["counts"]["map_owned_call_abi"], 223)
+        self.assertEqual(report["counts"]["contract_pending_maps"], 50)
+        self.assertEqual(report["counts"]["map_owned_call_abi"], 225)
         self.assertEqual(report["counts"]["legacy_interface_ready_maps"], 57)
         self.assertEqual(report["counts"]["selection_managed_maps"], 90)
         self.assertEqual(report["selection"]["legacy_selection_if_statements"], 59)

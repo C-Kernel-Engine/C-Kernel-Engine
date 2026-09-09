@@ -224,6 +224,81 @@ int attention_forward_query_key_head_major_f32(
         query_tokens, key_tokens, head_dim, scale);
 }
 
+typedef struct {
+    const float *query;
+    const float *key;
+    const float *value;
+    float *output;
+    float *score_scratch;
+    int num_heads;
+    int query_tokens;
+    int key_tokens;
+    int head_dim;
+    float scale;
+} ck_attention_query_key_f32_head_args_t;
+
+static void ck_attention_query_key_f32_head_work(int ith, int nth, void *opaque)
+{
+    ck_attention_query_key_f32_head_args_t *args =
+        (ck_attention_query_key_f32_head_args_t *)opaque;
+    const size_t query_stride =
+        (size_t)args->query_tokens * (size_t)args->head_dim;
+    const size_t kv_stride =
+        (size_t)args->key_tokens * (size_t)args->head_dim;
+    for (int head = ith; head < args->num_heads; head += nth) {
+        ck_attention_forward_query_key_head_major_f32_run(
+            args->query + (size_t)head * query_stride,
+            args->key + (size_t)head * kv_stride,
+            args->value + (size_t)head * kv_stride,
+            args->output + (size_t)head * query_stride,
+            args->score_scratch + (size_t)head * args->key_tokens,
+            NULL, 1, args->query_tokens, args->key_tokens,
+            args->head_dim, args->scale);
+    }
+}
+
+int attention_forward_query_key_head_major_f32_decode_heads(
+    const float *query,
+    const float *key,
+    const float *value,
+    float *output,
+    float *score_scratch,
+    int num_heads,
+    int query_tokens,
+    int key_tokens,
+    int head_dim,
+    float scale)
+{
+    if (query == NULL || key == NULL || value == NULL || output == NULL ||
+        score_scratch == NULL) return -1;
+    if (num_heads <= 0 || query_tokens <= 0 || key_tokens <= 0 ||
+        head_dim <= 0 || !isfinite(scale)) return -2;
+
+    ck_attention_query_key_f32_head_args_t args = {
+        .query = query,
+        .key = key,
+        .value = value,
+        .output = output,
+        .score_scratch = score_scratch,
+        .num_heads = num_heads,
+        .query_tokens = query_tokens,
+        .key_tokens = key_tokens,
+        .head_dim = head_dim,
+        .scale = scale,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active <= 1) {
+        return ck_attention_forward_query_key_head_major_f32_run(
+            query, key, value, output, score_scratch, NULL, num_heads,
+            query_tokens, key_tokens, head_dim, scale);
+    }
+    if (active > num_heads) active = num_heads;
+    ck_threadpool_dispatch_n(pool, active,
+        ck_attention_query_key_f32_head_work, &args);
+    return 0;
+}
+
 int attention_forward_query_key_head_major_f32_packed_k(
     const float *query,
     const float *key,

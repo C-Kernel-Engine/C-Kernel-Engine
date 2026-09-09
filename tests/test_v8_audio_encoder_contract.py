@@ -423,6 +423,20 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertIn(
             "CK_EXPORT int ck_model_prepare_audio_wav_window(", entrypoint
         )
+        self.assertIn(
+            "CK_EXPORT int ck_model_prepare_audio_wav_features(", entrypoint
+        )
+        feature_window = frontend_calls["audio_feature_window"]
+        full_call = codegen._audio_call_expression(
+            feature_window,
+            source_overrides={
+                "runtime:audio_window_start_frame": "0",
+                "dim:n_frames": "audio_feature_frame_capacity",
+                "output:log_mel": "audio_features",
+            },
+        )
+        self.assertIn("audio_feature_frame_capacity", full_call)
+        self.assertTrue(full_call.endswith(", audio_features)"))
         for function in expected_frontend_functions.values():
             self.assertIn(function + "(", entrypoint)
         descriptor = codegen._emit_runtime_capability_api(
@@ -693,6 +707,36 @@ class AudioEncoderContractTests(unittest.TestCase):
         self.assertIn("reference_erf(", function)
         self.assertIn("const double scaled", function)
         self.assertIn("data[i] = (float)", function)
+
+    def test_audio_parallel_erf_gelu_preserves_scalar_arithmetic(self):
+        kernel = json.loads(
+            (
+                V8
+                / "kernel_maps"
+                / "gelu_erf_fp64_f32_parallel_dispatch.json"
+            ).read_text(encoding="utf-8")
+        )
+        capability = kernel["numerical_capabilities"][0]
+        self.assertEqual(
+            capability["contract_id"],
+            "gelu_erf_fp64_parallel_fp32_storage",
+        )
+        self.assertFalse(
+            capability["arithmetic"]["thread_count_changes_arithmetic_order"]
+        )
+        contract = json.loads(
+            (V8 / "contracts" / "numerical_execution.json").read_text(
+                encoding="utf-8"
+            )
+        )["contracts"]["gelu_erf_fp64_parallel_fp32_storage"]
+        self.assertEqual(contract["reduction"]["kind"], "none")
+        self.assertEqual(
+            contract["threading"]["work_partition"],
+            "output_tiles",
+        )
+        self.assertFalse(
+            contract["threading"]["thread_count_changes_arithmetic_order"]
+        )
 
     def test_bf16_erf_gelu_oracle_is_pytorch_version_scoped(self):
         source = (

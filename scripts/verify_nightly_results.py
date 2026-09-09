@@ -4,12 +4,221 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 
 VALID_STATUSES = {"pass", "fail", "skip", "timeout"}
+CAPABILITY_STATUSES = {"pass", "fail", "error", "timeout", "not_tested"}
+ROOT = Path(__file__).resolve().parents[1]
+CAPABILITY_MANIFEST = ROOT / "version" / "v8" / "testing" / "capability_cases.json"
+CAPABILITY_SCHEMA = ROOT / "version" / "v8" / "schemas" / "capability_evidence_report.schema.json"
+
+
+def _git_commit() -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return completed.stdout.strip() if completed.returncode == 0 else ""
+
+
+def _capability_event(event: object) -> str:
+    value = str(event or "").lower()
+    if value == "pull_request":
+        return "pull_request"
+    if value in {"push", "schedule", "workflow_dispatch"}:
+        return "nightly"
+    return ""
+
+
+def _execution_key(record: dict) -> tuple[str, str, tuple[str, ...]]:
+    args = record.get("args") or record.get("execution_args") or []
+    if not isinstance(args, list):
+        args = []
+    return (
+        str(record.get("kind") or record.get("execution_kind") or ""),
+        str(record.get("target") or record.get("id") or record.get("execution_id") or ""),
+        tuple(str(arg) for arg in args),
+    )
+
+
+def _result_capability_state(result: dict) -> tuple[str, bool]:
+    status = str(result.get("status") or "").lower()
+    if status in {"pass", "fail", "timeout"}:
+        return status, True
+    if status == "skip":
+        return "not_tested", False
+    return "error", False
+
+
+def _verify_capability_evidence(payload: dict) -> list[str]:
+    report = payload.get("capability_evidence")
+    if not isinstance(report, dict):
+        return ["current-run capability evidence is missing"]
+
+    errors: list[str] = []
+    try:
+        schema = json.loads(CAPABILITY_SCHEMA.read_text(encoding="utf-8"))
+        manifest = json.loads(CAPABILITY_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"cannot load capability contracts: {exc}"]
+    schema_errors = sorted(
+        Draft202012Validator(schema).iter_errors(report),
+        key=lambda error: list(error.absolute_path),
+    )
+    errors.extend(
+        "capability schema:"
+        f"{'.'.join(str(item) for item in error.absolute_path) or '<root>'}: "
+        f"{error.message}"
+        for error in schema_errors
+    )
+    expected_cases = {case["id"]: case for case in manifest["cases"]}
+    if report.get("schema") != "cke.v8.capability_evidence_report":
+        errors.append("capability evidence has an invalid schema identity")
+    if report.get("schema_version") != 1 or report.get("scope") != "current_run":
+        errors.append("capability evidence is not a v1 current-run report")
+    source = report.get("source")
+    if not isinstance(source, dict):
+        errors.append("capability evidence has no source provenance")
+        source = {}
+    else:
+        if source.get("event") != payload.get("event", "local"):
+            errors.append("capability evidence event does not match the nightly report")
+        commit = _git_commit()
+        if commit and source.get("repository_commit") != commit:
+            errors.append("capability evidence does not describe the checked-out commit")
+        manifest_hash = hashlib.sha256(CAPABILITY_MANIFEST.read_bytes()).hexdigest()
+        if source.get("manifest_sha256") != manifest_hash:
+            errors.append("capability evidence uses a stale capability manifest")
+
+    report_errors = report.get("errors")
+    if not isinstance(report_errors, list):
+        errors.append("capability evidence errors field is malformed")
+    else:
+        errors.extend(f"capability evidence: {message}" for message in report_errors)
+
+    cases = report.get("cases")
+    summary = report.get("summary")
+    if not isinstance(cases, list):
+        errors.append("capability evidence has no case rows")
+        cases = []
+    if not isinstance(summary, dict):
+        errors.append("capability evidence has no summary")
+        summary = {}
+
+    counts = {status: 0 for status in CAPABILITY_STATUSES}
+    seen: set[str] = set()
+    required_event = _capability_event(payload.get("event"))
+    result_index: dict[tuple[str, str, tuple[str, ...]], dict] = {}
+    for result in payload.get("results") or []:
+        if not isinstance(result, dict):
+            continue
+        key = _execution_key(result)
+        if not key[0] or not key[1]:
+            continue
+        if key in result_index:
+            errors.append(
+                "duplicate capability execution record: "
+                + " ".join((key[0], key[1], *key[2]))
+            )
+        result_index[key] = result
+    for index, row in enumerate(cases):
+        if not isinstance(row, dict):
+            errors.append(f"capability row {index} is not an object")
+            continue
+        case_id = str(row.get("id") or "").strip()
+        status = str(row.get("status") or "").lower()
+        if not case_id:
+            errors.append(f"capability row {index} has no ID")
+        elif case_id in seen:
+            errors.append(f"duplicate capability row: {case_id}")
+        seen.add(case_id)
+        if status not in CAPABILITY_STATUSES:
+            errors.append(f"{case_id or f'capability row {index}'} has invalid status {status!r}")
+            continue
+        counts[status] += 1
+        expected_case = expected_cases.get(case_id)
+        if expected_case is None:
+            errors.append(f"unregistered capability row: {case_id}")
+            events = []
+        else:
+            for field in (
+                "family",
+                "circuits",
+                "evidence_level",
+                "phases",
+                "oracle",
+                "artifact",
+                "schedule",
+            ):
+                if row.get(field) != expected_case.get(field):
+                    errors.append(f"{case_id}: evidence {field} differs from manifest")
+            events = expected_case["schedule"]["events"]
+            expected_key = _execution_key(expected_case["entrypoint"])
+            selected = row.get("selected") is True
+            executed = row.get("executed") is True
+            execution = row.get("execution")
+            if not selected:
+                if executed or execution is not None or status != "not_tested":
+                    errors.append(
+                        f"{case_id}: unselected evidence must be not_tested without execution"
+                    )
+            elif not isinstance(execution, dict):
+                errors.append(f"{case_id}: selected evidence has no execution record")
+            else:
+                actual_key = _execution_key(execution)
+                if actual_key != expected_key:
+                    errors.append(
+                        f"{case_id}: execution identity differs from registered entrypoint"
+                    )
+                result = result_index.get(actual_key)
+                if result is None:
+                    errors.append(f"{case_id}: execution has no matching nightly result")
+                else:
+                    result_status, result_executed = _result_capability_state(result)
+                    if status != result_status:
+                        errors.append(
+                            f"{case_id}: evidence status {status} contradicts "
+                            f"nightly result {result_status}"
+                        )
+                    if executed != result_executed:
+                        errors.append(
+                            f"{case_id}: executed={executed} contradicts "
+                            f"nightly result executed={result_executed}"
+                        )
+        if required_event and required_event in events and status != "pass":
+            errors.append(
+                f"required capability {case_id}: {status}"
+                + (f" ({row.get('reason')})" if row.get("reason") else "")
+            )
+
+    expected = {
+        "total": len(cases),
+        "passed": counts["pass"],
+        "failed": counts["fail"],
+        "errors": counts["error"],
+        "timeouts": counts["timeout"],
+        "not_tested": counts["not_tested"],
+    }
+    for key, value in expected.items():
+        if summary.get(key) != value:
+            errors.append(
+                f"capability summary {key} mismatch: "
+                f"reported={summary.get(key)!r} actual={value}"
+            )
+    missing = sorted(set(expected_cases) - seen)
+    if missing:
+        errors.append("capability evidence is missing cases: " + ", ".join(missing))
+    return errors
 
 
 def _parse_bool(value: str) -> bool:
@@ -98,6 +307,7 @@ def verify_report(
                 errors.append("required fast regression summary path is missing")
             if not isinstance(regression.get("family_rows"), list) or not regression["family_rows"]:
                 errors.append("required fast regression has no family rows")
+    errors.extend(_verify_capability_evidence(payload))
     return errors
 
 

@@ -23,7 +23,7 @@ def test_checked_in_capability_cases_are_reachable() -> None:
     report = audit.audit_manifest(load_manifest(), ROOT)
     assert report["status"] == "pass", report["errors"]
     assert report["scope"] == "registration_only"
-    assert report["summary"] == {"cases": 8, "families": 5, "errors": 0}
+    assert report["summary"] == {"cases": 10, "families": 7, "errors": 0}
     assert report["coverage"]["cohere2"] == {
         "contract": 1,
         "full_artifact": 1,
@@ -32,6 +32,8 @@ def test_checked_in_capability_cases_are_reachable() -> None:
         "contract": 1,
         "full_artifact": 1,
     }
+    assert report["coverage"]["qwen35"] == {"component_oracle": 1}
+    assert report["coverage"]["qwen36"] == {"contract": 1}
 
 
 def test_duplicate_case_ids_fail_closed() -> None:

@@ -27,6 +27,7 @@
 #include <stdlib.h>
 
 #include "bf16_utils.h"
+#include "ck_threadpool.h"
 #include "ckernel_quant.h"
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
@@ -573,6 +574,57 @@ void gelu_erf_fp64_f32_inplace(float *data, size_t n)
         const double erf_value = reference_erf ? reference_erf(scaled) : erf(scaled);
         data[i] = (float)(0.5 * (double)x * (1.0 + erf_value));
     }
+}
+
+typedef struct {
+    float *data;
+    size_t n;
+    ck_gelu_math_f64_fn reference_erf;
+} ck_gelu_erf_fp64_parallel_args_t;
+
+static void ck_gelu_erf_fp64_parallel_work(int ith, int nth, void *opaque)
+{
+    const double inv_sqrt_2 = 0.707106781186547524400844362104849039;
+    ck_gelu_erf_fp64_parallel_args_t *args =
+        (ck_gelu_erf_fp64_parallel_args_t *)opaque;
+    const size_t width = args->n / (size_t)nth;
+    const size_t remainder = args->n % (size_t)nth;
+    const size_t begin = (size_t)ith * width +
+        ((size_t)ith < remainder ? (size_t)ith : remainder);
+    const size_t end = begin + width + ((size_t)ith < remainder ? 1u : 0u);
+
+    for (size_t i = begin; i < end; ++i) {
+        const float x = args->data[i];
+        const double scaled = (double)x * inv_sqrt_2;
+        const double erf_value = args->reference_erf
+            ? args->reference_erf(scaled)
+            : erf(scaled);
+        args->data[i] = (float)(0.5 * (double)x * (1.0 + erf_value));
+    }
+}
+
+void gelu_erf_fp64_f32_parallel_dispatch(float *data, size_t n)
+{
+    const size_t minimum_elements_per_thread = 32768u;
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+
+    if (!data || n == 0) return;
+    if (!pool || active <= 1 || n < 2u * minimum_elements_per_thread ||
+        ck_threadpool_thread_id(pool) > 0) {
+        gelu_erf_fp64_f32_inplace(data, n);
+        return;
+    }
+
+    const size_t useful_threads =
+        (n + minimum_elements_per_thread - 1u) / minimum_elements_per_thread;
+    if ((size_t)active > useful_threads) active = (int)useful_threads;
+    ck_gelu_erf_fp64_parallel_args_t args = {
+        .data = data,
+        .n = n,
+        .reference_erf = ck_gelu_system_erf(),
+    };
+    ck_threadpool_dispatch_n(pool, active, ck_gelu_erf_fp64_parallel_work, &args);
 }
 
 // Retain the former public symbol for generated bundles built before the

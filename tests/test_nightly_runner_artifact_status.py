@@ -40,6 +40,31 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         self.assertEqual(payload["runner_python"]["executable"], sys.executable)
         self.assertTrue(payload["runner_python"]["version"])
 
+    def test_json_report_maps_existing_results_to_current_capability_evidence(self) -> None:
+        runner = _load_runner()
+        results = [
+            runner.TestResult(
+                "Cohere/Laguna contracts",
+                "inference",
+                "pass",
+                1.0,
+                execution_kind="make",
+                execution_id="test-v8-cohere-laguna-contracts",
+            )
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "nightly.json"
+            with mock.patch.object(
+                runner, "capture_runner_hardware", return_value={"available": False}
+            ):
+                runner.save_json_report(results, report, datetime(2026, 8, 26, 1, 2, 3))
+            payload = json.loads(report.read_text(encoding="utf-8"))
+
+        rows = {row["id"]: row for row in payload["capability_evidence"]["cases"]}
+        self.assertEqual(rows["cohere2.compiler-circuit"]["status"], "pass")
+        self.assertEqual(rows["laguna.compiler-circuit"]["status"], "pass")
+        self.assertEqual(rows["qwen38-dense.storage-lowering"]["status"], "not_tested")
+
     def test_makefile_reuses_primary_checkout_venv_from_linked_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             primary = Path(tmp) / "primary"
@@ -398,6 +423,21 @@ class NightlyArtifactStatusTests(unittest.TestCase):
                 result = runner.run_make_target(target)
         self.assertEqual(result.status, "skip")
         self.assertEqual(result.error_msg, "missing BF16 checkpoint")
+
+    def test_nightly_vision_target_reports_the_q8_artifact_phase(self) -> None:
+        runner = _load_runner()
+        target = runner.MAKE_TARGETS["v8_vision_encoder_accuracy"]
+        self.assertEqual(target["category"], "parity")
+        self.assertEqual(target["status_phase"], "q8_mmproj_llamacpp")
+
+    def test_scheduled_vision_gate_matches_prepared_artifact_and_runner_size(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "nightly.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('echo "V8_VISION_ENCODER_MODE=q4"', workflow)
+        self.assertIn("vision_threads=$(nproc)", workflow)
+        self.assertIn('echo "V8_VISION_ENCODER_THREADS=${vision_threads}"', workflow)
+        self.assertIn("build/vision_encoder_accuracy/**", workflow)
 
 
 if __name__ == "__main__":

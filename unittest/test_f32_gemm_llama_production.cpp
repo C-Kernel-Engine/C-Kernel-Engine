@@ -17,6 +17,9 @@ void gemm_nt_f32_llama_production(
 void gemm_nt_f32_llama_production_output_range(
         const float * A, const float * B, const float * bias, float * C,
         int M, int N, int K, int output_begin, int output_end);
+void gemm_nt_f32_llama_production_parallel_dispatch(
+        const float * A, const float * B, const float * bias, float * C,
+        int M, int N, int K);
 }
 
 namespace {
@@ -82,6 +85,7 @@ static bool run_case(const case_spec & spec) {
     std::vector<float> ck(
             static_cast<size_t>(spec.rows) * spec.outputs, 0.0f);
     std::vector<float> ck_ranges(ck.size(), 0.0f);
+    std::vector<float> ck_parallel(ck.size(), 0.0f);
     std::vector<float> llama(ck.size(), 0.0f);
     for (int row = 0; row < spec.rows; ++row) {
         for (int col = 0; col < spec.width; ++col) {
@@ -97,6 +101,9 @@ static bool run_case(const case_spec & spec) {
     }
     gemm_nt_f32_llama_production(
             input.data(), weight.data(), nullptr, ck.data(),
+            spec.rows, spec.outputs, spec.width);
+    gemm_nt_f32_llama_production_parallel_dispatch(
+            input.data(), weight.data(), nullptr, ck_parallel.data(),
             spec.rows, spec.outputs, spec.width);
     const int total = spec.rows * spec.outputs;
     const int chunk = std::max(1, (total + 6) / 7);
@@ -118,6 +125,10 @@ static bool run_case(const case_spec & spec) {
             std::fprintf(stderr, "%s: output-range mismatch at %zu\n", spec.name, i);
             return false;
         }
+        if (std::memcmp(&ck[i], &ck_parallel[i], sizeof(float)) != 0) {
+            std::fprintf(stderr, "%s: parallel-dispatch mismatch at %zu\n", spec.name, i);
+            return false;
+        }
         max_abs = std::max(max_abs, std::fabs(ck[i] - llama[i]));
     }
     std::printf("%-24s different=%zu/%zu max_abs=%.9g [%s]\n",
@@ -130,6 +141,10 @@ static bool run_case(const case_spec & spec) {
 
 int main() {
     const case_spec cases[] = {
+        {"whisper_decode_hidden", 1, 512, 512},
+        {"whisper_decode_mlp_up", 1, 2048, 512},
+        {"whisper_decode_mlp_down", 1, 512, 2048},
+        {"whisper_decode_logits", 1, 51865, 512},
         {"decode_narrow", 1, 48, 5120},
         {"prefill_four", 4, 48, 5120},
         {"prefill_chunk_tail", 65, 48, 5120},

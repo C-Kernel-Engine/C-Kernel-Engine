@@ -91,6 +91,17 @@ def _phase(status: str, **values: Any) -> dict[str, Any]:
     return {"status": status, **values}
 
 
+def _suite_failure_reason(summary: Path, fallback: str) -> str:
+    try:
+        payload = json.loads(summary.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return fallback
+    failures = payload.get("failures")
+    if isinstance(failures, list) and failures:
+        return "; ".join(str(item) for item in failures[:3])
+    return fallback
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run the promoted v8 vision encoder accuracy gate.")
     ap.add_argument("--family", choices=("qwen3vl",), default="qwen3vl")
@@ -181,7 +192,10 @@ def main(argv: list[str] | None = None) -> int:
                 _run(cmd, env=env, log=out_dir / "q8_mmproj_llamacpp.log")
                 report["phases"]["q8_mmproj_llamacpp"] = _phase("pass", report=str(q4_out / "summary.json"))
             except subprocess.CalledProcessError as exc:
-                report["phases"]["q8_mmproj_llamacpp"] = _phase("fail", returncode=exc.returncode, log=str(out_dir / "q8_mmproj_llamacpp.log"))
+                reason = _suite_failure_reason(
+                    q4_out / "summary.json", "Q8 mmproj parity command failed"
+                )
+                report["phases"]["q8_mmproj_llamacpp"] = _phase("fail", returncode=exc.returncode, reason=reason, log=str(out_dir / "q8_mmproj_llamacpp.log"))
                 failures.append("q8_mmproj_llamacpp parity failed")
             finally:
                 if not args.keep_artifacts:
