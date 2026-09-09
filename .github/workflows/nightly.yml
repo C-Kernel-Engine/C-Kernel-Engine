@@ -26,6 +26,45 @@ permissions:
   pages: write
 
 jobs:
+  documentation-policy:
+    name: Documentation policy and migration debt
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test documentation policy
+        run: python3 -m unittest discover -s tests -p test_documentation_policy.py
+      - name: Audit committed documentation
+        if: always()
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          args=()
+          if [ -n "$PR_BASE" ]; then args+=(--base "$PR_BASE"); fi
+          python3 scripts/check_documentation_policy.py "${args[@]}" --json documentation-policy.json
+      - name: Publish documentation indicator
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path('documentation-policy.json')
+          data = json.loads(path.read_text()) if path.exists() else {'status': 'error', 'failures': ['Report missing']}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Documentation policy\n\nStatus: ' + data['status'] + '\n\n')
+              out.write('Legacy Markdown debt: ' + str(data.get('legacy_debt_count', 'unknown')) + '\n\n')
+              for failure in data.get('failures', []): out.write('- ' + failure + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: documentation-policy
+          path: documentation-policy.json
+          if-no-files-found: error
+
   build-and-test:
     name: Required nightly verdict
     runs-on: ubuntu-latest

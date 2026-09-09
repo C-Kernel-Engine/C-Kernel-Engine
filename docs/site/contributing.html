@@ -1132,6 +1132,21 @@
   </tbody>
 </table>
 
+<section id="documentation-policy">
+<h2>Publish knowledge in the site, not hidden Markdown</h2>
+<p>Human-facing explanations belong in these HTML pages. New Markdown narratives in docs/logs, docs/notes, or the repository root are documentation debt, not a completed documentation deliverable. Temporary Markdown handoffs are useful between agents; keep them outside tracked documentation. README, legal/community entry points and the PR template remain explicit exceptions.</p>
+<p>For a feature, numerical fix or performance change, update the relevant topic page with the problem, method, reproducible command, measured result, limitations and links to the implementation and evidence. Use SVG when it helps explain ownership, data layout, scheduling or a numerical boundary. A new HTML file with no navigation or copied log prose is not sufficient. Changes with no human-facing impact may explain why no site update is needed in their PR.</p>
+<h3>A staged cleanup, not a mass deletion</h3>
+<ol>
+<li>Inventory the tracked Markdown debt using the nightly documentation-policy JSON report. Classify each file as a durable explanation, experiment evidence, obsolete duplicate, tooling input or third-party material. Do not delete legal notices or tool inputs blindly.</li>
+<li>Start with recent utilization and model bring-up logs. Merge their useful explanations into existing profiling, numerical-contract and model pages. Retain artifact identities, rejected invalid experiments and explicit certification limits.</li>
+<li>Keep raw evidence in structured JSON/CSV artifacts and reproducible scripts. Link it from the HTML explanation; do not turn every experiment into another narrative page.</li>
+<li>For each migrated document, repair inbound references, site navigation and relevant README links. Review the rendered page for comprehension and accessible diagrams before removing the obsolete source.</li>
+<li>Remove superseded Markdown only after checking references and consumers. Git history preserves its history; the published site must preserve useful knowledge. Handle independent groups in small reviewable PRs.</li>
+</ol>
+<p>The nightly gate rejects new Markdown paths outside exact repository exceptions, reports all inherited debt, and requires an HTML update when a PR edits legacy Markdown. It runs independently of model tests so documentation failures do not prevent numerical evidence collection. Existing debt is grandfathered by a fixed Git inventory, not a count that lets new files replace old ones. Reviewers still judge whether the HTML update is relevant, readable and discoverable. The GitHub job summary and downloadable JSON are the initial indicator; integration into the public capability dashboard is a separate follow-up.</p>
+<p>Run locally: <code>python3 scripts/check_documentation_policy.py --base &lt;PR-base-SHA&gt; --json /tmp/cke-documentation-policy.json</code>. The check uses tracked paths; stage new files before local validation. Protect the documentation-policy job through repository branch rules before treating it as a mandatory merge gate.</p>
+</section>
 <h2>Build and Test Before Review</h2>
 
 <p>Enable the repository hooks after cloning:</p>
