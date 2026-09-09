@@ -68,6 +68,10 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.POINTER(ctypes.c_float)
             ] + bwd.argtypes[6:]
             bwd_workspace.restype = None
+            lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+            lib.ck_set_num_threads.restype = None
+            lib.ck_threadpool_global_destroy.argtypes = []
+            lib.ck_threadpool_global_destroy.restype = None
             return lib
     return None
 
@@ -142,8 +146,8 @@ class TestRecurrentConvStateUpdate(unittest.TestCase):
         torch_d_k = (grads_from_conv[2] + t_k.grad).numpy()
         torch_d_v = (grads_from_conv[3] + t_v.grad).numpy()
 
-        np.testing.assert_allclose(ck_conv_x, t_conv_x.detach().numpy(), atol=self.atol, rtol=0.0)
-        np.testing.assert_allclose(ck_state_out, t_state_out.detach().numpy(), atol=self.atol, rtol=0.0)
+        self.assertTrue(np.array_equal(ck_conv_x, t_conv_x.detach().numpy()))
+        self.assertTrue(np.array_equal(ck_state_out, t_state_out.detach().numpy()))
         np.testing.assert_allclose(ck_d_state_in, torch_d_state_in, atol=self.atol, rtol=0.0)
         np.testing.assert_allclose(ck_d_q, torch_d_q, atol=self.atol, rtol=0.0)
         np.testing.assert_allclose(ck_d_k, torch_d_k, atol=self.atol, rtol=0.0)
@@ -190,8 +194,42 @@ class TestRecurrentConvStateUpdate(unittest.TestCase):
             step_state = next_state
 
         step_tail = np.concatenate(step_rows, axis=2)
-        np.testing.assert_allclose(step_tail, batch_conv[:, :, history_len:], atol=self.atol, rtol=0.0)
-        np.testing.assert_allclose(step_state, batch_state, atol=self.atol, rtol=0.0)
+        self.assertTrue(np.array_equal(step_tail, batch_conv[:, :, history_len:]))
+        self.assertTrue(np.array_equal(step_state, batch_state))
+
+    def test_parallel_forward_is_bit_exact_with_in_place_state(self) -> None:
+        history_len, num_seqs, num_tokens = 3, 2, 257
+        q_dim, k_dim, v_dim = 97, 83, 122
+        channels = q_dim + k_dim + v_dim
+        rng = np.random.default_rng(47)
+        state = rng.standard_normal((num_seqs, channels, history_len)).astype(np.float32)
+        q = rng.standard_normal((num_seqs * num_tokens, q_dim)).astype(np.float32)
+        k = rng.standard_normal((num_seqs * num_tokens, k_dim)).astype(np.float32)
+        v = rng.standard_normal((num_seqs * num_tokens, v_dim)).astype(np.float32)
+
+        def run(threads: int) -> tuple[np.ndarray, np.ndarray]:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(threads)
+            state_io = state.copy()
+            conv_x = np.empty(
+                (num_seqs, channels, history_len + num_tokens), dtype=np.float32
+            )
+            LIB.recurrent_conv_state_update_forward(
+                _as_ptr(state_io), _as_ptr(q), _as_ptr(k), _as_ptr(v),
+                _as_ptr(conv_x), _as_ptr(state_io),
+                history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim,
+            )
+            return conv_x, state_io
+
+        try:
+            serial_conv, serial_state = run(1)
+            for _ in range(8):
+                parallel_conv, parallel_state = run(4)
+                self.assertTrue(np.array_equal(serial_conv, parallel_conv))
+                self.assertTrue(np.array_equal(serial_state, parallel_state))
+        finally:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(0)
 
 
 if __name__ == "__main__":
