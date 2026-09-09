@@ -31,6 +31,10 @@ LIB.attn_gate_sigmoid_mul_backward.argtypes = [
     ctypes.c_int,
 ]
 LIB.attn_gate_sigmoid_mul_backward.restype = None
+LIB.ck_set_num_threads.argtypes = [ctypes.c_int]
+LIB.ck_set_num_threads.restype = None
+LIB.ck_threadpool_global_destroy.argtypes = []
+LIB.ck_threadpool_global_destroy.restype = None
 
 
 def _ptr(arr: np.ndarray):
@@ -70,6 +74,33 @@ def main() -> None:
     )
     np.testing.assert_allclose(d_x_np, ref_d_x.numpy(), rtol=1e-6, atol=1e-6)
     np.testing.assert_allclose(d_gate_np, ref_d_gate.numpy(), rtol=1e-6, atol=1e-6)
+
+    rows, num_heads, state_dim = 257, 16, 128
+    dim = num_heads * state_dim
+    rng = np.random.default_rng(37)
+    large_x = rng.standard_normal((rows, dim)).astype(np.float32)
+    large_gate = rng.standard_normal((rows, dim)).astype(np.float32)
+
+    def run(threads: int, in_place: bool) -> np.ndarray:
+        LIB.ck_threadpool_global_destroy()
+        LIB.ck_set_num_threads(threads)
+        x_arg = large_x.copy()
+        out_arg = x_arg if in_place else np.empty_like(x_arg)
+        LIB.attn_gate_sigmoid_mul_forward(
+            _ptr(x_arg), _ptr(large_gate), _ptr(out_arg),
+            rows, num_heads, state_dim,
+        )
+        return out_arg
+
+    try:
+        serial = run(1, False)
+        np.testing.assert_array_equal(run(1, True), serial)
+        for _ in range(8):
+            np.testing.assert_array_equal(run(4, False), serial)
+            np.testing.assert_array_equal(run(4, True), serial)
+    finally:
+        LIB.ck_threadpool_global_destroy()
+        LIB.ck_set_num_threads(0)
 
     print("attn_gate_sigmoid_mul forward/backward parity: PASS")
 

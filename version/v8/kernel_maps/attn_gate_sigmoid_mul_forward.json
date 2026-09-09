@@ -54,9 +54,9 @@
       "implementation": {
         "isa_dispatch": "scalar",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows"],
-          "dispatch": ["inline"],
+          "dispatch": ["inline", "ck_threadpool_parallel_for_n"],
           "reduction_order_effect": "none"
         }
       },
@@ -97,5 +97,5 @@
       }
     ]
   },
-  "notes": "Applies a llama.cpp-compatible FP32 sigmoid gate after attention and before the output projection."
+  "notes": "Applies a llama.cpp-compatible FP32 sigmoid gate after attention and before the output projection. Large non-overlapping prefill calls schedule complete rows through the CK thread pool; small, decode, nested, and unsupported overlap cases remain serial."
 }

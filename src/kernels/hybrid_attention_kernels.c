@@ -1,9 +1,12 @@
 #include "ckernel_engine.h"
 #include "bf16_utils.h"
+#include "ck_threadpool.h"
 
 #include <dlfcn.h>
+#include <limits.h>
 #include <math.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,20 +116,83 @@ void split_q_gate_backward(const float *d_q,
     }
 }
 
+typedef struct {
+    const float *x;
+    const float *gate;
+    float *out;
+    int dim;
+} ck_attn_gate_sigmoid_mul_args_t;
+
+static void attn_gate_sigmoid_mul_row_range(int begin,
+                                            int end,
+                                            void *opaque) {
+    const ck_attn_gate_sigmoid_mul_args_t *args =
+        (const ck_attn_gate_sigmoid_mul_args_t *)opaque;
+    for (int row = begin; row < end; ++row) {
+        const float *x_row =
+            args->x + (size_t)row * (size_t)args->dim;
+        const float *gate_row =
+            args->gate + (size_t)row * (size_t)args->dim;
+        float *out_row =
+            args->out + (size_t)row * (size_t)args->dim;
+        const int dim = args->dim;
+        for (int col = 0; col < dim; ++col) {
+            out_row[col] = x_row[col] * hybrid_sigmoid(gate_row[col]);
+        }
+    }
+}
+
+static int hybrid_ranges_overlap(const float *lhs,
+                                 const float *rhs,
+                                 size_t elements) {
+    const uintptr_t lhs_begin = (uintptr_t)lhs;
+    const uintptr_t rhs_begin = (uintptr_t)rhs;
+    const size_t bytes = elements * sizeof(float);
+    return lhs_begin < rhs_begin + bytes && rhs_begin < lhs_begin + bytes;
+}
+
 void attn_gate_sigmoid_mul_forward(const float *x,
                                    const float *gate,
                                    float *out,
                                    int rows,
                                    int num_heads,
                                    int state_dim) {
+    if (!x || !gate || !out || rows <= 0 || num_heads <= 0 ||
+        state_dim <= 0 || num_heads > INT_MAX / state_dim) {
+        return;
+    }
     const int dim = num_heads * state_dim;
-    for (int row = 0; row < rows; ++row) {
-        const float *x_row = x + (size_t) row * (size_t) dim;
-        const float *gate_row = gate + (size_t) row * (size_t) dim;
-        float *out_row = out + (size_t) row * (size_t) dim;
-        for (int col = 0; col < dim; ++col) {
-            out_row[col] = x_row[col] * hybrid_sigmoid(gate_row[col]);
-        }
+    const size_t elements = (size_t)rows * (size_t)dim;
+    ck_attn_gate_sigmoid_mul_args_t args = {x, gate, out, dim};
+    const size_t minimum_elements_per_thread = 32768u;
+
+    const int partial_x_overlap = out != x &&
+        hybrid_ranges_overlap(out, x, elements);
+    const int gate_overlap = hybrid_ranges_overlap(out, gate, elements);
+    if (partial_x_overlap || gate_overlap ||
+        elements < 2u * minimum_elements_per_thread) {
+        attn_gate_sigmoid_mul_row_range(0, rows, &args);
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    size_t useful_threads =
+        (elements + minimum_elements_per_thread - 1u) /
+        minimum_elements_per_thread;
+    if ((size_t)active > useful_threads) {
+        active = (int)useful_threads;
+    }
+    if (active > rows) {
+        active = rows;
+    }
+
+    if (active > 1 && ck_threadpool_thread_id(pool) <= 0) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, rows, 4,
+            attn_gate_sigmoid_mul_row_range, &args);
+    } else {
+        attn_gate_sigmoid_mul_row_range(0, rows, &args);
     }
 }
 

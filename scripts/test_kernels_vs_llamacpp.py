@@ -1211,7 +1211,7 @@ class KernelTester:
 
         return self.compare("recurrent_norm_gate", ggml_out, ck_out)
 
-    def test_attn_gate_sigmoid_mul(self, rows: int = 6, dim: int = 128):
+    def test_attn_gate_sigmoid_mul(self, rows: int = 65, dim: int = 2048):
         """Test full-attention gate sigmoid multiply."""
         print(f"\n--- test_attn_gate_sigmoid_mul (rows={rows}, dim={dim}) ---")
 
