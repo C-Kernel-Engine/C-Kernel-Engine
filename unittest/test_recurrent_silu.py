@@ -28,6 +28,10 @@ LIB.recurrent_silu_forward.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.PO
 LIB.recurrent_silu_forward_ggml.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int]
 LIB.swiglu_forward_ggml.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int]
 LIB.recurrent_silu_backward.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int]
+LIB.ck_set_num_threads.argtypes = [ctypes.c_int]
+LIB.ck_set_num_threads.restype = None
+LIB.ck_threadpool_global_destroy.argtypes = []
+LIB.ck_threadpool_global_destroy.restype = None
 
 
 def _as_ptr(arr: np.ndarray) -> ctypes.POINTER(ctypes.c_float):
@@ -75,6 +79,30 @@ class TestRecurrentSilu(unittest.TestCase):
 
     def test_llama_qwen35_production_width_is_exact(self) -> None:
         self._run_ggml_exact_case(1, 6144, 31)
+
+    def test_llama_parallel_rows_are_bit_exact_and_repeatable(self) -> None:
+        rows, dim = 257, 1027
+        rng = np.random.default_rng(43)
+        x = (1.75 * rng.standard_normal((rows, dim))).astype(np.float32)
+
+        def run(threads: int, in_place: bool) -> np.ndarray:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(threads)
+            output = x.copy() if in_place else np.empty_like(x)
+            source = output if in_place else x
+            LIB.recurrent_silu_forward_ggml(
+                _as_ptr(source), _as_ptr(output), rows, dim
+            )
+            return output
+
+        try:
+            serial = run(1, False)
+            for _ in range(8):
+                np.testing.assert_array_equal(run(4, False), serial)
+                np.testing.assert_array_equal(run(4, True), serial)
+        finally:
+            LIB.ck_threadpool_global_destroy()
+            LIB.ck_set_num_threads(0)
 
 
 if __name__ == "__main__":

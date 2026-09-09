@@ -4,6 +4,7 @@
 
 #include "bf16_utils.h"
 #include "ckernel_engine.h"
+#include "ck_threadpool.h"
 
 #include <dlfcn.h>
 #include <math.h>
@@ -465,13 +466,21 @@ static inline __m256 recurrent_ggml_expf_avx2(__m256 x) {
 }
 #endif
 
-void recurrent_silu_forward_ggml(const float *x,
-                                 float *out,
-                                 int rows,
-                                 int dim) {
-    for (int row = 0; row < rows; ++row) {
-        const float *x_row = x + (size_t) row * (size_t) dim;
-        float *out_row = out + (size_t) row * (size_t) dim;
+typedef struct {
+    const float *x;
+    float *out;
+    int dim;
+} ck_recurrent_silu_ggml_args_t;
+
+static void recurrent_silu_forward_ggml_rows(int begin,
+                                             int end,
+                                             void *opaque) {
+    const ck_recurrent_silu_ggml_args_t *args =
+        (const ck_recurrent_silu_ggml_args_t *)opaque;
+    const int dim = args->dim;
+    for (int row = begin; row < end; ++row) {
+        const float *x_row = args->x + (size_t)row * (size_t)dim;
+        float *out_row = args->out + (size_t)row * (size_t)dim;
         int col = 0;
 #if defined(__AVX512F__) && defined(__AVX512DQ__)
         for (; col + 16 <= dim; col += 16) {
@@ -495,6 +504,39 @@ void recurrent_silu_forward_ggml(const float *x,
             const float xv = x_row[col];
             out_row[col] = xv / (1.0f + llama_expf(-xv));
         }
+    }
+}
+
+void recurrent_silu_forward_ggml(const float *x,
+                                 float *out,
+                                 int rows,
+                                 int dim) {
+    if (!x || !out || rows <= 0 || dim <= 0) {
+        return;
+    }
+
+    ck_recurrent_silu_ggml_args_t args = {x, out, dim};
+    const size_t elements = (size_t)rows * (size_t)dim;
+    const size_t minimum_elements_per_thread = 65536u;
+    if (rows < 2 || elements < 2u * minimum_elements_per_thread) {
+        recurrent_silu_forward_ggml_rows(0, rows, &args);
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    size_t useful_threads =
+        (elements + minimum_elements_per_thread - 1u) /
+        minimum_elements_per_thread;
+    if ((size_t)active > useful_threads) active = (int)useful_threads;
+    if (active > rows) active = rows;
+
+    if (active > 1 && ck_threadpool_thread_id(pool) <= 0) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, rows, 1,
+            recurrent_silu_forward_ggml_rows, &args);
+    } else {
+        recurrent_silu_forward_ggml_rows(0, rows, &args);
     }
 }
 

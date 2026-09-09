@@ -36,9 +36,9 @@
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": ["independent_rows"],
-          "dispatch": ["inline"],
+          "dispatch": ["ck_threadpool_parallel_for_n", "inline"],
           "reduction_order_effect": "none"
         }
       },
