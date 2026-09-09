@@ -1,0 +1,162 @@
+<!-- TITLE: Muse-Glimmer Text Bring-up and Certification -->
+<!-- NAV: kernels -->
+
+<div class="container">
+  <h1>Muse-Glimmer Text Bring-up and Certification</h1>
+  <p class="lead">
+    Muse-Glimmer-30B is a bounded text correctness candidate in CKE v8. The complete checkpoint converts,
+    both 52-layer graphs generate and compile, and three short prefill plus cached-decode trajectories match
+    the pinned PyTorch eager BF16 reference bit for bit. The selected eager attention provider has quadratic
+    prefill scratch, so this result does not certify practical long-context inference or vision.
+  </p>
+
+  <style>
+    .muse-section { margin-top: 1.5rem; background: #0f151c; border: 1px solid #22313f; border-radius: 12px; padding: 1.2rem; }
+    .muse-section h2 { margin: 0 0 0.6rem; color: var(--orange); }
+    .muse-section h3 { margin: 1rem 0 0.35rem; color: var(--text-primary); }
+    .muse-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; }
+    .muse-card { background: var(--dark-card); border: 1px solid var(--grey); border-radius: 10px; padding: 0.9rem; color: var(--text-secondary); }
+    .muse-table-wrap { overflow-x: auto; margin-top: 0.7rem; }
+    .muse-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 0.86rem; }
+    .muse-table th, .muse-table td { border: 1px solid var(--grey); padding: 0.5rem 0.65rem; text-align: left; vertical-align: top; }
+    .muse-table th { color: var(--orange); background: #121a24; }
+    .pass { color: #7fd4a3; } .open { color: #ffd38a; } .blocked { color: #ff8a80; }
+    .muse-command { overflow-x: auto; background: #0b1118; border: 1px solid #263242; border-radius: 8px; padding: 0.8rem; }
+    main code { overflow-wrap: anywhere; }
+  </style>
+
+  <section class="muse-section" id="evidence">
+    <h2>Recorded evidence</h2>
+    <p>
+      The machine-readable <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/muse_glimmer_text_parity_128_2026-09-09.json">Ryzen certification report</a>
+      is the authoritative snapshot for this run. It records reference and runtime hashes, resolved engine identity,
+      case-level logits and token divergence, and incomplete-run failures. The checked-in report is consumed by the
+      Muse contract tests; it is evidence from one pinned run, not a substitute for rerunning certification when the
+      circuit, lowering, selected providers, conversion, or runtime changes.
+    </p>
+    <div class="muse-table-wrap"><table class="muse-table">
+      <thead><tr><th>Prompt</th><th>Prompt tokens</th><th>Finite, bit-exact logit rows</th><th>Greedy token divergence</th></tr></thead>
+      <tbody>
+        <tr><td>Complete C function</td><td>69</td><td class="pass">128 / 128</td><td>None</td></tr>
+        <tr><td>Standalone SVG</td><td>69</td><td class="pass">128 / 128</td><td>None</td></tr>
+        <tr><td>CKE v8 architecture analysis</td><td>96</td><td class="pass">128 / 128</td><td>None</td></tr>
+      </tbody>
+    </table></div>
+    <p>
+      All 384 float32 logit rows matched by raw IEEE-754 bit pattern, and all free-running greedy tokens matched.
+      The runner retains CKE and reference output separately. It preloads the requested engine and uses
+      <code>dladdr</code> on an engine-owned symbol to verify that <code>libmodel.so</code> resolved the recorded
+      <code>libckernel_engine.so</code>. This is PyTorch parity; llama.cpp was not used as a Muse oracle.
+    </p>
+  </section>
+
+  <section class="muse-section" id="reference-contract">
+    <h2>Frozen reference contract</h2>
+    <div class="muse-grid">
+      <div class="muse-card"><strong>Model</strong><br><code>meta-models/Muse-Glimmer-30B</code>, Hugging Face branch <code>main-30B2</code><br>BF16 storage and activations</div>
+      <div class="muse-card"><strong>Implementation</strong><br>Transformers commit <code>4177486a9f199bd7be520eff14431071d5d41ec5</code><br><code>MuseGlimmerForConditionalGeneration</code>, eager attention</div>
+      <div class="muse-card"><strong>Ryzen environment</strong><br>Transformers 5.15.1, PyTorch 2.13.0+cpu, oneDNN 3.12, PyTorch-supplied SLEEF symbols, <code>OMP_NUM_THREADS=16</code></div>
+    </div>
+    <div class="muse-table-wrap"><table class="muse-table">
+      <thead><tr><th>Reference file</th><th>SHA-256</th></tr></thead>
+      <tbody>
+        <tr><td><code>config.json</code></td><td><code>5a9df2d8a385b3d361ab6ae68d73586f4e775033933bd0cd863fb7f3820e6a14</code></td></tr>
+        <tr><td><code>model.safetensors.index.json</code></td><td><code>7d817b4dccb1b123fc6c1939356c65cee3a0ad462a5b821ac88280990a27d1ba</code></td></tr>
+        <tr><td><code>chat_template.jinja</code></td><td><code>cfc67e5f349f37690dfd31ed1f18bc4442a9dd32fe39a648f993cb4eb3cae678</code></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="muse-section" id="implemented-contract">
+    <h2>Implemented text contract</h2>
+    <ul>
+      <li>Independent hidden, query, KV, gate, and MLP dimensions in the <code>muse_glimmer_text</code> circuit.</li>
+      <li>Three sliding-attention layers followed by one full-attention layer, with RoPE only on sliding layers.</li>
+      <li>Centered weighted RMSNorm, post-branch RMSNorm, unweighted Q/K normalization, query scaling, attention gating, four normalization sites, output scaling, and tanh logit softcapping.</li>
+      <li>Explicit BF16 rounding boundaries through normalization, projections, attention, SwiGLU, residuals, and logits.</li>
+      <li>Separate embedding and output-head tensors, strict tensor-family checks, and explicit vision deferral.</li>
+      <li>Caller-owned attention and projection tensor scratch declared in kernel maps, with an aggregate lowering-time workspace budget.</li>
+    </ul>
+    <p>
+      Conversion accounts for all 1,436 checkpoint tensors: 627 feed the text circuit and 809 vision tensors are
+      explicitly deferred. The four attention maps accurately state AVX-512, oneDNN 3.12, SLEEF, serial CKE head
+      traversal, and external oneDNN threading. Their selection status remains <code>candidate</code>.
+    </p>
+  </section>
+
+  <section class="muse-section" id="xray">
+    <h2>Numerical X-ray findings</h2>
+    <p>
+      The complete 59.55 GB checkpoint converted to a 55.5 GiB CKE weight artifact. The first multi-token mismatch
+      came from full-attention cache placement: global layers omit RoPE, and lowering had stored K before Q/K
+      normalization. The corrected graph stores normalized K for those layers.
+    </p>
+    <p>
+      The remaining layer-1 mismatch came from Q/K normalization. The model spells the reciprocal factor as
+      <code>torch.pow(value, -0.5)</code>, while PyTorch's CPU unary dispatch uses its reciprocal-square-root path for
+      that exponent. Selecting CKE's existing reciprocal-square-root path reproduced the dispatch. No new BF16
+      normalization kernel was needed. A 69-token X-ray remained exact through layers 0&ndash;50, followed by the
+      complete-graph certification above.
+    </p>
+    <p>
+      Attention preserves BF16 QK matmul, BF16 scale rounding, FP32 softmax, BF16 probability storage, and BF16 PV
+      matmul. Synthetic oracles cover multiple KV heads, sliding masks, and decode with cache capacity greater than
+      live KV length. Null, undersized, and overflowing workspace requests fail explicitly.
+    </p>
+  </section>
+
+  <section class="muse-section" id="limits">
+    <h2>Memory and allocation boundary</h2>
+    <p>
+      Eager prefill requires <code>6*T*C + 4*C*D + 2*T*D</code> bytes. Score buffers alone use <code>6*T*C</code>:
+      24 GiB at <code>T=C=64K</code> and 96 GiB at <code>T=C=128K</code>. Sliding attention still materializes the
+      full matrix before masking, so the maps impose a 1 GiB call-workspace gate. A bounded-memory provider needs
+      separate numerical validation before this gate can expand.
+    </p>
+    <p>
+      Selected Muse maps make attention and projection tensor scratch caller-owned and contain no explicit C heap
+      allocation for those tensors. This does not establish allocation-free execution. The projection helper creates
+      and destroys oneDNN objects per invocation under a global mutex, and oneDNN may allocate internally. The current
+      repository audit also retains 51 inherited production allocation sites. Muse did not expand that baseline; its
+      workspace ABI reduced mapped allocating providers without scratch contracts from three to two.
+    </p>
+  </section>
+
+  <section class="muse-section" id="status">
+    <h2>Certification envelope</h2>
+    <div class="muse-table-wrap"><table class="muse-table">
+      <thead><tr><th>Gate</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Configuration and complete tensor inventory</td><td class="pass">Passed</td></tr>
+        <tr><td>Conversion, lowering, generated C, and component contracts</td><td class="pass">Passed</td></tr>
+        <tr><td>Short real-weight prefill and cached decode</td><td class="pass">Passed: 384 / 384 finite, bit-exact rows</td></tr>
+        <tr><td>Decode stride beyond live KV length; workspace capacity and overflow</td><td class="pass">Passed</td></tr>
+        <tr><td>Repeated-call library allocation instrumentation</td><td class="open">Not tested</td></tr>
+        <tr><td>2,047 / 2,048 / 2,049-token window boundaries</td><td class="open">Not tested</td></tr>
+        <tr><td>4K through 128K context</td><td class="blocked">Blocked by eager workspace budget</td></tr>
+        <tr><td>Reset/reuse and concurrent-session isolation</td><td class="open">Not tested</td></tr>
+        <tr><td>Quantization</td><td class="open">Not tested</td></tr>
+        <tr><td>Vision and image preprocessing</td><td class="open">Deferred</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="muse-section" id="reproduce">
+    <h2>Reproduce the comparison</h2>
+    <p>Generate a pinned reference fixture, then compare it with a converted and compiled CKE runtime:</p>
+    <pre class="muse-command"><code>python version/v8/scripts/certify_muse_glimmer_text_v8.py reference \
+  --model-dir /path/to/Muse-Glimmer-30B \
+  --reference-dir /path/to/muse-reference
+
+python version/v8/scripts/certify_muse_glimmer_text_v8.py compare \
+  --runtime-dir /path/to/Muse-Glimmer-30B-cke \
+  --reference-dir /path/to/muse-reference \
+  --report /path/to/muse-report.json</code></pre>
+    <p>
+      Rerun this comparison when affected kernels, maps, lowering, conversion, or runtime linkage changes. Coverage
+      should progress through window boundaries, longer histories, repeated sessions, and each supported hardware
+      configuration while reporting passed, failed, skipped, and untested gates separately.
+    </p>
+    <p><a href="model-kernel-matrix.html#card-muse-glimmer">Return to the Model + Kernel Matrix</a>.</p>
+  </section>
+</div>

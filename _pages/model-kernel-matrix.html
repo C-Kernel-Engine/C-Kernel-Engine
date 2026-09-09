@@ -940,6 +940,31 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
       </div>
     </div>
 
+    <!-- Muse-Glimmer -->
+    <div class="model-card mc-cohere2" id="card-muse-glimmer">
+      <span class="model-badge">circuit: muse_glimmer_text</span>
+      <div class="model-title">Muse-Glimmer-30B Text</div>
+      <div class="model-arch">Dense GQA · 3:1 sliding/full attention · RoPE on sliding layers only<br>Centered RMSNorm · Q/K normalization · sigmoid attention gate · SwiGLU<br>Untied output head · scaled and tanh-softcapped logits</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot st-e2e"></span><span class="mp-text">Complete BF16 checkpoint conversion and generated 52-layer prefill/decode graphs</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Ryzen PyTorch eager parity — 384 / 384 finite logit rows bit exact across three 128-token trajectories</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Window-boundary, long-context, allocation-instrumentation, quantization, and vision certification remain open</span></div>
+      </div>
+      <div class="source-note">
+        The selected candidate attention provider uses caller-owned but quadratic eager prefill scratch and a 1 GiB workspace gate. Read the <a href="v8-muse-glimmer.html">Muse-Glimmer text certification page</a> for the numerical X-ray, pinned evidence, exact support boundary, and reproduction commands.
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">independent hidden/query/KV widths</span>
+        <span class="tag fixed">PyTorch BF16 bit exact</span>
+        <span class="tag fixed">planner-owned tensor scratch</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">BF16 &#9733;</span>
+        <span class="mq-chip">text candidate</span>
+        <span class="mq-chip">vision deferred</span>
+      </div>
+    </div>
+
     <!-- Cohere2 Command R -->
     <div class="model-card mc-cohere2" id="card-cohere2">
       <span class="model-badge">template: cohere2.json</span>

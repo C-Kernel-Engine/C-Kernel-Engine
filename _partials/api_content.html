@@ -1,6 +1,6 @@
 
 <details open>
-    <summary>GEMM (Matrix Multiplication) (258)</summary>
+    <summary>GEMM (Matrix Multiplication) (262)</summary>
     <div class="accordion-content">
 
 
@@ -460,6 +460,26 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">float ck_llama_regular_gemm_f16(const float * probability, const float * value_column, int count)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_pytorch_brgemm_fault</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_pytorch_brgemm_fault(const char * message, int M, int N, int K)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_pytorch_brgemm_workspace_sizes</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_pytorch_brgemm_workspace_sizes(int M, int N, int K, size_t * input_bytes, size_t * output_bytes, size_t * bias_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -1116,6 +1136,16 @@
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace(const float * A, const void * B, const float * bias, float * C, int M, int N, int K, uint16_t * input_bf16, size_t input_bf16_bytes, uint16_t * output_bf16, size_t output_bf16_bytes, uint16_t * bias_bf16, size_t bias_bf16_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -1130,6 +1160,16 @@
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(const float * A, const void * B, const float * bias, float * C, int M, int N, int K)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl(const float * A, const void * B, const float * bias, float * C, int M, int N, int K, uint16_t * input_bf16, size_t input_bf16_bytes, uint16_t * output_bf16, size_t output_bf16_bytes, uint16_t * bias_bf16, size_t bias_bf16_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -2726,7 +2766,7 @@
 
 
 <details open>
-    <summary>RMS Normalization (60)</summary>
+    <summary>RMS Normalization (63)</summary>
     <div class="accordion-content">
 
 
@@ -3144,6 +3184,36 @@ test_parity.py::test_rmsnorm_backward_parity</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_muse_centered_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_muse_centered_pytorch_bf16_storage(const float * input, const float * zero_centered_weight, float * output, float * rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_muse_unweighted_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(const float * input, float * output, float * rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_muse_weighted_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_muse_weighted_pytorch_bf16_storage(const float * input, const float * weight, float * output, float * rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_no_weight</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -3177,7 +3247,7 @@ test_parity.py::test_rmsnorm_backward_parity</p>
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rmsnorm_forward_pytorch_bf16_storage_impl</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
-            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_pytorch_bf16_storage_impl(const float * input, const float * gamma, float * output, float * rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps, int qwen3next_weight_order)</pre>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rmsnorm_forward_pytorch_bf16_storage_impl(const float * input, const float * gamma, float * output, float * rstd_cache, int tokens, int d_model, int input_stride, int output_stride, float eps, int weight_mode, int use_pow_inverse)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -3871,7 +3941,7 @@ test_softmax.py::TestSoftmaxForward::test_exact_vs_fast</p>
 
 
 <details open>
-    <summary>Attention (173)</summary>
+    <summary>Attention (179)</summary>
     <div class="accordion-content">
 
 
@@ -4142,6 +4212,26 @@ test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_causal_head_major_gqa_muse_eager_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void attention_forward_causal_head_major_gqa_muse_eager_bf16_storage(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, float * scores, size_t scores_bytes, uint16_t * key_rows, size_t key_rows_bytes, uint16_t * value_columns, size_t value_columns_bytes, uint16_t * gemm_rows, size_t gemm_rows_bytes, uint16_t * gemm_scores, size_t gemm_scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_causal_head_major_gqa_muse_eager_bf16_storage_sliding</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void attention_forward_causal_head_major_gqa_muse_eager_bf16_storage_sliding(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int sliding_window, float * scores, size_t scores_bytes, uint16_t * key_rows, size_t key_rows_bytes, uint16_t * value_columns, size_t value_columns_bytes, uint16_t * gemm_rows, size_t gemm_rows_bytes, uint16_t * gemm_scores, size_t gemm_scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_causal_head_major_gqa_prefill_append_bf16cache_pytorch_contract</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -4329,6 +4419,26 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int live_tokens, int kv_stride_tokens, int head_dim, int aligned_head_dim, int sliding_window, float * scores, size_t scores_bytes, float * value_columns, size_t value_columns_bytes, float * scaled_scores, size_t scaled_scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_decode_head_major_gqa_muse_eager_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void attention_forward_decode_head_major_gqa_muse_eager_bf16_storage(const float * q_token, const float * k_cache, const float * v_cache, float * out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, float * scores, size_t scores_bytes, uint16_t * key_rows, size_t key_rows_bytes, uint16_t * value_columns, size_t value_columns_bytes, uint16_t * gemm_rows, size_t gemm_rows_bytes, uint16_t * gemm_scores, size_t gemm_scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">attention_forward_decode_head_major_gqa_muse_eager_bf16_storage_sliding</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void attention_forward_decode_head_major_gqa_muse_eager_bf16_storage_sliding(const float * q_token, const float * k_cache, const float * v_cache, float * out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window, float * scores, size_t scores_bytes, uint16_t * key_rows, size_t key_rows_bytes, uint16_t * value_columns, size_t value_columns_bytes, uint16_t * gemm_rows, size_t gemm_rows_bytes, uint16_t * gemm_scores, size_t gemm_scores_bytes)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -4925,6 +5035,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_muse_eager_bf16_storage_impl</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void ck_attention_muse_eager_bf16_storage_impl(const float * q, const float * k, const float * v, float * output, int num_heads, int num_kv_heads, int query_tokens, int kv_tokens, int kv_stride_tokens, int head_dim, int aligned_head_dim, int sliding_window, float * scores, size_t scores_bytes, uint16_t * key_rows, size_t key_rows_bytes, uint16_t * value_columns, size_t value_columns_bytes, uint16_t * gemm_rows, size_t gemm_rows_bytes, uint16_t * gemm_scores, size_t gemm_scores_bytes)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_attention_oracle_dump_enabled</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -5329,6 +5449,16 @@ test_attention.py::TestAttentionForward::test_flash_decode</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">int ck_attention_vec_dump_vcols_enabled(void)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">ck_muse_attention_checked_product</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">size_t ck_muse_attention_checked_product(size_t left, size_t right, const char * label)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
         </div>
 
@@ -6858,7 +6988,7 @@ test_parity.py::test_swiglu_parity</p>
 
 
 <details open>
-    <summary>RoPE (Rotary Position Embedding) (81)</summary>
+    <summary>RoPE (Rotary Position Embedding) (83)</summary>
     <div class="accordion-content">
 
 
@@ -7419,6 +7549,16 @@ test_parity.py::test_rope_qk_parity</p>
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rope_forward_qk_split_direct_muse_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rope_forward_qk_split_direct_muse_pytorch_bf16_storage(float * q, float * k, const float * freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rope_forward_qk_split_direct_token_range_f32</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -7474,6 +7614,16 @@ test_kv_cache_attention.py::TestKVCacheAttention::test_qk_rope_strided</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rope_forward_qk_with_rotary_dim_cache_stride(float * q, float * k, const float * cos_cache, const float * sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, int cache_rotary_dim)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">rope_forward_split_direct_muse_bf16_one</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void rope_forward_split_direct_muse_bf16_one(float * x, int heads, int tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
@@ -7712,7 +7862,7 @@ test_rope.py::TestRoPECache::test_cache_values</p>
 
 
 <details open>
-    <summary>Other Functions (1372)</summary>
+    <summary>Other Functions (1375)</summary>
     <div class="accordion-content">
 
 
@@ -15209,6 +15359,26 @@ hugepage_mode
 
         <div class="card" style="margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">final_logit_scale_muse_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void final_logit_scale_muse_pytorch_bf16_storage(float * logits, int tokens, int vocab_size, float scale)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">final_logit_softcap_muse_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void final_logit_softcap_muse_pytorch_bf16_storage(float * logits, int tokens, int vocab_size, float cap)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;"></p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">find_best_merge</code>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
@@ -18895,6 +19065,16 @@ The IR graph structure (number of layers, op types)</p>
                 <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
             </div>
             <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void qk_norm_forward_llama_production_parallel_dispatch(float * q, float * k, const float * q_gamma, const float * k_gamma, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps)</pre>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
+        </div>
+
+
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <code style="font-size: 1rem; background: none; color: var(--orange); padding: 0;">qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage</code>
+                <span class="badge badge-green" style="margin-left: 0.5rem;">Forward</span>
+            </div>
+            <pre style="margin: 0.5rem 0; font-size: 0.8rem; overflow-x: auto;">void qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage(float * q, float * k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps, float q_scale)</pre>
             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Forward pass computation</p>
         </div>
 
