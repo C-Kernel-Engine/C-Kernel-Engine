@@ -110,6 +110,14 @@ def test_muse_circuit_preserves_ordered_text_numerics() -> None:
     assert sliding.index("attn_sliding") < sliding.index("attn_gate_sigmoid_mul") < sliding.index("out_proj")
     assert sliding.count("post_attention_norm") == 1
     assert sliding.count("post_ffn_norm") == 1
+    assert circuit["kernels"]["attn"].endswith("muse_eager_bf16_storage")
+    assert circuit["kernels"]["attn_decode"].endswith("muse_eager_bf16_storage")
+    assert circuit["kernels"]["attn_sliding"].endswith(
+        "muse_eager_bf16_storage_sliding"
+    )
+    assert circuit["kernels"]["attn_sliding_decode"].endswith(
+        "muse_eager_bf16_storage_sliding"
+    )
 
     footer = [
         item if isinstance(item, str) else item["op"]
@@ -297,6 +305,13 @@ def test_muse_tiny_checkpoint_converts_lowers_and_emits_strict_c(tmp_path: Path)
             if arg["source"] in {"activation:x", "activation:a"}
         )
         assert gate_input["buffer_ref"] == "embedded_input"
+        if mode == "decode":
+            layer_three = [
+                op["op"] for op in lowered["operations"] if op["layer"] == 3
+            ]
+            assert layer_three.index("qk_norm_no_weight_scaled") < layer_three.index(
+                "kv_cache_store"
+            ) < layer_three.index("attn")
 
     generated = output / "muse_tiny.c"
     subprocess.run(
@@ -328,3 +343,44 @@ def test_muse_tiny_checkpoint_converts_lowers_and_emits_strict_c(tmp_path: Path)
     assert "final_logit_scale_muse_pytorch_bf16_storage" in emitted
     assert "final_logit_softcap_muse_pytorch_bf16_storage" in emitted
     assert "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage" in emitted
+    assert "attention_forward_causal_head_major_gqa_muse_eager_bf16_storage" in emitted
+    assert "attention_forward_causal_head_major_gqa_muse_eager_bf16_storage_sliding" in emitted
+    assert "attention_forward_decode_head_major_gqa_muse_eager_bf16_storage" in emitted
+    assert "attention_forward_decode_head_major_gqa_muse_eager_bf16_storage_sliding" in emitted
+
+
+def test_muse_eager_attention_workspace_budget_is_enforced() -> None:
+    provider = json.loads(
+        (
+            ROOT
+            / "version/v8/kernel_maps/attention_forward_causal_head_major_gqa_muse_eager_bf16_storage.json"
+        ).read_text(encoding="utf-8")
+    )
+    op = {
+        "kernel": provider["id"],
+        "op": "attention",
+        "layer": 0,
+        "scratch": provider["scratch"],
+        "params": {"num_heads": 32, "num_kv_heads": 2, "head_dim": 128},
+    }
+    with pytest.raises(RuntimeError, match="HARD SCRATCH BUDGET FAULT"):
+        builder._required_kernel_call_scratch_bytes(
+            [op], {"context_length": 131072}, 2048
+        )
+
+
+def test_muse_attention_adds_no_kernel_allocation_debt() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "version/v8/scripts/audit_kernel_allocations_v8.py"),
+            "--check",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    source = (ROOT / "src/kernels/attention_kernels.c").read_text(encoding="utf-8")
+    body = source.split("static void ck_attention_muse_eager_bf16_storage_impl", 1)[1]
+    body = body.split("void attention_forward_causal_head_major_gqa_muse", 1)[0]
+    assert "malloc(" not in body
+    assert "free(" not in body

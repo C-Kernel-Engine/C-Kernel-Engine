@@ -1,9 +1,11 @@
 # Muse-Glimmer text bring-up (2026-09-09)
 
-This note records the first CKE text bring-up for
-`meta-models/Muse-Glimmer-30B`. Conversion, declarative lowering, generated-C
-compilation, and one-token BF16 parity are complete. Multi-token attention is
-still a numerical mismatch, so this is not yet a full text-support claim.
+This note records the first bounded text bring-up for
+`meta-models/Muse-Glimmer-30B`. The complete checkpoint converts, both
+52-layer graphs generate and compile, and short prefill plus cached decode are
+bit exact with the pinned PyTorch eager BF16 reference. The selected attention
+provider is an eager parity implementation with quadratic prefill scratch; it
+is not a practical long-context implementation.
 
 ## Frozen reference contract
 
@@ -22,7 +24,9 @@ still a numerical mismatch, so this is not yet a full text-support claim.
   `cfc67e5f349f37690dfd31ed1f18bc4442a9dd32fe39a648f993cb4eb3cae678`
 
 The Ryzen validation host used Transformers 5.15.1, PyTorch 2.13.0+cpu,
-oneDNN 3.12, and the SLEEF symbols supplied by that PyTorch build.
+oneDNN 3.12, and the SLEEF symbols supplied by that PyTorch build. The full
+machine-readable result is in
+`docs/notes/artifacts/muse_glimmer_text_parity_128_2026-09-09.json`.
 
 ## Implemented contract
 
@@ -34,43 +38,91 @@ oneDNN 3.12, and the SLEEF symbols supplied by that PyTorch build.
   normalization, query scaling, attention gating, four normalization sites,
   output scaling, and final tanh softcapping.
 - Explicit BF16 rounding boundaries for normalization, Q/K scaling, RoPE,
-  projections, SwiGLU, residuals, and logits.
+  projections, attention, SwiGLU, residuals, and logits.
 - Separate embedding and output-head tensors.
 - Strict tensor-family checks and explicit deferral of every vision tensor.
-- Generic concat-shape propagation used to pack MLP gate and up projections
-  into the layout expected by the existing SwiGLU provider.
+- Caller-owned attention and projection tensor scratch, declared in kernel
+  maps and bound through generated call ABIs.
+- An explicit aggregate workspace budget enforced during lowering.
 
 The published checkpoint contains 1,436 tensors. Conversion accounts for all
 of them: 627 are consumed by the text circuit and 809 vision tensors are
 explicitly marked as deferred. There are no unexplained leftovers.
 
-## Ryzen evidence
+The four Muse attention maps describe their current implementation rather
+than broader generic capabilities: AVX-512, oneDNN 3.12, SLEEF, serial CKE
+head traversal, and external oneDNN threading. Their selection status remains
+`candidate`.
+
+## Numerical X-ray
 
 The complete 59.55 GB checkpoint converted to a 55.5 GiB CKE weight artifact.
-Both 52-layer prefill and decode graphs lower, generate C, compile, and load
-with context length 128 and prefill chunk length 8.
+Both full prefill and cached decode run on the Ryzen host.
 
-For input token `[1]`, a real-weight X-ray found exact decoder outputs through
-the transformer stack and an exact 6,656-element final normalized hidden
-vector. After selecting the oneDNN 3.12 BF16 projection contract for the
-output head, all 202,048 logits are bit exact with the eager PyTorch reference.
+The first multi-token failure was in full-attention cache placement. Global
+layers omit RoPE, and decoder lowering had stored K before Q/K normalization.
+The corrected graph stores normalized K for these layers.
 
-For input tokens `[1, 2]`, CKE and the reference still select token 24, but the
-logit arrays expose the unresolved attention contract:
+The remaining X-ray mismatch appeared in layer 1 Q/K normalization. The model
+source spells the reciprocal factor as `torch.pow(value, -0.5)`, but PyTorch's
+CPU unary dispatch uses its reciprocal-square-root kernel for this exponent.
+Selecting the existing reciprocal-square-root path in the Muse weighted and
+unweighted RMSNorm wrappers reproduced that dispatch. No new BF16
+normalization kernel was required. A 69-token layer X-ray then remained exact
+through layers 0 through 50; the end-to-end logit evidence below is the
+certification result used for the complete graph.
 
-| Path | Exact logits | Maximum absolute error | Mean absolute error |
-| --- | ---: | ---: | ---: |
-| Decode | 1,475 / 202,048 | 3.0703125 | 0.6042349 |
-| Prefill | 12,089 / 202,048 | 0.34375 | 0.0628345 |
+The attention provider reproduces the reference sequence of BF16 QK matmul,
+BF16 scale rounding, FP32 softmax, BF16 probability storage, and BF16 PV
+matmul. Synthetic oracles cover multiple KV heads, sliding masks, and decode
+where cache capacity exceeds live KV length. Null or undersized scratch and
+workspace size overflow fail explicitly.
 
-Component oracles are bit exact for all three RMSNorm variants, Q/K
-normalization plus query scaling, direct split-half RoPE at nonzero positions,
-and the ordered logit scale/softcap chain. Synthetic multi-token X-rays first
-diverge when attention combines token values. The selected generic attention
-providers accumulate through FP32 paths, while the pinned eager reference uses
-BF16 score and value matmuls with a float32 softmax followed by BF16 probability
-storage. Decode additionally lacks a Muse-specific BF16 sliding-window cache
-provider. Those are the next numerical provider contracts to implement.
+## End-to-end Ryzen certification
+
+The certification runner separates two questions:
+
+1. Forced-reference-token history compares every float32 logit by its raw
+   IEEE-754 bit pattern.
+2. Free-running history compares the actual CKE greedy trajectory and retains
+   CKE's decoded output independently from the reference output.
+
+It checks finite values, records first divergence, publishes partial failures,
+and hashes the runtime libraries, generated C, runtime bundle, and reference
+manifest. Three official-chat-template prompts ran for 128 generated tokens
+each:
+
+| Prompt | Prompt tokens | Exact logit rows | Greedy token divergence |
+| --- | ---: | ---: | --- |
+| Complete C function | 69 | 128 / 128 | None |
+| Standalone SVG | 69 | 128 / 128 | None |
+| CKE v8 architecture analysis | 96 | 128 / 128 | None |
+
+All 384 logit rows were finite and bit exact. Because every free-running token
+matched, the forced and free-running histories were identical in this run.
+This is PyTorch parity; no llama.cpp Muse implementation was used as an oracle.
+
+## Memory and allocation scope
+
+The eager prefill workspace is
+`6*T*C + 4*C*D + 2*T*D` bytes. Its score buffers alone use `6*T*C` bytes:
+24 GiB at `T=C=64K` and 96 GiB at `T=C=128K`. Sliding attention currently
+materializes this full matrix before masking. The maps therefore impose a
+1 GiB call-workspace gate. A bounded-memory provider needs separate numerical
+validation before the gate can be expanded.
+
+The selected Muse maps contain no C heap allocation in their attention or
+projection tensor workspaces. This is a narrower claim than allocation-free
+execution. The projection helper still creates and destroys oneDNN
+descriptors, primitives, and memory objects per invocation and executes under
+a global mutex; oneDNN may allocate internally. Prepared objects and
+user-owned library scratch should be investigated outside this correctness
+bring-up, with allocation instrumentation around the full selected call chain.
+
+The repository audit still reports 51 inherited production allocation sites.
+Moving Muse projection selection to the workspace ABI reduces mapped
+allocating providers without scratch contracts from three to two; the
+allocation baseline was tightened accordingly and was not expanded for Muse.
 
 ## Certification state
 
@@ -79,15 +131,18 @@ provider. Those are the next numerical provider contracts to implement.
 | Configuration and tensor inventory | Pass |
 | Synthetic conversion/lowering/generated C | Pass |
 | Component numerical contracts | Pass |
-| Official one-token text parity | Pass |
-| Multi-token prefill | Numerical mismatch at attention |
-| Cached decode and window rollover | Numerical mismatch / not certified |
+| Short real-weight prefill | Pass, bit exact |
+| Short cached decode | Pass, 384 / 384 logit rows bit exact |
+| Decode stride with capacity greater than live length | Pass |
+| Workspace capacity and overflow rejection | Pass |
+| Repeated-call library allocation instrumentation | Not tested |
 | 2,047 / 2,048 / 2,049-token boundaries | Not tested |
-| 4K through 128K context | Not tested |
+| 4K through 128K context | Blocked by eager workspace budget |
+| Concurrent-session isolation | Not tested |
 | Quantization | Not tested |
 | Vision and image preprocessing | Deferred |
 
-The next acceptance gate is a causal grouped-query provider that reproduces
-the eager BF16 arithmetic for both full and sliding attention, including a
-BF16 sliding cache. After that passes at short lengths, cache rollover and the
-2,047 / 2,048 / 2,049 boundary sequence can begin.
+This establishes a short-context text correctness candidate. Promotion still
+requires window-boundary and reset/reuse coverage, library-allocation
+measurement, and a bounded-memory attention implementation for practical long
+contexts. Vision remains a separate milestone.

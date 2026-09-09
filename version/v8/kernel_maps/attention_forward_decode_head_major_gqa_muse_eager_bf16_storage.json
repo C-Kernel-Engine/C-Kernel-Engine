@@ -1,0 +1,335 @@
+{
+  "id": "attention_forward_decode_head_major_gqa_muse_eager_bf16_storage",
+  "op": "attention",
+  "selection": {
+    "status": "candidate",
+    "priority": 200,
+    "equivalence_group": "attention.muse_eager_bf16_decode.v1",
+    "phases": [
+      "decode"
+    ]
+  },
+  "variant": "decode_muse_eager_bf16",
+  "mode": "decode",
+  "contract_schema_version": 1,
+  "provides": {
+    "execution.phase": [
+      "decode"
+    ],
+    "execution.attention_schedule": [
+      "full_matrix_causal"
+    ],
+    "tensor.q.dtype": [
+      "fp32"
+    ],
+    "tensor.kv.dtype": [
+      "fp32"
+    ],
+    "tensor.layout": [
+      "head_major"
+    ],
+    "numerics.attention_reduction": [
+      "muse_eager_bf16"
+    ]
+  },
+  "supported_reductions": {
+    "muse_eager_bf16": {
+      "status": "observed",
+      "function": "attention_forward_decode_head_major_gqa_muse_eager_bf16_storage",
+      "explicit_selector": true,
+      "notes": "Muse eager BF16 decode over the live KV cache."
+    }
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "threading": {
+      "runtime": "external_blas",
+      "work_partition": [
+        "serial"
+      ],
+      "dispatch": [
+        "internal_threaded"
+      ],
+      "reduction_order_effect": "contract_defined"
+    }
+  },
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "q_token",
+      "dtype": "fp32",
+      "shape": [
+        "num_heads",
+        "head_dim"
+      ],
+      "desc": "Query for single token [num_heads, head_dim]",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "k_cache",
+      "dtype": "fp32",
+      "shape": [
+        "num_kv_heads",
+        "cache_capacity",
+        "head_dim"
+      ],
+      "desc": "K cache [num_kv_heads, max_seq_len, head_dim]",
+      "layout": "head_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "runtime",
+      "consumption": "required"
+    },
+    {
+      "name": "v_cache",
+      "dtype": "fp32",
+      "shape": [
+        "num_kv_heads",
+        "cache_capacity",
+        "head_dim"
+      ],
+      "desc": "V cache [num_kv_heads, max_seq_len, head_dim]",
+      "layout": "head_major_strided",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "runtime",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out_token",
+      "dtype": "fp32",
+      "shape": [
+        "num_heads",
+        "head_dim"
+      ],
+      "desc": "Output for single token [num_heads, head_dim]",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scores",
+      "dtype": "fp32",
+      "shape": [
+        "C"
+      ],
+      "size_resolution": "required",
+      "aggregate_budget_bytes": 1073741824,
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "key_rows",
+      "dtype": "bf16",
+      "shape": [
+        "C",
+        "D"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "value_columns",
+      "dtype": "bf16",
+      "shape": [
+        "D",
+        "C"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "gemm_rows",
+      "dtype": "bf16",
+      "shape": [
+        "D"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "gemm_scores",
+      "dtype": "bf16",
+      "shape": [
+        "C"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "num_heads",
+    "num_kv_heads",
+    "kv_tokens",
+    "cache_capacity",
+    "head_dim",
+    "aligned_head_dim"
+  ],
+  "impl": {
+    "function": "attention_forward_decode_head_major_gqa_muse_eager_bf16_storage",
+    "c_declaration": "void attention_forward_decode_head_major_gqa_muse_eager_bf16_storage(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, float *scores, size_t scores_bytes, uint16_t *key_rows, size_t key_rows_bytes, uint16_t *value_columns, size_t value_columns_bytes, uint16_t *gemm_rows, size_t gemm_rows_bytes, uint16_t *gemm_scores, size_t gemm_scores_bytes);",
+    "sources": [
+      "src/kernels/attention_kernels.c",
+      "src/kernels/gemm_kernels_bf16.c"
+    ]
+  },
+  "tests": {
+    "unit": [
+      "unittest/bf16/test_muse_glimmer_norms_bf16.py"
+    ],
+    "parity": [
+      {
+        "kind": "pytorch_eager_bf16",
+        "command": "python version/v8/scripts/certify_muse_glimmer_text_v8.py compare ...",
+        "tolerance": "bit_exact",
+        "notes": "Full-model cached decode evidence is recorded in the Muse bring-up report."
+      }
+    ]
+  },
+  "notes": "Bounded full-matrix Muse eager BF16 decode provider. Requires AVX-512F, oneDNN 3.12.0 and PyTorch SLEEF expf16. Caller-owned CKE tensor scratch does not imply that oneDNN performs no internal allocation.",
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "q_token",
+        "source": "scratch:q_scratch",
+        "cast": "const float*",
+        "ports": [
+          "input:q_token"
+        ]
+      },
+      {
+        "name": "k_cache",
+        "source": "runtime:kv_cache_k_layer",
+        "cast": "const float*",
+        "ports": [
+          "input:k_cache"
+        ]
+      },
+      {
+        "name": "v_cache",
+        "source": "runtime:kv_cache_v_layer",
+        "cast": "const float*",
+        "ports": [
+          "input:v_cache"
+        ]
+      },
+      {
+        "name": "out_token",
+        "source": "output:out",
+        "cast": "float*",
+        "ports": [
+          "output:out_token"
+        ]
+      },
+      {
+        "name": "num_heads",
+        "source": "dim:num_heads"
+      },
+      {
+        "name": "num_kv_heads",
+        "source": "dim:num_kv_heads"
+      },
+      {
+        "name": "kv_tokens",
+        "source": "runtime:kv_tokens"
+      },
+      {
+        "name": "cache_capacity",
+        "source": "dim:max_seq_len"
+      },
+      {
+        "name": "head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "aligned_head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "scores",
+        "source": "scratch:scores",
+        "cast": "float*"
+      },
+      {
+        "name": "scores_bytes",
+        "source": "scratch_size:scores"
+      },
+      {
+        "name": "key_rows",
+        "source": "scratch:key_rows",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "key_rows_bytes",
+        "source": "scratch_size:key_rows"
+      },
+      {
+        "name": "value_columns",
+        "source": "scratch:value_columns",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "value_columns_bytes",
+        "source": "scratch_size:value_columns"
+      },
+      {
+        "name": "gemm_rows",
+        "source": "scratch:gemm_rows",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "gemm_rows_bytes",
+        "source": "scratch_size:gemm_rows"
+      },
+      {
+        "name": "gemm_scores",
+        "source": "scratch:gemm_scores",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "gemm_scores_bytes",
+        "source": "scratch_size:gemm_scores"
+      }
+    ]
+  },
+  "operation_interface": "attention.muse_eager_bf16.decode.attention.v1",
+  "weights": []
+}

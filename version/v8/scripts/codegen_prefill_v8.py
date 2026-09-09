@@ -293,6 +293,14 @@ def emit_prefill_op(
                 == "preserve_provider"
             )
             if preserve_provider and gemm_a_expr and gemm_b_expr and gemm_c_expr:
+                provider_tail = [
+                    str(arg.get("expr", "")).strip()
+                    for arg in args_list[7:]
+                    if str(arg.get("expr", "")).strip()
+                ]
+                provider_tail_text = ""
+                if provider_tail:
+                    provider_tail_text = ",\n        " + ",\n        ".join(provider_tail)
                 dump_code = ""
                 if dump:
                     raw_output = gemm_c_expr.replace("(float*)", "").replace("(void*)", "").strip()
@@ -307,7 +315,7 @@ def emit_prefill_op(
         {gemm_c_expr},
         1,
         {vocab_size},
-        {embed_dim}
+        {embed_dim}{provider_tail_text}
     );
     ck_debug_export_hidden(model, -1, "logits", (const float*){gemm_c_expr}, VOCAB_SIZE);{dump_code}"""
             if linear_emission is None:

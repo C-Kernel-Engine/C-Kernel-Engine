@@ -2,26 +2,108 @@
   "id": "rmsnorm_muse_unweighted_pytorch_bf16_storage",
   "op": "unweighted_rmsnorm",
   "variant": "muse_pow_pytorch_bf16_storage",
-  "quant": {"activation": "fp32", "output": "fp32"},
-  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["T", "E"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
   "weights": [],
-  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["T", "E"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"}],
-  "dims": ["T", "E"],
-  "params": [{"name": "eps", "dtype": "float32"}],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "T",
+    "E"
+  ],
+  "params": [
+    {
+      "name": "eps",
+      "dtype": "float32"
+    }
+  ],
   "impl": {
     "function": "rmsnorm_forward_muse_unweighted_pytorch_bf16_storage",
     "c_declaration": "void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(const float *input, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
-    "sources": ["src/kernels/rmsnorm_kernels.c"],
-    "variants": [{"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}]
+    "sources": [
+      "src/kernels/rmsnorm_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "avx2",
+        "requires": [
+          "avx2"
+        ],
+        "compile_flags": [
+          "-mavx2"
+        ]
+      }
+    ]
   },
-  "call_abi": {"version": 1, "params": [
-    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
-    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
-    {"name": "rstd_cache", "source": "null"},
-    {"name": "tokens", "source": "dim:seq_len"},
-    {"name": "d_model", "source": "dim:embed_dim"},
-    {"name": "aligned_embed_dim", "source": "dim:embed_dim"},
-    {"name": "eps", "source": "dim:rms_eps"}
-  ]},
-  "notes": "Unweighted RMSNorm using the Muse torch.pow(x, -0.5) contract and BF16 output storage."
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "rstd_cache",
+        "source": "null"
+      },
+      {
+        "name": "tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "d_model",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "aligned_embed_dim",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "eps",
+        "source": "dim:rms_eps"
+      }
+    ]
+  },
+  "notes": "Unweighted RMSNorm using the Muse torch.pow(x, -0.5) contract and BF16 output storage. PyTorch dispatches the source torch.pow(x, -0.5) operation to its reciprocal-square-root kernel; the provider mirrors that dispatched arithmetic.",
+  "operation_interface": "rmsnorm.muse_unweighted_bf16.v1"
 }

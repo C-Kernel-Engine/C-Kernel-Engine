@@ -3,30 +3,145 @@
   "op": "rmsnorm",
   "operation_interface": "rmsnorm.fp32_bf16_values.v1",
   "variant": "muse_pow_weighted_pytorch_bf16_storage",
-  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
-  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["T", "E"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
-  "weights": [{"name": "gamma", "dtype": "fp32", "shape": ["E"], "layout": "feature_contiguous", "access": "read", "storage_class": "weight", "consumption": "required"}],
-  "outputs": [
-    {"name": "output", "dtype": "fp32", "shape": ["T", "E"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required"},
-    {"name": "rstd", "dtype": "fp32", "shape": ["T"], "layout": "token_contiguous", "access": "write", "storage_class": "scratch", "consumption": "optional"}
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
   ],
-  "dims": ["T", "E"],
-  "params": [{"name": "eps", "dtype": "float32"}],
+  "weights": [
+    {
+      "name": "gamma",
+      "dtype": "fp32",
+      "shape": [
+        "E"
+      ],
+      "layout": "feature_contiguous",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "layout": "token_major_contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "rstd",
+      "dtype": "fp32",
+      "shape": [
+        "T"
+      ],
+      "layout": "token_contiguous",
+      "access": "write",
+      "storage_class": "scratch",
+      "consumption": "optional"
+    }
+  ],
+  "dims": [
+    "T",
+    "E"
+  ],
+  "params": [
+    {
+      "name": "eps",
+      "dtype": "float32"
+    }
+  ],
   "impl": {
     "function": "rmsnorm_forward_muse_weighted_pytorch_bf16_storage",
     "c_declaration": "void rmsnorm_forward_muse_weighted_pytorch_bf16_storage(const float *input, const float *weight, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
-    "sources": ["src/kernels/rmsnorm_kernels.c"],
-    "variants": [{"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}]
+    "sources": [
+      "src/kernels/rmsnorm_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "avx2",
+        "requires": [
+          "avx2"
+        ],
+        "compile_flags": [
+          "-mavx2"
+        ]
+      }
+    ]
   },
-  "call_abi": {"version": 1, "params": [
-    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
-    {"name": "weight", "source": "weight:gamma", "alt": ["final_ln_weight"], "cast": "const float*", "ports": ["weight:gamma"]},
-    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
-    {"name": "rstd_cache", "source": "null", "ports": ["output:rstd"]},
-    {"name": "tokens", "source": "dim:seq_len"},
-    {"name": "d_model", "source": "dim:embed_dim"},
-    {"name": "aligned_embed_dim", "source": "dim:embed_dim"},
-    {"name": "eps", "source": "dim:rms_eps"}
-  ]},
-  "notes": "Muse weighted RMSNorm uses torch.pow for the inverse root, multiplies the FP32 normalized value by the raw weight, then stores BF16."
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "weight",
+        "source": "weight:gamma",
+        "alt": [
+          "final_ln_weight"
+        ],
+        "cast": "const float*",
+        "ports": [
+          "weight:gamma"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "rstd_cache",
+        "source": "null",
+        "ports": [
+          "output:rstd"
+        ]
+      },
+      {
+        "name": "tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "d_model",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "aligned_embed_dim",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "eps",
+        "source": "dim:rms_eps"
+      }
+    ]
+  },
+  "notes": "Muse weighted RMSNorm uses torch.pow for the inverse root, multiplies the FP32 normalized value by the raw weight, then stores BF16. PyTorch dispatches the source torch.pow(x, -0.5) operation to its reciprocal-square-root kernel; the provider mirrors that dispatched arithmetic."
 }

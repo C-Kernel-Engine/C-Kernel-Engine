@@ -8730,6 +8730,234 @@ int ck_attention_bf16_pytorch_gqa_available(void)
 #endif
 }
 
+static size_t ck_muse_attention_checked_product(
+    size_t left, size_t right, const char *label)
+{
+    if (left != 0 && right > SIZE_MAX / left) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: Muse eager attention %s "
+                "size overflow\n", label);
+        abort();
+    }
+    return left * right;
+}
+
+static void ck_attention_muse_eager_bf16_storage_impl(
+    const float *q,
+    const float *k,
+    const float *v,
+    float *output,
+    int num_heads,
+    int num_kv_heads,
+    int query_tokens,
+    int kv_tokens,
+    int kv_stride_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int sliding_window,
+    float *scores,
+    size_t scores_bytes,
+    uint16_t *key_rows,
+    size_t key_rows_bytes,
+    uint16_t *value_columns,
+    size_t value_columns_bytes,
+    uint16_t *gemm_rows,
+    size_t gemm_rows_bytes,
+    uint16_t *gemm_scores,
+    size_t gemm_scores_bytes)
+{
+#if defined(__AVX512F__) && defined(USE_ONEDNN)
+    if (!q || !k || !v || !output || num_heads <= 0 || num_kv_heads <= 0 ||
+        query_tokens <= 0 || kv_tokens < query_tokens ||
+        kv_stride_tokens < kv_tokens || head_dim <= 0 ||
+        aligned_head_dim != head_dim || num_heads % num_kv_heads != 0) {
+        fprintf(stderr, "HARD KERNEL CONTRACT FAULT: invalid Muse eager attention dimensions\n");
+        abort();
+    }
+
+    const size_t score_count = ck_muse_attention_checked_product(
+        (size_t)query_tokens, (size_t)kv_tokens, "score");
+    const size_t kv_matrix_count = ck_muse_attention_checked_product(
+        (size_t)kv_tokens, (size_t)head_dim, "KV matrix");
+    const size_t row_count = ck_muse_attention_checked_product(
+        (size_t)query_tokens, (size_t)head_dim, "row matrix");
+    if (score_count > SIZE_MAX / sizeof(*scores) ||
+        kv_matrix_count > SIZE_MAX / sizeof(*key_rows) ||
+        row_count > SIZE_MAX / sizeof(*gemm_rows)) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: Muse eager attention workspace "
+                "byte size overflow\n");
+        abort();
+    }
+    if (!scores || scores_bytes < score_count * sizeof(*scores) ||
+        !key_rows || key_rows_bytes < kv_matrix_count * sizeof(*key_rows) ||
+        !value_columns ||
+            value_columns_bytes < kv_matrix_count * sizeof(*value_columns) ||
+        !gemm_rows || gemm_rows_bytes < row_count * sizeof(*gemm_rows) ||
+        !gemm_scores ||
+            gemm_scores_bytes < score_count * sizeof(*gemm_scores)) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: Muse eager attention received "
+                "an undersized planner-owned workspace\n");
+        abort();
+    }
+    pthread_once(&ck_pytorch_attention_once, ck_bind_pytorch_attention_primitives);
+    if (!ck_pytorch_attention_expf16) {
+        fprintf(stderr,
+                "HARD KERNEL CONTRACT FAULT: Muse eager attention requires "
+                "Sleef_expf16_u10 from CK_SLEEF_LIBRARY\n");
+        abort();
+    }
+
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    const int heads_per_kv = num_heads / num_kv_heads;
+    const int query_position_offset = kv_tokens - query_tokens;
+    const size_t query_head_stride = ck_muse_attention_checked_product(
+        (size_t)query_tokens, (size_t)aligned_head_dim, "query stride");
+    const size_t kv_head_stride = ck_muse_attention_checked_product(
+        (size_t)kv_stride_tokens, (size_t)aligned_head_dim, "KV stride");
+    (void)ck_muse_attention_checked_product(
+        (size_t)num_heads, query_head_stride, "query tensor");
+    (void)ck_muse_attention_checked_product(
+        (size_t)num_kv_heads, kv_head_stride, "KV tensor");
+
+    for (int head = 0; head < num_heads; ++head) {
+        const int kv_head = head / heads_per_kv;
+        const float *key_head = k + (size_t)kv_head * kv_head_stride;
+        const float *value_head = v + (size_t)kv_head * kv_head_stride;
+        for (int token = 0; token < kv_tokens; ++token) {
+            const float *key_row = key_head +
+                (size_t)token * (size_t)aligned_head_dim;
+            const float *value_row = value_head +
+                (size_t)token * (size_t)aligned_head_dim;
+            for (int dim = 0; dim < head_dim; ++dim) {
+                key_rows[(size_t)token * (size_t)head_dim + (size_t)dim] =
+                    float_to_bf16(key_row[dim]);
+                value_columns[(size_t)dim * (size_t)kv_tokens + (size_t)token] =
+                    float_to_bf16(value_row[dim]);
+            }
+        }
+
+        const float *query_head = q + (size_t)head * query_head_stride;
+        float *output_head = output + (size_t)head * query_head_stride;
+        gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace(
+            query_head, key_rows, NULL, scores,
+            query_tokens, kv_tokens, head_dim,
+            gemm_rows, gemm_rows_bytes, gemm_scores, gemm_scores_bytes,
+            NULL, 0);
+
+        for (int query_token = 0; query_token < query_tokens; ++query_token) {
+            const int query_position = query_position_offset + query_token;
+            const int visible_end = query_position + 1;
+            int visible_begin = 0;
+            if (sliding_window > 0 && visible_end > sliding_window) {
+                visible_begin = visible_end - sliding_window;
+            }
+            float *score_row = scores +
+                (size_t)query_token * (size_t)kv_tokens;
+            for (int token = 0; token < kv_tokens; ++token) {
+                score_row[token] = bf16_to_float(
+                    float_to_bf16(score_row[token] * scale));
+                if (token < visible_begin || token >= visible_end) {
+                    score_row[token] = -INFINITY;
+                }
+            }
+            (void)ck_pytorch_softmax_f32(score_row, kv_tokens);
+        }
+        gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace(
+            scores, value_columns, NULL, output_head,
+            query_tokens, head_dim, kv_tokens,
+            gemm_scores, gemm_scores_bytes, gemm_rows, gemm_rows_bytes,
+            NULL, 0);
+    }
+#else
+    (void)q; (void)k; (void)v; (void)output; (void)num_heads;
+    (void)num_kv_heads; (void)query_tokens; (void)kv_tokens;
+    (void)kv_stride_tokens; (void)head_dim; (void)aligned_head_dim;
+    (void)sliding_window;
+    (void)scores; (void)scores_bytes; (void)key_rows; (void)key_rows_bytes;
+    (void)value_columns; (void)value_columns_bytes;
+    (void)gemm_rows; (void)gemm_rows_bytes;
+    (void)gemm_scores; (void)gemm_scores_bytes;
+    fprintf(stderr,
+            "HARD KERNEL CONTRACT FAULT: Muse eager attention requires "
+            "AVX-512 and USE_ONEDNN=1\n");
+    abort();
+#endif
+}
+
+void attention_forward_causal_head_major_gqa_muse_eager_bf16_storage(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens,
+    float *scores, size_t scores_bytes,
+    uint16_t *key_rows, size_t key_rows_bytes,
+    uint16_t *value_columns, size_t value_columns_bytes,
+    uint16_t *gemm_rows, size_t gemm_rows_bytes,
+    uint16_t *gemm_scores, size_t gemm_scores_bytes)
+{
+    ck_attention_muse_eager_bf16_storage_impl(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
+        kv_stride_tokens, head_dim, aligned_head_dim, 0,
+        scores, scores_bytes, key_rows, key_rows_bytes,
+        value_columns, value_columns_bytes, gemm_rows, gemm_rows_bytes,
+        gemm_scores, gemm_scores_bytes);
+}
+
+void attention_forward_causal_head_major_gqa_muse_eager_bf16_storage_sliding(
+    const float *q, const float *k, const float *v, float *output,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int kv_stride_tokens, int sliding_window,
+    float *scores, size_t scores_bytes,
+    uint16_t *key_rows, size_t key_rows_bytes,
+    uint16_t *value_columns, size_t value_columns_bytes,
+    uint16_t *gemm_rows, size_t gemm_rows_bytes,
+    uint16_t *gemm_scores, size_t gemm_scores_bytes)
+{
+    ck_attention_muse_eager_bf16_storage_impl(
+        q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
+        kv_stride_tokens, head_dim, aligned_head_dim, sliding_window,
+        scores, scores_bytes, key_rows, key_rows_bytes,
+        value_columns, value_columns_bytes, gemm_rows, gemm_rows_bytes,
+        gemm_scores, gemm_scores_bytes);
+}
+
+void attention_forward_decode_head_major_gqa_muse_eager_bf16_storage(
+    const float *q_token, const float *k_cache, const float *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim,
+    float *scores, size_t scores_bytes,
+    uint16_t *key_rows, size_t key_rows_bytes,
+    uint16_t *value_columns, size_t value_columns_bytes,
+    uint16_t *gemm_rows, size_t gemm_rows_bytes,
+    uint16_t *gemm_scores, size_t gemm_scores_bytes)
+{
+    ck_attention_muse_eager_bf16_storage_impl(
+        q_token, k_cache, v_cache, out_token, num_heads, num_kv_heads,
+        1, kv_tokens, cache_capacity, head_dim, aligned_head_dim, 0,
+        scores, scores_bytes, key_rows, key_rows_bytes,
+        value_columns, value_columns_bytes, gemm_rows, gemm_rows_bytes,
+        gemm_scores, gemm_scores_bytes);
+}
+
+void attention_forward_decode_head_major_gqa_muse_eager_bf16_storage_sliding(
+    const float *q_token, const float *k_cache, const float *v_cache,
+    float *out_token, int num_heads, int num_kv_heads, int kv_tokens,
+    int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window,
+    float *scores, size_t scores_bytes,
+    uint16_t *key_rows, size_t key_rows_bytes,
+    uint16_t *value_columns, size_t value_columns_bytes,
+    uint16_t *gemm_rows, size_t gemm_rows_bytes,
+    uint16_t *gemm_scores, size_t gemm_scores_bytes)
+{
+    ck_attention_muse_eager_bf16_storage_impl(
+        q_token, k_cache, v_cache, out_token, num_heads, num_kv_heads,
+        1, kv_tokens, cache_capacity, head_dim, aligned_head_dim,
+        sliding_window, scores, scores_bytes, key_rows, key_rows_bytes,
+        value_columns, value_columns_bytes, gemm_rows, gemm_rows_bytes,
+        gemm_scores, gemm_scores_bytes);
+}
+
 ck_attention_status_t attention_forward_decode_head_major_gqa_bf16cache_pytorch_contract(
     const float *q_token,
     const uint16_t *k_cache,

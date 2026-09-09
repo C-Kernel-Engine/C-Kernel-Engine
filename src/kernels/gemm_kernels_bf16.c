@@ -28,6 +28,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void ck_pytorch_brgemm_fault(const char *message, int M, int N, int K)
+{
+    fprintf(stderr, "HARD KERNEL CONTRACT FAULT: PyTorch oneDNN BF16 BRGEMM %s "
+                    "(M=%d N=%d K=%d)\n", message, M, N, K);
+    abort();
+}
+
 #ifdef USE_ONEDNN
 #include <dnnl.h>
 #include <pthread.h>
@@ -1393,13 +1400,6 @@ static void ck_pytorch_brgemm_init(void)
     ck_pytorch_brgemm_init_status = 0;
 }
 
-static void ck_pytorch_brgemm_fault(const char *message, int M, int N, int K)
-{
-    fprintf(stderr, "HARD KERNEL CONTRACT FAULT: PyTorch oneDNN BF16 BRGEMM %s "
-                    "(M=%d N=%d K=%d)\n", message, M, N, K);
-    abort();
-}
-
 static void ck_pytorch_brgemm_require_version(int major, int minor, int patch,
                                                const char *source_hash,
                                                const char *provider,
@@ -1427,9 +1427,33 @@ static void ck_pytorch_brgemm_require_version(int major, int minor, int patch,
 }
 #endif
 
-static void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
+static void ck_pytorch_brgemm_workspace_sizes(
+    int M, int N, int K,
+    size_t *input_bytes, size_t *output_bytes, size_t *bias_bytes)
+{
+    if (M <= 0 || N <= 0 || K <= 0 ||
+        (size_t)M > SIZE_MAX / (size_t)K ||
+        (size_t)M > SIZE_MAX / (size_t)N) {
+        ck_pytorch_brgemm_fault("workspace size overflow", M, N, K);
+    }
+    const size_t input_count = (size_t)M * (size_t)K;
+    const size_t output_count = (size_t)M * (size_t)N;
+    if (input_count > SIZE_MAX / sizeof(uint16_t) ||
+        output_count > SIZE_MAX / sizeof(uint16_t) ||
+        (size_t)N > SIZE_MAX / sizeof(uint16_t)) {
+        ck_pytorch_brgemm_fault("workspace byte size overflow", M, N, K);
+    }
+    *input_bytes = input_count * sizeof(uint16_t);
+    *output_bytes = output_count * sizeof(uint16_t);
+    *bias_bytes = (size_t)N * sizeof(uint16_t);
+}
+
+static void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl(
     const float *A, const void *B, const float *bias, float *C,
-    int M, int N, int K)
+    int M, int N, int K,
+    uint16_t *input_bf16, size_t input_bf16_bytes,
+    uint16_t *output_bf16, size_t output_bf16_bytes,
+    uint16_t *bias_bf16, size_t bias_bf16_bytes)
 {
 #ifdef USE_ONEDNN
     if (!A || !B || !C || M <= 0 || N <= 0 || K <= 0) {
@@ -1439,16 +1463,18 @@ static void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
         ck_pytorch_brgemm_fault("could not initialize oneDNN", M, N, K);
     }
 
-    const size_t input_count = (size_t)M * (size_t)K;
-    const size_t output_count = (size_t)M * (size_t)N;
-    uint16_t *input_bf16 = (uint16_t *)malloc(input_count * sizeof(*input_bf16));
-    uint16_t *output_bf16 = (uint16_t *)malloc(output_count * sizeof(*output_bf16));
-    uint16_t *bias_bf16 = bias ? (uint16_t *)malloc((size_t)N * sizeof(*bias_bf16)) : NULL;
-    if (!input_bf16 || !output_bf16 || (bias && !bias_bf16)) {
-        free(bias_bf16);
-        free(output_bf16);
-        free(input_bf16);
-        ck_pytorch_brgemm_fault("workspace allocation failed", M, N, K);
+    size_t required_input_bytes = 0;
+    size_t required_output_bytes = 0;
+    size_t required_bias_bytes = 0;
+    ck_pytorch_brgemm_workspace_sizes(
+        M, N, K, &required_input_bytes, &required_output_bytes,
+        &required_bias_bytes);
+    const size_t input_count = required_input_bytes / sizeof(*input_bf16);
+    const size_t output_count = required_output_bytes / sizeof(*output_bf16);
+    if (!input_bf16 || input_bf16_bytes < required_input_bytes ||
+        !output_bf16 || output_bf16_bytes < required_output_bytes ||
+        (bias && (!bias_bf16 || bias_bf16_bytes < required_bias_bytes))) {
+        ck_pytorch_brgemm_fault("received an undersized workspace", M, N, K);
     }
     for (size_t i = 0; i < input_count; ++i) input_bf16[i] = float_to_bf16(A[i]);
     if (bias) {
@@ -1516,21 +1542,45 @@ cleanup:
 #undef CK_DNNL
 
     if (status != dnnl_success) {
-        free(bias_bf16);
-        free(output_bf16);
-        free(input_bf16);
         ck_pytorch_brgemm_fault("execution failed", M, N, K);
     }
     for (size_t i = 0; i < output_count; ++i) C[i] = bf16_to_float(output_bf16[i]);
-    free(bias_bf16);
-    free(output_bf16);
-    free(input_bf16);
 #else
     (void)A; (void)B; (void)bias; (void)C; (void)M; (void)N; (void)K;
+    (void)input_bf16; (void)input_bf16_bytes;
+    (void)output_bf16; (void)output_bf16_bytes;
+    (void)bias_bf16; (void)bias_bf16_bytes;
     fprintf(stderr, "HARD KERNEL CONTRACT FAULT: PyTorch oneDNN BF16 BRGEMM was "
                     "selected without USE_ONEDNN=1\n");
     abort();
 #endif
+}
+
+static void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
+    const float *A, const void *B, const float *bias, float *C,
+    int M, int N, int K)
+{
+    size_t input_bytes = 0;
+    size_t output_bytes = 0;
+    size_t bias_bytes = 0;
+    ck_pytorch_brgemm_workspace_sizes(
+        M, N, K, &input_bytes, &output_bytes, &bias_bytes);
+    uint16_t *input_bf16 = (uint16_t *)malloc(input_bytes);
+    uint16_t *output_bf16 = (uint16_t *)malloc(output_bytes);
+    uint16_t *bias_bf16 = bias ? (uint16_t *)malloc(bias_bytes) : NULL;
+    if (!input_bf16 || !output_bf16 || (bias && !bias_bf16)) {
+        free(bias_bf16);
+        free(output_bf16);
+        free(input_bf16);
+        ck_pytorch_brgemm_fault("workspace allocation failed", M, N, K);
+    }
+    gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl(
+        A, B, bias, C, M, N, K,
+        input_bf16, input_bytes, output_bf16, output_bytes,
+        bias_bf16, bias_bytes);
+    free(bias_bf16);
+    free(output_bf16);
+    free(input_bf16);
 }
 
 void gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage(const float *A,
@@ -1559,6 +1609,25 @@ void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage(
 #endif
     gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl(
         A, B, bias, C, M, N, K);
+}
+
+void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace(
+    const float *A, const void *B, const float *bias, float *C,
+    int M, int N, int K,
+    uint16_t *input_bf16, size_t input_bf16_bytes,
+    uint16_t *output_bf16, size_t output_bf16_bytes,
+    uint16_t *bias_bf16, size_t bias_bf16_bytes)
+{
+#ifdef USE_ONEDNN
+    ck_pytorch_brgemm_require_version(
+        3, 12, 0, "80afa71049cd69a3df32adcccb623b12cd7baa22",
+        "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace",
+        M, N, K);
+#endif
+    gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl(
+        A, B, bias, C, M, N, K,
+        input_bf16, input_bf16_bytes, output_bf16, output_bf16_bytes,
+        bias_bf16, bias_bf16_bytes);
 }
 
 void patch_projection_bf16_pytorch_onednn_conv3d_storage(

@@ -5286,6 +5286,9 @@ def _kernel_scratch_size_bytes(
         "K": values.get("_k", values.get("_input_dim")),
         "K_blocks": int(k_extent) // 256 if k_extent is not None else None,
         "T": values.get("seq_len"),
+        "C": values.get(
+            "context_length", values.get("context_len", values.get("max_seq_len"))
+        ),
         "S": values.get(
             "max_seq_len", values.get("context_length", values.get("context_len"))
         ),
@@ -5402,7 +5405,16 @@ def _required_kernel_call_storage_bytes(
 
         workspace_cursor = 0
         arena_cursor = live_prefix
+        scratch_budget = None
         for scratch in scratch_items:
+            declared_budget = scratch.get("aggregate_budget_bytes")
+            if declared_budget is not None:
+                declared_budget = int(declared_budget)
+                scratch_budget = (
+                    declared_budget
+                    if scratch_budget is None
+                    else min(scratch_budget, declared_budget)
+                )
             size = _kernel_scratch_size_bytes(scratch, params, scratch_config)
             if size is None:
                 if scratch.get("size_resolution") == "required":
@@ -5420,6 +5432,12 @@ def _required_kernel_call_storage_bytes(
             workspace_cursor += int(size)
             arena_cursor = (arena_cursor + alignment - 1) & ~(alignment - 1)
             arena_cursor += int(size)
+        if scratch_budget is not None and workspace_cursor > scratch_budget:
+            raise RuntimeError(
+                "HARD SCRATCH BUDGET FAULT: selected bounded provider "
+                f"{op.get('kernel')} requires {workspace_cursor} bytes, exceeding "
+                f"its declared {scratch_budget}-byte call-workspace budget"
+            )
         maximum_workspace = max(maximum_workspace, workspace_cursor)
         maximum_arena = max(maximum_arena, arena_cursor)
     return maximum_workspace, maximum_arena
@@ -10804,6 +10822,11 @@ def generate_ir_lower_1(
         for op in lowered_ops
         if str(op.get("op", "")) in {"rope_qk", "rope_q", "mrope_qk"}
     }
+    decode_qk_norm_layers = {
+        int(op.get("layer", 0))
+        for op in lowered_ops
+        if str(op.get("op", "")) in {"qk_norm", "qk_norm_no_weight_scaled"}
+    }
     decode_mla_layers = {
         int(op.get("layer", 0))
         for op in lowered_ops
@@ -10980,6 +11003,7 @@ def generate_ir_lower_1(
                 op_name == "v_proj"
                 and layer in decode_attention_layers
                 and layer not in decode_rope_layers
+                and layer not in decode_qk_norm_layers
                 and layer not in decode_explicit_v_bias_layers
             )
             should_store_after_v_bias = (
@@ -10987,8 +11011,14 @@ def generate_ir_lower_1(
                 and str(op.get("bias_for", "")) == "v_proj"
                 and layer in decode_attention_layers
                 and layer not in decode_rope_layers
+                and layer not in decode_qk_norm_layers
             )
-            if should_store_after_rope or should_store_after_v:
+            should_store_after_qk_norm = (
+                op_name in {"qk_norm", "qk_norm_no_weight_scaled"}
+                and layer in decode_attention_layers
+                and layer not in decode_rope_layers
+            )
+            if should_store_after_rope or should_store_after_v or should_store_after_qk_norm:
                 final_ops.append(_make_decode_kv_store_op(op))
                 kv_store_count += 1
             elif should_store_after_v_bias:

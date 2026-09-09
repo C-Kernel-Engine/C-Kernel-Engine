@@ -15,13 +15,12 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class TestKernelAllocationAudit(unittest.TestCase):
-    def test_versioned_onednn_wrappers_keep_shared_allocation_debt(self):
+    def test_legacy_onednn_wrapper_keeps_shared_allocation_debt(self):
         rows = AUDIT.build_report()["mapped_allocating_providers"]
         shared = [row for row in rows if row["function"] ==
                   "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl"]
         self.assertEqual({row["id"] for row in shared}, {
             "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage",
-            "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
         })
 
     def test_scanner_ignores_comments_and_literals(self):
@@ -49,9 +48,9 @@ class TestKernelAllocationAudit(unittest.TestCase):
         baseline = json.loads(AUDIT.BASELINE.read_text(encoding="utf-8"))
         AUDIT.validate_ratchet(report, baseline)
         self.assertEqual(report["counts"]["production_allocation_calls"], 51)
-        self.assertEqual(report["counts"]["mapped_allocating_providers"], 3)
+        self.assertEqual(report["counts"]["mapped_allocating_providers"], 2)
         self.assertEqual(
-            report["counts"]["mapped_allocating_without_scratch_contract"], 3
+            report["counts"]["mapped_allocating_without_scratch_contract"], 2
         )
         self.assertEqual(
             [warning["code"] for warning in report["warnings"]],

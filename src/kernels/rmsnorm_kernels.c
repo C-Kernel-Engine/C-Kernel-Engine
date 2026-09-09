@@ -477,7 +477,7 @@ void rmsnorm_forward_muse_weighted_pytorch_bf16_storage(
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, weight, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, aligned_embed_dim, eps, 1, 1);
+        aligned_embed_dim, aligned_embed_dim, eps, 1, 0);
 }
 
 void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
@@ -491,7 +491,7 @@ void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, NULL, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, aligned_embed_dim, eps, 3, 1);
+        aligned_embed_dim, aligned_embed_dim, eps, 3, 0);
 }
 
 static void rmsnorm_backward_strict_scalar(const float *d_output,

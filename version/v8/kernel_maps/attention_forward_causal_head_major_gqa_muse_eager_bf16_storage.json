@@ -1,0 +1,378 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_muse_eager_bf16_storage",
+  "op": "attention",
+  "selection": {
+    "status": "candidate",
+    "priority": 200,
+    "equivalence_group": "attention.muse_eager_bf16_causal.v1",
+    "phases": [
+      "prefill"
+    ]
+  },
+  "variant": "muse_eager_bf16_causal",
+  "mode": "prefill",
+  "contract_schema_version": 1,
+  "provides": {
+    "execution.phase": [
+      "prefill"
+    ],
+    "execution.attention_schedule": [
+      "full_matrix_causal"
+    ],
+    "tensor.q.dtype": [
+      "fp32"
+    ],
+    "tensor.kv.dtype": [
+      "fp32"
+    ],
+    "tensor.layout": [
+      "head_major"
+    ],
+    "numerics.attention_reduction": [
+      "muse_eager_bf16"
+    ]
+  },
+  "supported_reductions": {
+    "muse_eager_bf16": {
+      "status": "observed",
+      "function": "attention_forward_causal_head_major_gqa_muse_eager_bf16_storage",
+      "explicit_selector": true,
+      "notes": "BF16 QK matmul, BF16 scaling, FP32 softmax, BF16 probability storage, and BF16 PV matmul."
+    }
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "threading": {
+      "runtime": "external_blas",
+      "work_partition": [
+        "serial"
+      ],
+      "dispatch": [
+        "internal_threaded"
+      ],
+      "reduction_order_effect": "contract_defined"
+    }
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "desc": "Query tensor [heads, tokens, head_dim]",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Key tensor [kv_heads, prefill token count, head_dim], compact prefill layout",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": [
+        "KV",
+        "T",
+        "D"
+      ],
+      "desc": "Value tensor [kv_heads, prefill token count, head_dim], compact prefill layout",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": [
+        "H",
+        "T",
+        "D"
+      ],
+      "desc": "Attention output [heads, tokens, head_dim]",
+      "layout": "head_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "scores",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "size_resolution": "required",
+      "aggregate_budget_bytes": 1073741824,
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "key_rows",
+      "dtype": "bf16",
+      "shape": [
+        "C",
+        "D"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "value_columns",
+      "dtype": "bf16",
+      "shape": [
+        "D",
+        "C"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "gemm_rows",
+      "dtype": "bf16",
+      "shape": [
+        "T",
+        "D"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "gemm_scores",
+      "dtype": "bf16",
+      "shape": [
+        "T",
+        "C"
+      ],
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64,
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "H",
+    "KV",
+    "T",
+    "D"
+  ],
+  "params": [
+    {
+      "name": "kv_stride_tokens",
+      "dtype": "int32",
+      "desc": "Stride in tokens for KV cache layout"
+    },
+    {
+      "name": "head_dim",
+      "dtype": "int32",
+      "desc": "Head dimension (unpadded)"
+    },
+    {
+      "name": "aligned_head_dim",
+      "dtype": "int32",
+      "desc": "Aligned head dimension for SIMD"
+    }
+  ],
+  "constraints": {
+    "alignment": {
+      "D": 64
+    },
+    "notes": "Bounded eager-parity provider. Requires AVX-512F, oneDNN 3.12.0, PyTorch SLEEF expf16, D == aligned D, and at most 1 GiB of declared call workspace."
+  },
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_muse_eager_bf16_storage",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_muse_eager_bf16_storage(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, float *scores, size_t scores_bytes, uint16_t *key_rows, size_t key_rows_bytes, uint16_t *value_columns, size_t value_columns_bytes, uint16_t *gemm_rows, size_t gemm_rows_bytes, uint16_t *gemm_scores, size_t gemm_scores_bytes);",
+    "sources": [
+      "src/kernels/attention_kernels.c",
+      "src/kernels/gemm_kernels_bf16.c",
+      "src/kernels/softmax_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "avx512_onednn_3_12",
+        "requires": [
+          "avx512f",
+          "onednn_3_12",
+          "pytorch_sleef_expf16"
+        ],
+        "compile_flags": [
+          "-mavx512f",
+          "-DUSE_ONEDNN"
+        ]
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "unittest/bf16/test_muse_glimmer_norms_bf16.py"
+    ],
+    "parity": [
+      {
+        "kind": "pytorch_eager_bf16",
+        "command": "python unittest/bf16/test_muse_glimmer_norms_bf16.py",
+        "tolerance": "bit_exact",
+        "notes": "Small multi-KV-head oracle; full-model evidence is recorded separately."
+      }
+    ]
+  },
+  "notes": "Bounded full-matrix Muse eager-attention parity provider. Caller-owned CKE tensor scratch does not imply that oneDNN performs no internal allocation.",
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "q",
+        "source": "scratch:q_scratch",
+        "cast": "float*",
+        "ports": [
+          "input:q"
+        ]
+      },
+      {
+        "name": "k",
+        "source": "scratch:k_scratch",
+        "cast": "float*",
+        "ports": [
+          "input:k"
+        ]
+      },
+      {
+        "name": "v",
+        "source": "scratch:v_scratch",
+        "cast": "float*",
+        "ports": [
+          "input:v"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:out",
+        "cast": "float*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "num_heads",
+        "source": "dim:num_heads"
+      },
+      {
+        "name": "num_kv_heads",
+        "source": "dim:num_kv_heads"
+      },
+      {
+        "name": "num_tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "aligned_head_dim",
+        "source": "dim:head_dim"
+      },
+      {
+        "name": "kv_stride_tokens",
+        "source": "dim:seq_len"
+      },
+      {
+        "name": "scores",
+        "source": "scratch:scores",
+        "cast": "float*"
+      },
+      {
+        "name": "scores_bytes",
+        "source": "scratch_size:scores"
+      },
+      {
+        "name": "key_rows",
+        "source": "scratch:key_rows",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "key_rows_bytes",
+        "source": "scratch_size:key_rows"
+      },
+      {
+        "name": "value_columns",
+        "source": "scratch:value_columns",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "value_columns_bytes",
+        "source": "scratch_size:value_columns"
+      },
+      {
+        "name": "gemm_rows",
+        "source": "scratch:gemm_rows",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "gemm_rows_bytes",
+        "source": "scratch_size:gemm_rows"
+      },
+      {
+        "name": "gemm_scores",
+        "source": "scratch:gemm_scores",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "gemm_scores_bytes",
+        "source": "scratch_size:gemm_scores"
+      }
+    ]
+  },
+  "operation_interface": "attention.muse_eager_bf16.prefill.attention.v1"
+}

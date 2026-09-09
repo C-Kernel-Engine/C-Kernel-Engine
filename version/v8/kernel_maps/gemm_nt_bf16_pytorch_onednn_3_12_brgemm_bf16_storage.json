@@ -4,46 +4,171 @@
   "operation_interface": "gemm.nt.bf16_weight.bf16_values.bf16_output.v1",
   "physical_contract_version": 1,
   "variant": "bf16_w_fp32_pytorch_onednn_3_12_brgemm_bf16_out",
-  "quant": {"weight": "bf16", "activation": "fp32", "output": "bf16"},
+  "quant": {
+    "weight": "bf16",
+    "activation": "fp32",
+    "output": "bf16"
+  },
   "inputs": [
-    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required", "desc": "BF16-valued activation in FP32 storage"}
+    {
+      "name": "A",
+      "dtype": "fp32",
+      "shape": [
+        "M",
+        "K"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16-valued activation in FP32 storage"
+    }
   ],
   "weights": [
-    {"name": "B", "dtype": "bf16", "shape": ["N", "K"], "layout": "opaque_packed", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required", "desc": "PyTorch Linear weight layout"},
-    {"name": "bias", "dtype": "fp32", "shape": ["N"], "layout": "token_major_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "optional", "optional": true, "desc": "BF16-valued bias in FP32 storage"}
+    {
+      "name": "B",
+      "dtype": "bf16",
+      "shape": [
+        "N",
+        "K"
+      ],
+      "layout": "opaque_packed",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required",
+      "desc": "PyTorch Linear weight layout"
+    },
+    {
+      "name": "bias",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "optional",
+      "optional": true,
+      "desc": "BF16-valued bias in FP32 storage"
+    }
   ],
   "outputs": [
-    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "layout": "token_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required", "desc": "BF16 RNE values represented in FP32 storage"}
+    {
+      "name": "C",
+      "dtype": "fp32",
+      "shape": [
+        "M",
+        "N"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required",
+      "desc": "BF16 RNE values represented in FP32 storage"
+    }
   ],
-  "scratch": [],
-  "dims": ["M", "N", "K"],
+  "scratch": [
+    {
+      "name": "input_bf16",
+      "dtype": "bf16",
+      "shape": [
+        "M",
+        "K"
+      ],
+      "size_resolution": "required",
+      "alignment": 64,
+      "lifetime": "kernel_call",
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "output_bf16",
+      "dtype": "bf16",
+      "shape": [
+        "M",
+        "N"
+      ],
+      "size_resolution": "required",
+      "alignment": 64,
+      "lifetime": "kernel_call",
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    },
+    {
+      "name": "bias_bf16",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "size_resolution": "required",
+      "alignment": 64,
+      "lifetime": "kernel_call",
+      "layout": "contiguous",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "M",
+    "N",
+    "K"
+  ],
   "constraints": {
     "external_runtime": "onednn_3_12_openmp",
     "source_hash": "80afa71049cd69a3df32adcccb623b12cd7baa22"
   },
   "impl": {
-    "allocation_helpers": ["gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_impl"],
-    "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
-    "c_declaration": "void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
-    "sources": ["src/kernels/gemm_kernels_bf16.c"],
+    "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace",
+    "c_declaration": "void gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace(const float *A, const void *B, const float *bias, float *C, int M, int N, int K, uint16_t *input_bf16, size_t input_bf16_bytes, uint16_t *output_bf16, size_t output_bf16_bytes, uint16_t *bias_bf16, size_t bias_bf16_bytes);",
+    "sources": [
+      "src/kernels/gemm_kernels_bf16.c"
+    ],
     "variants": [
-      {"name": "onednn_3_12_openmp", "requires": ["avx512_bf16"], "compile_flags": ["-DUSE_ONEDNN"]}
+      {
+        "name": "onednn_3_12_openmp",
+        "requires": [
+          "avx512_bf16"
+        ],
+        "compile_flags": [
+          "-DUSE_ONEDNN"
+        ]
+      }
     ]
   },
-  "modes": {"inference": true, "training": false, "backward": false},
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
   "numerical_capabilities": [
     {
       "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
       "status": "validated",
-      "phases": ["prefill", "decode"],
-      "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage",
+      "phases": [
+        "prefill",
+        "decode"
+      ],
+      "function": "gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace",
       "explicit_selector": true,
       "implementation": {
         "isa_dispatch": "runtime",
         "threading": {
           "runtime": "openmp",
-          "work_partition": ["split_k"],
-          "dispatch": ["internal_threaded"],
+          "work_partition": [
+            "split_k"
+          ],
+          "dispatch": [
+            "internal_threaded"
+          ],
           "reduction_order_effect": "contract_defined"
         }
       },
@@ -58,7 +183,9 @@
   ],
   "notes": "PyTorch 2.13 BF16 Linear parity provider pinned to oneDNN 3.12.0 OpenMP at source commit 80afa71049cd69a3df32adcccb623b12cd7baa22. Exactness is defined at a fixed OpenMP thread count.",
   "tests": {
-    "unit": ["unittest/bf16/test_pytorch_onednn_3_12_oracle_contract_bf16.py"],
+    "unit": [
+      "unittest/bf16/test_pytorch_onednn_3_12_oracle_contract_bf16.py"
+    ],
     "real_shapes": [
       "M=1,N=256,K=6144"
     ]
@@ -67,13 +194,75 @@
     "version": 1,
     "last_token_dispatch": "preserve_provider",
     "params": [
-      {"cast": "const float*", "name": "A", "source": "activation:a", "ports": ["input:A"]},
-      {"name": "B", "source": "weight:_first_weight", "ports": ["weight:B"]},
-      {"name": "bias", "source": "weight_f:_bias", "ports": ["weight:bias"]},
-      {"cast": "float*", "name": "C", "source": "output:c", "ports": ["output:C"]},
-      {"name": "M", "source": "dim:_m"},
-      {"name": "N", "source": "dim:_output_dim"},
-      {"name": "K", "source": "dim:_input_dim"}
+      {
+        "cast": "const float*",
+        "name": "A",
+        "source": "activation:a",
+        "ports": [
+          "input:A"
+        ]
+      },
+      {
+        "name": "B",
+        "source": "weight:_first_weight",
+        "ports": [
+          "weight:B"
+        ]
+      },
+      {
+        "name": "bias",
+        "source": "weight_f:_bias",
+        "ports": [
+          "weight:bias"
+        ]
+      },
+      {
+        "cast": "float*",
+        "name": "C",
+        "source": "output:c",
+        "ports": [
+          "output:C"
+        ]
+      },
+      {
+        "name": "M",
+        "source": "dim:_m"
+      },
+      {
+        "name": "N",
+        "source": "dim:_output_dim"
+      },
+      {
+        "name": "K",
+        "source": "dim:_input_dim"
+      },
+      {
+        "name": "input_bf16",
+        "source": "scratch:input_bf16",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "input_bf16_bytes",
+        "source": "scratch_size:input_bf16"
+      },
+      {
+        "name": "output_bf16",
+        "source": "scratch:output_bf16",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "output_bf16_bytes",
+        "source": "scratch_size:output_bf16"
+      },
+      {
+        "name": "bias_bf16",
+        "source": "scratch:bias_bf16",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "bias_bf16_bytes",
+        "source": "scratch_size:bias_bf16"
+      }
     ]
   }
 }

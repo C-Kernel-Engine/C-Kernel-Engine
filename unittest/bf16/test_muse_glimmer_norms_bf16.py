@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import ctypes
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +21,7 @@ LIB_PATH = Path(
 )
 LIB = ctypes.CDLL(str(LIB_PATH))
 FLOAT_P = ctypes.POINTER(ctypes.c_float)
+U16_P = ctypes.POINTER(ctypes.c_uint16)
 
 
 def bf16_values(values: np.ndarray) -> np.ndarray:
@@ -82,6 +85,31 @@ LOGIT_SOFTCAP = LIB.final_logit_softcap_muse_pytorch_bf16_storage
 for kernel in (LOGIT_SCALE, LOGIT_SOFTCAP):
     kernel.argtypes = [FLOAT_P, ctypes.c_int, ctypes.c_int, ctypes.c_float]
     kernel.restype = None
+
+ATTENTION = LIB.attention_forward_causal_head_major_gqa_muse_eager_bf16_storage_sliding
+ATTENTION.argtypes = [
+    FLOAT_P, FLOAT_P, FLOAT_P, FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    FLOAT_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+]
+ATTENTION.restype = None
+DECODE_ATTENTION = LIB.attention_forward_decode_head_major_gqa_muse_eager_bf16_storage_sliding
+DECODE_ATTENTION.argtypes = [
+    FLOAT_P, FLOAT_P, FLOAT_P, FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    FLOAT_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+    U16_P, ctypes.c_size_t,
+]
+DECODE_ATTENTION.restype = None
 
 
 def run_rmsnorm_case(tokens: int, dim: int, seed: int) -> None:
@@ -219,15 +247,152 @@ def run_logits_case(seed: int) -> None:
     np.testing.assert_array_equal(actual, expected.float().numpy())
 
 
+def run_attention_case(tokens: int, sliding_window: int, seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    heads, kv_heads, head_dim = 4, 2, 128
+    q = bf16_values(
+        rng.standard_normal((heads, tokens, head_dim), dtype=np.float32)
+    )
+    k = bf16_values(
+        rng.standard_normal((kv_heads, tokens, head_dim), dtype=np.float32)
+    )
+    v = bf16_values(
+        rng.standard_normal((kv_heads, tokens, head_dim), dtype=np.float32)
+    )
+    actual = np.empty_like(q)
+    scores = np.empty((tokens, tokens), dtype=np.float32)
+    key_rows = np.empty((tokens, head_dim), dtype=np.uint16)
+    value_columns = np.empty((head_dim, tokens), dtype=np.uint16)
+    gemm_rows = np.empty((tokens, head_dim), dtype=np.uint16)
+    gemm_scores = np.empty((tokens, tokens), dtype=np.uint16)
+    ATTENTION(
+        q.ctypes.data_as(FLOAT_P),
+        k.ctypes.data_as(FLOAT_P),
+        v.ctypes.data_as(FLOAT_P),
+        actual.ctypes.data_as(FLOAT_P),
+        heads,
+        kv_heads,
+        tokens,
+        head_dim,
+        head_dim,
+        tokens,
+        sliding_window,
+        scores.ctypes.data_as(FLOAT_P), scores.nbytes,
+        key_rows.ctypes.data_as(U16_P), key_rows.nbytes,
+        value_columns.ctypes.data_as(U16_P), value_columns.nbytes,
+        gemm_rows.ctypes.data_as(U16_P), gemm_rows.nbytes,
+        gemm_scores.ctypes.data_as(U16_P), gemm_scores.nbytes,
+    )
+
+    query = torch.from_numpy(q).to(torch.bfloat16)[None]
+    key = torch.from_numpy(k).to(torch.bfloat16).repeat_interleave(
+        heads // kv_heads, dim=0
+    )[None]
+    value = torch.from_numpy(v).to(torch.bfloat16).repeat_interleave(
+        heads // kv_heads, dim=0
+    )[None]
+    scores = torch.matmul(query, key.transpose(2, 3)) * (head_dim ** -0.5)
+    mask = torch.full((tokens, tokens), float("-inf"), dtype=torch.bfloat16)
+    for row in range(tokens):
+        begin = max(0, row + 1 - sliding_window) if sliding_window > 0 else 0
+        mask[row, begin : row + 1] = 0
+    probabilities = torch.softmax(
+        scores + mask[None, None], dim=-1, dtype=torch.float32
+    ).to(torch.bfloat16)
+    expected = torch.matmul(probabilities, value)[0].float().numpy()
+    np.testing.assert_array_equal(actual, expected)
+
+
+def run_undersized_attention_probe() -> None:
+    tokens, heads, kv_heads, head_dim = 2, 4, 2, 128
+    q = np.zeros((heads, tokens, head_dim), dtype=np.float32)
+    k = np.zeros((kv_heads, tokens, head_dim), dtype=np.float32)
+    v = np.zeros_like(k)
+    out = np.empty_like(q)
+    scores = np.empty((tokens, tokens), dtype=np.float32)
+    key_rows = np.empty((tokens, head_dim), dtype=np.uint16)
+    value_columns = np.empty((head_dim, tokens), dtype=np.uint16)
+    gemm_rows = np.empty((tokens, head_dim), dtype=np.uint16)
+    gemm_scores = np.empty((tokens, tokens), dtype=np.uint16)
+    ATTENTION(
+        q.ctypes.data_as(FLOAT_P), k.ctypes.data_as(FLOAT_P),
+        v.ctypes.data_as(FLOAT_P), out.ctypes.data_as(FLOAT_P),
+        heads, kv_heads, tokens, head_dim, head_dim, tokens, 0,
+        scores.ctypes.data_as(FLOAT_P), scores.nbytes - 1,
+        key_rows.ctypes.data_as(U16_P), key_rows.nbytes,
+        value_columns.ctypes.data_as(U16_P), value_columns.nbytes,
+        gemm_rows.ctypes.data_as(U16_P), gemm_rows.nbytes,
+        gemm_scores.ctypes.data_as(U16_P), gemm_scores.nbytes,
+    )
+    raise AssertionError("undersized Muse workspace was accepted")
+
+
+def run_decode_stride_case(seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    heads, kv_heads, live_tokens, capacity, head_dim = 4, 2, 3, 7, 128
+    q = bf16_values(rng.standard_normal((heads, head_dim), dtype=np.float32))
+    k = bf16_values(
+        rng.standard_normal((kv_heads, capacity, head_dim), dtype=np.float32)
+    )
+    v = bf16_values(
+        rng.standard_normal((kv_heads, capacity, head_dim), dtype=np.float32)
+    )
+    actual = np.empty_like(q)
+    scores = np.empty(live_tokens, dtype=np.float32)
+    key_rows = np.empty((live_tokens, head_dim), dtype=np.uint16)
+    value_columns = np.empty((head_dim, live_tokens), dtype=np.uint16)
+    gemm_rows = np.empty(head_dim, dtype=np.uint16)
+    gemm_scores = np.empty(live_tokens, dtype=np.uint16)
+    DECODE_ATTENTION(
+        q.ctypes.data_as(FLOAT_P), k.ctypes.data_as(FLOAT_P),
+        v.ctypes.data_as(FLOAT_P), actual.ctypes.data_as(FLOAT_P),
+        heads, kv_heads, live_tokens, capacity, head_dim, head_dim, 2048,
+        scores.ctypes.data_as(FLOAT_P), scores.nbytes,
+        key_rows.ctypes.data_as(U16_P), key_rows.nbytes,
+        value_columns.ctypes.data_as(U16_P), value_columns.nbytes,
+        gemm_rows.ctypes.data_as(U16_P), gemm_rows.nbytes,
+        gemm_scores.ctypes.data_as(U16_P), gemm_scores.nbytes,
+    )
+    query = torch.from_numpy(q).to(torch.bfloat16)[None, :, None, :]
+    key = torch.from_numpy(k[:, :live_tokens]).to(torch.bfloat16)
+    value = torch.from_numpy(v[:, :live_tokens]).to(torch.bfloat16)
+    key = key.repeat_interleave(heads // kv_heads, dim=0)[None]
+    value = value.repeat_interleave(heads // kv_heads, dim=0)[None]
+    probabilities = torch.softmax(
+        torch.matmul(query, key.transpose(2, 3)) * (head_dim ** -0.5),
+        dim=-1,
+        dtype=torch.float32,
+    ).to(torch.bfloat16)
+    expected = torch.matmul(probabilities, value)[0, :, 0].float().numpy()
+    np.testing.assert_array_equal(actual, expected)
+
+
 def main() -> int:
+    if os.environ.get("CK_MUSE_UNDERSIZED_PROBE") == "1":
+        run_undersized_attention_probe()
+        return 1
     if torch.backends.cpu.get_cpu_capability() not in {"AVX2", "AVX512"}:
         print("Muse-Glimmer BF16 normalization contracts [SKIP: AVX2 unavailable]")
         return 0
     run_rmsnorm_case(3, 6656, 91)
     run_qk_case(2, 92)
+    run_qk_case(69, 98)
     run_rope_case(0, 93)
     run_rope_case(2047, 94)
     run_logits_case(95)
+    run_attention_case(4, 3, 96)
+    run_decode_stride_case(97)
+    probe_env = dict(os.environ)
+    probe_env["CK_MUSE_UNDERSIZED_PROBE"] = "1"
+    probe = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve())],
+        env=probe_env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert probe.returncode != 0
+    assert "undersized planner-owned workspace" in probe.stderr
     print("Muse-Glimmer BF16 numerical contracts: exact")
     return 0
 
