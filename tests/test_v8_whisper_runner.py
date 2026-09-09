@@ -4,10 +4,13 @@ import errno
 import hashlib
 import importlib.util
 import json
+import multiprocessing
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
+import time
 from types import SimpleNamespace
 from unittest import mock
 
@@ -64,6 +67,47 @@ def _frontend_xray_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _shutdown_protocol_fixture(connection, mode: str) -> None:
+    connection.send({"status": "ready"})
+    request = connection.recv()
+    if request != {"command": "close"}:
+        os._exit(31)
+    if mode == "timeout":
+        time.sleep(30.0)
+    if mode == "crash":
+        os._exit(23)
+    if mode == "ack_hang_ignore_sigterm":
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        connection.send({"status": "closed", "role": "encoder"})
+        while True:
+            time.sleep(30.0)
+    connection.send({"status": "closed", "role": "encoder"})
+    connection.close()
+
+
+def _protocol_worker(runner, mode: str, timeout_seconds: float = 0.2):
+    context = multiprocessing.get_context("spawn")
+    parent, child = context.Pipe()
+    process = context.Process(
+        target=_shutdown_protocol_fixture,
+        args=(child, mode),
+    )
+    process.start()
+    child.close()
+    assert parent.poll(5.0)
+    assert parent.recv() == {"status": "ready"}
+    worker = object.__new__(runner._PersistentWorker)
+    worker._connection = parent
+    worker._process = process
+    worker._role = "encoder"
+    worker._timeout_seconds = timeout_seconds
+    worker._closed = False
+    worker._terminal_error_received = False
+    worker._cleanup_failure = None
+    worker.shutdown_response = None
+    return worker
 
 
 def test_whisper_runner_uses_generated_frontend_and_forced_prefix_is_stable() -> None:
@@ -304,6 +348,271 @@ def test_whisper_persistent_worker_initializes_and_frees_once(
         {"status": "ok", "role": "encoder"},
         {"status": "closed", "role": "encoder"},
     ]
+
+
+def test_whisper_persistent_worker_reports_initialization_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+
+    class Connection:
+        def __init__(self) -> None:
+            self.responses: list[dict[str, object]] = []
+
+        def send(self, response: dict[str, object]) -> None:
+            self.responses.append(response)
+
+        def close(self) -> None:
+            pass
+
+    connection = Connection()
+    monkeypatch.setattr(runner, "_apply_worker_affinity", lambda: {})
+    monkeypatch.setattr(
+        runner,
+        "_open_encoder_model",
+        lambda _run_dir: (_ for _ in ()).throw(RuntimeError("init failed")),
+    )
+
+    runner._persistent_worker_main(connection, "encoder", str(tmp_path), {})
+
+    assert len(connection.responses) == 1
+    assert connection.responses[0]["status"] == "error"
+    assert connection.responses[0]["role"] == "encoder"
+    assert connection.responses[0]["error"] == "init failed"
+
+
+def test_whisper_persistent_worker_acknowledges_only_after_teardown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+    events: list[str] = []
+    requests = iter([{"command": "close"}])
+
+    class Connection:
+        def recv(self) -> dict[str, object]:
+            return next(requests)
+
+        def send(self, response: dict[str, object]) -> None:
+            events.append(str(response["status"]))
+
+        def close(self) -> None:
+            pass
+
+    class Model:
+        def ck_model_free(self) -> None:
+            events.append("freed")
+
+    monkeypatch.setattr(runner, "_apply_worker_affinity", lambda: {})
+    monkeypatch.setattr(
+        runner, "_open_encoder_model", lambda _run_dir: (Model(), 0.0)
+    )
+
+    runner._persistent_worker_main(Connection(), "encoder", str(tmp_path), {})
+
+    assert events == ["ready", "freed", "closed"]
+
+
+def test_whisper_persistent_worker_reports_teardown_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+    requests = iter([{"command": "close"}])
+
+    class Connection:
+        def __init__(self) -> None:
+            self.responses: list[dict[str, object]] = []
+
+        def recv(self) -> dict[str, object]:
+            return next(requests)
+
+        def send(self, response: dict[str, object]) -> None:
+            self.responses.append(response)
+
+        def close(self) -> None:
+            pass
+
+    class Model:
+        def ck_model_free(self) -> None:
+            raise RuntimeError("free failed")
+
+    connection = Connection()
+    monkeypatch.setattr(runner, "_apply_worker_affinity", lambda: {})
+    monkeypatch.setattr(
+        runner, "_open_encoder_model", lambda _run_dir: (Model(), 0.0)
+    )
+
+    runner._persistent_worker_main(connection, "encoder", str(tmp_path), {})
+
+    assert [response["status"] for response in connection.responses] == [
+        "ready",
+        "error",
+    ]
+    assert connection.responses[-1]["phase"] == "teardown"
+    assert connection.responses[-1]["error"] == "free failed"
+
+
+def test_whisper_persistent_worker_validates_shutdown_and_exit() -> None:
+    runner = _module()
+    worker = _protocol_worker(runner, "ok")
+
+    assert worker.close() == {"status": "closed", "role": "encoder"}
+    assert worker._process.exitcode == 0
+
+
+@pytest.mark.parametrize("mode", ["crash", "timeout"])
+def test_whisper_persistent_worker_forced_cleanup_is_a_failure(mode: str) -> None:
+    runner = _module()
+    worker = _protocol_worker(runner, mode)
+
+    with pytest.raises((RuntimeError, TimeoutError)) as failure:
+        worker.close()
+
+    assert not worker._process.is_alive()
+    if mode == "crash":
+        assert "exited without a response" in str(failure.value)
+    else:
+        assert "response deadline" in str(failure.value)
+        assert any("terminated" in note for note in failure.value.__notes__)
+
+
+def test_whisper_acknowledged_worker_that_ignores_sigterm_is_killed() -> None:
+    runner = _module()
+    worker = _protocol_worker(runner, "ack_hang_ignore_sigterm")
+
+    with pytest.raises(RuntimeError, match="shutdown acknowledgment") as failure:
+        worker.close()
+
+    assert not worker._process.is_alive()
+    assert any("was killed" in note for note in failure.value.__notes__)
+    saved_failure = worker._cleanup_failure
+    assert saved_failure is not None
+    with pytest.raises(RuntimeError) as repeated:
+        worker.close()
+    assert saved_failure in str(repeated.value)
+
+
+def test_whisper_cleanup_failure_does_not_replace_primary_error() -> None:
+    runner = _module()
+    primary = RuntimeError("inference failed")
+
+    class Worker:
+        _role = "decoder"
+
+        def close(self) -> None:
+            raise RuntimeError("cleanup failed")
+
+    _responses, failures = runner._close_persistent_workers([Worker()], primary)
+
+    assert failures == [
+        "persistent decoder worker cleanup failed: cleanup failed"
+    ]
+    assert str(primary) == "inference failed"
+    assert primary.__notes__ == failures
+
+
+def test_whisper_completed_output_is_retained_when_cleanup_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runner = _module()
+    encoder_dir = tmp_path / "encoder"
+    decoder_dir = tmp_path / "decoder"
+    for run_dir in (encoder_dir, decoder_dir):
+        run_dir.mkdir()
+        for name in ("libmodel.so", "libckernel_engine.so", "weights.bump"):
+            (run_dir / name).write_bytes(b"fixture")
+        (run_dir / "weights_manifest.map").write_text("fixture", encoding="utf-8")
+    (encoder_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "audio_sample_rate": 16000,
+                "audio_sample_extent": 480000,
+                "audio_hop_length": 160,
+                "num_layers": 1,
+                "embed_dim": 4,
+                "num_heads": 1,
+                "context_length": 8,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (decoder_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "num_layers": 1,
+                "embed_dim": 4,
+                "num_heads": 1,
+                "context_length": 8,
+                "encoder_memory_length": 8,
+                "vocab_size": 16,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (decoder_dir / "generation_config.json").write_text("{}", encoding="utf-8")
+    (decoder_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
+    wav = tmp_path / "audio.wav"
+    wav.write_bytes(b"wav")
+    output = tmp_path / "result.json"
+
+    class Worker:
+        def __init__(self, role, *_args):
+            self._role = role
+            self.model_init_seconds = 0.01
+            self.execution_topology = {"role": role}
+
+        def close(self):
+            if self._role == "decoder":
+                raise RuntimeError("decoder free failed")
+            return {"status": "closed", "role": self._role}
+
+    segment = {
+        "encoder": {
+            "frontend_seconds": 0.1,
+            "audio_encoder_seconds": 0.3,
+            "encoder_seconds": 0.2,
+            "execution_topology": {},
+            "worker_wall_seconds": 0.3,
+        },
+        "decoder": {
+            "generated_tokens": [1, 2],
+            "generated_count": 2,
+            "text": "retained transcript",
+            "transcript_text": "retained transcript",
+            "prefill_seconds": 0.1,
+            "decode_seconds": 0.2,
+            "stop": "eos",
+            "worker_wall_seconds": 0.3,
+        },
+    }
+    monkeypatch.setattr(runner, "_require_artifact", lambda _path: None)
+    monkeypatch.setattr(runner, "_worker_environment", lambda _config: {})
+    monkeypatch.setattr(runner, "_wav_geometry_for_cache", lambda _path: (1, 16000))
+    monkeypatch.setattr(runner, "_PersistentWorker", Worker)
+    monkeypatch.setattr(
+        runner, "_collect_segments", lambda *_args, **_kwargs: [segment]
+    )
+    args = SimpleNamespace(
+        encoder_run_dir=encoder_dir,
+        decoder_run_dir=decoder_dir,
+        wav=wav,
+        temp_dir=None,
+        worker_lifecycle="persistent",
+        worker_timeout_seconds=1.0,
+        language="en",
+        task="transcribe",
+        timestamps=False,
+        max_tokens=2,
+        output=output,
+    )
+
+    with pytest.raises(RuntimeError, match="decoder free failed"):
+        runner._run_parent(args)
+
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["status"] == "error"
+    assert report["decoder"]["text"] == "retained transcript"
+    assert report["worker_lifecycle"]["shutdown"]["status"] == "failed"
+    assert "retained transcript" in capsys.readouterr().out
 
 
 def test_whisper_decoder_resets_before_rebinding_encoder_memory(

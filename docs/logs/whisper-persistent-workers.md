@@ -17,6 +17,16 @@ thread pools, and the full-feature memory map remain resident.
 Use `--worker-lifecycle per-window` to reproduce the old lifecycle for diagnosis.
 Persistent workers are the default.
 
+Shutdown is part of the request contract. A worker acknowledges `closed` only
+after `ck_model_free()` completes, and the parent validates the response role,
+response deadline, process termination, and zero exit status. A worker crash,
+timeout, forced termination, or teardown exception therefore cannot be reported
+as a successful lifecycle. If inference and cleanup both fail, the inference
+exception remains primary and includes the cleanup failure as additional
+diagnostic evidence. If inference succeeds but cleanup fails, the completed
+transcript and JSON report remain available with `status: error` before the
+command returns failure.
+
 ## Numerical and task evidence
 
 The A/B comparison used the same Whisper-base generated runtimes, 16 kHz mono
@@ -76,8 +86,18 @@ Retained evidence is under:
 
 ## Validation
 
-- `29 passed, 2 skipped` in `tests/test_v8_whisper_runner.py`; the skipped cases
+- `39 passed, 2 skipped` in `tests/test_v8_whisper_runner.py`; the skipped cases
   require separately configured real-model fixtures.
+- The focused runner tests include initialization failure, teardown failure,
+  process crash, response timeout with forced cleanup, exit-status validation,
+  preservation of a primary inference exception, and retention of completed
+  output after cleanup failure. A real subprocess also acknowledges shutdown,
+  ignores `SIGTERM`, and hangs; the parent must escalate to `SIGKILL`, reap it,
+  and preserve the failure for repeated `close()` calls.
+- A real five-minute P3 replay completed with exit status zero after both
+  generated runtimes acknowledged post-free shutdown. Its report recorded
+  `status: ok`, 11 windows, 974 tokens, and explicit encoder/decoder `closed`
+  responses.
 - 31 audio/encoder/Cohere Transcribe contract tests passed.
 - Two Whisper conversion tests passed.
 - 13 long-audio and benchmark contract tests passed.

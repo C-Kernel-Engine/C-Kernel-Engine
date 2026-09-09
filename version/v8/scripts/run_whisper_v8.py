@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import nullcontext
 import ctypes
 import errno
 import hashlib
@@ -874,6 +873,8 @@ def _persistent_worker_main(
 ) -> None:
     """Own one generated model for a sequence of independent window requests."""
     model: ctypes.CDLL | None = None
+    terminal_response: dict[str, Any] | None = None
+    phase = "initialization"
     try:
         os.environ.update(environment)
         execution_topology = _apply_worker_affinity()
@@ -898,10 +899,16 @@ def _persistent_worker_main(
                 "execution_topology": execution_topology,
             }
         )
+        phase = "request"
         while True:
             request = connection.recv()
             if request.get("command") == "close":
-                connection.send({"status": "closed", "role": role})
+                model_to_free = model
+                model = None
+                phase = "teardown"
+                if model_to_free is not None:
+                    model_to_free.ck_model_free()
+                terminal_response = {"status": "closed", "role": role}
                 break
             if request.get("command") != "run":
                 raise ValueError(f"invalid {role} worker command")
@@ -922,20 +929,46 @@ def _persistent_worker_main(
                 )
             connection.send({"status": "ok", "role": role})
     except BaseException as error:
-        try:
-            connection.send(
-                {
+        terminal_response = {
+            "status": "error",
+            "role": role,
+            "phase": phase,
+            "error": str(error),
+            "traceback": traceback.format_exc(),
+        }
+    finally:
+        cleanup_error: BaseException | None = None
+        if model is not None:
+            model_to_free = model
+            model = None
+            try:
+                model_to_free.ck_model_free()
+            except BaseException as error:
+                cleanup_error = error
+
+        if cleanup_error is not None:
+            cleanup_traceback = "".join(
+                traceback.format_exception(
+                    type(cleanup_error), cleanup_error, cleanup_error.__traceback__
+                )
+            )
+            if terminal_response is not None and terminal_response["status"] == "error":
+                terminal_response["cleanup_error"] = str(cleanup_error)
+                terminal_response["cleanup_traceback"] = cleanup_traceback
+            else:
+                terminal_response = {
                     "status": "error",
                     "role": role,
-                    "error": str(error),
-                    "traceback": traceback.format_exc(),
+                    "phase": "teardown",
+                    "error": str(cleanup_error),
+                    "traceback": cleanup_traceback,
                 }
-            )
+
+        try:
+            if terminal_response is not None:
+                connection.send(terminal_response)
         except (BrokenPipeError, EOFError, OSError):
             pass
-    finally:
-        if model is not None:
-            model.ck_model_free()
         connection.close()
 
 
@@ -960,24 +993,41 @@ class _PersistentWorker:
         self._role = role
         self._timeout_seconds = timeout_seconds
         self._closed = False
+        self._terminal_error_received = False
+        self._cleanup_failure: str | None = None
+        self.shutdown_response: dict[str, Any] | None = None
         self._process.start()
         child.close()
         try:
             ready = self._receive()
-        except BaseException:
-            self.close()
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(
+                    f"persistent {self._role} worker startup cleanup also "
+                    f"failed: {cleanup_error}"
+                )
             raise
         if ready.get("status") != "ready":
-            self.close()
-            raise RuntimeError(f"{role} worker did not become ready")
+            error = RuntimeError(f"{role} worker did not become ready")
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(
+                    f"persistent {self._role} worker startup cleanup also "
+                    f"failed: {cleanup_error}"
+                )
+            raise error
         self.model_init_seconds = float(ready["model_init_seconds"])
         self.execution_topology = ready["execution_topology"]
 
-    def _receive(self) -> dict[str, Any]:
-        if not self._connection.poll(self._timeout_seconds):
+    def _receive(self, timeout_seconds: float | None = None) -> dict[str, Any]:
+        deadline = self._timeout_seconds if timeout_seconds is None else timeout_seconds
+        if not self._connection.poll(deadline):
             raise TimeoutError(
                 f"persistent {self._role} worker exceeded "
-                f"{self._timeout_seconds:.1f}s response deadline"
+                f"{deadline:.1f}s response deadline"
             )
         try:
             response = self._connection.recv()
@@ -987,10 +1037,18 @@ class _PersistentWorker:
                 f"(exitcode={self._process.exitcode})"
             ) from error
         if response.get("status") == "error":
-            raise RuntimeError(
+            self._terminal_error_received = True
+            detail = (
                 f"persistent {self._role} worker failed: {response['error']}\n"
                 f"{response['traceback']}"
             )
+            if response.get("cleanup_error"):
+                detail += (
+                    f"\npersistent {self._role} worker cleanup also failed: "
+                    f"{response['cleanup_error']}\n"
+                    f"{response.get('cleanup_traceback', '')}"
+                )
+            raise RuntimeError(detail)
         return response
 
     def run(self, arguments: dict[str, Any]) -> None:
@@ -1004,28 +1062,129 @@ class _PersistentWorker:
     def __enter__(self) -> _PersistentWorker:
         return self
 
-    def __exit__(self, *_exc: object) -> None:
-        self.close()
+    def __exit__(self, _type: object, error: BaseException | None, _tb: object) -> None:
+        try:
+            self.close()
+        except BaseException as cleanup_error:
+            if error is None:
+                raise
+            error.add_note(
+                f"persistent {self._role} worker cleanup also failed: "
+                f"{cleanup_error}"
+            )
 
-    def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
+    def _force_stop(self, timeout_seconds: float) -> str | None:
+        """Terminate, then kill, and never return while the process is alive."""
+        if not self._process.is_alive():
+            return None
+        action = "terminated"
+        self._process.terminate()
+        self._process.join(timeout=timeout_seconds)
         if self._process.is_alive():
-            try:
-                self._connection.send({"command": "close"})
-                if self._connection.poll(10.0):
-                    self._connection.recv()
-            except (BrokenPipeError, EOFError, OSError, RuntimeError):
-                pass
-        self._connection.close()
-        self._process.join(timeout=10.0)
-        if self._process.is_alive():
-            self._process.terminate()
-            self._process.join(timeout=5.0)
-        if self._process.is_alive():
+            action = "killed"
             self._process.kill()
-            self._process.join()
+            self._process.join(timeout=timeout_seconds)
+        if self._process.is_alive():
+            raise RuntimeError(
+                f"persistent {self._role} worker survived terminate and kill"
+            )
+        return action
+
+    def _remember_cleanup_failure(self, error: BaseException) -> None:
+        self._cleanup_failure = "".join(
+            traceback.format_exception_only(type(error), error)
+        ).strip()
+
+    def close(self) -> dict[str, Any] | None:
+        if self._closed:
+            if self._cleanup_failure is not None:
+                raise RuntimeError(self._cleanup_failure)
+            return self.shutdown_response
+        self._closed = True
+        shutdown_timeout = min(self._timeout_seconds, 10.0)
+        try:
+            if self._terminal_error_received:
+                self._process.join(timeout=shutdown_timeout)
+                if self._process.is_alive():
+                    raise RuntimeError(
+                        f"persistent {self._role} worker did not exit after "
+                        "reporting its failure"
+                    )
+                if self._process.exitcode != 0:
+                    raise RuntimeError(
+                        f"persistent {self._role} worker exited after reporting "
+                        f"its failure with code {self._process.exitcode}"
+                    )
+                return None
+            if self._process.is_alive():
+                self._connection.send({"command": "close"})
+                response = self._receive(shutdown_timeout)
+                if (
+                    response.get("status") != "closed"
+                    or response.get("role") != self._role
+                ):
+                    raise RuntimeError(
+                        f"invalid persistent {self._role} shutdown response: "
+                        f"{response!r}"
+                    )
+                self.shutdown_response = response
+            elif not self._terminal_error_received:
+                raise RuntimeError(
+                    f"persistent {self._role} worker exited before shutdown "
+                    f"acknowledgment (exitcode={self._process.exitcode})"
+                )
+            self._process.join(timeout=shutdown_timeout)
+            if self._process.is_alive():
+                raise RuntimeError(
+                    f"persistent {self._role} worker did not exit after "
+                    "shutdown acknowledgment"
+                )
+            if self._process.exitcode != 0:
+                raise RuntimeError(
+                    f"persistent {self._role} worker exited after shutdown with "
+                    f"code {self._process.exitcode}"
+                )
+            return self.shutdown_response
+        except BaseException as error:
+            if self._terminal_error_received and self._process.is_alive():
+                self._process.join(timeout=shutdown_timeout)
+            try:
+                forced_action = self._force_stop(shutdown_timeout)
+            except BaseException as force_error:
+                error.add_note(
+                    f"persistent {self._role} forced cleanup also failed: "
+                    f"{force_error}"
+                )
+            else:
+                if forced_action is not None:
+                    error.add_note(
+                        f"persistent {self._role} worker was {forced_action}"
+                    )
+            self._remember_cleanup_failure(error)
+            raise
+        finally:
+            self._connection.close()
+
+
+def _close_persistent_workers(
+    workers: list[_PersistentWorker],
+    primary_error: BaseException | None = None,
+) -> tuple[dict[str, dict[str, Any] | None], list[str]]:
+    """Close workers in reverse construction order without hiding failures."""
+    responses: dict[str, dict[str, Any] | None] = {}
+    failures: list[str] = []
+    for worker in reversed(workers):
+        try:
+            responses[worker._role] = worker.close()
+        except BaseException as cleanup_error:
+            detail = (
+                f"persistent {worker._role} worker cleanup failed: "
+                f"{cleanup_error}"
+            )
+            failures.append(detail)
+            if primary_error is not None:
+                primary_error.add_note(detail)
+    return responses, failures
 
 
 def _run_segment(
@@ -1307,42 +1466,59 @@ def _run_parent(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                 )
         persistent = args.worker_lifecycle == "persistent"
-        encoder_context = _PersistentWorker(
-            "encoder", encoder_dir, worker_env, args.worker_timeout_seconds
-        ) if persistent else nullcontext(None)
-        with encoder_context as encoder_worker:
-            decoder_context = _PersistentWorker(
-                "decoder", decoder_dir, worker_env, args.worker_timeout_seconds
-            ) if persistent else nullcontext(None)
-            with decoder_context as decoder_worker:
-                worker_lifecycle = {
-                    "mode": args.worker_lifecycle,
-                    "encoder_processes": 1 if persistent else None,
-                    "decoder_processes": 1 if persistent else None,
-                    "encoder_model_initializations": 1 if persistent else None,
-                    "decoder_model_initializations": 1 if persistent else None,
-                    "encoder_model_init_seconds": (
-                        encoder_worker.model_init_seconds if encoder_worker else None
-                    ),
-                    "decoder_model_init_seconds": (
-                        decoder_worker.model_init_seconds if decoder_worker else None
-                    ),
-                }
-                segments = _collect_segments(
-                    args,
-                    common=common,
-                    encoder_dir=encoder_dir,
-                    decoder_dir=decoder_dir,
-                    wav_path=wav_path,
-                    temp=temp,
-                    worker_env=worker_env,
-                    encoder_config=encoder_config,
-                    generation=generation,
-                    full_features=full_features,
-                    frontend_report=frontend_report_path,
-                    encoder_worker=encoder_worker,
-                    decoder_worker=decoder_worker,
+        encoder_worker: _PersistentWorker | None = None
+        decoder_worker: _PersistentWorker | None = None
+        workers: list[_PersistentWorker] = []
+        cleanup_failures: list[str] = []
+        shutdown_responses: dict[str, dict[str, Any] | None] = {}
+        try:
+            if persistent:
+                encoder_worker = _PersistentWorker(
+                    "encoder", encoder_dir, worker_env, args.worker_timeout_seconds
                 )
+                workers.append(encoder_worker)
+                decoder_worker = _PersistentWorker(
+                    "decoder", decoder_dir, worker_env, args.worker_timeout_seconds
+                )
+                workers.append(decoder_worker)
+            worker_lifecycle = {
+                "mode": args.worker_lifecycle,
+                "encoder_processes": 1 if persistent else None,
+                "decoder_processes": 1 if persistent else None,
+                "encoder_model_initializations": 1 if persistent else None,
+                "decoder_model_initializations": 1 if persistent else None,
+                "encoder_model_init_seconds": (
+                    encoder_worker.model_init_seconds if encoder_worker else None
+                ),
+                "decoder_model_init_seconds": (
+                    decoder_worker.model_init_seconds if decoder_worker else None
+                ),
+            }
+            segments = _collect_segments(
+                args,
+                common=common,
+                encoder_dir=encoder_dir,
+                decoder_dir=decoder_dir,
+                wav_path=wav_path,
+                temp=temp,
+                worker_env=worker_env,
+                encoder_config=encoder_config,
+                generation=generation,
+                full_features=full_features,
+                frontend_report=frontend_report_path,
+                encoder_worker=encoder_worker,
+                decoder_worker=decoder_worker,
+            )
+        except BaseException as error:
+            _close_persistent_workers(workers, error)
+            raise
+        else:
+            shutdown_responses, cleanup_failures = _close_persistent_workers(workers)
+            worker_lifecycle["shutdown"] = {
+                "status": "failed" if cleanup_failures else "ok",
+                "responses": shutdown_responses,
+                "failures": cleanup_failures,
+            }
         if not persistent:
             worker_lifecycle.update(
                 {
@@ -1434,7 +1610,7 @@ def _run_parent(args: argparse.Namespace) -> int:
     report = {
         "schema": "cke.whisper_e2e",
         "schema_version": 5,
-        "status": "ok",
+        "status": "error" if cleanup_failures else "ok",
         "wav": str(wav_path),
         "wav_sha256": _sha256(wav_path),
         "encoder_run_dir": str(encoder_dir),
@@ -1532,6 +1708,8 @@ def _run_parent(args: argparse.Namespace) -> int:
     )
     if args.output:
         print(f"report={args.output}", file=sys.stderr)
+    if cleanup_failures:
+        raise RuntimeError("; ".join(cleanup_failures))
     return 0
 
 
