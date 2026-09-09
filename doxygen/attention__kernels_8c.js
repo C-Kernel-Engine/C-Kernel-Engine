@@ -142,6 +142,7 @@ var attention__kernels_8c =
     [ "ck_llama_kv_pad_256", "attention__kernels_8c.html#a73d8b139e9de74e398c9f3df0a75756e", null ],
     [ "ck_llama_regular_dot_f16", "attention__kernels_8c.html#aa695eb09451351d18929b33a59acb333", null ],
     [ "ck_llama_regular_gemm_f16", "attention__kernels_8c.html#a1c1f48d0fa92a6b126cf7bb82b5bbf10", null ],
+    [ "ck_llama_regular_prefill_work", "attention__kernels_8c.html#a119f5c115ce7375cbef47df034074979", null ],
     [ "ck_local_fp16_to_fp32_2d", "attention__kernels_8c.html#ae08c3991312a232bd2a7c9af34c26b0e", null ],
     [ "ck_local_fp16_to_fp32_row", "attention__kernels_8c.html#a698506339700a0fae6dd82ee3b396483", null ],
     [ "ck_round_fp16_buffer", "attention__kernels_8c.html#a643edbfcea466ae909717441999a5076", null ],
