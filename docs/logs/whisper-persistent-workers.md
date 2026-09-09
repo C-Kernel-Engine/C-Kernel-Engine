@@ -58,6 +58,18 @@ runtime artifacts and input on an otherwise comparable local system.
 The measured wall-time improvement is 19.2%. This is orchestration and model
 lifecycle work, not a claim that encoder or decoder arithmetic became faster.
 
+## Ryzen cross-hardware check
+
+The same five-minute artifact and copied runtime binaries were replayed on the
+AMD Ryzen 9 9950X3D host with 16 physical cores / 32 logical CPUs. The per-window
+control completed in 11.708 s and persistent execution completed in 9.490 s, an
+18.9% wall-time improvement. All 1,126 generated tokens, feature and encoder
+hashes, window boundaries, timestamp events, and stop reasons matched exactly.
+Outside-phase time fell from 2.72 s to 0.44 s.
+
+The copied runtime is the same AVX2 artifact used on P3, so this result isolates
+worker lifecycle across hardware; it is not a native AVX-512 Ryzen benchmark.
+
 Retained evidence is under:
 
 `/data/cke/workloads/whisper/kernel2-youtube-video/persistent-worker-ab/`
@@ -69,5 +81,6 @@ Retained evidence is under:
 - 31 audio/encoder/Cohere Transcribe contract tests passed.
 - Two Whisper conversion tests passed.
 - 13 long-audio and benchmark contract tests passed.
-- Five-minute A/B/A controls were also exact across 1,126 tokens and 12 windows;
-  persistent execution completed in 15.80 s versus 19.76 s and 19.79 s controls.
+- Five-minute P3 A/B/A controls were also exact across 1,126 tokens and 12
+  windows; persistent execution completed in 15.80 s versus 19.76 s and 19.79 s
+  controls. The Ryzen five-minute A/B was exact and improved 18.9%.
