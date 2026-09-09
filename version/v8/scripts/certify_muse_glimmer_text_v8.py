@@ -9,8 +9,11 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import platform
+import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +50,31 @@ def _sha256(path: Path) -> str | None:
     return digest.hexdigest()
 
 
+def _execution_environment() -> dict:
+    cpu_model = platform.processor()
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.is_file():
+        for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.lower().startswith("model name") and ":" in line:
+                cpu_model = line.split(":", 1)[1].strip()
+                break
+    affinity = (
+        sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None
+    )
+    return {
+        "hostname": socket.gethostname(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "cpu_model": cpu_model,
+        "logical_cpus": os.cpu_count(),
+        "cpu_affinity": affinity,
+        "thread_environment": {
+            name: os.environ.get(name)
+            for name in ("CK_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+        },
+    }
+
+
 def _prompt_ids(tokenizer, prompt: str, date_string: str) -> list[int]:
     encoded = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
@@ -81,6 +109,41 @@ def _verify_loaded_engine(lib: ctypes.CDLL, requested_engine: Path) -> Path:
             f"requested={requested_engine} loaded={loaded_engine}"
         )
     return loaded_engine
+
+
+def _pytorch_sleef_library() -> Path | None:
+    try:
+        import torch
+    except ImportError:
+        return None
+    module_path = getattr(torch, "__file__", None)
+    if not module_path:
+        return None
+    return Path(module_path).resolve().parent / "lib" / "libtorch_cpu.so"
+
+
+def _configure_sleef_library(requested: Path | None) -> Path:
+    value = requested or (
+        Path(os.environ["CK_SLEEF_LIBRARY"])
+        if os.environ.get("CK_SLEEF_LIBRARY")
+        else _pytorch_sleef_library()
+    )
+    if value is None:
+        raise RuntimeError(
+            "Muse certification requires --sleef-library or CK_SLEEF_LIBRARY"
+        )
+    library = value.expanduser().resolve()
+    if not library.is_file():
+        raise FileNotFoundError(f"Muse SLEEF library does not exist: {library}")
+    try:
+        handle = ctypes.CDLL(str(library))
+        getattr(handle, "Sleef_expf16_u10")
+    except (OSError, AttributeError) as exc:
+        raise RuntimeError(
+            f"Muse SLEEF library lacks Sleef_expf16_u10: {library}"
+        ) from exc
+    os.environ["CK_SLEEF_LIBRARY"] = str(library)
+    return library
 
 
 def _validate_reference_manifest(reference: object) -> list[dict]:
@@ -202,14 +265,19 @@ def create_reference(
     import torch
     from transformers import AutoTokenizer, MuseGlimmerForConditionalGeneration
 
+    overall_started = time.perf_counter_ns()
     output_dir.mkdir(parents=True, exist_ok=True)
+    started = time.perf_counter_ns()
     tokenizer = AutoTokenizer.from_pretrained(model_dir, fix_mistral_regex=True)
+    tokenizer_load_ms = (time.perf_counter_ns() - started) / 1.0e6
+    started = time.perf_counter_ns()
     model = MuseGlimmerForConditionalGeneration.from_pretrained(
         model_dir,
         dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
         attn_implementation="eager",
     )
+    model_load_ms = (time.perf_counter_ns() - started) / 1.0e6
     model.eval()
     raw_eos = model.generation_config.eos_token_id
     eos_ids = {
@@ -223,6 +291,11 @@ def create_reference(
         "attention_backend": "eager",
         "date_string": date_string,
         "max_tokens": max_tokens,
+        "execution_environment": _execution_environment(),
+        "timing": {
+            "tokenizer_load_ms": tokenizer_load_ms,
+            "model_load_ms": model_load_ms,
+        },
         "provenance": {
             "torch_version": torch.__version__,
             "transformers_version": importlib.metadata.version("transformers"),
@@ -237,28 +310,39 @@ def create_reference(
     }
     with torch.inference_mode():
         for name, prompt in CASES.items():
+            case_started = time.perf_counter_ns()
             prompt_ids = _prompt_ids(tokenizer, prompt, date_string)
+            started = time.perf_counter_ns()
             result = model(
                 input_ids=torch.tensor([prompt_ids], dtype=torch.long),
                 use_cache=True,
                 logits_to_keep=1,
             )
+            prefill_ms = (time.perf_counter_ns() - started) / 1.0e6
             cache = result.past_key_values
             generated: list[int] = []
             logits_rows: list[np.ndarray] = []
-            for _ in range(max_tokens):
+            logits_ms = 0.0
+            decode_ms = 0.0
+            decode_calls = 0
+            for step in range(max_tokens):
+                started = time.perf_counter_ns()
                 logits = result.logits[0, -1].float().cpu().numpy()
+                logits_ms += (time.perf_counter_ns() - started) / 1.0e6
                 logits_rows.append(logits)
                 token = int(logits.argmax())
                 generated.append(token)
-                if token in eos_ids:
+                if token in eos_ids or step + 1 >= max_tokens:
                     break
+                started = time.perf_counter_ns()
                 result = model(
                     input_ids=torch.tensor([[token]], dtype=torch.long),
                     past_key_values=cache,
                     use_cache=True,
                     logits_to_keep=1,
                 )
+                decode_ms += (time.perf_counter_ns() - started) / 1.0e6
+                decode_calls += 1
                 cache = result.past_key_values
             np.savez(
                 output_dir / f"{name}.npz",
@@ -273,14 +357,71 @@ def create_reference(
                     "prompt_tokens": len(prompt_ids),
                     "generated_tokens": len(generated),
                     "output": tokenizer.decode(generated, skip_special_tokens=True),
+                    "timing": {
+                        "prefill_ms": prefill_ms,
+                        "prefill_tokens_per_second": (
+                            1000.0 * len(prompt_ids) / prefill_ms
+                            if prefill_ms > 0.0
+                            else None
+                        ),
+                        "logits_copy_ms": logits_ms,
+                        "decode_ms": decode_ms,
+                        "decode_calls": decode_calls,
+                        "decode_tokens_per_second": (
+                            1000.0 * decode_calls / decode_ms
+                            if decode_ms > 0.0
+                            else None
+                        ),
+                        "wall_ms": (
+                            time.perf_counter_ns() - case_started
+                        ) / 1.0e6,
+                    },
                 }
             )
+    reference_prefill_ms = sum(
+        float(case["timing"]["prefill_ms"]) for case in manifest["cases"]
+    )
+    reference_decode_ms = sum(
+        float(case["timing"]["decode_ms"]) for case in manifest["cases"]
+    )
+    reference_prompt_tokens = sum(
+        int(case["prompt_tokens"]) for case in manifest["cases"]
+    )
+    reference_decode_calls = sum(
+        int(case["timing"]["decode_calls"]) for case in manifest["cases"]
+    )
+    manifest["timing"]["generation"] = {
+        "cases": len(manifest["cases"]),
+        "prompt_tokens": reference_prompt_tokens,
+        "prefill_ms": reference_prefill_ms,
+        "prefill_tokens_per_second": (
+            1000.0 * reference_prompt_tokens / reference_prefill_ms
+            if reference_prefill_ms > 0.0
+            else None
+        ),
+        "decode_calls": reference_decode_calls,
+        "decode_ms": reference_decode_ms,
+        "decode_tokens_per_second": (
+            1000.0 * reference_decode_calls / reference_decode_ms
+            if reference_decode_ms > 0.0
+            else None
+        ),
+    }
+    manifest["timing"]["total_wall_ms"] = (
+        time.perf_counter_ns() - overall_started
+    ) / 1.0e6
     (output_dir / "reference.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
 
 
-def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> int:
+def compare_cke(
+    runtime_dir: Path,
+    reference_dir: Path,
+    report_path: Path,
+    sleef_library: Path | None = None,
+) -> int:
+    overall_started = time.perf_counter_ns()
     scripts_dir = Path(__file__).resolve().parent
     sys.path.insert(0, str(scripts_dir))
     from compare_ck_prefill_decode_logits_v8 import _extract_logits, _init_model
@@ -296,6 +437,7 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             "trajectory": "free-running greedy history",
             "exactness": "float32 IEEE-754 bit-pattern equality",
         },
+        "execution_environment": _execution_environment(),
         "provenance": {
             "libmodel_sha256": _sha256(runtime_dir / "libmodel.so"),
             "engine_sha256": _sha256(runtime_dir / "libckernel_engine.so"),
@@ -311,6 +453,7 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
                 ).strip()
             ),
         },
+        "timing": {},
         "cases": [],
         "status": "error",
     }
@@ -324,14 +467,26 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
     tokenizer = None
     vocab = 0
 
-    def prefill(prompt_ids: np.ndarray, name: str) -> None:
+    def prefill(prompt_ids: np.ndarray, name: str) -> dict[str, float]:
         assert lib is not None
+        started = time.perf_counter_ns()
         lib.ck_model_kv_cache_reset()
+        reset_ms = (time.perf_counter_ns() - started) / 1.0e6
         token_array = (ctypes.c_int32 * len(prompt_ids))(*prompt_ids.tolist())
+        started = time.perf_counter_ns()
         if lib.ck_model_embed_tokens(token_array, len(prompt_ids)) != 0:
             raise RuntimeError(f"CK prefill embedding failed for {name}")
+        embed_ms = (time.perf_counter_ns() - started) / 1.0e6
+        started = time.perf_counter_ns()
         if lib.ck_model_forward(None) != 0:
             raise RuntimeError(f"CK prefill failed for {name}")
+        forward_ms = (time.perf_counter_ns() - started) / 1.0e6
+        return {
+            "reset_ms": reset_ms,
+            "embed_ms": embed_ms,
+            "forward_ms": forward_ms,
+            "total_ms": reset_ms + embed_ms + forward_ms,
+        }
 
     def run_path(
         prompt_ids: np.ndarray,
@@ -341,7 +496,10 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
         forced: bool,
     ) -> dict:
         assert lib is not None and tokenizer is not None
-        prefill(prompt_ids, name)
+        path_started = time.perf_counter_ns()
+        prefill_timing = prefill(prompt_ids, name)
+        logits_ms = 0.0
+        decode_ms = 0.0
         actual_ids: list[int] = []
         first_logit_divergence = None
         first_token_divergence = None
@@ -350,9 +508,11 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
         finite_rows = 0
         first_nonfinite_step = None
         for step, expected_token in enumerate(expected_ids):
+            started = time.perf_counter_ns()
             actual_logits, _, _ = _extract_logits(
                 lib, vocab, len(prompt_ids) if step == 0 else 1
             )
+            logits_ms += (time.perf_counter_ns() - started) / 1.0e6
             expected_row = expected_logits[step]
             finite = bool(np.isfinite(actual_logits).all())
             finite_rows += int(finite)
@@ -383,8 +543,12 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
                 }
             if step + 1 < len(expected_ids):
                 next_token = int(expected_token) if forced else actual_token
+                started = time.perf_counter_ns()
                 if lib.ck_model_decode(ctypes.c_int32(next_token), None) != 0:
                     raise RuntimeError(f"CK decode failed for {name} at step {step}")
+                decode_ms += (time.perf_counter_ns() - started) / 1.0e6
+        decode_calls = max(0, len(expected_ids) - 1)
+        wall_ms = (time.perf_counter_ns() - path_started) / 1.0e6
         return {
             "actual_ids": actual_ids,
             "actual_output": tokenizer.decode(actual_ids, skip_special_tokens=True),
@@ -394,12 +558,32 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             "max_abs_error": maximum_error,
             "first_logit_divergence": first_logit_divergence,
             "first_token_divergence": first_token_divergence,
+            "timing": {
+                "prefill": prefill_timing,
+                "prefill_tokens_per_second": (
+                    1000.0 * len(prompt_ids) / prefill_timing["total_ms"]
+                    if prefill_timing["total_ms"] > 0.0
+                    else None
+                ),
+                "logits_copy_ms": logits_ms,
+                "decode_ms": decode_ms,
+                "decode_calls": decode_calls,
+                "decode_tokens_per_second": (
+                    1000.0 * decode_calls / decode_ms
+                    if decode_ms > 0.0
+                    else None
+                ),
+                "wall_ms": wall_ms,
+            },
         }
 
     passed = False
     try:
         reference = json.loads((reference_dir / "reference.json").read_text())
         cases = _validate_reference_manifest(reference)
+        configured_sleef = _configure_sleef_library(sleef_library)
+        report["provenance"]["sleef_library_path"] = str(configured_sleef)
+        report["provenance"]["sleef_library_sha256"] = _sha256(configured_sleef)
         engine_path = (runtime_dir / "libckernel_engine.so").resolve()
         model_path = (runtime_dir / "libmodel.so").resolve()
         if not engine_path.is_file() or not model_path.is_file():
@@ -416,7 +600,11 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
         tokenizer = AutoTokenizer.from_pretrained(
             runtime_dir, fix_mistral_regex=True
         )
+        started = time.perf_counter_ns()
         _init_model(lib, runtime_dir)
+        report["timing"]["model_init_ms"] = (
+            time.perf_counter_ns() - started
+        ) / 1.0e6
         lib.ck_model_get_vocab_size.argtypes = []
         lib.ck_model_get_vocab_size.restype = ctypes.c_int
         vocab = int(lib.ck_model_get_vocab_size())
@@ -495,6 +683,41 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             except Exception as exc:
                 report["cleanup_error"] = f"{type(exc).__name__}: {exc}"
                 passed = False
+    measured = [
+        case["free_running_history"]
+        for case in report["cases"]
+        if case.get("status") == "pass"
+        and isinstance(case.get("free_running_history", {}).get("timing"), dict)
+    ]
+    if measured:
+        prompt_tokens = sum(
+            int(case.get("prompt_tokens", 0))
+            for case in report["cases"]
+            if case.get("status") == "pass"
+        )
+        prefill_ms = sum(
+            float(path["timing"]["prefill"]["total_ms"]) for path in measured
+        )
+        decode_calls = sum(
+            int(path["timing"]["decode_calls"]) for path in measured
+        )
+        decode_ms = sum(float(path["timing"]["decode_ms"]) for path in measured)
+        report["timing"]["free_running"] = {
+            "cases": len(measured),
+            "prompt_tokens": prompt_tokens,
+            "prefill_ms": prefill_ms,
+            "prefill_tokens_per_second": (
+                1000.0 * prompt_tokens / prefill_ms if prefill_ms > 0.0 else None
+            ),
+            "decode_calls": decode_calls,
+            "decode_ms": decode_ms,
+            "decode_tokens_per_second": (
+                1000.0 * decode_calls / decode_ms if decode_ms > 0.0 else None
+            ),
+        }
+    report["timing"]["total_wall_ms"] = (
+        time.perf_counter_ns() - overall_started
+    ) / 1.0e6
     report["status"] = "pass" if passed else "fail"
     publish()
     print(json.dumps(report, indent=2))
@@ -513,11 +736,18 @@ def main() -> int:
     compare.add_argument("--runtime-dir", required=True, type=Path)
     compare.add_argument("--reference-dir", required=True, type=Path)
     compare.add_argument("--report", required=True, type=Path)
+    compare.add_argument(
+        "--sleef-library",
+        type=Path,
+        help="Shared library exporting Sleef_expf16_u10 (for example PyTorch libtorch_cpu.so)",
+    )
     args = parser.parse_args()
     if args.command == "reference":
         create_reference(args.model_dir, args.output_dir, args.max_tokens, args.date_string)
         return 0
-    return compare_cke(args.runtime_dir, args.reference_dir, args.report)
+    return compare_cke(
+        args.runtime_dir, args.reference_dir, args.report, args.sleef_library
+    )
 
 
 if __name__ == "__main__":

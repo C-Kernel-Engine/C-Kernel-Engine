@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -78,6 +79,21 @@ def test_committed_muse_certification_artifact_is_complete_and_consumable() -> N
         )
         assert case["free_running_history"]["actual_ids"] == case["reference_ids"]
         assert case["forced_reference_history"]["actual_ids"] == case["reference_ids"]
+
+
+def test_muse_documented_prompt_counts_match_committed_evidence() -> None:
+    report = json.loads(CERTIFICATION_ARTIFACT.read_text(encoding="utf-8"))
+    page = (ROOT / "docs/site/_pages/v8-muse-glimmer.html").read_text(
+        encoding="utf-8"
+    )
+    labels = {
+        "c_code": "Complete C function",
+        "svg": "Standalone SVG",
+        "cke_analysis": "CKE v8 architecture analysis",
+    }
+    for case in report["cases"]:
+        row = f"<tr><td>{labels[case['name']]}</td><td>{case['prompt_tokens']}</td>"
+        assert row in page
 
 
 def _text_config(num_layers: int = 4) -> dict:
@@ -545,6 +561,45 @@ def test_muse_certifier_rejects_a_different_loaded_engine(
     monkeypatch.setattr(certifier, "_resolved_symbol_library", lambda _lib, _symbol: loaded)
     with pytest.raises(RuntimeError, match="different CK engine"):
         certifier._verify_loaded_engine(object(), requested)
+
+
+def test_muse_certifier_requires_explicit_sleef_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CK_SLEEF_LIBRARY", raising=False)
+    monkeypatch.setattr(certifier, "_pytorch_sleef_library", lambda: None)
+    with pytest.raises(RuntimeError, match="requires --sleef-library"):
+        certifier._configure_sleef_library(None)
+
+
+def test_muse_certifier_discovers_pytorch_sleef_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "libtorch_cpu.so"
+    library.write_bytes(b"fixture")
+
+    class SleefLibrary:
+        Sleef_expf16_u10 = object()
+
+    monkeypatch.delenv("CK_SLEEF_LIBRARY", raising=False)
+    monkeypatch.setattr(certifier, "_pytorch_sleef_library", lambda: library)
+    monkeypatch.setattr(certifier.ctypes, "CDLL", lambda _path: SleefLibrary())
+    assert certifier._configure_sleef_library(None) == library.resolve()
+    assert os.environ["CK_SLEEF_LIBRARY"] == str(library.resolve())
+
+
+def test_muse_certifier_rejects_sleef_library_without_required_symbol(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "not-sleef.so"
+    library.write_bytes(b"not a shared library")
+
+    class BrokenLibrary:
+        pass
+
+    monkeypatch.setattr(certifier.ctypes, "CDLL", lambda _path: BrokenLibrary())
+    with pytest.raises(RuntimeError, match="lacks Sleef_expf16_u10"):
+        certifier._configure_sleef_library(library)
 
 
 def test_muse_certifier_publishes_failure_for_empty_reference(
