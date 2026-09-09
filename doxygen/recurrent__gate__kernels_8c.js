@@ -13,6 +13,7 @@ var recurrent__gate__kernels_8c =
     [ "recurrent_silu_backward", "recurrent__gate__kernels_8c.html#ae4d0d6861eb48e7e667044bfd536277d", null ],
     [ "recurrent_silu_forward", "recurrent__gate__kernels_8c.html#a8c4bf807b61bfd9add72843468cb7b05", null ],
     [ "recurrent_silu_forward_ggml", "recurrent__gate__kernels_8c.html#a68d1de609142507727987cabe36fe7a6", null ],
+    [ "recurrent_silu_forward_ggml_rows", "recurrent__gate__kernels_8c.html#a8affc393c10676aeab2b4980138b5594", null ],
     [ "recurrent_silu_forward_pytorch_bf16_input_fp32_output", "recurrent__gate__kernels_8c.html#a500cf70fc074fd75ae5b691103de1df3", null ],
     [ "recurrent_silu_forward_pytorch_bf16_storage", "recurrent__gate__kernels_8c.html#aa9bb1f355b62b068ba37724e41083e20", null ],
     [ "recurrent_softplus", "recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf", null ],

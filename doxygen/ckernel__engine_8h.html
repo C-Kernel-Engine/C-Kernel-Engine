@@ -11084,9 +11084,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  158</span>        }</div>
 <div class="line"><span class="lineno">  159</span>    }</div>
 <div class="line"><span class="lineno">  160</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a66184da8c8aaf47ea6f4c1ddb6fb1e7d"><div class="ttname"><a href="ckernel__engine_8h.html#a66184da8c8aaf47ea6f4c1ddb6fb1e7d">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00339">recurrent_gate_kernels.c:339</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a66184da8c8aaf47ea6f4c1ddb6fb1e7d"><div class="ttname"><a href="ckernel__engine_8h.html#a66184da8c8aaf47ea6f4c1ddb6fb1e7d">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00340">recurrent_gate_kernels.c:340</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00339">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00340">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output()</a>.</p>
 
 </div>
 </div>
@@ -49363,35 +49363,35 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00104">104</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  112</span>                                         {</div>
-<div class="line"><span class="lineno">  113</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  114</span>        d_dt_bias[col] = 0.0f;</div>
-<div class="line"><span class="lineno">  115</span>        d_a[col] = 0.0f;</div>
-<div class="line"><span class="lineno">  116</span>    }</div>
-<div class="line"><span class="lineno">  117</span> </div>
-<div class="line"><span class="lineno">  118</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordtype">float</span> *d_alpha_row = d_alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  122</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  123</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
-<div class="line"><span class="lineno">  124</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x);</div>
-<div class="line"><span class="lineno">  125</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(x);</div>
-<div class="line"><span class="lineno">  126</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_out = d_gate_row[col];</div>
-<div class="line"><span class="lineno">  127</span>            d_a[col] += d_out * sp;</div>
-<div class="line"><span class="lineno">  128</span>            {</div>
-<div class="line"><span class="lineno">  129</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_x = d_out * a[col] * sig;</div>
-<div class="line"><span class="lineno">  130</span>                d_alpha_row[col] = d_x;</div>
-<div class="line"><span class="lineno">  131</span>                d_dt_bias[col] += d_x;</div>
-<div class="line"><span class="lineno">  132</span>            }</div>
-<div class="line"><span class="lineno">  133</span>        }</div>
-<div class="line"><span class="lineno">  134</span>    }</div>
-<div class="line"><span class="lineno">  135</span>}</div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_a55f0223c9af0726faa6b1bb572ba78bf"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a></div><div class="ttdeci">static float recurrent_softplus(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00043">recurrent_gate_kernels.c:43</a></div></div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab91fc7c0631b68a01c56cc95211a5835"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a></div><div class="ttdeci">static float recurrent_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00054">recurrent_gate_kernels.c:54</a></div></div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00105">105</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  113</span>                                         {</div>
+<div class="line"><span class="lineno">  114</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  115</span>        d_dt_bias[col] = 0.0f;</div>
+<div class="line"><span class="lineno">  116</span>        d_a[col] = 0.0f;</div>
+<div class="line"><span class="lineno">  117</span>    }</div>
+<div class="line"><span class="lineno">  118</span> </div>
+<div class="line"><span class="lineno">  119</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  120</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  121</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  122</span>        <span class="keywordtype">float</span> *d_alpha_row = d_alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  123</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  124</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
+<div class="line"><span class="lineno">  125</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x);</div>
+<div class="line"><span class="lineno">  126</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(x);</div>
+<div class="line"><span class="lineno">  127</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_out = d_gate_row[col];</div>
+<div class="line"><span class="lineno">  128</span>            d_a[col] += d_out * sp;</div>
+<div class="line"><span class="lineno">  129</span>            {</div>
+<div class="line"><span class="lineno">  130</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_x = d_out * a[col] * sig;</div>
+<div class="line"><span class="lineno">  131</span>                d_alpha_row[col] = d_x;</div>
+<div class="line"><span class="lineno">  132</span>                d_dt_bias[col] += d_x;</div>
+<div class="line"><span class="lineno">  133</span>            }</div>
+<div class="line"><span class="lineno">  134</span>        }</div>
+<div class="line"><span class="lineno">  135</span>    }</div>
+<div class="line"><span class="lineno">  136</span>}</div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_a55f0223c9af0726faa6b1bb572ba78bf"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a></div><div class="ttdeci">static float recurrent_softplus(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00044">recurrent_gate_kernels.c:44</a></div></div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab91fc7c0631b68a01c56cc95211a5835"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a></div><div class="ttdeci">static float recurrent_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00055">recurrent_gate_kernels.c:55</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00054">recurrent_sigmoid()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00043">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00055">recurrent_sigmoid()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00044">recurrent_softplus()</a>.</p>
 
 </div>
 </div>
@@ -49451,23 +49451,23 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00083">83</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   89</span>                                                       {</div>
-<div class="line"><span class="lineno">   90</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   91</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads;</div>
-<div class="line"><span class="lineno">   92</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads * (size_t) state_dim;</div>
-<div class="line"><span class="lineno">   93</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">   94</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(alpha_row[h] + dt_bias[h]);</div>
-<div class="line"><span class="lineno">   95</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *a_head = a + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">   96</span>            <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
-<div class="line"><span class="lineno">   97</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
-<div class="line"><span class="lineno">   98</span>                gate_head[col] = sp * a_head[col];</div>
-<div class="line"><span class="lineno">   99</span>            }</div>
-<div class="line"><span class="lineno">  100</span>        }</div>
-<div class="line"><span class="lineno">  101</span>    }</div>
-<div class="line"><span class="lineno">  102</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00084">84</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   90</span>                                                       {</div>
+<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   92</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads;</div>
+<div class="line"><span class="lineno">   93</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) num_heads * (size_t) state_dim;</div>
+<div class="line"><span class="lineno">   94</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">   95</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sp = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(alpha_row[h] + dt_bias[h]);</div>
+<div class="line"><span class="lineno">   96</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *a_head = a + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">   97</span>            <span class="keywordtype">float</span> *gate_head = gate_row + (size_t) h * (<span class="keywordtype">size_t</span>) state_dim;</div>
+<div class="line"><span class="lineno">   98</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; state_dim; ++col) {</div>
+<div class="line"><span class="lineno">   99</span>                gate_head[col] = sp * a_head[col];</div>
+<div class="line"><span class="lineno">  100</span>            }</div>
+<div class="line"><span class="lineno">  101</span>        }</div>
+<div class="line"><span class="lineno">  102</span>    }</div>
+<div class="line"><span class="lineno">  103</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00043">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00044">recurrent_softplus()</a>.</p>
 
 </div>
 </div>
@@ -49527,20 +49527,20 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00065">65</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   71</span>                                              {</div>
-<div class="line"><span class="lineno">   72</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
-<div class="line"><span class="lineno">   73</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   74</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   75</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">   76</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">   77</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
-<div class="line"><span class="lineno">   78</span>            gate_row[col] = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x) * a[col];</div>
-<div class="line"><span class="lineno">   79</span>        }</div>
-<div class="line"><span class="lineno">   80</span>    }</div>
-<div class="line"><span class="lineno">   81</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00066">66</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   72</span>                                              {</div>
+<div class="line"><span class="lineno">   73</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">   74</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   75</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *alpha_row = alpha + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   76</span>        <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">   77</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">   78</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha_row[col] + dt_bias[col];</div>
+<div class="line"><span class="lineno">   79</span>            gate_row[col] = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a55f0223c9af0726faa6b1bb572ba78bf">recurrent_softplus</a>(x) * a[col];</div>
+<div class="line"><span class="lineno">   80</span>        }</div>
+<div class="line"><span class="lineno">   81</span>    }</div>
+<div class="line"><span class="lineno">   82</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00043">recurrent_softplus()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00044">recurrent_softplus()</a>.</p>
 
 </div>
 </div>
@@ -49600,78 +49600,78 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00179">179</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  186</span>{</div>
-<div class="line"><span class="lineno">  187</span>    <span class="keywordflow">if</span> (!alpha || !dt_bias || !a || !gate || rows &lt; 0 || num_heads &lt; 0 || state_dim != 1) {</div>
-<div class="line"><span class="lineno">  188</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  189</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch FP32 recurrent dt-gate arguments\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  190</span>        abort();</div>
-<div class="line"><span class="lineno">  191</span>    }</div>
-<div class="line"><span class="lineno">  192</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  193</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
-<div class="line"><span class="lineno">  194</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16 || !ck_recurrent_pytorch_log1pf16) {</div>
-<div class="line"><span class="lineno">  195</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  196</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires &quot;</span></div>
-<div class="line"><span class="lineno">  197</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10 and Sleef_log1pf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  198</span>        abort();</div>
-<div class="line"><span class="lineno">  199</span>    }</div>
-<div class="line"><span class="lineno">  200</span>    <span class="keywordflow">if</span> ((num_heads &amp; 15) != 0) {</div>
-<div class="line"><span class="lineno">  201</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  202</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch AVX-512 recurrent dt gate requires &quot;</span></div>
-<div class="line"><span class="lineno">  203</span>                <span class="stringliteral">&quot;a head count divisible by 16 (got %d)\n&quot;</span>,</div>
-<div class="line"><span class="lineno">  204</span>                num_heads);</div>
-<div class="line"><span class="lineno">  205</span>        abort();</div>
-<div class="line"><span class="lineno">  206</span>    }</div>
-<div class="line"><span class="lineno">  207</span>    pthread_once(&amp;<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#af2e23ba05a119b2f7660263235741827">ck_recurrent_libm_once</a>, <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab2326818d7de8bb62d3067fb5e93145a">ck_bind_recurrent_llama_libm</a>);</div>
-<div class="line"><span class="lineno">  208</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a>) {</div>
-<div class="line"><span class="lineno">  209</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  210</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires &quot;</span></div>
-<div class="line"><span class="lineno">  211</span>                <span class="stringliteral">&quot;log1pf from libm.so.6\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  212</span>        abort();</div>
-<div class="line"><span class="lineno">  213</span>    }</div>
-<div class="line"><span class="lineno">  214</span>    <span class="keyword">const</span> __m512 threshold = _mm512_set1_ps(20.0f);</div>
-<div class="line"><span class="lineno">  215</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * num_heads;</div>
-<div class="line"><span class="lineno">  216</span>    <span class="keywordtype">int</span> index = 0;</div>
-<div class="line"><span class="lineno">  217</span>    <span class="keywordflow">for</span> (; index + 32 &lt;= count; index += 32) {</div>
-<div class="line"><span class="lineno">  218</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> half = 0; half &lt; 2; ++half) {</div>
-<div class="line"><span class="lineno">  219</span>            <span class="keywordtype">float</span> x_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  220</span>            <span class="keywordtype">float</span> a_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  221</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> base = index + half * 16;</div>
-<div class="line"><span class="lineno">  222</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  223</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> head = (base + lane) % num_heads;</div>
-<div class="line"><span class="lineno">  224</span>                x_lanes[lane] = alpha[base + lane] + dt_bias[head];</div>
-<div class="line"><span class="lineno">  225</span>                a_lanes[lane] = a[head];</div>
-<div class="line"><span class="lineno">  226</span>            }</div>
-<div class="line"><span class="lineno">  227</span>            <span class="keyword">const</span> __m512 x = _mm512_load_ps(x_lanes);</div>
-<div class="line"><span class="lineno">  228</span>            <span class="keyword">const</span> __m512 softplus = _mm512_mask_blend_ps(</div>
-<div class="line"><span class="lineno">  229</span>                _mm512_cmp_ps_mask(x, threshold, _CMP_GT_OQ),</div>
-<div class="line"><span class="lineno">  230</span>                ck_recurrent_pytorch_log1pf16(ck_recurrent_pytorch_expf16(x)),</div>
-<div class="line"><span class="lineno">  231</span>                x);</div>
-<div class="line"><span class="lineno">  232</span>            _mm512_storeu_ps(</div>
-<div class="line"><span class="lineno">  233</span>                gate + base,</div>
-<div class="line"><span class="lineno">  234</span>                _mm512_mul_ps(softplus, _mm512_load_ps(a_lanes)));</div>
-<div class="line"><span class="lineno">  235</span>        }</div>
-<div class="line"><span class="lineno">  236</span>    }</div>
-<div class="line"><span class="lineno">  237</span>    <span class="keywordflow">for</span> (; index &lt; count; ++index) {</div>
-<div class="line"><span class="lineno">  238</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> head = index % num_heads;</div>
-<div class="line"><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha[index] + dt_bias[head];</div>
-<div class="line"><span class="lineno">  240</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> softplus = x &gt; 20.0f</div>
-<div class="line"><span class="lineno">  241</span>            ? x</div>
-<div class="line"><span class="lineno">  242</span>            : <a class="code hl_variable" href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a>(<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#add6f2e1dfde29edc019cdb5f83325b7a">ck_recurrent_llama_expf</a>(x));</div>
-<div class="line"><span class="lineno">  243</span>        gate[index] = softplus * a[head];</div>
-<div class="line"><span class="lineno">  244</span>    }</div>
-<div class="line"><span class="lineno">  245</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  246</span>    fprintf(stderr,</div>
-<div class="line"><span class="lineno">  247</span>            <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires AVX-512\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  248</span>    abort();</div>
-<div class="line"><span class="lineno">  249</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  250</span>}</div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_a907b4c4b8ee6cfbc81afacd01d66bcd1"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a></div><div class="ttdeci">static ck_recurrent_libm_f32_fn ck_recurrent_pytorch_log1pf</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00020">recurrent_gate_kernels.c:20</a></div></div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab2326818d7de8bb62d3067fb5e93145a"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab2326818d7de8bb62d3067fb5e93145a">ck_bind_recurrent_llama_libm</a></div><div class="ttdeci">static void ck_bind_recurrent_llama_libm(void)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00024">recurrent_gate_kernels.c:24</a></div></div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_add6f2e1dfde29edc019cdb5f83325b7a"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#add6f2e1dfde29edc019cdb5f83325b7a">ck_recurrent_llama_expf</a></div><div class="ttdeci">static ck_recurrent_libm_f32_fn ck_recurrent_llama_expf</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00018">recurrent_gate_kernels.c:18</a></div></div>
-<div class="ttc" id="arecurrent__gate__kernels_8c_html_af2e23ba05a119b2f7660263235741827"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#af2e23ba05a119b2f7660263235741827">ck_recurrent_libm_once</a></div><div class="ttdeci">static pthread_once_t ck_recurrent_libm_once</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00022">recurrent_gate_kernels.c:22</a></div></div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00180">180</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  187</span>{</div>
+<div class="line"><span class="lineno">  188</span>    <span class="keywordflow">if</span> (!alpha || !dt_bias || !a || !gate || rows &lt; 0 || num_heads &lt; 0 || state_dim != 1) {</div>
+<div class="line"><span class="lineno">  189</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  190</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch FP32 recurrent dt-gate arguments\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  191</span>        abort();</div>
+<div class="line"><span class="lineno">  192</span>    }</div>
+<div class="line"><span class="lineno">  193</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  194</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
+<div class="line"><span class="lineno">  195</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16 || !ck_recurrent_pytorch_log1pf16) {</div>
+<div class="line"><span class="lineno">  196</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  197</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires &quot;</span></div>
+<div class="line"><span class="lineno">  198</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10 and Sleef_log1pf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  199</span>        abort();</div>
+<div class="line"><span class="lineno">  200</span>    }</div>
+<div class="line"><span class="lineno">  201</span>    <span class="keywordflow">if</span> ((num_heads &amp; 15) != 0) {</div>
+<div class="line"><span class="lineno">  202</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  203</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch AVX-512 recurrent dt gate requires &quot;</span></div>
+<div class="line"><span class="lineno">  204</span>                <span class="stringliteral">&quot;a head count divisible by 16 (got %d)\n&quot;</span>,</div>
+<div class="line"><span class="lineno">  205</span>                num_heads);</div>
+<div class="line"><span class="lineno">  206</span>        abort();</div>
+<div class="line"><span class="lineno">  207</span>    }</div>
+<div class="line"><span class="lineno">  208</span>    pthread_once(&amp;<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#af2e23ba05a119b2f7660263235741827">ck_recurrent_libm_once</a>, <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab2326818d7de8bb62d3067fb5e93145a">ck_bind_recurrent_llama_libm</a>);</div>
+<div class="line"><span class="lineno">  209</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a>) {</div>
+<div class="line"><span class="lineno">  210</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  211</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires &quot;</span></div>
+<div class="line"><span class="lineno">  212</span>                <span class="stringliteral">&quot;log1pf from libm.so.6\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  213</span>        abort();</div>
+<div class="line"><span class="lineno">  214</span>    }</div>
+<div class="line"><span class="lineno">  215</span>    <span class="keyword">const</span> __m512 threshold = _mm512_set1_ps(20.0f);</div>
+<div class="line"><span class="lineno">  216</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * num_heads;</div>
+<div class="line"><span class="lineno">  217</span>    <span class="keywordtype">int</span> index = 0;</div>
+<div class="line"><span class="lineno">  218</span>    <span class="keywordflow">for</span> (; index + 32 &lt;= count; index += 32) {</div>
+<div class="line"><span class="lineno">  219</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> half = 0; half &lt; 2; ++half) {</div>
+<div class="line"><span class="lineno">  220</span>            <span class="keywordtype">float</span> x_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  221</span>            <span class="keywordtype">float</span> a_lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  222</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> base = index + half * 16;</div>
+<div class="line"><span class="lineno">  223</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  224</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> head = (base + lane) % num_heads;</div>
+<div class="line"><span class="lineno">  225</span>                x_lanes[lane] = alpha[base + lane] + dt_bias[head];</div>
+<div class="line"><span class="lineno">  226</span>                a_lanes[lane] = a[head];</div>
+<div class="line"><span class="lineno">  227</span>            }</div>
+<div class="line"><span class="lineno">  228</span>            <span class="keyword">const</span> __m512 x = _mm512_load_ps(x_lanes);</div>
+<div class="line"><span class="lineno">  229</span>            <span class="keyword">const</span> __m512 softplus = _mm512_mask_blend_ps(</div>
+<div class="line"><span class="lineno">  230</span>                _mm512_cmp_ps_mask(x, threshold, _CMP_GT_OQ),</div>
+<div class="line"><span class="lineno">  231</span>                ck_recurrent_pytorch_log1pf16(ck_recurrent_pytorch_expf16(x)),</div>
+<div class="line"><span class="lineno">  232</span>                x);</div>
+<div class="line"><span class="lineno">  233</span>            _mm512_storeu_ps(</div>
+<div class="line"><span class="lineno">  234</span>                gate + base,</div>
+<div class="line"><span class="lineno">  235</span>                _mm512_mul_ps(softplus, _mm512_load_ps(a_lanes)));</div>
+<div class="line"><span class="lineno">  236</span>        }</div>
+<div class="line"><span class="lineno">  237</span>    }</div>
+<div class="line"><span class="lineno">  238</span>    <span class="keywordflow">for</span> (; index &lt; count; ++index) {</div>
+<div class="line"><span class="lineno">  239</span>        <span class="keyword">const</span> <span class="keywordtype">int</span> head = index % num_heads;</div>
+<div class="line"><span class="lineno">  240</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> x = alpha[index] + dt_bias[head];</div>
+<div class="line"><span class="lineno">  241</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> softplus = x &gt; 20.0f</div>
+<div class="line"><span class="lineno">  242</span>            ? x</div>
+<div class="line"><span class="lineno">  243</span>            : <a class="code hl_variable" href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a>(<a class="code hl_variable" href="recurrent__gate__kernels_8c.html#add6f2e1dfde29edc019cdb5f83325b7a">ck_recurrent_llama_expf</a>(x));</div>
+<div class="line"><span class="lineno">  244</span>        gate[index] = softplus * a[head];</div>
+<div class="line"><span class="lineno">  245</span>    }</div>
+<div class="line"><span class="lineno">  246</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  247</span>    fprintf(stderr,</div>
+<div class="line"><span class="lineno">  248</span>            <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch FP32 recurrent dt gate requires AVX-512\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  249</span>    abort();</div>
+<div class="line"><span class="lineno">  250</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  251</span>}</div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_a907b4c4b8ee6cfbc81afacd01d66bcd1"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a907b4c4b8ee6cfbc81afacd01d66bcd1">ck_recurrent_pytorch_log1pf</a></div><div class="ttdeci">static ck_recurrent_libm_f32_fn ck_recurrent_pytorch_log1pf</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00021">recurrent_gate_kernels.c:21</a></div></div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_ab2326818d7de8bb62d3067fb5e93145a"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#ab2326818d7de8bb62d3067fb5e93145a">ck_bind_recurrent_llama_libm</a></div><div class="ttdeci">static void ck_bind_recurrent_llama_libm(void)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00025">recurrent_gate_kernels.c:25</a></div></div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_add6f2e1dfde29edc019cdb5f83325b7a"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#add6f2e1dfde29edc019cdb5f83325b7a">ck_recurrent_llama_expf</a></div><div class="ttdeci">static ck_recurrent_libm_f32_fn ck_recurrent_llama_expf</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00019">recurrent_gate_kernels.c:19</a></div></div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_af2e23ba05a119b2f7660263235741827"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#af2e23ba05a119b2f7660263235741827">ck_recurrent_libm_once</a></div><div class="ttdeci">static pthread_once_t ck_recurrent_libm_once</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00023">recurrent_gate_kernels.c:23</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00024">ck_bind_recurrent_llama_libm()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00022">ck_recurrent_libm_once</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00018">ck_recurrent_llama_expf</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00020">ck_recurrent_pytorch_log1pf</a>.</p>
+<p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00025">ck_bind_recurrent_llama_libm()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00023">ck_recurrent_libm_once</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00019">ck_recurrent_llama_expf</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00021">ck_recurrent_pytorch_log1pf</a>.</p>
 
 </div>
 </div>
@@ -49989,9 +49989,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   79</span>    }</div>
 <div class="line"><span class="lineno">   80</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a21313e5d9f149097d8059085232aabe9"><div class="ttname"><a href="ckernel__engine_8h.html#a21313e5d9f149097d8059085232aabe9">rmsnorm_forward_llama_production</a></div><div class="ttdeci">void rmsnorm_forward_llama_production(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_kernels.c:196</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_a68d1de609142507727987cabe36fe7a6"><div class="ttname"><a href="ckernel__engine_8h.html#a68d1de609142507727987cabe36fe7a6">recurrent_silu_forward_ggml</a></div><div class="ttdeci">void recurrent_silu_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00468">recurrent_gate_kernels.c:468</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a68d1de609142507727987cabe36fe7a6"><div class="ttname"><a href="ckernel__engine_8h.html#a68d1de609142507727987cabe36fe7a6">recurrent_silu_forward_ggml</a></div><div class="ttdeci">void recurrent_silu_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00510">recurrent_gate_kernels.c:510</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00468">recurrent_silu_forward_ggml()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00510">recurrent_silu_forward_ggml()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
 </div>
 </div>
@@ -50087,10 +50087,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  145</span>        }</div>
 <div class="line"><span class="lineno">  146</span>    }</div>
 <div class="line"><span class="lineno">  147</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a500cf70fc074fd75ae5b691103de1df3"><div class="ttname"><a href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00299">recurrent_gate_kernels.c:299</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a500cf70fc074fd75ae5b691103de1df3"><div class="ttname"><a href="ckernel__engine_8h.html#a500cf70fc074fd75ae5b691103de1df3">recurrent_silu_forward_pytorch_bf16_input_fp32_output</a></div><div class="ttdeci">void recurrent_silu_forward_pytorch_bf16_input_fp32_output(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00300">recurrent_gate_kernels.c:300</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_a84e08713e6234a99c0559a1538fa7a0c"><div class="ttname"><a href="ckernel__engine_8h.html#a84e08713e6234a99c0559a1538fa7a0c">rmsnorm_forward_pytorch_bf16_storage</a></div><div class="ttdeci">void rmsnorm_forward_pytorch_bf16_storage(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_kernels.c:395</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00299">recurrent_silu_forward_pytorch_bf16_input_fp32_output()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00300">recurrent_silu_forward_pytorch_bf16_input_fp32_output()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
 </div>
 </div>
@@ -50178,9 +50178,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  107</span>        }</div>
 <div class="line"><span class="lineno">  108</span>    }</div>
 <div class="line"><span class="lineno">  109</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a33632320e455741062d562d8aca62627"><div class="ttname"><a href="ckernel__engine_8h.html#a33632320e455741062d562d8aca62627">recurrent_sigmoid_forward_ggml</a></div><div class="ttdeci">void recurrent_sigmoid_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00501">recurrent_gate_kernels.c:501</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a33632320e455741062d562d8aca62627"><div class="ttname"><a href="ckernel__engine_8h.html#a33632320e455741062d562d8aca62627">recurrent_sigmoid_forward_ggml</a></div><div class="ttdeci">void recurrent_sigmoid_forward_ggml(const float *x, float *out, int rows, int dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00543">recurrent_gate_kernels.c:543</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00501">recurrent_sigmoid_forward_ggml()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00543">recurrent_sigmoid_forward_ggml()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00196">rmsnorm_forward_llama_production()</a>.</p>
 
 </div>
 </div>
@@ -50272,7 +50272,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  179</span>    }</div>
 <div class="line"><span class="lineno">  180</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00339">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="recurrent__gate__kernels_8c_source.html#l00340">recurrent_sigmoid_forward_pytorch_bf16_input_fp32_output()</a>, and <a class="el" href="rmsnorm__kernels_8c_source.html#l00395">rmsnorm_forward_pytorch_bf16_storage()</a>.</p>
 
 </div>
 </div>
@@ -50614,17 +50614,17 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00501">501</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  504</span>                                             {</div>
-<div class="line"><span class="lineno">  505</span>    float (*<span class="keyword">volatile</span> llama_expf)(float) = expf;</div>
-<div class="line"><span class="lineno">  506</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  507</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  508</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  509</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  510</span>            out_row[col] = 1.0f / (1.0f + llama_expf(-x_row[col]));</div>
-<div class="line"><span class="lineno">  511</span>        }</div>
-<div class="line"><span class="lineno">  512</span>    }</div>
-<div class="line"><span class="lineno">  513</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00543">543</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  546</span>                                             {</div>
+<div class="line"><span class="lineno">  547</span>    float (*<span class="keyword">volatile</span> llama_expf)(float) = expf;</div>
+<div class="line"><span class="lineno">  548</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  549</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  550</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  551</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  552</span>            out_row[col] = 1.0f / (1.0f + llama_expf(-x_row[col]));</div>
+<div class="line"><span class="lineno">  553</span>        }</div>
+<div class="line"><span class="lineno">  554</span>    }</div>
+<div class="line"><span class="lineno">  555</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="hyper__connection__kernels_8c_source.html#l00204">hyper_connection_mix_quantized()</a>, and <a class="el" href="recurrent__norm__kernels_8c_source.html#l00082">recurrent_norm_sigmoid_gate_llama_avx2_forward()</a>.</p>
 
@@ -50668,43 +50668,43 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00339">339</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  344</span>{</div>
-<div class="line"><span class="lineno">  345</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
-<div class="line"><span class="lineno">  346</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid BF16-input FP32-output sigmoid arguments\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  347</span>        abort();</div>
-<div class="line"><span class="lineno">  348</span>    }</div>
-<div class="line"><span class="lineno">  349</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  350</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
-<div class="line"><span class="lineno">  351</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
-<div class="line"><span class="lineno">  352</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  353</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16-input sigmoid requires &quot;</span></div>
-<div class="line"><span class="lineno">  354</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  355</span>        abort();</div>
-<div class="line"><span class="lineno">  356</span>    }</div>
-<div class="line"><span class="lineno">  357</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  358</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * dim;</div>
-<div class="line"><span class="lineno">  359</span>    <span class="keywordtype">int</span> i = 0;</div>
-<div class="line"><span class="lineno">  360</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  361</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= count; i += 16) {</div>
-<div class="line"><span class="lineno">  362</span>        <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  363</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  364</span>            lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i + lane]));</div>
-<div class="line"><span class="lineno">  365</span>        }</div>
-<div class="line"><span class="lineno">  366</span>        <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
-<div class="line"><span class="lineno">  367</span>        <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
-<div class="line"><span class="lineno">  368</span>            _mm512_set1_ps(1.0f),</div>
-<div class="line"><span class="lineno">  369</span>            ck_recurrent_pytorch_expf16(</div>
-<div class="line"><span class="lineno">  370</span>                _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
-<div class="line"><span class="lineno">  371</span>        _mm512_storeu_ps(out + i,</div>
-<div class="line"><span class="lineno">  372</span>                         _mm512_div_ps(_mm512_set1_ps(1.0f), denominator));</div>
-<div class="line"><span class="lineno">  373</span>    }</div>
-<div class="line"><span class="lineno">  374</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  375</span>    <span class="keywordflow">for</span> (; i &lt; count; ++i) {</div>
-<div class="line"><span class="lineno">  376</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i]));</div>
-<div class="line"><span class="lineno">  377</span>        out[i] = 1.0f / (1.0f + expf(-value));</div>
-<div class="line"><span class="lineno">  378</span>    }</div>
-<div class="line"><span class="lineno">  379</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00340">340</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  345</span>{</div>
+<div class="line"><span class="lineno">  346</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
+<div class="line"><span class="lineno">  347</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid BF16-input FP32-output sigmoid arguments\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  348</span>        abort();</div>
+<div class="line"><span class="lineno">  349</span>    }</div>
+<div class="line"><span class="lineno">  350</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  351</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
+<div class="line"><span class="lineno">  352</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
+<div class="line"><span class="lineno">  353</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  354</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16-input sigmoid requires &quot;</span></div>
+<div class="line"><span class="lineno">  355</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  356</span>        abort();</div>
+<div class="line"><span class="lineno">  357</span>    }</div>
+<div class="line"><span class="lineno">  358</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  359</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * dim;</div>
+<div class="line"><span class="lineno">  360</span>    <span class="keywordtype">int</span> i = 0;</div>
+<div class="line"><span class="lineno">  361</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  362</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= count; i += 16) {</div>
+<div class="line"><span class="lineno">  363</span>        <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  364</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  365</span>            lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i + lane]));</div>
+<div class="line"><span class="lineno">  366</span>        }</div>
+<div class="line"><span class="lineno">  367</span>        <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
+<div class="line"><span class="lineno">  368</span>        <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
+<div class="line"><span class="lineno">  369</span>            _mm512_set1_ps(1.0f),</div>
+<div class="line"><span class="lineno">  370</span>            ck_recurrent_pytorch_expf16(</div>
+<div class="line"><span class="lineno">  371</span>                _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
+<div class="line"><span class="lineno">  372</span>        _mm512_storeu_ps(out + i,</div>
+<div class="line"><span class="lineno">  373</span>                         _mm512_div_ps(_mm512_set1_ps(1.0f), denominator));</div>
+<div class="line"><span class="lineno">  374</span>    }</div>
+<div class="line"><span class="lineno">  375</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  376</span>    <span class="keywordflow">for</span> (; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">  377</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i]));</div>
+<div class="line"><span class="lineno">  378</span>        out[i] = 1.0f / (1.0f + expf(-value));</div>
+<div class="line"><span class="lineno">  379</span>    }</div>
+<div class="line"><span class="lineno">  380</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
@@ -50756,21 +50756,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00515">515</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  519</span>                                      {</div>
-<div class="line"><span class="lineno">  520</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  521</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  522</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  523</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  524</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  525</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
-<div class="line"><span class="lineno">  526</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
-<div class="line"><span class="lineno">  527</span>            d_x_row[col] = d_out_row[col] * (sig + xv * sig * (1.0f - sig));</div>
-<div class="line"><span class="lineno">  528</span>        }</div>
-<div class="line"><span class="lineno">  529</span>    }</div>
-<div class="line"><span class="lineno">  530</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00557">557</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  561</span>                                      {</div>
+<div class="line"><span class="lineno">  562</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  563</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  564</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  565</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  566</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  567</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
+<div class="line"><span class="lineno">  568</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
+<div class="line"><span class="lineno">  569</span>            d_x_row[col] = d_out_row[col] * (sig + xv * sig * (1.0f - sig));</div>
+<div class="line"><span class="lineno">  570</span>        }</div>
+<div class="line"><span class="lineno">  571</span>    }</div>
+<div class="line"><span class="lineno">  572</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00054">recurrent_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00055">recurrent_sigmoid()</a>.</p>
 
 </div>
 </div>
@@ -50812,19 +50812,19 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00137">137</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  140</span>                                     {</div>
-<div class="line"><span class="lineno">  141</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  142</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  143</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  144</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  145</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
-<div class="line"><span class="lineno">  146</span>            out_row[col] = xv * <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
-<div class="line"><span class="lineno">  147</span>        }</div>
-<div class="line"><span class="lineno">  148</span>    }</div>
-<div class="line"><span class="lineno">  149</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00138">138</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  141</span>                                     {</div>
+<div class="line"><span class="lineno">  142</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  143</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  144</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  145</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  146</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
+<div class="line"><span class="lineno">  147</span>            out_row[col] = xv * <a class="code hl_function" href="recurrent__gate__kernels_8c.html#ab91fc7c0631b68a01c56cc95211a5835">recurrent_sigmoid</a>(xv);</div>
+<div class="line"><span class="lineno">  148</span>        }</div>
+<div class="line"><span class="lineno">  149</span>    }</div>
+<div class="line"><span class="lineno">  150</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00054">recurrent_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__gate__kernels_8c_source.html#l00055">recurrent_sigmoid()</a>.</p>
 
 </div>
 </div>
@@ -50866,37 +50866,40 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00468">468</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  471</span>                                          {</div>
-<div class="line"><span class="lineno">  472</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  473</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  474</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  475</span>        <span class="keywordtype">int</span> col = 0;</div>
-<div class="line"><span class="lineno">  476</span><span class="preprocessor">#if defined(__AVX512F__) &amp;&amp; defined(__AVX512DQ__)</span></div>
-<div class="line"><span class="lineno">  477</span>        <span class="keywordflow">for</span> (; col + 16 &lt;= dim; col += 16) {</div>
-<div class="line"><span class="lineno">  478</span>            <span class="keyword">const</span> __m512 xv = _mm512_loadu_ps(x_row + col);</div>
-<div class="line"><span class="lineno">  479</span>            <span class="keyword">const</span> __m512 neg = _mm512_sub_ps(_mm512_setzero_ps(), xv);</div>
-<div class="line"><span class="lineno">  480</span>            <span class="keyword">const</span> __m512 denom = _mm512_add_ps(</div>
-<div class="line"><span class="lineno">  481</span>                _mm512_set1_ps(1.0f), recurrent_ggml_expf_avx512(neg));</div>
-<div class="line"><span class="lineno">  482</span>            _mm512_storeu_ps(out_row + col, _mm512_div_ps(xv, denom));</div>
-<div class="line"><span class="lineno">  483</span>        }</div>
-<div class="line"><span class="lineno">  484</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
-<div class="line"><span class="lineno">  485</span>        <span class="keywordflow">for</span> (; col + 8 &lt;= dim; col += 8) {</div>
-<div class="line"><span class="lineno">  486</span>            <span class="keyword">const</span> __m256 xv = _mm256_loadu_ps(x_row + col);</div>
-<div class="line"><span class="lineno">  487</span>            <span class="keyword">const</span> __m256 neg = _mm256_sub_ps(_mm256_setzero_ps(), xv);</div>
-<div class="line"><span class="lineno">  488</span>            <span class="keyword">const</span> __m256 denom = _mm256_add_ps(</div>
-<div class="line"><span class="lineno">  489</span>                _mm256_set1_ps(1.0f), recurrent_ggml_expf_avx2(neg));</div>
-<div class="line"><span class="lineno">  490</span>            _mm256_storeu_ps(out_row + col, _mm256_div_ps(xv, denom));</div>
-<div class="line"><span class="lineno">  491</span>        }</div>
-<div class="line"><span class="lineno">  492</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  493</span>        float (*<span class="keyword">volatile</span> llama_expf)(float) = expf;</div>
-<div class="line"><span class="lineno">  494</span>        <span class="keywordflow">for</span> (; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  495</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> xv = x_row[col];</div>
-<div class="line"><span class="lineno">  496</span>            out_row[col] = xv / (1.0f + llama_expf(-xv));</div>
-<div class="line"><span class="lineno">  497</span>        }</div>
-<div class="line"><span class="lineno">  498</span>    }</div>
-<div class="line"><span class="lineno">  499</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00510">510</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  513</span>                                          {</div>
+<div class="line"><span class="lineno">  514</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt;= 0 || dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">  515</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  516</span>    }</div>
+<div class="line"><span class="lineno">  517</span> </div>
+<div class="line"><span class="lineno">  518</span>    ck_recurrent_silu_ggml_args_t args = {x, out, dim};</div>
+<div class="line"><span class="lineno">  519</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> elements = (size_t)rows * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  520</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> minimum_elements_per_thread = 65536u;</div>
+<div class="line"><span class="lineno">  521</span>    <span class="keywordflow">if</span> (rows &lt; 2 || elements &lt; 2u * minimum_elements_per_thread) {</div>
+<div class="line"><span class="lineno">  522</span>        <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a8affc393c10676aeab2b4980138b5594">recurrent_silu_forward_ggml_rows</a>(0, rows, &amp;args);</div>
+<div class="line"><span class="lineno">  523</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  524</span>    }</div>
+<div class="line"><span class="lineno">  525</span> </div>
+<div class="line"><span class="lineno">  526</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  527</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  528</span>    <span class="keywordtype">size_t</span> useful_threads =</div>
+<div class="line"><span class="lineno">  529</span>        (elements + minimum_elements_per_thread - 1u) /</div>
+<div class="line"><span class="lineno">  530</span>        minimum_elements_per_thread;</div>
+<div class="line"><span class="lineno">  531</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)active &gt; useful_threads) active = (<span class="keywordtype">int</span>)useful_threads;</div>
+<div class="line"><span class="lineno">  532</span>    <span class="keywordflow">if</span> (active &gt; rows) active = rows;</div>
+<div class="line"><span class="lineno">  533</span> </div>
+<div class="line"><span class="lineno">  534</span>    <span class="keywordflow">if</span> (active &gt; 1 &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a>(pool) &lt;= 0) {</div>
+<div class="line"><span class="lineno">  535</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>(</div>
+<div class="line"><span class="lineno">  536</span>            pool, active, 0, rows, 1,</div>
+<div class="line"><span class="lineno">  537</span>            <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a8affc393c10676aeab2b4980138b5594">recurrent_silu_forward_ggml_rows</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  538</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  539</span>        <a class="code hl_function" href="recurrent__gate__kernels_8c.html#a8affc393c10676aeab2b4980138b5594">recurrent_silu_forward_ggml_rows</a>(0, rows, &amp;args);</div>
+<div class="line"><span class="lineno">  540</span>    }</div>
+<div class="line"><span class="lineno">  541</span>}</div>
+<div class="ttc" id="arecurrent__gate__kernels_8c_html_a8affc393c10676aeab2b4980138b5594"><div class="ttname"><a href="recurrent__gate__kernels_8c.html#a8affc393c10676aeab2b4980138b5594">recurrent_silu_forward_ggml_rows</a></div><div class="ttdeci">static void recurrent_silu_forward_ggml_rows(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__gate__kernels_8c_source.html#l00475">recurrent_gate_kernels.c:475</a></div></div>
 </div><!-- fragment -->
+<p class="reference">References <a class="el" href="ck__threadpool_8c_source.html#l00651">ck_threadpool_global()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00551">ck_threadpool_n_threads()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00494">ck_threadpool_parallel_for_n()</a>, <a class="el" href="ck__threadpool_8c_source.html#l00561">ck_threadpool_thread_id()</a>, and <a class="el" href="recurrent__gate__kernels_8c_source.html#l00475">recurrent_silu_forward_ggml_rows()</a>.</p>
+
 <p class="reference">Referenced by <a class="el" href="hyper__connection__kernels_8c_source.html#l00204">hyper_connection_mix_quantized()</a>, <a class="el" href="qwen4__exp__kernels_8c_source.html#l00245">qwen4_ple_gate_conv_inject_impl()</a>, and <a class="el" href="recurrent__norm__kernels_8c_source.html#l00053">recurrent_norm_gate_llama_avx2_forward()</a>.</p>
 
 </div>
@@ -50939,42 +50942,42 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00299">299</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  303</span>{</div>
-<div class="line"><span class="lineno">  304</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
-<div class="line"><span class="lineno">  305</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid BF16-input FP32-output SiLU arguments\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  306</span>        abort();</div>
-<div class="line"><span class="lineno">  307</span>    }</div>
-<div class="line"><span class="lineno">  308</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  309</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
-<div class="line"><span class="lineno">  310</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
-<div class="line"><span class="lineno">  311</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  312</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16-input SiLU requires &quot;</span></div>
-<div class="line"><span class="lineno">  313</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  314</span>        abort();</div>
-<div class="line"><span class="lineno">  315</span>    }</div>
-<div class="line"><span class="lineno">  316</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  317</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * dim;</div>
-<div class="line"><span class="lineno">  318</span>    <span class="keywordtype">int</span> i = 0;</div>
-<div class="line"><span class="lineno">  319</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  320</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= count; i += 16) {</div>
-<div class="line"><span class="lineno">  321</span>        <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  322</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  323</span>            lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i + lane]));</div>
-<div class="line"><span class="lineno">  324</span>        }</div>
-<div class="line"><span class="lineno">  325</span>        <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
-<div class="line"><span class="lineno">  326</span>        <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
-<div class="line"><span class="lineno">  327</span>            _mm512_set1_ps(1.0f),</div>
-<div class="line"><span class="lineno">  328</span>            ck_recurrent_pytorch_expf16(</div>
-<div class="line"><span class="lineno">  329</span>                _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
-<div class="line"><span class="lineno">  330</span>        _mm512_storeu_ps(out + i, _mm512_div_ps(values, denominator));</div>
-<div class="line"><span class="lineno">  331</span>    }</div>
-<div class="line"><span class="lineno">  332</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  333</span>    <span class="keywordflow">for</span> (; i &lt; count; ++i) {</div>
-<div class="line"><span class="lineno">  334</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i]));</div>
-<div class="line"><span class="lineno">  335</span>        out[i] = value / (1.0f + expf(-value));</div>
-<div class="line"><span class="lineno">  336</span>    }</div>
-<div class="line"><span class="lineno">  337</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00300">300</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  304</span>{</div>
+<div class="line"><span class="lineno">  305</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
+<div class="line"><span class="lineno">  306</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid BF16-input FP32-output SiLU arguments\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  307</span>        abort();</div>
+<div class="line"><span class="lineno">  308</span>    }</div>
+<div class="line"><span class="lineno">  309</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  310</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
+<div class="line"><span class="lineno">  311</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
+<div class="line"><span class="lineno">  312</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  313</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16-input SiLU requires &quot;</span></div>
+<div class="line"><span class="lineno">  314</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  315</span>        abort();</div>
+<div class="line"><span class="lineno">  316</span>    }</div>
+<div class="line"><span class="lineno">  317</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  318</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> count = rows * dim;</div>
+<div class="line"><span class="lineno">  319</span>    <span class="keywordtype">int</span> i = 0;</div>
+<div class="line"><span class="lineno">  320</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  321</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= count; i += 16) {</div>
+<div class="line"><span class="lineno">  322</span>        <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  323</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  324</span>            lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i + lane]));</div>
+<div class="line"><span class="lineno">  325</span>        }</div>
+<div class="line"><span class="lineno">  326</span>        <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
+<div class="line"><span class="lineno">  327</span>        <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
+<div class="line"><span class="lineno">  328</span>            _mm512_set1_ps(1.0f),</div>
+<div class="line"><span class="lineno">  329</span>            ck_recurrent_pytorch_expf16(</div>
+<div class="line"><span class="lineno">  330</span>                _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
+<div class="line"><span class="lineno">  331</span>        _mm512_storeu_ps(out + i, _mm512_div_ps(values, denominator));</div>
+<div class="line"><span class="lineno">  332</span>    }</div>
+<div class="line"><span class="lineno">  333</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  334</span>    <span class="keywordflow">for</span> (; i &lt; count; ++i) {</div>
+<div class="line"><span class="lineno">  335</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(x[i]));</div>
+<div class="line"><span class="lineno">  336</span>        out[i] = value / (1.0f + expf(-value));</div>
+<div class="line"><span class="lineno">  337</span>    }</div>
+<div class="line"><span class="lineno">  338</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, and <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>.</p>
 
@@ -51020,49 +51023,49 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00252">252</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  256</span>{</div>
-<div class="line"><span class="lineno">  257</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
-<div class="line"><span class="lineno">  258</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch BF16 recurrent SiLU arguments\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  259</span>        abort();</div>
-<div class="line"><span class="lineno">  260</span>    }</div>
-<div class="line"><span class="lineno">  261</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  262</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
-<div class="line"><span class="lineno">  263</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
-<div class="line"><span class="lineno">  264</span>        fprintf(stderr,</div>
-<div class="line"><span class="lineno">  265</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16 recurrent SiLU requires &quot;</span></div>
-<div class="line"><span class="lineno">  266</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
-<div class="line"><span class="lineno">  267</span>        abort();</div>
-<div class="line"><span class="lineno">  268</span>    }</div>
-<div class="line"><span class="lineno">  269</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  270</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  271</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = x + (size_t)row * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  272</span>        <span class="keywordtype">float</span> *dst = out + (size_t)row * (<span class="keywordtype">size_t</span>)dim;</div>
-<div class="line"><span class="lineno">  273</span>        <span class="keywordtype">int</span> col = 0;</div>
-<div class="line"><span class="lineno">  274</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  275</span>        <span class="keywordflow">for</span> (; col + 16 &lt;= dim; col += 16) {</div>
-<div class="line"><span class="lineno">  276</span>            <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
-<div class="line"><span class="lineno">  277</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  278</span>                lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(src[col + lane]));</div>
-<div class="line"><span class="lineno">  279</span>            }</div>
-<div class="line"><span class="lineno">  280</span>            <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
-<div class="line"><span class="lineno">  281</span>            <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
-<div class="line"><span class="lineno">  282</span>                _mm512_set1_ps(1.0f),</div>
-<div class="line"><span class="lineno">  283</span>                ck_recurrent_pytorch_expf16(</div>
-<div class="line"><span class="lineno">  284</span>                    _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
-<div class="line"><span class="lineno">  285</span>            _mm512_store_ps(lanes, _mm512_div_ps(values, denominator));</div>
-<div class="line"><span class="lineno">  286</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
-<div class="line"><span class="lineno">  287</span>                dst[col + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(lanes[lane]));</div>
-<div class="line"><span class="lineno">  288</span>            }</div>
-<div class="line"><span class="lineno">  289</span>        }</div>
-<div class="line"><span class="lineno">  290</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">for</span> (; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  292</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(src[col]));</div>
-<div class="line"><span class="lineno">  293</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = value / (1.0f + expf(-value));</div>
-<div class="line"><span class="lineno">  294</span>            dst[col] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>));</div>
-<div class="line"><span class="lineno">  295</span>        }</div>
-<div class="line"><span class="lineno">  296</span>    }</div>
-<div class="line"><span class="lineno">  297</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__gate__kernels_8c_source.html#l00253">253</a> of file <a class="el" href="recurrent__gate__kernels_8c_source.html">recurrent_gate_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  257</span>{</div>
+<div class="line"><span class="lineno">  258</span>    <span class="keywordflow">if</span> (!x || !out || rows &lt; 0 || dim &lt; 0) {</div>
+<div class="line"><span class="lineno">  259</span>        fprintf(stderr, <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: invalid PyTorch BF16 recurrent SiLU arguments\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  260</span>        abort();</div>
+<div class="line"><span class="lineno">  261</span>    }</div>
+<div class="line"><span class="lineno">  262</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  263</span>    pthread_once(&amp;ck_recurrent_sleef_once, ck_bind_recurrent_pytorch_sleef);</div>
+<div class="line"><span class="lineno">  264</span>    <span class="keywordflow">if</span> (!ck_recurrent_pytorch_expf16) {</div>
+<div class="line"><span class="lineno">  265</span>        fprintf(stderr,</div>
+<div class="line"><span class="lineno">  266</span>                <span class="stringliteral">&quot;HARD KERNEL CONTRACT FAULT: PyTorch BF16 recurrent SiLU requires &quot;</span></div>
+<div class="line"><span class="lineno">  267</span>                <span class="stringliteral">&quot;SLEEF Sleef_expf16_u10; set CK_SLEEF_LIBRARY\n&quot;</span>);</div>
+<div class="line"><span class="lineno">  268</span>        abort();</div>
+<div class="line"><span class="lineno">  269</span>    }</div>
+<div class="line"><span class="lineno">  270</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  271</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  272</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = x + (size_t)row * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  273</span>        <span class="keywordtype">float</span> *dst = out + (size_t)row * (<span class="keywordtype">size_t</span>)dim;</div>
+<div class="line"><span class="lineno">  274</span>        <span class="keywordtype">int</span> col = 0;</div>
+<div class="line"><span class="lineno">  275</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  276</span>        <span class="keywordflow">for</span> (; col + 16 &lt;= dim; col += 16) {</div>
+<div class="line"><span class="lineno">  277</span>            <span class="keywordtype">float</span> lanes[16] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(64)));</div>
+<div class="line"><span class="lineno">  278</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  279</span>                lanes[lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(src[col + lane]));</div>
+<div class="line"><span class="lineno">  280</span>            }</div>
+<div class="line"><span class="lineno">  281</span>            <span class="keyword">const</span> __m512 values = _mm512_load_ps(lanes);</div>
+<div class="line"><span class="lineno">  282</span>            <span class="keyword">const</span> __m512 denominator = _mm512_add_ps(</div>
+<div class="line"><span class="lineno">  283</span>                _mm512_set1_ps(1.0f),</div>
+<div class="line"><span class="lineno">  284</span>                ck_recurrent_pytorch_expf16(</div>
+<div class="line"><span class="lineno">  285</span>                    _mm512_sub_ps(_mm512_setzero_ps(), values)));</div>
+<div class="line"><span class="lineno">  286</span>            _mm512_store_ps(lanes, _mm512_div_ps(values, denominator));</div>
+<div class="line"><span class="lineno">  287</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> lane = 0; lane &lt; 16; ++lane) {</div>
+<div class="line"><span class="lineno">  288</span>                dst[col + lane] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(lanes[lane]));</div>
+<div class="line"><span class="lineno">  289</span>            }</div>
+<div class="line"><span class="lineno">  290</span>        }</div>
+<div class="line"><span class="lineno">  291</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  292</span>        <span class="keywordflow">for</span> (; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  293</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> value = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(src[col]));</div>
+<div class="line"><span class="lineno">  294</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = value / (1.0f + expf(-value));</div>
+<div class="line"><span class="lineno">  295</span>            dst[col] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>));</div>
+<div class="line"><span class="lineno">  296</span>        }</div>
+<div class="line"><span class="lineno">  297</span>    }</div>
+<div class="line"><span class="lineno">  298</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__()</a>, <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, and <a class="el" href="v6_85__simple_8c_source.html#l00159">silu()</a>.</p>
 
