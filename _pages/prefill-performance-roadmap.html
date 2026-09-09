@@ -197,6 +197,75 @@ make profile-v8-prefill-perf-stat</code></pre>
     The next step is a true token-tile/output-tile microkernel.
   </p>
 
+  <h2>Exact Qwen Recurrent Q/K Normalization Parallelism</h2>
+  <p>
+    The Qwen3.5 recurrent Q/K L2 provider now partitions complete
+    <code>(Q-or-K, row, head)</code> jobs through the persistent CK thread pool for sufficiently large prefill
+    calls. Every head retains the scalar FP64 accumulation, FP32 square root, epsilon clamp, and element-update
+    order. No reduction is split between workers. Decode, small calls, nested dispatch, and overlapping Q/K
+    ranges continue through the serial loops.
+  </p>
+  <p>
+    Native tests compared one-thread and four-thread execution bit-for-bit over 257 rows, unequal Q/K head
+    counts, and eight repetitions. The llama.cpp production oracle covered five shapes, including a 65-row case
+    above the dispatch threshold, at 1, 16, 20, and 24 threads: all 20 comparisons passed exactly. Three baseline
+    and three candidate full-model runs retained first-logit hash <code>7fedeeccedd89648</code> and token IDs
+    <code>[100, 100]</code>.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Q/K normalization measurement</th><th>Baseline</th><th>Parallel provider</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Isolated production shape, 1 thread</td><td>2.142 ms</td><td>2.109 ms</td></tr>
+      <tr><td>Isolated production shape, 16 threads</td><td>2.142 ms</td><td>0.404 ms</td></tr>
+      <tr><td>Combined-stack provider median</td><td>40.537 ms</td><td>9.002 ms</td></tr>
+      <tr><td>Combined-stack full prefill median</td><td>2160.170 ms</td><td>2117.058 ms</td></tr>
+    </tbody>
+  </table>
+  <p>
+    The isolated shape was <code>rows=1024</code>, <code>q_dim=k_dim=2048</code>, and
+    <code>head_dim=128</code>. The combined result was measured on an Intel Core i7-14700T with AVX2/FMA and 16
+    physical-core representatives, using a Qwen3.5 0.8B Q4_K_M artifact with SHA-256
+    <code>9297be150ac361e95e27387f5bd4b17a55a24c5428467e64bb304734f6be097d</code>. The baseline engine SHA-256 was
+    <code>d865e043cf826603b1a21267d01b695e435346fe5b69c4dfd306796d1ce1e5b6</code>; the candidate engine SHA-256 was
+    <code>824c41b3c5716a70bb5a29d38ffd250583c67c2cbcc5b7ac4a7359f64c2227be</code>. Ryzen and long-context
+    measurements remain open.
+  </p>
+
+  <h2>Exact Attention-Gate Parallelism</h2>
+  <p>
+    The llama.cpp-compatible FP32 attention gate now schedules complete token rows through the persistent CK
+    thread pool for sufficiently large prefill calls. Each output retains the scalar <code>libm.so.6</code>
+    <code>expf</code> call and multiplication order. Decode, small calls, nested dispatch, and unsupported overlap
+    cases stay serial. Qwen3.5, Qwen3.8 dense, and Instella MoE consume this provider; the separately selected
+    Qwen3.8 Flash PyTorch BF16-storage gate is unchanged.
+  </p>
+  <p>
+    Native tests compared one-thread and four-thread output bit-for-bit over 257 rows, 16 heads, and 128 values
+    per head, including separate and exact in-place output across eight repetitions. A production-size
+    <code>65 x 2048</code> comparison was bit-exact with the pinned llama.cpp oracle at 16 threads. Five baseline
+    and five candidate Qwen3.5 full-model runs retained first-logit hash <code>7fedeeccedd89648</code> and token IDs
+    <code>[100, 100]</code>.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Attention-gate measurement</th><th>Baseline</th><th>Parallel provider</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Isolated 1024 x 2048 call</td><td>7.391 ms</td><td>2.677 ms at 16 threads</td></tr>
+      <tr><td>Full-model gate region median</td><td>46.844 ms</td><td>4.933 ms</td></tr>
+      <tr><td>Full-model prefill median</td><td>2165.770 ms</td><td>2108.758 ms</td></tr>
+    </tbody>
+  </table>
+  <p>
+    These measurements used the same Intel Core i7-14700T host and Qwen artifact described above with 1,024
+    repeated token IDs, two generated IDs, and context capacity 2,048. The baseline engine SHA-256 was
+    <code>d865e043cf826603b1a21267d01b695e435346fe5b69c4dfd306796d1ce1e5b6</code>; the candidate engine SHA-256 was
+    <code>fe4c1af0514d5120038d6393363f7fa7c78c6ec2abca5196790ff4db67653cd4</code>. Ryzen, long-context, Instella
+    full-model, and matched llama.cpp end-to-end measurements remain open.
+  </p>
+
   <h2>Measurement Contract</h2>
   <p>
     Use the safe perf lane for routine iteration:

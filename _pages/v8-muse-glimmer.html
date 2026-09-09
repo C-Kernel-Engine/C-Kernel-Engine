@@ -131,6 +131,7 @@
         <tr><td>Conversion, lowering, generated C, and component contracts</td><td class="pass">Passed</td></tr>
         <tr><td>Short real-weight prefill and cached decode</td><td class="pass">Passed: 384 / 384 finite, bit-exact rows</td></tr>
         <tr><td>Decode stride beyond live KV length; workspace capacity and overflow</td><td class="pass">Passed</td></tr>
+        <tr><td>Ordinary nightly compiler and portable BF16 kernel contracts</td><td class="pass">Passed; oneDNN attention joins this target when selected by the engine build</td></tr>
         <tr><td>Repeated-call library allocation instrumentation</td><td class="open">Not tested</td></tr>
         <tr><td>2,047 / 2,048 / 2,049-token window boundaries</td><td class="open">Not tested</td></tr>
         <tr><td>4K through 128K context</td><td class="blocked">Blocked by eager workspace budget</td></tr>
@@ -156,6 +157,12 @@ python version/v8/scripts/certify_muse_glimmer_text_v8.py compare \
       Rerun this comparison when affected kernels, maps, lowering, conversion, or runtime linkage changes. Coverage
       should progress through window boundaries, longer histories, repeated sessions, and each supported hardware
       configuration while reporting passed, failed, skipped, and untested gates separately.
+    </p>
+    <p>
+      <code>make test-v8-muse-glimmer-contracts</code> is the resource-light nightly lane. Native builds exercise
+      conversion, lowering, generated C, artifact provenance, allocation contracts, and exact normalization, Q/K,
+      RoPE, and logits kernels. A <code>USE_ONEDNN=1</code> engine extends that lane to exact sliding-attention and
+      cached-decode kernel comparisons.
     </p>
     <p><a href="model-kernel-matrix.html#card-muse-glimmer">Return to the Model + Kernel Matrix</a>.</p>
   </section>

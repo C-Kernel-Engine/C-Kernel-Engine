@@ -1,5 +1,7 @@
 var NAVTREEINDEX15 =
 {
+"murmurhash3_8h_source.html":[2,0,0,1,2],
+"optimizer__kernels_8c.html":[2,0,1,1,64],
 "optimizer__kernels_8c.html#a017e1c756e664d84e72880c3afa3dbc2":[2,0,1,1,64,5],
 "optimizer__kernels_8c.html#a13410fec4c5089df3d3fc859d1a44c16":[2,0,1,1,64,11],
 "optimizer__kernels_8c.html#a1b5c89658044de1c75abb8822b2ac8a5":[2,0,1,1,64,4],
@@ -175,10 +177,11 @@ var NAVTREEINDEX15 =
 "recurrent__norm__kernels_8c_source.html":[2,0,1,1,73],
 "recurrent__qk__norm__kernels_8c.html":[2,0,1,1,74],
 "recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4":[2,0,1,1,74,1],
-"recurrent__qk__norm__kernels_8c.html#a1594cff75d6dc9fe6836555230b1b7cb":[2,0,1,1,74,10],
-"recurrent__qk__norm__kernels_8c.html#a1f8ded1d8bc4b06c825aceb06df8bbed":[2,0,1,1,74,9],
+"recurrent__qk__norm__kernels_8c.html#a1594cff75d6dc9fe6836555230b1b7cb":[2,0,1,1,74,11],
+"recurrent__qk__norm__kernels_8c.html#a1f8ded1d8bc4b06c825aceb06df8bbed":[2,0,1,1,74,10],
 "recurrent__qk__norm__kernels_8c.html#a259410cd2b892b43fbdfe309cf0103aa":[2,0,1,1,74,8],
 "recurrent__qk__norm__kernels_8c.html#a3db433fc055482ec19e14c60e3a89da6":[2,0,1,1,74,3],
+"recurrent__qk__norm__kernels_8c.html#a40128a284c7fe062bf4c3ecad6d2d4ea":[2,0,1,1,74,9],
 "recurrent__qk__norm__kernels_8c.html#a49eb6edcdcc1b513ab60cc3a0917ef60":[2,0,1,1,74,6],
 "recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27":[2,0,1,1,74,2],
 "recurrent__qk__norm__kernels_8c.html#ac4af9b8924cf11e95ce1d4cbbf4e8d51":[2,0,1,1,74,7],
@@ -246,8 +249,5 @@ var NAVTREEINDEX15 =
 "rmsnorm__kernels__int4_8c_source.html":[2,0,1,1,81],
 "rmsnorm__kernels__int8_8c.html":[2,0,1,1,82],
 "rmsnorm__kernels__int8_8c.html#a0296ca33e8e3ca947f0b2368c526aacd":[2,0,1,1,82,0],
-"rmsnorm__kernels__int8_8c.html#a05ce669a05d4f41b108073959a8a2449":[2,0,1,1,82,4],
-"rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b":[2,0,1,1,82,2],
-"rmsnorm__kernels__int8_8c.html#a8bcb792646f1c21869164c8394c76bf1":[2,0,1,1,82,3],
-"rmsnorm__kernels__int8_8c.html#aa0f94daa3cbcf5611313ea3211874b55":[2,0,1,1,82,1]
+"rmsnorm__kernels__int8_8c.html#a05ce669a05d4f41b108073959a8a2449":[2,0,1,1,82,4]
 };

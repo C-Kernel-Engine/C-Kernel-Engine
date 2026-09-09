@@ -66,18 +66,18 @@ var NAVTREEINDEX =
 "gemm__kernels__q4k__q8k__avx2_8c.html#a030c98b26ad610ccea6dabf993b60cdf",
 "gemm__kernels__q8__0__q8__0__contract_8c.html#a4dbe06a5a9b96fe29d5be5ee887dc94b",
 "hybrid__attention__kernels_8c.html#a2b1547061dcc5662b76ef3a1a84b5736",
-"optimizer__kernels_8c.html#a017e1c756e664d84e72880c3afa3dbc2",
-"rmsnorm__kernels__int8_8c_source.html",
-"structCKFooterGradOffsets.html#a6b4894e65e79da4ec83a9b2b535ef519",
-"structCKLayerForwardParamsQ4K.html#ad8373aa2774d6b69c1e4ea1d151d2646",
-"structCKModelRuntimeDescriptorV8.html#ab0bb22f4a933cd1eb8d4603b8391f950",
-"structMemoryInfo.html#a72adfc47f767bf59141275a7e542f5e2",
-"system__topology_8c.html#ab165ff3667f6ee7cca36f51b5a6bad20",
-"true__bpe_8c.html#ae277dc9b5acb2244cae7f956ac418f5f",
-"v6_85_2test__generated_2generic__api__test_8c.html#ad06e647ebaa7ddf119a84b3372883422",
-"v6_86_2generated_2ck-kernel-inference_8c.html#a83526729f733fbd311a503bf661132b6",
-"v6_86_2test__generated_2int8__q4k__test_8c.html#a369266c24eacffb87046522897a570d5",
-"v6__simple_8c.html#a9ec602b091ff5e82d41f6af9bf0766a1"
+"murmurhash3_8h_source.html",
+"rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b",
+"structCKFooterGradOffsets.html",
+"structCKLayerForwardParamsQ4K.html#ad6e110f69299b040cd07f83ed612548b",
+"structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4",
+"structMemoryInfo.html#a53dbc361ce7012951ceff084c52b17b9",
+"system__topology_8c.html#a7e083b9d0fb7a63db6e505f64a3237ce",
+"true__bpe_8c.html#ad85c42e889510c385f21508b66d103b5",
+"v6_85_2test__generated_2generic__api__test_8c.html#acba22172dabb4da8b3d848444f2fd364",
+"v6_86_2generated_2ck-kernel-inference_8c.html#a603e2dd5bd6b367a59a0d877038b6acd",
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a2de339e18e60a7acdea6c5946c3622d1",
+"v6__simple_8c.html#a6bb66d318498dbb9e011490d317eef0d"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
