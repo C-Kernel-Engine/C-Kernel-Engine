@@ -45,7 +45,7 @@
   "impl": {
     "function": "swiglu_forward",
     "c_declaration": "void swiglu_forward(const float *input, float *output, int tokens, int dim);",
-    "sources": ["src/kernels/swiglu_kernels.c", "src/kernels/sigmoid_kernels.c"],
+    "sources": ["src/kernels/swiglu_kernels.c", "src/kernels/sigmoid_kernels.c", "src/ck_threadpool.c"],
     "variants": [
       {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
       {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},

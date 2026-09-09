@@ -53,6 +53,19 @@ lib.swiglu_forward_exact.argtypes = [
 ]
 lib.swiglu_forward_exact.restype = None
 
+lib.swiglu_forward_ggml.argtypes = [
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.c_int,
+    ctypes.c_int,
+]
+lib.swiglu_forward_ggml.restype = None
+
+lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+lib.ck_set_num_threads.restype = None
+lib.ck_threadpool_global_destroy.argtypes = []
+lib.ck_threadpool_global_destroy.restype = None
+
 lib.swiglu_backward_exact.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # input [T × 2D]
     ctypes.POINTER(ctypes.c_float),  # d_output [T × D]
@@ -255,12 +268,71 @@ def run_backward_tests(T=64, D=128, warmup=10, iterations=1000):
     return report
 
 
+def run_parallel_consistency_tests():
+    rng = np.random.default_rng(20260908)
+    cases = ((1, 127), (2, 16384), (17, 4097), (128, 4096))
+    functions = (lib.swiglu_forward_exact, lib.swiglu_forward_ggml)
+
+    try:
+        for tokens, dim in cases:
+            source = rng.normal(0.0, 1.0, (tokens, 2 * dim)).astype(np.float32)
+            for function in functions:
+                serial = np.empty((tokens, dim), dtype=np.float32)
+                parallel = np.empty_like(serial)
+
+                lib.ck_threadpool_global_destroy()
+                lib.ck_set_num_threads(1)
+                function(
+                    numpy_to_ptr(source), numpy_to_ptr(serial), tokens, dim
+                )
+
+                lib.ck_threadpool_global_destroy()
+                lib.ck_set_num_threads(4)
+                function(
+                    numpy_to_ptr(source), numpy_to_ptr(parallel), tokens, dim
+                )
+                assert np.array_equal(serial, parallel), (
+                    function.__name__, tokens, dim,
+                    float(np.max(np.abs(serial - parallel))),
+                )
+
+                serial_inplace = source.copy()
+                lib.ck_threadpool_global_destroy()
+                lib.ck_set_num_threads(1)
+                function(
+                    numpy_to_ptr(serial_inplace),
+                    numpy_to_ptr(serial_inplace), tokens, dim,
+                )
+
+                lib.ck_threadpool_global_destroy()
+                lib.ck_set_num_threads(4)
+                for repetition in range(8):
+                    parallel_inplace = source.copy()
+                    function(
+                        numpy_to_ptr(parallel_inplace),
+                        numpy_to_ptr(parallel_inplace), tokens, dim,
+                    )
+                    assert np.array_equal(
+                        serial_inplace.ravel()[:tokens * dim],
+                        parallel_inplace.ravel()[:tokens * dim],
+                    ), (
+                        function.__name__, "inplace", tokens, dim, repetition
+                    )
+    finally:
+        lib.ck_threadpool_global_destroy()
+        lib.ck_set_num_threads(0)
+
+    print("SwiGLU serial/threaded exactness [PASS]")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     print_system_info()
+
+    run_parallel_consistency_tests()
 
     # Forward tests
     fwd_report = run_forward_tests(T=64, D=128, warmup=10, iterations=1000)

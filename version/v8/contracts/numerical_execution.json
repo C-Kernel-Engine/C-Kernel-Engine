@@ -2432,13 +2432,13 @@
         "merge_order": "none"
       },
       "threading": {
-        "work_partition": "serial",
-        "split_strategy": "serial",
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
         "deterministic": true,
         "thread_count_changes_arithmetic_order": false
       },
       "position_transform": null,
-      "description": "llama.cpp CPU SwiGLU semantics: evaluate GGML's ISA-specific vector exponential, divide gate by 1+exp(-gate), then multiply by up in FP32."
+      "description": "llama.cpp CPU SwiGLU semantics: evaluate GGML's ISA-specific vector exponential, divide gate by 1+exp(-gate), then multiply by up in FP32. Complete token rows may execute independently without changing per-output arithmetic."
     },
     "swiglu_pytorch_sleef_bf16_intermediate_bf16_output": {
       "operator_family": "swiglu",

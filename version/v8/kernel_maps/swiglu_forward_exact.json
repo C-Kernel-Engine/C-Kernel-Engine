@@ -26,7 +26,7 @@
         "name": "token",
         "partition_dim": "T",
         "param_style": "ith_nth",
-        "notes": "Exact training/parity path processes complete tokens with scalar sigmoid semantics."
+        "notes": "The persistent pool partitions complete token rows above the dispatch threshold. In-place compaction uses dependency-safe row waves; each output retains scalar sigmoid semantics."
       }
     ]
   },
@@ -37,7 +37,7 @@
   "impl": {
     "function": "swiglu_forward_exact",
     "c_declaration": "void swiglu_forward_exact(const float *input, float *output, int tokens, int dim);",
-    "sources": ["src/kernels/swiglu_kernels.c"],
+    "sources": ["src/kernels/swiglu_kernels.c", "src/ck_threadpool.c"],
     "variants": [
       {"name": "ref", "requires": [], "compile_flags": []}
     ]
@@ -47,5 +47,14 @@
     "bench": [],
     "parity": []
   },
-  "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid."
+  "implementation": {
+    "isa_dispatch": "scalar",
+    "threading": {
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_rows"],
+      "dispatch": ["ck_threadpool_parallel_for_n"],
+      "reduction_order_effect": "none"
+    }
+  },
+  "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid. Small, single-row, nested, and partially overlapping calls retain serial execution; exact in-place compaction uses dependency-safe row waves."
 }

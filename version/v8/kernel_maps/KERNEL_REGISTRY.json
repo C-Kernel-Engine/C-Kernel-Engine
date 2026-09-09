@@ -59856,7 +59856,8 @@
         "c_declaration": "void swiglu_forward(const float *input, float *output, int tokens, int dim);",
         "sources": [
           "src/kernels/swiglu_kernels.c",
-          "src/kernels/sigmoid_kernels.c"
+          "src/kernels/sigmoid_kernels.c",
+          "src/ck_threadpool.c"
         ],
         "variants": [
           {
@@ -59977,7 +59978,7 @@
             "name": "token",
             "partition_dim": "T",
             "param_style": "ith_nth",
-            "notes": "Exact training/parity path processes complete tokens with scalar sigmoid semantics."
+            "notes": "The persistent pool partitions complete token rows above the dispatch threshold. In-place compaction uses dependency-safe row waves; each output retains scalar sigmoid semantics."
           }
         ]
       },
@@ -59991,7 +59992,8 @@
         "function": "swiglu_forward_exact",
         "c_declaration": "void swiglu_forward_exact(const float *input, float *output, int tokens, int dim);",
         "sources": [
-          "src/kernels/swiglu_kernels.c"
+          "src/kernels/swiglu_kernels.c",
+          "src/ck_threadpool.c"
         ],
         "variants": [
           {
@@ -60008,7 +60010,20 @@
         "bench": [],
         "parity": []
       },
-      "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid.",
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "ck_threadpool",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "ck_threadpool_parallel_for_n"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid. Small, single-row, nested, and partially overlapping calls retain serial execution; exact in-place compaction uses dependency-safe row waves.",
       "name": "swiglu_forward_exact",
       "_source_file": "swiglu_forward_exact.json"
     },
@@ -60061,18 +60076,19 @@
       ],
       "parallelization": {
         "supported": [
-          "serial"
+          "serial",
+          "token"
         ],
         "preferred": {
-          "prefill": "serial",
+          "prefill": "token",
           "decode": "serial"
         },
         "strategies": [
           {
-            "name": "serial",
+            "name": "token",
             "partition_dim": "T",
-            "param_style": "complete_call",
-            "notes": "Elementwise ISA-vector traversal; no cross-element reduction."
+            "param_style": "threadpool_range",
+            "notes": "Large multi-token calls partition complete rows; in-place compaction uses dependency-safe row waves. Each row retains the existing ISA-vector traversal and tail arithmetic."
           }
         ]
       },
@@ -60086,7 +60102,8 @@
         "function": "swiglu_forward_ggml",
         "c_declaration": "void swiglu_forward_ggml(const float *input, float *output, int tokens, int dim);",
         "sources": [
-          "src/kernels/swiglu_kernels.c"
+          "src/kernels/swiglu_kernels.c",
+          "src/ck_threadpool.c"
         ],
         "variants": [
           {
@@ -60125,12 +60142,12 @@
           "implementation": {
             "isa_dispatch": "compile_time",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_rows"
               ],
               "dispatch": [
-                "inline"
+                "ck_threadpool_parallel_for_n"
               ],
               "reduction_order_effect": "none"
             }
@@ -60140,7 +60157,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -60182,7 +60199,7 @@
           "llama.cpp ggml_vec_swiglu_f32"
         ]
       },
-      "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic.",
+      "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic. Small, single-row, nested, and partially overlapping calls retain serial execution; exact in-place compaction uses dependency-safe row waves.",
       "name": "swiglu_forward_ggml",
       "_source_file": "swiglu_forward_ggml.json"
     },

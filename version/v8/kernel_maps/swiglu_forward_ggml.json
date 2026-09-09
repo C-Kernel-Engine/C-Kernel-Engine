@@ -37,14 +37,14 @@
   "scratch": [],
   "dims": ["T", "I"],
   "parallelization": {
-    "supported": ["serial"],
-    "preferred": {"prefill": "serial", "decode": "serial"},
+    "supported": ["serial", "token"],
+    "preferred": {"prefill": "token", "decode": "serial"},
     "strategies": [
       {
-        "name": "serial",
+        "name": "token",
         "partition_dim": "T",
-        "param_style": "complete_call",
-        "notes": "Elementwise ISA-vector traversal; no cross-element reduction."
+        "param_style": "threadpool_range",
+        "notes": "Large multi-token calls partition complete rows; in-place compaction uses dependency-safe row waves. Each row retains the existing ISA-vector traversal and tail arithmetic."
       }
     ]
   },
@@ -55,7 +55,7 @@
   "impl": {
     "function": "swiglu_forward_ggml",
     "c_declaration": "void swiglu_forward_ggml(const float *input, float *output, int tokens, int dim);",
-    "sources": ["src/kernels/swiglu_kernels.c"],
+    "sources": ["src/kernels/swiglu_kernels.c", "src/ck_threadpool.c"],
     "variants": [
       {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
       {"name": "ref", "requires": [], "compile_flags": []}
@@ -72,9 +72,9 @@
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "serial",
-          "work_partition": ["serial"],
-          "dispatch": ["inline"],
+          "runtime": "ck_threadpool",
+          "work_partition": ["independent_rows"],
+          "dispatch": ["ck_threadpool_parallel_for_n"],
           "reduction_order_effect": "none"
         }
       },
@@ -83,7 +83,7 @@
         "merge_order": "none",
         "deterministic": true,
         "thread_count_changes_arithmetic_order": false,
-        "split_strategy": "serial"
+        "split_strategy": "independent_outputs"
       }
     }
   ],
@@ -101,5 +101,5 @@
     "bench": [],
     "parity": ["llama.cpp ggml_vec_swiglu_f32"]
   },
-  "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic."
+  "notes": "Exact llama.cpp CPU SwiGLU provider selected by numerical contract, never by model-name codegen logic. Small, single-row, nested, and partially overlapping calls retain serial execution; exact in-place compaction uses dependency-safe row waves."
 }

@@ -19,6 +19,7 @@
 #endif
 
 #include "bf16_utils.h"
+#include "ck_threadpool.h"
 #include "ckernel_engine.h"
 #include "ckernel_quant.h"
 #include <dlfcn.h>
@@ -512,37 +513,127 @@ void swiglu_backward(const float *input,
  *
  * After changes: make test
  */
-void swiglu_forward_exact(const float *input,
-                          float *output,
-                          int tokens,
-                          int dim)
+typedef struct {
+    const float *input;
+    float *output;
+    int dim;
+} ck_swiglu_exact_args_t;
+
+static int ck_swiglu_ranges_overlap(const float *input,
+                                    const float *output,
+                                    int tokens,
+                                    int dim)
 {
-    int T = tokens;
-    int D = dim;
+    const uintptr_t input_begin = (uintptr_t)input;
+    const uintptr_t input_end = input_begin +
+        (size_t)tokens * (size_t)(2 * dim) * sizeof(float);
+    const uintptr_t output_begin = (uintptr_t)output;
+    const uintptr_t output_end = output_begin +
+        (size_t)tokens * (size_t)dim * sizeof(float);
+    return input_begin < output_end && output_begin < input_end;
+}
 
-    for (int t = 0; t < T; ++t) {
-        const float *row = input + (size_t)t * (2 * D);
-        float *out_row = output + (size_t)t * D;
+static void ck_swiglu_dispatch_rows(ck_threadpool_t *pool,
+                                    int active,
+                                    int tokens,
+                                    int dim,
+                                    ck_range_fn_t fn,
+                                    void *args,
+                                    const float *input,
+                                    float *output)
+{
+    const size_t minimum_elements_per_thread = 65536u;
+    const size_t elems = (size_t)tokens * (size_t)dim;
+    if (!pool || active <= 1 || tokens < 2 ||
+        elems < 2u * minimum_elements_per_thread ||
+        ck_threadpool_thread_id(pool) > 0) {
+        fn(0, tokens, args);
+        return;
+    }
 
-        for (int d = 0; d < D; ++d) {
-            float a = row[d];       // gate
-            float b = row[D + d];   // value
+    const size_t useful_threads =
+        (elems + minimum_elements_per_thread - 1u) /
+        minimum_elements_per_thread;
+    if ((size_t)active > useful_threads) active = (int)useful_threads;
+    if (active > tokens) active = tokens;
 
-            float s = sigmoid_scalar_parity(a); // sigmoid(a)
-            float silu = a * s;                 // silu(a)
+    if (!ck_swiglu_ranges_overlap(input, output, tokens, dim)) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, tokens, 1, fn, args);
+        return;
+    }
+    if (input != output) {
+        fn(0, tokens, args);
+        return;
+    }
+
+    /*
+     * In-place [T, 2D] -> [T, D] compaction has a binary dependency:
+     * output row t overlaps input row floor(t / 2). Process each parent
+     * wave before its children; rows within a wave remain independent.
+     */
+    fn(0, 1, args);
+    for (int begin = 1; begin < tokens;) {
+        int end = begin > tokens - begin ? tokens : begin * 2;
+        int wave_threads = active;
+        const int wave_rows = end - begin;
+        if (wave_threads > wave_rows) wave_threads = wave_rows;
+        ck_threadpool_parallel_for_n(
+            pool, wave_threads, begin, end, 1, fn, args);
+        begin = end;
+    }
+}
+
+static void ck_swiglu_exact_rows(int begin, int end, void *opaque)
+{
+    const ck_swiglu_exact_args_t *args =
+        (const ck_swiglu_exact_args_t *)opaque;
+
+    for (int t = begin; t < end; ++t) {
+        const float *row = args->input +
+            (size_t)t * (size_t)(2 * args->dim);
+        float *out_row = args->output + (size_t)t * (size_t)args->dim;
+
+        for (int d = 0; d < args->dim; ++d) {
+            float a = row[d];
+            float b = row[args->dim + d];
+            float s = sigmoid_scalar_parity(a);
+            float silu = a * s;
             out_row[d] = silu * b;
         }
     }
 }
 
-void swiglu_forward_ggml(const float *input,
-                         float *output,
-                         int tokens,
-                         int dim)
+void swiglu_forward_exact(const float *input,
+                          float *output,
+                          int tokens,
+                          int dim)
 {
-    for (int t = 0; t < tokens; ++t) {
-        const float *row = input + (size_t)t * (2 * dim);
-        float *out_row = output + (size_t)t * dim;
+    if (!input || !output || tokens <= 0 || dim <= 0) {
+        return;
+    }
+
+    ck_swiglu_exact_args_t args = {input, output, dim};
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    ck_swiglu_dispatch_rows(pool, active, tokens, dim,
+                            ck_swiglu_exact_rows, &args, input, output);
+}
+
+typedef struct {
+    const float *input;
+    float *output;
+    int dim;
+} ck_swiglu_ggml_args_t;
+
+static void ck_swiglu_ggml_rows(int begin, int end, void *opaque)
+{
+    const ck_swiglu_ggml_args_t *args =
+        (const ck_swiglu_ggml_args_t *)opaque;
+    const int dim = args->dim;
+    for (int t = begin; t < end; ++t) {
+        const float *row = args->input + (size_t)t * (size_t)(2 * dim);
+        float *out_row = args->output + (size_t)t * (size_t)dim;
         int d = 0;
 
 #if defined(__AVX512F__) && defined(__AVX512DQ__)
@@ -571,6 +662,22 @@ void swiglu_forward_ggml(const float *input,
             out_row[d] = (gate / (1.0f + expf(-gate))) * row[dim + d];
         }
     }
+}
+
+void swiglu_forward_ggml(const float *input,
+                         float *output,
+                         int tokens,
+                         int dim)
+{
+    if (!input || !output || tokens <= 0 || dim <= 0) {
+        return;
+    }
+
+    ck_swiglu_ggml_args_t args = {input, output, dim};
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    ck_swiglu_dispatch_rows(pool, active, tokens, dim,
+                            ck_swiglu_ggml_rows, &args, input, output);
 }
 
 void swiglu_forward_ggml_split(const float *gate,
