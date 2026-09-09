@@ -11,6 +11,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 CONVERTER_PATH = ROOT / "version" / "v8" / "scripts" / "convert_safetensors_to_bump_v8.py"
 BUILDER_PATH = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
+CERTIFIER_PATH = (
+    ROOT / "version" / "v8" / "scripts" / "certify_muse_glimmer_text_v8.py"
+)
 
 
 def _load(name: str, path: Path):
@@ -24,6 +27,7 @@ def _load(name: str, path: Path):
 
 converter = _load("muse_converter_test", CONVERTER_PATH)
 builder = _load("muse_builder_test", BUILDER_PATH)
+certifier = _load("muse_certifier_test", CERTIFIER_PATH)
 
 
 def _text_config(num_layers: int = 4) -> dict:
@@ -384,3 +388,135 @@ def test_muse_attention_adds_no_kernel_allocation_debt() -> None:
     body = body.split("void attention_forward_causal_head_major_gqa_muse", 1)[0]
     assert "malloc(" not in body
     assert "free(" not in body
+
+
+def _reference_manifest() -> dict:
+    return {
+        "schema": "cke.v8.muse_glimmer_text_reference",
+        "max_tokens": 128,
+        "cases": [
+            {
+                "name": name,
+                "prompt_tokens": 2,
+                "generated_tokens": 2,
+                "output": "fixture",
+            }
+            for name in certifier.CASES
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    "mutate,match",
+    [
+        (lambda manifest: manifest.update(cases=[]), "nonempty cases"),
+        (
+            lambda manifest: manifest.update(cases=manifest["cases"][:-1]),
+            "do not match",
+        ),
+        (lambda manifest: manifest.update(max_tokens=0), "positive integer"),
+    ],
+)
+def test_muse_certifier_rejects_incomplete_manifests(mutate, match: str) -> None:
+    manifest = _reference_manifest()
+    mutate(manifest)
+    with pytest.raises(ValueError, match=match):
+        certifier._validate_reference_manifest(manifest)
+
+
+def test_muse_certifier_validates_trajectory_arrays(tmp_path: Path) -> None:
+    case = _reference_manifest()["cases"][0]
+    fixture = tmp_path / "case.npz"
+    import numpy as np
+
+    np.savez(
+        fixture,
+        prompt_ids=np.asarray([1, 2], dtype=np.int32),
+        generated_ids=np.asarray([3, 4], dtype=np.int32),
+        logits=np.zeros((2, 8), dtype=np.float32),
+    )
+    with np.load(fixture, allow_pickle=False) as arrays:
+        prompt, generated, logits = certifier._validate_reference_arrays(
+            case, arrays, 8
+        )
+    assert prompt.tolist() == [1, 2]
+    assert generated.tolist() == [3, 4]
+    assert logits.shape == (2, 8)
+
+    np.savez(
+        fixture,
+        prompt_ids=np.asarray([1, 2], dtype=np.int32),
+        generated_ids=np.asarray([3, 4], dtype=np.int32),
+        logits=np.asarray([[0.0] * 8, [float("nan")] * 8], dtype=np.float32),
+    )
+    with np.load(fixture, allow_pickle=False) as arrays, pytest.raises(
+        ValueError, match="non-finite"
+    ):
+        certifier._validate_reference_arrays(case, arrays, 8)
+
+    np.savez(
+        fixture,
+        prompt_ids=np.asarray([1, 2], dtype=np.int32),
+        generated_ids=np.asarray([], dtype=np.int32),
+        logits=np.empty((0, 8), dtype=np.float32),
+    )
+    with np.load(fixture, allow_pickle=False) as arrays, pytest.raises(
+        ValueError, match="generated_ids must be nonempty"
+    ):
+        certifier._validate_reference_arrays(case, arrays, 8)
+
+
+def test_muse_certifier_requires_all_runtime_logits_to_be_finite() -> None:
+    free = {
+        "first_token_divergence": None,
+        "finite_logit_rows": 2,
+    }
+    forced = {
+        "first_logit_divergence": None,
+        "finite_logit_rows": 2,
+    }
+    assert certifier._case_passes(free, forced, 2)
+    forced["finite_logit_rows"] = 1
+    assert not certifier._case_passes(free, forced, 2)
+    forced["finite_logit_rows"] = 2
+    free["finite_logit_rows"] = 1
+    assert not certifier._case_passes(free, forced, 2)
+
+
+def test_muse_certifier_rejects_a_different_loaded_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    requested = tmp_path / "requested" / "libckernel_engine.so"
+    loaded = tmp_path / "loaded" / "libckernel_engine.so"
+    requested.parent.mkdir()
+    loaded.parent.mkdir()
+    requested.write_bytes(b"requested")
+    loaded.write_bytes(b"loaded")
+    monkeypatch.setattr(certifier, "_resolved_symbol_library", lambda _lib, _symbol: loaded)
+    with pytest.raises(RuntimeError, match="different CK engine"):
+        certifier._verify_loaded_engine(object(), requested)
+
+
+def test_muse_certifier_publishes_failure_for_empty_reference(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runtime = tmp_path / "runtime"
+    reference = tmp_path / "reference"
+    report = tmp_path / "report.json"
+    runtime.mkdir()
+    reference.mkdir()
+    (reference / "reference.json").write_text(
+        json.dumps(
+            {
+                "schema": "cke.v8.muse_glimmer_text_reference",
+                "max_tokens": 128,
+                "cases": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert certifier.compare_cke(runtime, reference, report) == 3
+    published = json.loads(report.read_text(encoding="utf-8"))
+    assert published["status"] == "fail"
+    assert "nonempty cases" in published["error"]
+    capsys.readouterr()

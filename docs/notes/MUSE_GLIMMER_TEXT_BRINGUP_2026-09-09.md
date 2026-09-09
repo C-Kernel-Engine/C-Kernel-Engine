@@ -89,8 +89,11 @@ The certification runner separates two questions:
 
 It checks finite values, records first divergence, publishes partial failures,
 and hashes the runtime libraries, generated C, runtime bundle, and reference
-manifest. Three official-chat-template prompts ran for 128 generated tokens
-each:
+manifest. It rejects empty, incomplete, malformed, or non-finite reference
+fixtures. It also preloads the requested engine and uses `dladdr` on an
+engine-owned symbol to prove that `libmodel.so` resolved that exact file; the
+resolved path and content hash are recorded in the report. Three
+official-chat-template prompts ran for 128 generated tokens each:
 
 | Prompt | Prompt tokens | Exact logit rows | Greedy token divergence |
 | --- | ---: | ---: | --- |

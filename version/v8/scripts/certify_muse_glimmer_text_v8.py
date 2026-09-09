@@ -8,6 +8,7 @@ import ctypes
 import hashlib
 import importlib.metadata
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +26,15 @@ CASES = {
         "and one risk."
     ),
 }
+
+
+class _DlInfo(ctypes.Structure):
+    _fields_ = [
+        ("dli_fname", ctypes.c_char_p),
+        ("dli_fbase", ctypes.c_void_p),
+        ("dli_sname", ctypes.c_char_p),
+        ("dli_saddr", ctypes.c_void_p),
+    ]
 
 
 def _sha256(path: Path) -> str | None:
@@ -46,6 +56,141 @@ def _prompt_ids(tokenizer, prompt: str, date_string: str) -> list[int]:
     )
     values = encoded["input_ids"] if hasattr(encoded, "keys") else encoded
     return [int(value) for value in values]
+
+
+def _resolved_symbol_library(lib: ctypes.CDLL, symbol: str) -> Path:
+    function = getattr(lib, symbol)
+    dladdr = ctypes.CDLL(None).dladdr
+    dladdr.argtypes = [ctypes.c_void_p, ctypes.POINTER(_DlInfo)]
+    dladdr.restype = ctypes.c_int
+    info = _DlInfo()
+    if (
+        dladdr(ctypes.cast(function, ctypes.c_void_p), ctypes.byref(info)) == 0
+        or not info.dli_fname
+    ):
+        raise RuntimeError(f"dladdr could not resolve runtime symbol {symbol}")
+    return Path(os.fsdecode(info.dli_fname)).resolve()
+
+
+def _verify_loaded_engine(lib: ctypes.CDLL, requested_engine: Path) -> Path:
+    requested_engine = requested_engine.resolve()
+    loaded_engine = _resolved_symbol_library(lib, "ck_set_num_threads")
+    if loaded_engine != requested_engine:
+        raise RuntimeError(
+            "Muse certification resolved a different CK engine than requested: "
+            f"requested={requested_engine} loaded={loaded_engine}"
+        )
+    return loaded_engine
+
+
+def _validate_reference_manifest(reference: object) -> list[dict]:
+    if not isinstance(reference, dict):
+        raise ValueError("reference manifest must be a JSON object")
+    if reference.get("schema") != "cke.v8.muse_glimmer_text_reference":
+        raise ValueError("reference manifest has the wrong schema")
+    max_tokens = reference.get("max_tokens")
+    if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens <= 0:
+        raise ValueError("reference max_tokens must be a positive integer")
+    cases = reference.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("reference manifest must contain nonempty cases")
+    if not all(isinstance(case, dict) for case in cases):
+        raise ValueError("every reference case must be an object")
+    names = [case.get("name") for case in cases]
+    if not all(isinstance(name, str) and name for name in names):
+        raise ValueError("every reference case must have a nonempty string name")
+    if len(names) != len(set(names)):
+        raise ValueError("reference case names must be unique")
+    expected_names = set(CASES)
+    actual_names = set(names)
+    if actual_names != expected_names:
+        raise ValueError(
+            "reference cases do not match the certification suite: "
+            f"missing={sorted(expected_names - actual_names)} "
+            f"unexpected={sorted(actual_names - expected_names)}"
+        )
+    for case in cases:
+        prompt_tokens = case.get("prompt_tokens")
+        generated_tokens = case.get("generated_tokens")
+        if (
+            not isinstance(prompt_tokens, int)
+            or isinstance(prompt_tokens, bool)
+            or prompt_tokens <= 0
+        ):
+            raise ValueError(
+                f"reference {case['name']} prompt_tokens must be positive"
+            )
+        if (
+            not isinstance(generated_tokens, int)
+            or isinstance(generated_tokens, bool)
+            or generated_tokens <= 0
+            or generated_tokens > max_tokens
+        ):
+            raise ValueError(
+                f"reference {case['name']} generated_tokens must be within "
+                f"1..{max_tokens}"
+            )
+        if not isinstance(case.get("output"), str):
+            raise ValueError(f"reference {case['name']} output must be a string")
+    return cases
+
+
+def _validate_reference_arrays(
+    case: dict, arrays: object, vocab: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    required = {"prompt_ids", "generated_ids", "logits"}
+    files = set(getattr(arrays, "files", ()))
+    if files != required:
+        raise ValueError(
+            f"reference {case['name']} arrays mismatch: "
+            f"missing={sorted(required - files)} unexpected={sorted(files - required)}"
+        )
+    raw_prompt_ids = arrays["prompt_ids"]
+    raw_expected_ids = arrays["generated_ids"]
+    raw_expected_logits = arrays["logits"]
+    if raw_prompt_ids.ndim != 1 or raw_prompt_ids.size == 0:
+        raise ValueError(f"reference {case['name']} prompt_ids must be nonempty rank 1")
+    if raw_expected_ids.ndim != 1 or raw_expected_ids.size == 0:
+        raise ValueError(
+            f"reference {case['name']} generated_ids must be nonempty rank 1"
+        )
+    if not np.issubdtype(raw_prompt_ids.dtype, np.integer) or not np.issubdtype(
+        raw_expected_ids.dtype, np.integer
+    ):
+        raise ValueError(f"reference {case['name']} token IDs must be integers")
+    if raw_expected_logits.ndim != 2:
+        raise ValueError(f"reference {case['name']} logits must have rank 2")
+    if raw_expected_logits.shape != (raw_expected_ids.size, vocab):
+        raise ValueError(
+            f"reference {case['name']} logits shape {raw_expected_logits.shape} "
+            f"does not match trajectory/vocab {(raw_expected_ids.size, vocab)}"
+        )
+    if raw_expected_logits.dtype != np.float32:
+        raise ValueError(f"reference {case['name']} logits must use float32 storage")
+    if not np.isfinite(raw_expected_logits).all():
+        raise ValueError(f"reference {case['name']} logits contain non-finite values")
+    prompt_ids = raw_prompt_ids.astype(np.int32)
+    expected_ids = raw_expected_ids.astype(np.int32)
+    expected_logits = raw_expected_logits.astype(np.float32)
+    if np.any(prompt_ids < 0) or np.any(prompt_ids >= vocab):
+        raise ValueError(f"reference {case['name']} prompt IDs exceed the vocabulary")
+    if np.any(expected_ids < 0) or np.any(expected_ids >= vocab):
+        raise ValueError(f"reference {case['name']} generated IDs exceed the vocabulary")
+    if case.get("prompt_tokens") != prompt_ids.size:
+        raise ValueError(f"reference {case['name']} prompt token count is inconsistent")
+    if case.get("generated_tokens") != expected_ids.size:
+        raise ValueError(f"reference {case['name']} generated token count is inconsistent")
+    return prompt_ids, expected_ids, expected_logits
+
+
+def _case_passes(free: dict, forced: dict, expected_steps: int) -> bool:
+    return bool(
+        expected_steps > 0
+        and forced.get("first_logit_divergence") is None
+        and forced.get("finite_logit_rows") == expected_steps
+        and free.get("first_token_divergence") is None
+        and free.get("finite_logit_rows") == expected_steps
+    )
 
 
 def create_reference(
@@ -142,24 +287,6 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
 
     from transformers import AutoTokenizer
 
-    reference = json.loads((reference_dir / "reference.json").read_text())
-    tokenizer = AutoTokenizer.from_pretrained(runtime_dir, fix_mistral_regex=True)
-    lib = ctypes.CDLL(str(runtime_dir / "libmodel.so"), mode=ctypes.RTLD_GLOBAL)
-    _init_model(lib, runtime_dir)
-    lib.ck_model_get_vocab_size.argtypes = []
-    lib.ck_model_get_vocab_size.restype = ctypes.c_int
-    vocab = int(lib.ck_model_get_vocab_size())
-    lib.ck_model_kv_cache_reset.argtypes = []
-    lib.ck_model_kv_cache_reset.restype = None
-    lib.ck_model_embed_tokens.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.c_int]
-    lib.ck_model_embed_tokens.restype = ctypes.c_int
-    lib.ck_model_forward.argtypes = [ctypes.POINTER(ctypes.c_float)]
-    lib.ck_model_forward.restype = ctypes.c_int
-    lib.ck_model_decode.argtypes = [ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
-    lib.ck_model_decode.restype = ctypes.c_int
-    lib.ck_model_free.argtypes = []
-    lib.ck_model_free.restype = None
-
     report = {
         "schema": "cke.v8.muse_glimmer_text_parity",
         "runtime_dir": str(runtime_dir.resolve()),
@@ -185,13 +312,20 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             ),
         },
         "cases": [],
+        "status": "error",
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
     def publish() -> None:
         report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
+    publish()
+    lib = None
+    tokenizer = None
+    vocab = 0
+
     def prefill(prompt_ids: np.ndarray, name: str) -> None:
+        assert lib is not None
         lib.ck_model_kv_cache_reset()
         token_array = (ctypes.c_int32 * len(prompt_ids))(*prompt_ids.tolist())
         if lib.ck_model_embed_tokens(token_array, len(prompt_ids)) != 0:
@@ -206,6 +340,7 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
         name: str,
         forced: bool,
     ) -> dict:
+        assert lib is not None and tokenizer is not None
         prefill(prompt_ids, name)
         actual_ids: list[int] = []
         first_logit_divergence = None
@@ -213,6 +348,7 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
         exact_rows = 0
         maximum_error = 0.0
         finite_rows = 0
+        first_nonfinite_step = None
         for step, expected_token in enumerate(expected_ids):
             actual_logits, _, _ = _extract_logits(
                 lib, vocab, len(prompt_ids) if step == 0 else 1
@@ -220,6 +356,8 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             expected_row = expected_logits[step]
             finite = bool(np.isfinite(actual_logits).all())
             finite_rows += int(finite)
+            if not finite and first_nonfinite_step is None:
+                first_nonfinite_step = step
             bits_equal = bool(
                 np.array_equal(
                     actual_logits.view(np.uint32), expected_row.view(np.uint32)
@@ -252,21 +390,66 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             "actual_output": tokenizer.decode(actual_ids, skip_special_tokens=True),
             "bit_exact_logit_rows": exact_rows,
             "finite_logit_rows": finite_rows,
+            "first_nonfinite_step": first_nonfinite_step,
             "max_abs_error": maximum_error,
             "first_logit_divergence": first_logit_divergence,
             "first_token_divergence": first_token_divergence,
         }
 
-    passed = True
+    passed = False
     try:
-        for case in reference["cases"]:
+        reference = json.loads((reference_dir / "reference.json").read_text())
+        cases = _validate_reference_manifest(reference)
+        engine_path = (runtime_dir / "libckernel_engine.so").resolve()
+        model_path = (runtime_dir / "libmodel.so").resolve()
+        if not engine_path.is_file() or not model_path.is_file():
+            raise FileNotFoundError(
+                f"runtime requires {engine_path} and {model_path}"
+            )
+        ctypes.CDLL(str(engine_path), mode=ctypes.RTLD_GLOBAL)
+        lib = ctypes.CDLL(str(model_path), mode=ctypes.RTLD_GLOBAL)
+        loaded_engine = _verify_loaded_engine(lib, engine_path)
+        report["provenance"]["loaded_engine_path"] = str(loaded_engine)
+        report["provenance"]["loaded_engine_sha256"] = _sha256(loaded_engine)
+        report["status"] = "running"
+        publish()
+        tokenizer = AutoTokenizer.from_pretrained(
+            runtime_dir, fix_mistral_regex=True
+        )
+        _init_model(lib, runtime_dir)
+        lib.ck_model_get_vocab_size.argtypes = []
+        lib.ck_model_get_vocab_size.restype = ctypes.c_int
+        vocab = int(lib.ck_model_get_vocab_size())
+        if vocab <= 0:
+            raise RuntimeError(f"runtime reported invalid vocabulary size {vocab}")
+        lib.ck_model_kv_cache_reset.argtypes = []
+        lib.ck_model_kv_cache_reset.restype = None
+        lib.ck_model_embed_tokens.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+        ]
+        lib.ck_model_embed_tokens.restype = ctypes.c_int
+        lib.ck_model_forward.argtypes = [ctypes.POINTER(ctypes.c_float)]
+        lib.ck_model_forward.restype = ctypes.c_int
+        lib.ck_model_decode.argtypes = [
+            ctypes.c_int32,
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.ck_model_decode.restype = ctypes.c_int
+        lib.ck_model_free.argtypes = []
+        lib.ck_model_free.restype = None
+
+        passed = True
+        for case in cases:
             result = {"name": case["name"], "status": "error"}
             report["cases"].append(result)
             try:
-                arrays = np.load(reference_dir / f"{case['name']}.npz")
-                prompt_ids = arrays["prompt_ids"].astype(np.int32)
-                expected_ids = arrays["generated_ids"].astype(np.int32)
-                expected_logits = arrays["logits"].astype(np.float32)
+                with np.load(
+                    reference_dir / f"{case['name']}.npz", allow_pickle=False
+                ) as arrays:
+                    prompt_ids, expected_ids, expected_logits = (
+                        _validate_reference_arrays(case, arrays, vocab)
+                    )
                 free = run_path(
                     prompt_ids, expected_ids, expected_logits, case["name"], False
                 )
@@ -281,10 +464,7 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
                         prompt_ids, expected_ids, expected_logits, case["name"], True
                     )
                     forced["execution_reused"] = False
-                case_passed = (
-                    forced["first_logit_divergence"] is None
-                    and free["first_token_divergence"] is None
-                )
+                case_passed = _case_passes(free, forced, len(expected_ids))
                 result.update(
                     {
                         "status": "pass" if case_passed else "fail",
@@ -300,10 +480,21 @@ def compare_cke(runtime_dir: Path, reference_dir: Path, report_path: Path) -> in
             except Exception as exc:
                 result["error"] = f"{type(exc).__name__}: {exc}"
                 passed = False
-            report["status"] = "pass" if passed else "fail"
+            report["status"] = "running" if passed else "fail"
             publish()
+        passed = passed and len(report["cases"]) == len(cases) and all(
+            case.get("status") == "pass" for case in report["cases"]
+        )
+    except Exception as exc:
+        report["error"] = f"{type(exc).__name__}: {exc}"
+        passed = False
     finally:
-        lib.ck_model_free()
+        if lib is not None and hasattr(lib, "ck_model_free"):
+            try:
+                lib.ck_model_free()
+            except Exception as exc:
+                report["cleanup_error"] = f"{type(exc).__name__}: {exc}"
+                passed = False
     report["status"] = "pass" if passed else "fail"
     publish()
     print(json.dumps(report, indent=2))
