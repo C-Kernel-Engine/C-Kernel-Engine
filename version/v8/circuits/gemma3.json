@@ -101,6 +101,60 @@
     "attn_sliding_decode": "attention_forward_decode_head_major_gqa_llama_regular_sliding",
     "rope_init": "rope_precompute_cache_split"
   },
+  "required_numerical_contracts": {
+    "decoder.rmsnorm": {
+      "operation_interface": "rmsnorm.fp32.v1",
+      "op": "rmsnorm",
+      "template_ops": [
+        "attn_norm",
+        "post_attention_norm",
+        "ffn_norm",
+        "post_ffn_norm",
+        "final_rmsnorm"
+      ],
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Independent token rows use the exact llama.cpp-compatible reduction through the persistent prefill pool."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the serial llama.cpp-compatible provider."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.rmsnorm.output",
+        "producer": "rmsnorm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    },
+    "decoder.qk_norm": {
+      "operation_interface": "qk_norm.fp32_inplace.v1",
+      "op": "qk_norm",
+      "template_ops": ["qk_norm"],
+      "phases": {
+        "prefill": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Independent Q/K head-token rows use the exact llama.cpp-compatible reduction through the persistent prefill pool."
+        },
+        "decode": {
+          "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+          "validation": "validated",
+          "evidence": "Single-token decode retains the serial llama.cpp-compatible Q/K provider."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.qk_norm.output",
+        "producer": "qk_norm",
+        "logical_layout": "head_major",
+        "axis_names": ["head", "token", "channel"]
+      }
+    }
+  },
   "required_contracts": {
     "decoder.sliding_attention": {
       "op": "attention_sliding",

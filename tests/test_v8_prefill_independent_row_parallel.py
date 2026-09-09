@@ -109,6 +109,12 @@ class PrefillIndependentRowParallelTests(unittest.TestCase):
         cls.qk_norm_serial.argtypes = qk_norm_args
         cls.qk_norm_parallel = cls.lib.qk_norm_forward_parallel_dispatch
         cls.qk_norm_parallel.argtypes = qk_norm_args
+        cls.qk_norm_llama_serial = cls.lib.qk_norm_forward_llama_production
+        cls.qk_norm_llama_serial.argtypes = qk_norm_args
+        cls.qk_norm_llama_parallel = (
+            cls.lib.qk_norm_forward_llama_production_parallel_dispatch
+        )
+        cls.qk_norm_llama_parallel.argtypes = qk_norm_args
 
         v_norm_args = [
             FLOAT_PTR,
@@ -363,6 +369,89 @@ class PrefillIndependentRowParallelTests(unittest.TestCase):
         )
         np.testing.assert_array_equal(q_parallel, q_serial)
         np.testing.assert_array_equal(k_parallel, k_serial)
+
+    def test_qk_norm_llama_rows_are_bit_exact_in_place(self) -> None:
+        heads, kv_heads, tokens, head_dim = 8, 2, 131, 256
+        rng = np.random.default_rng(67)
+        q_source = rng.standard_normal(
+            (heads, tokens, head_dim), dtype=np.float32
+        )
+        k_source = rng.standard_normal(
+            (kv_heads, tokens, head_dim), dtype=np.float32
+        )
+        q_gamma = rng.standard_normal(head_dim, dtype=np.float32)
+        k_gamma = rng.standard_normal(head_dim, dtype=np.float32)
+        q_serial, q_parallel = q_source.copy(), q_source.copy()
+        k_serial, k_parallel = k_source.copy(), k_source.copy()
+        suffix = (
+            q_gamma.ctypes.data_as(FLOAT_PTR),
+            k_gamma.ctypes.data_as(FLOAT_PTR),
+            heads,
+            kv_heads,
+            tokens,
+            head_dim,
+            ctypes.c_float(1e-6),
+        )
+
+        self.qk_norm_llama_serial(
+            q_serial.ctypes.data_as(FLOAT_PTR),
+            k_serial.ctypes.data_as(FLOAT_PTR),
+            *suffix,
+        )
+        self.qk_norm_llama_parallel(
+            q_parallel.ctypes.data_as(FLOAT_PTR),
+            k_parallel.ctypes.data_as(FLOAT_PTR),
+            *suffix,
+        )
+        np.testing.assert_array_equal(q_parallel, q_serial)
+        np.testing.assert_array_equal(k_parallel, k_serial)
+
+    def test_qk_norm_llama_parallel_boundaries_are_repeatable(self) -> None:
+        rng = np.random.default_rng(71)
+        for heads, kv_heads, tokens, head_dim in (
+            (1, 1, 1, 64),
+            (3, 2, 5, 96),
+            (4, 3, 7, 128),
+            (8, 4, 17, 256),
+        ):
+            with self.subTest(
+                heads=heads,
+                kv_heads=kv_heads,
+                tokens=tokens,
+                head_dim=head_dim,
+            ):
+                q_source = rng.standard_normal(
+                    (heads, tokens, head_dim), dtype=np.float32
+                )
+                k_source = rng.standard_normal(
+                    (kv_heads, tokens, head_dim), dtype=np.float32
+                )
+                q_gamma = rng.standard_normal(head_dim, dtype=np.float32)
+                k_gamma = rng.standard_normal(head_dim, dtype=np.float32)
+                q_expected, k_expected = q_source.copy(), k_source.copy()
+                suffix = (
+                    q_gamma.ctypes.data_as(FLOAT_PTR),
+                    k_gamma.ctypes.data_as(FLOAT_PTR),
+                    heads,
+                    kv_heads,
+                    tokens,
+                    head_dim,
+                    ctypes.c_float(1e-6),
+                )
+                self.qk_norm_llama_serial(
+                    q_expected.ctypes.data_as(FLOAT_PTR),
+                    k_expected.ctypes.data_as(FLOAT_PTR),
+                    *suffix,
+                )
+                for _ in range(4):
+                    q_actual, k_actual = q_source.copy(), k_source.copy()
+                    self.qk_norm_llama_parallel(
+                        q_actual.ctypes.data_as(FLOAT_PTR),
+                        k_actual.ctypes.data_as(FLOAT_PTR),
+                        *suffix,
+                    )
+                    np.testing.assert_array_equal(q_actual, q_expected)
+                    np.testing.assert_array_equal(k_actual, k_expected)
 
     def test_v_norm_rows_are_bit_exact_in_place(self) -> None:
         tokens, kv_heads, head_dim = 131, 2, 256
