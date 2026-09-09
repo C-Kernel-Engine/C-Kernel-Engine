@@ -995,6 +995,24 @@ make test-native-session-v8</pre>
     </p>
 </div>
 
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Localhost Serve E2E</h3>
+    <p>
+        Bounded localhost integration for <code>ck_serve_v8.py</code> serves Qwen3-0.6B with Q8_0 quantizations 
+        on context length of 1024 on an ephemeral <code>127.0.0.1</code> port, waits for
+        <code>GET /v1/health</code> under one monotonic deadline, streams one
+        <code>POST /v1/responses</code> request, validates every event against the
+        Responses schema, and requires streamed, terminal, and stored text to agree.
+        Process-group shutdown and port cleanup complete before the lane reports success.
+        Failures preserve the server log and partial SSE transcript.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make test-v8-serve-localhost-e2e</pre>
+    </div>
+    <p style="margin-bottom: 0;" class="mini-note">Nightly row: <code>v8 Serve Localhost E2E</code> (10 min total limit, including reserved cleanup time). The target first runs model-free validator regressions, then the real localhost path. Failure artifacts are uploaded from <code>build/v8_serve_e2e_last_failure/</code>.</p>
+</div>
+
 <div class="card">
     <h3 style="margin-top: 0;">Profile The Native Token Loop</h3>
     <p>Use the C CLI directly so Python startup and orchestration do not contaminate the profile:</p>
