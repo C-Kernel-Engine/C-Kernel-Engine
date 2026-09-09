@@ -2202,9 +2202,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  824</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a55ef0ed9f1f51ca4910e3f7457054044">recurrent_conv_state_update_forward</a>(</div>
 <div class="line"><span class="lineno">  825</span>        state_in, q, k, v, conv_x, state_out, history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim);</div>
 <div class="line"><span class="lineno">  826</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_a55ef0ed9f1f51ca4910e3f7457054044"><div class="ttname"><a href="ck__parity__api_8c.html#a55ef0ed9f1f51ca4910e3f7457054044">recurrent_conv_state_update_forward</a></div><div class="ttdeci">void recurrent_conv_state_update_forward(const float *state_in, const float *q, const float *k, const float *v, float *conv_x, float *state_out, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__state__kernels_8c_source.html#l00008">recurrent_state_kernels.c:8</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_a55ef0ed9f1f51ca4910e3f7457054044"><div class="ttname"><a href="ck__parity__api_8c.html#a55ef0ed9f1f51ca4910e3f7457054044">recurrent_conv_state_update_forward</a></div><div class="ttdeci">void recurrent_conv_state_update_forward(const float *state_in, const float *q, const float *k, const float *v, float *conv_x, float *state_out, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__state__kernels_8c_source.html#l00100">recurrent_state_kernels.c:100</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__state__kernels_8c_source.html#l00008">recurrent_conv_state_update_forward()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__state__kernels_8c_source.html#l00100">recurrent_conv_state_update_forward()</a>.</p>
 
 </div>
 </div>
@@ -5293,45 +5293,55 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00008">8</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   19</span>                                                    {</div>
-<div class="line"><span class="lineno">   20</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
-<div class="line"><span class="lineno">   21</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
-<div class="line"><span class="lineno">   22</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> seq = 0; seq &lt; num_seqs; ++seq) {</div>
-<div class="line"><span class="lineno">   23</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *state_seq = state_in + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   24</span>        <span class="keywordtype">float</span> *conv_seq = conv_x + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) total_len;</div>
-<div class="line"><span class="lineno">   25</span>        <span class="keywordtype">float</span> *state_out_seq = state_out + (size_t) seq * (<span class="keywordtype">size_t</span>) channels * (size_t) history_len;</div>
-<div class="line"><span class="lineno">   26</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   27</span>            memcpy(</div>
-<div class="line"><span class="lineno">   28</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len,</div>
-<div class="line"><span class="lineno">   29</span>                state_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
-<div class="line"><span class="lineno">   30</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   31</span>        }</div>
-<div class="line"><span class="lineno">   32</span> </div>
-<div class="line"><span class="lineno">   33</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> tok = 0; tok &lt; num_tokens; ++tok) {</div>
-<div class="line"><span class="lineno">   34</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> row = seq * num_tokens + tok;</div>
-<div class="line"><span class="lineno">   35</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *q_row = q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">   36</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *k_row = k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
-<div class="line"><span class="lineno">   37</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *v_row = v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
-<div class="line"><span class="lineno">   38</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; q_dim; ++col) {</div>
-<div class="line"><span class="lineno">   39</span>                conv_seq[(size_t) col * (<span class="keywordtype">size_t</span>) total_len + (size_t) (history_len + tok)] = q_row[col];</div>
-<div class="line"><span class="lineno">   40</span>            }</div>
-<div class="line"><span class="lineno">   41</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; k_dim; ++col) {</div>
-<div class="line"><span class="lineno">   42</span>                conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = k_row[col];</div>
-<div class="line"><span class="lineno">   43</span>            }</div>
-<div class="line"><span class="lineno">   44</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; v_dim; ++col) {</div>
-<div class="line"><span class="lineno">   45</span>                conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (<span class="keywordtype">size_t</span>) (history_len + tok)] = v_row[col];</div>
-<div class="line"><span class="lineno">   46</span>            }</div>
-<div class="line"><span class="lineno">   47</span>        }</div>
-<div class="line"><span class="lineno">   48</span> </div>
-<div class="line"><span class="lineno">   49</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ch = 0; ch &lt; channels; ++ch) {</div>
-<div class="line"><span class="lineno">   50</span>            memcpy(</div>
-<div class="line"><span class="lineno">   51</span>                state_out_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) history_len,</div>
-<div class="line"><span class="lineno">   52</span>                conv_seq + (<span class="keywordtype">size_t</span>) ch * (<span class="keywordtype">size_t</span>) total_len + (<span class="keywordtype">size_t</span>) num_tokens,</div>
-<div class="line"><span class="lineno">   53</span>                (<span class="keywordtype">size_t</span>) history_len * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   54</span>        }</div>
-<div class="line"><span class="lineno">   55</span>    }</div>
-<div class="line"><span class="lineno">   56</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__state__kernels_8c_source.html#l00100">100</a> of file <a class="el" href="recurrent__state__kernels_8c_source.html">recurrent_state_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  111</span>                                                    {</div>
+<div class="line"><span class="lineno">  112</span>    <span class="keywordflow">if</span> (!state_in || !q || !k || !v || !conv_x || !state_out ||</div>
+<div class="line"><span class="lineno">  113</span>        history_len &lt; 0 || num_seqs &lt;= 0 || num_tokens &lt; 0 ||</div>
+<div class="line"><span class="lineno">  114</span>        q_dim &lt; 0 || k_dim &lt; 0 || v_dim &lt; 0 ||</div>
+<div class="line"><span class="lineno">  115</span>        q_dim &gt; INT_MAX - k_dim || q_dim + k_dim &gt; INT_MAX - v_dim ||</div>
+<div class="line"><span class="lineno">  116</span>        history_len &gt; INT_MAX - num_tokens) {</div>
+<div class="line"><span class="lineno">  117</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  118</span>    }</div>
+<div class="line"><span class="lineno">  119</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> channels = q_dim + k_dim + v_dim;</div>
+<div class="line"><span class="lineno">  120</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> total_len = history_len + num_tokens;</div>
+<div class="line"><span class="lineno">  121</span>    <span class="keywordflow">if</span> (channels &lt;= 0 || total_len &lt;= 0 || num_seqs &gt; INT_MAX / channels ||</div>
+<div class="line"><span class="lineno">  122</span>        (num_tokens &gt; 0 &amp;&amp; num_seqs &gt; INT_MAX / num_tokens)) {</div>
+<div class="line"><span class="lineno">  123</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  124</span>    }</div>
+<div class="line"><span class="lineno">  125</span> </div>
+<div class="line"><span class="lineno">  126</span>    ck_recurrent_conv_state_args_t args = {</div>
+<div class="line"><span class="lineno">  127</span>        state_in, q, k, v, conv_x, state_out,</div>
+<div class="line"><span class="lineno">  128</span>        history_len, num_tokens, q_dim, k_dim, v_dim, channels, total_len,</div>
+<div class="line"><span class="lineno">  129</span>    };</div>
+<div class="line"><span class="lineno">  130</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> jobs = num_seqs * channels;</div>
+<div class="line"><span class="lineno">  131</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> elements = (size_t)jobs * (<span class="keywordtype">size_t</span>)num_tokens;</div>
+<div class="line"><span class="lineno">  132</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> minimum_elements_per_thread = 32768u;</div>
+<div class="line"><span class="lineno">  133</span>    <span class="keywordflow">if</span> (num_tokens &lt;= 1 || elements &lt; 2u * minimum_elements_per_thread) {</div>
+<div class="line"><span class="lineno">  134</span>        <a class="code hl_function" href="recurrent__state__kernels_8c.html#a4839ff299aaf53d24536fbb057e8e73b">ck_recurrent_conv_state_channel_range</a>(0, jobs, &amp;args);</div>
+<div class="line"><span class="lineno">  135</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  136</span>    }</div>
+<div class="line"><span class="lineno">  137</span> </div>
+<div class="line"><span class="lineno">  138</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  139</span>    <span class="keywordtype">int</span> active = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  140</span>    <span class="keywordtype">size_t</span> useful_threads =</div>
+<div class="line"><span class="lineno">  141</span>        (elements + minimum_elements_per_thread - 1u) /</div>
+<div class="line"><span class="lineno">  142</span>        minimum_elements_per_thread;</div>
+<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">if</span> ((<span class="keywordtype">size_t</span>)active &gt; useful_threads) active = (<span class="keywordtype">int</span>)useful_threads;</div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">if</span> (active &gt; jobs) active = jobs;</div>
+<div class="line"><span class="lineno">  145</span> </div>
+<div class="line"><span class="lineno">  146</span>    <span class="keywordflow">if</span> (active &gt; 1 &amp;&amp; <a class="code hl_function" href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a>(pool) &lt;= 0) {</div>
+<div class="line"><span class="lineno">  147</span>        <a class="code hl_function" href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a>(</div>
+<div class="line"><span class="lineno">  148</span>            pool, active, 0, jobs, 32,</div>
+<div class="line"><span class="lineno">  149</span>            <a class="code hl_function" href="recurrent__state__kernels_8c.html#a4839ff299aaf53d24536fbb057e8e73b">ck_recurrent_conv_state_channel_range</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  150</span>    } <span class="keywordflow">else</span> {</div>
+<div class="line"><span class="lineno">  151</span>        <a class="code hl_function" href="recurrent__state__kernels_8c.html#a4839ff299aaf53d24536fbb057e8e73b">ck_recurrent_conv_state_channel_range</a>(0, jobs, &amp;args);</div>
+<div class="line"><span class="lineno">  152</span>    }</div>
+<div class="line"><span class="lineno">  153</span>}</div>
+<div class="ttc" id="ack__threadpool_8h_html_a201c68c915e80d824c95721b55c5ab83"><div class="ttname"><a href="ck__threadpool_8h.html#a201c68c915e80d824c95721b55c5ab83">ck_threadpool_parallel_for_n</a></div><div class="ttdeci">void ck_threadpool_parallel_for_n(ck_threadpool_t *pool, int active_threads, int begin, int end, int grain_size, ck_range_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00494">ck_threadpool.c:494</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00651">ck_threadpool.c:651</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_ada9a2b22c2eb79fe8834b026a3c7d8b4"><div class="ttname"><a href="ck__threadpool_8h.html#ada9a2b22c2eb79fe8834b026a3c7d8b4">ck_threadpool_thread_id</a></div><div class="ttdeci">int ck_threadpool_thread_id(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00561">ck_threadpool.c:561</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00551">ck_threadpool.c:551</a></div></div>
+<div class="ttc" id="arecurrent__state__kernels_8c_html_a4839ff299aaf53d24536fbb057e8e73b"><div class="ttname"><a href="recurrent__state__kernels_8c.html#a4839ff299aaf53d24536fbb057e8e73b">ck_recurrent_conv_state_channel_range</a></div><div class="ttdeci">static void ck_recurrent_conv_state_channel_range(int begin, int end, void *opaque)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__state__kernels_8c_source.html#l00025">recurrent_state_kernels.c:25</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00811">ck_test_recurrent_conv_state_update()</a>.</p>
 
