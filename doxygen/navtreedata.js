@@ -72,11 +72,12 @@ var NAVTREEINDEX =
 "structCKLayerGradOffsets.html#a961c5f51bc787cfd934f468f70536674",
 "structCKSection.html#a77177dc1f5d94b91942e9dd199556661",
 "structNetworkInterface.html#a6aeca68cb500898ceebc5a70b984ed10",
-"system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446a532135b3b6ed583aaf4bf2864793255e",
-"true__bpe_8h.html#adc7b8f0514fd7d4fefa123e27ce8922d",
-"v6_85_2test__generated_2int8__q4k__test_8c.html#a661840b34b3c7fe7294744ba1afc1260",
-"v6_86_2generated_2ck-kernel-inference_8h.html#a740d86aa66a19a66306d7cbd96187864",
-"v6_86_2test__generated_2int8__q4k__test_8c.html#aefe572c58f1dd2cbf3cfc0f2c5286b94"
+"system__topology_8h.html#ab165ff3667f6ee7cca36f51b5a6bad20",
+"true__bpe_8h.html#ab366d3078c02b7305089770c9de837b9",
+"v6_85_2test__generated_2int8__q4k__test_8c.html#a50d24a31f1b4b0ced60287c3bc8e3968",
+"v6_86_2generated_2ck-kernel-inference_8h.html#a606a63ce7973b73a0a5ccad95e710bd0",
+"v6_86_2test__generated_2int8__q4k__test_8c.html#ae297e4193654fc2efb7c2a061abbd011",
+"vision__kernels__bf16_8c.html#a57139580e075be2d5a65cfffc8e84898"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

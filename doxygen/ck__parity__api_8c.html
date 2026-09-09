@@ -3234,9 +3234,9 @@ Functions</h2></td></tr>
 <div class="fragment"><div class="line"><span class="lineno">  715</span>{</div>
 <div class="line"><span class="lineno">  716</span>    <a class="code hl_function" href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a>(gate_up, output, n_tokens, intermediate_dim);</div>
 <div class="line"><span class="lineno">  717</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_a26369aa07808fb6aae4502d54a1ba650"><div class="ttname"><a href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a></div><div class="ttdeci">void swiglu_forward(const float *input, float *output, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00237">swiglu_kernels.c:237</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_a26369aa07808fb6aae4502d54a1ba650"><div class="ttname"><a href="ck__parity__api_8c.html#a26369aa07808fb6aae4502d54a1ba650">swiglu_forward</a></div><div class="ttdeci">void swiglu_forward(const float *input, float *output, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00238">swiglu_kernels.c:238</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="swiglu__kernels_8c_source.html#l00237">swiglu_forward()</a>.</p>
+<p class="reference">References <a class="el" href="swiglu__kernels_8c_source.html#l00238">swiglu_forward()</a>.</p>
 
 </div>
 </div>
@@ -6382,86 +6382,86 @@ Functions</h2></td></tr>
 <p>SwiGLU: y = silu(gate) * up where silu(x) = x * sigmoid(x)</p>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full </p>
 
-<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00237">237</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  241</span>{</div>
-<div class="line"><span class="lineno">  242</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *fast_env = getenv(<span class="stringliteral">&quot;CK_SWIGLU_FAST&quot;</span>);</div>
-<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *exact_env = getenv(<span class="stringliteral">&quot;CK_SWIGLU_EXACT&quot;</span>);</div>
-<div class="line"><span class="lineno">  244</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() ||</div>
-<div class="line"><span class="lineno">  245</span>        !(fast_env &amp;&amp; atoi(fast_env) != 0) ||</div>
-<div class="line"><span class="lineno">  246</span>        (exact_env &amp;&amp; atoi(exact_env) != 0)) {</div>
-<div class="line"><span class="lineno">  247</span>        <a class="code hl_function" href="swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c">swiglu_forward_exact</a>(input, output, tokens, dim);</div>
-<div class="line"><span class="lineno">  248</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  249</span>    }</div>
-<div class="line"><span class="lineno">  250</span> </div>
-<div class="line"><span class="lineno">  251</span>    <span class="keywordtype">int</span> T = tokens;</div>
-<div class="line"><span class="lineno">  252</span>    <span class="keywordtype">int</span> D = dim;</div>
-<div class="line"><span class="lineno">  253</span> </div>
-<div class="line"><span class="lineno">  254</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
-<div class="line"><span class="lineno">  255</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (2 * D);</div>
-<div class="line"><span class="lineno">  256</span>        <span class="keywordtype">float</span> *out_row = output + (size_t)t * D;</div>
-<div class="line"><span class="lineno">  257</span>        <span class="keywordtype">int</span> d = 0;</div>
-<div class="line"><span class="lineno">  258</span> </div>
-<div class="line"><span class="lineno">  259</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  260</span>        <span class="comment">// AVX-512: Process 16 floats at a time</span></div>
-<div class="line"><span class="lineno">  261</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= D; d += 16) {</div>
-<div class="line"><span class="lineno">  262</span>            __m512 a = _mm512_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
-<div class="line"><span class="lineno">  263</span>            __m512 b = _mm512_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
-<div class="line"><span class="lineno">  264</span> </div>
-<div class="line"><span class="lineno">  265</span>            __m512 s = sigmoid512_fast(a);              <span class="comment">// sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  266</span>            __m512 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm512_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  267</span>            __m512 y = _mm512_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
-<div class="line"><span class="lineno">  268</span> </div>
-<div class="line"><span class="lineno">  269</span>            _mm512_storeu_ps(&amp;out_row[d], y);</div>
-<div class="line"><span class="lineno">  270</span>        }</div>
-<div class="line"><span class="lineno">  271</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
-<div class="line"><span class="lineno">  272</span>        <span class="comment">// AVX2: Process 8 floats at a time</span></div>
-<div class="line"><span class="lineno">  273</span>        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
-<div class="line"><span class="lineno">  274</span>            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
-<div class="line"><span class="lineno">  275</span>            __m256 b = _mm256_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
-<div class="line"><span class="lineno">  276</span> </div>
-<div class="line"><span class="lineno">  277</span>            __m256 s = sigmoid256_fast(a);              <span class="comment">// sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  278</span>            __m256 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm256_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  279</span>            __m256 y = _mm256_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
-<div class="line"><span class="lineno">  280</span> </div>
-<div class="line"><span class="lineno">  281</span>            _mm256_storeu_ps(&amp;out_row[d], y);</div>
-<div class="line"><span class="lineno">  282</span>        }</div>
-<div class="line"><span class="lineno">  283</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  284</span>        <span class="comment">// AVX1: Vectorize arithmetic, use scalar sigmoid</span></div>
-<div class="line"><span class="lineno">  285</span>        <span class="keywordtype">float</span> a_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
-<div class="line"><span class="lineno">  286</span>        <span class="keywordtype">float</span> s_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
-<div class="line"><span class="lineno">  287</span> </div>
-<div class="line"><span class="lineno">  288</span>        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
-<div class="line"><span class="lineno">  289</span>            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
-<div class="line"><span class="lineno">  290</span>            __m256 b = _mm256_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
-<div class="line"><span class="lineno">  291</span> </div>
-<div class="line"><span class="lineno">  292</span>            <span class="comment">// Compute sigmoid scalarly</span></div>
-<div class="line"><span class="lineno">  293</span>            _mm256_store_ps(a_arr, a);</div>
-<div class="line"><span class="lineno">  294</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 8; ++j) {</div>
-<div class="line"><span class="lineno">  295</span>                s_arr[j] = <a class="code hl_function" href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a>(a_arr[j]);</div>
-<div class="line"><span class="lineno">  296</span>            }</div>
-<div class="line"><span class="lineno">  297</span>            __m256 s = _mm256_load_ps(s_arr);</div>
-<div class="line"><span class="lineno">  298</span> </div>
-<div class="line"><span class="lineno">  299</span>            __m256 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm256_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  300</span>            __m256 y = _mm256_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
-<div class="line"><span class="lineno">  301</span> </div>
-<div class="line"><span class="lineno">  302</span>            _mm256_storeu_ps(&amp;out_row[d], y);</div>
-<div class="line"><span class="lineno">  303</span>        }</div>
-<div class="line"><span class="lineno">  304</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  305</span> </div>
-<div class="line"><span class="lineno">  306</span>        <span class="comment">// Scalar fallback for remaining elements</span></div>
-<div class="line"><span class="lineno">  307</span>        <span class="keywordflow">for</span> (; d &lt; D; ++d) {</div>
-<div class="line"><span class="lineno">  308</span>            <span class="keywordtype">float</span> a = row[d];       <span class="comment">// gate</span></div>
-<div class="line"><span class="lineno">  309</span>            <span class="keywordtype">float</span> b = row[D + d];   <span class="comment">// value</span></div>
-<div class="line"><span class="lineno">  310</span> </div>
-<div class="line"><span class="lineno">  311</span>            <span class="keywordtype">float</span> s = <a class="code hl_function" href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a>(a);         <span class="comment">// sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  312</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = a * s;                  <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
-<div class="line"><span class="lineno">  313</span> </div>
-<div class="line"><span class="lineno">  314</span>            out_row[d] = <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> * b;</div>
-<div class="line"><span class="lineno">  315</span>        }</div>
-<div class="line"><span class="lineno">  316</span>    }</div>
-<div class="line"><span class="lineno">  317</span>}</div>
+<p class="definition">Definition at line <a class="el" href="swiglu__kernels_8c_source.html#l00238">238</a> of file <a class="el" href="swiglu__kernels_8c_source.html">swiglu_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  242</span>{</div>
+<div class="line"><span class="lineno">  243</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *fast_env = getenv(<span class="stringliteral">&quot;CK_SWIGLU_FAST&quot;</span>);</div>
+<div class="line"><span class="lineno">  244</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *exact_env = getenv(<span class="stringliteral">&quot;CK_SWIGLU_EXACT&quot;</span>);</div>
+<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a>() ||</div>
+<div class="line"><span class="lineno">  246</span>        !(fast_env &amp;&amp; atoi(fast_env) != 0) ||</div>
+<div class="line"><span class="lineno">  247</span>        (exact_env &amp;&amp; atoi(exact_env) != 0)) {</div>
+<div class="line"><span class="lineno">  248</span>        <a class="code hl_function" href="swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c">swiglu_forward_exact</a>(input, output, tokens, dim);</div>
+<div class="line"><span class="lineno">  249</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  250</span>    }</div>
+<div class="line"><span class="lineno">  251</span> </div>
+<div class="line"><span class="lineno">  252</span>    <span class="keywordtype">int</span> T = tokens;</div>
+<div class="line"><span class="lineno">  253</span>    <span class="keywordtype">int</span> D = dim;</div>
+<div class="line"><span class="lineno">  254</span> </div>
+<div class="line"><span class="lineno">  255</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; T; ++t) {</div>
+<div class="line"><span class="lineno">  256</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *row = input + (size_t)t * (2 * D);</div>
+<div class="line"><span class="lineno">  257</span>        <span class="keywordtype">float</span> *out_row = output + (size_t)t * D;</div>
+<div class="line"><span class="lineno">  258</span>        <span class="keywordtype">int</span> d = 0;</div>
+<div class="line"><span class="lineno">  259</span> </div>
+<div class="line"><span class="lineno">  260</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  261</span>        <span class="comment">// AVX-512: Process 16 floats at a time</span></div>
+<div class="line"><span class="lineno">  262</span>        <span class="keywordflow">for</span> (; d + 16 &lt;= D; d += 16) {</div>
+<div class="line"><span class="lineno">  263</span>            __m512 a = _mm512_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
+<div class="line"><span class="lineno">  264</span>            __m512 b = _mm512_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
+<div class="line"><span class="lineno">  265</span> </div>
+<div class="line"><span class="lineno">  266</span>            __m512 s = sigmoid512_fast(a);              <span class="comment">// sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  267</span>            __m512 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm512_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  268</span>            __m512 y = _mm512_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
+<div class="line"><span class="lineno">  269</span> </div>
+<div class="line"><span class="lineno">  270</span>            _mm512_storeu_ps(&amp;out_row[d], y);</div>
+<div class="line"><span class="lineno">  271</span>        }</div>
+<div class="line"><span class="lineno">  272</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  273</span>        <span class="comment">// AVX2: Process 8 floats at a time</span></div>
+<div class="line"><span class="lineno">  274</span>        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
+<div class="line"><span class="lineno">  275</span>            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
+<div class="line"><span class="lineno">  276</span>            __m256 b = _mm256_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
+<div class="line"><span class="lineno">  277</span> </div>
+<div class="line"><span class="lineno">  278</span>            __m256 s = sigmoid256_fast(a);              <span class="comment">// sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  279</span>            __m256 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm256_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  280</span>            __m256 y = _mm256_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
+<div class="line"><span class="lineno">  281</span> </div>
+<div class="line"><span class="lineno">  282</span>            _mm256_storeu_ps(&amp;out_row[d], y);</div>
+<div class="line"><span class="lineno">  283</span>        }</div>
+<div class="line"><span class="lineno">  284</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  285</span>        <span class="comment">// AVX1: Vectorize arithmetic, use scalar sigmoid</span></div>
+<div class="line"><span class="lineno">  286</span>        <span class="keywordtype">float</span> a_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><span class="lineno">  287</span>        <span class="keywordtype">float</span> s_arr[8] <a class="code hl_function" href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a>((aligned(32)));</div>
+<div class="line"><span class="lineno">  288</span> </div>
+<div class="line"><span class="lineno">  289</span>        <span class="keywordflow">for</span> (; d + 8 &lt;= D; d += 8) {</div>
+<div class="line"><span class="lineno">  290</span>            __m256 a = _mm256_loadu_ps(&amp;row[d]);         <span class="comment">// gate</span></div>
+<div class="line"><span class="lineno">  291</span>            __m256 b = _mm256_loadu_ps(&amp;row[D + d]);     <span class="comment">// value</span></div>
+<div class="line"><span class="lineno">  292</span> </div>
+<div class="line"><span class="lineno">  293</span>            <span class="comment">// Compute sigmoid scalarly</span></div>
+<div class="line"><span class="lineno">  294</span>            _mm256_store_ps(a_arr, a);</div>
+<div class="line"><span class="lineno">  295</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; 8; ++j) {</div>
+<div class="line"><span class="lineno">  296</span>                s_arr[j] = <a class="code hl_function" href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a>(a_arr[j]);</div>
+<div class="line"><span class="lineno">  297</span>            }</div>
+<div class="line"><span class="lineno">  298</span>            __m256 s = _mm256_load_ps(s_arr);</div>
+<div class="line"><span class="lineno">  299</span> </div>
+<div class="line"><span class="lineno">  300</span>            __m256 <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = _mm256_mul_ps(a, s);          <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  301</span>            __m256 y = _mm256_mul_ps(<a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a>, b);          <span class="comment">// y = silu(a) * b</span></div>
+<div class="line"><span class="lineno">  302</span> </div>
+<div class="line"><span class="lineno">  303</span>            _mm256_storeu_ps(&amp;out_row[d], y);</div>
+<div class="line"><span class="lineno">  304</span>        }</div>
+<div class="line"><span class="lineno">  305</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  306</span> </div>
+<div class="line"><span class="lineno">  307</span>        <span class="comment">// Scalar fallback for remaining elements</span></div>
+<div class="line"><span class="lineno">  308</span>        <span class="keywordflow">for</span> (; d &lt; D; ++d) {</div>
+<div class="line"><span class="lineno">  309</span>            <span class="keywordtype">float</span> a = row[d];       <span class="comment">// gate</span></div>
+<div class="line"><span class="lineno">  310</span>            <span class="keywordtype">float</span> b = row[D + d];   <span class="comment">// value</span></div>
+<div class="line"><span class="lineno">  311</span> </div>
+<div class="line"><span class="lineno">  312</span>            <span class="keywordtype">float</span> s = <a class="code hl_function" href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a>(a);         <span class="comment">// sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  313</span>            <span class="keywordtype">float</span> <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> = a * s;                  <span class="comment">// silu(a) = a * sigmoid(a)</span></div>
+<div class="line"><span class="lineno">  314</span> </div>
+<div class="line"><span class="lineno">  315</span>            out_row[d] = <a class="code hl_function" href="v6_85__simple_8c.html#a49cac1d218fc2817ed1f679a37f25f41">silu</a> * b;</div>
+<div class="line"><span class="lineno">  316</span>        }</div>
+<div class="line"><span class="lineno">  317</span>    }</div>
+<div class="line"><span class="lineno">  318</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_aaa76ef661048368434b452a237bc3669"><div class="ttname"><a href="ckernel__engine_8h.html#aaa76ef661048368434b452a237bc3669">sigmoid_scalar</a></div><div class="ttdeci">float sigmoid_scalar(float x)</div><div class="ttdef"><b>Definition</b> <a href="sigmoid__kernels_8c_source.html#l00026">sigmoid_kernels.c:26</a></div></div>
-<div class="ttc" id="aswiglu__kernels_8c_html_a102617ea5d170076dc9e1d6ac167617c"><div class="ttname"><a href="swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c">swiglu_forward_exact</a></div><div class="ttdeci">void swiglu_forward_exact(const float *input, float *output, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00515">swiglu_kernels.c:515</a></div></div>
+<div class="ttc" id="aswiglu__kernels_8c_html_a102617ea5d170076dc9e1d6ac167617c"><div class="ttname"><a href="swiglu__kernels_8c.html#a102617ea5d170076dc9e1d6ac167617c">swiglu_forward_exact</a></div><div class="ttdeci">void swiglu_forward_exact(const float *input, float *output, int tokens, int dim)</div><div class="ttdef"><b>Definition</b> <a href="swiglu__kernels_8c_source.html#l00607">swiglu_kernels.c:607</a></div></div>
 <div class="ttc" id="atokenizer_8h_html_a42cef42021e2391865cfbed2c2ee5278"><div class="ttname"><a href="tokenizer_8h.html#a42cef42021e2391865cfbed2c2ee5278">__attribute__</a></div><div class="ttdeci">__attribute__((visibility(&quot;default&quot;))) CKTokenizer *ck_tokenizer_create(CKTokenizerType type)</div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00712">ck_test_swiglu()</a>.</p>
