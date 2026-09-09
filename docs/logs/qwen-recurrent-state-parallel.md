@@ -25,6 +25,8 @@ reads.
 - Serial and four-thread outputs are byte-identical across eight repetitions.
 - Exact `state_out == state_in` aliasing is covered.
 - Batched multi-token execution matches repeated one-token state continuation.
+- Hostile dimensions prove both `num_seqs * channels` scheduling and
+  `num_seqs * num_tokens` row-index products are rejected before overflow.
 - Qwen3.8 dense contracts: 79 passed, including 11 subtests.
 - Qwen3.8 Flash contracts: 130 passed, 2 skipped, including 2 subtests.
 - Shared Qwen/template/numerical suite: 117 passed, 1 pre-existing v7 template

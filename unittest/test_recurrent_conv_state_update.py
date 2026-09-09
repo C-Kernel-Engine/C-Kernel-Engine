@@ -6,6 +6,7 @@ PyTorch parity test for recurrent_conv_state_update.
 from __future__ import annotations
 
 import ctypes
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -230,6 +231,27 @@ class TestRecurrentConvStateUpdate(unittest.TestCase):
         finally:
             LIB.ck_threadpool_global_destroy()
             LIB.ck_set_num_threads(0)
+
+    def test_rejects_sequence_token_product_overflow(self) -> None:
+        code = f"""
+import ctypes
+lib = ctypes.CDLL({LIB._name!r})
+fn = lib.recurrent_conv_state_update_forward
+ptr = ctypes.POINTER(ctypes.c_float)
+fn.argtypes = [ptr, ptr, ptr, ptr, ptr, ptr] + [ctypes.c_int] * 6
+value = (ctypes.c_float * 1)(123.0)
+fn(value, value, value, value, value, value,
+   1, 1073741824, 2, 1, 0, 0)
+assert value[0] == 123.0
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

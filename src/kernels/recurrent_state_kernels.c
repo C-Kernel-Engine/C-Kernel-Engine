@@ -118,7 +118,8 @@ void recurrent_conv_state_update_forward(const float *state_in,
     }
     const int channels = q_dim + k_dim + v_dim;
     const int total_len = history_len + num_tokens;
-    if (channels <= 0 || total_len <= 0 || num_seqs > INT_MAX / channels) {
+    if (channels <= 0 || total_len <= 0 || num_seqs > INT_MAX / channels ||
+        (num_tokens > 0 && num_seqs > INT_MAX / num_tokens)) {
         return;
     }
 
