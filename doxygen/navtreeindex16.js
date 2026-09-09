@@ -1,5 +1,6 @@
 var NAVTREEINDEX16 =
 {
+"rope__kernels_8c.html#a2ec35bba368786079155a0f5d81d637c":[2,0,1,1,83,46],
 "rope__kernels_8c.html#a3409fed5994aa0812520a9c452331321":[2,0,1,1,83,1],
 "rope__kernels_8c.html#a345af4013242b5015a2f49a4b1492e28":[2,0,1,1,83,13],
 "rope__kernels_8c.html#a34f0851fabca7e3c7b30e4e58016c8c6":[2,0,1,1,83,24],
@@ -248,6 +249,5 @@ var NAVTREEINDEX16 =
 "structCKIRGraph.html":[1,0,25],
 "structCKIRGraph.html#aab28fe3564ea6a66b72b4226d05ffb2f":[1,0,25,1],
 "structCKIRGraph.html#ac761026b9b84254516bce9995dd04465":[1,0,25,2],
-"structCKIRGraph.html#af12e4b320dee98416c63539b743801f2":[1,0,25,0],
-"structCKIRNode.html":[1,0,26]
+"structCKIRGraph.html#af12e4b320dee98416c63539b743801f2":[1,0,25,0]
 };
