@@ -6032,6 +6032,58 @@ static void ck_attention_llama_regular_impl(
     }
 }
 
+typedef struct {
+    const float *q;
+    const float *k;
+    const float *value_columns;
+    float *output;
+    float *scores;
+    float *scaled_scores;
+    int num_heads;
+    int num_kv_heads;
+    int num_tokens;
+    int head_dim;
+    int aligned_head_dim;
+    int kv_stride_tokens;
+    int sliding_window;
+    int padded;
+    _Alignas(CK_CACHE_LINE) atomic_int next_job;
+} ck_llama_regular_prefill_args_t;
+
+static void ck_llama_regular_prefill_work(int ith, int nth, void *opaque)
+{
+    ck_llama_regular_prefill_args_t *a =
+        (ck_llama_regular_prefill_args_t *)opaque;
+    float *worker_scores = a->scores + (size_t)ith * (size_t)a->padded;
+    float *worker_scaled =
+        a->scaled_scores + (size_t)ith * (size_t)a->padded;
+    const size_t worker_kv_stride =
+        (size_t)a->kv_stride_tokens * (size_t)a->aligned_head_dim;
+    const int jobs = a->num_heads * a->num_tokens;
+    (void)nth;
+    /* Query rows are independent, but their cost grows with the causal
+     * prefix. Dynamic claims keep asymmetric workers balanced while each
+     * worker retains exclusive ownership of its score scratch. */
+    for (;;) {
+        const int job = atomic_fetch_add_explicit(
+            &a->next_job, 1, memory_order_relaxed);
+        if (job >= jobs) break;
+        const int head = job / a->num_tokens;
+        const int query = job - head * a->num_tokens;
+        const int kv_head =
+            (int)((long long)head * a->num_kv_heads / a->num_heads);
+        ck_attention_llama_regular_query(
+            a->q + ((size_t)head * a->num_tokens + query) * a->aligned_head_dim,
+            a->k + (size_t)kv_head * worker_kv_stride,
+            a->value_columns +
+                (size_t)kv_head * (size_t)a->head_dim * (size_t)a->padded,
+            a->output +
+                ((size_t)head * a->num_tokens + query) * a->aligned_head_dim,
+            worker_scores, worker_scaled, a->num_tokens, a->padded, query,
+            a->head_dim, a->aligned_head_dim, a->sliding_window, 1);
+    }
+}
+
 void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace(
     const float *q, const float *k, const float *v, float *output,
     int num_heads, int num_kv_heads, int num_tokens, int head_dim,
@@ -6040,11 +6092,95 @@ void attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_works
     float *value_columns, size_t value_columns_bytes,
     float *scaled_scores, size_t scaled_scores_bytes)
 {
-    ck_attention_llama_regular_impl(
-        q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
-        head_dim, aligned_head_dim, kv_stride_tokens, sliding_window,
-        scores, scores_bytes, value_columns, value_columns_bytes,
-        scaled_scores, scaled_scores_bytes, 1);
+    if (!q || !k || !v || !output || !scores || !value_columns || !scaled_scores ||
+        num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0 || head_dim <= 0 ||
+        aligned_head_dim < head_dim || kv_stride_tokens < num_tokens ||
+        num_heads > INT_MAX / num_tokens) return;
+
+    const size_t score_elements = scores_bytes / sizeof(float);
+    const size_t scaled_elements = scaled_scores_bytes / sizeof(float);
+    const size_t value_elements = value_columns_bytes / sizeof(float);
+    if ((size_t)num_kv_heads > SIZE_MAX / (size_t)head_dim) return;
+    const size_t value_rows = (size_t)num_kv_heads * (size_t)head_dim;
+    const size_t value_capacity = value_rows > 0 ? value_elements / value_rows : 0;
+    const size_t padded_size = num_tokens < 256
+        ? 256 : (((size_t)num_tokens + 255) / 256) * 256;
+    const int padded = padded_size > (size_t)INT_MAX ? 0 : (int)padded_size;
+
+    /* Older direct callers provide one score row and one value bank. Keep that
+     * ABI usable while generated v8 runtimes provide the parallel workspace. */
+    if (padded <= 0 || value_capacity < (size_t)padded ||
+        score_elements < (size_t)padded * 2 ||
+        scaled_elements < (size_t)padded * 2 ||
+        value_elements < value_rows * (size_t)padded) {
+        ck_attention_llama_regular_impl(
+            q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
+            head_dim, aligned_head_dim, kv_stride_tokens, sliding_window,
+            scores, scores_bytes, value_columns, value_columns_bytes,
+            scaled_scores, scaled_scores_bytes, 1);
+        return;
+    }
+
+    if (ck_attention_vec_dump_enabled()) {
+        ck_attention_llama_regular_impl(
+            q, k, v, output, num_heads, num_kv_heads, num_tokens, num_tokens,
+            head_dim, aligned_head_dim, kv_stride_tokens, sliding_window,
+            scores, (size_t)padded * sizeof(float),
+            value_columns, (size_t)head_dim * (size_t)padded * sizeof(float),
+            scaled_scores, (size_t)padded * sizeof(float), 1);
+        return;
+    }
+
+    const size_t kv_head_stride =
+        (size_t)kv_stride_tokens * (size_t)aligned_head_dim;
+    for (int kv_head = 0; kv_head < num_kv_heads; ++kv_head) {
+        const float *value_head = v + (size_t)kv_head * kv_head_stride;
+        float *packed_head = value_columns +
+            (size_t)kv_head * (size_t)head_dim * (size_t)padded;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            float *column = packed_head + (size_t)dim * (size_t)padded;
+            int token = 0;
+            for (; token < num_tokens; ++token) {
+                column[token] =
+                    value_head[(size_t)token * (size_t)aligned_head_dim + (size_t)dim];
+            }
+            for (; token < padded; ++token) column[token] = 0.0f;
+        }
+    }
+
+    ck_llama_regular_prefill_args_t args = {
+        .q = q,
+        .k = k,
+        .value_columns = value_columns,
+        .output = output,
+        .scores = scores,
+        .scaled_scores = scaled_scores,
+        .num_heads = num_heads,
+        .num_kv_heads = num_kv_heads,
+        .num_tokens = num_tokens,
+        .head_dim = head_dim,
+        .aligned_head_dim = aligned_head_dim,
+        .kv_stride_tokens = kv_stride_tokens,
+        .sliding_window = sliding_window,
+        .padded = padded,
+    };
+    atomic_init(&args.next_job, 0);
+
+    size_t scratch_lanes = score_elements / (size_t)padded;
+    const size_t scaled_lanes = scaled_elements / (size_t)padded;
+    if (scaled_lanes < scratch_lanes) scratch_lanes = scaled_lanes;
+    int active = scratch_lanes > (size_t)INT_MAX ? INT_MAX : (int)scratch_lanes;
+    const int jobs = num_heads * num_tokens;
+    if (active > jobs) active = jobs;
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int pool_threads = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > pool_threads) active = pool_threads;
+    if (active < 1) active = 1;
+    if (pool && active > 1) {
+        ck_threadpool_dispatch_n(pool, active, ck_llama_regular_prefill_work, &args);
+    } else {
+        ck_llama_regular_prefill_work(0, 1, &args);
+    }
 }
 
 void attention_forward_decode_head_major_gqa_llama_regular_sliding_workspace(

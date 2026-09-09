@@ -129,7 +129,72 @@ def test_global_attention_does_not_inherit_512_token_window() -> None:
     np.testing.assert_allclose(output[0, -1, 0], expected, rtol=0.0, atol=0.0)
 
 
+def test_parallel_prefill_is_bit_exact_with_multiple_kv_heads() -> None:
+    lib = load_lib("libckernel_engine.so")
+    kernel = lib.attention_forward_causal_head_major_gqa_llama_regular_strided_sliding_workspace
+    kernel.argtypes = [
+        FLOAT_P, FLOAT_P, FLOAT_P, FLOAT_P,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        FLOAT_P, ctypes.c_size_t, FLOAT_P, ctypes.c_size_t,
+        FLOAT_P, ctypes.c_size_t,
+    ]
+    kernel.restype = None
+    lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+    lib.ck_threadpool_global_destroy.argtypes = []
+
+    rng = np.random.default_rng(20260909)
+    heads, kv_heads = 8, 2
+    lanes = 16
+
+    try:
+        cases = (
+            (67, 32, 31),
+            (255, 8, 64),
+            (256, 8, 256),
+            (257, 8, 256),
+            (520, 8, 0),
+        )
+        for tokens, dim, sliding_window in cases:
+            padded_tokens = 256 if tokens < 256 else math.ceil(tokens / 256) * 256
+            q = rng.standard_normal((heads, tokens, dim), dtype=np.float32)
+            k = rng.standard_normal((kv_heads, tokens, dim), dtype=np.float32)
+            v = rng.standard_normal((kv_heads, tokens, dim), dtype=np.float32)
+            k[1] += np.float32(2.0)
+            v[1] -= np.float32(4.0)
+
+            def run(threads: int) -> np.ndarray:
+                lib.ck_threadpool_global_destroy()
+                lib.ck_set_num_threads(threads)
+                output = np.zeros_like(q)
+                scores = np.empty((lanes, padded_tokens), dtype=np.float32)
+                scaled_scores = np.empty((lanes, padded_tokens), dtype=np.float32)
+                value_columns = np.empty(
+                    (kv_heads, dim, padded_tokens), dtype=np.float32
+                )
+                kernel(
+                    _ptr(q), _ptr(k), _ptr(v), _ptr(output),
+                    heads, kv_heads, tokens, dim, dim, tokens, sliding_window,
+                    _ptr(scores), scores.nbytes,
+                    _ptr(value_columns), value_columns.nbytes,
+                    _ptr(scaled_scores), scaled_scores.nbytes,
+                )
+                return output
+
+            serial = run(1)
+            threaded = run(8)
+            threaded_repeat = run(8)
+            assert np.array_equal(serial.view(np.uint32), threaded.view(np.uint32))
+            assert np.array_equal(
+                threaded.view(np.uint32), threaded_repeat.view(np.uint32)
+            )
+    finally:
+        lib.ck_threadpool_global_destroy()
+        lib.ck_set_num_threads(0)
+
+
 if __name__ == "__main__":
     test_prefill_uses_declared_scratch_capacity_with_compact_kv_stride()
     test_global_attention_does_not_inherit_512_token_window()
+    test_parallel_prefill_is_bit_exact_with_multiple_kv_heads()
     print("llama regular attention contracts: PASS")

@@ -498,6 +498,29 @@ class AttentionContractV8Tests(unittest.TestCase):
             "observed",
         )
 
+    def test_gemma3_regular_prefill_declares_bounded_parallel_workspace(self) -> None:
+        kernel = resolver.load_json(
+            V8_ROOT
+            / "kernel_maps"
+            / "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding.json"
+        )
+        threading = kernel["implementation"]["threading"]
+        self.assertEqual(threading["runtime"], "ck_threadpool")
+        self.assertEqual(
+            threading["work_partition"],
+            ["independent_heads", "independent_query_blocks"],
+        )
+        self.assertEqual(threading["dispatch"], ["ck_threadpool_dispatch_n"])
+        self.assertEqual(threading["reduction_order_effect"], "none")
+        self.assertEqual(
+            {item["name"]: item["shape"] for item in kernel["scratch"]},
+            {
+                "scores": [16, "S"],
+                "value_columns": ["KV", "D", "S"],
+                "scaled_scores": [16, "S"],
+            },
+        )
+
     def test_qwen35_attention_storage_selectors_use_kv_contract_metadata(self) -> None:
         circuit = resolver.load_json(V8_ROOT / "circuits" / "qwen35.json")
         contracts = circuit["required_contracts"]

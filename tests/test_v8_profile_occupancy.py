@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -197,6 +198,34 @@ class V8ProfileOccupancyTests(unittest.TestCase):
             path.write_text("7, 11\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "2 IDs, but 3 were requested"):
                 self.profile._load_prompt_token_ids(path, limit=3)
+
+    def test_existing_runtime_engine_precedes_worktree_build(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runtime"
+            run_dir.mkdir()
+            captured_env = {}
+
+            def fake_run(command, *, env, timeout):
+                del command, timeout
+                captured_env.update(env)
+                return 0, ""
+
+            with mock.patch.object(self.profile, "_run", side_effect=fake_run):
+                self.profile._profile_run(
+                    run_dir,
+                    prompt_token_ids=[100, 100],
+                    decode=2,
+                    threads=2,
+                    cpu_affinity=None,
+                    csv_path=root / "profile.csv",
+                    json_path=root / "profile.json",
+                    timeout=10,
+                )
+
+        library_paths = captured_env["LD_LIBRARY_PATH"].split(":")
+        self.assertEqual(library_paths[0], str(run_dir))
+        self.assertEqual(library_paths[1], str(ROOT / "build"))
 
     def test_cli_rejects_budget_without_decode_forward(self) -> None:
         result = subprocess.run(

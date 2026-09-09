@@ -3298,14 +3298,15 @@
       "implementation": {
         "isa_dispatch": "compile_time",
         "threading": {
-          "runtime": "serial",
+          "runtime": "ck_threadpool",
           "work_partition": [
-            "serial"
+            "independent_heads",
+            "independent_query_blocks"
           ],
           "dispatch": [
-            "inline"
+            "ck_threadpool_dispatch_n"
           ],
-          "reduction_order_effect": "contract_defined"
+          "reduction_order_effect": "none"
         }
       },
       "quant": {
@@ -3381,6 +3382,7 @@
           "name": "scores",
           "dtype": "fp32",
           "shape": [
+            16,
             "S"
           ],
           "size_resolution": "required",
@@ -3390,6 +3392,7 @@
           "name": "value_columns",
           "dtype": "fp32",
           "shape": [
+            "KV",
             "D",
             "S"
           ],
@@ -3400,6 +3403,7 @@
           "name": "scaled_scores",
           "dtype": "fp32",
           "shape": [
+            16,
             "S"
           ],
           "size_resolution": "required",
@@ -3542,7 +3546,7 @@
           "unittest/test_attention_llama_regular.py"
         ]
       },
-      "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity.",
+      "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Independent head/query jobs use dynamic claims and up to 16 planner-owned score lanes; value columns are materialized once per KV head. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity.",
       "_source_file": "attention_forward_causal_head_major_gqa_llama_regular_strided_sliding.json"
     },
     {

@@ -141,7 +141,10 @@ def _profile_run(
     env["CK_THREADPOOL_PROFILE"] = "1"
     env["CK_PROFILE_CSV"] = str(csv_path)
     env["CK_PROFILE_JSON"] = str(json_path)
-    env["LD_LIBRARY_PATH"] = f"{ROOT / 'build'}:{run_dir}:{env.get('LD_LIBRARY_PATH', '')}"
+    # The generated model and its engine are one runtime bundle. Loading the
+    # current worktree engine first can silently invalidate existing-runtime
+    # comparisons when its ABI-compatible implementation has changed.
+    env["LD_LIBRARY_PATH"] = f"{run_dir}:{ROOT / 'build'}:{env.get('LD_LIBRARY_PATH', '')}"
     csv_path.unlink(missing_ok=True)
     json_path.unlink(missing_ok=True)
     trace_path = json_path.with_name(f"{json_path.stem}.trace.json")

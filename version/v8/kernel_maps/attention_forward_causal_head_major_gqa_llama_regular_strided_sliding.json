@@ -31,10 +31,10 @@
   "implementation": {
     "isa_dispatch": "compile_time",
     "threading": {
-      "runtime": "serial",
-      "work_partition": ["serial"],
-      "dispatch": ["inline"],
-      "reduction_order_effect": "contract_defined"
+      "runtime": "ck_threadpool",
+      "work_partition": ["independent_heads", "independent_query_blocks"],
+      "dispatch": ["ck_threadpool_dispatch_n"],
+      "reduction_order_effect": "none"
     }
   },
   "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
@@ -50,9 +50,9 @@
     {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}
   ],
   "scratch": [
-    {"name": "scores", "dtype": "fp32", "shape": ["S"], "size_resolution": "required", "lifetime": "kernel_call"},
-    {"name": "value_columns", "dtype": "fp32", "shape": ["D", "S"], "size_resolution": "required", "lifetime": "kernel_call"},
-    {"name": "scaled_scores", "dtype": "fp32", "shape": ["S"], "size_resolution": "required", "lifetime": "kernel_call"}
+    {"name": "scores", "dtype": "fp32", "shape": [16, "S"], "size_resolution": "required", "lifetime": "kernel_call"},
+    {"name": "value_columns", "dtype": "fp32", "shape": ["KV", "D", "S"], "size_resolution": "required", "lifetime": "kernel_call"},
+    {"name": "scaled_scores", "dtype": "fp32", "shape": [16, "S"], "size_resolution": "required", "lifetime": "kernel_call"}
   ],
   "dims": ["H", "KV", "T", "S", "D"],
   "params": [
@@ -95,5 +95,5 @@
     "output_dtype": "fp32"
   },
   "tests": {"unit": ["unittest/test_attention_llama_regular.py"]},
-  "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity."
+  "notes": "Materialized causal/sliding attention matching llama.cpp CPU non-flash FP16-cache rounding, padding, and reduction order. Independent head/query jobs use dynamic claims and up to 16 planner-owned score lanes; value columns are materialized once per KV head. Compact K/V prefill stride remains independent of the planner-declared padded reduction capacity."
 }
