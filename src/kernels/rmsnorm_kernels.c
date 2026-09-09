@@ -260,7 +260,8 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
                                                        int input_stride,
                                                        int output_stride,
                                                        float eps,
-                                                       int qwen3next_weight_order)
+                                                       int weight_mode,
+                                                       int use_pow_inverse)
 {
     for (int t = 0; t < tokens; ++t) {
         const float *x = input + (size_t)t * (size_t)input_stride;
@@ -368,15 +369,28 @@ static void rmsnorm_forward_pytorch_bf16_storage_impl(const float *input,
 
 #if defined(__i386__) || defined(__x86_64__)
         const float variance = rmsnorm_div_f32_ordered(sum_sq, (float)d_model);
-        const float rstd = rmsnorm_div_f32_ordered(1.0f, sqrtf(variance + eps));
+        const float rstd = use_pow_inverse
+            ? powf(variance + eps, -0.5f)
+            : rmsnorm_div_f32_ordered(1.0f, sqrtf(variance + eps));
 #else
         const float variance = sum_sq / (float)d_model;
-        const float rstd = 1.0f / sqrtf(variance + eps);
+        const float rstd = use_pow_inverse
+            ? powf(variance + eps, -0.5f)
+            : 1.0f / sqrtf(variance + eps);
 #endif
         if (rstd_cache) rstd_cache[t] = rstd;
         for (int d = 0; d < d_model; ++d) {
             const float value = bf16_to_float(float_to_bf16(x[d]));
-            if (qwen3next_weight_order) {
+            if (weight_mode == 3) {
+                /* Muse unweighted normalization rounds only when the FP32
+                 * normalized value returns to the BF16 hidden-state dtype. */
+                y[d] = bf16_to_float(float_to_bf16(value * rstd));
+            } else if (weight_mode == 2) {
+                /* Keep the checkpoint weight zero-centered. Form 1 + weight
+                 * in FP32 at execution instead of pre-folding into BF16. */
+                y[d] = bf16_to_float(float_to_bf16(
+                    (value * rstd) * (1.0f + gamma[d])));
+            } else if (weight_mode == 1) {
                 /* Qwen3Next: (FP32 normalized * FP32 weight).to(BF16). */
                 y[d] = bf16_to_float(float_to_bf16(
                     (value * rstd) * gamma[d]));
@@ -403,7 +417,7 @@ void rmsnorm_forward_pytorch_bf16_storage(const float *input,
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, gamma, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, aligned_embed_dim, eps, 0);
+        aligned_embed_dim, aligned_embed_dim, eps, 0, 0);
 }
 
 void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input,
@@ -418,7 +432,7 @@ void rmsnorm_forward_strided_pytorch_bf16_storage(const float *input,
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, gamma, output, rstd_cache, tokens, d_model,
-        input_stride, output_stride, eps, 0);
+        input_stride, output_stride, eps, 0, 0);
 }
 
 void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
@@ -433,7 +447,51 @@ void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
 {
     rmsnorm_forward_pytorch_bf16_storage_impl(
         input, gamma, output, rstd_cache, tokens, d_model,
-        aligned_embed_dim, aligned_embed_dim, eps, 1);
+        aligned_embed_dim, aligned_embed_dim, eps, 1, 0);
+}
+
+void rmsnorm_forward_muse_centered_pytorch_bf16_storage(
+                                          const float *input,
+                                          const float *zero_centered_weight,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps)
+{
+    rmsnorm_forward_pytorch_bf16_storage_impl(
+        input, zero_centered_weight, output, rstd_cache, tokens, d_model,
+        aligned_embed_dim, aligned_embed_dim, eps, 2, 0);
+}
+
+void rmsnorm_forward_muse_weighted_pytorch_bf16_storage(
+                                          const float *input,
+                                          const float *weight,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps)
+{
+    rmsnorm_forward_pytorch_bf16_storage_impl(
+        input, weight, output, rstd_cache, tokens, d_model,
+        aligned_embed_dim, aligned_embed_dim, eps, 1, 1);
+}
+
+void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
+                                          const float *input,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps)
+{
+    rmsnorm_forward_pytorch_bf16_storage_impl(
+        input, NULL, output, rstd_cache, tokens, d_model,
+        aligned_embed_dim, aligned_embed_dim, eps, 3, 1);
 }
 
 static void rmsnorm_backward_strict_scalar(const float *d_output,

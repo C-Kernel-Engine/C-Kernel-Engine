@@ -1,0 +1,34 @@
+{
+  "id": "qk_norm_muse_unweighted_scaled_pytorch_bf16_storage",
+  "op": "qk_norm_no_weight_scaled",
+  "variant": "muse_pow_q_scale_pytorch_bf16_storage",
+  "quant": {"activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "weights": [],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:q"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:k"}
+  ],
+  "dims": ["H", "KV", "T", "D"],
+  "params": [{"name": "eps", "dtype": "float32"}, {"name": "q_scale", "dtype": "float32"}],
+  "impl": {
+    "function": "qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage",
+    "c_declaration": "void qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage(float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, float eps, float q_scale);",
+    "sources": ["src/kernels/qk_norm_kernels.c", "src/kernels/rmsnorm_kernels.c"],
+    "variants": [{"name": "avx2", "requires": ["avx2"], "compile_flags": ["-mavx2"]}]
+  },
+  "call_abi": {"version": 1, "params": [
+    {"name": "q", "source": "scratch:q_scratch", "cast": "float*", "ports": ["input:q", "output:q"]},
+    {"name": "k", "source": "scratch:k_scratch", "cast": "float*", "ports": ["input:k", "output:k"]},
+    {"name": "num_heads", "source": "dim:num_heads"},
+    {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+    {"name": "num_tokens", "source": "dim:seq_len"},
+    {"name": "head_dim", "source": "dim:head_dim"},
+    {"name": "eps", "source": "dim:rms_eps"},
+    {"name": "q_scale", "source": "dim:qk_scale_factor"}
+  ]},
+  "notes": "Muse unweighted per-head Q/K normalization followed by the separately rounded query scale."
+}

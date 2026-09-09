@@ -781,6 +781,7 @@ PY_TESTS_BF16 := unittest/bf16/test_sigmoid_bf16.py \
                 unittest/bf16/test_layernorm_storage_contract_bf16.py \
                 unittest/bf16/test_rmsnorm_pytorch_storage_bf16.py \
                 unittest/bf16/test_qk_norm_pytorch_storage_bf16.py \
+                unittest/bf16/test_muse_glimmer_norms_bf16.py \
                 unittest/bf16/test_embedding_bf16_fp32.py \
                 unittest/bf16/test_gemm_storage_contract_bf16.py \
                 unittest/bf16/test_attention_storage_contract_bf16.py \

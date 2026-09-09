@@ -33,6 +33,7 @@
  * is shared across all heads (Qwen3 design: one gamma per Q, one per K).
  */
 
+#include "bf16_utils.h"
 #include <math.h>
 #include <stddef.h>  /* NULL */
 #include <stdlib.h>  /* getenv */
@@ -81,6 +82,14 @@ void rmsnorm_forward_pytorch_bf16_storage(const float *input,
 void rmsnorm_forward_qwen3next_pytorch_bf16_storage(
                                           const float *input,
                                           const float *gamma,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps);
+void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
+                                          const float *input,
                                           float *output,
                                           float *rstd_cache,
                                           int tokens,
@@ -393,6 +402,26 @@ void qk_norm_forward_qwen4_pytorch_bf16_storage(float *q, float *k,
     rmsnorm_forward_qwen3next_pytorch_bf16_storage(
         k, k_gamma, k, NULL,
         num_kv_heads * num_tokens, head_dim, head_dim, eps);
+}
+
+void qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage(
+                                                float *q,
+                                                float *k,
+                                                int num_heads,
+                                                int num_kv_heads,
+                                                int num_tokens,
+                                                int head_dim,
+                                                float eps,
+                                                float q_scale)
+{
+    const int q_elements = num_heads * num_tokens * head_dim;
+    rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
+        q, q, NULL, num_heads * num_tokens, head_dim, head_dim, eps);
+    rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
+        k, k, NULL, num_kv_heads * num_tokens, head_dim, head_dim, eps);
+    for (int index = 0; index < q_elements; ++index) {
+        q[index] = bf16_to_float(float_to_bf16(q[index] * q_scale));
+    }
 }
 
 /**

@@ -2,6 +2,60 @@
   "version": 1,
   "description": "Declarative safetensors-to-CK source tensor mapping. Source formats are not first-class CK runtime artifacts; they map into BUMP manifest names consumed by templates.",
   "architectures": {
+    "muse_glimmer_text": {
+      "template": "muse_glimmer_text",
+      "family": "muse_glimmer",
+      "aliases": ["muse_glimmer", "MuseGlimmerForConditionalGeneration", "MuseGlimmerTextForCausalLM"],
+      "status": "text_contract_mapping",
+      "config_builder": "muse_glimmer_text",
+      "config": {
+        "model": "muse_glimmer_text",
+        "arch": "muse_glimmer_text",
+        "model_type": "muse_glimmer_text",
+        "prefer_q8_activation": false,
+        "prefill_policy": "batched",
+        "decode_kv_cache_dtype": "fp32"
+      },
+      "ignored_source_tensors": [
+        {"prefix": "model.vision_tower.", "reason": "vision_milestone_not_in_text_artifact"},
+        {"prefix": "model.vision_adapter.", "reason": "vision_milestone_not_in_text_artifact"},
+        {"exact": "model.vision_projection.weight", "reason": "vision_milestone_not_in_text_artifact"}
+      ],
+      "required_tensor_families": [
+        "model.language_model.embed_tokens.weight",
+        "model.language_model.layers.{L}.input_layernorm.weight",
+        "model.language_model.layers.{L}.post_attention_layernorm.weight",
+        "model.language_model.layers.{L}.pre_feedforward_layernorm.weight",
+        "model.language_model.layers.{L}.post_feedforward_layernorm.weight",
+        "model.language_model.layers.{L}.self_attn.q_proj.weight",
+        "model.language_model.layers.{L}.self_attn.k_proj.weight",
+        "model.language_model.layers.{L}.self_attn.v_proj.weight",
+        "model.language_model.layers.{L}.self_attn.gate_proj.weight",
+        "model.language_model.layers.{L}.self_attn.o_proj.weight",
+        "model.language_model.layers.{L}.mlp.gate_proj.weight",
+        "model.language_model.layers.{L}.mlp.up_proj.weight",
+        "model.language_model.layers.{L}.mlp.down_proj.weight",
+        "model.language_model.norm.weight",
+        "lm_head.weight"
+      ],
+      "tensor_refs": [
+        {"target": "token_emb", "sources": ["model.language_model.embed_tokens.weight"]},
+        {"target": "layer.{L}.ln1_gamma", "sources": ["model.language_model.layers.{L}.input_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.post_attention_norm", "sources": ["model.language_model.layers.{L}.post_attention_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.ln2_gamma", "sources": ["model.language_model.layers.{L}.pre_feedforward_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.post_ffn_norm", "sources": ["model.language_model.layers.{L}.post_feedforward_layernorm.weight"], "dtype": "fp32"},
+        {"target": "layer.{L}.wq", "sources": ["model.language_model.layers.{L}.self_attn.q_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.wk", "sources": ["model.language_model.layers.{L}.self_attn.k_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.wv", "sources": ["model.language_model.layers.{L}.self_attn.v_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.mla_gate_proj", "sources": ["model.language_model.layers.{L}.self_attn.gate_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.wo", "sources": ["model.language_model.layers.{L}.self_attn.o_proj.weight"], "role": "linear_weight"},
+        {"target": "layer.{L}.w1", "sources": ["model.language_model.layers.{L}.mlp.gate_proj.weight", "model.language_model.layers.{L}.mlp.up_proj.weight"], "combine": "concat", "shape": ["2*intermediate_size", "embed_dim"], "role": "linear_weight"},
+        {"target": "layer.{L}.w2", "sources": ["model.language_model.layers.{L}.mlp.down_proj.weight"], "role": "linear_weight"},
+        {"target": "final_ln_weight", "sources": ["model.language_model.norm.weight"], "dtype": "fp32"},
+        {"target": "lm_head", "sources": ["lm_head.weight"], "role": "linear_weight"}
+      ],
+      "notes": "Text-only Muse-Glimmer artifact. Vision tensors are explicitly accounted for as a later artifact rather than silently dropped."
+    },
     "whisper_decoder": {
       "template": "audio_transformer_decoder",
       "family": "audio_transformer",

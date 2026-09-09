@@ -1282,6 +1282,32 @@ void rmsnorm_forward_qwen3next_pytorch_bf16_storage(const float *input,
                                                      int d_model,
                                                      int aligned_embed_dim,
                                                      float eps);
+void rmsnorm_forward_muse_centered_pytorch_bf16_storage(
+    const float *input,
+    const float *zero_centered_weight,
+    float *output,
+    float *rstd_cache,
+    int tokens,
+    int d_model,
+    int aligned_embed_dim,
+    float eps);
+void rmsnorm_forward_muse_weighted_pytorch_bf16_storage(
+    const float *input,
+    const float *weight,
+    float *output,
+    float *rstd_cache,
+    int tokens,
+    int d_model,
+    int aligned_embed_dim,
+    float eps);
+void rmsnorm_forward_muse_unweighted_pytorch_bf16_storage(
+    const float *input,
+    float *output,
+    float *rstd_cache,
+    int tokens,
+    int d_model,
+    int aligned_embed_dim,
+    float eps);
 void rmsnorm_forward_fp32_square_fp64_sum(const float *input,
                                           const float *gamma,
                                           float *output,
@@ -1404,6 +1430,15 @@ void qk_norm_forward_qwen4_pytorch_bf16_storage(float *q,
                                                 int num_tokens,
                                                 int head_dim,
                                                 float eps);
+void qk_norm_forward_muse_unweighted_scaled_pytorch_bf16_storage(
+    float *q,
+    float *k,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    float eps,
+    float q_scale);
 void qk_norm_forward_prefill_exact(float *q, float *k,
                                    const float *q_gamma, const float *k_gamma,
                                    int num_heads, int num_kv_heads,
@@ -1472,6 +1507,14 @@ void final_logit_scale_f32(float *logits,
                            int tokens,
                            int vocab_size,
                            float scale);
+void final_logit_scale_muse_pytorch_bf16_storage(float *logits,
+                                                  int tokens,
+                                                  int vocab_size,
+                                                  float scale);
+void final_logit_softcap_muse_pytorch_bf16_storage(float *logits,
+                                                    int tokens,
+                                                    int vocab_size,
+                                                    float cap);
 void qk_norm_backward(const float *d_q_out,
                       const float *d_k_out,
                       const float *q_in,
@@ -4651,6 +4694,10 @@ void rope_forward_qk_split_direct_f32(float *q,
                                       int pos_offset,
                                       int rotary_dim,
                                       float freq_base);
+void rope_forward_qk_split_direct_muse_pytorch_bf16_storage(
+    float *q, float *k, const float *freq_factors, int use_freq_factors,
+    int num_heads, int num_kv_heads, int num_tokens, int head_dim,
+    int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);
 void rope_forward_qk_split_direct_token_range_f32(
     float *q,
     float *k,

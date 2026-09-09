@@ -476,7 +476,11 @@ def _refs_from_safetensors_contract(arch: str, config: dict[str, Any], headers: 
             transform = str(transform) if transform is not None else None
             synth = spec.get("synth")
             synth = str(synth) if synth is not None else None
-            shape = _shape_from_spec(spec.get("shape"), config) if (synth or spec.get("fallback_synth")) else None
+            shape = (
+                _shape_from_spec(spec.get("shape"), config)
+                if spec.get("shape") is not None
+                else None
+            )
             sources_raw = spec.get("sources") or []
             if isinstance(sources_raw, str):
                 sources_raw = [sources_raw]
@@ -495,7 +499,16 @@ def _refs_from_safetensors_contract(arch: str, config: dict[str, Any], headers: 
                 missing = [name for name in concat_sources if name not in headers]
                 if missing or not concat_sources:
                     raise SystemExit(f"Missing required safetensors tensor for {ck_name}: tried {named_sources}")
-                refs.append(TensorRef(ck_name, tuple(concat_sources), dtype=dtype, role=role, transform=transform))
+                refs.append(
+                    TensorRef(
+                        ck_name,
+                        tuple(concat_sources),
+                        dtype=dtype,
+                        role=role,
+                        shape=shape,
+                        transform=transform,
+                    )
+                )
                 continue
             found = _first_existing_from_patterns(headers, (str(x) for x in sources_raw), layer)
             if found is not None:
@@ -2043,6 +2056,77 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
         })
 
 
+    if config_builder == "muse_glimmer_text":
+        layer_types = [str(kind) for kind in (text.get("layer_types") or [])]
+        layer_rope_theta = [float(value) for value in (text.get("layer_rope_theta") or [])]
+        num_layers = int(cfg.get("num_layers") or 0)
+        if len(layer_types) != num_layers:
+            raise SystemExit(
+                f"Muse-Glimmer layer_types has {len(layer_types)} entries for {num_layers} layers"
+            )
+        if len(layer_rope_theta) != num_layers:
+            raise SystemExit(
+                "Muse-Glimmer layer_rope_theta must declare one independent "
+                f"value per layer; got {len(layer_rope_theta)} for {num_layers} layers"
+            )
+        unsupported = sorted(set(layer_types) - {"sliding_attention", "full_attention"})
+        if unsupported:
+            raise SystemExit(f"Muse-Glimmer has unsupported layer types: {unsupported}")
+        head_dim = int(cfg.get("head_dim") or 0)
+        num_heads = int(cfg.get("num_heads") or 0)
+        num_kv_heads = int(cfg.get("num_kv_heads") or 0)
+        attention_width = num_heads * head_dim
+        kv_width = num_kv_heads * head_dim
+        sliding_window = int(text.get("sliding_window") or 0)
+        cfg.update({
+            "model": "muse_glimmer_text",
+            "arch": "muse_glimmer_text",
+            "model_type": "muse_glimmer_text",
+            "layer_types": layer_types,
+            "layer_kinds": layer_types[:],
+            "hybrid_block_pattern": layer_types[:],
+            "layer_attention_policy": layer_types[:],
+            "layer_mlp_policy": ["swiglu" for _ in layer_types],
+            "layer_kv_policy": ["attention_kv_cache" for _ in layer_types],
+            "layer_sliding_window": [
+                sliding_window if kind == "sliding_attention" else 0
+                for kind in layer_types
+            ],
+            "layer_rope_kind": [
+                "swa" if theta != 0.0 else "none" for theta in layer_rope_theta
+            ],
+            "layer_rotary_dim": [head_dim if theta != 0.0 else 0 for theta in layer_rope_theta],
+            "layer_q_dim": [attention_width for _ in layer_types],
+            "layer_attention_output_dim": [attention_width for _ in layer_types],
+            "layer_attention_gate_dim": [attention_width for _ in layer_types],
+            "attn_out_dim": attention_width,
+            "attn_gate_dim": attention_width,
+            "q_dim": attention_width,
+            "k_dim": kv_width,
+            "v_dim": kv_width,
+            "rotary_dim": head_dim,
+            "intermediate_dim": int(cfg.get("intermediate_size") or 0),
+            "max_seq_len": int(cfg.get("context_length") or 0),
+            "sliding_window": sliding_window,
+            "rope_theta": float(rope_parameters.get("rope_theta") or 500000.0),
+            "rope_theta_swa": float(rope_parameters.get("rope_theta") or 500000.0),
+            "rope_freq_base": float(rope_parameters.get("rope_theta") or 500000.0),
+            "rms_eps": float(text.get("rms_norm_eps") or 1.0e-5),
+            "rms_norm_eps": float(text.get("rms_norm_eps") or 1.0e-5),
+            "post_norm_eps": float(text.get("post_norm_eps") or 1.0e-8),
+            "qk_scale_factor": float(text.get("qk_scale_factor") or 1.0),
+            "attention_scale": float(head_dim ** -0.5),
+            "logit_scale": float(text.get("output_multiplier") or 1.0),
+            "final_logit_softcapping": float(text.get("final_logit_softcapping") or 0.0),
+            "has_qk_norm": True,
+            "has_attention_biases": bool(text.get("attention_bias", False)),
+            "decoder_norm_storage_boundary": "bf16",
+            "decoder_residual_storage_boundary": "bf16",
+            "decode_kv_cache_dtype": "fp32",
+            "prefer_q8_activation": False,
+            "prefill_policy": "batched",
+        })
+
     if config_builder == "cohere2_text":
         sliding_rope = (
             rope_parameters.get("sliding_attention")
@@ -2978,7 +3062,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "muse_glimmer_text", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

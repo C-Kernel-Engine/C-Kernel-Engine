@@ -1,0 +1,26 @@
+{
+  "id": "final_logit_scale_muse_pytorch_bf16_storage",
+  "op": "final_logit_scale",
+  "operation_interface": "logits.scale.bf16_storage_inplace.v1",
+  "variant": "muse_pytorch_bf16_storage",
+  "modes": {"inference": true, "training": false, "backward": false},
+  "quant": {"weight": "none", "activation": "fp32_bf16_values", "output": "fp32_bf16_values"},
+  "inputs": [{"name": "logits", "dtype": "fp32", "shape": ["T", "V"], "layout": "token_major_contiguous", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [],
+  "outputs": [{"name": "logits", "dtype": "fp32", "shape": ["T", "V"], "layout": "token_major_contiguous", "access": "write", "storage_class": "activation", "consumption": "required", "alias_of": "input:logits"}],
+  "scratch": [],
+  "dims": ["seq_len", "vocab_size"],
+  "params": [{"name": "scale", "dtype": "float32"}],
+  "impl": {
+    "function": "final_logit_scale_muse_pytorch_bf16_storage",
+    "c_declaration": "void final_logit_scale_muse_pytorch_bf16_storage(float *logits, int tokens, int vocab_size, float scale);",
+    "sources": ["src/kernels/logit_kernels.c"]
+  },
+  "call_abi": {"version": 1, "params": [
+    {"name": "logits", "source": "activation:logits", "cast": "float*", "ports": ["input:logits", "output:logits"]},
+    {"name": "tokens", "source": "dim:seq_len"},
+    {"name": "vocab_size", "source": "dim:vocab_size"},
+    {"name": "scale", "source": "dim:logit_scale"}
+  ]},
+  "notes": "Rounds projection output and scaled logits at PyTorch BF16 storage boundaries."
+}

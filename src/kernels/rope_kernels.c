@@ -1198,6 +1198,79 @@ void rope_forward_qk_split_direct_f32(float *q,
                                   pos_offset, rotary_dim, freq_base);
 }
 
+static void rope_forward_split_direct_muse_bf16_one(
+    float *x,
+    int heads,
+    int tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int pos_offset,
+    int rotary_dim,
+    float freq_base)
+{
+    if (!x || heads <= 0 || tokens <= 0 || head_dim <= 0 ||
+        aligned_head_dim < head_dim) {
+        return;
+    }
+    if (rotary_dim <= 0 || rotary_dim > head_dim) rotary_dim = head_dim;
+    if (freq_base <= 0.0f) freq_base = 10000.0f;
+
+    const int half = rotary_dim / 2;
+    const size_t head_stride = (size_t)tokens * (size_t)aligned_head_dim;
+    for (int token = 0; token < tokens; ++token) {
+        const float position = (float)(pos_offset + token);
+        for (int index = 0; index < half; ++index) {
+            const float exponent = (float)(2 * index) / (float)rotary_dim;
+            const float inv_freq = 1.0f / powf(freq_base, exponent);
+            const float angle = position * inv_freq;
+            const float cosine = bf16_to_float(float_to_bf16(cosf(angle)));
+            const float sine = bf16_to_float(float_to_bf16(sinf(angle)));
+            for (int head = 0; head < heads; ++head) {
+                float *row = x + (size_t)head * head_stride +
+                             (size_t)token * (size_t)aligned_head_dim;
+                const float first = bf16_to_float(float_to_bf16(row[index]));
+                const float second = bf16_to_float(float_to_bf16(row[index + half]));
+                const float first_cos =
+                    bf16_to_float(float_to_bf16(first * cosine));
+                const float second_sin =
+                    bf16_to_float(float_to_bf16(second * sine));
+                const float second_cos =
+                    bf16_to_float(float_to_bf16(second * cosine));
+                const float first_sin =
+                    bf16_to_float(float_to_bf16(first * sine));
+                row[index] =
+                    bf16_to_float(float_to_bf16(first_cos - second_sin));
+                row[index + half] =
+                    bf16_to_float(float_to_bf16(second_cos + first_sin));
+            }
+        }
+    }
+}
+
+void rope_forward_qk_split_direct_muse_pytorch_bf16_storage(
+    float *q,
+    float *k,
+    const float *freq_factors,
+    int use_freq_factors,
+    int num_heads,
+    int num_kv_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int pos_offset,
+    int rotary_dim,
+    float freq_base)
+{
+    (void)freq_factors;
+    (void)use_freq_factors;
+    rope_forward_split_direct_muse_bf16_one(
+        q, num_heads, num_tokens, head_dim, aligned_head_dim,
+        pos_offset, rotary_dim, freq_base);
+    rope_forward_split_direct_muse_bf16_one(
+        k, num_kv_heads, num_tokens, head_dim, aligned_head_dim,
+        pos_offset, rotary_dim, freq_base);
+}
+
 void rope_forward_qk_split_direct_token_range_f32(
     float *q,
     float *k,

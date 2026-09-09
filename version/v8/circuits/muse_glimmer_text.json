@@ -1,0 +1,192 @@
+{
+  "version": 2,
+  "name": "muse_glimmer_text",
+  "family": "muse_glimmer",
+  "projection_inputs": {
+    "q_proj": {"x": "main_stream"},
+    "k_proj": {"x": "main_stream"},
+    "v_proj": {"x": "main_stream"},
+    "attention_gate_projection": {"x": "main_stream"}
+  },
+  "flags": {
+    "activation": "swiglu",
+    "rope": "rope",
+    "tokenizer": "bpe",
+    "attention": "three_sliding_one_full_nope",
+    "has_qk_norm": true,
+    "post_attention_norm": true
+  },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "bpe",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {"source": "manifest_or_hf"}
+    },
+    "chat_contract": {
+      "version": 1,
+      "name": "muse_glimmer",
+      "raw_prompt_allowed": true,
+      "conversation_prefix": "",
+      "turn_prefix": "<|start|>{role}<|message|>",
+      "turn_prefix_by_role": {
+        "system": "<|start|>system<|message|>",
+        "user": "<|start|>user<|message|>",
+        "assistant": "<|start|>assistant to=user<|message|>"
+      },
+      "turn_suffix": "<|eot|>",
+      "assistant_generation_prefix": "<|start|>assistant",
+      "role_labels": {"system": "system", "user": "user", "assistant": "assistant"},
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "You are a helpful AI assistant.\nKnowledge cutoff: 2026-01-04.\nCurrent date: 2026-09-09.\n\nReasoning strength: high.\n\n# Valid recipients: \"self\", \"user\".",
+      "inject_default_system_prompt": true,
+      "template_revision": "4177486a9f199bd7be520eff14431071d5d41ec5",
+      "template_parameters": {
+        "knowledge_cutoff": "2026-01-04",
+        "current_date": "2026-09-09",
+        "reasoning_strength": "high",
+        "tools": false
+      },
+      "stop_text_markers": ["<|eot|>"],
+      "token_stop_markers": ["<|eot|>"],
+      "template_markers": ["<|start|>", "<|message|>", "<|eom|>", "<|eot|>"],
+      "min_response_tokens": 1
+    },
+    "attention_contract": {
+      "causal": true,
+      "rope_layout": "split",
+      "rope_type": "rope_on_sliding_layers_only",
+      "attn_variant": "gated_gqa_global_or_sliding",
+      "kv_layout": "layer_major_kv_cache",
+      "qk_norm": "unweighted_pow_then_query_scale",
+      "query_width_config_key": "attn_out_dim",
+      "kv_width_config_keys": ["k_dim", "v_dim"],
+      "gate_width_config_key": "attn_gate_dim",
+      "layer_kind_config_key": "layer_kinds",
+      "sliding_window_config_key": "layer_sliding_window",
+      "rope_kind_config_key": "layer_rope_kind",
+      "rope_param_mode": "per_layer_direct"
+    },
+    "block_contract": {
+      "norm_type": "centered_rmsnorm",
+      "body_type": "serial_gated_attention_swiglu",
+      "activation": "swiglu",
+      "input_norm_eps_config_key": "rms_eps",
+      "post_branch_norm_eps_config_key": "post_norm_eps",
+      "attention_gate_formula": "attention * sigmoid(project(input_norm))",
+      "mlp_formula": "gate_up -> silu_mul -> down",
+      "residual_formula": "residual + post_norm(branch)",
+      "qkv_bias": false
+    },
+    "logits_contract": {
+      "final_norm": "weighted_pow_rmsnorm",
+      "lm_head": "separate_output_weight",
+      "ordered_transforms": ["output_multiplier", "tanh_softcap"],
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "pytorch_bf16_storage_boundaries",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {},
+      "independent_widths": ["embed_dim", "attn_out_dim", "k_dim", "v_dim", "attn_gate_dim"],
+      "attention_schedule": "three_sliding_one_full"
+    }
+  },
+  "required_numerical_contracts": {
+    "decoder.projections_bf16_storage": {
+      "op": "gemm",
+      "template_ops": [
+        "q_proj", "k_proj", "v_proj", "attention_gate_projection",
+        "out_proj", "mlp_gate_up", "mlp_down", "logits"
+      ],
+      "phases": {
+        "prefill": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Muse-Glimmer stores each BF16 linear result before the next PyTorch operation."
+        },
+        "decode": {
+          "contract_id": "bf16_weight_bf16_input_pytorch_onednn_3_12_brgemm_bf16_output",
+          "validation": "validated",
+          "evidence": "Single-token decode preserves the same BF16 linear-output boundary."
+        }
+      },
+      "checkpoint": {
+        "id": "decoder.layer.{layer}.projection.output",
+        "producer": "gemm",
+        "logical_layout": "token_major",
+        "axis_names": ["token", "channel"]
+      }
+    }
+  },
+  "kernels": {
+    "unweighted_rmsnorm": "rmsnorm_muse_unweighted_pytorch_bf16_storage",
+    "attn_norm": "rmsnorm_muse_centered_pytorch_bf16_storage",
+    "post_attention_norm": "rmsnorm_muse_centered_pytorch_bf16_storage",
+    "ffn_norm": "rmsnorm_muse_centered_pytorch_bf16_storage",
+    "post_ffn_norm": "rmsnorm_muse_centered_pytorch_bf16_storage",
+    "final_rmsnorm": "rmsnorm_muse_weighted_pytorch_bf16_storage",
+    "qk_norm_no_weight_scaled": "qk_norm_muse_unweighted_scaled_pytorch_bf16_storage",
+    "rope_init": "rope_precompute_cache_split",
+    "rope_qk": "rope_forward_qk_split_direct_muse_pytorch_bf16_storage",
+    "attn": "attention_forward_causal_head_major_gqa_flash_strided",
+    "attn_decode": "attention_forward_decode_head_major_gqa_flash",
+    "attn_sliding": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+    "attn_sliding_decode": "attention_forward_decode_head_major_gqa_flash_sliding",
+    "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul_pytorch_bf16_storage",
+    "silu_mul": "swiglu_forward_pytorch_bf16_storage",
+    "residual_add": "ck_residual_add_token_major_bf16_storage",
+    "final_logit_scale": "final_logit_scale_muse_pytorch_bf16_storage",
+    "final_logit_softcap": "final_logit_softcap_muse_pytorch_bf16_storage"
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup",
+        {"op": "unweighted_rmsnorm", "params": {"rms_eps_from_config": "rms_eps"}}
+      ],
+      "body": {
+        "type": "hybrid_sliding_attention",
+        "kind_config_key": "layer_kinds",
+        "default_kind": "sliding_attention",
+        "ops_by_kind": {
+          "sliding_attention": [
+            {"op": "attn_norm", "params": {"rms_eps_from_config": "rms_eps"}},
+            "q_proj", "k_proj", "v_proj",
+            {"op": "qk_norm_no_weight_scaled", "params": {"rms_eps_from_config": "rms_eps", "qk_scale_factor_from_config": "qk_scale_factor"}},
+            "rope_qk", "attention_gate_projection", "attn_sliding", "attn_gate_sigmoid_mul", "out_proj",
+            {"op": "post_attention_norm", "params": {"rms_eps_from_config": "post_norm_eps"}},
+            "residual_add",
+            {"op": "ffn_norm", "params": {"rms_eps_from_config": "rms_eps"}},
+            "mlp_gate_up", "silu_mul", "mlp_down",
+            {"op": "post_ffn_norm", "params": {"rms_eps_from_config": "post_norm_eps"}},
+            "residual_add"
+          ],
+          "full_attention": [
+            {"op": "attn_norm", "params": {"rms_eps_from_config": "rms_eps"}},
+            "q_proj", "k_proj", "v_proj",
+            {"op": "qk_norm_no_weight_scaled", "params": {"rms_eps_from_config": "rms_eps", "qk_scale_factor_from_config": "qk_scale_factor"}},
+            "attention_gate_projection", "attn", "attn_gate_sigmoid_mul", "out_proj",
+            {"op": "post_attention_norm", "params": {"rms_eps_from_config": "post_norm_eps"}},
+            "residual_add",
+            {"op": "ffn_norm", "params": {"rms_eps_from_config": "rms_eps"}},
+            "mlp_gate_up", "silu_mul", "mlp_down",
+            {"op": "post_ffn_norm", "params": {"rms_eps_from_config": "post_norm_eps"}},
+            "residual_add"
+          ]
+        }
+      },
+      "footer": [
+        {"op": "final_rmsnorm", "params": {"rms_eps_from_config": "rms_eps"}},
+        "lm_head", "logits", "final_logit_scale", "final_logit_softcap"
+      ]
+    }
+  }
+}

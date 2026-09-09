@@ -1,0 +1,37 @@
+{
+  "id": "rope_forward_qk_split_direct_muse_pytorch_bf16_storage",
+  "op": "rope",
+  "operation_interface": "rope.split_direct.pytorch_bf16_storage.v1",
+  "variant": "head_major_split_half_direct_muse_pytorch_bf16_storage",
+  "quant": {"weight": "none", "activation": "fp32_bf16_values", "output": "fp32_bf16_values"},
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "access": "read", "storage_class": "scratch", "consumption": "required"}
+  ],
+  "weights": [{"name": "rope_freqs", "dtype": "fp32", "shape": ["rotary_dim/2"], "layout": "feature_contiguous", "access": "read", "storage_class": "weight", "consumption": "optional"}],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "layout": "head_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:q"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "D"], "layout": "head_major_contiguous", "access": "write", "storage_class": "scratch", "consumption": "required", "alias_of": "input:k"}
+  ],
+  "dims": ["H", "KV", "T", "D", "rotary_dim"],
+  "impl": {
+    "function": "rope_forward_qk_split_direct_muse_pytorch_bf16_storage",
+    "c_declaration": "void rope_forward_qk_split_direct_muse_pytorch_bf16_storage(float *q, float *k, const float *freq_factors, int use_freq_factors, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim, float freq_base);",
+    "sources": ["src/kernels/rope_kernels.c"]
+  },
+  "call_abi": {"version": 1, "params": [
+    {"name": "q", "source": "scratch:q_scratch", "cast": "float*", "ports": ["input:q", "output:q"]},
+    {"name": "k", "source": "scratch:k_scratch", "cast": "float*", "ports": ["input:k", "output:k"]},
+    {"name": "freq_factors", "source": "weight_f:rope_freqs", "cast": "const float*", "ports": ["weight:rope_freqs"]},
+    {"name": "use_freq_factors", "source": "dim:use_rope_freq_factors"},
+    {"name": "num_heads", "source": "dim:num_heads"},
+    {"name": "num_kv_heads", "source": "dim:num_kv_heads"},
+    {"name": "num_tokens", "source": "dim:seq_len"},
+    {"name": "head_dim", "source": "dim:head_dim"},
+    {"name": "aligned_head_dim", "source": "dim:head_dim"},
+    {"name": "pos_offset", "source": "runtime:pos"},
+    {"name": "rotary_dim", "source": "dim:rotary_dim"},
+    {"name": "freq_base", "source": "dim:rope_freq_base"}
+  ]},
+  "notes": "Muse split-half RoPE with BF16 cos, sin, multiply, and add storage boundaries."
+}
