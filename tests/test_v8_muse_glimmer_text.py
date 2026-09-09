@@ -14,6 +14,13 @@ BUILDER_PATH = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
 CERTIFIER_PATH = (
     ROOT / "version" / "v8" / "scripts" / "certify_muse_glimmer_text_v8.py"
 )
+CERTIFICATION_ARTIFACT = (
+    ROOT
+    / "docs"
+    / "notes"
+    / "artifacts"
+    / "muse_glimmer_text_parity_128_2026-09-09.json"
+)
 
 
 def _load(name: str, path: Path):
@@ -28,6 +35,49 @@ def _load(name: str, path: Path):
 converter = _load("muse_converter_test", CONVERTER_PATH)
 builder = _load("muse_builder_test", BUILDER_PATH)
 certifier = _load("muse_certifier_test", CERTIFIER_PATH)
+
+
+def test_committed_muse_certification_artifact_is_complete_and_consumable() -> None:
+    report = json.loads(CERTIFICATION_ARTIFACT.read_text(encoding="utf-8"))
+    assert report["schema"] == "cke.v8.muse_glimmer_text_parity"
+    assert report["status"] == "pass"
+    assert report["comparison"] == {
+        "numeric": "forced-reference-token history",
+        "trajectory": "free-running greedy history",
+        "exactness": "float32 IEEE-754 bit-pattern equality",
+    }
+
+    provenance = report["provenance"]
+    required_hashes = {
+        "libmodel_sha256",
+        "engine_sha256",
+        "generated_c_sha256",
+        "runtime_bundle_sha256",
+        "reference_manifest_sha256",
+        "loaded_engine_sha256",
+    }
+    for field in required_hashes:
+        assert len(provenance[field]) == 64
+        int(provenance[field], 16)
+    assert provenance["loaded_engine_sha256"] == provenance["engine_sha256"]
+    assert Path(provenance["loaded_engine_path"]).name == "libckernel_engine.so"
+
+    cases = report["cases"]
+    assert [case["name"] for case in cases] == list(certifier.CASES)
+    assert sum(case["generated_tokens"] for case in cases) == 384
+    for case in cases:
+        expected = case["generated_tokens"]
+        assert case["status"] == "pass"
+        assert case["prompt_tokens"] > 0
+        assert expected == 128
+        assert len(case["reference_ids"]) == expected
+        assert certifier._case_passes(
+            case["free_running_history"],
+            case["forced_reference_history"],
+            expected,
+        )
+        assert case["free_running_history"]["actual_ids"] == case["reference_ids"]
+        assert case["forced_reference_history"]["actual_ids"] == case["reference_ids"]
 
 
 def _text_config(num_layers: int = 4) -> dict:
