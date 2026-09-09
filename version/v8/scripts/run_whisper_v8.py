@@ -4,16 +4,19 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import ctypes
 import errno
 import hashlib
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import wave
 from typing import Any
 
@@ -205,6 +208,69 @@ def _load_generated_model(run_dir: Path) -> ctypes.CDLL:
     return model
 
 
+def _initialize_model(model: ctypes.CDLL, run_dir: Path, role: str) -> float:
+    started = time.perf_counter()
+    status = int(
+        model.ck_model_init_with_manifest(
+            str(run_dir / "weights.bump").encode(),
+            str(run_dir / "weights_manifest.map").encode(),
+        )
+    )
+    elapsed = time.perf_counter() - started
+    if status != 0:
+        raise RuntimeError(f"{role} initialization failed with code {status}")
+    return elapsed
+
+
+def _open_encoder_model(run_dir: Path) -> tuple[ctypes.CDLL, float]:
+    model = _load_generated_model(run_dir)
+    model.ck_model_get_named_activation_ptr.argtypes = [ctypes.c_char_p]
+    model.ck_model_get_named_activation_ptr.restype = ctypes.c_void_p
+    model.ck_model_get_named_activation_nbytes.argtypes = [ctypes.c_char_p]
+    model.ck_model_get_named_activation_nbytes.restype = ctypes.c_ssize_t
+    model.ck_model_prepare_audio_wav_window.argtypes = [
+        _U8_P,
+        ctypes.c_size_t,
+        ctypes.c_int,
+        ctypes.POINTER(CKAudioWavInfo),
+    ]
+    model.ck_model_prepare_audio_wav_window.restype = ctypes.c_int
+    model.ck_model_run_encoder.argtypes = []
+    model.ck_model_run_encoder.restype = ctypes.c_int
+    return model, _initialize_model(model, run_dir, "encoder")
+
+
+def _open_decoder_model(run_dir: Path) -> tuple[ctypes.CDLL, float]:
+    model = _load_generated_model(run_dir)
+    model.ck_model_set_encoder_memory.argtypes = [
+        _FLOAT_P,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    model.ck_model_set_encoder_memory.restype = ctypes.c_int
+    model.ck_model_embed_tokens.argtypes = [
+        ctypes.POINTER(ctypes.c_int32),
+        ctypes.c_int,
+    ]
+    model.ck_model_embed_tokens.restype = ctypes.c_int
+    model.ck_model_decode.argtypes = [ctypes.c_int32, _FLOAT_P]
+    model.ck_model_decode.restype = ctypes.c_int
+    model.ck_model_get_logits.argtypes = []
+    model.ck_model_get_logits.restype = _FLOAT_P
+    model.ck_model_get_vocab_size.argtypes = []
+    model.ck_model_get_vocab_size.restype = ctypes.c_int
+    try:
+        reset = model.ck_model_kv_cache_reset
+    except AttributeError as error:
+        raise RuntimeError(
+            "decoder runtime lacks ck_model_kv_cache_reset; rebuild before "
+            "using persistent workers"
+        ) from error
+    reset.argtypes = []
+    reset.restype = None
+    return model, _initialize_model(model, run_dir, "decoder")
+
+
 def _run_audio_encoder_window(
     model: ctypes.CDLL,
     wav: np.ndarray,
@@ -351,36 +417,25 @@ def _frontend_worker(args: argparse.Namespace) -> int:
     return 0
 
 
-def _encoder_worker(args: argparse.Namespace) -> int:
+def _encoder_worker(
+    args: argparse.Namespace,
+    *,
+    model: ctypes.CDLL | None = None,
+    execution_topology: dict[str, Any] | None = None,
+    feature_cache: dict[Path, np.ndarray] | None = None,
+) -> int:
     if (args.full_features is None) != (args.frontend_report is None):
         raise ValueError(
             "--full-features and --frontend-report must be provided together"
         )
-    execution_topology = _apply_worker_affinity()
+    if execution_topology is None:
+        execution_topology = _apply_worker_affinity()
     run_dir = args.encoder_run_dir.resolve()
     _require_artifact(run_dir)
-    model = _load_generated_model(run_dir)
-    model.ck_model_get_named_activation_ptr.argtypes = [ctypes.c_char_p]
-    model.ck_model_get_named_activation_ptr.restype = ctypes.c_void_p
-    model.ck_model_get_named_activation_nbytes.argtypes = [ctypes.c_char_p]
-    model.ck_model_get_named_activation_nbytes.restype = ctypes.c_ssize_t
-    model.ck_model_prepare_audio_wav_window.argtypes = [
-        _U8_P,
-        ctypes.c_size_t,
-        ctypes.c_int,
-        ctypes.POINTER(CKAudioWavInfo),
-    ]
-    model.ck_model_prepare_audio_wav_window.restype = ctypes.c_int
-    model.ck_model_run_encoder.argtypes = []
-    model.ck_model_run_encoder.restype = ctypes.c_int
-    status = int(
-        model.ck_model_init_with_manifest(
-            str(run_dir / "weights.bump").encode(),
-            str(run_dir / "weights_manifest.map").encode(),
-        )
-    )
-    if status != 0:
-        raise RuntimeError(f"encoder initialization failed with code {status}")
+    owns_model = model is None
+    init_seconds = 0.0
+    if model is None:
+        model, init_seconds = _open_encoder_model(run_dir)
     try:
         info = CKAudioWavInfo()
         config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
@@ -400,7 +455,13 @@ def _encoder_worker(args: argparse.Namespace) -> int:
             raise RuntimeError("generated audio feature checkpoint is unavailable")
         if args.full_features is not None:
             started = time.perf_counter()
-            full_features = np.load(args.full_features, mmap_mode="r")
+            feature_path = args.full_features.resolve()
+            if feature_cache is not None and feature_path in feature_cache:
+                full_features = feature_cache[feature_path]
+            else:
+                full_features = np.load(feature_path, mmap_mode="r")
+                if feature_cache is not None:
+                    feature_cache[feature_path] = full_features
             frontend_report = json.loads(
                 args.frontend_report.read_text(encoding="utf-8")
             )
@@ -479,7 +540,8 @@ def _encoder_worker(args: argparse.Namespace) -> int:
             ctypes.cast(output_ptr, _FLOAT_P), shape=(tokens * embed,)
         ).copy().reshape(tokens, embed)
     finally:
-        model.ck_model_free()
+        if owns_model:
+            model.ck_model_free()
 
     np.save(args.encoder_output, output)
     if args.feature_output is not None:
@@ -499,6 +561,7 @@ def _encoder_worker(args: argparse.Namespace) -> int:
                 "frontend_seconds": frontend_seconds,
                 "audio_encoder_seconds": frontend_seconds + encoder_seconds,
                 "encoder_seconds": encoder_seconds,
+                "model_init_seconds": init_seconds,
                 "feature_sha256": hashlib.sha256(features.tobytes()).hexdigest(),
                 "encoder_sha256": hashlib.sha256(output.tobytes()).hexdigest(),
                 "execution_topology": execution_topology,
@@ -680,8 +743,15 @@ def apply_timestamp_logits_contract(
     return scores
 
 
-def _decoder_worker(args: argparse.Namespace) -> int:
-    execution_topology = _apply_worker_affinity()
+def _decoder_worker(
+    args: argparse.Namespace,
+    *,
+    model: ctypes.CDLL | None = None,
+    execution_topology: dict[str, Any] | None = None,
+    tokenizer: Any | None = None,
+) -> int:
+    if execution_topology is None:
+        execution_topology = _apply_worker_affinity()
     run_dir = args.decoder_run_dir.resolve()
     _require_artifact(run_dir)
     generation_path = run_dir / "generation_config.json"
@@ -692,34 +762,14 @@ def _decoder_worker(args: argparse.Namespace) -> int:
     generation = json.loads(generation_path.read_text(encoding="utf-8"))
     encoder_memory = np.load(args.encoder_output).astype(np.float32, copy=False)
 
-    model = _load_generated_model(run_dir)
-    model.ck_model_set_encoder_memory.argtypes = [
-        _FLOAT_P,
-        ctypes.c_int,
-        ctypes.c_int,
-    ]
-    model.ck_model_set_encoder_memory.restype = ctypes.c_int
-    model.ck_model_embed_tokens.argtypes = [
-        ctypes.POINTER(ctypes.c_int32),
-        ctypes.c_int,
-    ]
-    model.ck_model_embed_tokens.restype = ctypes.c_int
-    model.ck_model_decode.argtypes = [ctypes.c_int32, _FLOAT_P]
-    model.ck_model_decode.restype = ctypes.c_int
-    model.ck_model_get_logits.argtypes = []
-    model.ck_model_get_logits.restype = _FLOAT_P
-    model.ck_model_get_vocab_size.argtypes = []
-    model.ck_model_get_vocab_size.restype = ctypes.c_int
-
-    status = int(
-        model.ck_model_init_with_manifest(
-            str(run_dir / "weights.bump").encode(),
-            str(run_dir / "weights_manifest.map").encode(),
-        )
-    )
-    if status != 0:
-        raise RuntimeError(f"decoder initialization failed with code {status}")
+    owns_model = model is None
+    init_seconds = 0.0
+    if model is None:
+        model, init_seconds = _open_decoder_model(run_dir)
     try:
+        # Each audio window is an independent decoder request. Retain immutable
+        # weights and prepared constants, but never retain generated state.
+        model.ck_model_kv_cache_reset()
         status = int(
             model.ck_model_set_encoder_memory(
                 _fptr(encoder_memory),
@@ -777,11 +827,13 @@ def _decoder_worker(args: argparse.Namespace) -> int:
                 )
         decode_seconds = time.perf_counter() - decode_started
     finally:
-        model.ck_model_free()
+        if owns_model:
+            model.ck_model_free()
 
-    from tokenizers import Tokenizer
+    if tokenizer is None:
+        from tokenizers import Tokenizer
 
-    tokenizer = Tokenizer.from_file(str(tokenizer_path))
+        tokenizer = Tokenizer.from_file(str(tokenizer_path))
     text = tokenizer.decode(tokens, skip_special_tokens=True)
     timestamp_begin = int(generation["no_timestamps_token_id"]) + 1
     transcript_tokens = [
@@ -803,6 +855,7 @@ def _decoder_worker(args: argparse.Namespace) -> int:
                 "transcript_text": transcript_text,
                 "prefill_seconds": prefill_seconds,
                 "decode_seconds": decode_seconds,
+                "model_init_seconds": init_seconds,
                 "execution_topology": execution_topology,
             },
             indent=2,
@@ -811,6 +864,168 @@ def _decoder_worker(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     return 0
+
+
+def _persistent_worker_main(
+    connection: Any,
+    role: str,
+    run_dir_text: str,
+    environment: dict[str, str],
+) -> None:
+    """Own one generated model for a sequence of independent window requests."""
+    model: ctypes.CDLL | None = None
+    try:
+        os.environ.update(environment)
+        execution_topology = _apply_worker_affinity()
+        run_dir = Path(run_dir_text).resolve()
+        if role == "encoder":
+            model, init_seconds = _open_encoder_model(run_dir)
+            feature_cache: dict[Path, np.ndarray] = {}
+            tokenizer = None
+        elif role == "decoder":
+            model, init_seconds = _open_decoder_model(run_dir)
+            from tokenizers import Tokenizer
+
+            tokenizer = Tokenizer.from_file(str(run_dir / "tokenizer.json"))
+            feature_cache = {}
+        else:
+            raise ValueError(f"unknown persistent worker role: {role}")
+        connection.send(
+            {
+                "status": "ready",
+                "role": role,
+                "model_init_seconds": init_seconds,
+                "execution_topology": execution_topology,
+            }
+        )
+        while True:
+            request = connection.recv()
+            if request.get("command") == "close":
+                connection.send({"status": "closed", "role": role})
+                break
+            if request.get("command") != "run":
+                raise ValueError(f"invalid {role} worker command")
+            arguments = argparse.Namespace(**request["args"])
+            if role == "encoder":
+                _encoder_worker(
+                    arguments,
+                    model=model,
+                    execution_topology=execution_topology,
+                    feature_cache=feature_cache,
+                )
+            else:
+                _decoder_worker(
+                    arguments,
+                    model=model,
+                    execution_topology=execution_topology,
+                    tokenizer=tokenizer,
+                )
+            connection.send({"status": "ok", "role": role})
+    except BaseException as error:
+        try:
+            connection.send(
+                {
+                    "status": "error",
+                    "role": role,
+                    "error": str(error),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+        except (BrokenPipeError, EOFError, OSError):
+            pass
+    finally:
+        if model is not None:
+            model.ck_model_free()
+        connection.close()
+
+
+class _PersistentWorker:
+    def __init__(
+        self,
+        role: str,
+        run_dir: Path,
+        environment: dict[str, str],
+        timeout_seconds: float,
+    ) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("persistent worker timeout must be positive")
+        context = multiprocessing.get_context("spawn")
+        parent, child = context.Pipe()
+        self._connection = parent
+        self._process = context.Process(
+            target=_persistent_worker_main,
+            args=(child, role, str(run_dir), environment),
+            name=f"cke-whisper-{role}",
+        )
+        self._role = role
+        self._timeout_seconds = timeout_seconds
+        self._closed = False
+        self._process.start()
+        child.close()
+        try:
+            ready = self._receive()
+        except BaseException:
+            self.close()
+            raise
+        if ready.get("status") != "ready":
+            self.close()
+            raise RuntimeError(f"{role} worker did not become ready")
+        self.model_init_seconds = float(ready["model_init_seconds"])
+        self.execution_topology = ready["execution_topology"]
+
+    def _receive(self) -> dict[str, Any]:
+        if not self._connection.poll(self._timeout_seconds):
+            raise TimeoutError(
+                f"persistent {self._role} worker exceeded "
+                f"{self._timeout_seconds:.1f}s response deadline"
+            )
+        try:
+            response = self._connection.recv()
+        except EOFError as error:
+            raise RuntimeError(
+                f"persistent {self._role} worker exited without a response "
+                f"(exitcode={self._process.exitcode})"
+            ) from error
+        if response.get("status") == "error":
+            raise RuntimeError(
+                f"persistent {self._role} worker failed: {response['error']}\n"
+                f"{response['traceback']}"
+            )
+        return response
+
+    def run(self, arguments: dict[str, Any]) -> None:
+        if self._closed:
+            raise RuntimeError(f"persistent {self._role} worker is closed")
+        self._connection.send({"command": "run", "args": arguments})
+        response = self._receive()
+        if response.get("status") != "ok":
+            raise RuntimeError(f"invalid persistent {self._role} response")
+
+    def __enter__(self) -> _PersistentWorker:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._process.is_alive():
+            try:
+                self._connection.send({"command": "close"})
+                if self._connection.poll(10.0):
+                    self._connection.recv()
+            except (BrokenPipeError, EOFError, OSError, RuntimeError):
+                pass
+        self._connection.close()
+        self._process.join(timeout=10.0)
+        if self._process.is_alive():
+            self._process.terminate()
+            self._process.join(timeout=5.0)
+        if self._process.is_alive():
+            self._process.kill()
+            self._process.join()
 
 
 def _run_segment(
@@ -826,66 +1041,191 @@ def _run_segment(
     worker_env: dict[str, str],
     full_features: Path | None = None,
     frontend_report: Path | None = None,
+    encoder_worker: _PersistentWorker | None = None,
+    decoder_worker: _PersistentWorker | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     encoder_output = temp / f"encoder-{index:04d}.npy"
     encoder_report = temp / f"encoder-{index:04d}.json"
     decoder_report = temp / f"decoder-{index:04d}.json"
-    subprocess.run(
-        [
-            *common,
-            "_encoder",
-            "--encoder-run-dir",
-            str(encoder_dir),
-            "--wav",
-            str(wav_path),
-            "--window-start-frame",
-            str(window_start_frame),
-            *(
-                [
-                    "--full-features",
-                    str(full_features),
-                    "--frontend-report",
-                    str(frontend_report),
-                ]
-                if full_features is not None and frontend_report is not None
-                else []
-            ),
-            "--encoder-output",
-            str(encoder_output),
-            "--worker-report",
-            str(encoder_report),
-        ],
-        check=True,
-        env=worker_env,
-    )
-    subprocess.run(
-        [
-            *common,
-            "_decoder",
-            "--decoder-run-dir",
-            str(decoder_dir),
-            "--encoder-output",
-            str(encoder_output),
-            "--language",
-            args.language,
-            "--task",
-            args.task,
-            "--max-tokens",
-            str(args.max_tokens),
-            *(["--timestamps"] if args.timestamps else []),
-            "--worker-report",
-            str(decoder_report),
-        ],
-        check=True,
-        env=worker_env,
-    )
-    return (
-        json.loads(encoder_report.read_text(encoding="utf-8")),
-        json.loads(decoder_report.read_text(encoding="utf-8")),
-    )
+    encoder_arguments = {
+        "encoder_run_dir": encoder_dir,
+        "wav": wav_path,
+        "window_start_frame": window_start_frame,
+        "full_features": full_features,
+        "frontend_report": frontend_report,
+        "encoder_output": encoder_output,
+        "feature_output": None,
+        "worker_report": encoder_report,
+    }
+    decoder_arguments = {
+        "decoder_run_dir": decoder_dir,
+        "encoder_output": encoder_output,
+        "language": args.language,
+        "task": args.task,
+        "max_tokens": args.max_tokens,
+        "timestamps": args.timestamps,
+        "worker_report": decoder_report,
+    }
+    encoder_started = time.perf_counter()
+    if encoder_worker is not None and decoder_worker is not None:
+        encoder_worker.run(encoder_arguments)
+        encoder_wall_seconds = time.perf_counter() - encoder_started
+        decoder_started = time.perf_counter()
+        decoder_worker.run(decoder_arguments)
+        decoder_wall_seconds = time.perf_counter() - decoder_started
+    else:
+        subprocess.run(
+            [
+                *common,
+                "_encoder",
+                "--encoder-run-dir",
+                str(encoder_dir),
+                "--wav",
+                str(wav_path),
+                "--window-start-frame",
+                str(window_start_frame),
+                *(
+                    [
+                        "--full-features",
+                        str(full_features),
+                        "--frontend-report",
+                        str(frontend_report),
+                    ]
+                    if full_features is not None and frontend_report is not None
+                    else []
+                ),
+                "--encoder-output",
+                str(encoder_output),
+                "--worker-report",
+                str(encoder_report),
+            ],
+            check=True,
+            env=worker_env,
+        )
+        encoder_wall_seconds = time.perf_counter() - encoder_started
+        decoder_started = time.perf_counter()
+        subprocess.run(
+            [
+                *common,
+                "_decoder",
+                "--decoder-run-dir",
+                str(decoder_dir),
+                "--encoder-output",
+                str(encoder_output),
+                "--language",
+                args.language,
+                "--task",
+                args.task,
+                "--max-tokens",
+                str(args.max_tokens),
+                *(["--timestamps"] if args.timestamps else []),
+                "--worker-report",
+                str(decoder_report),
+            ],
+            check=True,
+            env=worker_env,
+        )
+        decoder_wall_seconds = time.perf_counter() - decoder_started
+    encoder_result = json.loads(encoder_report.read_text(encoding="utf-8"))
+    decoder_result = json.loads(decoder_report.read_text(encoding="utf-8"))
+    encoder_result["worker_wall_seconds"] = encoder_wall_seconds
+    decoder_result["worker_wall_seconds"] = decoder_wall_seconds
+    return encoder_result, decoder_result
+
+
+def _collect_segments(
+    args: argparse.Namespace,
+    *,
+    common: list[str],
+    encoder_dir: Path,
+    decoder_dir: Path,
+    wav_path: Path,
+    temp: Path,
+    worker_env: dict[str, str],
+    encoder_config: dict[str, Any],
+    generation: dict[str, Any],
+    full_features: Path | None,
+    frontend_report: Path | None,
+    encoder_worker: _PersistentWorker | None,
+    decoder_worker: _PersistentWorker | None,
+) -> list[dict[str, Any]]:
+    segments: list[dict[str, Any]] = []
+    window_start_frame = 0
+    target_sample_rate = int(encoder_config["audio_sample_rate"])
+    while True:
+        encoder, decoder = _run_segment(
+            args,
+            common=common,
+            encoder_dir=encoder_dir,
+            decoder_dir=decoder_dir,
+            wav_path=wav_path,
+            temp=temp,
+            index=len(segments),
+            window_start_frame=window_start_frame,
+            worker_env=worker_env,
+            full_features=full_features,
+            frontend_report=frontend_report,
+            encoder_worker=encoder_worker,
+            decoder_worker=decoder_worker,
+        )
+        audio = encoder["audio"]
+        source_rate = int(audio["source_sample_rate"])
+        source_frames = int(audio["source_frames"])
+        window_frames = int(audio["window_source_frames"])
+        try:
+            plan_audio_windows(
+                source_frames,
+                source_rate,
+                target_sample_rate,
+                int(encoder_config["audio_sample_extent"]),
+            )
+        except ValueError as error:
+            raise RuntimeError(str(error)) from error
+        start_seconds = window_start_frame / source_rate
+        window_end_frame = min(source_frames, window_start_frame + window_frames)
+        timestamp_events = global_timestamp_events(
+            decoder["generated_tokens"], generation, start_seconds
+        )
+        consumed_frames = (
+            timestamp_seek_consumed_frames(
+                decoder["generated_tokens"],
+                generation,
+                source_rate,
+                window_frames,
+            )
+            if args.timestamps
+            else window_frames
+        )
+        consumed_end_frame = min(
+            source_frames, window_start_frame + consumed_frames
+        )
+        if args.timestamps:
+            consumed_end_frame = consume_timestamp_sized_tail(
+                consumed_end_frame, source_frames, source_rate
+            )
+        segments.append(
+            {
+                "index": len(segments),
+                "source_frame_start": window_start_frame,
+                "source_frame_window_end": window_end_frame,
+                "source_frame_consumed_end": consumed_end_frame,
+                "start_seconds": start_seconds,
+                "end_seconds": consumed_end_frame / source_rate,
+                "timestamp_offset_seconds": start_seconds,
+                "timestamp_events": timestamp_events,
+                "encoder": encoder,
+                "decoder": decoder,
+            }
+        )
+        if consumed_end_frame >= source_frames:
+            return segments
+        if consumed_end_frame <= window_start_frame:
+            raise RuntimeError("audio window scheduler made no progress")
+        window_start_frame = consumed_end_frame
 
 
 def _run_parent(args: argparse.Namespace) -> int:
+    parent_started = time.perf_counter()
     encoder_dir = args.encoder_run_dir.resolve()
     decoder_dir = args.decoder_run_dir.resolve()
     wav_path = args.wav.resolve()
@@ -966,84 +1306,60 @@ def _run_parent(args: argparse.Namespace) -> int:
                     f"warning: frontend reuse disabled: {frontend_reuse_reason}",
                     file=sys.stderr,
                 )
-        segments: list[dict[str, Any]] = []
-        window_start_frame = 0
-        while True:
-            encoder, decoder = _run_segment(
-                args,
-                common=common,
-                encoder_dir=encoder_dir,
-                decoder_dir=decoder_dir,
-                wav_path=wav_path,
-                temp=temp,
-                index=len(segments),
-                window_start_frame=window_start_frame,
-                worker_env=worker_env,
-                full_features=full_features,
-                frontend_report=frontend_report_path,
-            )
-            audio = encoder["audio"]
-            source_rate = int(audio["source_sample_rate"])
-            source_frames = int(audio["source_frames"])
-            window_frames = int(audio["window_source_frames"])
-            try:
-                plan_audio_windows(
-                    source_frames,
-                    source_rate,
-                    target_sample_rate,
-                    int(encoder_config["audio_sample_extent"]),
+        persistent = args.worker_lifecycle == "persistent"
+        encoder_context = _PersistentWorker(
+            "encoder", encoder_dir, worker_env, args.worker_timeout_seconds
+        ) if persistent else nullcontext(None)
+        with encoder_context as encoder_worker:
+            decoder_context = _PersistentWorker(
+                "decoder", decoder_dir, worker_env, args.worker_timeout_seconds
+            ) if persistent else nullcontext(None)
+            with decoder_context as decoder_worker:
+                worker_lifecycle = {
+                    "mode": args.worker_lifecycle,
+                    "encoder_processes": 1 if persistent else None,
+                    "decoder_processes": 1 if persistent else None,
+                    "encoder_model_initializations": 1 if persistent else None,
+                    "decoder_model_initializations": 1 if persistent else None,
+                    "encoder_model_init_seconds": (
+                        encoder_worker.model_init_seconds if encoder_worker else None
+                    ),
+                    "decoder_model_init_seconds": (
+                        decoder_worker.model_init_seconds if decoder_worker else None
+                    ),
+                }
+                segments = _collect_segments(
+                    args,
+                    common=common,
+                    encoder_dir=encoder_dir,
+                    decoder_dir=decoder_dir,
+                    wav_path=wav_path,
+                    temp=temp,
+                    worker_env=worker_env,
+                    encoder_config=encoder_config,
+                    generation=generation,
+                    full_features=full_features,
+                    frontend_report=frontend_report_path,
+                    encoder_worker=encoder_worker,
+                    decoder_worker=decoder_worker,
                 )
-            except ValueError as error:
-                raise RuntimeError(str(error)) from error
-            start_seconds = window_start_frame / source_rate
-            window_end_frame = min(
-                source_frames,
-                window_start_frame + window_frames,
+        if not persistent:
+            worker_lifecycle.update(
+                {
+                    "encoder_processes": len(segments),
+                    "decoder_processes": len(segments),
+                    "encoder_model_initializations": len(segments),
+                    "decoder_model_initializations": len(segments),
+                    "encoder_model_init_seconds": sum(
+                        float(segment["encoder"].get("model_init_seconds", 0.0))
+                        for segment in segments
+                    ),
+                    "decoder_model_init_seconds": sum(
+                        float(segment["decoder"].get("model_init_seconds", 0.0))
+                        for segment in segments
+                    ),
+                }
             )
-            timestamp_events = global_timestamp_events(
-                decoder["generated_tokens"],
-                generation,
-                start_seconds,
-            )
-            consumed_frames = (
-                timestamp_seek_consumed_frames(
-                    decoder["generated_tokens"],
-                    generation,
-                    source_rate,
-                    window_frames,
-                )
-                if args.timestamps
-                else window_frames
-            )
-            consumed_end_frame = min(
-                source_frames,
-                window_start_frame + consumed_frames,
-            )
-            if args.timestamps:
-                consumed_end_frame = consume_timestamp_sized_tail(
-                    consumed_end_frame,
-                    source_frames,
-                    source_rate,
-                )
-            end_seconds = consumed_end_frame / source_rate
-            segment = {
-                "index": len(segments),
-                "source_frame_start": window_start_frame,
-                "source_frame_window_end": window_end_frame,
-                "source_frame_consumed_end": consumed_end_frame,
-                "start_seconds": start_seconds,
-                "end_seconds": end_seconds,
-                "timestamp_offset_seconds": start_seconds,
-                "timestamp_events": timestamp_events,
-                "encoder": encoder,
-                "decoder": decoder,
-            }
-            segments.append(segment)
-            if consumed_end_frame >= source_frames:
-                break
-            if consumed_end_frame <= window_start_frame:
-                raise RuntimeError("audio window scheduler made no progress")
-            window_start_frame = consumed_end_frame
 
     generated_tokens = [
         token
@@ -1108,9 +1424,16 @@ def _run_parent(args: argparse.Namespace) -> int:
     decoder_config = json.loads(
         (decoder_dir / "config.json").read_text(encoding="utf-8")
     )
+    phase_seconds = (
+        float(encoder["frontend_seconds"])
+        + float(encoder["encoder_seconds"])
+        + float(decoder["prefill_seconds"])
+        + float(decoder["decode_seconds"])
+    )
+    parent_wall_seconds = time.perf_counter() - parent_started
     report = {
         "schema": "cke.whisper_e2e",
-        "schema_version": 4,
+        "schema_version": 5,
         "status": "ok",
         "wav": str(wav_path),
         "wav_sha256": _sha256(wav_path),
@@ -1171,6 +1494,20 @@ def _run_parent(args: argparse.Namespace) -> int:
             "encoder": encoder.get("execution_topology"),
             "decoder": decoder.get("execution_topology"),
         },
+        "worker_lifecycle": worker_lifecycle,
+        "timing": {
+            "parent_wall_seconds": parent_wall_seconds,
+            "reported_phase_seconds": phase_seconds,
+            "outside_phase_seconds": max(0.0, parent_wall_seconds - phase_seconds),
+            "encoder_worker_wall_seconds": sum(
+                float(segment["encoder"]["worker_wall_seconds"])
+                for segment in segments
+            ),
+            "decoder_worker_wall_seconds": sum(
+                float(segment["decoder"]["worker_wall_seconds"])
+                for segment in segments
+            ),
+        },
         "segments": segments,
         "encoder": encoder,
         "decoder": decoder,
@@ -1218,6 +1555,21 @@ def _parser() -> argparse.ArgumentParser:
         "--temp-dir",
         type=Path,
         help="Temporary storage root for request-scoped audio artifacts",
+    )
+    run.add_argument(
+        "--worker-lifecycle",
+        choices=("per-window", "persistent"),
+        default="persistent",
+        help=(
+            "Worker/model lifetime; persistent retains immutable model state "
+            "while resetting each audio window (default: persistent)"
+        ),
+    )
+    run.add_argument(
+        "--worker-timeout-seconds",
+        type=float,
+        default=600.0,
+        help="Maximum time for one persistent worker response (default: 600)",
     )
 
     encoder = subparsers.add_parser("_encoder", help=argparse.SUPPRESS)

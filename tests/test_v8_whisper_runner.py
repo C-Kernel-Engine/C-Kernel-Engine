@@ -91,6 +91,28 @@ def test_whisper_runner_uses_generated_frontend_and_forced_prefix_is_stable() ->
     ) == [50258, 50259, 50359]
 
 
+def test_whisper_persistent_workers_are_default_with_control_fallback() -> None:
+    runner = _module()
+    required = [
+        "run",
+        "--encoder-run-dir",
+        "/encoder",
+        "--decoder-run-dir",
+        "/decoder",
+        "--wav",
+        "/audio.wav",
+    ]
+    defaults = runner._parser().parse_args(required)
+    assert defaults.worker_lifecycle == "persistent"
+    assert defaults.worker_timeout_seconds == 600.0
+    assert (
+        runner._parser().parse_args(
+            [*required, "--worker-lifecycle", "per-window"]
+        ).worker_lifecycle
+        == "per-window"
+    )
+
+
 def test_whisper_runner_measures_frontend_and_encoder_separately() -> None:
     runner = _module()
     calls: list[str] = []
@@ -220,6 +242,135 @@ def test_whisper_workers_do_not_compete_with_numpy_blas_threads(
     assert worker_env["MKL_NUM_THREADS"] == "1"
     assert os.environ["OPENBLAS_NUM_THREADS"] == "28"
     assert os.environ["MKL_NUM_THREADS"] == "28"
+
+
+def test_whisper_persistent_worker_initializes_and_frees_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+    requests = iter(
+        [
+            {"command": "run", "args": {"value": 1}},
+            {"command": "run", "args": {"value": 2}},
+            {"command": "close"},
+        ]
+    )
+
+    class Connection:
+        def __init__(self) -> None:
+            self.responses: list[dict[str, object]] = []
+
+        def recv(self) -> dict[str, object]:
+            return next(requests)
+
+        def send(self, response: dict[str, object]) -> None:
+            self.responses.append(response)
+
+        def close(self) -> None:
+            pass
+
+    class Model:
+        def __init__(self) -> None:
+            self.free_count = 0
+
+        def ck_model_free(self) -> None:
+            self.free_count += 1
+
+    connection = Connection()
+    model = Model()
+    observed: list[int] = []
+    monkeypatch.setattr(runner, "_apply_worker_affinity", lambda: {"cpus": [0]})
+    monkeypatch.setattr(
+        runner, "_open_encoder_model", lambda _run_dir: (model, 0.125)
+    )
+    monkeypatch.setattr(
+        runner,
+        "_encoder_worker",
+        lambda args, **_kwargs: observed.append(args.value),
+    )
+
+    runner._persistent_worker_main(connection, "encoder", str(tmp_path), {})
+
+    assert observed == [1, 2]
+    assert model.free_count == 1
+    assert connection.responses == [
+        {
+            "status": "ready",
+            "role": "encoder",
+            "model_init_seconds": 0.125,
+            "execution_topology": {"cpus": [0]},
+        },
+        {"status": "ok", "role": "encoder"},
+        {"status": "ok", "role": "encoder"},
+        {"status": "closed", "role": "encoder"},
+    ]
+
+
+def test_whisper_decoder_resets_before_rebinding_encoder_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = _module()
+    run_dir = tmp_path / "decoder"
+    run_dir.mkdir()
+    (run_dir / "generation_config.json").write_text(
+        json.dumps(
+            {
+                "decoder_start_token_id": 1,
+                "lang_to_id": {"<|en|>": 2},
+                "task_to_id": {"transcribe": 3},
+                "no_timestamps_token_id": 4,
+                "eos_token_id": 5,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
+    encoder_output = tmp_path / "encoder.npy"
+    np.save(encoder_output, np.zeros((2, 3), dtype=np.float32))
+    report = tmp_path / "decoder.json"
+    calls: list[str] = []
+
+    class Model:
+        def ck_model_kv_cache_reset(self) -> None:
+            calls.append("reset")
+
+        def ck_model_set_encoder_memory(self, *_args) -> int:
+            calls.append("bind")
+            return 0
+
+        def ck_model_embed_tokens(self, *_args) -> int:
+            calls.append("prefill")
+            return 0
+
+        def ck_model_get_vocab_size(self) -> int:
+            return 6
+
+        def ck_model_get_logits(self):
+            return (runner.ctypes.c_float * 6)(0, 0, 0, 0, 0, 1)
+
+    class Tokenizer:
+        @staticmethod
+        def from_file(_path: str):
+            return Tokenizer()
+
+        def decode(self, *_args, **_kwargs) -> str:
+            return ""
+
+    monkeypatch.setattr(runner, "_require_artifact", lambda _path: None)
+    monkeypatch.setitem(sys.modules, "tokenizers", SimpleNamespace(Tokenizer=Tokenizer))
+    args = SimpleNamespace(
+        decoder_run_dir=run_dir,
+        encoder_output=encoder_output,
+        language="en",
+        task="transcribe",
+        max_tokens=0,
+        timestamps=False,
+        worker_report=report,
+    )
+
+    runner._decoder_worker(args, model=Model(), execution_topology={})
+
+    assert calls[:3] == ["reset", "bind", "prefill"]
 
 
 def test_whisper_hybrid_topology_selects_smt_capable_cores(
