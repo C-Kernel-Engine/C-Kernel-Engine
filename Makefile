@@ -1376,6 +1376,7 @@ test-server-schema:
 
 .PHONY: test-v8-serve-localhost-e2e
 test-v8-serve-localhost-e2e:
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_serve_localhost_e2e.py
 	$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/test_serve_localhost_e2e.py
 
 .PHONY: test-native-session-v8

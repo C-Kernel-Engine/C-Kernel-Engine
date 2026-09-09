@@ -48,6 +48,8 @@ DEFAULT_CONTEXT_LEN = 1024
 # plus session open; keeps total still inside the 10 min nightly budget.
 DEFAULT_READY_TIMEOUT = 480.0
 DEFAULT_REQUEST_TIMEOUT = 120.0
+DEFAULT_TOTAL_TIMEOUT = 600.0
+DEFAULT_CLEANUP_RESERVE = 20.0
 POLL_INTERVAL = 0.5
 TERMINATE_GRACE_SEC = 10.0
 KILL_GRACE_SEC = 5.0
@@ -77,8 +79,8 @@ def _port_is_free(port: int) -> bool:
 
 
 def _wait_port_free(port: int, timeout: float = 5.0) -> bool:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         if _port_is_free(port):
             return True
         time.sleep(0.2)
@@ -109,13 +111,16 @@ def _wait_for_health(
     base: str, deadline: float, proc: subprocess.Popen | None = None
 ) -> None:
     last_error = "no attempt yet"
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         if proc is not None and proc.poll() is not None:
             raise RuntimeError(
                 f"server exited during readiness (code={proc.returncode}); last error: {last_error}"
             )
         try:
-            status, body = _http("GET", f"{base}/v1/health", timeout=5.0)
+            remaining = deadline - time.monotonic()
+            status, body = _http(
+                "GET", f"{base}/v1/health", timeout=max(0.001, min(5.0, remaining))
+            )
             if status == 200:
                 try:
                     doc = json.loads(body)
@@ -130,8 +135,69 @@ def _wait_for_health(
                 last_error = f"health status={status} body={body[:300]}"
         except Exception as exc:  # connection refused while booting
             last_error = f"{type(exc).__name__}: {exc}"
-        time.sleep(POLL_INTERVAL)
+        time.sleep(max(0.0, min(POLL_INTERVAL, deadline - time.monotonic())))
     raise RuntimeError(f"server readiness timeout; last error: {last_error}")
+
+
+def _set_response_timeout(response, timeout: float) -> None:
+    """Bound the next blocking response read where urllib exposes its socket."""
+    candidates = (
+        getattr(response, "fp", None),
+        getattr(getattr(response, "fp", None), "raw", None),
+    )
+    for candidate in candidates:
+        sock = getattr(candidate, "_sock", None)
+        if sock is not None:
+            sock.settimeout(timeout)
+            return
+
+
+def _read_response_incrementally(
+    response,
+    deadline: float,
+    *,
+    now=time.monotonic,
+    on_chunk=None,
+) -> str:
+    """Read an HTTP response without allowing a trickle to reset the deadline."""
+    chunks: list[bytes] = []
+    while True:
+        remaining = deadline - now()
+        if remaining <= 0:
+            raise TimeoutError("streaming response exceeded its overall deadline")
+        _set_response_timeout(response, max(0.001, remaining))
+        chunk = response.readline()
+        if not chunk:
+            break
+        chunks.append(chunk)
+        if on_chunk is not None:
+            on_chunk(chunk.decode("utf-8", "replace"))
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
+def _stream_http(
+    url: str,
+    payload: dict,
+    deadline: float,
+    *,
+    on_chunk=None,
+) -> tuple[int, str]:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("request deadline expired before POST")
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=remaining) as response:
+            return int(response.status), _read_response_incrementally(
+                response, deadline, on_chunk=on_chunk
+            )
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), exc.read().decode("utf-8", "replace")
 
 
 def _parse_sse(raw: str) -> list[tuple[str, dict]]:
@@ -157,7 +223,7 @@ def _parse_sse(raw: str) -> list[tuple[str, dict]]:
     return events
 
 
-def _validate_stream(events: list[tuple[str, dict]]) -> tuple[str, str, str]:
+def _validate_stream(events: list[tuple[str, dict]]) -> tuple[str, str, str, dict]:
     """Structural + schema validation of the streamed response.
 
     Returns (response_id, emitted_text, terminal_event_name).
@@ -168,40 +234,52 @@ def _validate_stream(events: list[tuple[str, dict]]) -> tuple[str, str, str]:
     if names[0] != "response.created" or names[1] != "response.in_progress":
         raise RuntimeError(f"bad SSE prefix: {names[:3]}")
 
-    # sequence_number must be monotonic 0..N.
+    # Importing and applying the actual union is mandatory. A missing schema
+    # dependency means this E2E cannot establish its advertised contract.
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from pydantic import TypeAdapter
+    from server.schemas.streaming import ResponseStreamEvent
+
+    adapter = TypeAdapter(ResponseStreamEvent)
+
+    # sequence_number must be contiguous 0..N-1.
     seqs: list[int] = []
     for name, payload in events:
+        if payload.get("type") != name:
+            raise RuntimeError(
+                f"SSE event/payload type mismatch: event={name!r} "
+                f"payload={payload.get('type')!r}"
+            )
+        try:
+            adapter.validate_python(payload)
+        except Exception as exc:
+            raise RuntimeError(f"event {name!r} failed schema validation: {exc}") from exc
         seq = payload.get("sequence_number")
-        if not isinstance(seq, int):
+        if not isinstance(seq, int) or isinstance(seq, bool):
             raise RuntimeError(f"event {name!r} missing int sequence_number")
         seqs.append(seq)
-    if seqs != sorted(seqs) or seqs[0] != 0 or len(set(seqs)) != len(seqs):
-        raise RuntimeError(f"non-monotonic sequence_numbers: {seqs[:12]}")
+    if seqs != list(range(len(events))):
+        raise RuntimeError(f"non-contiguous sequence_numbers: {seqs[:12]}")
 
-    # Optional pydantic validation against the streaming union.
-    try:
-        sys.path.insert(0, str(PROJECT_ROOT))
-        from server.schemas.streaming import StreamingEvent  # type: ignore
-
-        for name, payload in events:
-            StreamingEvent.model_validate({**payload, "type": payload.get("type", name)})
-    except ImportError:
-        pass  # structural checks above still apply
-
-    response_id: str | None = None
+    response_ids: set[str] = set()
     for name, payload in events:
         resp = payload.get("response")
         if isinstance(resp, dict) and isinstance(resp.get("id"), str):
-            response_id = resp["id"]
-            break
-    if not response_id:
+            response_ids.add(resp["id"])
+    if not response_ids:
         raise RuntimeError("no response id found in SSE prefix events")
+    if len(response_ids) != 1:
+        raise RuntimeError(f"inconsistent response ids in SSE events: {sorted(response_ids)}")
+    response_id = next(iter(response_ids))
 
-    deltas = [
-        str(p.get("delta", ""))
-        for n, p in events
-        if n == "response.output_text.delta"
-    ]
+    deltas: list[str] = []
+    for name, payload in events:
+        if name != "response.output_text.delta":
+            continue
+        delta = payload.get("delta")
+        if not isinstance(delta, str):
+            raise RuntimeError("output_text.delta delta must be a string")
+        deltas.append(delta)
     if not deltas:
         raise RuntimeError("no response.output_text.delta events emitted")
     for n, p in events:
@@ -217,26 +295,35 @@ def _validate_stream(events: list[tuple[str, dict]]) -> tuple[str, str, str]:
             f"expected terminal response.completed, got {terminal!r}; "
             f"events={names[-4:]}"
         )
-    return response_id, emitted, terminal
+    terminal_response = events[-1][1].get("response")
+    if not isinstance(terminal_response, dict):
+        raise RuntimeError("response.completed is missing its response payload")
+    if terminal_response.get("output_text") != emitted:
+        raise RuntimeError("streamed deltas do not match response.completed output_text")
+    return response_id, emitted, terminal, terminal_response
 
 
-def _validate_final_response(doc: dict, response_id: str) -> None:
+def _validate_final_response(
+    doc: dict, response_id: str, emitted: str, terminal_response: dict
+) -> None:
     if doc.get("id") != response_id:
         raise RuntimeError(
             f"GET id mismatch: {doc.get('id')!r} != {response_id!r}"
         )
     if doc.get("status") != "completed":
         raise RuntimeError(f"final status is {doc.get('status')!r}, want completed")
-    if not str(doc.get("output_text", "")).strip():
+    if not isinstance(doc.get("output_text"), str) or not doc["output_text"].strip():
         raise RuntimeError("final output_text is empty")
-    try:
-        sys.path.insert(0, str(PROJECT_ROOT))
-        from server.schemas.response import Response  # type: ignore
+    if doc["output_text"] != emitted:
+        raise RuntimeError("stored response output_text does not match streamed deltas")
+    if terminal_response.get("id") != doc.get("id"):
+        raise RuntimeError("stored response id does not match terminal response")
+    if terminal_response.get("output_text") != doc.get("output_text"):
+        raise RuntimeError("stored response text does not match terminal response")
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from server.schemas.response import Response
 
-        Response.model_validate(doc)
-    except ImportError:
-        if not isinstance(doc.get("output"), list) or not doc.get("output"):
-            raise RuntimeError("final output list is empty")
+    Response.model_validate(doc)
 
 
 def _stop_server(proc: subprocess.Popen, port: int) -> None:
@@ -279,6 +366,15 @@ def _save_failure(log_text: str, transcript: str, summary: dict) -> None:
     )
 
 
+def _combine_failure(
+    failure: Exception | None, cleanup_error: Exception
+) -> Exception:
+    cleanup_failure = RuntimeError(f"cleanup failed: {cleanup_error}")
+    if failure is None:
+        return cleanup_failure
+    return RuntimeError(f"{failure}; {cleanup_failure}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Bounded localhost E2E: serve Qwen3-0.6B and stream one Responses request.",
@@ -288,8 +384,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-dir", default=None)
     parser.add_argument("--ready-timeout", type=float, default=DEFAULT_READY_TIMEOUT)
     parser.add_argument("--request-timeout", type=float, default=DEFAULT_REQUEST_TIMEOUT)
+    parser.add_argument("--total-timeout", type=float, default=DEFAULT_TOTAL_TIMEOUT)
+    parser.add_argument("--cleanup-reserve", type=float, default=DEFAULT_CLEANUP_RESERVE)
     parser.add_argument("--max-output-tokens", type=int, default=32)
     args = parser.parse_args(argv)
+
+    if args.total_timeout <= args.cleanup_reserve:
+        parser.error("--total-timeout must exceed --cleanup-reserve")
 
     if not SERVE_SCRIPT.is_file():
         print(f"FAIL: serve script missing: {SERVE_SCRIPT}", flush=True)
@@ -322,15 +423,13 @@ def main(argv: list[str] | None = None) -> int:
     transcript = ""
     response_id = ""
     summary: dict = {"model": args.model, "port": port}
+    failure: Exception | None = None
+    pass_details: tuple[str, int] | None = None
+    overall_deadline = time.monotonic() + args.total_timeout
+    work_deadline = overall_deadline - args.cleanup_reserve
 
     def _handle_signal(signum, _frame):
-        # Ensure child and port are cleaned up on SIGTERM/SIGINT/timeout.
-        if proc is not None:
-            try:
-                _stop_server(proc, port)
-            except Exception:
-                pass
-        raise SystemExit(128 + int(signum))
+        raise RuntimeError(f"interrupted by signal {int(signum)}")
 
     prev_sigterm = signal.getsignal(signal.SIGTERM)
     prev_sigint = signal.getsignal(signal.SIGINT)
@@ -344,12 +443,16 @@ def main(argv: list[str] | None = None) -> int:
             proc = subprocess.Popen(cmd, **kw)  # noqa: SUBW001 - localhost E2E child
 
         # Hard readiness bound; also fails fast if child exits during model prep.
-        _wait_for_health(base, time.time() + args.ready_timeout, proc)
+        _wait_for_health(
+            base,
+            min(work_deadline, time.monotonic() + args.ready_timeout),
+            proc,
+        )
         if proc.poll() is not None:
             raise RuntimeError(f"server exited during startup (code={proc.returncode})")
 
-        status, transcript = _http(
-            "POST",
+        transcript_chunks: list[str] = []
+        status, transcript = _stream_http(
             f"{base}/v1/responses",
             {
                 "model": "ck-v8",
@@ -358,46 +461,35 @@ def main(argv: list[str] | None = None) -> int:
                 "stream": True,
                 "store": True,
             },
-            timeout=args.request_timeout,
-            accept="text/event-stream",
+            min(work_deadline, time.monotonic() + args.request_timeout),
+            on_chunk=transcript_chunks.append,
         )
+        transcript = "".join(transcript_chunks) or transcript
         if status != 200:
             raise RuntimeError(f"POST /v1/responses status={status}: {transcript[:500]}")
         events = _parse_sse(transcript)
-        response_id, emitted, terminal = _validate_stream(events)
+        response_id, emitted, terminal, terminal_response = _validate_stream(events)
 
+        remaining = work_deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("overall deadline expired before stored-response retrieval")
         get_status, get_body = _http(
-            "GET", f"{base}/v1/responses/{response_id}", timeout=15.0
+            "GET",
+            f"{base}/v1/responses/{response_id}",
+            timeout=min(15.0, remaining),
         )
         if get_status != 200:
             raise RuntimeError(f"GET /v1/responses/{{id}} status={get_status}")
-        _validate_final_response(json.loads(get_body), response_id)
+        _validate_final_response(
+            json.loads(get_body), response_id, emitted, terminal_response
+        )
 
         summary.update(
             {"status": "pass", "response_id": response_id, "terminal": terminal}
         )
-        print(
-            f"PASS serve-localhost-e2e model=Qwen3-0.6B-Q8_0.gguf context-len={args.context_len} "
-            f"port={port} id={response_id} chars={len(emitted)}",
-            flush=True,
-        )
-        return 0
+        pass_details = (response_id, len(emitted))
     except Exception as exc:
-        log_text = ""
-        try:
-            log_text = Path(log_path).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            pass
-        summary.update({"status": "fail", "error": str(exc), "response_id": response_id})
-        _save_failure(log_text, transcript, summary)
-        print(f"FAIL serve-localhost-e2e: {exc}", flush=True)
-        if log_text:
-            print(f"--- server log tail ({log_path}) ---", flush=True)
-            print(log_text[-LOG_TAIL_CHARS:], flush=True)
-        if transcript:
-            print("--- response transcript tail ---", flush=True)
-            print(transcript[-LOG_TAIL_CHARS:], flush=True)
-        return 1
+        failure = exc
     finally:
         # Restore previous signal handlers before cleanup.
         try:
@@ -409,11 +501,33 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 _stop_server(proc, port)
             except Exception as exc:
-                print(f"FAIL serve-localhost-e2e cleanup: {exc}", flush=True)
-                if summary.get("status") == "pass":
-                    summary["status"] = "fail"
-                    summary["error"] = f"cleanup: {exc}"
-                    raise SystemExit(1)
+                failure = _combine_failure(failure, exc)
+
+    if failure is None and pass_details is not None:
+        response_id, emitted_chars = pass_details
+        print(
+            f"PASS serve-localhost-e2e model=Qwen3-0.6B-Q8_0.gguf context-len={args.context_len} "
+            f"port={port} id={response_id} chars={emitted_chars}",
+            flush=True,
+        )
+        return 0
+
+    log_text = ""
+    try:
+        log_text = Path(log_path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        pass
+    failure = failure or RuntimeError("test ended without a result")
+    summary.update({"status": "fail", "error": str(failure), "response_id": response_id})
+    _save_failure(log_text, transcript, summary)
+    print(f"FAIL serve-localhost-e2e: {failure}", flush=True)
+    if log_text:
+        print(f"--- server log tail ({log_path}) ---", flush=True)
+        print(log_text[-LOG_TAIL_CHARS:], flush=True)
+    if transcript:
+        print("--- response transcript tail ---", flush=True)
+        print(transcript[-LOG_TAIL_CHARS:], flush=True)
+    return 1
 
 
 if __name__ == "__main__":
