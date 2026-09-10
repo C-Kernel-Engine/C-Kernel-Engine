@@ -39,6 +39,15 @@ from collections.abc import Sequence, Callable
 from pathlib import Path
 from typing import Any
 
+try:
+    import jinja2
+    import jinja2.sandbox  # noqa: F401 ensure sandbox submodule loaded
+
+    _JINJA_AVAILABLE = True
+except ImportError:
+    jinja2 = None  # type: ignore
+    _JINJA_AVAILABLE = False
+
 # SCRIPTS_DIR/PROJECT_ROOT must be on sys.path before importing ck_* helpers
 # (supports both ``python version/v8/scripts/ck_serve_v8.py`` and
 # ``python -m version.v8.scripts.ck_serve_v8`` / pytest shims).
@@ -128,6 +137,7 @@ try:
     from server.schemas.common import ResponseStatus
     from server.schemas.content import ResponseOutputText
     from server.schemas.output_items import (
+        FunctionCall,
         ReasoningItem,
         ReasoningTextContent,
         ResponseOutputMessage,
@@ -739,78 +749,37 @@ def _log_performance(model: str, perf: dict[str, Any] | None) -> None:
 # Python-side chat contract loading and prompt formatting
 # ---------------------------------------------------------------------------
 
-_CIRCUITS_DIR = PROJECT_ROOT / "version" / "v8" / "circuits"
+
+def _load_runtime_chat_contract(run_dir: Path) -> dict[str, Any] | None:
+    """Load the exact chat contract exported by the built runtime.
+
+    Delegates to ``ck_serve_runtime_v8.load_manifest_templates`` so the manifest
+    is the single source of truth. Kept for backward compatibility with
+    ``server/tests/test_live_app.py``.
+    """
+    try:
+        _, _, contract = ck_serve_runtime_v8.load_manifest_templates(run_dir)
+        return contract
+    except RuntimeError:
+        raise
+    except Exception:
+        return None
 
 
+def _load_runtime_templates(
+    run_dir: Path,
+) -> tuple[str | None, dict[str, str] | None, dict[str, Any] | None]:
+    """Return (chat_template, chat_templates, chat_contract) from manifest."""
+    return ck_serve_runtime_v8.load_manifest_templates(run_dir)
+
+
+# Backward-compat stub: previously loaded from version/v8/circuits/*.json.
+# Now removed — manifest is single source. Keep symbol so imports do not break.
 def _load_builtin_chat_contract(
     template_name: str | None,
     *,
     _seen: set[str] | None = None,
 ) -> dict[str, Any] | None:
-    name = str(template_name or "").strip().lower()
-    if not name or not re.fullmatch(r"[a-z0-9_]+", name):
-        return None
-    seen = set() if _seen is None else _seen
-    if name in seen:
-        return None
-    seen.add(name)
-    path = _CIRCUITS_DIR / f"{name}.json"
-    if not path.exists():
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            doc = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return None
-    contract_doc = (
-        doc.get("contract") if isinstance(doc.get("contract"), dict) else None
-    )
-    if isinstance(contract_doc, dict):
-        chat_contract = contract_doc.get("chat_contract")
-        if isinstance(chat_contract, dict):
-            return chat_contract
-
-    components = doc.get("components")
-    if not isinstance(components, dict):
-        return None
-    ordered_components = sorted(
-        (value for value in components.values() if isinstance(value, dict)),
-        key=lambda value: value.get("runtime_role") != "decoder",
-    )
-    for component in ordered_components:
-        circuit = component.get("circuit")
-        if isinstance(circuit, str):
-            inherited = _load_builtin_chat_contract(circuit, _seen=seen)
-            if inherited is not None:
-                return inherited
-    return None
-
-
-def _load_runtime_chat_contract(run_dir: Path) -> dict[str, Any] | None:
-    """Load the exact chat contract exported by the built runtime."""
-    manifest_path = Path(run_dir) / "weights_manifest.json"
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return None
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(
-            f"cannot load runtime chat contract from {manifest_path}: {exc}"
-        ) from exc
-
-    candidates: list[Any] = [manifest.get("chat_contract")]
-    config = manifest.get("config")
-    if isinstance(config, dict):
-        candidates.append(config.get("chat_contract"))
-    template = manifest.get("template")
-    if isinstance(template, dict):
-        template_contract = template.get("contract")
-        if isinstance(template_contract, dict):
-            candidates.append(template_contract.get("chat_contract"))
-
-    for contract in candidates:
-        if isinstance(contract, dict):
-            return dict(contract)
     return None
 
 
@@ -907,6 +876,231 @@ def _format_prompt_with_chat_contract(
     return formatted if formatted else user_text
 
 
+# --- Tool-call helpers -------------------------------------------------------
+
+
+def _has_tool_support(
+    chat_template: str | None, chat_templates: dict[str, str] | None
+) -> bool:
+    # Primary signal: plural chat_templates with tool_use variant
+    if isinstance(chat_templates, dict) and chat_templates:
+        for key in ("tool_use", "tools", "default"):
+            if isinstance(chat_templates.get(key), str) and chat_templates[key].strip():
+                return True
+        if any(isinstance(v, str) and v.strip() for v in chat_templates.values()):
+            return True
+    # Fallback: single chat_template string that handles tools (Qwen3 {% if tools %})
+    if isinstance(chat_template, str) and chat_template.strip():
+        # Heuristic: template that branches on tools and emits tool_call
+        lower = chat_template.lower()
+        if "tools" in lower and ("tool_call" in lower or "tool" in lower):
+            return True
+        # If template mentions tools at all, assume it supports them via jinja
+        if "tools" in lower:
+            return True
+    return False
+
+
+def _render_with_chat_templates(
+    chat_template: str | None,
+    chat_templates: dict[str, str] | None,
+    prompt: str,
+    body: Any,
+    chat_contract: dict[str, Any] | None = None,
+    effective_thinking: str = "suppressed",
+) -> str | None:
+    """Try to render a jinja chat template with tools. Returns None on failure or absence."""
+    if not _JINJA_AVAILABLE:
+        return None
+    # Prefer tool_use variant when tools are present
+    tmpl_str: str | None = None
+    if (
+        body is not None
+        and getattr(body, "tools", None)
+        and isinstance(chat_templates, dict)
+    ):
+        for key in ("tool_use", "tools", "default"):
+            candidate = chat_templates.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                tmpl_str = candidate
+                break
+    if tmpl_str is None and isinstance(chat_template, str) and chat_template.strip():
+        tmpl_str = chat_template
+    if not tmpl_str:
+        return None
+    try:
+        # Build minimal messages list expected by HF/qwen templates
+        messages: list[dict[str, Any]] = []
+        instructions = getattr(body, "instructions", None) if body is not None else None
+        if isinstance(instructions, str) and instructions.strip():
+            messages.append({"role": "system", "content": instructions})
+        messages.append({"role": "user", "content": str(prompt or "")})
+        tools = None
+        if body is not None and getattr(body, "tools", None):
+            tools = [t.model_dump() for t in body.tools]  # type: ignore
+        env = jinja2.sandbox.SandboxedEnvironment(
+            undefined=jinja2.StrictUndefined, autoescape=False
+        )  # type: ignore
+        tmpl = env.from_string(tmpl_str)
+        # Qwen-like templates expect enable_thinking flag
+        rendered = tmpl.render(
+            messages=messages,
+            tools=tools,
+            tool_choice=getattr(body, "tool_choice", None)
+            if body is not None
+            else None,
+            enable_thinking=(effective_thinking == "visible"),
+            add_generation_prompt=True,
+        )
+        return str(rendered)
+    except Exception as exc:
+        try:
+            log_error(
+                f"jinja render failed (fallback to contract): {exc} template_len={len(tmpl_str)}"
+            )
+        except Exception:
+            pass
+        return None
+
+
+def _extract_tool_calls_from_text(
+    text: str,
+    allowed_names: set[str] | None,
+) -> tuple[list[dict[str, Any]], str | None, str | None]:
+    """Parse tool calls from generated text.
+
+    Returns (tool_calls, error_code, error_message).
+    - Malformed JSON -> error_code="malformed"
+    - Unknown tool name -> error_code="unknown"
+    - Otherwise tool_calls is list of {name, arguments:str, call_id}
+    """
+    if not text or not text.strip():
+        return [], None, None
+    stripped = text.strip()
+    # 1) Try <tool_call>...</tool_call> blocks (Qwen style) — still support if present in text
+    tool_blocks: list[str] = []
+    import re as _re
+
+    for m in _re.finditer(
+        r"<tool_call>(.*?)</tool_call>", text, flags=_re.DOTALL | _re.IGNORECASE
+    ):
+        tool_blocks.append(m.group(1).strip())
+    # also handle bare JSON objects
+    candidates: list[str] = []
+    if tool_blocks:
+        candidates = tool_blocks
+    else:
+        # If whole text is a JSON object or array, use it directly
+        if (stripped.startswith("{") and stripped.endswith("}")) or (
+            stripped.startswith("[") and stripped.endswith("]")
+        ):
+            candidates = [stripped]
+        else:
+            # scan for balanced JSON objects containing "name"
+            # naive brace matching
+            stack = []
+            start = -1
+            for idx, ch in enumerate(text):
+                if ch == "{":
+                    if not stack:
+                        start = idx
+                    stack.append(ch)
+                elif ch == "}":
+                    if stack:
+                        stack.pop()
+                        if not stack and start != -1:
+                            snippet = text[start : idx + 1]
+                            if '"name"' in snippet:
+                                candidates.append(snippet)
+                            start = -1
+            # trailing incomplete JSON -> malformed
+            if stack and start != -1:
+                snippet = text[start:]
+                if '"name"' in snippet or '"arguments"' in snippet:
+                    try:
+                        json.loads(snippet)
+                    except json.JSONDecodeError as exc:
+                        return [], "malformed", f"malformed tool call: {exc}"
+                    # if it parses but incomplete, still consider malformed
+                    return [], "malformed", "malformed tool call: incomplete JSON"
+    tool_calls: list[dict[str, Any]] = []
+    for snippet in candidates:
+        try:
+            obj = json.loads(snippet)
+        except json.JSONDecodeError as exc:
+            return [], "malformed", f"malformed tool call: {exc}"
+        # obj may be dict or list
+        items = obj if isinstance(obj, list) else [obj]
+        for item in items:
+            if not isinstance(item, dict):
+                return [], "malformed", "malformed tool call: expected object"
+            name = item.get("name")
+            if not isinstance(name, str) or not name.strip():
+                # try alternative keys like function.name
+                func = item.get("function")
+                if isinstance(func, dict):
+                    name = func.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    return [], "malformed", "malformed tool call: missing name"
+            name = str(name).strip()
+            if allowed_names is not None and name not in allowed_names:
+                return [], "unknown", f"unknown tool {name!r}"
+            args = item.get("arguments")
+            if args is None and isinstance(item.get("function"), dict):
+                args = item["function"].get("arguments")
+            # arguments may be dict or string
+            if isinstance(args, dict):
+                args_str = json.dumps(args, separators=(",", ":"))
+            elif isinstance(args, str):
+                # validate that string is valid JSON if non-empty
+                if args.strip():
+                    try:
+                        json.loads(args)
+                    except json.JSONDecodeError as exc:
+                        return [], "malformed", f"malformed tool call arguments: {exc}"
+                args_str = args
+            elif args is None:
+                args_str = "{}"
+            else:
+                return [], "malformed", "malformed tool call: invalid arguments"
+            tool_calls.append(
+                {
+                    "name": name,
+                    "arguments": args_str,
+                    "call_id": f"call_{uuid.uuid4().hex[:24]}",
+                }
+            )
+    return tool_calls, None, None
+
+
+def _strip_tool_json_from_text(
+    text: str, tool_calls: list[dict[str, Any]] | None
+) -> str:
+    """Remove tool JSON snippets from text to get residual message text."""
+    if not text or not tool_calls:
+        return text
+    remaining = text
+    # remove <tool_call> blocks
+    import re as _re2
+
+    remaining = _re2.sub(
+        r"<tool_call>.*?</tool_call>",
+        "",
+        remaining,
+        flags=_re2.DOTALL | _re2.IGNORECASE,
+    )
+    # remove json snippets that were parsed — naive: remove each json dump if present
+    for tc in tool_calls:
+        # try to find json containing name
+        pattern = _re2.escape(tc["name"])
+        # just strip any json object containing the name on a best-effort basis
+        # fallback: remove first json object containing the name
+        m = _re2.search(r"\{[^}]*" + pattern + r"[^}]*\}", remaining)
+        if m:
+            remaining = remaining[: m.start()] + remaining[m.end() :]
+    return remaining.strip()
+
+
 def create_app(
     session,
     *,
@@ -920,7 +1114,8 @@ def create_app(
     stop_at_eos: bool = False,
     flags: int = 0,
     chat_contract: dict[str, Any] | None = None,
-    thinking_mode: str = "auto",
+    chat_template: str | None = None,
+    chat_templates: dict[str, str] | None = None,
 ):
     """Build the FastAPI app around a live session (real or injected fake).
 
@@ -975,10 +1170,11 @@ def create_app(
                 detail=f"Model {body.model!r} is not loaded; available model: {model!r}",
             )
         if body.tools:
-            raise HTTPException(
-                status_code=501,
-                detail="Tool calling is not implemented by the CKE native session yet.",
-            )
+            if not _has_tool_support(chat_template, chat_templates):
+                raise HTTPException(
+                    status_code=501,
+                    detail="Model doesn't support tool calling",
+                )
 
     def _store_response(response_id: str, response: dict[str, Any]) -> None:
         with response_store_lock:
@@ -999,13 +1195,27 @@ def create_app(
         top_p_eff = body.top_p if body.top_p is not None else top_p
         effective_flags = flags
 
-        if chat_contract is not None:
-            if thinking_mode != "auto":
-                effective_thinking = thinking_mode
-            elif body.reasoning is not None:
-                effective_thinking = "visible"
-            else:
-                effective_thinking = "suppressed"
+        # Thinking: absent -> suppressed, present -> visible (ignore contract default)
+        effective_thinking = "visible" if body.reasoning is not None else "suppressed"
+
+        # Try Jinja rendering when we have a template (tool_use variant preferred)
+        jinja_rendered: str | None = None
+        if (chat_template is not None or chat_templates is not None) and (
+            chat_contract is not None or body.tools
+        ):
+            jinja_rendered = _render_with_chat_templates(
+                chat_template,
+                chat_templates,
+                prompt,
+                body,
+                chat_contract,
+                effective_thinking,
+            )
+
+        if jinja_rendered is not None and jinja_rendered.strip():
+            prompt = jinja_rendered
+            effective_flags |= CK_SESSION_REQUEST_RAW_PROMPT
+        elif chat_contract is not None:
             prompt = _format_prompt_with_chat_contract(
                 prompt,
                 chat_contract,
@@ -1015,6 +1225,14 @@ def create_app(
             effective_flags |= CK_SESSION_REQUEST_RAW_PROMPT
         elif isinstance(body.instructions, str):
             prompt = f"{body.instructions}\n{prompt}".strip()
+
+        # Guard: never send empty prompt to native (causes embed failed n<=0)
+        if not prompt or not prompt.strip():
+            prompt = _extract_prompt(body) or "Hello"
+            if isinstance(body.instructions, str) and body.instructions.strip():
+                prompt = f"{body.instructions}\n{prompt}".strip()
+            if not prompt.strip():
+                prompt = "Hello"
 
         return prompt, tok_limit, temperature_eff, top_p_eff, effective_flags
 
@@ -1037,6 +1255,7 @@ def create_app(
         item_status: str = "completed",
         reasoning_item_id: str | None = None,
         include_empty_reasoning: bool = False,
+        tool_calls: list[dict[str, Any]] | None = None,
     ):
         item_status_value = (
             "in_progress" if status == ResponseStatus.in_progress else item_status
@@ -1056,13 +1275,35 @@ def create_app(
                         summary=[],
                     ).model_dump()
                 )
-            message = ResponseOutputMessage(
-                id=message_id,
-                content=[ResponseOutputText(text=text)],
-                role="assistant",
-                status=item_status_value,
-            )
-            output.append(message.model_dump())
+            if tool_calls:
+                for tc in tool_calls:
+                    output.append(
+                        FunctionCall(
+                            id=tc.get("id") or f"fc_{uuid.uuid4().hex[:24]}",
+                            call_id=tc.get("call_id")
+                            or f"call_{uuid.uuid4().hex[:24]}",
+                            name=tc.get("name") or "",
+                            arguments=tc.get("arguments") or "{}",
+                            status=item_status_value,  # type: ignore
+                        ).model_dump()
+                    )
+                # Also keep message if there is leftover text after tool extraction
+                if text and text.strip():
+                    message = ResponseOutputMessage(
+                        id=message_id,
+                        content=[ResponseOutputText(text=text)],
+                        role="assistant",
+                        status=item_status_value,
+                    )
+                    output.append(message.model_dump())
+            else:
+                message = ResponseOutputMessage(
+                    id=message_id,
+                    content=[ResponseOutputText(text=text)],
+                    role="assistant",
+                    status=item_status_value,
+                )
+                output.append(message.model_dump())
 
         reasoning_echo = (
             body.reasoning.model_dump() if body.reasoning is not None else None
@@ -1375,6 +1616,169 @@ def create_app(
                     output_tokens = int(result.get("generated_tokens") or len(complete))
                     message_index = 1 if think_enabled else 0
 
+                    # --- Tool-call detection (manifest chat_templates-gated) ---
+                    tool_calls: list[dict[str, Any]] | None = None
+                    tool_error_code: str | None = None
+                    tool_error_msg: str | None = None
+                    has_tools = bool(getattr(body, "tools", None))
+                    if has_tools:
+                        allowed = {
+                            t.name
+                            for t in body.tools  # type: ignore
+                            if getattr(t, "type", None) == "function"
+                            and getattr(t, "name", None)
+                        }
+                        tool_calls, tool_error_code, tool_error_msg = (
+                            _extract_tool_calls_from_text(text, allowed)
+                        )
+                        if tool_error_code is None and not tool_calls:
+                            tool_calls = None  # no tool JSON => plain text
+                        elif tool_calls == [] and tool_error_code is None:
+                            tool_calls = None
+
+                    # Handle malformed / unknown as failed (unless cancelled)
+                    if has_tools and tool_error_code is not None and not is_cancelled:
+                        # First emit reasoning lifecycle if needed (still needed for parity)
+                        if think_enabled:
+                            if reasoning_started:
+                                if thinking is not None:
+                                    yield from emit(
+                                        "response.reasoning_text.done",
+                                        {
+                                            "type": "response.reasoning_text.done",
+                                            "item_id": reasoning_item_id,
+                                            "output_index": 0,
+                                            "content_index": 0,
+                                            "text": thinking,
+                                        },
+                                    )
+                                item_status_cancel = (
+                                    "incomplete" if is_cancelled else "completed"
+                                )
+                                yield from emit(
+                                    "response.output_item.done",
+                                    {
+                                        "type": "response.output_item.done",
+                                        "output_index": 0,
+                                        "item": ReasoningItem(
+                                            id=reasoning_item_id,
+                                            status=item_status_cancel,
+                                            content=(
+                                                [ReasoningTextContent(text=thinking)]
+                                                if thinking is not None
+                                                else []
+                                            ),
+                                            summary=[],
+                                        ).model_dump(),
+                                    },
+                                )
+                            else:
+                                item_status_cancel = (
+                                    "incomplete" if is_cancelled else "completed"
+                                )
+                                yield from emit(
+                                    "response.output_item.added",
+                                    {
+                                        "type": "response.output_item.added",
+                                        "output_index": 0,
+                                        "item": ReasoningItem(
+                                            id=reasoning_item_id,
+                                            status="in_progress",
+                                            content=[],
+                                            summary=[],
+                                        ).model_dump(),
+                                    },
+                                )
+                                yield from emit(
+                                    "response.output_item.done",
+                                    {
+                                        "type": "response.output_item.done",
+                                        "output_index": 0,
+                                        "item": ReasoningItem(
+                                            id=reasoning_item_id,
+                                            status=item_status_cancel,
+                                            content=[],
+                                            summary=[],
+                                        ).model_dump(),
+                                    },
+                                )
+                        final = build_response(
+                            body,
+                            response_id=response_id,
+                            message_id=message_id,
+                            created_at=created_at,
+                            completed_at=int(time.time()),
+                            status=ResponseStatus.failed,
+                            text=text,
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            thinking=thinking,
+                            reasoning_tokens=max(0, len(thinking or "") // 4)
+                            if thinking
+                            else 0,
+                            result=result,
+                            error={
+                                "code": "server_error",
+                                "message": tool_error_msg or "tool call failed",
+                            },
+                            reasoning_item_id=reasoning_item_id,
+                            include_empty_reasoning=think_enabled,
+                            item_status="incomplete",
+                            tool_calls=None,
+                        )
+                        yield from emit(
+                            "error",
+                            {
+                                "type": "error",
+                                "code": "server_error",
+                                "message": tool_error_msg or "tool call failed",
+                                "param": None,
+                            },
+                        )
+                        yield from emit(
+                            "response.failed",
+                            {
+                                "type": "response.failed",
+                                "response": final,
+                                "error": {
+                                    "code": "server_error",
+                                    "message": tool_error_msg or "tool call failed",
+                                },
+                            },
+                        )
+                        return
+
+                    # Prepare final status helpers for tool / non-tool
+                    incomplete_details = None
+                    tool_incomplete = False
+                    if has_tools and tool_calls:
+                        if (
+                            getattr(body, "parallel_tool_calls", True) is False
+                            and len(tool_calls) > 1
+                        ):
+                            tool_calls = tool_calls[:1]
+                            tool_incomplete = True
+                            incomplete_details = {"reason": "max_tool_calls"}
+                    remaining_text = (
+                        _strip_tool_json_from_text(text, tool_calls)
+                        if tool_calls
+                        else text
+                    )
+                    # Determine final status: cancelled > incomplete (tool count / token_limit) > completed
+                    if is_cancelled:
+                        final_status = ResponseStatus.cancelled
+                        msg_status = "incomplete"
+                    elif tool_incomplete:
+                        final_status = ResponseStatus.incomplete
+                        msg_status = "incomplete"
+                    elif stop_reason_val == 2:  # token_limit
+                        final_status = ResponseStatus.incomplete
+                        msg_status = "incomplete"
+                        incomplete_details = {"reason": "max_output_tokens"}
+                    else:
+                        final_status = ResponseStatus.completed
+                        msg_status = "completed"
+
                     if think_enabled:
                         if reasoning_started:
                             if thinking is not None:
@@ -1439,88 +1843,207 @@ def create_app(
                                     ).model_dump(),
                                 },
                             )
-                    if not message_started:
+                    # Emit tool or text events
+                    if tool_calls:
+                        # For tool calls, emit function_call lifecycle for each
+                        base_idx = message_index
+                        for idx, tc in enumerate(tool_calls):
+                            out_idx = base_idx + idx
+                            func_id = tc.get("id") or f"fc_{uuid.uuid4().hex[:24]}"
+                            tc["id"] = func_id
+                            yield from emit(
+                                "response.output_item.added",
+                                {
+                                    "type": "response.output_item.added",
+                                    "output_index": out_idx,
+                                    "item": FunctionCall(
+                                        id=func_id,
+                                        call_id=tc.get("call_id")
+                                        or f"call_{uuid.uuid4().hex[:24]}",
+                                        name=tc["name"],
+                                        arguments="",
+                                        status="in_progress",  # type: ignore
+                                    ).model_dump(),
+                                },
+                            )
+                            args_str = tc.get("arguments") or "{}"
+                            # emit arguments delta chunked (simple: whole at once)
+                            if args_str:
+                                yield from emit(
+                                    "response.function_call_arguments.delta",
+                                    {
+                                        "type": "response.function_call_arguments.delta",
+                                        "item_id": func_id,
+                                        "output_index": out_idx,
+                                        "delta": args_str,
+                                    },
+                                )
+                            yield from emit(
+                                "response.function_call_arguments.done",
+                                {
+                                    "type": "response.function_call_arguments.done",
+                                    "item_id": func_id,
+                                    "output_index": out_idx,
+                                    "arguments": args_str,
+                                },
+                            )
+                            yield from emit(
+                                "response.output_item.done",
+                                {
+                                    "type": "response.output_item.done",
+                                    "output_index": out_idx,
+                                    "item": FunctionCall(
+                                        id=func_id,
+                                        call_id=tc.get("call_id") or func_id,
+                                        name=tc["name"],
+                                        arguments=args_str,
+                                        status=msg_status,  # type: ignore
+                                    ).model_dump(),
+                                },
+                            )
+                        # If there is residual text after stripping tool json, also emit message
+                        if remaining_text and remaining_text.strip():
+                            msg_out_idx = base_idx + len(tool_calls)
+                            if not message_started:
+                                yield from emit(
+                                    "response.output_item.added",
+                                    {
+                                        "type": "response.output_item.added",
+                                        "output_index": msg_out_idx,
+                                        "item": ResponseOutputMessage(
+                                            id=message_id,
+                                            content=[],
+                                            role="assistant",
+                                            status="in_progress",
+                                        ).model_dump(),
+                                    },
+                                )
+                                message_started = True
+                                yield from emit(
+                                    "response.content_part.added",
+                                    {
+                                        "type": "response.content_part.added",
+                                        "item_id": message_id,
+                                        "output_index": msg_out_idx,
+                                        "content_index": 0,
+                                        "part": {
+                                            "type": "output_text",
+                                            "text": "",
+                                            "annotations": [],
+                                        },
+                                    },
+                                )
+                                message_content_part_added = True
+                            if message_content_part_added:
+                                yield from emit(
+                                    "response.content_part.done",
+                                    {
+                                        "type": "response.content_part.done",
+                                        "item_id": message_id,
+                                        "output_index": msg_out_idx,
+                                        "content_index": 0,
+                                        "part": {
+                                            "type": "output_text",
+                                            "text": remaining_text,
+                                            "annotations": [],
+                                        },
+                                    },
+                                )
+                            yield from emit(
+                                "response.output_text.done",
+                                {
+                                    "type": "response.output_text.done",
+                                    "item_id": message_id,
+                                    "output_index": msg_out_idx,
+                                    "content_index": 0,
+                                    "text": remaining_text,
+                                },
+                            )
+                            yield from emit(
+                                "response.output_item.done",
+                                {
+                                    "type": "response.output_item.done",
+                                    "output_index": msg_out_idx,
+                                    "item": ResponseOutputMessage(
+                                        id=message_id,
+                                        content=[
+                                            ResponseOutputText(text=remaining_text)
+                                        ],
+                                        role="assistant",
+                                        status=msg_status,
+                                    ).model_dump(),
+                                },
+                            )
+                    else:
+                        if not message_started:
+                            yield from emit(
+                                "response.output_item.added",
+                                {
+                                    "type": "response.output_item.added",
+                                    "output_index": message_index,
+                                    "item": ResponseOutputMessage(
+                                        id=message_id,
+                                        content=[],
+                                        role="assistant",
+                                        status="in_progress",
+                                    ).model_dump(),
+                                },
+                            )
+                            message_started = True
+                            yield from emit(
+                                "response.content_part.added",
+                                {
+                                    "type": "response.content_part.added",
+                                    "item_id": message_id,
+                                    "output_index": message_index,
+                                    "content_index": 0,
+                                    "part": {
+                                        "type": "output_text",
+                                        "text": "",
+                                        "annotations": [],
+                                    },
+                                },
+                            )
+                            message_content_part_added = True
+                        # Content part done before output_text.done (OpenAI order)
+                        if message_content_part_added:
+                            yield from emit(
+                                "response.content_part.done",
+                                {
+                                    "type": "response.content_part.done",
+                                    "item_id": message_id,
+                                    "output_index": message_index,
+                                    "content_index": 0,
+                                    "part": {
+                                        "type": "output_text",
+                                        "text": remaining_text,
+                                        "annotations": [],
+                                    },
+                                },
+                            )
                         yield from emit(
-                            "response.output_item.added",
+                            "response.output_text.done",
                             {
-                                "type": "response.output_item.added",
+                                "type": "response.output_text.done",
+                                "item_id": message_id,
+                                "output_index": message_index,
+                                "content_index": 0,
+                                "text": remaining_text,
+                            },
+                        )
+                        yield from emit(
+                            "response.output_item.done",
+                            {
+                                "type": "response.output_item.done",
                                 "output_index": message_index,
                                 "item": ResponseOutputMessage(
                                     id=message_id,
-                                    content=[],
+                                    content=[ResponseOutputText(text=remaining_text)],
                                     role="assistant",
-                                    status="in_progress",
+                                    status=msg_status,
                                 ).model_dump(),
                             },
                         )
-                        message_started = True
-                        yield from emit(
-                            "response.content_part.added",
-                            {
-                                "type": "response.content_part.added",
-                                "item_id": message_id,
-                                "output_index": message_index,
-                                "content_index": 0,
-                                "part": {
-                                    "type": "output_text",
-                                    "text": "",
-                                    "annotations": [],
-                                },
-                            },
-                        )
-                        message_content_part_added = True
-                    # Content part done before output_text.done (OpenAI order)
-                    if message_content_part_added:
-                        yield from emit(
-                            "response.content_part.done",
-                            {
-                                "type": "response.content_part.done",
-                                "item_id": message_id,
-                                "output_index": message_index,
-                                "content_index": 0,
-                                "part": {
-                                    "type": "output_text",
-                                    "text": text,
-                                    "annotations": [],
-                                },
-                            },
-                        )
-                    yield from emit(
-                        "response.output_text.done",
-                        {
-                            "type": "response.output_text.done",
-                            "item_id": message_id,
-                            "output_index": message_index,
-                            "content_index": 0,
-                            "text": text,
-                        },
-                    )
-                    # Determine final status: cancelled > incomplete (token_limit) > completed
-                    # OpenAI uses incomplete with reason max_output_tokens when stop_reason token_limit
-                    incomplete_details = None
-                    if is_cancelled:
-                        final_status = ResponseStatus.cancelled
-                        msg_status = "incomplete"
-                    elif stop_reason_val == 2:  # token_limit
-                        final_status = ResponseStatus.incomplete
-                        msg_status = "incomplete"
-                        incomplete_details = {"reason": "max_output_tokens"}
-                    else:
-                        final_status = ResponseStatus.completed
-                        msg_status = "completed"
-                    yield from emit(
-                        "response.output_item.done",
-                        {
-                            "type": "response.output_item.done",
-                            "output_index": message_index,
-                            "item": ResponseOutputMessage(
-                                id=message_id,
-                                content=[ResponseOutputText(text=text)],
-                                role="assistant",
-                                status=msg_status,
-                            ).model_dump(),
-                        },
-                    )
                     # Reasoning tokens approximated as len(thinking)//4 when thinking present
                     if thinking is not None:
                         reasoning_tokens = max(0, len(thinking) // 4)
@@ -1531,7 +2054,7 @@ def create_app(
                         created_at=created_at,
                         completed_at=int(time.time()),
                         status=final_status,
-                        text=text,
+                        text=remaining_text,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         thinking=thinking,
@@ -1541,6 +2064,7 @@ def create_app(
                         reasoning_item_id=reasoning_item_id,
                         include_empty_reasoning=think_enabled,
                         item_status=msg_status,
+                        tool_calls=tool_calls,
                     )
                     if stats:
                         _log_performance(model, final.get("performance"))
@@ -1553,6 +2077,20 @@ def create_app(
                         yield from emit(
                             "response.incomplete",
                             {"type": "response.incomplete", "response": final},
+                        )
+                    elif final_status == ResponseStatus.failed:
+                        yield from emit(
+                            "error",
+                            {
+                                "type": "error",
+                                "code": "server_error",
+                                "message": tool_error_msg or "tool call failed",
+                                "param": None,
+                            },
+                        )
+                        yield from emit(
+                            "response.failed",
+                            {"type": "response.failed", "response": final},
                         )
                     else:
                         yield from emit(
@@ -1654,6 +2192,21 @@ def create_app(
                 except RuntimeError:
                     pass
 
+    def _acquire_flight_or_429(timeout: float = 2.0) -> None:
+        """Try to acquire the single-flight lock with a short wait to absorb
+        concurrent harness requests (e.g., title + main) instead of immediate 429.
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            if _flight_lock.acquire(blocking=False):
+                return
+            if time.monotonic() >= deadline:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Session busy: another request is in progress. Retry later.",
+                )
+            time.sleep(0.05)
+
     @router.post("/responses", response_model=None)
     def create_response(body: CreateResponseRequest, request: Request):
         (
@@ -1665,11 +2218,7 @@ def create_app(
         ) = _prepare_request(body)
         think_enabled = body.reasoning is not None
 
-        if not _flight_lock.acquire(blocking=False):
-            raise HTTPException(
-                status_code=429,
-                detail="Session busy: another request is in progress. Retry later.",
-            )
+        _acquire_flight_or_429(timeout=2.0)
 
         if body.stream:
             return StreamingResponse(
@@ -1721,6 +2270,12 @@ def create_app(
                     detail="Session busy: another request is in progress. Retry later.",
                 )
             except Exception as e:
+                try:
+                    log_error(
+                        f"non-stream native failed: prompt_len={len(prompt)} err={e} preview={(prompt[:600] if len(prompt) > 600 else prompt)!r}"
+                    )
+                except Exception:
+                    pass
                 # Map generic failures to OpenAI-style Response with status:failed (200, not 500)
                 err_text = _truncate_stop_markers("".join(chunks), all_stop_markers)
                 err_thinking: str | None = None
@@ -1766,6 +2321,26 @@ def create_app(
             thinking = thinking or None
             if thinking is not None:
                 reasoning_tokens = max(0, len(thinking) // 4)
+        # Tool parsing for non-stream
+        tool_calls: list[dict[str, Any]] | None = None
+        tool_error_code: str | None = None
+        tool_error_msg: str | None = None
+        if body.tools:
+            allowed = {
+                t.name
+                for t in body.tools
+                if getattr(t, "type", None) == "function" and getattr(t, "name", None)  # type: ignore
+            }
+            tool_calls, tool_error_code, tool_error_msg = _extract_tool_calls_from_text(
+                text, allowed
+            )
+            if tool_error_code is None and not tool_calls:
+                tool_calls = None
+            elif tool_calls == [] and tool_error_code is None:
+                tool_calls = None
+        remaining_text = (
+            _strip_tool_json_from_text(text, tool_calls) if tool_calls else text
+        )
         input_tokens = int(result.get("prompt_tokens") or 0) if result else 0
         output_tokens = (
             int(result.get("generated_tokens") or len(chunks))
@@ -1776,7 +2351,24 @@ def create_app(
         incomplete_details = None
         final_status = ResponseStatus.completed
         item_status = "completed"
-        if stop_reason_val == 3:  # cancelled
+        error: dict[str, Any] | None = None
+        if tool_error_code is not None:
+            final_status = ResponseStatus.failed
+            item_status = "incomplete"
+            error = {
+                "code": "server_error",
+                "message": tool_error_msg or "tool call failed",
+            }
+        elif (
+            tool_calls
+            and getattr(body, "parallel_tool_calls", True) is False
+            and len(tool_calls) > 1
+        ):
+            tool_calls = tool_calls[:1]
+            incomplete_details = {"reason": "max_tool_calls"}
+            final_status = ResponseStatus.incomplete
+            item_status = "incomplete"
+        elif stop_reason_val == 3:  # cancelled
             final_status = ResponseStatus.cancelled
             item_status = "incomplete"
         elif stop_reason_val == 2:  # token_limit → incomplete
@@ -1790,7 +2382,7 @@ def create_app(
             created_at=int(time.time()),
             completed_at=int(time.time()),
             status=final_status,
-            text=text,
+            text=remaining_text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             thinking=thinking,
@@ -1800,6 +2392,8 @@ def create_app(
             item_status=item_status,
             reasoning_item_id=non_stream_reasoning_id,
             include_empty_reasoning=think_enabled,  # B: empty reasoning when reasoning requested but no markers
+            tool_calls=tool_calls,
+            error=error,
         )
         if stats:
             _log_performance(model, resp.get("performance"))
@@ -2000,14 +2594,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Stop generation when '<eos>' appears in decoded text",
     )
 
-    reasoning = parser.add_argument_group("reasoning / thinking mode")
-    reasoning.add_argument(
-        "--thinking-mode",
-        choices=["auto", "visible", "suppressed"],
-        default="auto",
-        help="Force thinking mode for all requests (default: auto; per-request reasoning field controls visibility)",
-    )
-
     display = parser.add_argument_group("metrics / visualizer")
     display.add_argument(
         "--stats",
@@ -2077,21 +2663,36 @@ def main(argv: list[str] | None = None) -> int:
             C_ORANGE,
         )
 
-    log(f"Opening session {run_dir} ...")
     session = SessionV8.open(
         run_dir,
         context_length=args.context_len,
     )
 
-    chat_contract = _load_runtime_chat_contract(run_dir)
+    chat_template, chat_templates, chat_contract = _load_runtime_templates(run_dir)
     if chat_contract is not None:
         contract_name = str(chat_contract.get("name") or "runtime")
         log(
             f"Loaded chat contract {contract_name!r} from weights_manifest.json; "
             "Python-side prompt formatting enabled"
         )
+        if chat_template:
+            log(
+                f"Loaded chat_template ({len(chat_template)} chars) from manifest",
+                C_GRAY,
+            )
+        if chat_templates:
+            log(
+                f"Loaded chat_templates variants {list(chat_templates.keys())} from manifest",
+                C_GRAY,
+            )
     else:
         log("Runtime chat contract not found; using C-side format_chat", C_ORANGE)
+        # still try to load templates even without contract
+        if chat_template or chat_templates:
+            log(
+                f"Loaded templates without contract: chat_template={bool(chat_template)} chat_templates={list(chat_templates.keys()) if chat_templates else None}",
+                C_GRAY,
+            )
 
     app = create_app(
         session,
@@ -2109,7 +2710,8 @@ def main(argv: list[str] | None = None) -> int:
             else 0
         ),
         chat_contract=chat_contract,
-        thinking_mode=args.thinking_mode,
+        chat_template=chat_template,
+        chat_templates=chat_templates,
     )
 
     try:

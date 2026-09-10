@@ -22,6 +22,12 @@
   .thinking { margin-top: 16px; border: 1px dashed #5a4a2a; background: #201d14; border-radius: 6px; }
   .thinking summary { padding: 8px 12px; cursor: pointer; color: #c9a86a; font-weight: 700; }
   .thinking .body { padding: 8px 12px 12px; color: #8a8f7a; white-space: pre-wrap; }
+  .tools-panel { margin-top: 16px; border: 1px dashed #3a4a6a; background: #1a1f2e; border-radius: 6px; }
+  .tools-panel summary { padding: 8px 12px; cursor: pointer; color: #7fb0d1; font-weight: 700; }
+  .tools-panel .body { padding: 8px 12px 12px; }
+  .tool-call { background: #0f141b; border: 1px solid #2a3446; border-radius: 6px; padding: 8px; margin-top: 8px; }
+  .tool-call .name { color: #7fd1a8; font-weight: 700; }
+  .tool-call pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: #c9d1de; }
   #answer { margin-top: 14px; white-space: pre-wrap; line-height: 1.5; min-height: 40px; }
   #status { font-size: 12px; color: #6a7383; margin-top: 10px; }
   #perf { margin-top: 12px; border-top: 1px solid #333c4d; padding-top: 10px; color: #7f8aa0; font-size: 12px; white-space: pre-wrap; }
@@ -54,6 +60,37 @@
     <label for="stream" style="margin:0">Streaming</label>
   </div>
 
+  <details class="tools-panel" id="tools-panel" open>
+    <summary>Tools (OpenAI Responses)</summary>
+    <div class="body">
+      <div class="toggle">
+        <input id="enable-tools" type="checkbox">
+        <label for="enable-tools" style="margin:0">Enable tool calling</label>
+      </div>
+      <div class="row">
+        <div>
+          <label for="tool-choice">tool_choice</label>
+          <select id="tool-choice">
+            <option value="auto" selected>auto</option>
+            <option value="none">none</option>
+            <option value="required">required (first tool)</option>
+          </select>
+        </div>
+        <div>
+          <label for="parallel-tool-calls">parallel_tool_calls</label>
+          <select id="parallel-tool-calls">
+            <option value="true" selected>true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+      </div>
+      <label for="tools-json">tools JSON (list of FunctionTool)</label>
+      <textarea id="tools-json" style="min-height:120px">[{"type":"function","name":"get_weather","description":"Get weather for a location","parameters":{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}}]</textarea>
+      <div id="tools-error" style="color:#d45d5d;font-size:12px;min-height:16px"></div>
+      <div style="font-size:11px;color:#6a7383;margin-top:4px">Demo: prompt "What is weather in Paris?" → streams <code>function_call</code> with <code>response.function_call_arguments.delta/done</code>. Try malformed JSON or unknown tool to see <code>failed</code>, or two tools with parallel false to see <code>incomplete:max_tool_calls</code>.</div>
+    </div>
+  </details>
+
   <button id="run">Generate</button>
   <button id="cancel" disabled>Cancel</button>
 
@@ -61,6 +98,11 @@
     <summary>Thinking</summary>
     <div class="body" id="thinking"></div>
   </details>
+
+  <div class="tools-panel" id="tool-calls-box" style="display:none">
+    <div style="padding:8px 12px;color:#7fb0d1;font-weight:700">Tool calls</div>
+    <div class="body" id="tool-calls"></div>
+  </div>
 
   <div id="answer"></div>
   <div id="status"></div>
@@ -79,9 +121,39 @@
   const answerEl = $("answer");
   const statusEl = $("status");
   const perfEl = $("perf");
+  const toolCallsBox = $("tool-calls-box");
+  const toolCallsEl = $("tool-calls");
+  const toolsErrorEl = $("tools-error");
 
   let currentResponseId = null;
   let currentAbort = null;
+  const toolCallsMap = new Map(); // item_id -> {name, arguments, el}
+
+  function ensureToolCall(item_id, name) {
+    if (toolCallsMap.has(item_id)) return toolCallsMap.get(item_id);
+    const div = document.createElement("div");
+    div.className = "tool-call";
+    div.dataset.itemId = item_id;
+    const nameEl = document.createElement("div");
+    nameEl.className = "name";
+    nameEl.textContent = name || item_id;
+    const pre = document.createElement("pre");
+    pre.textContent = "";
+    div.appendChild(nameEl);
+    div.appendChild(pre);
+    toolCallsEl.appendChild(div);
+    toolCallsBox.style.display = "block";
+    const entry = { name: name || item_id, arguments: "", el: div, pre: pre };
+    toolCallsMap.set(item_id, entry);
+    return entry;
+  }
+
+  function clearToolCalls() {
+    toolCallsMap.clear();
+    toolCallsEl.innerHTML = "";
+    toolCallsBox.style.display = "none";
+    if (toolsErrorEl) toolsErrorEl.textContent = "";
+  }
 
   runBtn.addEventListener("click", run);
   cancelBtn.addEventListener("click", cancelCurrent);
@@ -121,11 +193,15 @@
     const max_output_tokens = parseInt($("max_tokens").value, 10) || 512;
     const reasoning = $("reasoning").checked ? { effort: "medium" } : null;
     const stream = $("stream").checked;
+    const enableTools = $("enable-tools") ? $("enable-tools").checked : false;
+    const toolChoiceSel = $("tool-choice") ? $("tool-choice").value : "auto";
+    const parallelSel = $("parallel-tool-calls") ? $("parallel-tool-calls").value : "true";
 
     answerEl.textContent = "";
     thinkingEl.textContent = "";
     perfEl.textContent = "";
     thinkingBox.open = true;
+    clearToolCalls();
     currentResponseId = null;
 
     const body = {
@@ -137,6 +213,25 @@
       stream: stream,
     };
     if (reasoning) body.reasoning = reasoning;
+    if (enableTools) {
+      try {
+        const tools = JSON.parse($("tools-json").value || "[]");
+        if (!Array.isArray(tools)) throw new Error("tools must be an array");
+        body.tools = tools;
+        body.parallel_tool_calls = parallelSel === "true";
+        if (toolChoiceSel === "none") body.tool_choice = "none";
+        else if (toolChoiceSel === "required") {
+          const first = tools.find(t => t && t.name);
+          if (first) body.tool_choice = { type: "function", function: { name: first.name } };
+          else body.tool_choice = "required";
+        } else body.tool_choice = "auto";
+        if (toolsErrorEl) toolsErrorEl.textContent = "";
+      } catch (e) {
+        if (toolsErrorEl) toolsErrorEl.textContent = "tools JSON error: " + e.message;
+        statusEl.textContent = "tools JSON error: " + e.message;
+        return;
+      }
+    }
 
     runBtn.disabled = true;
     cancelBtn.disabled = false;
@@ -216,13 +311,27 @@
       const out = response.output || [];
       let thinking = null;
       let text = "";
+      // Preserve existing tool calls map for final rendering if not already streamed
+      let hasTool = false;
       for (const item of out) {
         if (item.type === "reasoning" && item.content && item.content[0]) {
           thinking = item.content[0].text;
         } else if (item.type === "message" && item.content && item.content[0]) {
           text = item.content[0].text;
+        } else if (item.type === "function_call") {
+          hasTool = true;
+          const entry = ensureToolCall(item.id || item.call_id, item.name);
+          entry.arguments = item.arguments || "";
+          try {
+            const pretty = JSON.stringify(JSON.parse(entry.arguments), null, 2);
+            entry.pre.textContent = pretty;
+          } catch (e) {
+            entry.pre.textContent = entry.arguments;
+          }
+          entry.el.querySelector(".name").textContent = item.name + " (" + (item.call_id || item.id) + ")";
         }
       }
+      if (hasTool) toolCallsBox.style.display = "block";
       if (thinking) {
         thinkingBox.open = true;
         thinkingEl.textContent = thinking;
@@ -234,6 +343,12 @@
       if (response.usage) {
         statusEl.textContent = "done — in: " + response.usage.input_tokens +
           ", out: " + response.usage.output_tokens;
+      }
+      if (response.error) {
+        statusEl.textContent += " | error: " + (response.error.message || response.error.code);
+      }
+      if (response.incomplete_details) {
+        statusEl.textContent += " | incomplete: " + response.incomplete_details.reason;
       }
     }
 
@@ -301,10 +416,50 @@
         } catch (e) {}
         return;
       }
+      if (event === "response.output_item.added") {
+        try {
+          const p = JSON.parse(dataLines.join("\n"));
+          if (p.item && p.item.type === "function_call") {
+            ensureToolCall(p.item.id || p.item.call_id, p.item.name);
+          }
+        } catch (e) {}
+        return;
+      }
+      if (event === "response.output_item.done" && dataLines.length) {
+        try {
+          const p = JSON.parse(dataLines.join("\n"));
+          if (p.item && p.item.type === "function_call") {
+            const entry = ensureToolCall(p.item.id || p.item.call_id, p.item.name);
+            if (p.item.arguments) {
+              try { entry.pre.textContent = JSON.stringify(JSON.parse(p.item.arguments), null, 2); } catch (e) { entry.pre.textContent = p.item.arguments; }
+            }
+          }
+        } catch (e) {}
+        return;
+      }
       if (event === "response.content_part.added" || event === "response.content_part.done" ||
-          event === "response.output_item.added" || event === "response.output_item.done" ||
           event === "response.reasoning_text.done" || event === "response.output_text.done") {
         // Structural events — handled via deltas and renderCompleted; keep id capture
+        return;
+      }
+      if (event === "response.function_call_arguments.delta") {
+        if (!dataLines.length) return;
+        try {
+          const p = JSON.parse(dataLines.join("\n"));
+          const entry = ensureToolCall(p.item_id, "");
+          entry.arguments += p.delta || "";
+          try { entry.pre.textContent = JSON.stringify(JSON.parse(entry.arguments), null, 2); } catch (e) { entry.pre.textContent = entry.arguments; }
+        } catch (e) {}
+        return;
+      }
+      if (event === "response.function_call_arguments.done") {
+        if (!dataLines.length) return;
+        try {
+          const p = JSON.parse(dataLines.join("\n"));
+          const entry = ensureToolCall(p.item_id, "");
+          entry.arguments = p.arguments || entry.arguments;
+          try { entry.pre.textContent = JSON.stringify(JSON.parse(entry.arguments), null, 2); } catch (e) { entry.pre.textContent = entry.arguments; }
+        } catch (e) {}
         return;
       }
       if (!dataLines.length) return;

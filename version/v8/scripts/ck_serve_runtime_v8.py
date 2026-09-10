@@ -25,9 +25,11 @@ It can also run standalone::
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPTS_DIR.parents[2]
@@ -146,6 +148,97 @@ def _build_runtime(
             + (proc.stderr or proc.stdout or "").strip()
         )
     return run_dir
+
+
+def load_manifest_templates(
+    run_dir: Path,
+) -> tuple[str | None, dict[str, str] | None, dict[str, Any] | None]:
+    """Load (chat_template, chat_templates, chat_contract) from weights_manifest.json.
+
+    Checks ``config.chat_template``, ``config.chat_templates`` and the
+    chat_contract candidates mirroring ck_serve_v8._load_runtime_chat_contract.
+    Falls back to ``config.json`` and sidecar jinja files if manifest is missing.
+    """
+    run_dir = Path(run_dir)
+    manifest_path = run_dir / "weights_manifest.json"
+    chat_template: str | None = None
+    chat_templates: dict[str, str] | None = None
+    chat_contract: dict[str, Any] | None = None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        manifest = None
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"cannot load runtime templates from {manifest_path}: {exc}"
+        ) from exc
+    if isinstance(manifest, dict):
+        cfg = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+        # chat_template candidates
+        for candidate in (cfg.get("chat_template"), manifest.get("chat_template")):
+            if isinstance(candidate, str) and candidate.strip():
+                chat_template = candidate.strip()
+                break
+        # chat_templates (plural) - tool_use variants
+        for candidate in (cfg.get("chat_templates"), manifest.get("chat_templates")):
+            if isinstance(candidate, dict) and candidate:
+                # normalize values to strings
+                chat_templates = {str(k): str(v) for k, v in candidate.items() if isinstance(v, str) and str(v).strip()}
+                if chat_templates:
+                    break
+        # chat_contract candidates
+        candidates: list[Any] = [manifest.get("chat_contract")]
+        if isinstance(cfg, dict):
+            candidates.append(cfg.get("chat_contract"))
+        template = manifest.get("template")
+        if isinstance(template, dict):
+            template_contract = template.get("contract")
+            if isinstance(template_contract, dict):
+                candidates.append(template_contract.get("chat_contract"))
+        for contract in candidates:
+            if isinstance(contract, dict) and contract:
+                chat_contract = dict(contract)
+                break
+    # Fallback to config.json if manifest lacked template
+    if chat_template is None:
+        config_path = run_dir / "config.json"
+        try:
+            cfg_json = json.loads(config_path.read_text(encoding="utf-8"))
+            if isinstance(cfg_json, dict):
+                ct = cfg_json.get("chat_template")
+                if isinstance(ct, str) and ct.strip():
+                    chat_template = ct.strip()
+                cts = cfg_json.get("chat_templates")
+                if chat_templates is None and isinstance(cts, dict) and cts:
+                    chat_templates = {str(k): str(v) for k, v in cts.items() if isinstance(v, str) and str(v).strip()}
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            pass
+    # Fallback to sidecar jinja files
+    if chat_template is None:
+        for name in ("chat_template.jinja", "tokenizer_chat_template.jinja"):
+            p = run_dir / name
+            if p.is_file():
+                try:
+                    txt = p.read_text(encoding="utf-8").strip()
+                    if txt:
+                        chat_template = txt
+                        break
+                except OSError:
+                    pass
+    if chat_templates is None:
+        additional_dir = run_dir / "additional_chat_templates"
+        if additional_dir.is_dir():
+            collected: dict[str, str] = {}
+            for jinja_file in additional_dir.glob("*.jinja"):
+                try:
+                    txt = jinja_file.read_text(encoding="utf-8").strip()
+                    if txt:
+                        collected[jinja_file.stem] = txt
+                except OSError:
+                    continue
+            if collected:
+                chat_templates = collected
+    return chat_template, chat_templates, chat_contract
 
 
 def add_build_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
