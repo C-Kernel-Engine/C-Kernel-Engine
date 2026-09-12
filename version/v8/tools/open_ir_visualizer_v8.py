@@ -3558,6 +3558,180 @@ def _build_training_canary_summary(run_root: Path | None) -> dict | None:
     }
 
 
+# -- Explain-this-operation panel artifacts ------------------------------
+#
+# The panel chains one circuit op to its contract, provider selection,
+# kernel map, generated call and C implementation.  Two artifact families
+# feed it beyond the standard IR/call/registry payloads:
+#
+#   explain_*.json          Failure-mode reports (schema cke.v8.explain_op_report)
+#                           captured at a failed stage, e.g. a provider
+#                           selection rejection trace.  Run-dir scoped.
+#   .ck_ir_bundle.json /    Provenance stamps written by ck_run_v8.py.  The
+#   .ck_codegen_bundle.json recorded sha256 of each chain artifact is
+#                           compared against the file actually loaded so
+#                           stale or mixed-revision artifacts are disclosed
+#                           instead of silently filling the chain.
+
+EXPLAIN_REPORT_SCHEMA = "cke.v8.explain_op_report"
+EXPLAIN_PROVENANCE_SCHEMA = "cke.v8.explain_provenance"
+
+# files key -> artifact name used by the .ck_*_bundle.json stamps.
+EXPLAIN_CHAIN_STAMP_NAMES = {
+    "ir1_decode": "decode_ir",
+    "lowered_decode": "decode_lowered",
+    "lowered_decode_call": "decode_call",
+    "layout_decode": "decode_layout",
+    "ir1_prefill": "prefill_ir",
+    "lowered_prefill": "prefill_lowered",
+    "lowered_prefill_call": "prefill_call",
+    "layout_prefill": "prefill_layout",
+}
+
+_EXPLAIN_COMMIT_KEYS = ("commit", "git_commit", "git_revision", "revision", "source_commit")
+
+
+def collect_explain_reports(search_roots: list[Path]) -> tuple[dict, dict]:
+    """Load explain_*.json failure-mode reports from the scoped roots.
+
+    First root wins per report name (standard convention); only payloads
+    carrying the explain report schema are accepted.
+    """
+    reports: dict[str, dict] = {}
+    paths: dict[str, str] = {}
+    for root in search_roots:
+        try:
+            candidates = sorted(root.glob("explain_*.json"))
+        except OSError:
+            continue
+        for path in candidates:
+            name = path.stem
+            if name in reports:
+                continue
+            payload = _load_json_loose(path)
+            if not isinstance(payload, dict):
+                continue
+            if str(payload.get("schema") or "") != EXPLAIN_REPORT_SCHEMA:
+                continue
+            reports[name] = payload
+            paths[name] = str(path)
+    return reports, paths
+
+
+def _explain_embedded_commits(payload, out: list, origin: str) -> None:
+    """Collect embedded revision stamps from one payload, if any exist."""
+    if not isinstance(payload, dict):
+        return
+    for key in _EXPLAIN_COMMIT_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            out.append({"origin": origin, "field": key, "value": value.strip()})
+    for nested_key in ("provenance", "_meta", "meta"):
+        nested = payload.get(nested_key)
+        if isinstance(nested, dict):
+            for key in _EXPLAIN_COMMIT_KEYS:
+                value = nested.get(key)
+                if isinstance(value, str) and value.strip():
+                    out.append({"origin": f"{origin}.{nested_key}", "field": key, "value": value.strip()})
+
+
+def collect_explain_provenance(
+    search_roots: list[Path],
+    files: dict,
+    loaded_paths: dict,
+    loaded_hashes: dict,
+    strict_run_scope: bool,
+) -> dict:
+    """Summarize revision provenance for the explain chain.
+
+    Compares the sha256 recorded in the ck_run bundle stamps against the
+    artifact actually loaded.  A mismatch means the artifact changed after
+    the stamp was written (stale or mixed-revision run) and is disclosed as
+    "stale"; a missing stamp is "no_stamp", never silently "ok".
+    """
+    stamps: dict[str, dict] = {}
+    stamp_paths: list[str] = []
+    source_roots: list[str] = []
+    for bundle_name in (".ck_ir_bundle.json", ".ck_codegen_bundle.json"):
+        for root in search_roots:
+            path = root / bundle_name
+            if not path.exists():
+                continue
+            payload = _load_json_loose(path)
+            if not isinstance(payload, dict):
+                continue
+            stamp_paths.append(str(path))
+            # IR bundle records produced artifacts under outputs; the codegen
+            # bundle records the same identities under inputs.artifacts.
+            containers = []
+            outputs = payload.get("outputs")
+            if isinstance(outputs, dict):
+                containers.append(outputs)
+            inputs = payload.get("inputs")
+            if isinstance(inputs, dict):
+                artifacts = inputs.get("artifacts")
+                if isinstance(artifacts, dict):
+                    containers.append(artifacts)
+                planner_sources = inputs.get("planner_sources")
+                if isinstance(planner_sources, dict):
+                    for src in planner_sources:
+                        parts = Path(str(src)).parts
+                        if "version" in parts:
+                            root_hint = str(Path(*parts[: parts.index("version")]))
+                            if root_hint and root_hint not in source_roots:
+                                source_roots.append(root_hint)
+            for container in containers:
+                for artifact_name, identity in container.items():
+                    if artifact_name in stamps or not isinstance(identity, dict):
+                        continue
+                    sha = identity.get("sha256")
+                    if isinstance(sha, str) and sha:
+                        stamps[artifact_name] = {
+                            "sha256": sha,
+                            "size": identity.get("size"),
+                            "bundle": bundle_name,
+                        }
+            break  # first root carrying this bundle wins
+
+    artifacts = []
+    for file_key, stamp_name in EXPLAIN_CHAIN_STAMP_NAMES.items():
+        loaded_sha = loaded_hashes.get(file_key) or None
+        loaded_path = loaded_paths.get(file_key) or None
+        stamp = stamps.get(stamp_name)
+        if loaded_sha is None:
+            status = "not_loaded"
+        elif stamp is None:
+            status = "no_stamp"
+        elif stamp["sha256"] == loaded_sha:
+            status = "match"
+        else:
+            status = "stale"
+        artifacts.append(
+            {
+                "key": file_key,
+                "stamp_name": stamp_name,
+                "loaded_path": loaded_path,
+                "loaded_sha256": loaded_sha,
+                "stamped_sha256": stamp["sha256"] if stamp else None,
+                "stamp_bundle": stamp["bundle"] if stamp else None,
+                "status": status,
+            }
+        )
+
+    embedded_commits: list[dict] = []
+    for file_key in EXPLAIN_CHAIN_STAMP_NAMES:
+        _explain_embedded_commits(files.get(file_key), embedded_commits, file_key)
+
+    return {
+        "schema": EXPLAIN_PROVENANCE_SCHEMA,
+        "strict_run_artifacts": bool(strict_run_scope),
+        "bundle_stamps": stamp_paths,
+        "planner_source_roots": source_roots,
+        "embedded_commits": embedded_commits,
+        "artifacts": artifacts,
+    }
+
+
 def load_model_data(
     ck_build_path: Path,
     run_dir: Path | None = None,
@@ -4018,6 +4192,23 @@ def load_model_data(
         loaded.append("analysis_checkpoints")
     else:
         missing_optional.append("analysis_checkpoints")
+
+    # Explain-this-operation panel: failure-mode reports plus revision
+    # provenance for the op -> contract -> provider -> map -> call -> C chain.
+    explain_reports, explain_report_paths = collect_explain_reports(search_roots)
+    if explain_reports:
+        data["files"]["explain_reports"] = explain_reports
+        loaded.append(f"explain_reports({len(explain_reports)})")
+        for report_name, report_path in explain_report_paths.items():
+            loaded_paths[f"explain_report:{report_name}"] = report_path
+    data["files"]["explain_provenance"] = collect_explain_provenance(
+        search_roots,
+        data["files"],
+        loaded_paths,
+        loaded_hashes,
+        strict_run_scope,
+    )
+    loaded.append("explain_provenance")
 
     training_logbook_payload = collect_training_logbook(
         search_roots,
