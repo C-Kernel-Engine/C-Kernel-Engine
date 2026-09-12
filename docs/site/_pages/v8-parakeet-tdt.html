@@ -40,6 +40,7 @@
     <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz">Intermediate tensors (NPZ)</a></li>
     <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">Complete 723-tensor manifest (JSON)</a></li>
     <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json">Operation-reuse inventory (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_host_math_inventory.json">Remaining host-math ownership inventory (JSON)</a></li>
   </ul>
 
   <h2 id="native-evidence">Native execution evidence</h2>
@@ -56,6 +57,14 @@
   </ul>
   <p>A synthetic 48 kHz stereo transform of the short fixture also reproduces the 16 kHz mono trajectory after CKE windowed-sinc resampling. This validates the wiring and deterministic fixture transform; broader real-world resampling quality is not yet certified.</p>
   <p>The bounded long-audio policy uses 180-second full-attention windows with 30 seconds of overlap. Encoder and decoder state reset for each window. Each word belongs to the window whose ownership region contains its timestamp midpoint; ownership regions meet at the midpoint of each overlap. Two five-minute runs produced identical 700-word trajectories, exact 0–300 second coverage, and 7.25% WER. The retained repeat took 231.19 seconds (RTF 0.771) with 3.24 GB peak RSS.</p>
+
+  <h2 id="run">Run Parakeet through the production entry point</h2>
+  <p>The audio front door recognizes the checkpoint architecture, creates the FP32 BUMP bundle, builds the current native libraries, and selects deterministic bounded long-audio execution. The output report can resume only at completed window boundaries.</p>
+  <pre class="para-code"><code>version/v8/scripts/cks-v8-run audio \
+  hf://nvidia/parakeet-tdt-0.6b-v3 \
+  --wav recording.wav \
+  --output build/parakeet-transcript.json \
+  --resume</code></pre>
 
   <h2 id="inventory">Original operation-reuse inventory</h2>
   <p>This table records the pre-implementation inventory from PR #503. Its missing-provider and composition labels describe that starting point; the native evidence above is the current status. Candidate reuse meant that an interface fit still required comparison at the named fixture boundary.</p>

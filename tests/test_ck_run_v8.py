@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,103 @@ def _load_module():
 
 
 ck_run_v8 = _load_module()
+
+
+def test_audio_checkpoint_kind_detects_parakeet_and_whisper(tmp_path: Path) -> None:
+    parakeet = tmp_path / "parakeet"
+    parakeet.mkdir()
+    (parakeet / "config.json").write_text(
+        json.dumps({"model_type": "parakeet_tdt", "architectures": ["ParakeetForTDT"]}),
+        encoding="utf-8",
+    )
+    whisper = tmp_path / "whisper"
+    whisper.mkdir()
+    (whisper / "config.json").write_text(
+        json.dumps({"model_type": "whisper", "architectures": ["WhisperForConditionalGeneration"]}),
+        encoding="utf-8",
+    )
+
+    assert ck_run_v8._audio_checkpoint_kind(parakeet) == "parakeet_tdt"
+    assert ck_run_v8._audio_checkpoint_kind(whisper) == "whisper"
+
+
+def test_audio_front_door_dispatches_parakeet_long_audio(
+    tmp_path: Path, monkeypatch
+) -> None:
+    checkpoint = tmp_path / "source"
+    runtime = tmp_path / "runtime"
+    wav = tmp_path / "recording.wav"
+    output = tmp_path / "report.json"
+    commands: list[tuple[list[str], Path]] = []
+    monkeypatch.setattr(
+        ck_run_v8,
+        "_resolve_audio_checkpoint",
+        lambda *_args, **_kwargs: (checkpoint, "nvidia--parakeet", "parakeet_tdt"),
+    )
+    monkeypatch.setattr(
+        ck_run_v8,
+        "_build_parakeet_native_runtime",
+        lambda *_args, **_kwargs: runtime,
+    )
+    monkeypatch.setattr(
+        ck_run_v8,
+        "run_cmd",
+        lambda command, cwd=None, **_kwargs: commands.append((command, cwd)),
+    )
+    args = SimpleNamespace(
+        model="hf://nvidia/parakeet-tdt-0.6b-v3",
+        encoder_run_dir=None,
+        decoder_run_dir=None,
+        force_download=False,
+        force_convert=False,
+        force_compile=False,
+        encoder_linear_weight_dtype="preserve",
+        run_dir=None,
+        task="transcribe",
+        language="en",
+        wav=wav,
+        window_seconds=180.0,
+        overlap_seconds=30.0,
+        output=output,
+        resume=True,
+    )
+
+    assert ck_run_v8.run_audio_pipeline(args) == 0
+    assert len(commands) == 1
+    command, cwd = commands[0]
+    assert command[1].endswith("run_parakeet_long_audio_v8.py")
+    assert command[command.index("--model") + 1] == str(runtime)
+    assert command[command.index("--wav") + 1] == str(wav)
+    assert command[command.index("--output") + 1] == str(output)
+    assert "--resume" in command
+    assert cwd == ck_run_v8.PROJECT_ROOT
+
+
+def test_audio_front_door_reuses_pinned_parakeet_cache(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cache = tmp_path / "models"
+    checkpoint = (
+        cache
+        / "nvidia--parakeet-tdt-0.6b-v3"
+        / ck_run_v8.PARAKEET_TDT_REVISION[:8]
+    )
+    checkpoint.mkdir(parents=True)
+    (checkpoint / "config.json").write_text(
+        json.dumps({"model_type": "parakeet_tdt"}), encoding="utf-8"
+    )
+    (checkpoint / "model.safetensors").write_bytes(b"fixture")
+    monkeypatch.setattr(ck_run_v8, "CACHE_DIR", cache)
+    monkeypatch.setattr(ck_run_v8, "DEFAULT_CACHE_DIR", cache)
+    monkeypatch.setattr(ck_run_v8, "LEGACY_CACHE_DIR", cache)
+
+    resolved, name, kind = ck_run_v8._resolve_audio_checkpoint(
+        "hf://nvidia/parakeet-tdt-0.6b-v3", force_download=False
+    )
+
+    assert resolved == checkpoint
+    assert name == "nvidia--parakeet-tdt-0.6b-v3"
+    assert kind == "parakeet_tdt"
 
 
 def test_scratch_defaults_to_persistent_cache(

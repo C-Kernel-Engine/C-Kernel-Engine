@@ -1,0 +1,126 @@
+{
+  "id": "audio_argmax_first_f32",
+  "op": "audio_argmax",
+  "operation_interface": "audio.argmax.first_index.fp32.v1",
+  "variant": "finite_first_index_on_tie",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "audio_argmax_first_finite_fp32",
+    "phases": [
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "i32"
+  },
+  "inputs": [
+    {
+      "name": "values",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "index",
+      "dtype": "i32",
+      "shape": [
+        1
+      ],
+      "layout": "scalar",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "elements"
+  ],
+  "params": [],
+  "constraints": {
+    "notes": "Input must be finite; ties select the lowest index."
+  },
+  "impl": {
+    "function": "audio_argmax_first_f32",
+    "c_declaration": "int audio_argmax_first_f32(const float *values, int elements, int *selected);",
+    "sources": [
+      "src/kernels/audio_kernels.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "audio_argmax_first_finite_fp32",
+      "status": "validated",
+      "phases": [
+        "decode"
+      ],
+      "function": "audio_argmax_first_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "contract_defined"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp32",
+        "merge_order": "first_index_on_tie",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "serial"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "values",
+        "source": "activation:values",
+        "ports": [
+          "input:values"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "dim:elements"
+      },
+      {
+        "name": "selected",
+        "source": "output:index",
+        "ports": [
+          "output:index"
+        ]
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "unittest/test_audio_encoder.py"
+    ],
+    "oracle": "NumPy argmax over finite FP32 values"
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "id": "audio_scaled_residual_add_f32",
+  "op": "audio_scaled_residual_add",
+  "operation_interface": "audio.residual_add.scaled.fp32.v1",
+  "variant": "separate_multiply_add_fp32",
+  "selection": {
+    "status": "candidate",
+    "priority": 100,
+    "equivalence_group": "audio_scaled_residual_add_separate_fp32",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "residual",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "branch",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "elements"
+  ],
+  "params": [
+    {
+      "name": "scale",
+      "dtype": "fp32"
+    }
+  ],
+  "impl": {
+    "function": "audio_scaled_residual_add_f32",
+    "c_declaration": "int audio_scaled_residual_add_f32(const float *residual, const float *branch, float scale, float *output, size_t elements);",
+    "sources": [
+      "src/kernels/audio_kernels.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "audio_scaled_residual_add_separate_fp32",
+      "status": "validated",
+      "phases": [
+        "prefill",
+        "decode"
+      ],
+      "function": "audio_scaled_residual_add_f32",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "scalar",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "serial"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "none",
+        "merge_order": "none",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "residual",
+        "source": "activation:residual",
+        "ports": [
+          "input:residual"
+        ]
+      },
+      {
+        "name": "branch",
+        "source": "activation:branch",
+        "ports": [
+          "input:branch"
+        ]
+      },
+      {
+        "name": "scale",
+        "source": "param:scale"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "dim:elements"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "unittest/test_audio_encoder.py"
+    ],
+    "oracle": "NumPy FP32 multiply followed by FP32 add"
+  }
+}

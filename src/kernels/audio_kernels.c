@@ -1522,6 +1522,53 @@ int audio_transpose_channel_to_token_f32(
     return 0;
 }
 
+int audio_scaled_residual_add_f32(
+    const float *residual,
+    const float *branch,
+    float scale,
+    float *output,
+    size_t elements)
+{
+    if (residual == NULL || branch == NULL || output == NULL) {
+        return -1;
+    }
+    if (elements == 0 || !isfinite(scale)) {
+        return -2;
+    }
+    for (size_t index = 0; index < elements; ++index) {
+        /* Preserve the pinned elementwise multiply then add cast boundary. */
+        volatile float scaled = branch[index] * scale;
+        output[index] = residual[index] + scaled;
+    }
+    return 0;
+}
+
+int audio_argmax_first_f32(const float *values, int elements, int *selected)
+{
+    if (values == NULL || selected == NULL) {
+        return -1;
+    }
+    if (elements <= 0) {
+        return -2;
+    }
+    if (!isfinite(values[0])) {
+        return -3;
+    }
+    int best = 0;
+    float maximum = values[0];
+    for (int index = 1; index < elements; ++index) {
+        if (!isfinite(values[index])) {
+            return -3;
+        }
+        if (values[index] > maximum) {
+            maximum = values[index];
+            best = index;
+        }
+    }
+    *selected = best;
+    return 0;
+}
+
 int audio_whisper_stft_power_reference_f32(
     const float *samples,
     int n_samples,

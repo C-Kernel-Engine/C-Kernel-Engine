@@ -151,6 +151,14 @@ class Kernels:
             F32P, F32P, F32P, F32P, F32P, F32P, F32P, F32P, F32P,
             ctypes.c_size_t, ctypes.c_int, ctypes.c_int,
         ]
+        self.audio.audio_scaled_residual_add_f32.argtypes = [
+            F32P, F32P, ctypes.c_float, F32P, ctypes.c_size_t,
+        ]
+        self.audio.audio_scaled_residual_add_f32.restype = ctypes.c_int
+        self.audio.audio_argmax_first_f32.argtypes = [
+            F32P, ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+        ]
+        self.audio.audio_argmax_first_f32.restype = ctypes.c_int
         self.audio.audio_wav_parse_memory.argtypes = [
             U8P, ctypes.c_size_t, ctypes.POINTER(WavInfo),
         ]
@@ -243,6 +251,31 @@ class Kernels:
 
     def relu_inplace(self, value: np.ndarray) -> None:
         self.engine.relu_forward_inplace(ptr(value), value.size)
+
+    def residual_add(
+        self, residual: np.ndarray, branch: np.ndarray, scale: float = 1.0,
+    ) -> np.ndarray:
+        residual = f32(residual)
+        branch = f32(branch)
+        if residual.shape != branch.shape:
+            raise ValueError(f"residual shape mismatch: {residual.shape} != {branch.shape}")
+        result = np.empty_like(residual)
+        status = self.audio.audio_scaled_residual_add_f32(
+            ptr(residual), ptr(branch), ctypes.c_float(scale), ptr(result), result.size,
+        )
+        if status != 0:
+            raise RuntimeError(f"scaled residual add failed with status {status}")
+        return result
+
+    def argmax_first(self, values: np.ndarray) -> int:
+        values = f32(values)
+        selected = ctypes.c_int(-1)
+        status = self.audio.audio_argmax_first_f32(
+            ptr(values), values.size, ctypes.byref(selected),
+        )
+        if status != 0:
+            raise RuntimeError(f"argmax failed with status {status}")
+        return int(selected.value)
 
 
 class SafetensorWeights:
@@ -570,13 +603,19 @@ class ParakeetSession:
     def encoder_block(self, value: np.ndarray, positions: np.ndarray, layer: int) -> np.ndarray:
         prefix = f"encoder.layers.{layer}"
         normalized = self.layer_norm(value, prefix + ".norm_feed_forward1")
-        value = f32(value + np.float32(0.5) * self.feed_forward(normalized, prefix + ".feed_forward1"))
+        value = self.k.residual_add(
+            value, self.feed_forward(normalized, prefix + ".feed_forward1"), 0.5,
+        )
         normalized = self.layer_norm(value, prefix + ".norm_self_att")
-        value = f32(value + self.attention(normalized, positions, prefix + ".self_attn"))
+        value = self.k.residual_add(
+            value, self.attention(normalized, positions, prefix + ".self_attn"),
+        )
         normalized = self.layer_norm(value, prefix + ".norm_conv")
-        value = f32(value + self.convolution(normalized, prefix + ".conv"))
+        value = self.k.residual_add(value, self.convolution(normalized, prefix + ".conv"))
         normalized = self.layer_norm(value, prefix + ".norm_feed_forward2")
-        value = f32(value + np.float32(0.5) * self.feed_forward(normalized, prefix + ".feed_forward2"))
+        value = self.k.residual_add(
+            value, self.feed_forward(normalized, prefix + ".feed_forward2"), 0.5,
+        )
         return self.layer_norm(value, prefix + ".norm_out")
 
     def encode(self, features: np.ndarray, live_frames: int, stop_after_layer: int | None = None) -> np.ndarray:
@@ -635,7 +674,7 @@ class ParakeetSession:
         )[0]
 
     def joint(self, encoder_row: np.ndarray, decoder_row: np.ndarray) -> np.ndarray:
-        value = f32(encoder_row + decoder_row)[None]
+        value = self.k.residual_add(encoder_row, decoder_row)[None]
         self.k.relu_inplace(value)
         return self.k.gemm(
             value, self.w("joint.head.weight"), self.w("joint.head.bias"),
@@ -663,8 +702,8 @@ class ParakeetSession:
             logits = self.joint(encoder[frame], decoder_cache)
             if first_logits is None:
                 first_logits = logits.copy()
-            token = int(np.argmax(logits[:vocab_size]))
-            duration_index = int(np.argmax(logits[vocab_size:]))
+            token = self.k.argmax_first(logits[:vocab_size])
+            duration_index = self.k.argmax_first(logits[vocab_size:])
             duration = durations_table[duration_index]
             if token == blank and duration == 0:
                 duration = 1

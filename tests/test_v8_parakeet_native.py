@@ -93,6 +93,8 @@ def test_circuit_binds_new_native_providers_and_declares_memory_ownership() -> N
         "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
         "batch_norm": "audio_batch_norm_inference_channel_major_f32",
         "lstm": "audio_lstm_step_f32",
+        "scaled_residual_add": "audio_scaled_residual_add_f32",
+        "argmax": "audio_argmax_first_f32",
     }
     invariants = circuit["contract"]["runtime_invariants"]
     assert invariants["weight_container"] == "BUMPWGT5"
@@ -121,6 +123,8 @@ def test_new_compute_kernels_do_not_allocate_or_free() -> None:
         "audio_lstm_step_f32",
         "audio_conv1d_channel_major_grouped_f32",
         "audio_conformer_relative_attention_f32",
+        "audio_scaled_residual_add_f32",
+        "audio_argmax_first_f32",
     )
     for name in names:
         start = source.index(f"int {name}(")
@@ -130,6 +134,15 @@ def test_new_compute_kernels_do_not_allocate_or_free() -> None:
         assert "calloc(" not in body
         assert "realloc(" not in body
         assert "free(" not in body
+
+
+def test_python_session_routes_residual_and_argmax_model_math_to_native() -> None:
+    source = (ROOT / "version/v8/scripts/run_parakeet_native_v8.py").read_text(
+        encoding="utf-8"
+    )
+    assert "np.argmax(" not in source
+    assert "value + np.float32(0.5)" not in source
+    assert "encoder_row + decoder_row" not in source
 
 
 def test_native_timestamp_contract_matches_pinned_transformers_fixture() -> None:

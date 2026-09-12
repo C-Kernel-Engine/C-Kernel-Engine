@@ -36,18 +36,13 @@ Raw CLI examples:
   version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \\
     --context-len 1024 --force-compile --force-convert
 
-  version/v8/scripts/cks-v8-run run /path/to/model.gguf \\
-    --context-len 1024
-
   version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \\
     --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \\
     --image-path version/v8/test_assets/v8_vision_doc_card_72.ppm \\
     --prompt "Explain this image."
 
-  version/v8/scripts/cks-v8-run audio \\
-    --encoder-run-dir /path/to/whisper-tiny-encoder \\
-    --decoder-run-dir /path/to/whisper-tiny-decoder \\
-    --wav /path/to/audio.wav
+  version/v8/scripts/cks-v8-run audio hf://openai/whisper-tiny \\
+    --wav recording.wav
 
 After a run exists:
   ./build/ck-cli-v8 --list

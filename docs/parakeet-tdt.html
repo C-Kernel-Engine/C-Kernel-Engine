@@ -19,28 +19,15 @@
 <body><main>
   <p><a href="index.html">CKE documentation</a> / Parakeet TDT</p>
   <h1>Parakeet TDT 0.6B native CPU bring-up</h1>
-  <p><span class="status">Short WAV E2E passes</span></p>
+  <p><span class="status">Short and five-minute E2E pass</span></p>
   <p>CKE converts the pinned <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3">nvidia/parakeet-tdt-0.6b-v3</a> checkpoint to BUMPWGT5, decodes PCM WAV audio, runs the 24-layer FastConformer encoder and the TDT prediction/joint networks, and emits text without importing PyTorch or Transformers during inference.</p>
 
   <h2>Reproduce the validated path</h2>
-  <pre><code>hf download nvidia/parakeet-tdt-0.6b-v3 \
-  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
-  --local-dir .ck_models/parakeet-tdt-0.6b-v3
-
-python version/v8/scripts/convert_safetensors_to_bump_v8.py \
-  --checkpoint .ck_models/parakeet-tdt-0.6b-v3 \
-  --output .ck_build/parakeet-tdt-0.6b-v3/weights.bump \
-  --config-out .ck_build/parakeet-tdt-0.6b-v3/config.json \
-  --manifest-out .ck_build/parakeet-tdt-0.6b-v3/weights_manifest.json \
-  --arch parakeet_tdt --dtype fp32
-
-python version/v8/scripts/run_parakeet_native_v8.py \
-  --model .ck_build/parakeet-tdt-0.6b-v3 \
-  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
-  --fixture docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz \
-  --engine build/libckernel_engine.so \
-  --audio-lib build/libckernel_audio.so \
-  --decode --output .ck_build/parakeet-tdt-0.6b-v3/native-e2e.json</code></pre>
+  <pre><code>version/v8/scripts/cks-v8-run audio \
+  hf://nvidia/parakeet-tdt-0.6b-v3 \
+  --wav recording.wav \
+  --output build/parakeet-transcript.json \
+  --resume</code></pre>
 
   <h2>Current evidence</h2>
   <table>
@@ -51,7 +38,7 @@ python version/v8/scripts/run_parakeet_native_v8.py \
     <tr><td>Ryzen timing</td><td>0.069 seconds frontend plus 1.027 seconds encoder for 7.435 seconds of audio on the recorded warm run. Hashing and conversion are outside those stage timings.</td></tr>
     <tr><td>Memory ownership</td><td>New attention, grouped Conv1D, BatchNorm, position, and LSTM compute providers contain no heap allocation. Head-parallel attention uses one caller-owned T-element score row per head; LSTM uses caller-owned 4H gate scratch and session-owned state.</td></tr>
   </table>
-  <p>Machine-readable evidence: <a href="notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_certification.json">five-minute certification</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">reference fixture manifest</a>, and <a href="notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">tensor manifest</a>.</p>
+  <p>Machine-readable evidence: <a href="notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_certification.json">five-minute certification</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_chunking_certification.json">chunking certification</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">reference fixture manifest</a>, and <a href="notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">tensor manifest</a>.</p>
 
   <h2>Certification boundary</h2>
   <p>The exact reference result covers one 7.435-second English, mono, 16 kHz PCM WAV. Deterministic full-attention and overlapping-window runs pass on a complete five-minute English recording, and a synthetic 48 kHz stereo resampling case also passes. Multilingual speech, real-world resampling quality, 42-minute audio, concurrent sessions, generated-circuit execution, and diarization remain open. The current runtime orchestration is a thin Python layer over native CKE kernels and BUMP weights.</p>

@@ -262,6 +262,18 @@ int audio_transpose_channel_to_token_f32(
     int channels,
     int frames);
 
+int audio_scaled_residual_add_f32(
+    const float *residual,
+    const float *branch,
+    float scale,
+    float *output,
+    size_t elements);
+
+int audio_argmax_first_f32(
+    const float *values,
+    int elements,
+    int *selected);
+
 int audio_whisper_stft_power_reference_f32(
     const float *samples,
     int n_samples,
