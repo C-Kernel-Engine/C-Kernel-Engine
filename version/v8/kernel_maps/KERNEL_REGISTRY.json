@@ -11188,7 +11188,7 @@
       "id": "audio_conformer_relative_attention_f32",
       "op": "audio_relative_attention",
       "operation_interface": "audio_attention.transformer_xl_relative.full.fp32.v1",
-      "variant": "token_major_transformer_xl_relative_eager_fp32",
+      "variant": "token_major_transformer_xl_relative_head_parallel_fp32",
       "selection": {
         "status": "candidate",
         "priority": 100,
@@ -11302,12 +11302,13 @@
           "name": "scores",
           "dtype": "fp32",
           "shape": [
+            "H",
             "T"
           ],
           "size_resolution": "required",
           "lifetime": "kernel_call",
           "alignment": 64,
-          "layout": "key_contiguous",
+          "layout": "head_major_key_contiguous",
           "access": "read_write",
           "storage_class": "scratch",
           "consumption": "required"
@@ -11343,14 +11344,15 @@
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_heads"
               ],
               "dispatch": [
+                "ck_threadpool_parallel_for_n",
                 "inline"
               ],
-              "reduction_order_effect": "contract_defined"
+              "reduction_order_effect": "none"
             }
           },
           "arithmetic": {
@@ -11358,7 +11360,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -11452,7 +11454,7 @@
         ],
         "oracle": "Transformers ParakeetConformerSelfAttention eager FP32 CPU"
       },
-      "notes": "Uses one caller-owned T-element score row; it does not materialize a T-by-T score matrix.",
+      "notes": "Uses one caller-owned T-element score row per head so head workers never share mutable scratch; it does not materialize a T-by-T score matrix.",
       "name": "audio_conformer_relative_attention_f32",
       "_source_file": "audio_conformer_relative_attention_f32.json"
     },

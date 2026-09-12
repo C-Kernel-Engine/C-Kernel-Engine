@@ -7,7 +7,10 @@ import argparse
 import ctypes
 import hashlib
 import json
+import os
 import platform
+import resource
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +20,7 @@ import numpy as np
 
 F32P = ctypes.POINTER(ctypes.c_float)
 U8P = ctypes.POINTER(ctypes.c_uint8)
+ROOT = Path(__file__).resolve().parents[3]
 
 
 class WavInfo(ctypes.Structure):
@@ -45,6 +49,56 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def file_identity(path: Path) -> dict[str, object]:
+    resolved = path.resolve()
+    return {
+        "path": str(resolved),
+        "bytes": resolved.stat().st_size,
+        "sha256": sha256_file(resolved),
+    }
+
+
+def git_identity(root: Path) -> dict[str, object]:
+    def run(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments], cwd=root, check=True, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        return result.stdout.strip()
+
+    return {
+        "commit": run("rev-parse", "HEAD"),
+        "dirty": bool(run("status", "--porcelain")),
+    }
+
+
+def host_identity() -> dict[str, object]:
+    cpuinfo = Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="replace")
+    model_name = next(
+        (line.split(":", 1)[1].strip() for line in cpuinfo.splitlines()
+         if line.startswith("model name")),
+        platform.processor(),
+    )
+    flags = next(
+        (line.split(":", 1)[1].strip().split() for line in cpuinfo.splitlines()
+         if line.startswith("flags")),
+        [],
+    )
+    relevant_flags = [
+        flag for flag in (
+            "avx", "avx2", "fma", "avx512f", "avx512_vnni", "avx512_bf16"
+        ) if flag in flags
+    ]
+    return {
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "cpu_model": model_name,
+        "logical_cpus": os.cpu_count(),
+        "isa": relevant_flags,
+        "memory_bytes": int(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")),
+    }
 
 
 class Kernels:
@@ -103,6 +157,13 @@ class Kernels:
         self.audio.audio_wav_decode_pcm16_mono_f32.argtypes = [
             U8P, ctypes.c_size_t, ctypes.POINTER(WavInfo), F32P, ctypes.c_int,
         ]
+        self.audio.audio_resampled_frame_count.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+        self.audio.audio_resampled_frame_count.restype = ctypes.c_int
+        self.audio.audio_resample_windowed_sinc_f32.argtypes = [
+            F32P, ctypes.c_int, ctypes.c_int, F32P, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int,
+        ]
+        self.audio.audio_resample_windowed_sinc_f32.restype = ctypes.c_int
         self.audio.audio_preemphasis_f32.argtypes = [
             F32P, F32P, ctypes.c_int, ctypes.c_float,
         ]
@@ -123,6 +184,9 @@ class Kernels:
         self.audio.audio_feature_normalize_per_feature_f32.argtypes = [
             F32P, F32P, ctypes.c_int, ctypes.c_int, ctypes.c_float,
         ]
+        for library in (self.engine, self.audio):
+            library.ck_get_num_threads.argtypes = []
+            library.ck_get_num_threads.restype = ctypes.c_int
 
     def provenance(self) -> dict[str, object]:
         loaded = Path("/proc/self/maps").read_text(encoding="utf-8")
@@ -136,6 +200,17 @@ class Kernels:
                 "present_in_process_maps": str(path) in loaded,
             }
         return result
+
+    def thread_policy(self) -> dict[str, object]:
+        return {
+            "engine_threads": int(self.engine.ck_get_num_threads()),
+            "audio_threads": int(self.audio.ck_get_num_threads()),
+            "environment": {
+                name: os.environ[name]
+                for name in ("OMP_NUM_THREADS", "CK_NUM_THREADS")
+                if name in os.environ
+            },
+        }
 
     def gemm(self, value: np.ndarray, weight: np.ndarray, bias: np.ndarray | None = None) -> np.ndarray:
         value = f32(value)
@@ -262,6 +337,14 @@ class ParakeetSession:
     def close(self) -> None:
         self.weights.close()
 
+    def model_metadata_provenance(self) -> dict[str, object]:
+        names = ("config.json", "tokenizer.json", "tokenizer_config.json")
+        return {
+            name: file_identity(self.model_dir / name)
+            for name in names
+            if (self.model_dir / name).is_file()
+        }
+
     def w(self, name: str) -> np.ndarray:
         return f32(self.weights.get_tensor(name))
 
@@ -273,9 +356,9 @@ class ParakeetSession:
         )
         if status != 0:
             raise RuntimeError(f"WAV parse failed with status {status}")
-        if info.sample_rate != 16000 or info.channels != 1 or info.bits_per_sample != 16:
+        if info.bits_per_sample != 16:
             raise ValueError(
-                "Parakeet frontend currently requires mono 16-bit PCM WAV at 16000 Hz; "
+                "Parakeet frontend requires 16-bit PCM WAV input; "
                 f"got {info.channels} channel(s), {info.bits_per_sample}-bit, {info.sample_rate} Hz"
             )
         samples = np.empty(info.frames, dtype=np.float32)
@@ -284,6 +367,23 @@ class ParakeetSession:
         )
         if decoded != info.frames:
             raise RuntimeError(f"WAV decode returned {decoded} frames, expected {info.frames}")
+        source_samples = samples
+        if info.sample_rate != 16000:
+            output_frames = self.k.audio.audio_resampled_frame_count(
+                samples.size, info.sample_rate, 16000,
+            )
+            if output_frames <= 0:
+                raise RuntimeError(
+                    f"invalid resampled frame count for {samples.size} frames at {info.sample_rate} Hz"
+                )
+            resampled = np.empty(output_frames, dtype=np.float32)
+            status = self.k.audio.audio_resample_windowed_sinc_f32(
+                ptr(samples), samples.size, info.sample_rate, ptr(resampled),
+                output_frames, 16000, 16,
+            )
+            if status != 0:
+                raise RuntimeError(f"windowed-sinc resampling failed with status {status}")
+            samples = resampled
         emphasized = np.empty_like(samples)
         status = self.k.audio.audio_preemphasis_f32(
             ptr(samples), ptr(emphasized), samples.size, ctypes.c_float(0.97),
@@ -321,7 +421,7 @@ class ParakeetSession:
             raise RuntimeError(f"centered STFT failed with status {status}")
         mel_filters = np.empty((128, bins), dtype=np.float32)
         status = self.k.audio.audio_whisper_mel_filters_slaney_f32(
-            info.sample_rate, n_fft, 128, ptr(mel_filters),
+            16000, n_fft, 128, ptr(mel_filters),
         )
         if status != 0:
             raise RuntimeError(f"Slaney mel filter preparation failed with status {status}")
@@ -339,6 +439,11 @@ class ParakeetSession:
         if status != 0:
             raise RuntimeError(f"feature normalization failed with status {status}")
         return features, live_frames, {
+            "source_sample_rate": int(info.sample_rate),
+            "source_channels": int(info.channels),
+            "source_samples": source_samples,
+            "source_frames_consumed": int(decoded),
+            "resampled": bool(info.sample_rate != 16000),
             "samples": samples,
             "preemphasis": emphasized,
             "power": power,
@@ -428,7 +533,7 @@ class ParakeetSession:
         val = self.k.gemm(value, self.w(prefix + ".v_proj.weight"))
         relative = self.k.gemm(positions, self.w(prefix + ".relative_k_proj.weight"))
         attended = np.empty_like(value)
-        scores = np.empty(frames, dtype=np.float32)
+        scores = np.empty((heads, frames), dtype=np.float32)
         status = self.k.audio.audio_conformer_relative_attention_f32(
             ptr(query), ptr(key), ptr(val), ptr(relative),
             ptr(self.w(prefix + ".bias_u")), ptr(self.w(prefix + ".bias_v")),
@@ -475,6 +580,16 @@ class ParakeetSession:
         return self.layer_norm(value, prefix + ".norm_out")
 
     def encode(self, features: np.ndarray, live_frames: int, stop_after_layer: int | None = None) -> np.ndarray:
+        encoded_frames = int(features.shape[0])
+        for _ in range(3):
+            encoded_frames = (encoded_frames + 1) // 2
+        max_positions = int(self.encoder_config["max_position_embeddings"])
+        if encoded_frames > max_positions:
+            raise ValueError(
+                f"full-attention Parakeet input requires {encoded_frames} encoder positions, "
+                f"exceeding the declared limit {max_positions}; use a certified local-attention "
+                "or chunked mode"
+            )
         hidden = self.subsampling(features, live_frames)
         if stop_after_layer == -1:
             return hidden
@@ -566,6 +681,70 @@ class ParakeetSession:
         )
 
 
+def refine_token_timestamps(
+    sequences: np.ndarray,
+    durations: np.ndarray,
+    decoded_chunks: list[str | None],
+    *,
+    blank_token_id: int,
+    pad_token_id: int,
+    frame_rate: float = 0.08,
+) -> list[dict[str, object]]:
+    """Apply the pinned Transformers/NeMo TDT timestamp arithmetic."""
+    if sequences.ndim != 1 or durations.ndim != 1 or sequences.size != durations.size:
+        raise ValueError("TDT timestamp inputs must be equal-length rank-one arrays")
+    if len(decoded_chunks) != sequences.size:
+        raise ValueError("decoded token chunks must align with the TDT trajectory")
+    if np.any(durations < 0):
+        raise ValueError("TDT durations must be nonnegative")
+    frame = 0
+    timestamps: list[dict[str, object]] = []
+    punctuation = {"?", "'", "¡", "¿", "-", ":", ",", "%", "/", ".", "!"}
+    skip_ids = {int(blank_token_id), int(pad_token_id)}
+    for token_id, duration_value, chunk in zip(sequences, durations, decoded_chunks):
+        token = int(token_id)
+        duration = int(duration_value)
+        start_frame = frame
+        frame += duration
+        if token in skip_ids:
+            continue
+        if chunk is None:
+            continue
+        start = start_frame * frame_rate
+        end = (start_frame + duration) * frame_rate
+        if chunk in punctuation and timestamps:
+            start = float(timestamps[-1]["end"])
+            end = start
+        timestamps.append({"token": chunk, "start": start, "end": end})
+    return timestamps
+
+
+def decode_token_timestamps(
+    tokenizer,
+    sequences: np.ndarray,
+    durations: np.ndarray,
+    *,
+    blank_token_id: int,
+    pad_token_id: int,
+    frame_rate: float = 0.08,
+) -> list[dict[str, object]]:
+    """Stream tokenizer pieces and reproduce the pinned TDT timestamp contract."""
+    from tokenizers.decoders import DecodeStream
+
+    stream = DecodeStream(skip_special_tokens=True)
+    skip_ids = {int(blank_token_id), int(pad_token_id)}
+    chunks = [
+        None if int(token) in skip_ids else stream.step(tokenizer, int(token))
+        for token in sequences
+    ]
+    return refine_token_timestamps(
+        sequences, durations, chunks,
+        blank_token_id=blank_token_id,
+        pad_token_id=pad_token_id,
+        frame_rate=frame_rate,
+    )
+
+
 def compare(actual: np.ndarray, expected: np.ndarray) -> dict[str, float | bool]:
     difference = np.abs(actual.astype(np.float64) - expected.astype(np.float64))
     return {
@@ -580,11 +759,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--reference-report", type=Path)
     parser.add_argument("--audio", type=Path)
     parser.add_argument("--engine", default=Path("build/libckernel_engine.so"), type=Path)
     parser.add_argument("--audio-lib", default=Path("build/libckernel_audio.so"), type=Path)
     parser.add_argument("--stop-after-layer", type=int)
     parser.add_argument("--decode", action="store_true")
+    parser.add_argument(
+        "--allow-empty-transcript", action="store_true",
+        help="accept an all-silence chunk while retaining finite/termination checks",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -592,15 +776,20 @@ def main() -> int:
         parser.error("at least one of --fixture or --audio is required")
     fixture_context = np.load(args.fixture, allow_pickle=False) if args.fixture else None
     fixture = fixture_context
+    reference_report = (
+        json.loads(args.reference_report.read_text(encoding="utf-8"))
+        if args.reference_report else None
+    )
     try:
         run_started = time.perf_counter()
+        usage_started = resource.getrusage(resource.RUSAGE_SELF)
         kernels = Kernels(args.engine, args.audio_lib)
         session = ParakeetSession(args.model, kernels)
         frontend_report = None
         frontend_seconds = None
         if args.audio is not None:
             frontend_started = time.perf_counter()
-            features, live_frames, _frontend_intermediates = session.frontend(args.audio)
+            features, live_frames, frontend_intermediates = session.frontend(args.audio)
             frontend_seconds = time.perf_counter() - frontend_started
             if fixture is not None:
                 frontend_report = compare(features, f32(fixture["frontend.input_features"][0]))
@@ -630,30 +819,59 @@ def main() -> int:
                     "id": "nvidia/parakeet-tdt-0.6b-v3",
                     "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
                     "dtype": "fp32",
+                    "metadata": session.model_metadata_provenance(),
                 },
                 "reference": {
                     "implementation": "huggingface/transformers",
                     "revision": "66799f45cea7513712580c6170cdaa4438df702a",
                 },
-                "host": {"platform": platform.platform(), "python": platform.python_version()},
+                "cke": git_identity(ROOT),
+                "host": host_identity(),
                 "runtime": kernels.provenance(),
+                "thread_policy": kernels.thread_policy(),
                 "weights": session.weights.provenance(),
                 "inputs": {
                     "audio": {"path": str(args.audio.resolve()), "sha256": sha256_file(args.audio)} if args.audio else None,
                     "fixture": {"path": str(args.fixture.resolve()), "sha256": sha256_file(args.fixture)} if args.fixture else None,
+                    "reference_report": {
+                        "path": str(args.reference_report.resolve()),
+                        "sha256": sha256_file(args.reference_report),
+                    } if args.reference_report else None,
                 },
                 "shape": list(actual.shape),
                 "frontend_elapsed_seconds": frontend_seconds,
                 "encoder_elapsed_seconds": encoder_seconds,
                 "frontend": frontend_report,
+                "audio_frontend": {
+                    "source_sample_rate": frontend_intermediates["source_sample_rate"],
+                    "source_channels": frontend_intermediates["source_channels"],
+                    "source_samples": int(frontend_intermediates["source_samples"].size),
+                    "source_frames_consumed": frontend_intermediates["source_frames_consumed"],
+                    "source_seconds": (
+                        float(frontend_intermediates["source_samples"].size) /
+                        float(frontend_intermediates["source_sample_rate"])
+                    ),
+                    "processed_sample_rate": 16000,
+                    "resampled": frontend_intermediates["resampled"],
+                    "processed_samples": int(frontend_intermediates["samples"].size),
+                } if args.audio is not None else None,
                 "comparison": compare(actual, expected) if expected is not None else None,
             }
             if args.decode:
                 if args.stop_after_layer is not None:
                     raise ValueError("--decode requires the complete projected encoder")
                 sequences, durations, first_logits = session.decode(actual)
-                expected_sequences = fixture["decode.sequences"][0] if fixture is not None else None
-                expected_durations = fixture["decode.durations"][0] if fixture is not None else None
+                expected_decode = reference_report.get("decode", {}) if reference_report else {}
+                expected_sequences = (
+                    fixture["decode.sequences"][0] if fixture is not None
+                    else np.asarray(expected_decode["sequences"], dtype=np.int64)
+                    if "sequences" in expected_decode else None
+                )
+                expected_durations = (
+                    fixture["decode.durations"][0] if fixture is not None
+                    else np.asarray(expected_decode["durations"], dtype=np.int64)
+                    if "durations" in expected_decode else None
+                )
                 expected_logits = fixture["joint.first_logits"][0, 0, 0] if fixture is not None else None
                 report["decode"] = {
                     "steps": int(sequences.size),
@@ -670,6 +888,8 @@ def main() -> int:
                     "first_logits": compare(first_logits, expected_logits) if expected_logits is not None else None,
                     "sequences": sequences.tolist(),
                     "durations": durations.tolist(),
+                    "encoder_frames_consumed": int(durations.sum()),
+                    "termination_reason": "encoder_exhausted",
                 }
                 try:
                     from tokenizers import Tokenizer
@@ -677,8 +897,24 @@ def main() -> int:
                     report["decode"]["transcript"] = tokenizer.decode(
                         sequences.tolist(), skip_special_tokens=True,
                     )
+                    report["decode"]["timestamps"] = decode_token_timestamps(
+                        tokenizer, sequences, durations,
+                        blank_token_id=int(session.config["blank_token_id"]),
+                        pad_token_id=int(session.config["pad_token_id"]),
+                    )
                 except ImportError:
                     report["decode"]["transcript"] = None
+                    report["decode"]["timestamps"] = None
+                expected_transcript = expected_decode.get("transcript")
+                expected_timestamps = expected_decode.get("timestamps")
+                report["decode"]["transcript_equal"] = (
+                    report["decode"]["transcript"] == expected_transcript
+                    if expected_transcript is not None else None
+                )
+                report["decode"]["timestamps_equal"] = (
+                    report["decode"]["timestamps"] == expected_timestamps
+                    if expected_timestamps is not None else None
+                )
             checks = {
                 "runtime_libraries_loaded": all(
                     bool(item["present_in_process_maps"])
@@ -686,6 +922,11 @@ def main() -> int:
                 ),
                 "finite_frontend": frontend_report is None or bool(frontend_report["finite"]),
                 "finite_encoder": bool(report["comparison"]["finite"]) if report["comparison"] else bool(np.isfinite(actual).all()),
+                "complete_source_consumption": (
+                    report["audio_frontend"] is None or
+                    report["audio_frontend"]["source_frames_consumed"] ==
+                    report["audio_frontend"]["source_samples"]
+                ),
                 "frontend_rmse_at_most_5e_4": frontend_report is None or float(frontend_report["rmse"]) <= 5.0e-4,
                 "encoder_rmse_at_most_2e_5": report["comparison"] is None or float(report["comparison"]["rmse"]) <= 2.0e-5,
             }
@@ -694,16 +935,46 @@ def main() -> int:
                     "finite_first_logits": bool(report["decode"]["first_logits"]["finite"]) if report["decode"]["first_logits"] else bool(np.isfinite(first_logits).all()),
                     "sequence_trajectory_exact": report["decode"]["sequences_equal"] is not False,
                     "duration_trajectory_exact": report["decode"]["durations_equal"] is not False,
-                    "nonempty_transcript": bool(report["decode"]["transcript"]),
+                    "valid_transcript": (
+                        bool(report["decode"]["transcript"]) or args.allow_empty_transcript
+                    ),
+                    "valid_timestamps": (
+                        bool(report["decode"]["timestamps"]) or args.allow_empty_transcript
+                    ),
+                    "transcript_exact": report["decode"]["transcript_equal"] is not False,
+                    "timestamps_exact": report["decode"]["timestamps_equal"] is not False,
+                    "decoder_consumed_encoder": (
+                        report["decode"]["encoder_frames_consumed"] >= actual.shape[0]
+                    ),
                 })
             report["checks"] = checks
             report["status"] = "pass" if all(checks.values()) else "fail"
+            source_description = (
+                f"{report['audio_frontend']['source_seconds']:.3f}-second "
+                f"{report['audio_frontend']['source_channels']}-channel "
+                f"{report['audio_frontend']['source_sample_rate']} Hz PCM WAV"
+                if report["audio_frontend"] else "retained feature fixture"
+            )
             report["scope"] = (
-                "one 7.435-second mono 16 kHz PCM WAV trajectory; exact token and "
-                "duration parity does not certify silence, multilingual, resampling, "
-                "long-audio chunking, or diarization"
+                f"{source_description}; full-attention native Parakeet execution; "
+                "long-audio local attention, multilingual quality, word/segment timestamps, "
+                "and diarization require separate evidence"
             )
             report["total_elapsed_seconds"] = time.perf_counter() - run_started
+            usage_finished = resource.getrusage(resource.RUSAGE_SELF)
+            report["process_cpu_seconds"] = {
+                "user": float(usage_finished.ru_utime - usage_started.ru_utime),
+                "system": float(usage_finished.ru_stime - usage_started.ru_stime),
+            }
+            if report["audio_frontend"]:
+                report["real_time_factor"] = (
+                    report["total_elapsed_seconds"] /
+                    report["audio_frontend"]["source_seconds"]
+                )
+            report["peak_rss_bytes"] = (
+                int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024
+            )
+            report["exit"] = {"code": 0 if report["status"] == "pass" else 1}
             serialized = json.dumps(report, indent=2) + "\n"
             if args.output is not None:
                 args.output.parent.mkdir(parents=True, exist_ok=True)

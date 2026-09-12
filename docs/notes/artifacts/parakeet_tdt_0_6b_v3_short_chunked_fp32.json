@@ -1,0 +1,263 @@
+{
+  "schema": "cke.parakeet.long_audio.v1",
+  "status": "pass",
+  "cke": {
+    "commit": "909a2c164c25c1724c7a0f3e552f0e18ba0e9cfe",
+    "dirty": true
+  },
+  "model": {
+    "id": "nvidia/parakeet-tdt-0.6b-v3",
+    "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+    "metadata": {
+      "config.json": {
+        "path": "/tmp/parakeet-bump/config.json",
+        "bytes": 2018,
+        "sha256": "c7f3830d7ed0f3a138365baef193a7a824cb7fe3c9cc737b98d3dc65d90aab5e"
+      },
+      "tokenizer.json": {
+        "path": "/tmp/parakeet-bump/tokenizer.json",
+        "bytes": 1159960,
+        "sha256": "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91"
+      },
+      "tokenizer_config.json": {
+        "path": "/tmp/parakeet-bump/tokenizer_config.json",
+        "bytes": 290,
+        "sha256": "0b2fe0037599ee335f0b972fa682bf0ece74e4ccfec755cb7daa3405d3d3e874"
+      }
+    }
+  },
+  "runtime": {
+    "engine": {
+      "path": "/data/cke/worktrees/parakeet-long-audio/build/libckernel_engine.so",
+      "sha256": "689e440b355472c98bf9fe6a8b29e8950d958a23ee00caff06723cf798376b70",
+      "bytes": 1871592,
+      "present_in_process_maps": true
+    },
+    "audio": {
+      "path": "/data/cke/worktrees/parakeet-long-audio/build/libckernel_audio.so",
+      "sha256": "08b31a30f4bdf7c08d1d2b369818d81e5b62753c8749471f92ab69ee978e06ae",
+      "bytes": 71880,
+      "present_in_process_maps": true
+    }
+  },
+  "thread_policy": {
+    "engine_threads": 16,
+    "audio_threads": 16,
+    "environment": {}
+  },
+  "host": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.14.4",
+    "cpu_model": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "logical_cpus": 32,
+    "isa": [
+      "avx",
+      "avx2",
+      "fma",
+      "avx512f",
+      "avx512_vnni",
+      "avx512_bf16"
+    ],
+    "memory_bytes": 161760223232
+  },
+  "input": {
+    "path": "/data/cke/worktrees/parakeet-long-audio/version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav",
+    "bytes": 237964,
+    "sha256": "5fceacff0315d49cb59fcc505bcecf1ed5f2f35c2897b1e65a59f30e5d922150",
+    "sample_rate": 16000,
+    "channels": 1,
+    "sample_width_bytes": 2,
+    "source_frames": 118960,
+    "source_seconds": 7.435
+  },
+  "policy": {
+    "kind": "overlapping_full_attention_windows",
+    "window_seconds": 5.0,
+    "overlap_seconds": 2.0,
+    "state": "reset_each_window",
+    "ownership": "word_midpoint_at_overlap_midpoint",
+    "timestamp_offset": "source_window_start"
+  },
+  "windows": [
+    {
+      "index": 0,
+      "source_frame_start": 0,
+      "source_frame_end": 80000,
+      "ownership_frame_start": 0,
+      "ownership_frame_end": 64000,
+      "source_seconds_start": 0.0,
+      "source_seconds_end": 5.0,
+      "ownership_seconds_start": 0.0,
+      "ownership_seconds_end": 4.0,
+      "source_frames_consumed": 80000,
+      "encoder_frames": 63,
+      "decode_steps": 36,
+      "termination_reason": "encoder_exhausted",
+      "finite_encoder": true,
+      "finite_first_logits": true,
+      "selected_words": 13,
+      "transcript": "Well, I don't wish to see it any more, observed Phoebe, turning away her eyes.",
+      "elapsed_seconds": 0.6297550250310451,
+      "encoder_seconds": 0.5041096060303971
+    },
+    {
+      "index": 1,
+      "source_frame_start": 48000,
+      "source_frame_end": 118960,
+      "ownership_frame_start": 64000,
+      "ownership_frame_end": 118960,
+      "source_seconds_start": 3.0,
+      "source_seconds_end": 7.435,
+      "ownership_seconds_start": 4.0,
+      "ownership_seconds_end": 7.435,
+      "source_frames_consumed": 70960,
+      "encoder_frames": 56,
+      "decode_steps": 25,
+      "termination_reason": "encoder_exhausted",
+      "finite_encoder": true,
+      "finite_first_logits": true,
+      "selected_words": 10,
+      "transcript": "turning away her eyes. It is certainly very like the old portrait.",
+      "elapsed_seconds": 0.4738117309752852,
+      "encoder_seconds": 0.3731800109380856
+    }
+  ],
+  "selected_words": [
+    {
+      "text": "Well,",
+      "start": 0.32,
+      "end": 0.56
+    },
+    {
+      "text": " I",
+      "start": 0.64,
+      "end": 0.8
+    },
+    {
+      "text": " don't",
+      "start": 0.8,
+      "end": 1.04
+    },
+    {
+      "text": " wish",
+      "start": 1.04,
+      "end": 1.28
+    },
+    {
+      "text": " to",
+      "start": 1.28,
+      "end": 1.36
+    },
+    {
+      "text": " see",
+      "start": 1.36,
+      "end": 1.52
+    },
+    {
+      "text": " it",
+      "start": 1.52,
+      "end": 1.68
+    },
+    {
+      "text": " any",
+      "start": 1.68,
+      "end": 1.76
+    },
+    {
+      "text": " more,",
+      "start": 1.92,
+      "end": 2.0
+    },
+    {
+      "text": " observed",
+      "start": 2.24,
+      "end": 2.56
+    },
+    {
+      "text": " Phoebe,",
+      "start": 2.56,
+      "end": 3.04
+    },
+    {
+      "text": " turning",
+      "start": 3.2800000000000002,
+      "end": 3.68
+    },
+    {
+      "text": " away",
+      "start": 3.68,
+      "end": 4.0
+    },
+    {
+      "text": " her",
+      "start": 4.04,
+      "end": 4.2
+    },
+    {
+      "text": " eyes.",
+      "start": 4.2,
+      "end": 4.68
+    },
+    {
+      "text": " It",
+      "start": 4.92,
+      "end": 5.16
+    },
+    {
+      "text": " is",
+      "start": 5.16,
+      "end": 5.32
+    },
+    {
+      "text": " certainly",
+      "start": 5.32,
+      "end": 5.800000000000001
+    },
+    {
+      "text": " very",
+      "start": 5.800000000000001,
+      "end": 5.96
+    },
+    {
+      "text": " like",
+      "start": 5.96,
+      "end": 6.2
+    },
+    {
+      "text": " the",
+      "start": 6.2,
+      "end": 6.359999999999999
+    },
+    {
+      "text": " old",
+      "start": 6.359999999999999,
+      "end": 6.68
+    },
+    {
+      "text": " portrait.",
+      "start": 6.68,
+      "end": 7.24
+    }
+  ],
+  "transcript": "Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.",
+  "source_coverage": {
+    "start_seconds": 0.0,
+    "end_seconds": 7.435,
+    "complete": true,
+    "planned_windows": 2,
+    "completed_windows": 2
+  },
+  "total_elapsed_seconds": 1.13846172997728,
+  "process_cpu_seconds": {
+    "user": 10.985813,
+    "system": 0.32911
+  },
+  "peak_rss_bytes": 2562441216,
+  "checks": {
+    "all_windows_completed": true,
+    "source_coverage_exact": true,
+    "finite_outputs": true,
+    "monotonic_word_timestamps": true,
+    "nonempty_transcript": true
+  }
+}

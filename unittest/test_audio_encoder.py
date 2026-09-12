@@ -195,6 +195,10 @@ lib.audio_conformer_relative_attention_f32.argtypes = [
     _FLOAT_P, ctypes.c_size_t,
 ]
 lib.audio_conformer_relative_attention_f32.restype = ctypes.c_int
+lib.ck_set_num_threads.argtypes = [ctypes.c_int]
+lib.ck_set_num_threads.restype = None
+lib.ck_get_num_threads.argtypes = []
+lib.ck_get_num_threads.restype = ctypes.c_int
 lib.audio_stft_power_fft400_f32.argtypes = [
     _FLOAT_P, ctypes.c_int, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, _FLOAT_P, ctypes.c_int, _FLOAT_P,
@@ -773,12 +777,23 @@ def check_conformer_relative_attention() -> None:
     expected = (probability @ v).permute(1, 0, 2).reshape(frames, channels).numpy()
 
     actual = np.empty_like(query)
-    scratch = np.empty(frames, dtype=np.float32)
+    serial = np.empty_like(query)
+    scratch = np.empty((heads, frames), dtype=np.float32)
+    original_threads = lib.ck_get_num_threads()
+    lib.ck_set_num_threads(1)
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(serial), frames, heads,
+        head_dim, float(scale), _fptr(scratch), scratch.nbytes,
+    ) == 0
+    lib.ck_set_num_threads(max(2, original_threads))
     assert lib.audio_conformer_relative_attention_f32(
         _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
         _fptr(bias_u), _fptr(bias_v), _fptr(actual), frames, heads,
         head_dim, float(scale), _fptr(scratch), scratch.nbytes,
     ) == 0
+    lib.ck_set_num_threads(original_threads)
+    assert np.array_equal(actual, serial)
     maximum = float(np.max(np.abs(actual - expected)))
     rmse = float(np.sqrt(np.mean((actual - expected) ** 2)))
     assert maximum <= 1.5e-7, maximum

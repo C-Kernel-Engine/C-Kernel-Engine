@@ -49,11 +49,11 @@ python version/v8/scripts/run_parakeet_native_v8.py \
     <tr><td>WAV trajectory</td><td>50/50 token IDs and 50/50 durations exactly match the pinned Transformers FP32 reference.</td></tr>
     <tr><td>Transcript</td><td>“Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.”</td></tr>
     <tr><td>Ryzen timing</td><td>0.069 seconds frontend plus 1.027 seconds encoder for 7.435 seconds of audio on the recorded warm run. Hashing and conversion are outside those stage timings.</td></tr>
-    <tr><td>Memory ownership</td><td>New attention, grouped Conv1D, BatchNorm, position, and LSTM compute providers contain no heap allocation. Attention uses one caller-owned T-element score row; LSTM uses caller-owned 4H gate scratch and session-owned state.</td></tr>
+    <tr><td>Memory ownership</td><td>New attention, grouped Conv1D, BatchNorm, position, and LSTM compute providers contain no heap allocation. Head-parallel attention uses one caller-owned T-element score row per head; LSTM uses caller-owned 4H gate scratch and session-owned state.</td></tr>
   </table>
-  <p>Machine-readable evidence: <a href="notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">reference fixture manifest</a>, and <a href="notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">tensor manifest</a>.</p>
+  <p>Machine-readable evidence: <a href="notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_certification.json">five-minute certification</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">reference fixture manifest</a>, and <a href="notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">tensor manifest</a>.</p>
 
   <h2>Certification boundary</h2>
-  <p>The passing result covers one 7.435-second English, mono, 16 kHz PCM WAV. Silence, multilingual speech, resampling, five-minute and 42-minute audio, chunk boundaries, timestamps, concurrent sessions, and diarization remain open. The current runtime orchestration is a thin Python layer over native CKE kernels and BUMP weights.</p>
+  <p>The exact reference result covers one 7.435-second English, mono, 16 kHz PCM WAV. Deterministic full-attention and overlapping-window runs pass on a complete five-minute English recording, and a synthetic 48 kHz stereo resampling case also passes. Multilingual speech, real-world resampling quality, 42-minute audio, concurrent sessions, generated-circuit execution, and diarization remain open. The current runtime orchestration is a thin Python layer over native CKE kernels and BUMP weights.</p>
 </main></body>
 </html>

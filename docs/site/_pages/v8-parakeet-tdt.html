@@ -3,7 +3,7 @@
 
 <div class="container">
   <h1>Parakeet TDT Native CPU Bring-up</h1>
-  <p class="lead">The first Parakeet milestone freezes the reference and maps every required operation to CKE. A pinned FP32 reference fixture passes on Ryzen, but native CKE transcription has not been implemented or tested. Diarization is a separate milestone.</p>
+  <p class="lead">CKE now runs the pinned Parakeet TDT 0.6B v3 checkpoint end to end through native CPU kernels and BUMP weights. The exact short trajectory passes, and full-attention plus deterministic overlapping-window execution pass on a complete five-minute recording. The 42-minute production workload remains the next gate. Diarization remains a separate milestone.</p>
 
   <style>
     .para-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin:1rem 0; }
@@ -20,7 +20,7 @@
     main code { overflow-wrap:anywhere; }
   </style>
 
-  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>Reference fixture: passed. Operation inventory: complete. Native CKE conversion, generated circuit, transcription parity, multilingual audio, long audio, and diarization: not tested.</div></div>
+  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>One 7.435-second English trajectory matches the pinned Transformers reference exactly for all 50 token and duration decisions. Two complete five-minute full-attention runs and two deterministic overlapping-window runs pass with exact source coverage and timestamps. The runtime still uses Python orchestration around native kernels; generated-circuit execution, 42-minute input, multilingual quality, concurrent-session isolation, and diarization remain open.</div></div>
 
   <h2 id="reference">Frozen reference</h2>
   <div class="para-grid">
@@ -42,8 +42,23 @@
     <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json">Operation-reuse inventory (JSON)</a></li>
   </ul>
 
-  <h2 id="inventory">Operation-reuse inventory</h2>
-  <p>Reusable means the provider's interface fits. Candidate reuse still requires a comparison at the named fixture boundary. Missing composition means the mathematical pieces exist but no declared Parakeet graph binds them yet.</p>
+  <h2 id="native-evidence">Native execution evidence</h2>
+  <p>The short native path converts all 699 inference tensors to BUMPWGT5 and excludes 24 BatchNorm training counters explicitly. On Ryzen, the frontend, all 24 FastConformer blocks, prediction network, joint network, greedy TDT decoder, tokenizer, and token timestamps complete without importing PyTorch or Transformers. The retained short result matches 50 of 50 token IDs, 50 of 50 durations, the decoded transcript, and all 44 timestamp entries.</p>
+  <p>The five-minute fixture consumes all 4,800,000 source samples and produces a complete transcript and monotonic token timestamps. Two runs produced identical token IDs, durations, transcript, and 1,296 timestamp entries. The retained repeat took 369.19 seconds (RTF 1.23) and 2.87 GB peak RSS on Ryzen. Its WER is 10.43% against the curated 690-word transcript.</p>
+  <p>Whisper Base on the identical PCM completed in 10.19 seconds (RTF 0.034) with 5.65% WER using its per-window fallback. Whisper's default persistent-worker path failed before inference with a dynamic-module pickling error, which is retained as a separate runtime limitation. Full Parakeet attention uses one caller-owned score row per head and schedules heads independently; the provider does not allocate heap memory. The complete selected call chain still needs repeated-call allocation instrumentation before an allocation-free runtime claim.</p>
+  <ul>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">Exact short native report (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_fp32.json">Five-minute native report (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_certification.json">Five-minute repeat and quality certification (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_whisper_five_minute_matched.json">Matched Parakeet and Whisper result (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_short_chunked_fp32.json">Two-window short-audio reconciliation result (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_chunking_certification.json">Five-minute chunking certification (JSON)</a></li>
+  </ul>
+  <p>A synthetic 48 kHz stereo transform of the short fixture also reproduces the 16 kHz mono trajectory after CKE windowed-sinc resampling. This validates the wiring and deterministic fixture transform; broader real-world resampling quality is not yet certified.</p>
+  <p>The bounded long-audio policy uses 180-second full-attention windows with 30 seconds of overlap. Encoder and decoder state reset for each window. Each word belongs to the window whose ownership region contains its timestamp midpoint; ownership regions meet at the midpoint of each overlap. Two five-minute runs produced identical 700-word trajectories, exact 0–300 second coverage, and 7.25% WER. The retained repeat took 231.19 seconds (RTF 0.771) with 3.24 GB peak RSS.</p>
+
+  <h2 id="inventory">Original operation-reuse inventory</h2>
+  <p>This table records the pre-implementation inventory from PR #503. Its missing-provider and composition labels describe that starting point; the native evidence above is the current status. Candidate reuse meant that an interface fit still required comparison at the named fixture boundary.</p>
   <div class="para-table"><table><thead><tr><th>Stage</th><th>Required operation</th><th>Disposition</th><th>CKE foundation and exact gap</th></tr></thead><tbody><tr><td>frontend</td><td>PCM decode and mono conversion</td><td><span class="status status-reuse">Reusable</span></td><td><code>audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32</code><br>16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input.</td></tr>
 <tr><td>frontend</td><td>sample-rate validation and resampling</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_resample_windowed_sinc_f32</code><br>The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately.</td></tr>
 <tr><td>frontend</td><td>pre-emphasis x[t]-0.97*x[t-1]</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_preemphasis_f32</code><br>Arithmetic and first-sample rule match; real-fixture comparison remains required.</td></tr>
@@ -76,12 +91,12 @@
 <tr><td>runtime</td><td>Parakeet circuit and native session</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>v8 circuit/lowering/runtime foundations</code><br>Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths.</td></tr></tbody></table></div>
 
   <h2 id="milestones">Implementation milestones</h2>
-  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>Exit evidence</th></tr></thead><tbody><tr><td>1</td><td>frontend and subsampling X-Ray</td><td>CKE matches the committed frontend and subsampling tensors for the short fixture under stated tolerances.</td></tr>
-<tr><td>2</td><td>one FastConformer block</td><td>Layer 0 matches at all five residual boundaries; BatchNorm and relative attention contracts are explicit.</td></tr>
-<tr><td>3</td><td>full encoder</td><td>All 24 encoder boundaries and the 1024-to-640 projection match; memory is bounded for the tested clip.</td></tr>
-<tr><td>4</td><td>prediction, joint, and TDT decode</td><td>Native token ids, durations, timestamps, and transcript match the pinned reference on the short fixture.</td></tr>
-<tr><td>5</td><td>BUMP conversion and native CLI</td><td>All 723 tensors are accounted for, generated C builds, and normal inference has no reference-framework dependency.</td></tr>
-<tr><td>6</td><td>long audio and multilingual coverage</td><td>Five-minute then 42-minute runs report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior.</td></tr></tbody></table></div>
+  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>Status and evidence</th></tr></thead><tbody><tr><td>1</td><td>frontend and subsampling X-Ray</td><td>Passed on the retained short fixture under declared tolerances.</td></tr>
+<tr><td>2</td><td>one FastConformer block</td><td>Passed at layer 0; BatchNorm and relative-attention contracts are declared.</td></tr>
+<tr><td>3</td><td>full encoder</td><td>Passed across all 24 retained boundaries and the 1024-to-640 projection.</td></tr>
+<tr><td>4</td><td>prediction, joint, and TDT decode</td><td>Passed: token IDs, durations, timestamps, and transcript match the pinned short reference.</td></tr>
+<tr><td>5</td><td>BUMP conversion and native diagnostic runner</td><td>Passed: 723 tensors are accounted for and inference has no reference-framework dependency. Generated-circuit execution remains open.</td></tr>
+<tr><td>6</td><td>long audio and multilingual coverage</td><td>In progress: deterministic five-minute full-attention and overlapping-window evidence passes. A matched Whisper Base control passes. The 42-minute execution and multilingual quality remain open.</td></tr></tbody></table></div>
   <p>New production compute paths must use planner-declared scratch or session-owned state. They may not allocate or free heap memory per call, hide allocation in helpers, substitute large stack buffers, or share mutable scratch across sessions.</p>
 
   <h2 id="reproduce">Reproduce the reference capture</h2>
@@ -101,5 +116,5 @@ python version/v8/scripts/capture_parakeet_reference_v8.py \
   --transformers-revision 66799f45cea7513712580c6170cdaa4438df702a</code></pre>
 
   <h2 id="next">Next work</h2>
-  <p>The next PR should implement and X-Ray only the frontend plus Conv2D subsampling against this fixture. One FastConformer block follows after the BatchNorm and relative-attention contracts are settled. Diarization begins in a separate PR after a bounded checkpoint comparison, and it first integrates with the already working Whisper path.</p>
+  <p>The next gate is running the complete 42-minute retained recording through the certified overlapping-window policy and proving coverage ends at exactly 2,542.0 seconds. The full-attention diagnostic runner fails closed above the checkpoint's 5,000-position limit. Model arithmetic still performed by NumPy orchestration must then move into declared CKE operations and a planned generated circuit. Multilingual coverage and diarization follow as separate evidence lanes.</p>
 </div>

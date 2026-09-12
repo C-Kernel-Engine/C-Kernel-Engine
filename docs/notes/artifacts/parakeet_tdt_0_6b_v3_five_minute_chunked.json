@@ -1,0 +1,3653 @@
+{
+  "schema": "cke.parakeet.long_audio.v1",
+  "status": "pass",
+  "cke": {
+    "commit": "909a2c164c25c1724c7a0f3e552f0e18ba0e9cfe",
+    "dirty": true
+  },
+  "model": {
+    "id": "nvidia/parakeet-tdt-0.6b-v3",
+    "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+    "metadata": {
+      "config.json": {
+        "path": "/tmp/parakeet-bump/config.json",
+        "bytes": 2018,
+        "sha256": "c7f3830d7ed0f3a138365baef193a7a824cb7fe3c9cc737b98d3dc65d90aab5e"
+      },
+      "tokenizer.json": {
+        "path": "/tmp/parakeet-bump/tokenizer.json",
+        "bytes": 1159960,
+        "sha256": "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91"
+      },
+      "tokenizer_config.json": {
+        "path": "/tmp/parakeet-bump/tokenizer_config.json",
+        "bytes": 290,
+        "sha256": "0b2fe0037599ee335f0b972fa682bf0ece74e4ccfec755cb7daa3405d3d3e874"
+      }
+    }
+  },
+  "runtime": {
+    "engine": {
+      "path": "/data/cke/worktrees/parakeet-long-audio/build/libckernel_engine.so",
+      "sha256": "689e440b355472c98bf9fe6a8b29e8950d958a23ee00caff06723cf798376b70",
+      "bytes": 1871592,
+      "present_in_process_maps": true
+    },
+    "audio": {
+      "path": "/data/cke/worktrees/parakeet-long-audio/build/libckernel_audio.so",
+      "sha256": "08b31a30f4bdf7c08d1d2b369818d81e5b62753c8749471f92ab69ee978e06ae",
+      "bytes": 71880,
+      "present_in_process_maps": true
+    }
+  },
+  "thread_policy": {
+    "engine_threads": 16,
+    "audio_threads": 16,
+    "environment": {}
+  },
+  "host": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.14.4",
+    "cpu_model": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "logical_cpus": 32,
+    "isa": [
+      "avx",
+      "avx2",
+      "fma",
+      "avx512f",
+      "avx512_vnni",
+      "avx512_bf16"
+    ],
+    "memory_bytes": 161760223232
+  },
+  "input": {
+    "path": "/home/antshiv/.cache/ck-engine-v8/fixtures/kernel-2-nightly-5min.wav",
+    "bytes": 9600098,
+    "sha256": "cca3c7deb9cf5673780258483bbd919c27d8ac0e0a721e9d744fdddbbd1a23ab",
+    "sample_rate": 16000,
+    "channels": 1,
+    "sample_width_bytes": 2,
+    "source_frames": 4800000,
+    "source_seconds": 300.0
+  },
+  "policy": {
+    "kind": "overlapping_full_attention_windows",
+    "window_seconds": 180.0,
+    "overlap_seconds": 30.0,
+    "state": "reset_each_window",
+    "ownership": "word_midpoint_at_overlap_midpoint",
+    "timestamp_offset": "source_window_start"
+  },
+  "windows": [
+    {
+      "index": 0,
+      "source_frame_start": 0,
+      "source_frame_end": 2880000,
+      "ownership_frame_start": 0,
+      "ownership_frame_end": 2640000,
+      "source_seconds_start": 0.0,
+      "source_seconds_end": 180.0,
+      "ownership_seconds_start": 0.0,
+      "ownership_seconds_end": 165.0,
+      "source_frames_consumed": 2880000,
+      "encoder_frames": 2251,
+      "decode_steps": 1117,
+      "termination_reason": "encoder_exhausted",
+      "finite_encoder": true,
+      "finite_first_logits": true,
+      "selected_words": 486,
+      "transcript": "Now, in the first video in this series, I started with activation, activation kernels, and we looked at sigmoid, reluct, relusquared, CLU, and Swigloo. These are all the different activations, and the objective was to connect each mathematical formula to its curves, its role in the model, and the loop and compute computer eventually has to execute. And in this video, I want to continue from there, but widen the view. I want to build a practical map of the kernels that appears across modern AI systems. Like what is a GEMM, and how do normalization, softmax, rope, rotational positional encoding, quantization, attention, and recurrent states become loops and memory access on a real CPU. And I'm creating this series for two reasons. Um, first, I want to improve my own understanding, and building the C kernel engine forces me to move between model architecture, mathematics, C code, compiler output, numerical parity, and physical CPU measurements. And explaining that work makes the gap in my understanding much easier to find. I've been doing this series for for a while now, so it just becomes more and more ingrained in my mind. But the second most important factor, a little selfish reason, is I also want CK needs more contributors and also more CPU evidence. So you do not need a GPU cluster to contribute. So if you have a Linux computer with an Intel AMD or even an ARM CPU, that machine can expose a different instruction set, cache hierarchy, memory limit, compiler behavior, or scheduling problems. So I hopefully can encourage more contributors to contribute to the project and you know become a better kernel engineer, improve on your understanding of how AI works at the fundamental level, and working on frameworks is my kind of like my gateway or was my recommended gateway for you to understand these things much more practically and much more uh what do you say viscerally uh when it comes to AI. So you can begin by reproducing one test and inspect one kernel, compare it with its scalar reference, profile it, make one change, and prove that the results remain correct. Now, CK, you know, at this point in time does have a very very broad model um compatibility, uh including different quantization formats, not all, but some of it. But in this video, I'm still talking more about you know a follow-up from what I did last time, which was all about understanding how to become a kernel engineer, and that work also strengthens your career, hopefully. So instead of only saying that you know C or Linux or single instruction multiple data how to profile or machine learning, you can now point to a real kernel, a benchmark, a party result, and a pull request, and that is concrete engineering evidence. So if you're a beginner, do not begin by trying to understand the entire model at once, pick one operation, uh, write down its equation, track its tensor shapes, and then implement the simplest correct version and then test tiny inputs, then ask what.",
+      "elapsed_seconds": 136.0291487768991,
+      "frontend_seconds": 1.5754036461003125,
+      "encoder_seconds": 131.86853559000883,
+      "decoder_seconds": 2.5818005729233846
+    },
+    {
+      "index": 1,
+      "source_frame_start": 2400000,
+      "source_frame_end": 4800000,
+      "ownership_frame_start": 2640000,
+      "ownership_frame_end": 4800000,
+      "source_seconds_start": 150.0,
+      "source_seconds_end": 300.0,
+      "ownership_seconds_start": 165.0,
+      "ownership_seconds_end": 300.0,
+      "source_frames_consumed": 2400000,
+      "encoder_frames": 1876,
+      "decode_steps": 789,
+      "termination_reason": "encoder_exhausted",
+      "finite_encoder": true,
+      "finite_first_logits": true,
+      "selected_words": 214,
+      "transcript": "Hopefully. So instead of only saying that you know C or Linux or single instruction multiple data how to profile or machine learning, you can now point to a real kernel, a benchmark, a party result, and a pull request. And that is concrete engineering evidence. So if you're a beginner, do not begin by trying to understand the entire model at once. Pick one operation, write down its equation, track its tensor shapes, and then implement the simplest correct version. And then test tiny inputs. Then ask what did the CPU what is the CPU doing with every load, store, loop, vector, lane, and thread. And do not optimize because the code looks clever. Like first measure it and keep the scalar implementation as an oracle. You could also use PYPy torches, something that I've been using as an oracle. Then change one boundary at a time and check correctness again after every optimization. This is how I want the series to work. So one mathematical operation at a time connected to real code, real hardware, and real evidence. And let's continue with the series. So I'm Anthony Shifkumar from Anti Robotics. I do build the C kernel engine. I'm looking for contributors. I do document all some of my blogs on Shivaznos.com. So let us continue from those activation kernels that I spoke about in my previous uh video, and let's get started. So here is the part for this video math, kernels, runtime and model. And when I say kernels, I do not mean the Linux kernel, I mean a focus routine that computes one operation or one tightly fused group of.",
+      "elapsed_seconds": 95.12352602102328,
+      "frontend_seconds": 1.3156067290110514,
+      "encoder_seconds": 92.48870911204722,
+      "decoder_seconds": 1.3172389680985361
+    }
+  ],
+  "selected_words": [
+    {
+      "text": "Now,",
+      "start": 1.52,
+      "end": 1.84
+    },
+    {
+      "text": " in",
+      "start": 1.92,
+      "end": 2.16
+    },
+    {
+      "text": " the",
+      "start": 2.16,
+      "end": 2.48
+    },
+    {
+      "text": " first",
+      "start": 2.48,
+      "end": 2.8000000000000003
+    },
+    {
+      "text": " video",
+      "start": 2.8000000000000003,
+      "end": 3.12
+    },
+    {
+      "text": " in",
+      "start": 3.44,
+      "end": 3.68
+    },
+    {
+      "text": " this",
+      "start": 3.68,
+      "end": 3.84
+    },
+    {
+      "text": " series,",
+      "start": 3.84,
+      "end": 4.24
+    },
+    {
+      "text": " I",
+      "start": 4.32,
+      "end": 4.48
+    },
+    {
+      "text": " started",
+      "start": 4.48,
+      "end": 4.88
+    },
+    {
+      "text": " with",
+      "start": 4.88,
+      "end": 5.12
+    },
+    {
+      "text": " activation,",
+      "start": 5.12,
+      "end": 6.0
+    },
+    {
+      "text": " activation",
+      "start": 6.4,
+      "end": 7.12
+    },
+    {
+      "text": " kernels,",
+      "start": 7.12,
+      "end": 7.5200000000000005
+    },
+    {
+      "text": " and",
+      "start": 7.6000000000000005,
+      "end": 7.76
+    },
+    {
+      "text": " we",
+      "start": 7.76,
+      "end": 7.92
+    },
+    {
+      "text": " looked",
+      "start": 7.92,
+      "end": 8.08
+    },
+    {
+      "text": " at",
+      "start": 8.08,
+      "end": 8.24
+    },
+    {
+      "text": " sigmoid,",
+      "start": 8.24,
+      "end": 8.88
+    },
+    {
+      "text": " reluct,",
+      "start": 9.040000000000001,
+      "end": 10.56
+    },
+    {
+      "text": " relusquared,",
+      "start": 10.88,
+      "end": 12.0
+    },
+    {
+      "text": " CLU,",
+      "start": 12.16,
+      "end": 12.72
+    },
+    {
+      "text": " and",
+      "start": 12.88,
+      "end": 13.040000000000001
+    },
+    {
+      "text": " Swigloo.",
+      "start": 13.040000000000001,
+      "end": 13.76
+    },
+    {
+      "text": " These",
+      "start": 13.84,
+      "end": 14.0
+    },
+    {
+      "text": " are",
+      "start": 14.0,
+      "end": 14.08
+    },
+    {
+      "text": " all",
+      "start": 14.08,
+      "end": 14.16
+    },
+    {
+      "text": " the",
+      "start": 14.16,
+      "end": 14.24
+    },
+    {
+      "text": " different",
+      "start": 14.24,
+      "end": 14.48
+    },
+    {
+      "text": " activations,",
+      "start": 14.48,
+      "end": 14.96
+    },
+    {
+      "text": " and",
+      "start": 15.040000000000001,
+      "end": 15.200000000000001
+    },
+    {
+      "text": " the",
+      "start": 15.200000000000001,
+      "end": 15.36
+    },
+    {
+      "text": " objective",
+      "start": 15.36,
+      "end": 15.76
+    },
+    {
+      "text": " was",
+      "start": 15.76,
+      "end": 15.92
+    },
+    {
+      "text": " to",
+      "start": 15.92,
+      "end": 16.080000000000002
+    },
+    {
+      "text": " connect",
+      "start": 16.080000000000002,
+      "end": 16.48
+    },
+    {
+      "text": " each",
+      "start": 16.48,
+      "end": 16.8
+    },
+    {
+      "text": " mathematical",
+      "start": 16.8,
+      "end": 17.52
+    },
+    {
+      "text": " formula",
+      "start": 17.52,
+      "end": 18.0
+    },
+    {
+      "text": " to",
+      "start": 18.0,
+      "end": 18.240000000000002
+    },
+    {
+      "text": " its",
+      "start": 18.240000000000002,
+      "end": 18.48
+    },
+    {
+      "text": " curves,",
+      "start": 18.48,
+      "end": 18.8
+    },
+    {
+      "text": " its",
+      "start": 19.28,
+      "end": 19.44
+    },
+    {
+      "text": " role",
+      "start": 19.6,
+      "end": 20.0
+    },
+    {
+      "text": " in",
+      "start": 20.0,
+      "end": 20.080000000000002
+    },
+    {
+      "text": " the",
+      "start": 20.080000000000002,
+      "end": 20.32
+    },
+    {
+      "text": " model,",
+      "start": 20.32,
+      "end": 20.48
+    },
+    {
+      "text": " and",
+      "start": 20.56,
+      "end": 20.72
+    },
+    {
+      "text": " the",
+      "start": 20.72,
+      "end": 20.96
+    },
+    {
+      "text": " loop",
+      "start": 20.96,
+      "end": 21.2
+    },
+    {
+      "text": " and",
+      "start": 21.28,
+      "end": 21.44
+    },
+    {
+      "text": " compute",
+      "start": 21.44,
+      "end": 22.16
+    },
+    {
+      "text": " computer",
+      "start": 22.400000000000002,
+      "end": 22.88
+    },
+    {
+      "text": " eventually",
+      "start": 23.04,
+      "end": 23.44
+    },
+    {
+      "text": " has",
+      "start": 23.44,
+      "end": 23.6
+    },
+    {
+      "text": " to",
+      "start": 23.6,
+      "end": 23.76
+    },
+    {
+      "text": " execute.",
+      "start": 23.76,
+      "end": 24.32
+    },
+    {
+      "text": " And",
+      "start": 24.48,
+      "end": 24.72
+    },
+    {
+      "text": " in",
+      "start": 24.72,
+      "end": 24.96
+    },
+    {
+      "text": " this",
+      "start": 24.96,
+      "end": 25.2
+    },
+    {
+      "text": " video,",
+      "start": 25.2,
+      "end": 25.36
+    },
+    {
+      "text": " I",
+      "start": 25.44,
+      "end": 25.68
+    },
+    {
+      "text": " want",
+      "start": 25.68,
+      "end": 25.84
+    },
+    {
+      "text": " to",
+      "start": 25.84,
+      "end": 26.0
+    },
+    {
+      "text": " continue",
+      "start": 26.0,
+      "end": 26.48
+    },
+    {
+      "text": " from",
+      "start": 26.48,
+      "end": 26.72
+    },
+    {
+      "text": " there,",
+      "start": 26.72,
+      "end": 26.96
+    },
+    {
+      "text": " but",
+      "start": 27.04,
+      "end": 27.2
+    },
+    {
+      "text": " widen",
+      "start": 27.2,
+      "end": 27.6
+    },
+    {
+      "text": " the",
+      "start": 27.76,
+      "end": 27.92
+    },
+    {
+      "text": " view.",
+      "start": 27.92,
+      "end": 28.240000000000002
+    },
+    {
+      "text": " I",
+      "start": 28.400000000000002,
+      "end": 28.560000000000002
+    },
+    {
+      "text": " want",
+      "start": 28.560000000000002,
+      "end": 28.8
+    },
+    {
+      "text": " to",
+      "start": 28.8,
+      "end": 28.88
+    },
+    {
+      "text": " build",
+      "start": 28.88,
+      "end": 29.12
+    },
+    {
+      "text": " a",
+      "start": 29.12,
+      "end": 29.28
+    },
+    {
+      "text": " practical",
+      "start": 29.28,
+      "end": 29.76
+    },
+    {
+      "text": " map",
+      "start": 29.76,
+      "end": 30.0
+    },
+    {
+      "text": " of",
+      "start": 30.0,
+      "end": 30.16
+    },
+    {
+      "text": " the",
+      "start": 30.16,
+      "end": 30.240000000000002
+    },
+    {
+      "text": " kernels",
+      "start": 30.240000000000002,
+      "end": 30.72
+    },
+    {
+      "text": " that",
+      "start": 30.72,
+      "end": 30.96
+    },
+    {
+      "text": " appears",
+      "start": 30.96,
+      "end": 31.36
+    },
+    {
+      "text": " across",
+      "start": 31.36,
+      "end": 31.76
+    },
+    {
+      "text": " modern",
+      "start": 31.76,
+      "end": 32.160000000000004
+    },
+    {
+      "text": " AI",
+      "start": 32.160000000000004,
+      "end": 32.64
+    },
+    {
+      "text": " systems.",
+      "start": 32.64,
+      "end": 33.2
+    },
+    {
+      "text": " Like",
+      "start": 33.44,
+      "end": 33.76
+    },
+    {
+      "text": " what",
+      "start": 33.76,
+      "end": 33.92
+    },
+    {
+      "text": " is",
+      "start": 33.92,
+      "end": 34.08
+    },
+    {
+      "text": " a",
+      "start": 34.08,
+      "end": 34.24
+    },
+    {
+      "text": " GEMM,",
+      "start": 34.24,
+      "end": 35.28
+    },
+    {
+      "text": " and",
+      "start": 36.480000000000004,
+      "end": 36.800000000000004
+    },
+    {
+      "text": " how",
+      "start": 36.800000000000004,
+      "end": 37.04
+    },
+    {
+      "text": " do",
+      "start": 37.04,
+      "end": 37.28
+    },
+    {
+      "text": " normalization,",
+      "start": 37.28,
+      "end": 38.0
+    },
+    {
+      "text": " softmax,",
+      "start": 38.08,
+      "end": 38.72
+    },
+    {
+      "text": " rope,",
+      "start": 38.96,
+      "end": 39.28
+    },
+    {
+      "text": " rotational",
+      "start": 39.68,
+      "end": 40.160000000000004
+    },
+    {
+      "text": " positional",
+      "start": 40.32,
+      "end": 40.72
+    },
+    {
+      "text": " encoding,",
+      "start": 40.72,
+      "end": 41.04
+    },
+    {
+      "text": " quantization,",
+      "start": 41.12,
+      "end": 41.68
+    },
+    {
+      "text": " attention,",
+      "start": 41.76,
+      "end": 42.08
+    },
+    {
+      "text": " and",
+      "start": 42.160000000000004,
+      "end": 42.32
+    },
+    {
+      "text": " recurrent",
+      "start": 42.32,
+      "end": 42.88
+    },
+    {
+      "text": " states",
+      "start": 42.88,
+      "end": 43.12
+    },
+    {
+      "text": " become",
+      "start": 43.2,
+      "end": 43.52
+    },
+    {
+      "text": " loops",
+      "start": 43.52,
+      "end": 43.92
+    },
+    {
+      "text": " and",
+      "start": 43.92,
+      "end": 44.0
+    },
+    {
+      "text": " memory",
+      "start": 44.0,
+      "end": 44.4
+    },
+    {
+      "text": " access",
+      "start": 44.4,
+      "end": 44.64
+    },
+    {
+      "text": " on",
+      "start": 44.800000000000004,
+      "end": 44.88
+    },
+    {
+      "text": " a",
+      "start": 44.88,
+      "end": 44.96
+    },
+    {
+      "text": " real",
+      "start": 44.96,
+      "end": 45.2
+    },
+    {
+      "text": " CPU.",
+      "start": 45.2,
+      "end": 46.0
+    },
+    {
+      "text": " And",
+      "start": 46.88,
+      "end": 47.2
+    },
+    {
+      "text": " I'm",
+      "start": 47.2,
+      "end": 47.44
+    },
+    {
+      "text": " creating",
+      "start": 47.44,
+      "end": 47.76
+    },
+    {
+      "text": " this",
+      "start": 47.76,
+      "end": 48.0
+    },
+    {
+      "text": " series",
+      "start": 48.0,
+      "end": 48.480000000000004
+    },
+    {
+      "text": " for",
+      "start": 48.480000000000004,
+      "end": 48.72
+    },
+    {
+      "text": " two",
+      "start": 48.72,
+      "end": 48.96
+    },
+    {
+      "text": " reasons.",
+      "start": 48.96,
+      "end": 49.52
+    },
+    {
+      "text": " Um,",
+      "start": 49.68,
+      "end": 49.84
+    },
+    {
+      "text": " first,",
+      "start": 50.08,
+      "end": 50.32
+    },
+    {
+      "text": " I",
+      "start": 50.72,
+      "end": 50.96
+    },
+    {
+      "text": " want",
+      "start": 50.96,
+      "end": 51.2
+    },
+    {
+      "text": " to",
+      "start": 51.2,
+      "end": 51.36
+    },
+    {
+      "text": " improve",
+      "start": 51.36,
+      "end": 51.84
+    },
+    {
+      "text": " my",
+      "start": 51.84,
+      "end": 52.0
+    },
+    {
+      "text": " own",
+      "start": 52.0,
+      "end": 52.32
+    },
+    {
+      "text": " understanding,",
+      "start": 52.32,
+      "end": 53.04
+    },
+    {
+      "text": " and",
+      "start": 53.28,
+      "end": 53.52
+    },
+    {
+      "text": " building",
+      "start": 53.52,
+      "end": 53.84
+    },
+    {
+      "text": " the",
+      "start": 53.84,
+      "end": 54.0
+    },
+    {
+      "text": " C",
+      "start": 54.0,
+      "end": 54.24
+    },
+    {
+      "text": " kernel",
+      "start": 54.32,
+      "end": 54.56
+    },
+    {
+      "text": " engine",
+      "start": 54.64,
+      "end": 55.04
+    },
+    {
+      "text": " forces",
+      "start": 55.04,
+      "end": 55.36
+    },
+    {
+      "text": " me",
+      "start": 55.36,
+      "end": 55.52
+    },
+    {
+      "text": " to",
+      "start": 55.52,
+      "end": 55.6
+    },
+    {
+      "text": " move",
+      "start": 55.6,
+      "end": 55.84
+    },
+    {
+      "text": " between",
+      "start": 55.84,
+      "end": 56.160000000000004
+    },
+    {
+      "text": " model",
+      "start": 56.160000000000004,
+      "end": 56.480000000000004
+    },
+    {
+      "text": " architecture,",
+      "start": 56.56,
+      "end": 57.04
+    },
+    {
+      "text": " mathematics,",
+      "start": 57.120000000000005,
+      "end": 57.52
+    },
+    {
+      "text": " C",
+      "start": 57.68,
+      "end": 57.92
+    },
+    {
+      "text": " code,",
+      "start": 57.92,
+      "end": 58.24
+    },
+    {
+      "text": " compiler",
+      "start": 58.32,
+      "end": 58.72
+    },
+    {
+      "text": " output,",
+      "start": 58.72,
+      "end": 59.04
+    },
+    {
+      "text": " numerical",
+      "start": 59.120000000000005,
+      "end": 59.68
+    },
+    {
+      "text": " parity,",
+      "start": 59.68,
+      "end": 60.08
+    },
+    {
+      "text": " and",
+      "start": 60.160000000000004,
+      "end": 60.32
+    },
+    {
+      "text": " physical",
+      "start": 60.32,
+      "end": 60.72
+    },
+    {
+      "text": " CPU",
+      "start": 60.72,
+      "end": 61.2
+    },
+    {
+      "text": " measurements.",
+      "start": 61.2,
+      "end": 61.76
+    },
+    {
+      "text": " And",
+      "start": 61.84,
+      "end": 62.08
+    },
+    {
+      "text": " explaining",
+      "start": 62.08,
+      "end": 63.120000000000005
+    },
+    {
+      "text": " that",
+      "start": 63.36,
+      "end": 63.68
+    },
+    {
+      "text": " work",
+      "start": 63.68,
+      "end": 63.92
+    },
+    {
+      "text": " makes",
+      "start": 64.0,
+      "end": 64.24
+    },
+    {
+      "text": " the",
+      "start": 64.24,
+      "end": 64.32000000000001
+    },
+    {
+      "text": " gap",
+      "start": 64.32000000000001,
+      "end": 64.64
+    },
+    {
+      "text": " in",
+      "start": 64.64,
+      "end": 64.8
+    },
+    {
+      "text": " my",
+      "start": 64.8,
+      "end": 64.96000000000001
+    },
+    {
+      "text": " understanding",
+      "start": 64.96000000000001,
+      "end": 65.44
+    },
+    {
+      "text": " much",
+      "start": 65.44,
+      "end": 65.6
+    },
+    {
+      "text": " easier",
+      "start": 65.6,
+      "end": 65.92
+    },
+    {
+      "text": " to",
+      "start": 65.92,
+      "end": 66.08
+    },
+    {
+      "text": " find.",
+      "start": 66.08,
+      "end": 66.32000000000001
+    },
+    {
+      "text": " I've",
+      "start": 66.48,
+      "end": 66.72
+    },
+    {
+      "text": " been",
+      "start": 66.72,
+      "end": 66.8
+    },
+    {
+      "text": " doing",
+      "start": 66.8,
+      "end": 67.04
+    },
+    {
+      "text": " this",
+      "start": 67.04,
+      "end": 67.2
+    },
+    {
+      "text": " series",
+      "start": 67.2,
+      "end": 67.52
+    },
+    {
+      "text": " for",
+      "start": 67.52,
+      "end": 67.84
+    },
+    {
+      "text": " for",
+      "start": 67.84,
+      "end": 68.0
+    },
+    {
+      "text": " a",
+      "start": 68.0,
+      "end": 68.08
+    },
+    {
+      "text": " while",
+      "start": 68.08,
+      "end": 68.48
+    },
+    {
+      "text": " now,",
+      "start": 68.48,
+      "end": 68.72
+    },
+    {
+      "text": " so",
+      "start": 68.8,
+      "end": 69.12
+    },
+    {
+      "text": " it",
+      "start": 69.12,
+      "end": 69.36
+    },
+    {
+      "text": " just",
+      "start": 69.36,
+      "end": 69.60000000000001
+    },
+    {
+      "text": " becomes",
+      "start": 69.60000000000001,
+      "end": 70.08
+    },
+    {
+      "text": " more",
+      "start": 70.08,
+      "end": 70.24
+    },
+    {
+      "text": " and",
+      "start": 70.24,
+      "end": 70.56
+    },
+    {
+      "text": " more",
+      "start": 70.56,
+      "end": 70.72
+    },
+    {
+      "text": " ingrained",
+      "start": 70.96000000000001,
+      "end": 71.60000000000001
+    },
+    {
+      "text": " in",
+      "start": 71.60000000000001,
+      "end": 71.76
+    },
+    {
+      "text": " my",
+      "start": 71.76,
+      "end": 72.08
+    },
+    {
+      "text": " mind.",
+      "start": 72.08,
+      "end": 72.32000000000001
+    },
+    {
+      "text": " But",
+      "start": 72.48,
+      "end": 72.72
+    },
+    {
+      "text": " the",
+      "start": 72.72,
+      "end": 72.88
+    },
+    {
+      "text": " second",
+      "start": 72.88,
+      "end": 73.36
+    },
+    {
+      "text": " most",
+      "start": 73.36,
+      "end": 73.68
+    },
+    {
+      "text": " important",
+      "start": 73.68,
+      "end": 74.0
+    },
+    {
+      "text": " factor,",
+      "start": 74.96000000000001,
+      "end": 75.44
+    },
+    {
+      "text": " a",
+      "start": 75.60000000000001,
+      "end": 75.68
+    },
+    {
+      "text": " little",
+      "start": 75.68,
+      "end": 75.92
+    },
+    {
+      "text": " selfish",
+      "start": 75.92,
+      "end": 76.48
+    },
+    {
+      "text": " reason,",
+      "start": 76.48,
+      "end": 76.88
+    },
+    {
+      "text": " is",
+      "start": 77.04,
+      "end": 77.2
+    },
+    {
+      "text": " I",
+      "start": 77.28,
+      "end": 77.52
+    },
+    {
+      "text": " also",
+      "start": 77.52,
+      "end": 77.76
+    },
+    {
+      "text": " want",
+      "start": 77.76,
+      "end": 77.92
+    },
+    {
+      "text": " CK",
+      "start": 78.0,
+      "end": 78.48
+    },
+    {
+      "text": " needs",
+      "start": 78.64,
+      "end": 78.96000000000001
+    },
+    {
+      "text": " more",
+      "start": 78.96000000000001,
+      "end": 79.12
+    },
+    {
+      "text": " contributors",
+      "start": 79.12,
+      "end": 79.84
+    },
+    {
+      "text": " and",
+      "start": 80.0,
+      "end": 80.24
+    },
+    {
+      "text": " also",
+      "start": 80.24,
+      "end": 80.48
+    },
+    {
+      "text": " more",
+      "start": 80.48,
+      "end": 80.72
+    },
+    {
+      "text": " CPU",
+      "start": 80.72,
+      "end": 81.2
+    },
+    {
+      "text": " evidence.",
+      "start": 81.2,
+      "end": 81.76
+    },
+    {
+      "text": " So",
+      "start": 82.0,
+      "end": 82.16
+    },
+    {
+      "text": " you",
+      "start": 82.32000000000001,
+      "end": 82.48
+    },
+    {
+      "text": " do",
+      "start": 82.48,
+      "end": 82.64
+    },
+    {
+      "text": " not",
+      "start": 82.64,
+      "end": 82.88
+    },
+    {
+      "text": " need",
+      "start": 82.88,
+      "end": 83.04
+    },
+    {
+      "text": " a",
+      "start": 83.04,
+      "end": 83.28
+    },
+    {
+      "text": " GPU",
+      "start": 83.28,
+      "end": 83.76
+    },
+    {
+      "text": " cluster",
+      "start": 83.76,
+      "end": 84.16
+    },
+    {
+      "text": " to",
+      "start": 84.16,
+      "end": 84.24
+    },
+    {
+      "text": " contribute.",
+      "start": 84.24,
+      "end": 84.72
+    },
+    {
+      "text": " So",
+      "start": 84.8,
+      "end": 84.96000000000001
+    },
+    {
+      "text": " if",
+      "start": 85.04,
+      "end": 85.2
+    },
+    {
+      "text": " you",
+      "start": 85.2,
+      "end": 85.28
+    },
+    {
+      "text": " have",
+      "start": 85.28,
+      "end": 85.36
+    },
+    {
+      "text": " a",
+      "start": 85.36,
+      "end": 85.52
+    },
+    {
+      "text": " Linux",
+      "start": 85.52,
+      "end": 86.0
+    },
+    {
+      "text": " computer",
+      "start": 86.0,
+      "end": 86.4
+    },
+    {
+      "text": " with",
+      "start": 86.4,
+      "end": 86.56
+    },
+    {
+      "text": " an",
+      "start": 86.56,
+      "end": 86.72
+    },
+    {
+      "text": " Intel",
+      "start": 86.72,
+      "end": 87.12
+    },
+    {
+      "text": " AMD",
+      "start": 87.2,
+      "end": 87.68
+    },
+    {
+      "text": " or",
+      "start": 87.76,
+      "end": 87.84
+    },
+    {
+      "text": " even",
+      "start": 87.84,
+      "end": 88.0
+    },
+    {
+      "text": " an",
+      "start": 88.0,
+      "end": 88.16
+    },
+    {
+      "text": " ARM",
+      "start": 88.16,
+      "end": 88.48
+    },
+    {
+      "text": " CPU,",
+      "start": 88.56,
+      "end": 89.2
+    },
+    {
+      "text": " that",
+      "start": 89.44,
+      "end": 89.68
+    },
+    {
+      "text": " machine",
+      "start": 89.68,
+      "end": 90.08
+    },
+    {
+      "text": " can",
+      "start": 90.08,
+      "end": 90.24
+    },
+    {
+      "text": " expose",
+      "start": 90.24,
+      "end": 90.64
+    },
+    {
+      "text": " a",
+      "start": 90.64,
+      "end": 90.8
+    },
+    {
+      "text": " different",
+      "start": 90.8,
+      "end": 91.04
+    },
+    {
+      "text": " instruction",
+      "start": 91.04,
+      "end": 91.44
+    },
+    {
+      "text": " set,",
+      "start": 91.52,
+      "end": 91.76
+    },
+    {
+      "text": " cache",
+      "start": 91.84,
+      "end": 92.16
+    },
+    {
+      "text": " hierarchy,",
+      "start": 92.16,
+      "end": 92.72
+    },
+    {
+      "text": " memory",
+      "start": 92.8,
+      "end": 93.12
+    },
+    {
+      "text": " limit,",
+      "start": 93.12,
+      "end": 93.36
+    },
+    {
+      "text": " compiler",
+      "start": 93.44,
+      "end": 93.84
+    },
+    {
+      "text": " behavior,",
+      "start": 93.84,
+      "end": 94.24
+    },
+    {
+      "text": " or",
+      "start": 94.32000000000001,
+      "end": 94.48
+    },
+    {
+      "text": " scheduling",
+      "start": 94.48,
+      "end": 95.04
+    },
+    {
+      "text": " problems.",
+      "start": 95.04,
+      "end": 95.36
+    },
+    {
+      "text": " So",
+      "start": 95.52,
+      "end": 95.84
+    },
+    {
+      "text": " I",
+      "start": 96.24000000000001,
+      "end": 96.56
+    },
+    {
+      "text": " hopefully",
+      "start": 96.8,
+      "end": 97.28
+    },
+    {
+      "text": " can",
+      "start": 97.44,
+      "end": 97.68
+    },
+    {
+      "text": " encourage",
+      "start": 97.68,
+      "end": 98.16
+    },
+    {
+      "text": " more",
+      "start": 98.16,
+      "end": 98.4
+    },
+    {
+      "text": " contributors",
+      "start": 98.4,
+      "end": 98.96000000000001
+    },
+    {
+      "text": " to",
+      "start": 98.96000000000001,
+      "end": 99.12
+    },
+    {
+      "text": " contribute",
+      "start": 99.12,
+      "end": 99.52
+    },
+    {
+      "text": " to",
+      "start": 99.52,
+      "end": 99.68
+    },
+    {
+      "text": " the",
+      "start": 99.68,
+      "end": 99.84
+    },
+    {
+      "text": " project",
+      "start": 99.84,
+      "end": 100.24000000000001
+    },
+    {
+      "text": " and",
+      "start": 100.4,
+      "end": 100.64
+    },
+    {
+      "text": " you",
+      "start": 100.64,
+      "end": 100.8
+    },
+    {
+      "text": " know",
+      "start": 100.8,
+      "end": 100.88
+    },
+    {
+      "text": " become",
+      "start": 101.04,
+      "end": 101.36
+    },
+    {
+      "text": " a",
+      "start": 101.36,
+      "end": 101.44
+    },
+    {
+      "text": " better",
+      "start": 101.44,
+      "end": 101.76
+    },
+    {
+      "text": " kernel",
+      "start": 101.76,
+      "end": 102.16
+    },
+    {
+      "text": " engineer,",
+      "start": 102.16,
+      "end": 102.56
+    },
+    {
+      "text": " improve",
+      "start": 102.72,
+      "end": 103.28
+    },
+    {
+      "text": " on",
+      "start": 103.28,
+      "end": 103.52
+    },
+    {
+      "text": " your",
+      "start": 103.52,
+      "end": 103.68
+    },
+    {
+      "text": " understanding",
+      "start": 103.68,
+      "end": 104.16
+    },
+    {
+      "text": " of",
+      "start": 104.16,
+      "end": 104.32000000000001
+    },
+    {
+      "text": " how",
+      "start": 104.32000000000001,
+      "end": 104.56
+    },
+    {
+      "text": " AI",
+      "start": 104.56,
+      "end": 104.96000000000001
+    },
+    {
+      "text": " works",
+      "start": 104.96000000000001,
+      "end": 105.2
+    },
+    {
+      "text": " at",
+      "start": 105.2,
+      "end": 105.36
+    },
+    {
+      "text": " the",
+      "start": 105.36,
+      "end": 105.52
+    },
+    {
+      "text": " fundamental",
+      "start": 105.52,
+      "end": 106.0
+    },
+    {
+      "text": " level,",
+      "start": 106.0,
+      "end": 106.32000000000001
+    },
+    {
+      "text": " and",
+      "start": 106.4,
+      "end": 106.64
+    },
+    {
+      "text": " working",
+      "start": 106.64,
+      "end": 107.04
+    },
+    {
+      "text": " on",
+      "start": 107.04,
+      "end": 107.2
+    },
+    {
+      "text": " frameworks",
+      "start": 107.2,
+      "end": 107.92
+    },
+    {
+      "text": " is",
+      "start": 108.08,
+      "end": 108.4
+    },
+    {
+      "text": " my",
+      "start": 108.4,
+      "end": 108.72
+    },
+    {
+      "text": " kind",
+      "start": 108.8,
+      "end": 109.12
+    },
+    {
+      "text": " of",
+      "start": 109.12,
+      "end": 109.36
+    },
+    {
+      "text": " like",
+      "start": 109.36,
+      "end": 109.60000000000001
+    },
+    {
+      "text": " my",
+      "start": 109.60000000000001,
+      "end": 109.92
+    },
+    {
+      "text": " gateway",
+      "start": 109.92,
+      "end": 110.72
+    },
+    {
+      "text": " or",
+      "start": 110.88,
+      "end": 111.12
+    },
+    {
+      "text": " was",
+      "start": 111.28,
+      "end": 111.52
+    },
+    {
+      "text": " my",
+      "start": 111.52,
+      "end": 111.68
+    },
+    {
+      "text": " recommended",
+      "start": 111.68,
+      "end": 112.24000000000001
+    },
+    {
+      "text": " gateway",
+      "start": 112.24000000000001,
+      "end": 112.72
+    },
+    {
+      "text": " for",
+      "start": 112.72,
+      "end": 112.8
+    },
+    {
+      "text": " you",
+      "start": 112.8,
+      "end": 112.96000000000001
+    },
+    {
+      "text": " to",
+      "start": 112.96000000000001,
+      "end": 113.12
+    },
+    {
+      "text": " understand",
+      "start": 113.12,
+      "end": 113.52
+    },
+    {
+      "text": " these",
+      "start": 113.52,
+      "end": 113.68
+    },
+    {
+      "text": " things",
+      "start": 113.68,
+      "end": 114.0
+    },
+    {
+      "text": " much",
+      "start": 114.24000000000001,
+      "end": 114.48
+    },
+    {
+      "text": " more",
+      "start": 114.48,
+      "end": 114.72
+    },
+    {
+      "text": " practically",
+      "start": 114.72,
+      "end": 115.2
+    },
+    {
+      "text": " and",
+      "start": 115.28,
+      "end": 115.52
+    },
+    {
+      "text": " much",
+      "start": 115.52,
+      "end": 115.84
+    },
+    {
+      "text": " more",
+      "start": 115.84,
+      "end": 116.0
+    },
+    {
+      "text": " uh",
+      "start": 116.08,
+      "end": 116.32000000000001
+    },
+    {
+      "text": " what",
+      "start": 116.8,
+      "end": 117.04
+    },
+    {
+      "text": " do",
+      "start": 117.04,
+      "end": 117.2
+    },
+    {
+      "text": " you",
+      "start": 117.2,
+      "end": 117.28
+    },
+    {
+      "text": " say",
+      "start": 117.28,
+      "end": 117.36
+    },
+    {
+      "text": " viscerally",
+      "start": 117.52,
+      "end": 118.16
+    },
+    {
+      "text": " uh",
+      "start": 118.48,
+      "end": 118.64
+    },
+    {
+      "text": " when",
+      "start": 118.8,
+      "end": 119.04
+    },
+    {
+      "text": " it",
+      "start": 119.04,
+      "end": 119.2
+    },
+    {
+      "text": " comes",
+      "start": 119.2,
+      "end": 119.44
+    },
+    {
+      "text": " to",
+      "start": 119.44,
+      "end": 119.60000000000001
+    },
+    {
+      "text": " AI.",
+      "start": 119.60000000000001,
+      "end": 120.0
+    },
+    {
+      "text": " So",
+      "start": 120.08,
+      "end": 120.24000000000001
+    },
+    {
+      "text": " you",
+      "start": 120.32000000000001,
+      "end": 120.4
+    },
+    {
+      "text": " can",
+      "start": 120.4,
+      "end": 120.56
+    },
+    {
+      "text": " begin",
+      "start": 120.56,
+      "end": 120.8
+    },
+    {
+      "text": " by",
+      "start": 120.8,
+      "end": 120.96000000000001
+    },
+    {
+      "text": " reproducing",
+      "start": 120.96000000000001,
+      "end": 121.60000000000001
+    },
+    {
+      "text": " one",
+      "start": 121.60000000000001,
+      "end": 121.92
+    },
+    {
+      "text": " test",
+      "start": 121.92,
+      "end": 122.24000000000001
+    },
+    {
+      "text": " and",
+      "start": 122.48,
+      "end": 122.8
+    },
+    {
+      "text": " inspect",
+      "start": 122.8,
+      "end": 123.28
+    },
+    {
+      "text": " one",
+      "start": 123.28,
+      "end": 123.44
+    },
+    {
+      "text": " kernel,",
+      "start": 123.44,
+      "end": 123.76
+    },
+    {
+      "text": " compare",
+      "start": 123.84,
+      "end": 124.16
+    },
+    {
+      "text": " it",
+      "start": 124.16,
+      "end": 124.32000000000001
+    },
+    {
+      "text": " with",
+      "start": 124.32000000000001,
+      "end": 124.48
+    },
+    {
+      "text": " its",
+      "start": 124.48,
+      "end": 124.64
+    },
+    {
+      "text": " scalar",
+      "start": 124.64,
+      "end": 125.04
+    },
+    {
+      "text": " reference,",
+      "start": 125.04,
+      "end": 125.36
+    },
+    {
+      "text": " profile",
+      "start": 125.44,
+      "end": 125.84
+    },
+    {
+      "text": " it,",
+      "start": 125.84,
+      "end": 126.0
+    },
+    {
+      "text": " make",
+      "start": 126.08,
+      "end": 126.24000000000001
+    },
+    {
+      "text": " one",
+      "start": 126.24000000000001,
+      "end": 126.4
+    },
+    {
+      "text": " change,",
+      "start": 126.4,
+      "end": 126.64
+    },
+    {
+      "text": " and",
+      "start": 126.72,
+      "end": 126.88000000000001
+    },
+    {
+      "text": " prove",
+      "start": 126.88000000000001,
+      "end": 127.12
+    },
+    {
+      "text": " that",
+      "start": 127.12,
+      "end": 127.28
+    },
+    {
+      "text": " the",
+      "start": 127.28,
+      "end": 127.36
+    },
+    {
+      "text": " results",
+      "start": 127.36,
+      "end": 127.84
+    },
+    {
+      "text": " remain",
+      "start": 127.84,
+      "end": 128.16
+    },
+    {
+      "text": " correct.",
+      "start": 128.16,
+      "end": 128.4
+    },
+    {
+      "text": " Now,",
+      "start": 128.48,
+      "end": 128.64000000000001
+    },
+    {
+      "text": " CK,",
+      "start": 128.72,
+      "end": 129.2
+    },
+    {
+      "text": " you",
+      "start": 129.44,
+      "end": 129.6
+    },
+    {
+      "text": " know,",
+      "start": 129.6,
+      "end": 129.68
+    },
+    {
+      "text": " at",
+      "start": 129.84,
+      "end": 130.0
+    },
+    {
+      "text": " this",
+      "start": 130.0,
+      "end": 130.24
+    },
+    {
+      "text": " point",
+      "start": 130.24,
+      "end": 130.4
+    },
+    {
+      "text": " in",
+      "start": 130.4,
+      "end": 130.56
+    },
+    {
+      "text": " time",
+      "start": 130.56,
+      "end": 130.72
+    },
+    {
+      "text": " does",
+      "start": 130.88,
+      "end": 131.12
+    },
+    {
+      "text": " have",
+      "start": 131.12,
+      "end": 131.28
+    },
+    {
+      "text": " a",
+      "start": 131.28,
+      "end": 131.52
+    },
+    {
+      "text": " very",
+      "start": 131.52,
+      "end": 131.68
+    },
+    {
+      "text": " very",
+      "start": 131.76,
+      "end": 132.08
+    },
+    {
+      "text": " broad",
+      "start": 132.08,
+      "end": 132.72
+    },
+    {
+      "text": " model",
+      "start": 132.72,
+      "end": 133.04
+    },
+    {
+      "text": " um",
+      "start": 133.6,
+      "end": 133.92000000000002
+    },
+    {
+      "text": " compatibility,",
+      "start": 134.24,
+      "end": 135.28
+    },
+    {
+      "text": " uh",
+      "start": 135.36,
+      "end": 135.52
+    },
+    {
+      "text": " including",
+      "start": 135.6,
+      "end": 136.08
+    },
+    {
+      "text": " different",
+      "start": 136.08,
+      "end": 136.32
+    },
+    {
+      "text": " quantization",
+      "start": 136.32,
+      "end": 137.04
+    },
+    {
+      "text": " formats,",
+      "start": 137.04,
+      "end": 137.44
+    },
+    {
+      "text": " not",
+      "start": 137.6,
+      "end": 137.76
+    },
+    {
+      "text": " all,",
+      "start": 137.76,
+      "end": 138.0
+    },
+    {
+      "text": " but",
+      "start": 138.08,
+      "end": 138.24
+    },
+    {
+      "text": " some",
+      "start": 138.24,
+      "end": 138.48
+    },
+    {
+      "text": " of",
+      "start": 138.48,
+      "end": 138.64000000000001
+    },
+    {
+      "text": " it.",
+      "start": 138.64000000000001,
+      "end": 138.8
+    },
+    {
+      "text": " But",
+      "start": 138.96,
+      "end": 139.20000000000002
+    },
+    {
+      "text": " in",
+      "start": 139.20000000000002,
+      "end": 139.28
+    },
+    {
+      "text": " this",
+      "start": 139.28,
+      "end": 139.52
+    },
+    {
+      "text": " video,",
+      "start": 139.52,
+      "end": 139.76
+    },
+    {
+      "text": " I'm",
+      "start": 139.84,
+      "end": 140.08
+    },
+    {
+      "text": " still",
+      "start": 140.08,
+      "end": 140.32
+    },
+    {
+      "text": " talking",
+      "start": 140.32,
+      "end": 140.72
+    },
+    {
+      "text": " more",
+      "start": 140.72,
+      "end": 140.88
+    },
+    {
+      "text": " about",
+      "start": 140.88,
+      "end": 141.04
+    },
+    {
+      "text": " you",
+      "start": 141.12,
+      "end": 141.20000000000002
+    },
+    {
+      "text": " know",
+      "start": 141.20000000000002,
+      "end": 141.28
+    },
+    {
+      "text": " a",
+      "start": 141.36,
+      "end": 141.44
+    },
+    {
+      "text": " follow-up",
+      "start": 141.44,
+      "end": 141.92000000000002
+    },
+    {
+      "text": " from",
+      "start": 142.0,
+      "end": 142.24
+    },
+    {
+      "text": " what",
+      "start": 142.24,
+      "end": 142.32
+    },
+    {
+      "text": " I",
+      "start": 142.32,
+      "end": 142.4
+    },
+    {
+      "text": " did",
+      "start": 142.4,
+      "end": 142.56
+    },
+    {
+      "text": " last",
+      "start": 142.56,
+      "end": 142.8
+    },
+    {
+      "text": " time,",
+      "start": 142.8,
+      "end": 142.96
+    },
+    {
+      "text": " which",
+      "start": 143.04,
+      "end": 143.20000000000002
+    },
+    {
+      "text": " was",
+      "start": 143.20000000000002,
+      "end": 143.36
+    },
+    {
+      "text": " all",
+      "start": 143.36,
+      "end": 143.6
+    },
+    {
+      "text": " about",
+      "start": 143.6,
+      "end": 143.84
+    },
+    {
+      "text": " understanding",
+      "start": 143.84,
+      "end": 144.56
+    },
+    {
+      "text": " how",
+      "start": 144.56,
+      "end": 144.72
+    },
+    {
+      "text": " to",
+      "start": 144.72,
+      "end": 144.88
+    },
+    {
+      "text": " become",
+      "start": 144.88,
+      "end": 145.20000000000002
+    },
+    {
+      "text": " a",
+      "start": 145.20000000000002,
+      "end": 145.36
+    },
+    {
+      "text": " kernel",
+      "start": 145.36,
+      "end": 145.76
+    },
+    {
+      "text": " engineer,",
+      "start": 145.76,
+      "end": 146.64000000000001
+    },
+    {
+      "text": " and",
+      "start": 147.12,
+      "end": 147.44
+    },
+    {
+      "text": " that",
+      "start": 147.44,
+      "end": 147.76
+    },
+    {
+      "text": " work",
+      "start": 147.76,
+      "end": 148.08
+    },
+    {
+      "text": " also",
+      "start": 148.16,
+      "end": 148.4
+    },
+    {
+      "text": " strengthens",
+      "start": 148.4,
+      "end": 149.20000000000002
+    },
+    {
+      "text": " your",
+      "start": 149.20000000000002,
+      "end": 149.44
+    },
+    {
+      "text": " career,",
+      "start": 149.44,
+      "end": 149.76
+    },
+    {
+      "text": " hopefully.",
+      "start": 149.92000000000002,
+      "end": 150.4
+    },
+    {
+      "text": " So",
+      "start": 150.56,
+      "end": 150.72
+    },
+    {
+      "text": " instead",
+      "start": 150.8,
+      "end": 151.12
+    },
+    {
+      "text": " of",
+      "start": 151.12,
+      "end": 151.28
+    },
+    {
+      "text": " only",
+      "start": 151.28,
+      "end": 151.44
+    },
+    {
+      "text": " saying",
+      "start": 151.44,
+      "end": 151.68
+    },
+    {
+      "text": " that",
+      "start": 151.68,
+      "end": 151.76
+    },
+    {
+      "text": " you",
+      "start": 151.84,
+      "end": 152.0
+    },
+    {
+      "text": " know",
+      "start": 152.0,
+      "end": 152.08
+    },
+    {
+      "text": " C",
+      "start": 152.24,
+      "end": 152.48
+    },
+    {
+      "text": " or",
+      "start": 152.48,
+      "end": 152.64000000000001
+    },
+    {
+      "text": " Linux",
+      "start": 152.64000000000001,
+      "end": 152.96
+    },
+    {
+      "text": " or",
+      "start": 153.04,
+      "end": 153.20000000000002
+    },
+    {
+      "text": " single",
+      "start": 153.20000000000002,
+      "end": 153.44
+    },
+    {
+      "text": " instruction",
+      "start": 153.44,
+      "end": 153.68
+    },
+    {
+      "text": " multiple",
+      "start": 153.84,
+      "end": 154.16
+    },
+    {
+      "text": " data",
+      "start": 154.16,
+      "end": 154.32
+    },
+    {
+      "text": " how",
+      "start": 154.4,
+      "end": 154.56
+    },
+    {
+      "text": " to",
+      "start": 154.56,
+      "end": 154.64000000000001
+    },
+    {
+      "text": " profile",
+      "start": 154.64000000000001,
+      "end": 154.96
+    },
+    {
+      "text": " or",
+      "start": 155.04,
+      "end": 155.20000000000002
+    },
+    {
+      "text": " machine",
+      "start": 155.20000000000002,
+      "end": 155.52
+    },
+    {
+      "text": " learning,",
+      "start": 155.52,
+      "end": 155.84
+    },
+    {
+      "text": " you",
+      "start": 155.92000000000002,
+      "end": 156.0
+    },
+    {
+      "text": " can",
+      "start": 156.0,
+      "end": 156.16
+    },
+    {
+      "text": " now",
+      "start": 156.16,
+      "end": 156.32
+    },
+    {
+      "text": " point",
+      "start": 156.32,
+      "end": 156.48
+    },
+    {
+      "text": " to",
+      "start": 156.48,
+      "end": 156.64000000000001
+    },
+    {
+      "text": " a",
+      "start": 156.64000000000001,
+      "end": 156.72
+    },
+    {
+      "text": " real",
+      "start": 156.72,
+      "end": 156.88
+    },
+    {
+      "text": " kernel,",
+      "start": 156.88,
+      "end": 157.12
+    },
+    {
+      "text": " a",
+      "start": 157.20000000000002,
+      "end": 157.28
+    },
+    {
+      "text": " benchmark,",
+      "start": 157.28,
+      "end": 157.76
+    },
+    {
+      "text": " a",
+      "start": 157.84,
+      "end": 158.0
+    },
+    {
+      "text": " party",
+      "start": 158.0,
+      "end": 158.32
+    },
+    {
+      "text": " result,",
+      "start": 158.4,
+      "end": 158.56
+    },
+    {
+      "text": " and",
+      "start": 158.8,
+      "end": 158.96
+    },
+    {
+      "text": " a",
+      "start": 158.96,
+      "end": 159.12
+    },
+    {
+      "text": " pull",
+      "start": 159.12,
+      "end": 159.44
+    },
+    {
+      "text": " request,",
+      "start": 159.44,
+      "end": 159.68
+    },
+    {
+      "text": " and",
+      "start": 159.76,
+      "end": 159.92000000000002
+    },
+    {
+      "text": " that",
+      "start": 159.92000000000002,
+      "end": 160.08
+    },
+    {
+      "text": " is",
+      "start": 160.08,
+      "end": 160.24
+    },
+    {
+      "text": " concrete",
+      "start": 160.24,
+      "end": 160.72
+    },
+    {
+      "text": " engineering",
+      "start": 160.72,
+      "end": 161.20000000000002
+    },
+    {
+      "text": " evidence.",
+      "start": 161.20000000000002,
+      "end": 161.6
+    },
+    {
+      "text": " So",
+      "start": 161.68,
+      "end": 161.84
+    },
+    {
+      "text": " if",
+      "start": 161.92000000000002,
+      "end": 162.0
+    },
+    {
+      "text": " you're",
+      "start": 162.0,
+      "end": 162.16
+    },
+    {
+      "text": " a",
+      "start": 162.16,
+      "end": 162.24
+    },
+    {
+      "text": " beginner,",
+      "start": 162.24,
+      "end": 162.64000000000001
+    },
+    {
+      "text": " do",
+      "start": 162.72,
+      "end": 162.88
+    },
+    {
+      "text": " not",
+      "start": 162.88,
+      "end": 163.04
+    },
+    {
+      "text": " begin",
+      "start": 163.04,
+      "end": 163.36
+    },
+    {
+      "text": " by",
+      "start": 163.36,
+      "end": 163.52
+    },
+    {
+      "text": " trying",
+      "start": 163.52,
+      "end": 163.76
+    },
+    {
+      "text": " to",
+      "start": 163.76,
+      "end": 163.84
+    },
+    {
+      "text": " understand",
+      "start": 163.84,
+      "end": 164.16
+    },
+    {
+      "text": " the",
+      "start": 164.16,
+      "end": 164.32
+    },
+    {
+      "text": " entire",
+      "start": 164.32,
+      "end": 164.72
+    },
+    {
+      "text": " model",
+      "start": 164.72,
+      "end": 165.04
+    },
+    {
+      "text": " at",
+      "start": 165.04,
+      "end": 165.28
+    },
+    {
+      "text": " once.",
+      "start": 165.28,
+      "end": 165.6
+    },
+    {
+      "text": " Pick",
+      "start": 165.84,
+      "end": 166.24
+    },
+    {
+      "text": " one",
+      "start": 166.24,
+      "end": 166.56
+    },
+    {
+      "text": " operation,",
+      "start": 166.56,
+      "end": 167.2
+    },
+    {
+      "text": " write",
+      "start": 167.92000000000002,
+      "end": 168.32
+    },
+    {
+      "text": " down",
+      "start": 168.32,
+      "end": 168.56
+    },
+    {
+      "text": " its",
+      "start": 168.56,
+      "end": 168.8
+    },
+    {
+      "text": " equation,",
+      "start": 168.8,
+      "end": 169.6
+    },
+    {
+      "text": " track",
+      "start": 170.48,
+      "end": 171.04
+    },
+    {
+      "text": " its",
+      "start": 171.04,
+      "end": 171.28
+    },
+    {
+      "text": " tensor",
+      "start": 171.28,
+      "end": 171.84
+    },
+    {
+      "text": " shapes,",
+      "start": 171.84,
+      "end": 172.64
+    },
+    {
+      "text": " and",
+      "start": 173.12,
+      "end": 173.36
+    },
+    {
+      "text": " then",
+      "start": 173.36,
+      "end": 173.6
+    },
+    {
+      "text": " implement",
+      "start": 173.6,
+      "end": 174.08
+    },
+    {
+      "text": " the",
+      "start": 174.08,
+      "end": 174.32
+    },
+    {
+      "text": " simplest",
+      "start": 174.32,
+      "end": 174.8
+    },
+    {
+      "text": " correct",
+      "start": 174.8,
+      "end": 175.36
+    },
+    {
+      "text": " version.",
+      "start": 175.36,
+      "end": 176.0
+    },
+    {
+      "text": " And",
+      "start": 176.16,
+      "end": 176.4
+    },
+    {
+      "text": " then",
+      "start": 176.4,
+      "end": 176.72
+    },
+    {
+      "text": " test",
+      "start": 176.72,
+      "end": 177.04
+    },
+    {
+      "text": " tiny",
+      "start": 177.04,
+      "end": 177.28
+    },
+    {
+      "text": " inputs.",
+      "start": 177.52,
+      "end": 178.24
+    },
+    {
+      "text": " Then",
+      "start": 178.96,
+      "end": 179.28
+    },
+    {
+      "text": " ask",
+      "start": 179.28,
+      "end": 179.68
+    },
+    {
+      "text": " what",
+      "start": 179.84,
+      "end": 180.08
+    },
+    {
+      "text": " did",
+      "start": 180.08,
+      "end": 180.32
+    },
+    {
+      "text": " the",
+      "start": 180.32,
+      "end": 180.4
+    },
+    {
+      "text": " CPU",
+      "start": 180.4,
+      "end": 180.8
+    },
+    {
+      "text": " what",
+      "start": 181.04,
+      "end": 181.2
+    },
+    {
+      "text": " is",
+      "start": 181.2,
+      "end": 181.36
+    },
+    {
+      "text": " the",
+      "start": 181.36,
+      "end": 181.44
+    },
+    {
+      "text": " CPU",
+      "start": 181.44,
+      "end": 181.92000000000002
+    },
+    {
+      "text": " doing",
+      "start": 181.92000000000002,
+      "end": 182.16
+    },
+    {
+      "text": " with",
+      "start": 182.16,
+      "end": 182.4
+    },
+    {
+      "text": " every",
+      "start": 182.4,
+      "end": 182.72
+    },
+    {
+      "text": " load,",
+      "start": 182.72,
+      "end": 183.04
+    },
+    {
+      "text": " store,",
+      "start": 183.12,
+      "end": 183.36
+    },
+    {
+      "text": " loop,",
+      "start": 183.44,
+      "end": 183.76
+    },
+    {
+      "text": " vector,",
+      "start": 183.84,
+      "end": 184.07999999999998
+    },
+    {
+      "text": " lane,",
+      "start": 184.24,
+      "end": 184.48000000000002
+    },
+    {
+      "text": " and",
+      "start": 184.56,
+      "end": 184.72
+    },
+    {
+      "text": " thread.",
+      "start": 184.72,
+      "end": 185.12
+    },
+    {
+      "text": " And",
+      "start": 185.2,
+      "end": 185.44
+    },
+    {
+      "text": " do",
+      "start": 185.44,
+      "end": 185.6
+    },
+    {
+      "text": " not",
+      "start": 185.6,
+      "end": 185.84
+    },
+    {
+      "text": " optimize",
+      "start": 185.84,
+      "end": 186.4
+    },
+    {
+      "text": " because",
+      "start": 186.4,
+      "end": 186.64
+    },
+    {
+      "text": " the",
+      "start": 186.64,
+      "end": 186.72
+    },
+    {
+      "text": " code",
+      "start": 186.72,
+      "end": 187.04
+    },
+    {
+      "text": " looks",
+      "start": 187.04,
+      "end": 187.28
+    },
+    {
+      "text": " clever.",
+      "start": 187.28,
+      "end": 187.68
+    },
+    {
+      "text": " Like",
+      "start": 187.84,
+      "end": 188.0
+    },
+    {
+      "text": " first",
+      "start": 188.07999999999998,
+      "end": 188.32
+    },
+    {
+      "text": " measure",
+      "start": 188.4,
+      "end": 189.04
+    },
+    {
+      "text": " it",
+      "start": 189.04,
+      "end": 189.36
+    },
+    {
+      "text": " and",
+      "start": 190.32,
+      "end": 190.64
+    },
+    {
+      "text": " keep",
+      "start": 190.64,
+      "end": 190.88
+    },
+    {
+      "text": " the",
+      "start": 190.88,
+      "end": 191.12
+    },
+    {
+      "text": " scalar",
+      "start": 191.12,
+      "end": 191.68
+    },
+    {
+      "text": " implementation",
+      "start": 191.68,
+      "end": 192.32
+    },
+    {
+      "text": " as",
+      "start": 192.32,
+      "end": 192.48000000000002
+    },
+    {
+      "text": " an",
+      "start": 192.48000000000002,
+      "end": 192.72
+    },
+    {
+      "text": " oracle.",
+      "start": 192.72,
+      "end": 193.28
+    },
+    {
+      "text": " You",
+      "start": 193.36,
+      "end": 193.52
+    },
+    {
+      "text": " could",
+      "start": 193.52,
+      "end": 193.6
+    },
+    {
+      "text": " also",
+      "start": 193.6,
+      "end": 193.76
+    },
+    {
+      "text": " use",
+      "start": 193.76,
+      "end": 193.92000000000002
+    },
+    {
+      "text": " PYPy",
+      "start": 193.92000000000002,
+      "end": 194.56
+    },
+    {
+      "text": " torches,",
+      "start": 194.64,
+      "end": 194.96
+    },
+    {
+      "text": " something",
+      "start": 195.28,
+      "end": 195.44
+    },
+    {
+      "text": " that",
+      "start": 195.44,
+      "end": 195.52
+    },
+    {
+      "text": " I've",
+      "start": 195.52,
+      "end": 195.76
+    },
+    {
+      "text": " been",
+      "start": 195.76,
+      "end": 195.84
+    },
+    {
+      "text": " using",
+      "start": 195.84,
+      "end": 196.07999999999998
+    },
+    {
+      "text": " as",
+      "start": 196.07999999999998,
+      "end": 196.24
+    },
+    {
+      "text": " an",
+      "start": 196.24,
+      "end": 196.4
+    },
+    {
+      "text": " oracle.",
+      "start": 196.4,
+      "end": 197.04
+    },
+    {
+      "text": " Then",
+      "start": 197.12,
+      "end": 197.36
+    },
+    {
+      "text": " change",
+      "start": 197.36,
+      "end": 197.68
+    },
+    {
+      "text": " one",
+      "start": 197.68,
+      "end": 197.84
+    },
+    {
+      "text": " boundary",
+      "start": 197.84,
+      "end": 198.24
+    },
+    {
+      "text": " at",
+      "start": 198.24,
+      "end": 198.48000000000002
+    },
+    {
+      "text": " a",
+      "start": 198.48000000000002,
+      "end": 198.72
+    },
+    {
+      "text": " time",
+      "start": 198.72,
+      "end": 198.88
+    },
+    {
+      "text": " and",
+      "start": 199.12,
+      "end": 199.44
+    },
+    {
+      "text": " check",
+      "start": 199.44,
+      "end": 199.76
+    },
+    {
+      "text": " correctness",
+      "start": 199.76,
+      "end": 200.4
+    },
+    {
+      "text": " again",
+      "start": 200.48000000000002,
+      "end": 200.88
+    },
+    {
+      "text": " after",
+      "start": 201.04,
+      "end": 201.36
+    },
+    {
+      "text": " every",
+      "start": 201.36,
+      "end": 201.68
+    },
+    {
+      "text": " optimization.",
+      "start": 201.68,
+      "end": 202.24
+    },
+    {
+      "text": " This",
+      "start": 202.32,
+      "end": 202.48000000000002
+    },
+    {
+      "text": " is",
+      "start": 202.48000000000002,
+      "end": 202.64
+    },
+    {
+      "text": " how",
+      "start": 202.64,
+      "end": 202.72
+    },
+    {
+      "text": " I",
+      "start": 202.72,
+      "end": 202.88
+    },
+    {
+      "text": " want",
+      "start": 202.88,
+      "end": 203.04
+    },
+    {
+      "text": " the",
+      "start": 203.04,
+      "end": 203.2
+    },
+    {
+      "text": " series",
+      "start": 203.2,
+      "end": 203.44
+    },
+    {
+      "text": " to",
+      "start": 203.44,
+      "end": 203.6
+    },
+    {
+      "text": " work.",
+      "start": 203.6,
+      "end": 203.76
+    },
+    {
+      "text": " So",
+      "start": 203.84,
+      "end": 203.92000000000002
+    },
+    {
+      "text": " one",
+      "start": 204.0,
+      "end": 204.16
+    },
+    {
+      "text": " mathematical",
+      "start": 204.16,
+      "end": 204.72
+    },
+    {
+      "text": " operation",
+      "start": 204.72,
+      "end": 204.96
+    },
+    {
+      "text": " at",
+      "start": 204.96,
+      "end": 205.12
+    },
+    {
+      "text": " a",
+      "start": 205.12,
+      "end": 205.2
+    },
+    {
+      "text": " time",
+      "start": 205.2,
+      "end": 205.28
+    },
+    {
+      "text": " connected",
+      "start": 205.36,
+      "end": 205.84
+    },
+    {
+      "text": " to",
+      "start": 205.84,
+      "end": 205.92000000000002
+    },
+    {
+      "text": " real",
+      "start": 205.92000000000002,
+      "end": 206.16
+    },
+    {
+      "text": " code,",
+      "start": 206.16,
+      "end": 206.4
+    },
+    {
+      "text": " real",
+      "start": 206.48000000000002,
+      "end": 206.72
+    },
+    {
+      "text": " hardware,",
+      "start": 206.72,
+      "end": 206.96
+    },
+    {
+      "text": " and",
+      "start": 207.04,
+      "end": 207.28
+    },
+    {
+      "text": " real",
+      "start": 207.28,
+      "end": 207.52
+    },
+    {
+      "text": " evidence.",
+      "start": 207.52,
+      "end": 208.07999999999998
+    },
+    {
+      "text": " And",
+      "start": 208.24,
+      "end": 208.48000000000002
+    },
+    {
+      "text": " let's",
+      "start": 208.48000000000002,
+      "end": 208.8
+    },
+    {
+      "text": " continue",
+      "start": 208.8,
+      "end": 209.2
+    },
+    {
+      "text": " with",
+      "start": 209.2,
+      "end": 209.36
+    },
+    {
+      "text": " the",
+      "start": 209.36,
+      "end": 209.52
+    },
+    {
+      "text": " series.",
+      "start": 209.52,
+      "end": 209.92000000000002
+    },
+    {
+      "text": " So",
+      "start": 210.0,
+      "end": 210.16
+    },
+    {
+      "text": " I'm",
+      "start": 210.24,
+      "end": 210.48000000000002
+    },
+    {
+      "text": " Anthony",
+      "start": 210.48000000000002,
+      "end": 210.8
+    },
+    {
+      "text": " Shifkumar",
+      "start": 210.8,
+      "end": 211.28
+    },
+    {
+      "text": " from",
+      "start": 211.36,
+      "end": 211.36
+    },
+    {
+      "text": " Anti",
+      "start": 211.44,
+      "end": 211.6
+    },
+    {
+      "text": " Robotics.",
+      "start": 211.84,
+      "end": 212.24
+    },
+    {
+      "text": " I",
+      "start": 212.4,
+      "end": 212.48000000000002
+    },
+    {
+      "text": " do",
+      "start": 212.48000000000002,
+      "end": 212.64
+    },
+    {
+      "text": " build",
+      "start": 212.64,
+      "end": 212.8
+    },
+    {
+      "text": " the",
+      "start": 212.8,
+      "end": 212.96
+    },
+    {
+      "text": " C",
+      "start": 212.96,
+      "end": 213.2
+    },
+    {
+      "text": " kernel",
+      "start": 213.36,
+      "end": 213.6
+    },
+    {
+      "text": " engine.",
+      "start": 213.76,
+      "end": 214.16
+    },
+    {
+      "text": " I'm",
+      "start": 214.32,
+      "end": 214.64
+    },
+    {
+      "text": " looking",
+      "start": 214.64,
+      "end": 214.96
+    },
+    {
+      "text": " for",
+      "start": 214.96,
+      "end": 215.12
+    },
+    {
+      "text": " contributors.",
+      "start": 215.12,
+      "end": 215.84
+    },
+    {
+      "text": " I",
+      "start": 215.92000000000002,
+      "end": 216.07999999999998
+    },
+    {
+      "text": " do",
+      "start": 216.07999999999998,
+      "end": 216.24
+    },
+    {
+      "text": " document",
+      "start": 216.24,
+      "end": 216.72
+    },
+    {
+      "text": " all",
+      "start": 216.72,
+      "end": 216.96
+    },
+    {
+      "text": " some",
+      "start": 216.96,
+      "end": 217.2
+    },
+    {
+      "text": " of",
+      "start": 217.2,
+      "end": 217.44
+    },
+    {
+      "text": " my",
+      "start": 217.44,
+      "end": 217.68
+    },
+    {
+      "text": " blogs",
+      "start": 217.68,
+      "end": 218.07999999999998
+    },
+    {
+      "text": " on",
+      "start": 218.07999999999998,
+      "end": 218.24
+    },
+    {
+      "text": " Shivaznos.com.",
+      "start": 218.24,
+      "end": 219.84
+    },
+    {
+      "text": " So",
+      "start": 219.92000000000002,
+      "end": 220.07999999999998
+    },
+    {
+      "text": " let",
+      "start": 220.16,
+      "end": 220.32
+    },
+    {
+      "text": " us",
+      "start": 220.32,
+      "end": 220.4
+    },
+    {
+      "text": " continue",
+      "start": 220.4,
+      "end": 220.8
+    },
+    {
+      "text": " from",
+      "start": 220.8,
+      "end": 220.96
+    },
+    {
+      "text": " those",
+      "start": 220.96,
+      "end": 221.2
+    },
+    {
+      "text": " activation",
+      "start": 221.2,
+      "end": 221.60000000000002
+    },
+    {
+      "text": " kernels",
+      "start": 221.60000000000002,
+      "end": 222.0
+    },
+    {
+      "text": " that",
+      "start": 222.0,
+      "end": 222.16
+    },
+    {
+      "text": " I",
+      "start": 222.16,
+      "end": 222.24
+    },
+    {
+      "text": " spoke",
+      "start": 222.24,
+      "end": 222.56
+    },
+    {
+      "text": " about",
+      "start": 222.56,
+      "end": 222.72
+    },
+    {
+      "text": " in",
+      "start": 222.72,
+      "end": 222.8
+    },
+    {
+      "text": " my",
+      "start": 222.8,
+      "end": 223.04000000000002
+    },
+    {
+      "text": " previous",
+      "start": 223.04000000000002,
+      "end": 223.51999999999998
+    },
+    {
+      "text": " uh",
+      "start": 223.68,
+      "end": 224.0
+    },
+    {
+      "text": " video,",
+      "start": 225.2,
+      "end": 225.51999999999998
+    },
+    {
+      "text": " and",
+      "start": 225.84,
+      "end": 226.16
+    },
+    {
+      "text": " let's",
+      "start": 226.16,
+      "end": 226.56
+    },
+    {
+      "text": " get",
+      "start": 226.56,
+      "end": 226.88
+    },
+    {
+      "text": " started.",
+      "start": 226.88,
+      "end": 227.51999999999998
+    },
+    {
+      "text": " So",
+      "start": 288.56,
+      "end": 288.8
+    },
+    {
+      "text": " here",
+      "start": 288.96000000000004,
+      "end": 289.20000000000005
+    },
+    {
+      "text": " is",
+      "start": 289.20000000000005,
+      "end": 289.36
+    },
+    {
+      "text": " the",
+      "start": 289.36,
+      "end": 289.6
+    },
+    {
+      "text": " part",
+      "start": 289.6,
+      "end": 289.84000000000003
+    },
+    {
+      "text": " for",
+      "start": 289.84000000000003,
+      "end": 290.08000000000004
+    },
+    {
+      "text": " this",
+      "start": 290.08000000000004,
+      "end": 290.32
+    },
+    {
+      "text": " video",
+      "start": 290.32,
+      "end": 290.56
+    },
+    {
+      "text": " math,",
+      "start": 290.72,
+      "end": 291.12
+    },
+    {
+      "text": " kernels,",
+      "start": 291.20000000000005,
+      "end": 291.6
+    },
+    {
+      "text": " runtime",
+      "start": 291.68,
+      "end": 292.0
+    },
+    {
+      "text": " and",
+      "start": 292.08000000000004,
+      "end": 292.24
+    },
+    {
+      "text": " model.",
+      "start": 292.24,
+      "end": 292.56
+    },
+    {
+      "text": " And",
+      "start": 292.64,
+      "end": 292.8
+    },
+    {
+      "text": " when",
+      "start": 292.8,
+      "end": 292.88
+    },
+    {
+      "text": " I",
+      "start": 292.88,
+      "end": 292.96000000000004
+    },
+    {
+      "text": " say",
+      "start": 292.96000000000004,
+      "end": 293.12
+    },
+    {
+      "text": " kernels,",
+      "start": 293.12,
+      "end": 293.52
+    },
+    {
+      "text": " I",
+      "start": 293.6,
+      "end": 293.68
+    },
+    {
+      "text": " do",
+      "start": 293.68,
+      "end": 293.76
+    },
+    {
+      "text": " not",
+      "start": 293.76,
+      "end": 293.92
+    },
+    {
+      "text": " mean",
+      "start": 293.92,
+      "end": 294.08000000000004
+    },
+    {
+      "text": " the",
+      "start": 294.08000000000004,
+      "end": 294.24
+    },
+    {
+      "text": " Linux",
+      "start": 294.24,
+      "end": 294.72
+    },
+    {
+      "text": " kernel,",
+      "start": 294.72,
+      "end": 295.28
+    },
+    {
+      "text": " I",
+      "start": 295.44,
+      "end": 295.6
+    },
+    {
+      "text": " mean",
+      "start": 295.6,
+      "end": 295.84000000000003
+    },
+    {
+      "text": " a",
+      "start": 295.84000000000003,
+      "end": 296.0
+    },
+    {
+      "text": " focus",
+      "start": 296.0,
+      "end": 296.48
+    },
+    {
+      "text": " routine",
+      "start": 296.48,
+      "end": 296.88
+    },
+    {
+      "text": " that",
+      "start": 296.88,
+      "end": 297.12
+    },
+    {
+      "text": " computes",
+      "start": 297.12,
+      "end": 297.68
+    },
+    {
+      "text": " one",
+      "start": 297.68,
+      "end": 297.92
+    },
+    {
+      "text": " operation",
+      "start": 297.92,
+      "end": 298.4
+    },
+    {
+      "text": " or",
+      "start": 298.4,
+      "end": 298.56
+    },
+    {
+      "text": " one",
+      "start": 298.56,
+      "end": 298.72
+    },
+    {
+      "text": " tightly",
+      "start": 298.72,
+      "end": 299.03999999999996
+    },
+    {
+      "text": " fused",
+      "start": 299.03999999999996,
+      "end": 299.36
+    },
+    {
+      "text": " group",
+      "start": 299.36,
+      "end": 299.6
+    },
+    {
+      "text": " of.",
+      "start": 299.6,
+      "end": 299.68
+    }
+  ],
+  "transcript": "Now, in the first video in this series, I started with activation, activation kernels, and we looked at sigmoid, reluct, relusquared, CLU, and Swigloo. These are all the different activations, and the objective was to connect each mathematical formula to its curves, its role in the model, and the loop and compute computer eventually has to execute. And in this video, I want to continue from there, but widen the view. I want to build a practical map of the kernels that appears across modern AI systems. Like what is a GEMM, and how do normalization, softmax, rope, rotational positional encoding, quantization, attention, and recurrent states become loops and memory access on a real CPU. And I'm creating this series for two reasons. Um, first, I want to improve my own understanding, and building the C kernel engine forces me to move between model architecture, mathematics, C code, compiler output, numerical parity, and physical CPU measurements. And explaining that work makes the gap in my understanding much easier to find. I've been doing this series for for a while now, so it just becomes more and more ingrained in my mind. But the second most important factor, a little selfish reason, is I also want CK needs more contributors and also more CPU evidence. So you do not need a GPU cluster to contribute. So if you have a Linux computer with an Intel AMD or even an ARM CPU, that machine can expose a different instruction set, cache hierarchy, memory limit, compiler behavior, or scheduling problems. So I hopefully can encourage more contributors to contribute to the project and you know become a better kernel engineer, improve on your understanding of how AI works at the fundamental level, and working on frameworks is my kind of like my gateway or was my recommended gateway for you to understand these things much more practically and much more uh what do you say viscerally uh when it comes to AI. So you can begin by reproducing one test and inspect one kernel, compare it with its scalar reference, profile it, make one change, and prove that the results remain correct. Now, CK, you know, at this point in time does have a very very broad model um compatibility, uh including different quantization formats, not all, but some of it. But in this video, I'm still talking more about you know a follow-up from what I did last time, which was all about understanding how to become a kernel engineer, and that work also strengthens your career, hopefully. So instead of only saying that you know C or Linux or single instruction multiple data how to profile or machine learning, you can now point to a real kernel, a benchmark, a party result, and a pull request, and that is concrete engineering evidence. So if you're a beginner, do not begin by trying to understand the entire model at once. Pick one operation, write down its equation, track its tensor shapes, and then implement the simplest correct version. And then test tiny inputs. Then ask what did the CPU what is the CPU doing with every load, store, loop, vector, lane, and thread. And do not optimize because the code looks clever. Like first measure it and keep the scalar implementation as an oracle. You could also use PYPy torches, something that I've been using as an oracle. Then change one boundary at a time and check correctness again after every optimization. This is how I want the series to work. So one mathematical operation at a time connected to real code, real hardware, and real evidence. And let's continue with the series. So I'm Anthony Shifkumar from Anti Robotics. I do build the C kernel engine. I'm looking for contributors. I do document all some of my blogs on Shivaznos.com. So let us continue from those activation kernels that I spoke about in my previous uh video, and let's get started. So here is the part for this video math, kernels, runtime and model. And when I say kernels, I do not mean the Linux kernel, I mean a focus routine that computes one operation or one tightly fused group of.",
+  "source_coverage": {
+    "start_seconds": 0.0,
+    "end_seconds": 300.0,
+    "complete": true,
+    "planned_windows": 2,
+    "completed_windows": 2
+  },
+  "total_elapsed_seconds": 231.19062519504223,
+  "real_time_factor": 0.7706354173168074,
+  "process_cpu_seconds": {
+    "user": 1595.515012,
+    "system": 5.503208
+  },
+  "peak_rss_bytes": 3242315776,
+  "checks": {
+    "all_windows_completed": true,
+    "source_coverage_exact": true,
+    "finite_outputs": true,
+    "monotonic_word_timestamps": true,
+    "nonempty_transcript": true
+  }
+}
