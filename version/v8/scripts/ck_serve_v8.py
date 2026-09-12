@@ -2839,9 +2839,21 @@ def main(argv: list[str] | None = None) -> int:
             C_ORANGE,
         )
 
+    runtime_context_length = ck_serve_runtime_v8.resolve_runtime_context_length(
+        run_dir, args.context_len
+    )
+    if args.context_len is None and runtime_context_length is not None:
+        log(f"Using generated runtime context length: {runtime_context_length}")
+    elif args.context_len is None:
+        log(
+            "Warning: generated context capacity is unavailable; using the "
+            "native session default. Rebuild or pass --context-len explicitly.",
+            C_ORANGE,
+        )
+
     session = SessionV8.open(
         run_dir,
-        context_length=args.context_len,
+        context_length=runtime_context_length,
     )
 
     chat_template, chat_templates, chat_contract = _load_runtime_templates(run_dir)
