@@ -1,5 +1,15 @@
 var NAVTREEINDEX9 =
 {
+"ckernel__mem__plan_8h.html#a7593aeefed160055e5352bda2cb27873a8f8f213ffa426f0656a6de5c1fae8fbb":[2,0,0,24,3,3],
+"ckernel__mem__plan_8h.html#a7593aeefed160055e5352bda2cb27873a904b7e65d05595093e2c5ed58578a3be":[2,0,0,24,3,0],
+"ckernel__mem__plan_8h.html#a7593aeefed160055e5352bda2cb27873ab440f0630c9e4a2b22f79b82e76699f0":[2,0,0,24,3,1],
+"ckernel__mem__plan_8h.html#a7b0ecac54309914511507bc80cdce744":[2,0,0,24,2],
+"ckernel__mem__plan_8h.html#a92e5aeb38254a89e211012c7cfa1886c":[2,0,0,24,4],
+"ckernel__mem__plan_8h.html#ab2ccd14ce31d7ef0d57d5620a96a23f4":[2,0,0,24,5],
+"ckernel__mem__plan_8h_source.html":[2,0,0,24],
+"ckernel__memory__layout_8h.html":[2,0,0,25],
+"ckernel__memory__layout_8h.html#a27e838b35bf29a1fa749490d9e7fdd38":[2,0,0,25,13],
+"ckernel__memory__layout_8h.html#a35b79f7b661f83a89e63ee704117d053":[2,0,0,25,6],
 "ckernel__memory__layout_8h.html#a452e44b0d33892f36e77c590eba38daf":[2,0,0,25,5],
 "ckernel__memory__layout_8h.html#a73c5439888aa533ee2b15697fac6f8e0":[2,0,0,25,15],
 "ckernel__memory__layout_8h.html#ab71d40d0a04a0bdda4dd754953078d00":[2,0,0,25,9],
@@ -239,15 +249,5 @@ var NAVTREEINDEX9 =
 "cpu__features_8c.html#add9495a8b0827ace67807e0826a890d1":[2,0,1,26,8],
 "cpu__features_8c_source.html":[2,0,1,26],
 "cpu__features_8h.html":[2,0,0,32],
-"cpu__features_8h.html#a538a4414821926cda2c9e989764c00fd":[2,0,0,32,5],
-"cpu__features_8h.html#a7193b331026b925552b30e70dbca6727":[2,0,0,32,4],
-"cpu__features_8h.html#a72d28b72d616253f12ef0eff36325cba":[2,0,0,32,3],
-"cpu__features_8h.html#a87e02c44ce8117ceb227f928980a175a":[2,0,0,32,6],
-"cpu__features_8h.html#a9f67b8a4e1c74de8b6f0d8b535e44877":[2,0,0,32,7],
-"cpu__features_8h.html#ab051fa0f4c2fc0723066eab07401fed6":[2,0,0,32,2],
-"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,32,8],
-"cpu__features_8h_source.html":[2,0,0,32],
-"deepseek__kernels_8c.html":[2,0,1,1,10],
-"deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc":[2,0,1,1,10,22],
-"deepseek__kernels_8c.html#a0682ad34fba6fad7f8d57eb75e7be390":[2,0,1,1,10,18]
+"cpu__features_8h.html#a538a4414821926cda2c9e989764c00fd":[2,0,0,32,5]
 };

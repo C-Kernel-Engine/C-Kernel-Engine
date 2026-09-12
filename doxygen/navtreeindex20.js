@@ -1,5 +1,15 @@
 var NAVTREEINDEX20 =
 {
+"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,69,1],
+"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,69,3],
+"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,69,2],
+"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,69,0],
+"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,69,4],
+"structMemoryInfo.html":[1,0,71],
+"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,71,10],
+"structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2":[1,0,71,11],
+"structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46":[1,0,71,7],
+"structMemoryInfo.html#a4a595e517746ef202bb268465dd605b4":[1,0,71,5],
 "structMemoryInfo.html#a53dbc361ce7012951ceff084c52b17b9":[1,0,71,15],
 "structMemoryInfo.html#a558d233f4cd92a4c8fcde4e49da7db9d":[1,0,71,14],
 "structMemoryInfo.html#a58d128299366a3bbd1bef1b86180d2c9":[1,0,71,6],
@@ -239,15 +249,5 @@ var NAVTREEINDEX20 =
 "system__topology_8c.html#a089e974347ad9291cc98080f85392a57":[2,0,1,28,19],
 "system__topology_8c.html#a314b4992493c6b32bcb3258fca5f5eca":[2,0,1,28,9],
 "system__topology_8c.html#a349f2755a1cb7361bbbe5c729985136d":[2,0,1,28,15],
-"system__topology_8c.html#a34a4d2fcf0318c8d64e4ff73e1f2e6e5":[2,0,1,28,1],
-"system__topology_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,28,0],
-"system__topology_8c.html#a3e80c10682d58f63c4fa70b98e6a7dfb":[2,0,1,28,18],
-"system__topology_8c.html#a3fd4135ab056f548986d55e3864316f2":[2,0,1,28,11],
-"system__topology_8c.html#a4367943c7d4c62e0865d1171252a6b84":[2,0,1,28,14],
-"system__topology_8c.html#a5c4ea4dba04078e4897ec47d6f4bc425":[2,0,1,28,3],
-"system__topology_8c.html#a6636cf43268c0d06f3ded702846014ec":[2,0,1,28,4],
-"system__topology_8c.html#a685baee571576af254de8ea2cd9eaed8":[2,0,1,28,23],
-"system__topology_8c.html#a6a740276441a137e33d3b11888bfd2da":[2,0,1,28,13],
-"system__topology_8c.html#a6d93f41b7303c9e4c21b16e0ce3e858f":[2,0,1,28,25],
-"system__topology_8c.html#a74f7ad14b6c779249df057c693cfada4":[2,0,1,28,10]
+"system__topology_8c.html#a34a4d2fcf0318c8d64e4ff73e1f2e6e5":[2,0,1,28,1]
 };

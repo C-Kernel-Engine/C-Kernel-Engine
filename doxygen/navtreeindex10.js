@@ -1,5 +1,15 @@
 var NAVTREEINDEX10 =
 {
+"cpu__features_8h.html#a7193b331026b925552b30e70dbca6727":[2,0,0,32,4],
+"cpu__features_8h.html#a72d28b72d616253f12ef0eff36325cba":[2,0,0,32,3],
+"cpu__features_8h.html#a87e02c44ce8117ceb227f928980a175a":[2,0,0,32,6],
+"cpu__features_8h.html#a9f67b8a4e1c74de8b6f0d8b535e44877":[2,0,0,32,7],
+"cpu__features_8h.html#ab051fa0f4c2fc0723066eab07401fed6":[2,0,0,32,2],
+"cpu__features_8h.html#add9495a8b0827ace67807e0826a890d1":[2,0,0,32,8],
+"cpu__features_8h_source.html":[2,0,0,32],
+"deepseek__kernels_8c.html":[2,0,1,1,10],
+"deepseek__kernels_8c.html#a055589c2ea54c496e37add9646657afc":[2,0,1,1,10,22],
+"deepseek__kernels_8c.html#a0682ad34fba6fad7f8d57eb75e7be390":[2,0,1,1,10,18],
 "deepseek__kernels_8c.html#a0d2105645ed8d3c361c54d8bc14bc285":[2,0,1,1,10,25],
 "deepseek__kernels_8c.html#a3625048a020bc0685ef19a2e65b3874f":[2,0,1,1,10,11],
 "deepseek__kernels_8c.html#a42069d74cf9da1df1e67b745cc299e11":[2,0,1,1,10,21],
@@ -156,8 +166,8 @@ var NAVTREEINDEX10 =
 "functions_t.html":[1,2,0,18],
 "functions_u.html":[1,2,0,19],
 "functions_v.html":[1,2,0,20],
-"functions_vars.html":[1,2,1,0],
 "functions_vars.html":[1,2,1],
+"functions_vars.html":[1,2,1,0],
 "functions_vars_b.html":[1,2,1,1],
 "functions_vars_c.html":[1,2,1,2],
 "functions_vars_d.html":[1,2,1,3],
@@ -239,15 +249,5 @@ var NAVTREEINDEX10 =
 "gelu__kernels_8c.html#ab3debc2a69f7f85c072ab78453ec5565":[2,0,1,1,17,29],
 "gelu__kernels_8c.html#ab48a772c053be8dd3cc0f5e4ea1a1223":[2,0,1,1,17,24],
 "gelu__kernels_8c.html#abc5977fca1e95c2406a779657c4d2365":[2,0,1,1,17,22],
-"gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763":[2,0,1,1,17,17],
-"gelu__kernels_8c.html#ad24747e8b3c5e00732bd153715877324":[2,0,1,1,17,31],
-"gelu__kernels_8c.html#ad893f7c7aae6db18a790555697561cfb":[2,0,1,1,17,18],
-"gelu__kernels_8c.html#adca08cfc740df10ac2ef0f0c895f50b8":[2,0,1,1,17,28],
-"gelu__kernels_8c.html#ae2bf41b9b9172a7a197fc197d1e17200":[2,0,1,1,17,12],
-"gelu__kernels_8c.html#ae93ad49f83d821958ebbe4d0d24c0aef":[2,0,1,1,17,32],
-"gelu__kernels_8c.html#aeaf518a5239f4588f8c28b05b96d5478":[2,0,1,1,17,16],
-"gelu__kernels_8c.html#aef13e1955fcd7a7367d82a5da0bd8492":[2,0,1,1,17,20],
-"gelu__kernels_8c.html#af965b5310bebc06a3a3b7c76ad88a06e":[2,0,1,1,17,13],
-"gelu__kernels_8c.html#afa19bdb5dd6cbe60bc106159d62d7327":[2,0,1,1,17,27],
-"gelu__kernels_8c_source.html":[2,0,1,1,17]
+"gelu__kernels_8c.html#ac4d3711dee095194f24437af73ad1763":[2,0,1,1,17,17]
 };

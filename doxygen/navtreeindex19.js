@@ -1,5 +1,15 @@
 var NAVTREEINDEX19 =
 {
+"structCKModelConfig.html#ab06cae54dbee02ac43cc9bbf81c5e22f":[1,0,48,14],
+"structCKModelConfig.html#ab9893d601d7e6c7b03e255fe83b4dab7":[1,0,48,19],
+"structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027":[1,0,48,18],
+"structCKModelConfig.html#add8cceba6c14fd375e8e6b4320e9df98":[1,0,48,13],
+"structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377":[1,0,48,15],
+"structCKModelConfig.html#afd04ffe4db48600b90f32904c49d73af":[1,0,48,4],
+"structCKModelRuntimeDescriptorV8.html":[1,0,49],
+"structCKModelRuntimeDescriptorV8.html#a091b5afa9a16fa6614aabe006ce8ebe8":[1,0,49,9],
+"structCKModelRuntimeDescriptorV8.html#a0d617809f817677c4f5297ae16ddf05c":[1,0,49,2],
+"structCKModelRuntimeDescriptorV8.html#a1c05637dda33b9c3abcec4e34fffec57":[1,0,49,3],
 "structCKModelRuntimeDescriptorV8.html#a69bdc18d9035ad0958631dcf7f9243c4":[1,0,49,5],
 "structCKModelRuntimeDescriptorV8.html#a7230fff85cda3eb99e6a7e26469dfd9b":[1,0,49,1],
 "structCKModelRuntimeDescriptorV8.html#aac257f1176bc4823b6e7334638fc9537":[1,0,49,10],
@@ -239,15 +249,5 @@ var NAVTREEINDEX19 =
 "structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,11,1],
 "structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,11,2],
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,11,0],
-"structGEMMParams.html":[1,0,69],
-"structGEMMParams.html#a2956e1497d1e97174d5d17e872707769":[1,0,69,1],
-"structGEMMParams.html#a450121a9c76be4c90fe5326b1808eb1a":[1,0,69,3],
-"structGEMMParams.html#a6b0b003d129e3c027928ac6ad089e110":[1,0,69,2],
-"structGEMMParams.html#aa84a148f54c8ec49fec73e7b2354761c":[1,0,69,0],
-"structGEMMParams.html#adc0714de30284b4b62ecfac446979251":[1,0,69,4],
-"structMemoryInfo.html":[1,0,71],
-"structMemoryInfo.html#a0ff8aa8993baa2138de40490c4545fff":[1,0,71,10],
-"structMemoryInfo.html#a2409920ad9ccdec3d75c1d81f1a664d2":[1,0,71,11],
-"structMemoryInfo.html#a3f07269515a43e096aa98be0daa48f46":[1,0,71,7],
-"structMemoryInfo.html#a4a595e517746ef202bb268465dd605b4":[1,0,71,5]
+"structGEMMParams.html":[1,0,69]
 };

@@ -1,5 +1,15 @@
 var NAVTREEINDEX16 =
 {
+"rmsnorm__kernels__int4_8c.html#a59a34ee64765705aafa4472344e32e5e":[2,0,1,1,81,1],
+"rmsnorm__kernels__int4_8c.html#a6a38fc674c4b95afb267cc4d4b5cde57":[2,0,1,1,81,4],
+"rmsnorm__kernels__int4_8c.html#a8636e5ec5a86b1093378e6b9e47232f6":[2,0,1,1,81,2],
+"rmsnorm__kernels__int4_8c.html#a9c0e4a1798e2ff7fd3450cdb541783ea":[2,0,1,1,81,0],
+"rmsnorm__kernels__int4_8c.html#abd6eee8fe2cdb4c9b9934e93474f4f22":[2,0,1,1,81,3],
+"rmsnorm__kernels__int4_8c.html#ac4e3dd8120af16f51a0fc7178ba4d8cd":[2,0,1,1,81,5],
+"rmsnorm__kernels__int4_8c_source.html":[2,0,1,1,81],
+"rmsnorm__kernels__int8_8c.html":[2,0,1,1,82],
+"rmsnorm__kernels__int8_8c.html#a0296ca33e8e3ca947f0b2368c526aacd":[2,0,1,1,82,0],
+"rmsnorm__kernels__int8_8c.html#a05ce669a05d4f41b108073959a8a2449":[2,0,1,1,82,4],
 "rmsnorm__kernels__int8_8c.html#a45fe3ed3025a14b8ff912b887963cf4b":[2,0,1,1,82,2],
 "rmsnorm__kernels__int8_8c.html#a8bcb792646f1c21869164c8394c76bf1":[2,0,1,1,82,3],
 "rmsnorm__kernels__int8_8c.html#aa0f94daa3cbcf5611313ea3211874b55":[2,0,1,1,82,1],
@@ -239,15 +249,5 @@ var NAVTREEINDEX16 =
 "structCKBumpHeaderV5.html#ac9d9d27ee6b660da40e40517b5cc6a36":[1,0,18,17],
 "structCKBumpHeaderV5.html#ad0b6a32b8d1ed0f867e9c16c2d87d410":[1,0,18,7],
 "structCKBumpHeaderV5.html#ad4442506feb0743741ccc07af81a049d":[1,0,18,16],
-"structCKBumpHeaderV5.html#addaed139241f58dc329c9227aeb21cbb":[1,0,18,4],
-"structCKBumpHeaderV5.html#af48d4003b64b150726f101a8e1136285":[1,0,18,10],
-"structCKBumpHeaderV5.html#af4bdac04a2bdcef7589256ef352321ee":[1,0,18,0],
-"structCKBumpMetaFooterV5.html":[1,0,19],
-"structCKBumpMetaFooterV5.html#a2177646d88cf83b601f0e4bb309d9696":[1,0,19,2],
-"structCKBumpMetaFooterV5.html#a4bc1f2b2775c0de9d20b6f8a5a8077ed":[1,0,19,1],
-"structCKBumpMetaFooterV5.html#abfa91da71ba88c4f26b60f2a945aca03":[1,0,19,0],
-"structCKDimToken.html":[1,0,20],
-"structCKDimToken.html#a39ef233b6095ec24fa1374c9f6cd93d3":[1,0,20,0],
-"structCKDimToken.html#a64516b544f8812fc3b3c24ddb472bcb7":[1,0,20,1],
-"structCKDimToken.html#a984c6bca0fce2bd1893a21834837fc7f":[1,0,20,2]
+"structCKBumpHeaderV5.html#addaed139241f58dc329c9227aeb21cbb":[1,0,18,4]
 };
