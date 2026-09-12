@@ -74,6 +74,7 @@ struct DumpState {
     std::chrono::steady_clock::time_point profile_last_boundary;
     bool profile_batch_started = false;
     std::vector<LayerProfileEntry> profile_entries;
+    std::string capture_error;
 };
 
 static std::vector<std::string> split_csv(const std::string & s) {
@@ -774,14 +775,26 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
             }
         }
         if (!flash || total_bytes > max_flash_input_bytes) {
-            return false;
+            std::ostringstream oss;
+            oss << "cannot capture flash-attention inputs for " << dump_name;
+            if (!flash) {
+                oss << ": no flash-attention ancestor in the executed graph";
+            } else {
+                oss << ": source bytes " << total_bytes
+                    << " exceed diagnostic limit " << max_flash_input_bytes;
+            }
+            mut->capture_error = oss.str();
+            return true;
         }
         static const char * suffixes[] = {"q", "k", "v", "mask"};
         for (int source = 0; source < 4 && flash->src[source]; ++source) {
             if (!dump_tensor_bytes(
                     mut->dump_dir / (dump_name + ".flash_" + suffixes[source] + ".bin"),
                     flash->src[source])) {
-                return false;
+                mut->capture_error =
+                    "failed writing flash-attention input " + std::string(suffixes[source]) +
+                    " for " + dump_name;
+                return true;
             }
         }
     }
@@ -1067,8 +1080,7 @@ int main(int argc, char ** argv) {
         args.dump_names.end(),
         [](const std::string & name) {
             return name.rfind("kq-", 0) == 0 ||
-                   name.rfind("kq_soft_max-", 0) == 0 ||
-                   name.rfind("kqv-", 0) == 0;
+                   name.rfind("kq_soft_max-", 0) == 0;
         });
     if (dump_attention_internals || args.flash_attention_mode == "disabled") {
         // Flash attention intentionally hides scores and probabilities as one
@@ -1356,6 +1368,13 @@ int main(int argc, char ** argv) {
             llama_backend_free();
             return 22;
         }
+    }
+    if (!dump_state.capture_error.empty()) {
+        print_json_error(dump_state.capture_error);
+        llama_free(ctx);
+        llama_model_free(model);
+        llama_backend_free();
+        return 24;
     }
     if (!write_layer_profile(dump_state)) {
         print_json_error("failed writing profile-layers-out file");

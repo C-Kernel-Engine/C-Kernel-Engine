@@ -12,7 +12,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "version" / "v8" / "scripts" / "certify_qwen3vl_llamacpp_corpus_v8.py"
+SCRIPT = ROOT / "version" / "v8" / "scripts" / "certify_multimodal_llamacpp_corpus_v8.py"
 
 
 def _load_module():
@@ -41,6 +41,7 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
 
         qwen36 = SimpleNamespace(
             model_profile="qwen36vl",
+            encoder_runtime=Path("encoder-runtime"),
             model_label=None,
             chat_template=None,
             composition_circuit=None,
@@ -50,9 +51,22 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
         self.assertEqual(qwen36.chat_template, "auto")
         self.assertEqual(qwen36.composition_circuit, "qwen36vl")
 
+        gemma4 = SimpleNamespace(
+            model_profile="gemma4",
+            encoder_runtime=None,
+            model_label=None,
+            chat_template=None,
+            composition_circuit=None,
+        )
+        self.module._apply_model_profile(gemma4)
+        self.assertEqual(gemma4.model_label, "Gemma4 Vision")
+        self.assertEqual(gemma4.chat_template, "gemma4")
+        self.assertIsNone(gemma4.composition_circuit)
+
     def test_model_profile_preserves_explicit_overrides(self) -> None:
         args = SimpleNamespace(
             model_profile="qwen36vl",
+            encoder_runtime=Path("encoder-runtime"),
             model_label="private-label",
             chat_template="qwen35",
             composition_circuit="explicit-circuit",
@@ -61,6 +75,58 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
         self.assertEqual(args.model_label, "private-label")
         self.assertEqual(args.chat_template, "qwen35")
         self.assertEqual(args.composition_circuit, "explicit-circuit")
+
+    def test_model_profile_rejects_wrong_encoder_source(self) -> None:
+        args = SimpleNamespace(
+            model_profile="qwen36vl",
+            profile_file=None,
+            encoder_runtime=None,
+            model_label=None,
+            chat_template=None,
+            composition_circuit=None,
+        )
+        with self.assertRaisesRegex(ValueError, "requires encoder_source=prebuilt_runtime"):
+            self.module._apply_model_profile(args)
+
+    def test_external_profile_is_versioned_and_rejects_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            profile = Path(temporary) / "profile.json"
+            payload = {
+                "schema": "cke.multimodal_certification_profile",
+                "schema_version": 1,
+                "id": "candidate-vision",
+                "model_label": "Candidate Vision",
+                "chat_template": "auto",
+                "composition_circuit": "candidate_vision",
+                "encoder_source": "mmproj_gguf",
+                "oracle": {
+                    "backend": "llama.cpp",
+                    "decode_mode": "batched",
+                    "flash_attention": "enabled",
+                    "prefix_source": "cke",
+                },
+                "unsupported_guess": True,
+            }
+            profile.write_text(json.dumps(payload), encoding="utf-8")
+            args = SimpleNamespace(
+                model_profile="qwen3vl",
+                profile_file=profile,
+                encoder_runtime=None,
+                model_label=None,
+                chat_template=None,
+                composition_circuit=None,
+            )
+            with self.assertRaisesRegex(ValueError, "unknown fields: unsupported_guess"):
+                self.module._apply_model_profile(args)
+
+            del payload["unsupported_guess"]
+            profile.write_text(json.dumps(payload), encoding="utf-8")
+            self.module._apply_model_profile(args)
+            self.assertEqual(args.model_profile, "candidate-vision")
+            self.assertEqual(args.composition_circuit, "candidate_vision")
+            self.assertEqual(args.profile_contract["oracle"]["backend"], "llama.cpp")
+            self.assertEqual(args.profile_contract["oracle"]["prefix_source"], "cke")
+            self.assertEqual(args.llama_flash_attention, "enabled")
 
     def test_private_corpus_size_gate_requires_full_manifest(self) -> None:
         rows = [{"index": index} for index in range(1, 41)]
@@ -72,6 +138,8 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
 
     def test_makefile_exposes_both_private_model_profiles(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("certify_multimodal_llamacpp_corpus_v8.py", makefile)
+        self.assertIn("-Wl,--no-as-needed -lckernel_tokenizer", makefile)
         self.assertIn("test-qwen3vl-private-corpus-parity-auto:", makefile)
         self.assertIn("--model-profile qwen3vl", makefile)
         self.assertIn("test-qwen36vl-private-corpus-parity-auto:", makefile)
@@ -90,6 +158,18 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
             "test-qwen3vl-private-corpus-parity-auto "
             "test-qwen36vl-private-corpus-parity-auto",
             makefile,
+        )
+
+    def test_historical_qwen_entrypoint_forwards_to_shared_runner(self) -> None:
+        wrapper = (
+            ROOT
+            / "version"
+            / "v8"
+            / "scripts"
+            / "certify_qwen3vl_llamacpp_corpus_v8.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "from certify_multimodal_llamacpp_corpus_v8 import main", wrapper
         )
 
     def test_manifest_order_and_hashes_are_deterministic(self) -> None:
@@ -162,6 +242,22 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
         self.assertEqual(row["context_tokens_after_comparison"], 1012)
         self.assertEqual(row["elapsed_sec"]["total"], 3.0)
         self.assertEqual(row["elapsed_sec"]["comparison_per_token"], 2.0)
+
+    def test_public_provenance_discloses_shared_prefix_oracle_scope(self) -> None:
+        config = self._config()
+        config["profile_contract"] = {
+            "sha256": "profile-hash",
+            "oracle": {
+                "backend": "llama.cpp",
+                "decode_mode": "batched",
+                "flash_attention": "enabled",
+                "prefix_source": "cke",
+            },
+        }
+        provenance = self.module._public_provenance(config)
+        self.assertEqual(provenance["profile_sha256"], "profile-hash")
+        self.assertEqual(provenance["oracle"]["prefix_source"], "cke")
+        self.assertNotIn("path", json.dumps(provenance))
 
     def test_resume_requires_exact_case_configuration_and_pass(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -295,6 +391,18 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
         self.assertEqual(summary["status"], "fail")
         self.assertEqual(summary["failed"], 1)
 
+    def test_error_rows_expose_pipeline_stage_without_private_details(self) -> None:
+        row = {
+            "image_index": 1,
+            "status": "error",
+            "failure_stage": "bridge",
+            "error_type": "RuntimeError",
+            "error_sha256": "hash",
+        }
+        encoded = json.dumps(row)
+        self.assertIn('"failure_stage": "bridge"', encoded)
+        self.assertNotIn("/private/", encoded)
+
     def test_resume_can_skip_redundant_native_replay(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = Path(temporary) / "case_result.json"
@@ -321,6 +429,7 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
                 "threads": 20,
                 "ck_threads": 20,
                 "llama_required_isa": "avx2",
+                "llama_flash_attention": "enabled",
                 "append_on_divergence": "llama",
             },
         )()
@@ -330,13 +439,18 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
             prefix_path=Path("prefix.f32"),
             workdir=Path("work"),
             report_path=Path("report.json"),
+            runtime_dir=Path("runtime"),
         )
         rendered = " ".join(map(str, command))
         self.assertIn("--reuse-bridge-decoder-runtime-exact", rendered)
         self.assertIn("--llama-decode-mode batched", rendered)
+        self.assertIn("--llama-flash-attention enabled", rendered)
         self.assertIn("--append-on-divergence llama", rendered)
         self.assertIn("--max-new-tokens 128", rendered)
         self.assertIn("--gemm-schedule auto", rendered)
+        self.assertIn(
+            "--ck-engine-so runtime/decoder/libckernel_engine.so", rendered
+        )
 
         parser_values.encoder_runtime = Path("encoder-runtime")
         command = self.module._parity_command(
@@ -345,9 +459,10 @@ class Qwen3VLCorpusCertificationTests(unittest.TestCase):
             prefix_path=Path("prefix.f32"),
             workdir=Path("work"),
             report_path=Path("report.json"),
+            runtime_dir=Path("runtime"),
         )
         self.assertIn(
-            "--ck-engine-so encoder-runtime/libckernel_engine.so",
+            "--ck-engine-so runtime/decoder/libckernel_engine.so",
             " ".join(map(str, command)),
         )
 

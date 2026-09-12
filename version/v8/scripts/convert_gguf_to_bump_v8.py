@@ -1935,6 +1935,20 @@ GGML_TYPE_IQ4_NL = 20
 GGML_TYPE_IQ3_S = 21
 GGML_TYPE_IQ2_S = 22
 
+VISION_GGUF_WEIGHT_TYPES = (
+    GGML_TYPE_Q4_0,
+    GGML_TYPE_Q4_1,
+    GGML_TYPE_Q4_K,
+    GGML_TYPE_Q5_0,
+    GGML_TYPE_Q5_1,
+    GGML_TYPE_Q5_K,
+    GGML_TYPE_Q6_K,
+    GGML_TYPE_Q8_0,
+    GGML_TYPE_F16,
+    GGML_TYPE_BF16,
+    GGML_TYPE_F32,
+)
+
 
 def ggml_type_name(t: int) -> str:
     return {
@@ -3693,16 +3707,9 @@ def main() -> None:
             projector_type = clip_vision_projector_type
 
             def clip_weight_dtype(info: TensorInfo, label: str) -> int:
-                supported_types = (
-                    GGML_TYPE_Q4_0, GGML_TYPE_Q4_1,
-                    GGML_TYPE_Q4_K, GGML_TYPE_Q6_K,
-                    GGML_TYPE_Q5_0, GGML_TYPE_Q5_1,
-                    GGML_TYPE_Q5_K,
-                    GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32,
-                )
-                if info.ggml_type not in supported_types:
+                if info.ggml_type not in VISION_GGUF_WEIGHT_TYPES:
                     raise GGUFError(
-                        f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/F32 for {label}, "
+                        f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/BF16/F32 for {label}, "
                         f"got {ggml_type_name(info.ggml_type)}"
                     )
                 return ck_dtype_from_ggml_type(info.ggml_type)
@@ -4123,16 +4130,9 @@ def main() -> None:
             aligned_context = align_up_elems(context_len, 4, CACHE_ALIGN)
 
             def clip_weight_dtype(info: TensorInfo, label: str) -> int:
-                supported_types = (
-                    GGML_TYPE_Q4_0, GGML_TYPE_Q4_1,
-                    GGML_TYPE_Q4_K, GGML_TYPE_Q6_K,
-                    GGML_TYPE_Q5_0, GGML_TYPE_Q5_1,
-                    GGML_TYPE_Q5_K,
-                    GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32,
-                )
-                if info.ggml_type not in supported_types:
+                if info.ggml_type not in VISION_GGUF_WEIGHT_TYPES:
                     raise GGUFError(
-                        f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/F32 for {label}, "
+                        f"{info.name}: expected Q4_0/Q4_1/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/F16/BF16/F32 for {label}, "
                         f"got {ggml_type_name(info.ggml_type)}"
                     )
                 return ck_dtype_from_ggml_type(info.ggml_type)

@@ -68,6 +68,61 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertEqual(args.llama_persistent_dump_step, 0)
         self.assertEqual(args.llama_persistent_dump_names, "new_state-1")
 
+    def test_hidden_xray_accepts_explicit_dense_oracle_boundaries(self) -> None:
+        args = Namespace(
+            hidden_state_step=0,
+            hidden_state_layer=0,
+            hidden_state_names="attn_out,after_attn,layer_out",
+            hidden_state_oracle_map="attn_out=kqv_out,after_attn=ffn_inp",
+            hidden_state_dir=Path("capture"),
+            llama_persistent_dump_dir=None,
+            workdir=Path("work"),
+        )
+        inputs = {"runtime": {"manifest": {"config": {"num_layers": 4}}}}
+
+        self.runner._configure_hidden_oracle_capture(inputs, args)
+
+        self.assertEqual(
+            args.llama_persistent_dump_names,
+            "kqv_out-0,ffn_inp-0,l_out-0",
+        )
+        self.assertEqual(
+            args.hidden_state_oracle_name_map,
+            {"attn_out": "kqv_out", "after_attn": "ffn_inp"},
+        )
+
+    def test_hidden_xray_rejects_invalid_oracle_boundary_map(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unrequested hidden boundary"):
+            self.runner._parse_hidden_oracle_name_map(
+                "layer_out=l_out", requested_names=["attn_out"]
+            )
+        with self.assertRaisesRegex(ValueError, "more than one boundary"):
+            self.runner._parse_hidden_oracle_name_map(
+                "attn_out=kqv_out,after_attn=kqv_out",
+                requested_names=["attn_out", "after_attn"],
+            )
+
+    def test_hidden_xray_relabels_explicit_oracle_boundaries(self) -> None:
+        dump = self.runner.first_token.parity_test_v7.ParityDump(
+            2,
+            "kqv_out",
+            np.array([1.0, 2.0], dtype=np.float32),
+            7,
+            "fp32",
+            source_token_id=6,
+            source_name="kqv_out-2-occ-0",
+        )
+
+        relabeled = self.runner._apply_hidden_oracle_name_map(
+            [dump], {"attn_out": "kqv_out"}
+        )
+
+        self.assertEqual(relabeled[0].op_name, "attn_out")
+        self.assertEqual(relabeled[0].token_id, 7)
+        self.assertEqual(relabeled[0].source_token_id, 6)
+        self.assertEqual(relabeled[0].source_name, "kqv_out-2-occ-0")
+        np.testing.assert_array_equal(relabeled[0].data, dump.data)
+
     def test_load_ck_hidden_exports_preserves_layer_and_position(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -289,6 +344,20 @@ class MultitokenEOSContractTests(unittest.TestCase):
 
         self.assertEqual(self.runner._dump_element_count_mismatches(ck, llama), [])
 
+    def test_hidden_xray_ignores_unrequested_oracle_aliases(self) -> None:
+        dump_type = self.runner.first_token.parity_test_v7.ParityDump
+        dumps = [
+            dump_type(0, "q_proj", np.zeros(4, dtype=np.float32), 0, "fp32"),
+            dump_type(0, "qcur_rope", np.zeros(4, dtype=np.float32), 0, "fp32"),
+            dump_type(0, "v_proj_view", np.zeros(4, dtype=np.float32), 0, "fp32"),
+        ]
+
+        filtered = self.runner._filter_requested_dump_semantics(
+            dumps, {"q_proj"}
+        )
+
+        self.assertEqual([dump.op_name for dump in filtered], ["q_proj"])
+
     def test_llama_persistent_dump_uses_trajectory_logits_step_index(self) -> None:
         observed = {}
 
@@ -304,6 +373,7 @@ class MultitokenEOSContractTests(unittest.TestCase):
         args = Namespace(
             top_k=3,
             llama_decode_mode="batched",
+            llama_flash_attention="enabled",
             max_new_tokens=2,
             threads=4,
             llama_no_repack=False,
@@ -339,7 +409,45 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertEqual(command[index + 1], "0")
         self.assertEqual(command[command.index("--dump-names") + 1], "l_out-0")
         self.assertIn("--dump-flash-inputs", command)
+        flash_index = command.index("--flash-attn")
+        self.assertEqual(command[flash_index + 1], "enabled")
         self.assertEqual(result["oracle_evidence"]["commit"], "a" * 40)
+
+    def test_llama_flash_input_capture_rejects_unfused_oracle(self) -> None:
+        args = Namespace(
+            top_k=3,
+            llama_decode_mode="batched",
+            llama_flash_attention="disabled",
+            max_new_tokens=1,
+            threads=1,
+            llama_no_repack=False,
+            llama_persistent_dump_step=0,
+            llama_persistent_dump_dir=Path("persistent-dump"),
+            llama_persistent_dump_names="kqv_out-0",
+            llama_persistent_dump_flash_inputs=True,
+            workdir=Path("work"),
+        )
+        inputs = {
+            "gguf_path": Path("model.gguf"),
+            "ctx_len": 128,
+            "tokens_before": [1],
+            "tokens_after": [],
+            "llama_prefix_path": None,
+            "prefix_grid": None,
+            "prefix_row_dim": 0,
+            "prefix_text_pos": 0,
+        }
+        with mock.patch.object(
+            self.runner.first_token.compare_first_token_logits_v7,
+            "ensure_llama_helper",
+            return_value=Path("llama-helper"),
+        ), mock.patch.object(
+            self.runner,
+            "_llama_oracle_evidence",
+            return_value={"commit": "a" * 40},
+        ):
+            with self.assertRaisesRegex(ValueError, "requires --llama-flash-attention enabled"):
+                self.runner._run_llama_greedy_sequence(inputs, args)
 
     def test_kv_first_difference_decodes_semantic_location(self) -> None:
         header = struct.pack("<8I", 0x564B5843, 1, 3, 5, 2, 4096, 4, 0)
@@ -490,6 +598,33 @@ class MultitokenEOSContractTests(unittest.TestCase):
         self.assertEqual(result["resolved"], "batched")
         self.assertTrue(result["compatible"])
         self.assertEqual(result["scope"], "production")
+
+    def test_current_bridge_report_identifies_executed_segmented_prefill(self) -> None:
+        bridge = {
+            "multimodal_prompt_segmented": True,
+            "bridge_runtime_policy": "decode-staged",
+            "prefix_tokens": 1008,
+            "bridge_contract": {"prefill_schedules": {"segmented_append": {}}},
+        }
+
+        self.assertTrue(self.runner._uses_segmented_append_prefill(bridge))
+        result = self.runner._resolve_oracle_prefill_mode("auto", bridge)
+        self.assertEqual(result["required"], "batched")
+
+    def test_generated_layout_identifies_segmented_prefill(self) -> None:
+        config = {
+            "multimodal_bridge_contract": {
+                "prefill_batching": "segmented_append",
+                "prefill_schedule": {
+                    "segments": ["text_before", "visual", "text_after"],
+                    "cache_transition": "append_preserve",
+                },
+            }
+        }
+
+        self.assertTrue(
+            self.runner._uses_segmented_append_prefill({}, runtime_config=config)
+        )
 
     def test_unified_prefill_auto_also_selects_concrete_batched_oracle(self) -> None:
         result = self.runner._resolve_oracle_prefill_mode(
@@ -1155,6 +1290,10 @@ class MultitokenEOSContractTests(unittest.TestCase):
             self.runner._logits_sha256(np.zeros(3, dtype=np.float32)),
         )
         self.assertEqual(library.decode_calls, 0)
+
+    def test_execution_evidence_marks_hidden_state_capture_as_diagnostic(self) -> None:
+        args = Namespace(hidden_state_step=0)
+        self.assertTrue(self.runner._diagnostic_tensor_dump_requested(args))
 
 
 if __name__ == "__main__":

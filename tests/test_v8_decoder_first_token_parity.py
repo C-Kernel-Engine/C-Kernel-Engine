@@ -296,6 +296,24 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
         )
         np.testing.assert_array_equal(qwen_named.data, expected)
 
+        variable = decoder_parity_v8.parity_test_v7.ParityDump(
+            1,
+            "qk_norm_q",
+            np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4),
+            0,
+            "fp32",
+        )
+        decoder_parity_v8._normalize_ck_attention_head_major_layout(
+            [variable],
+            {
+                "num_heads": 2,
+                "num_kv_heads": 1,
+                "head_dim": 8,
+                "layer_q_head_dim": [8, 4],
+            },
+        )
+        np.testing.assert_array_equal(variable.data, expected)
+
     def test_requested_rope_semantics_disambiguate_llama_kcur_occurrences(self) -> None:
         def dump(name: str) -> object:
             return decoder_parity_v8.parity_test_v7.ParityDump(
@@ -311,6 +329,30 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
             {"k_proj", "rope_k"},
         )
         self.assertEqual([row.op_name for row in rows], ["k_proj", "rope_k"])
+
+        loaded_rows = decoder_parity_v8._apply_requested_oracle_attention_semantics(
+            [
+                decoder_parity_v8.parity_test_v7.ParityDump(
+                    3, "kcur_rope", np.array([2.0], dtype=np.float32), 0, "fp32",
+                    source_name="Kcur-3-token-000008-occ-002.bin",
+                )
+            ],
+            {"rope_k"},
+        )
+        self.assertEqual([row.op_name for row in loaded_rows], ["rope_k"])
+
+    def test_requested_rope_q_uses_only_post_rope_occurrence(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        rows = decoder_parity_v8._apply_requested_oracle_attention_semantics(
+            [
+                dump(3, "q_proj", np.array([1.0], dtype=np.float32), 0, "fp32",
+                     source_name="Qcur-3-token-000008-occ-000.bin"),
+                dump(3, "qcur_rope", np.array([2.0], dtype=np.float32), 0, "fp32",
+                     source_name="Qcur-3-token-000008-occ-002.bin"),
+            ],
+            {"rope_q"},
+        )
+        self.assertEqual([row.op_name for row in rows], ["q_proj", "rope_q"])
 
     def test_requested_v_projection_ignores_llama_tensor_view_occurrence(self) -> None:
         dump = decoder_parity_v8.parity_test_v7.ParityDump
@@ -1657,6 +1699,22 @@ class V8DecoderFirstTokenParityTests(unittest.TestCase):
                 [[1.0, 1.0], [2.0, 2.0], [2.0, 2.0], [2.0, 2.0], [3.0, 3.0], [3.0, 3.0]],
                 dtype=np.float32,
             ),
+        )
+
+    def test_coalesce_ignores_deceptive_ggml_axis_order(self) -> None:
+        dump = decoder_parity_v8.parity_test_v7.ParityDump
+        segmented = [
+            dump(0, "qk_norm_q", np.arange(4, dtype=np.float32).reshape(2, 2, 1), 0, "fp32"),
+            dump(0, "qk_norm_q", np.arange(4, 12, dtype=np.float32).reshape(2, 2, 2), 1, "fp32"),
+        ]
+        merged = decoder_parity_v8._coalesce_multimodal_prefill_segments(
+            segmented,
+            {(0, "qk_norm_q"): (4, (2, 2))},
+            [("text", 1, 0), ("visual", 2, 1)],
+        )
+        np.testing.assert_array_equal(
+            merged[0].data,
+            np.arange(12, dtype=np.float32).reshape(3, 2, 2),
         )
 
     def test_coalesce_multimodal_prefill_segments_uses_state_endpoints(self) -> None:
