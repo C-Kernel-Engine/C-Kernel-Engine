@@ -248,6 +248,13 @@ make test-qwen3vl-private-corpus-parity-auto</pre>
         and Gemma4 profiles remain candidate lanes until their pinned artifacts
         satisfy their declared numerical and corpus gates.
     </p>
+    <p class="v8-note">
+        At source commit <code>352108874</code>, the Qwen3-VL profile passed all
+        40 corpus images across P3 AVX2 and Ryzen AVX-512: 640/640 generated
+        full-vocabulary decoder rows were bit-exact to llama.cpp, with 40
+        distinct image and prefix hashes. This is shared-prefix decoder parity,
+        not independent vision-encoder parity or OCR-quality certification.
+    </p>
 </div>
 
 <h2 id="demo-readiness-nightly">Overnight Demo Readiness</h2>
