@@ -2,7 +2,7 @@
   "version": 1,
   "name": "cohere_transcribe",
   "family": "audio_encoder_decoder",
-  "status": "native_short_audio_e2e",
+  "status": "native_bounded_long_audio_e2e",
   "flags": {
     "activation": "silu_relu",
     "normalization": "layernorm_batchnorm",
@@ -21,7 +21,8 @@
       "input_modality": "wav_bytes",
       "container": "riff_wave",
       "sample_encoding": "pcm_s16_le",
-      "sample_rate": 16000,
+      "model_sample_rate": 16000,
+      "input_sample_rate": "positive_pcm16_resampled_with_cke_windowed_sinc_radius_16",
       "preemphasis": 0.97,
       "n_fft": 512,
       "window_length": 400,
@@ -63,8 +64,9 @@
       "production_kernel_heap_allocation": false,
       "attention_scratch": "caller_owned_score_rows",
       "persistent_kv": "session_owned",
-      "long_audio": "not_certified",
-      "timestamps": "not_certified"
+      "long_audio": "external_vad_speech_slices_up_to_30_seconds",
+      "long_audio_resume": "atomic_report_at_speech_slice_boundary",
+      "timestamps": "repeat_exact_last_decoder_layer_cross_attention_monotonic_dtw"
     }
   },
   "kernels": {

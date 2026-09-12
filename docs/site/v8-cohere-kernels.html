@@ -1231,12 +1231,15 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71 3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div style="min-width: 0;">
-        <strong>Status honesty.</strong> Cohere now has a native short-audio correctness path. The declared
+        <strong>Status honesty.</strong> Cohere now has native short- and bounded long-audio correctness paths. The declared
         <code>cohere_transcribe</code> circuit composes the frontend providers below with CKE dense, normalization,
         activation, relative-attention, causal-attention, cross-attention, residual, and argmax kernels. On the
-        pinned 7.435-second fixture it emits the same 32 generated token IDs and transcript as CrispASR. The
-        Python session driver reads a complete mixed FP16/FP32 BUMP bundle and its tokenizer sidecar; long audio,
-        timestamps, resampling, multilingual coverage, quantization, and optimized execution remain open.
+        pinned 7.435-second fixture it emits the same 32 generated token IDs and transcript as CrispASR. On the
+        retained five-minute recording, two runs over the same 13 VAD speech slices reproduce every token and
+        DTW timestamp and match CrispASR's 686-word transcript with zero word edits. The Python session driver
+        reads a complete mixed FP16/FP32 BUMP bundle and its tokenizer sidecar. Speech detection is an explicit
+        external preprocessing contract; CKE performs all ASR model execution. Multilingual quality, native VAD,
+        generated-circuit execution, quantization, and optimized execution remain open.
       </div>
     </div>
     <p style="color: var(--text-secondary);">
@@ -1255,6 +1258,39 @@ python version/v8/scripts/convert_cohere_transcribe_gguf_to_bump_v8.py \
 python version/v8/scripts/run_cohere_transcribe_native_v8.py \
   --model cohere-transcribe-bump \
   --audio recording.wav --decode --language en</code></pre>
+    <p style="color: var(--text-secondary);">
+      Long recordings require validated speech slices because this model fabricates text on silence. Export
+      versioned slices with Silero VAD, then run bounded CKE inference. Each completed slice is atomically retained,
+      so <code>--resume</code> restarts at a slice boundary. The runner emits the raw JSON trajectory, plain text,
+      and SRT captions without hiding decoder loops.
+    </p>
+    <pre><code>crispasr --vad --vad-model silero --vad-export speech-slices.json \
+  --chunk-seconds 30 -f recording.wav
+
+python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
+  --model cohere-transcribe-bump --audio recording.wav \
+  --speech-segments speech-slices.json --language en \
+  --output cohere-long.json --text-output transcript.txt --srt-output transcript.srt</code></pre>
+    <p style="color: var(--text-secondary);">
+      The five-minute certification used a Ryzen 9 9950X3D with 16 threads. The two native runs completed in
+      67.36 and 66.03 seconds (0.225 and 0.220 real-time factor) with about 8.51 GB peak RSS. The certifier requires
+      the actual engine and audio libraries to appear in the process map, identical artifact/runtime/input/VAD
+      identities, exact repeated token and timestamp trajectories, finite outputs, no repeated multi-word phrase
+      loop, and a
+      bounded oracle WER. These results certify English speech slices up to 30 seconds; they do not certify the VAD
+      model as a CKE kernel or timestamp agreement against an independent forced-alignment oracle.
+      A derived 8 kHz version of the short fixture also reproduces the 16 kHz token trajectory exactly after the
+      existing CKE radius-16 windowed-sinc resampler; broader sample-rate coverage remains open.
+      The compact <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/cohere_transcribe_03_2026_five_minute_certification.json">five-minute
+      certification artifact</a> records the immutable inputs, runtime hashes, checks, and measurements.
+      The complete 42:22 recording then consumed all 123 scheduled speech slices in 639.86 seconds
+      (0.252 real-time factor) at 8.75 GB peak RSS and emitted 729 SRT captions. Against a full CrispASR
+      transcript it differs by one word out of 6,889 (0.0145% WER): CKE preserves a spoken fourfold
+      “it’s,” while CrispASR's generic loop filter retains three. See the compact
+      <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/cohere_transcribe_03_2026_42_minute_certification.json">complete-recording
+      certification artifact</a>. That full run was not repeated, so deterministic long-run evidence remains the
+      two five-minute executions.
+    </p>
     <p style="color: var(--text-secondary);">
       All seven live in <code>src/kernels/audio_kernels.c</code> and form the Conformer frontend:
     </p>

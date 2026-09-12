@@ -1,0 +1,67 @@
+{
+  "schema": "cke.v8.cohere_transcribe.complete_recording_certification",
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "one complete retained 42-minute English recording over 123 Silero VAD speech slices",
+  "cke_source_base_commit": "047d79a0f07c15fec6df2efdc85fbb99a56eef17",
+  "model": {
+    "repository": "cstr/cohere-transcribe-03-2026-GGUF",
+    "revision": "77234fcd7f77d271e5fc57f14fb05f260275558c",
+    "source_sha256": "f38225c97dd8185823167cd5107370cda4bf7f77e5042cae7e254f1e6dabced4",
+    "bump_weights_sha256": "00324600d6487da49915d7a2e3a16e59156b3c9246d697a0bea2c51ae3f50c44"
+  },
+  "input": {
+    "wav_sha256": "5690063a657511ab16498b2f9aefc720c8d1c517e1e450445a8467ce710116fe",
+    "source_seconds": 2542.0,
+    "scheduled_speech_seconds": 2288.04,
+    "intentionally_skipped_seconds": 253.96,
+    "speech_slice_sha256": "1a90238ed65f043c6653d62e71a65c954fee0b4bc15082378ee108b251c74cdc",
+    "speech_slices": 123,
+    "maximum_speech_slice_seconds": 29.9
+  },
+  "oracle": {
+    "name": "CrispASR",
+    "revision": "ab87fba65a4ade1ef30ccaa881458a0914aae557",
+    "binary_sha256": "cc8e5870041af3bad738d5045dc8c44e8caa6dd888c84a13c568e7265d426977",
+    "transcript_sha256": "fc64aa1cb7681183dbd38e44e15952c755f106e383db500def38f168b0aa25f9",
+    "normalized_words": 6889,
+    "elapsed_seconds": 343.51,
+    "real_time_factor": 0.135133
+  },
+  "runtime": {
+    "engine_sha256": "7583a82ae7adc6875b5bf7d65cbcc1fa9db058e3f907af29be9f67f89a800447",
+    "audio_sha256": "dba313bff5450aa4401dcb5ccee4bebbf8c220891d83a747cd7980e12eccf2be",
+    "libraries_present_in_process_maps": true,
+    "threads": 16,
+    "host": "AMD Ryzen 9 9950X3D"
+  },
+  "checks": {
+    "all_speech_slices_completed": true,
+    "scheduled_source_coverage_exact": true,
+    "finite_outputs": true,
+    "monotonic_token_timestamps": true,
+    "no_repeated_phrase_loops": true,
+    "oracle_word_edits": 1,
+    "oracle_word_error_rate": 0.00014515894904920887,
+    "oracle_difference": "CKE retains the spoken fourfold 'it's'; CrispASR's generic loop filter retains three"
+  },
+  "outputs": {
+    "generated_tokens": 10207,
+    "transcript_characters": 39318,
+    "srt_captions": 729,
+    "retained_report_sha256": "3e406b6875bc64fa82db2e449069c15f16d4a9843b783ac40c3de8601eb3cc3f",
+    "plain_text_sha256": "2851de833b70c39c1177d9fe5cc7da2ead872ca3e6c97bc30523f02da7c52d38",
+    "srt_sha256": "8f30dfe94983b15f97809a64e9c14248c6a537bc42c5ca788cc8f50286494acd"
+  },
+  "performance": {
+    "cke_compute_elapsed_seconds": 639.8587137178984,
+    "cke_real_time_factor": 0.2517146788819427,
+    "cke_peak_rss_bytes": 8748830720
+  },
+  "limitations": [
+    "single complete English recording; the complete run was not repeated",
+    "speech detection uses a pinned external Silero VAD export rather than a CKE VAD circuit",
+    "DTW timestamps are monotonic and five-minute repeat-exact but lack independent forced-alignment accuracy evidence",
+    "generated-circuit, multilingual, concurrent-session, quantized, and matched-performance certification remain open"
+  ]
+}

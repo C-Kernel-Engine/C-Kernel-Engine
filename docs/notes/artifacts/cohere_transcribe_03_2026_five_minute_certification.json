@@ -1,0 +1,68 @@
+{
+  "schema": "cke.v8.cohere_transcribe.long_audio_certification",
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "retained five-minute English recording segmented into 13 Silero VAD speech slices",
+  "cke_source_base_commit": "047d79a0f07c15fec6df2efdc85fbb99a56eef17",
+  "model": {
+    "repository": "cstr/cohere-transcribe-03-2026-GGUF",
+    "revision": "77234fcd7f77d271e5fc57f14fb05f260275558c",
+    "source_sha256": "f38225c97dd8185823167cd5107370cda4bf7f77e5042cae7e254f1e6dabced4",
+    "bump_weights_sha256": "00324600d6487da49915d7a2e3a16e59156b3c9246d697a0bea2c51ae3f50c44"
+  },
+  "input": {
+    "wav_sha256": "7d1be9de45062a32b94e8e8e65f86ce4422551db21f81b59f8f3a8044bd1b582",
+    "source_seconds": 300.0,
+    "scheduled_speech_seconds": 225.15,
+    "intentionally_skipped_seconds": 74.85,
+    "speech_slice_sha256": "da7b99563c6e20e1c8b1ac20d8122521db2f583a6dd802296873c20ae4a7e266",
+    "speech_slices": 13
+  },
+  "oracle": {
+    "name": "CrispASR",
+    "revision": "ab87fba65a4ade1ef30ccaa881458a0914aae557",
+    "transcript_sha256": "59aa21d1c144ad3e5776f1a5e4df085aecfaa7a9021548f34b42f7dba1920f53",
+    "normalized_words": 686
+  },
+  "runtime": {
+    "engine_sha256": "7583a82ae7adc6875b5bf7d65cbcc1fa9db058e3f907af29be9f67f89a800447",
+    "audio_sha256": "dba313bff5450aa4401dcb5ccee4bebbf8c220891d83a747cd7980e12eccf2be",
+    "libraries_present_in_process_maps": true,
+    "threads": 16,
+    "host": "AMD Ryzen 9 9950X3D"
+  },
+  "checks": {
+    "candidate_passed": true,
+    "repeat_passed": true,
+    "matching_artifact_runtime_input_policy": true,
+    "generated_token_ids_exact": true,
+    "selected_token_trajectory_exact": true,
+    "transcript_exact": true,
+    "no_repeated_phrase_loops": true,
+    "oracle_word_edits": 0,
+    "oracle_word_error_rate": 0.0
+  },
+  "resampling": {
+    "source_sample_rate": 8000,
+    "source_seconds": 7.435,
+    "input_sha256": "4d505d8244c226914da470ffca1780a761d72ee818e6df4da00303880c15d4f7",
+    "provider": "audio_resample_windowed_sinc_f32",
+    "radius": 16,
+    "generated_token_ids_match_16khz_fixture": true,
+    "transcript_match_16khz_fixture": true
+  },
+  "performance": {
+    "candidate_elapsed_seconds": 67.35816871293355,
+    "candidate_real_time_factor": 0.22452722904311181,
+    "candidate_peak_rss_bytes": 8506486784,
+    "repeat_elapsed_seconds": 66.0339494360378,
+    "repeat_real_time_factor": 0.22011316478679266,
+    "repeat_peak_rss_bytes": 8507551744
+  },
+  "limitations": [
+    "speech detection uses a pinned external Silero VAD export rather than a CKE VAD circuit",
+    "DTW timestamps are repeat-exact but have not been compared with an independent forced-alignment oracle",
+    "English-only long-audio evidence; resampling evidence covers one derived 8 kHz fixture",
+    "generated-circuit, quantized, concurrent-session, and matched-performance certification remain open"
+  ]
+}

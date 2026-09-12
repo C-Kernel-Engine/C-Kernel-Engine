@@ -179,8 +179,14 @@ class CohereKernels(parakeet.Kernels):
         self.engine.attention_forward_query_key_head_major_f32_decode_heads.restype = ctypes.c_int
 
     def attention(
-        self, query: np.ndarray, key: np.ndarray, value: np.ndarray, *, decode: bool,
-    ) -> np.ndarray:
+        self,
+        query: np.ndarray,
+        key: np.ndarray,
+        value: np.ndarray,
+        *,
+        decode: bool,
+        return_weights: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         query, key, value = f32(query), f32(key), f32(value)
         heads, query_tokens, head_dim = query.shape
         if key.shape != value.shape or key.shape[0] != heads or key.shape[2] != head_dim:
@@ -202,6 +208,12 @@ class CohereKernels(parakeet.Kernels):
         )
         if status != 0:
             raise RuntimeError(f"attention failed with status {status}")
+        if return_weights:
+            totals = scratch.sum(axis=-1, keepdims=True)
+            if not np.isfinite(scratch).all() or not np.isfinite(totals).all() or np.any(totals <= 0):
+                raise RuntimeError("attention weights cannot be normalized")
+            weights = scratch / totals
+            return output, weights
         return output
 
 
@@ -264,14 +276,31 @@ class CohereSession:
             wav.ctypes.data_as(parakeet.U8P), wav.nbytes, ctypes.byref(info),
         ) != 0:
             raise RuntimeError("WAV parse failed")
-        if info.bits_per_sample != 16 or info.sample_rate != 16000:
-            raise ValueError("current Cohere correctness path requires 16 kHz PCM16 WAV")
+        if info.bits_per_sample != 16:
+            raise ValueError("Cohere frontend requires PCM16 WAV input")
         samples = np.empty(info.frames, np.float32)
         decoded = self.k.audio.audio_wav_decode_pcm16_mono_f32(
             wav.ctypes.data_as(parakeet.U8P), wav.nbytes, ctypes.byref(info), ptr(samples), samples.size,
         )
         if decoded != info.frames:
             raise RuntimeError("WAV decode was incomplete")
+        if info.sample_rate != 16000:
+            output_frames = self.k.audio.audio_resampled_frame_count(
+                samples.size, info.sample_rate, 16000,
+            )
+            if output_frames <= 0:
+                raise RuntimeError(
+                    f"invalid resampled frame count for {samples.size} frames "
+                    f"at {info.sample_rate} Hz"
+                )
+            resampled = np.empty(output_frames, np.float32)
+            status = self.k.audio.audio_resample_windowed_sinc_f32(
+                ptr(samples), samples.size, info.sample_rate, ptr(resampled),
+                output_frames, 16000, 16,
+            )
+            if status != 0:
+                raise RuntimeError(f"windowed-sinc resampling failed with status {status}")
+            samples = resampled
         emphasized = np.empty_like(samples)
         if self.k.audio.audio_preemphasis_f32(ptr(samples), ptr(emphasized), samples.size, ctypes.c_float(0.97)) != 0:
             raise RuntimeError("pre-emphasis failed")
@@ -431,6 +460,7 @@ class CohereSession:
         self_keys = [np.empty((self.decoder_heads, 0, self.decoder_width // self.decoder_heads), np.float32) for _ in range(self.decoder_layers)]
         self_values = [value.copy() for value in self_keys]
         generated: list[int] = []
+        self.last_cross_attention: list[np.ndarray] = []
         sequence = self._prompt(language)
         if len(sequence) + max_new_tokens > self.max_context:
             raise ValueError(
@@ -460,7 +490,15 @@ class CohereSession:
                 residual = value
                 normalized = self._norm(value, prefix + ".cross_ln")
                 query = self.k.gemm(normalized, self.w(prefix + ".cross_q.weight"), self.w(prefix + ".cross_q.bias"))
-                attended = self._tokens(self.k.attention(self._heads(query, self.decoder_heads), *cross[layer], decode=True))
+                cross_result = self.k.attention(
+                    self._heads(query, self.decoder_heads), *cross[layer],
+                    decode=True, return_weights=layer == self.decoder_layers - 1,
+                )
+                if layer == self.decoder_layers - 1:
+                    attended_heads, step_cross_attention = cross_result
+                else:
+                    attended_heads = cross_result
+                attended = self._tokens(attended_heads)
                 value = self.k.residual_add(residual, self.k.gemm(attended, self.w(prefix + ".cross_o.weight"), self.w(prefix + ".cross_o.bias")))
                 branch = self._ff(self._norm(value, prefix + ".ffn_ln"), prefix + ".ffn", "relu")
                 value = self.k.residual_add(value, branch)
@@ -468,6 +506,7 @@ class CohereSession:
             if position + 1 < len(sequence):
                 continue
             selected = self.k.argmax_first(logits)
+            self.last_cross_attention.append(step_cross_attention.copy())
             if selected == eos:
                 break
             generated.append(selected)

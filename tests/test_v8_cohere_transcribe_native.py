@@ -49,14 +49,16 @@ def test_session_routes_attention_and_token_selection_to_cke() -> None:
     assert "self.k.argmax_first(logits)" in source
 
 
-def test_circuit_declares_the_certified_short_audio_envelope() -> None:
+def test_circuit_declares_the_certified_bounded_audio_envelope() -> None:
     circuit = json.loads(CIRCUIT.read_text(encoding="utf-8"))
-    assert circuit["status"] == "native_short_audio_e2e"
+    assert circuit["status"] == "native_bounded_long_audio_e2e"
     assert circuit["contract"]["artifact"]["required_tensor_count"] == 2104
     assert circuit["contract"]["audio_encoder"]["blocks"] == 48
     assert circuit["contract"]["audio_decoder"]["blocks"] == 8
     assert circuit["contract"]["runtime_invariants"]["production_kernel_heap_allocation"] is False
-    assert circuit["contract"]["runtime_invariants"]["long_audio"] == "not_certified"
+    assert circuit["contract"]["runtime_invariants"]["long_audio"] == (
+        "external_vad_speech_slices_up_to_30_seconds"
+    )
     model_map = json.loads((ROOT / "version/v8/model_maps/gguf_ck_map.json").read_text())
     contract = model_map["architectures"]["cohere-transcribe"]
     assert contract["conversion_status"] == "dedicated_audio_converter"
