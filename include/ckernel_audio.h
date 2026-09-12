@@ -97,6 +97,36 @@ int audio_feature_normalize_per_feature_f32(
     int frames,
     float epsilon);
 
+int audio_relative_sinusoidal_position_f32(
+    float *output,
+    int frames,
+    int channels);
+
+int audio_batch_norm_inference_channel_major_f32(
+    const float *input,
+    const float *running_mean,
+    const float *running_variance,
+    const float *weight,
+    const float *bias,
+    float *output,
+    int channels,
+    int frames,
+    float epsilon);
+
+int audio_lstm_step_f32(
+    const float *input,
+    const float *weight_ih,
+    const float *weight_hh,
+    const float *bias_ih,
+    const float *bias_hh,
+    float *hidden_state,
+    float *cell_state,
+    float *output,
+    float *gates_scratch,
+    size_t gates_scratch_bytes,
+    int input_size,
+    int hidden_size);
+
 int audio_stft_precompute_tables_f32(
     int n_fft,
     float *window,
@@ -166,6 +196,20 @@ int audio_conv1d_channel_major_f32(
     int padding,
     int output_frames);
 
+int audio_conv1d_channel_major_grouped_f32(
+    const float *input,
+    const float *weight,
+    const float *bias,
+    float *output,
+    int input_channels,
+    int output_channels,
+    int input_frames,
+    int kernel_size,
+    int stride,
+    int padding,
+    int groups,
+    int output_frames);
+
 int audio_conv2d_whc_grouped_f32(
     const float *input,
     const float *weight,
@@ -196,6 +240,21 @@ int audio_relative_shift_f32(
     float *scores,
     int heads,
     int query_frames);
+
+int audio_conformer_relative_attention_f32(
+    const float *query,
+    const float *key,
+    const float *value,
+    const float *relative_key,
+    const float *bias_u,
+    const float *bias_v,
+    float *output,
+    int frames,
+    int heads,
+    int head_dim,
+    float scale,
+    float *scores_scratch,
+    size_t scores_scratch_bytes);
 
 int audio_transpose_channel_to_token_f32(
     const float *input,

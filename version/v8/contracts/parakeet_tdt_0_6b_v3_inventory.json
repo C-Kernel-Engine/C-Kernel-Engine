@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "cke.parakeet.operation_reuse_inventory",
-  "status": "inventory_complete_implementation_not_started",
+  "status": "native_short_wav_e2e_pass",
   "generated_at": "2026-09-12",
   "scope": "Native CPU text transcription for nvidia/parakeet-tdt-0.6b-v3; diarization is a separate milestone and is excluded.",
   "reference_contract": {
@@ -87,210 +87,240 @@
       "stage": "frontend",
       "disposition": "reuse",
       "cke_foundation": "audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32",
-      "finding": "16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input."
+      "finding": "16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input.",
+      "implementation_status": "open"
     },
     {
       "operation": "sample-rate validation and resampling",
       "stage": "frontend",
       "disposition": "contract_extension",
       "cke_foundation": "audio_resample_windowed_sinc_f32",
-      "finding": "The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately."
+      "finding": "The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately.",
+      "implementation_status": "open"
     },
     {
       "operation": "pre-emphasis x[t]-0.97*x[t-1]",
       "stage": "frontend",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_preemphasis_f32",
-      "finding": "Arithmetic and first-sample rule match; real-fixture comparison remains required."
+      "finding": "Arithmetic and first-sample rule match; real-fixture comparison remains required.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "centered STFT power, n_fft=512, win=400, hop=160",
       "stage": "frontend",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_stft_power_centered_window_f32",
-      "finding": "Use an explicit non-periodic Hann window and zero padding. Existing provider supports the shape; compare direct-DFT accumulation with torch.stft."
+      "finding": "Use an explicit non-periodic Hann window and zero padding. Existing provider supports the shape; compare direct-DFT accumulation with torch.stft.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Slaney mel filter bank, 128 bins",
       "stage": "frontend",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_whisper_mel_filters_slaney_f32",
-      "finding": "Provider is dimension-general despite its legacy name. Compare every filter coefficient with the pinned librosa FP32 bank."
+      "finding": "Provider is dimension-general despite its legacy name. Compare every filter coefficient with the pinned librosa FP32 bank.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "natural-log mel projection",
       "stage": "frontend",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_log_mel_time_major_f32",
-      "finding": "Time-major layout and ln(sum+epsilon) match structurally; freeze the pinned epsilon and accumulation tolerance."
+      "finding": "Time-major layout and ln(sum+epsilon) match structurally; freeze the pinned epsilon and accumulation tolerance.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "per-feature normalization over live frames",
       "stage": "frontend",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_feature_normalize_per_feature_f32",
-      "finding": "Sample variance uses N-1 and epsilon after sqrt. Batched padding masks need composition around the provider."
+      "finding": "Sample variance uses N-1 and epsilon after sqrt. Batched padding masks need composition around the provider.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "three-stage grouped Conv2D subsampling",
       "stage": "encoder",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_conv2d_whc_grouped_f32",
-      "finding": "Covers regular, depthwise, and 1x1 stages with bias. Circuit must reproduce masking after every Conv2D and CHW/time reshapes."
+      "finding": "Covers regular, depthwise, and 1x1 stages with bias. Circuit must reproduce masking after every Conv2D and CHW/time reshapes.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "subsampling ReLU",
       "stage": "encoder",
       "disposition": "map_promotion",
       "cke_foundation": "relu_forward",
-      "finding": "Kernel exists but lacks a current v8 inference kernel map; promote a narrow FP32 map or fuse only after parity."
+      "finding": "Kernel exists but lacks a current v8 inference kernel map; promote a narrow FP32 map or fuse only after parity.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "subsampling flatten and linear projection",
       "stage": "encoder",
       "disposition": "reuse",
       "cke_foundation": "gemm_nt_fp32_exact",
-      "finding": "Optional bias is supported. Layout conversion from [C,H,W] to time-major C*W must be declared."
+      "finding": "Optional bias is supported. Layout conversion from [C,H,W] to time-major C*W must be declared.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "relative sinusoidal position encoding",
       "stage": "encoder",
       "disposition": "missing_provider",
-      "cke_foundation": "none",
-      "finding": "Needs FP32 descending relative positions [T-1..-(T-1)], sin/cos interleave, and exact cast boundaries."
+      "cke_foundation": "audio_relative_sinusoidal_position_f32",
+      "finding": "Validated against the pinned Transformers Parakeet positional implementation; max absolute difference 5.96046448e-08.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "LayerNorm at five block sites",
       "stage": "encoder",
       "disposition": "reuse_candidate",
       "cke_foundation": "layernorm_fp32_exact",
-      "finding": "Shape fits, but existing exact contract targets ggml reduction order. PyTorch FP32 CPU parity must be measured before selection."
+      "finding": "Shape fits, but existing exact contract targets ggml reduction order. PyTorch FP32 CPU parity must be measured before selection.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Macaron FFN linear-SiLU-linear",
       "stage": "encoder",
       "disposition": "composition_gap",
       "cke_foundation": "gemm_nt_fp32_exact; recurrent_silu_forward",
-      "finding": "Linear provider is reusable. Standalone SiLU needs an architecture-neutral map and PyTorch FP32 numerical certification."
+      "finding": "Linear provider is reusable. Standalone SiLU needs an architecture-neutral map and PyTorch FP32 numerical certification.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "half-scaled FFN residual",
       "stage": "encoder",
       "disposition": "composition_gap",
       "cke_foundation": "add_stream_inplace",
-      "finding": "DSL needs explicit 0.5 branch scaling at both FFN residual sites with preserved operation order."
+      "finding": "DSL needs explicit 0.5 branch scaling at both FFN residual sites with preserved operation order.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Transformer-XL relative self-attention",
       "stage": "encoder",
       "disposition": "composition_gap",
-      "cke_foundation": "gemm_nt_fp32_exact; audio_relative_shift_f32",
-      "finding": "Q/K/V/O and relative-K projections reuse GEMM. Bias-u/v, content/position score composition, non-causal mask, FP32 softmax, value product, and layout contracts need a declared composite/provider."
+      "cke_foundation": "audio_conformer_relative_attention_f32",
+      "finding": "Validated eager FP32 provider uses one caller-owned T-element score row; the short fixture matches through all 24 encoder layers.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Conformer pointwise/depthwise Conv1D",
       "stage": "encoder",
       "disposition": "contract_extension",
-      "cke_foundation": "audio_conv1d_channel_major_f32",
-      "finding": "Kernel covers stride/padding. Parakeet weights omit convolution bias, while the map currently requires one; bind a prepared zero bias or add an optional-bias contract."
+      "cke_foundation": "audio_conv1d_channel_major_grouped_f32",
+      "finding": "The original dense-only provider was unsafe for [C,1,K] depthwise weights. The explicit grouped provider now matches torch groups=4 and depthwise cases and rejects invalid group geometry.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "channel-split GLU",
       "stage": "encoder",
       "disposition": "reuse_candidate",
       "cke_foundation": "audio_glu_split_channel_major_f32",
-      "finding": "Layout and value*sigmoid(gate) match; compare libm/SLEEF behavior against pinned PyTorch."
+      "finding": "Layout and value*sigmoid(gate) match; compare libm/SLEEF behavior against pinned PyTorch.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "inference BatchNorm1D",
       "stage": "encoder",
       "disposition": "missing_provider",
-      "cke_foundation": "none",
-      "finding": "Needs running mean/variance, affine weight/bias, epsilon, FP32 order, no training-state updates, and no per-call allocation."
+      "cke_foundation": "audio_batch_norm_inference_channel_major_f32",
+      "finding": "Validated inference-only running-statistics provider; max absolute unit-oracle difference 1.19209290e-07.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "padding-mask zeroing before convolution",
       "stage": "encoder",
       "disposition": "composition_gap",
       "cke_foundation": "none",
-      "finding": "Declare masked fill over channel-major activations; must use post-subsampling live lengths."
+      "finding": "Declare masked fill over channel-major activations; must use post-subsampling live lengths.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "encoder 1024-to-640 projector",
       "stage": "transducer",
       "disposition": "reuse",
       "cke_foundation": "gemm_nt_fp32_exact",
-      "finding": "Bias is present and provider dimensions fit."
+      "finding": "Bias is present and provider dimensions fit.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "8193-by-640 token embedding",
       "stage": "prediction",
       "disposition": "reuse_candidate",
       "cke_foundation": "embedding_forward_fp32",
-      "finding": "Vocabulary includes blank id 8192. Select the FP32 variant without positional embeddings."
+      "finding": "Vocabulary includes blank id 8192. Select the FP32 variant without positional embeddings.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "two-layer 640-wide LSTM prediction network",
       "stage": "prediction",
       "disposition": "missing_provider",
-      "cke_foundation": "none",
-      "finding": "Needs prepared/session-owned hidden and cell state, PyTorch gate order and nonlinearities, explicit reset/reuse semantics, and no compute-time heap allocation."
+      "cke_foundation": "audio_lstm_step_f32",
+      "finding": "Validated PyTorch IFGO single-step provider with session-owned state and caller-owned 4H gate scratch; max absolute unit-oracle difference 1.49011612e-08.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "decoder 640-to-640 projector",
       "stage": "prediction",
       "disposition": "reuse",
       "cke_foundation": "gemm_nt_fp32_exact",
-      "finding": "Bias is present."
+      "finding": "Bias is present.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "joint encoder-plus-decoder add and ReLU",
       "stage": "joint",
       "disposition": "map_promotion",
       "cke_foundation": "add_stream_inplace; relu_forward",
-      "finding": "Elementwise kernels exist; ReLU needs a v8 inference map and broadcast/add shapes must be declared."
+      "finding": "Elementwise kernels exist; ReLU needs a v8 inference map and broadcast/add shapes must be declared.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "joint 640-to-8198 token-duration head",
       "stage": "joint",
       "disposition": "reuse",
       "cke_foundation": "gemm_nt_fp32_exact",
-      "finding": "Output splits into 8193 token logits and five duration logits."
+      "finding": "Output splits into 8193 token logits and five duration logits.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "greedy TDT token-duration state machine",
       "stage": "decode",
       "disposition": "missing_runtime",
       "cke_foundation": "none",
-      "finding": "Argmax token and duration independently; blank with predicted duration zero advances by one; nonblank duration zero stays on frame; max output is bounded by encoder traversal."
+      "finding": "Argmax token and duration independently; blank with predicted duration zero advances by one; nonblank duration zero stays on frame; max output is bounded by encoder traversal.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Metaspace BPE decode",
       "stage": "decode",
       "disposition": "contract_extension",
       "cke_foundation": "existing tokenizer infrastructure",
-      "finding": "Tokenizer JSON has 8192 BPE entries with Metaspace replacement U+2581. Verify repeated tokens, blank/pad suppression, punctuation, and UTF-8 languages."
+      "finding": "Tokenizer JSON has 8192 BPE entries with Metaspace replacement U+2581. Verify repeated tokens, blank/pad suppression, punctuation, and UTF-8 languages.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "token timestamps",
       "stage": "decode",
       "disposition": "missing_runtime",
       "cke_foundation": "none",
-      "finding": "Cumulative duration gives frame index; frame rate is 0.08 s. Punctuation is collapsed to the previous token endpoint by the pinned processor."
+      "finding": "Cumulative duration gives frame index; frame rate is 0.08 s. Punctuation is collapsed to the previous token endpoint by the pinned processor.",
+      "implementation_status": "open"
     },
     {
       "operation": "safetensors to BUMP plus sidecar conversion",
       "stage": "conversion",
       "disposition": "missing_composition",
-      "cke_foundation": "convert_safetensors_to_bump_v8.py foundation",
-      "finding": "Add strict Parakeet name/shape rules and require all 723 tensors to be consumed or explicitly classified; do not load Transformers during inference."
+      "cke_foundation": "convert_safetensors_to_bump_v8.py parakeet_tdt map",
+      "finding": "Strict conversion maps 699 inference tensors and explicitly excludes 24 BatchNorm training counters; zero source tensors remain unexplained.",
+      "implementation_status": "short_fixture_validated"
     },
     {
       "operation": "Parakeet circuit and native session",
       "stage": "runtime",
       "disposition": "missing_composition",
-      "cke_foundation": "v8 circuit/lowering/runtime foundations",
-      "finding": "Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths."
+      "cke_foundation": "parakeet_tdt circuit; run_parakeet_native_v8.py",
+      "finding": "BUMPWGT5-backed thin Python orchestration runs WAV frontend, 24-layer encoder, LSTM prediction network, joint network, and TDT decoding with no reference-framework import.",
+      "implementation_status": "short_fixture_validated"
     }
   ],
   "implementation_order": [
@@ -337,13 +367,16 @@
     "reference_fixture_json": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json",
     "reference_fixture_npz": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz",
     "tensor_manifest": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json",
-    "audio": "version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav"
+    "audio": "version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav",
+    "native_e2e_json": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json",
+    "reproduction": "version/v8/scripts/run_parakeet_native_v8.py --model <converted BUMP directory> --fixture <reference NPZ> --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav --decode"
   },
   "claim_boundary": {
-    "native_cke_transcription": "not_implemented",
-    "native_cke_parity": "not_tested",
+    "native_cke_transcription": "short_wav_e2e_pass",
+    "native_cke_parity": "exact_50_token_and_duration_trajectory",
     "long_audio": "not_tested",
     "multilingual": "not_tested",
-    "diarization": "out_of_scope"
+    "diarization": "out_of_scope",
+    "bump_conversion": "699_mapped_24_explicitly_ignored_0_unaccounted"
   }
 }

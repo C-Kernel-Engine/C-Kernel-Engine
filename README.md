@@ -92,6 +92,7 @@ version/v8/scripts/cks-v8-run run \
 | Qwen3-VL 8B | `hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf` | Add `--mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf`, `--image-path`, and the runbook's vision options |
 | Qwen3.6-VL | `hf://ggml-org/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q4_K_M.gguf` | Add `--mmproj hf://ggml-org/Qwen3.6-27B-GGUF/mmproj-Qwen3.6-27B-Q8_0.gguf`; use the separate OCR command in the v8 runbook because text-only execution does not certify vision |
 | Whisper Tiny, Base, or Small | `version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav /path/to/audio.wav` | Audio uses the `audio` subcommand; see the v8 runbook for generated artifact directories and language/task options |
+| Parakeet TDT 0.6B v3 | [`hf://nvidia/parakeet-tdt-0.6b-v3`](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | FP32 BUMP candidate: one 7.435-second WAV has an exact 50-token and duration trajectory; use the [Parakeet HTML guide](https://c-kernel-engine.github.io/C-Kernel-Engine/parakeet-tdt.html) |
 
 Use `--force-convert --force-compile` when intentionally rebuilding a model.
 Qwen3.8 Flash Next remains in the evidence table below rather than this
@@ -150,6 +151,7 @@ records the strongest evidence for each family.
 | Laguna-XS 2.1 Q4_K_M | Coherent text; exact embedding/RMSNorm and near-exact router replay | 2,048 tokens | Ryzen Zen 5 bring-up; diagnostic llama.cpp oracle |
 | Instella-MoE 16B-A3B BF16 | Top-1 PyTorch match and 0.99998 full-logit cosine at the tested checkpoint | 32-token checkpoint | x86 BF16 reference/runtime lane; quantized and long trajectories open |
 | Whisper Tiny, Base, and Small FP32 | Token-exact Hugging Face trajectory on public JFK fixtures | JFK fixture; 33-second Base long-form fixture | Generated x86 encoder/decoder runtime |
+| Parakeet TDT 0.6B v3 FP32 | Exact 50-token and 50-duration Transformers trajectory from a BUMPWGT5-backed native-kernel run | One 7.435-second LibriSpeech WAV; long audio, multilingual speech, and diarization remain open | Ryzen 9 9950X3D short-fixture bring-up |
 
 The [model and kernel matrix](https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html)
 contains per-family commands, formats, open boundaries, and evidence classes. The
