@@ -984,7 +984,492 @@
     </header>
     <main>
 
+<style>
+.cg-note{border:1px solid rgba(7,173,248,.45);border-radius:8px;padding:1rem;background:rgba(7,173,248,.06)}
+.cg-good{border-color:rgba(48,196,141,.55);background:rgba(48,196,141,.06)}
+.cg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin:1rem 0}
+.cg-card{border:1px solid var(--grey);border-left:4px solid var(--orange);border-radius:8px;padding:1rem;background:rgba(255,255,255,.02)}
+.cg-card h3{margin-top:0}
+.cg-table{width:100%;border-collapse:collapse;margin:1rem 0 2rem}
+.cg-table th,.cg-table td{padding:.65rem .78rem;border:1px solid var(--grey);text-align:left;vertical-align:top}
+.cg-table th{color:var(--orange);background:rgba(255,180,0,.07)}
+.cg-table td:first-child{font-family:'JetBrains Mono',monospace}
+.cg-details{border:1px solid var(--grey);border-radius:8px;margin:1rem 0;background:rgba(255,255,255,.02)}
+.cg-details>summary{padding:.7rem 1rem;cursor:pointer;font-weight:600;color:var(--orange)}
+.cg-details>.cg-details-body{padding:0 1rem 1rem}
+.cg-prov{font-size:.78rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.svg-expand{position:relative}
+.svg-expand svg{cursor:zoom-in}
+.svg-expand svg:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
+.svg-expand-hint{text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:-.6rem;margin-bottom:1rem;font-family:'JetBrains Mono',monospace}
+#cg-svg-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.95);padding:3.2rem 1rem 1rem}
+#cg-svg-overlay .cg-ov-bar{position:fixed;top:0;left:0;right:0;padding:.55rem 1rem;background:rgba(0,0,0,.9);border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;gap:.6rem}
+#cg-svg-overlay .cg-ov-title{color:#ccc;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cg-svg-overlay .cg-ov-bar button{background:#333;color:#ffb400;border:1px solid #555;padding:.3rem .7rem;cursor:pointer;border-radius:4px;font-size:.85rem}
+#cg-svg-overlay .cg-ov-stage{width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
+#cg-svg-overlay .cg-ov-stage img{max-width:none;height:auto}
+main code{overflow-wrap:anywhere}
+@media (max-width:700px){.cg-table{display:block;max-width:100%;overflow-x:auto}}
+</style>
+
 <h1>Code Generation</h1>
+
+<p class="lead">
+    How CKE v8 turns a GGUF or safetensors model into a compiled <code>libmodel.so</code>: conversion,
+    circuit selection, fail-closed provider resolution, staged IR, C emission, and native compilation —
+    with every hand-off between stages named by the artifact it produces.
+</p>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>This page leads with the v8 pipeline.</strong> The older v7-era codegen documentation
+        (the <code>CKKernelSpec</code>/<code>CKPlanStep</code> registry and the generated forward/backward
+        examples) still describes the v7 training lane and is preserved as a
+        <a href="#legacy-v7-appendix">legacy appendix at the bottom of this page</a>. For the v7 training
+        flow itself, see the <a href="v7-runbook.html">v7 Inference + Training Runbook</a>.
+    </div>
+</div>
+
+<h2>The v8 Pipeline, End to End</h2>
+
+<p>
+    The runner <code>version/v8/scripts/ck_run_v8.py</code> drives the whole inference lane —
+    <em>download GGUF &rarr; convert &rarr; build IR &rarr; codegen &rarr; compile &rarr; chat</em> — but
+    every step is a separate script with a real, inspectable artifact on disk. The diagram names the
+    artifacts on the edges; the side rail lists the points where the pipeline is deliberately fail-closed.
+</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 620" width="100%" role="img" tabindex="0" data-svg-title="v8 codegen pipeline - GGUF/safetensors to libmodel.so"
+     aria-label="The v8 code generation pipeline in six stages. Stage 1, convert weights: convert_gguf_to_bump_v8.py or convert_safetensors_to_bump_v8.py read GGUF or safetensors and emit weights.bump, config.json, and weights_manifest.json, failing hard on an unknown architecture. Stage 2, select circuit: model_maps gguf_ck_map.json and safetensors_ck_map.json map architecture to circuit JSON, which composes via extends, components, and stitch. Stage 3, resolve and lower: build_ir_v8.py binds circuit-required providers from 364 kernel maps, fail-closed, and produces ir1_prefill and ir1_decode JSON, then layout JSON, then lowered_prefill_call and lowered_decode_call JSON. Stage 4, codegen: codegen_v8.py with codegen_core_v8.py for decode and codegen_prefill_v8.py for prefill emits model_v8.c. Stage 5, native compile: an example compile line, gcc with O3, fPIC and OpenMP, with flags varying by lane, builds a shared library linking libckernel_engine.so and libckernel_tokenizer.so into libmodel.so. Stage 6, run and prove: ck_run_v8.py runs prefill and decode while X-Ray and the parity harnesses produce the promotion evidence. A side rail lists the fail-closed points: unknown architecture makes conversion refuse to guess; a missing circuit binding is a HARD KERNEL RESOLUTION FAULT; a provider class or phase mismatch is rejected for circuit-bound providers per pull requests 453 and 461; an equal-priority tie is a HARD KERNEL SELECTION FAULT; and model-name dispatch is banned by the dsl_policy ratchet. Evidence caption: KERNEL_REGISTRY.json holds 364 maps across 126 ops and audit_dsl_policy_v8.py reports status pass at commit f7aedf6e4 on 2026-09-12. Caveats caption: snapshot counts are hand-maintained, 40 allowlisted model-literal sites remain in the compiler, and the tokenizer contract is exempt from the dispatch ban."
+     style="max-width:1180px;margin:.5rem auto 1rem;display:block;font-family:'Inter',system-ui,sans-serif;">
+  <style>
+    .pg-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .pg-rail{fill:#0b1118;stroke:#263242;stroke-width:1.2;}
+    .pg-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .pg-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .pg-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .pg-hi2{fill:#07adf8;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .pg-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .pg-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .pg-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;}
+    .pg-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="pg-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="34" class="pg-band">V8 CODEGEN PIPELINE - FROM GGUF / SAFETENSORS TO libmodel.so</text>
+
+  <!-- row 1 -->
+  <rect class="pg-box" x="24" y="64" width="250" height="150" rx="12"/>
+  <text x="44" y="96"  class="pg-title">1. convert weights</text>
+  <text x="44" y="124" class="pg-sub">convert_gguf_to_bump_v8.py</text>
+  <text x="44" y="144" class="pg-sub">convert_safetensors_to_bump_v8.py</text>
+  <text x="44" y="170" class="pg-sub">in: GGUF / safetensors</text>
+  <text x="44" y="196" class="pg-warn">hard fail on unknown arch</text>
+
+  <rect class="pg-box" x="359" y="64" width="250" height="150" rx="12"/>
+  <text x="379" y="96"  class="pg-title">2. select circuit</text>
+  <text x="379" y="124" class="pg-sub">model_maps/gguf_ck_map.json</text>
+  <text x="379" y="144" class="pg-sub">safetensors_ck_map.json</text>
+  <text x="379" y="170" class="pg-sub">arch -&gt; circuits/&lt;arch&gt;.json</text>
+  <text x="379" y="196" class="pg-hi">extends / components / stitch</text>
+
+  <rect class="pg-box" x="694" y="64" width="250" height="150" rx="12"/>
+  <text x="714" y="96"  class="pg-title">3. resolve + lower</text>
+  <text x="714" y="124" class="pg-sub">build_ir_v8.py</text>
+  <text x="714" y="144" class="pg-sub">364 kernel maps (126 ops)</text>
+  <text x="714" y="170" class="pg-sub">ir1_*.json -&gt; layout_*.json</text>
+  <text x="714" y="196" class="pg-hi">fail-closed provider selection</text>
+
+  <path d="M274,139 L353,139" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pg-arrow)"/>
+  <text x="313" y="128" class="pg-sub" text-anchor="middle">weights.bump</text>
+  <path d="M609,139 L688,139" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pg-arrow)"/>
+  <text x="648" y="128" class="pg-sub" text-anchor="middle">circuit JSON</text>
+
+  <!-- down arrow to row 2 (snake) -->
+  <path d="M819,214 L819,324" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pg-arrow)"/>
+  <text x="819" y="258" class="pg-sub" text-anchor="end">lowered_prefill_call.json</text>
+  <text x="819" y="278" class="pg-sub" text-anchor="end">lowered_decode_call.json</text>
+
+  <!-- row 2 (right to left) -->
+  <rect class="pg-box" x="694" y="330" width="250" height="150" rx="12"/>
+  <text x="714" y="362" class="pg-title">4. codegen</text>
+  <text x="714" y="390" class="pg-sub">codegen_v8.py</text>
+  <text x="714" y="410" class="pg-sub">codegen_core_v8.py (decode)</text>
+  <text x="714" y="430" class="pg-sub">codegen_prefill_v8.py (prefill)</text>
+  <text x="714" y="462" class="pg-hi">emits model_v8.c</text>
+
+  <rect class="pg-box" x="359" y="330" width="250" height="150" rx="12"/>
+  <text x="379" y="362" class="pg-title">5. native compile</text>
+  <text x="379" y="390" class="pg-sub">gcc -O3 -fPIC -fopenmp -shared</text>
+  <text x="379" y="410" class="pg-sub">links libckernel_engine.so</text>
+  <text x="379" y="430" class="pg-sub">+ libckernel_tokenizer.so</text>
+  <text x="379" y="450" class="pg-cap">example compile line - flags vary</text>
+  <text x="379" y="470" class="pg-hi">emits libmodel.so</text>
+
+  <rect class="pg-box" x="24" y="330" width="250" height="150" rx="12"/>
+  <text x="44" y="362" class="pg-title">6. run + prove</text>
+  <text x="44" y="390" class="pg-sub">ck_run_v8.py prefill/decode</text>
+  <text x="44" y="410" class="pg-sub">X-Ray selection evidence</text>
+  <text x="44" y="430" class="pg-sub">parity harnesses certify_*</text>
+  <text x="44" y="462" class="pg-good">no parity, no promotion</text>
+
+  <path d="M694,405 L615,405" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pg-arrow)"/>
+  <text x="654" y="394" class="pg-sub" text-anchor="middle">model_v8.c</text>
+  <path d="M359,405 L280,405" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pg-arrow)"/>
+  <text x="319" y="394" class="pg-sub" text-anchor="middle">libmodel.so</text>
+
+  <!-- fail-closed rail -->
+  <rect class="pg-rail" x="960" y="64" width="196" height="416" rx="12"/>
+  <text x="976" y="94" class="pg-title" font-size="13">fail-closed points</text>
+  <text x="976" y="126" class="pg-hi2">unknown arch</text>
+  <text x="976" y="144" class="pg-sub">convert refuses to guess</text>
+  <text x="976" y="176" class="pg-hi2">missing binding</text>
+  <text x="976" y="194" class="pg-warn">HARD KERNEL</text>
+  <text x="976" y="210" class="pg-warn">RESOLUTION FAULT</text>
+  <text x="976" y="242" class="pg-hi2">class / phase mismatch</text>
+  <text x="976" y="260" class="pg-sub">circuit-bound providers</text>
+  <text x="976" y="276" class="pg-sub">(#453 / #461)</text>
+  <text x="976" y="308" class="pg-hi2">equal-priority tie</text>
+  <text x="976" y="326" class="pg-warn">HARD KERNEL</text>
+  <text x="976" y="342" class="pg-warn">SELECTION FAULT</text>
+  <text x="976" y="374" class="pg-hi2">model-name dispatch</text>
+  <text x="976" y="392" class="pg-sub">dsl_policy ratchet bans it</text>
+  <text x="976" y="436" class="pg-cap">zero guesses:</text>
+  <text x="976" y="454" class="pg-cap">every miss is a fault</text>
+
+  <text x="24" y="556" class="pg-good">Evidence: KERNEL_REGISTRY.json 364 maps / 126 ops - audit_dsl_policy_v8.py status=pass at f7aedf6e4 (2026-09-12)</text>
+  <text x="24" y="584" class="pg-warn">Caveats: counts are a hand-maintained snapshot; 40 allowlisted model-literal sites remain; tokenizer contract is exempt</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<table class="cg-table">
+    <tr><th>Stage</th><th>Script(s)</th><th>Artifacts in &rarr; out</th></tr>
+    <tr>
+        <td>1. Convert</td>
+        <td><code>version/v8/scripts/convert_gguf_to_bump_v8.py</code>, <code>convert_safetensors_to_bump_v8.py</code></td>
+        <td>GGUF / safetensors &rarr; <code>weights.bump</code> + <code>config.json</code> + <code>weights_manifest.json</code> (+ <code>weights_manifest.map</code>). Architecture &rarr; circuit is data-driven through <code>version/v8/model_maps/gguf_ck_map.json</code> and <code>safetensors_ck_map.json</code>; an unknown architecture is a hard failure — the converter does not alias or guess similar families.</td>
+    </tr>
+    <tr>
+        <td>2. Circuit</td>
+        <td><code>version/v8/circuits/&lt;arch&gt;.json</code></td>
+        <td>The circuit declares op instances, port edges, and required numerical contracts. Multimodal families compose circuits with <code>extends</code>, <code>components</code>, and <code>stitch</code> edges — see <a href="kernel-architecture.html#composite-circuits">Kernel Architecture — Composite Circuits</a>.</td>
+    </tr>
+    <tr>
+        <td>3. Resolve + lower</td>
+        <td><code>version/v8/scripts/build_ir_v8.py</code> (+ <code>version/v8/kernel_maps/*.json</code>)</td>
+        <td>The fail-closed resolver binds each circuit-required operation to one provider from the 364 kernel maps, with operation-class and phase validation on circuit-bound providers (merged in <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/453">#453</a> / <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/461">#461</a>). Any miss is a <code>HARD KERNEL RESOLUTION FAULT</code>. Emits <code>ir1_prefill.json</code> / <code>ir1_decode.json</code> &rarr; <code>layout_prefill.json</code> / <code>layout_decode.json</code> &rarr; <code>lowered_prefill.json</code> / <code>lowered_decode.json</code> &rarr; <code>lowered_prefill_call.json</code> / <code>lowered_decode_call.json</code> (plus <code>init.json</code> / <code>init_call.json</code>). See <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>.</td>
+    </tr>
+    <tr>
+        <td>4. Codegen</td>
+        <td><code>codegen_v8.py</code> (orchestrator), <code>codegen_core_v8.py</code> (decode), <code>codegen_prefill_v8.py</code> (prefill)</td>
+        <td><code>lowered_*_call.json</code> + <code>layout_*.json</code> &rarr; <code>model_v8.c</code>. The generators emit exactly the call ABI the selected kernel map owns — no argument reconstruction, no model-name branches.</td>
+    </tr>
+    <tr>
+        <td>5. Compile</td>
+        <td>host C compiler (default <code>gcc</code>, overridable via <code>CK_V8_COMPILER</code>)</td>
+        <td><code>model_v8.c</code> &rarr; <code>libmodel.so</code> (example compile line: <code>gcc -O3 -fPIC -fopenmp -shared</code> — flags vary by lane and compiler), linked against <code>libckernel_engine.so</code> and <code>libckernel_tokenizer.so</code>. Each bundle carries a provenance stamp (<code>.ck_ir_bundle.json</code>, <code>.ck_codegen_bundle.json</code>, <code>.ck_runtime_bundle.json</code>) so stale artifacts are rebuilt instead of silently reused.</td>
+    </tr>
+    <tr>
+        <td>6. Run + prove</td>
+        <td><code>ck_run_v8.py</code>, X-Ray, <code>certify_*_v8.py</code> harnesses</td>
+        <td><code>libmodel.so</code> serves prefill and KV-cached decode through the exported CK ABI. <a href="xray.html">X-Ray</a> records the selected providers and compares layer/state/logit boundaries against an independent implementation; the certification harnesses gate promotion.</td>
+    </tr>
+</table>
+
+<h2>When Compilation Fails, Start Here</h2>
+
+<p>
+    Every stage above fails closed with a distinct signature. Match the symptom to the stage first, then open
+    the referenced doc — the fault messages are designed to name the op, phase, or architecture that failed.
+</p>
+
+<table class="cg-table">
+    <tr><th>Symptom</th><th>Failing stage</th><th>Start here</th></tr>
+    <tr>
+        <td>Converter rejects the model: unknown / unsupported architecture</td>
+        <td>1. Convert</td>
+        <td>The converter error names the architecture it could not map. Check <code>version/v8/model_maps/gguf_ck_map.json</code> (GGUF) or <code>safetensors_ck_map.json</code> (safetensors): the arch &rarr; circuit mapping is data-driven and intentionally refuses to guess. Supporting a new family means adding a map entry plus <code>version/v8/circuits/&lt;arch&gt;.json</code> — not patching the converter.</td>
+    </tr>
+    <tr>
+        <td><code>HARD KERNEL RESOLUTION FAULT</code> — missing or ambiguous provider binding</td>
+        <td>3. Resolve</td>
+        <td>The fault message names the op (and phase) that has zero or ambiguous providers. Read <a href="kernel-maps.html#resolution">Kernel Maps — the resolution algorithm</a> and <a href="kernel-maps.html#selection-trace">the real resolver trace</a>, then check the circuit's required binding against <code>version/v8/kernel_maps/*.json</code>; <a href="kernel-maps.html#anti-patterns">the anti-patterns table</a> covers the failure shapes the system is built to reject.</td>
+    </tr>
+    <tr>
+        <td>Operation-class / phase mismatch on a circuit-bound provider (#453/#461)</td>
+        <td>3. Resolve</td>
+        <td>The circuit bound a provider whose declared operation class or phase set does not cover the required use. Compare the circuit's <code>required_contracts</code> against the provider's numerical contract and phases — <a href="v8-numerical-contracts.html">v8 Numerical Contracts</a> (the <a href="v8-numerical-contracts.html#gemma3-schedule-case-study">Gemma3 case study</a> walks a full binding).</td>
+    </tr>
+    <tr>
+        <td>Memory planning / arena validation failure (scratch sizing, alignment, offsets)</td>
+        <td>3. Lower</td>
+        <td><a href="kernel-maps.html#memory-planning">Kernel Maps — memory planning</a>: sizing formulas, power-of-two alignment, arena offsets, and the fail-closed validation rules. <code>version/v8/scripts/audit_layout_dataflow_v8.py</code> cross-checks the layout chain.</td>
+    </tr>
+    <tr>
+        <td>C compiler errors building <code>model_v8.c</code> / <code>libmodel.so</code></td>
+        <td>5. Native compile</td>
+        <td>The native build log printed by <code>ck_run_v8.py</code> step 5. <code>.ck_runtime_bundle.json</code> in the model directory records the exact compiler and flags used; vary the toolchain with <code>CK_V8_COMPILER</code> / <code>CK_V8_EXTRA_CFLAGS</code> / <code>CK_V8_EXTRA_LDFLAGS</code>.</td>
+    </tr>
+</table>
+
+<div class="cg-note">
+    <strong>Diagnostic tools that exist today:</strong>
+    the IR visualizer (<code>python3 version/v8/tools/open_ir_visualizer_v8.py --generate &lt;model&gt; --html-only</code>)
+    renders the generated pipeline as HTML; the audit scripts
+    (<code>audit_kernel_map_interfaces_v8.py</code>, <code>audit_dsl_policy_v8.py</code>, <code>audit_layout_dataflow_v8.py</code>)
+    report registry, dispatch-policy, and layout-chain health; <a href="xray.html">X-Ray</a> records provider
+    selections and boundary comparisons, and each model directory carries an <code>ir_report.html</code> plus the
+    <code>.ck_*_bundle.json</code> provenance stamps.
+    <strong>Planned, not built:</strong> regenerating the registry/audit counters on this page during the docs
+    build — until that pipeline exists, the snapshot numbers here are hand-maintained.
+</div>
+
+<h2>One Command Runs the Lane</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Generate and run a model (GGUF example)</h3>
+    <pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://bartowski/google_gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Give me a concise example of C code.' \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
+    <p>Add <code>--generate-only</code> to stop after compile (convert &rarr; IR &rarr; codegen &rarr; <code>libmodel.so</code>) without running inference. Everything lands under <code>~/.cache/ck-engine-v8/models/&lt;model&gt;/</code> unless <code>--run</code> overrides it. More per-family invocations: <a href="v8-runbook.html">v8 Runbook</a>.</p>
+</div>
+
+<h2>What the Generated C Looks Like</h2>
+
+<p>
+    The generated <code>model_v8.c</code> is a flat sequence of resolved provider calls against named bump-allocator
+    offsets — the resolver's decisions made literal. Verbatim excerpt from the decode step of a locally generated
+    Gemma3 270M (Q5_K_M) runtime (<code>~/.cache/ck-engine-v8/models/gemma-3-270m-it-Q5_K_M/model_v8.c</code>,
+    produced by the <code>ck_run_v8.py</code> lane above; <code>…</code> marks elided debug-export lines):
+</p>
+
+<div class="card">
+    <h3 style="margin-top: 0;">model_v8.c — decode step, ops 0–2 (verbatim, elisions marked)</h3>
+    <pre>static void ck_decode(CKModel *model, int32_t token) {
+    uint8_t *MEM = (uint8_t*)model-&gt;bump;
+    /* … debug environment setup elided … */
+
+    /* Store token at offset 265119296 (from layout) */
+    *(int32_t*)(MEM + 265119296) = token;
+
+    /* Op 0: embedding_forward_q8_0 (dense_embedding_lookup) layer=-1 section=header */
+    embedding_forward_q8_0(
+        (int32_t*)(model-&gt;bump + A_TOKEN_IDS),
+        1, 262144,
+        (const void*)(model-&gt;bump + W_TOKEN_EMB),
+        NULL,
+        (float*)(model-&gt;bump + A_EMBEDDED_INPUT),
+        640, 640, 1, 0
+    );
+    /* … Gemma embedding scale contract (inp * sqrt(EMBED_DIM)) elided … */
+
+    /* Op 1: ck_memcpy_parallel_dispatch (residual_save) layer=0 section=body */
+    /* … debug export/import lines elided … */
+    ck_memcpy_parallel_dispatch(
+        (void*)(model-&gt;bump + A_RESIDUAL),
+        (const void*)(model-&gt;bump + A_EMBEDDED_INPUT),
+        2560
+    );
+
+    /* Op 2: rmsnorm_forward_llama_production (attn_norm) layer=0 section=body */
+    rmsnorm_forward_llama_production(
+        (const float*)(model-&gt;bump + A_EMBEDDED_INPUT),
+        (const float*)(model-&gt;bump + W_LAYER_0_LN1_GAMMA),
+        (float*)(model-&gt;bump + A_EMBEDDED_INPUT),
+        NULL, 1, 640, 640, 9.999999974752427e-07
+    );
+    /* … 18 layers, then final norm + tied Q8_0 vocab projection … */</pre>
+    <p>Every call site names its provider (<code>embedding_forward_q8_0</code>, <code>rmsnorm_forward_llama_production</code>),
+    its op comment (<code>dense_embedding_lookup</code>, <code>attn_norm</code>), its layer, and the layout-resolved
+    buffer offsets (<code>A_TOKEN_IDS</code>, <code>W_LAYER_0_LN1_GAMMA</code>). The provider choice was frozen by the
+    resolver before GraphIR construction; codegen only transcribes it. The surrounding
+    <code>ck_debug_export_hidden</code> calls are the X-Ray/debug export chain — present in generated code, compiled
+    out unless requested.</p>
+</div>
+
+<h3>Anatomy of One Generated Call: rmsnorm_forward_llama_production</h3>
+
+<p>
+    Take Op 2 from the excerpt and trace it back through every layer of the pipeline. The call site is:
+</p>
+
+<pre>/* Op 2: rmsnorm_forward_llama_production (attn_norm) layer=0 section=body */
+rmsnorm_forward_llama_production(
+    (const float*)(model-&gt;bump + A_EMBEDDED_INPUT),      /* input  */
+    (const float*)(model-&gt;bump + W_LAYER_0_LN1_GAMMA),   /* gamma  */
+    (float*)(model-&gt;bump + A_EMBEDDED_INPUT),            /* output */
+    NULL,                                                /* rstd_cache */
+    1, 640, 640, 9.999999974752427e-07                   /* tokens, d_model, aligned, eps */
+);</pre>
+
+<p>
+    <strong>The circuit operation.</strong> The op comment names it: <code>attn_norm</code> at layer 0 — Gemma3's
+    pre-attention RMSNorm. The Gemma3 circuit does not ask for "an RMSNorm"; its
+    <code>required_contracts</code> pin the llama.cpp production schedule for the norm boundaries, and the resolver
+    binds exactly this provider (the mechanism is the one walked in the
+    <a href="v8-numerical-contracts.html#gemma3-schedule-case-study">Gemma3 schedule case study</a>).
+</p>
+
+<p>
+    <strong>The kernel map.</strong> <code>version/v8/kernel_maps/rmsnorm_forward_llama_production.json</code> —
+    operation interface <code>rmsnorm.fp32.v1</code>, variant <code>llama_cpu_production_fp32_output</code>, FP32
+    activation/weight/output, numerical contract <code>rmsnorm_llama_cpu_production_fp32_output</code>
+    (<code>validated</code>, decode phase, serial over independent rows, FP64 scalar accumulation, deterministic).
+    The map owns the eight-argument <code>call_abi</code>; codegen emits it verbatim:
+</p>
+
+<table class="cg-table">
+    <tr><th>C argument</th><th>Emitted value</th><th>Logical port / dim (map call_abi source)</th><th>Notes</th></tr>
+    <tr>
+        <td><code>input</code></td>
+        <td><code>model-&gt;bump + A_EMBEDDED_INPUT</code></td>
+        <td><code>activation:input</code> — fp32 <code>[T, E]</code>, token-major contiguous</td>
+        <td>The embedded (and Gemma-scaled) token from Op 0; a layout-resolved bump offset.</td>
+    </tr>
+    <tr>
+        <td><code>gamma</code></td>
+        <td><code>model-&gt;bump + W_LAYER_0_LN1_GAMMA</code></td>
+        <td><code>weight:gamma</code> (alt names <code>ln1_gamma</code>/<code>ln2_gamma</code>/<code>final_ln_weight</code>) — fp32 <code>[E]</code></td>
+        <td>Layer 0's pre-attention norm weight, read from <code>weights.bump</code>.</td>
+    </tr>
+    <tr>
+        <td><code>output</code></td>
+        <td><code>model-&gt;bump + A_EMBEDDED_INPUT</code></td>
+        <td><code>output:output</code> — fp32 <code>[T, E]</code></td>
+        <td>Same offset as <code>input</code>: the op normalizes in place. The alias is a circuit/lowering decision, valid here because the kernel reads each row before writing it.</td>
+    </tr>
+    <tr>
+        <td><code>rstd_cache</code></td>
+        <td><code>NULL</code></td>
+        <td><code>output:rstd</code> (optional scratch) — call_abi source <code>null</code></td>
+        <td>The rstd scratch port is <code>optional</code> and unbound in decode: no arena scratch is allocated and the kernel skips the store (<code>if (rstd_cache)</code>). Scratch ownership stays with the caller — nothing is malloc'd inside the kernel.</td>
+    </tr>
+    <tr>
+        <td><code>tokens</code></td>
+        <td><code>1</code></td>
+        <td><code>dim:seq_len</code></td>
+        <td>Single-token decode; prefill emits the actual sequence length.</td>
+    </tr>
+    <tr>
+        <td><code>d_model</code> / <code>aligned_embed_dim</code></td>
+        <td><code>640</code> / <code>640</code></td>
+        <td><code>dim:embed_dim</code> (both)</td>
+        <td>Gemma3 270M hidden size; equal here because 640 needs no stride padding.</td>
+    </tr>
+    <tr>
+        <td><code>eps</code></td>
+        <td><code>9.999999974752427e-07</code></td>
+        <td><code>dim:rms_eps</code></td>
+        <td>Gemma3's <code>rms_norm_eps</code> = 1e-6, as the nearest float32.</td>
+    </tr>
+</table>
+
+<p>
+    <strong>The C implementation.</strong> <code>src/kernels/rmsnorm_kernels.c:196</code> — ordered FP32 square,
+    FP64 scalar accumulation, scalar sqrt then scalar divide (the explicit boundary that keeps ICX from
+    substituting <code>vrsqrt14ss</code> + Newton refinement), then the fused scale by <code>gamma</code>.
+    Evidence on the map: unit test <code>unittest/test_rmsnorm_llama_production.cpp</code>, plus a bit-exact
+    parity oracle against llama.cpp's fused RMSNorm+mul CPU graph at widths 128/4096/5120 across 1/16/20/24
+    threads. That chain — circuit requirement &rarr; map-owned ABI &rarr; generated call &rarr; tested kernel —
+    is the whole v8 codegen story in one function.
+</p>
+
+<h2>How the Pieces Stitch</h2>
+
+<div class="cg-grid">
+  <div class="cg-card">
+    <h3>Circuits select the logical</h3>
+    <p><code>version/v8/circuits/*.json</code> choose the op graph and the required numerical contracts — including composition via <code>extends</code>/<code>components</code>/<code>stitch</code> (<a href="kernel-architecture.html#composite-circuits">composite circuits</a>) and schedule pinning (<a href="v8-numerical-contracts.html#gemma3-schedule-case-study">the Gemma3 schedule case study</a>). A circuit states requirements, never provider IDs.</p>
+  </div>
+  <div class="cg-card">
+    <h3>Kernel maps own the physical</h3>
+    <p>The 364 maps in <code>version/v8/kernel_maps/</code> own provider requirements: port dtypes, layouts, phases, ISA variants, priority inside one equivalence group — and the exact C call ABI. See <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>.</p>
+  </div>
+  <div class="cg-card">
+    <h3>The DSL resolves — and must not guess</h3>
+    <p><code>build_ir_v8.py</code> matches requirements to maps mechanically. Zero matches: unsupported. Ambiguous tie: fault. Wrong operation class or phase on a circuit-bound provider: fault (#453/#461). There is no heuristic fallback and no model-name dispatch — the <code>dsl_policy</code> ratchet bans it.</p>
+  </div>
+  <div class="cg-card">
+    <h3>Codegen emits</h3>
+    <p><code>codegen_v8.py</code> + <code>codegen_core_v8.py</code> + <code>codegen_prefill_v8.py</code> transcribe the lowered call IR into <code>model_v8.c</code> exactly as the map-owned ABI dictates, then the native compiler produces <code>libmodel.so</code>. <a href="xray.html">X-Ray</a> and the parity harnesses prove the composition afterwards.</p>
+  </div>
+</div>
+
+<h2>What v8 Made Model-Agnostic</h2>
+
+<p>
+    Adding a model family used to mean touching the compiler. In v8 the family-specific knowledge lives in data,
+    and the shared compiler is ratcheted against re-growing model dispatch:
+</p>
+
+<ul>
+    <li><strong>Architecture &rarr; circuit is JSON-data-driven.</strong> The converters resolve the model architecture through <code>version/v8/model_maps/gguf_ck_map.json</code> / <code>safetensors_ck_map.json</code> and fail hard on anything unknown — a new family adds a map entry and a circuit file, not a converter branch.</li>
+    <li><strong>Circuit-required kernel bindings.</strong> Pattern-sensitive providers (the RoPE application pattern, MLA provider classes) are bound by the circuit and validated for operation class and phase by the resolver — merged in <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/453">#453</a> and <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/pull/461">#461</a>. The compiler enforces the binding; it does not infer it from the model name.</li>
+    <li><strong>The <code>dsl_policy</code> ratchet.</strong> <code>version/v8/dsl_policy.json</code> forbids model-family literals (<code>qwen</code>, <code>gemma</code>, <code>llama</code>, …) and dispatch keys (<code>model</code>, <code>arch</code>, <code>family</code>, …) in protected compiler functions, with per-file caps on the remaining allowlisted literal sites. <code>version/v8/scripts/audit_dsl_policy_v8.py</code> enforces it and fails on regression.</li>
+    <li><strong>The advisory novelty report.</strong> <code>version/v8/scripts/report_model_novelty_v8.py</code> measures how much a family bring-up changes <em>outside</em> its own circuit, maps, kernels, and evidence — the core-compiler bucket's target trend is zero. Advisory only; not a CI gate.</li>
+</ul>
+
+<div class="card">
+    <h3 style="margin-top: 0;">dsl_policy audit — current actuals</h3>
+    <p>Run: <code>python3 version/v8/scripts/audit_dsl_policy_v8.py</code> at commit <code>f7aedf6e4</code> (snapshot 2026-09-12):</p>
+    <table class="cg-table">
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>status</td><td><code>pass</code> (0 findings, 11 checked functions)</td></tr>
+        <tr><td>model-literal sites: <code>build_ir_v8.py</code></td><td>20 (cap 24)</td></tr>
+        <tr><td>model-literal sites: <code>codegen_core_v8.py</code></td><td>11 (cap 11)</td></tr>
+        <tr><td>model-literal sites: <code>codegen_prefill_v8.py</code></td><td>9 (cap 9)</td></tr>
+        <tr><td>model-literal sites: <code>codegen_v8.py</code></td><td>0 (cap 0)</td></tr>
+    </table>
+</div>
+
+<div class="cg-note">
+    <strong>Remaining debt, stated plainly:</strong> 40 allowlisted model-literal sites still sit in the compiler —
+    family-named op vocabulary in static tables (e.g. tokenizer/chat-template names) that the ratchet caps but has
+    not eliminated. The <code>ck_debug_export_hidden</code> debug-export chains visible in the generated excerpt are
+    another: family-specific X-Ray probe names baked into emission. And the tokenizer contract is an explicit
+    exemption — <code>_generate_tokenizer_c_code</code> and <code>_resolve_tokenizer_contract</code> are excluded
+    from the dispatch ban in <code>dsl_policy.json</code>. None of this is hidden from the audit; all of it is
+    counted, capped, and only allowed to shrink.
+</div>
+
+<p class="cg-prov">
+    Registry census from <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (364 maps across 126 ops) and
+    <code>audit_dsl_policy_v8.py</code> output at commit <code>f7aedf6e4</code> (2026-09-12). These numbers are
+    hand-maintained until the docs build regenerates them; treat them as a dated snapshot, not a live counter.
+</p>
+
+<h2 id="legacy-v7-appendix">Appendix: Legacy v7 Codegen (Training Lane)</h2>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div style="min-width: 0;">
+        <strong>Everything below this banner is the older v7-era codegen documentation.</strong><br>
+        It describes the <code>CKKernelSpec</code>/<code>CKBufferSpec</code>/<code>CKPlanStep</code> registry and the
+        generated forward/backward passes used by the v7 training lane — a different system from the v8 pipeline
+        above (fail-closed kernel maps, staged IR, <code>model_v8.c</code>). It is kept because it still documents
+        v7 training; for the current v7 flow see the <a href="v7-runbook.html">v7 Inference + Training Runbook</a>,
+        and for the v8 successor to the registry see <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>.
+    </div>
+</div>
+
+<details class="cg-details">
+  <summary>Legacy v7 codegen documentation (config &rarr; IR &rarr; forward/backward C)</summary>
+  <div class="cg-details-body">
 
 <p>C-Kernel-Engine can generate optimized C runtime code from HuggingFace model configs. This enables running models with zero Python overhead.</p>
 
@@ -992,7 +1477,7 @@
     <img src="assets/architecture-overview.svg" alt="Code Generation Pipeline">
 </div>
 
-<h2>Pipeline Overview</h2>
+<h3>Pipeline Overview (v7)</h3>
 
 <div class="grid grid-3">
     <div class="card card-accent">
@@ -1025,7 +1510,7 @@ ck_build_decoder_backward_ir(
     </div>
 </div>
 
-<h2>Quick Start</h2>
+<h3>Quick Start (v7)</h3>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Generate from Config</h3>
@@ -1050,7 +1535,7 @@ cc -O3 -fPIC -fopenmp -shared -Iinclude -o build/libmodel.so build/model.c $(cat
     <p><strong>Inference sequence:</strong> enable KV cache → prefill once → decode token-by-token. Decode is disabled when training is enabled.</p>
 </div>
 
-<h2>Input: Model Config</h2>
+<h3>Input: Model Config (v7)</h3>
 
 <div class="card">
     <h3 style="margin-top: 0;">HuggingFace config.json</h3>
@@ -1084,7 +1569,7 @@ cc -O3 -fPIC -fopenmp -shared -Iinclude -o build/libmodel.so build/model.c $(cat
 } CKModelConfig;</pre>
 </div>
 
-<h2>Kernel Map: Single Source of Truth</h2>
+<h3>Kernel Map: Single Source of Truth (v7 registry)</h3>
 
 <div class="alert alert-info">
     <div class="alert-icon">
@@ -1145,7 +1630,7 @@ cc -O3 -fPIC -fopenmp -shared -Iinclude -o build/libmodel.so build/model.c $(cat
     <pre>const CKPlanStep ck_decoder_forward_plan[] = {
     {"rmsnorm",      NULL},           // LN1
     {"qkv_project",  NULL},           // Q, K, V projections
-    {"rope",         "rope_theta>0"}, // RoPE (conditional)
+    {"rope",         "rope_theta&gt;0"}, // RoPE (conditional)
     {"attention",    NULL},           // Self-attention
     {"attn_proj",    NULL},           // Output projection
     {"residual_add", NULL},           // Residual connection
@@ -1180,7 +1665,7 @@ cc -O3 -fPIC -fopenmp -shared -Iinclude -o build/libmodel.so build/model.c $(cat
     </div>
 </div>
 
-<h2>Registry Flow: How It All Fits Together</h2>
+<h3>Registry Flow: How It All Fits Together (v7)</h3>
 
 <div class="img-container svg-viewer" data-title="Kernel Registry Flow">
     <img src="assets/kernel-registry-flow.svg" alt="Kernel Registry Flow Diagram">
@@ -1268,7 +1753,7 @@ void gelu_backward(const float *in, const float *d_out, float *d_in, int n);
     <p>Codegen automatically picks up the new kernel. No other changes needed.</p>
 </div>
 
-<h2>Intermediate Representation</h2>
+<h3>Intermediate Representation (v7)</h3>
 
 <div class="alert alert-info">
     <div class="alert-icon">
@@ -1339,7 +1824,7 @@ typedef struct {
     </table>
 </div>
 
-<h2>Output: Generated Code</h2>
+<h3>Output: Generated Code (v7)</h3>
 
 <div class="card">
     <h3 style="margin-top: 0;">Generated Forward Pass</h3>
@@ -1352,32 +1837,32 @@ typedef struct {
     int num_tokens
 ) {
     // 1. Pre-attention RMSNorm
-    rmsnorm_forward(input, weights->ln1_gamma, acts->ln1_out,
-                    acts->rstd1, num_tokens, 768, 768, 1e-5f);
+    rmsnorm_forward(input, weights-&gt;ln1_gamma, acts-&gt;ln1_out,
+                    acts-&gt;rstd1, num_tokens, 768, 768, 1e-5f);
 
     // 2. QKV projection
-    ck_qkv_project_head_major(acts->ln1_out,
-        weights->wq, weights->bq,
-        weights->wk, weights->bk,
-        weights->wv, weights->bv,
-        acts->q, acts->k, acts->v,
+    ck_qkv_project_head_major(acts-&gt;ln1_out,
+        weights-&gt;wq, weights-&gt;bq,
+        weights-&gt;wk, weights-&gt;bk,
+        weights-&gt;wv, weights-&gt;bv,
+        acts-&gt;q, acts-&gt;k, acts-&gt;v,
         num_tokens, 768, 12, 4, 64);
 
     // 3. Apply RoPE
-    rope_forward_qk(acts->q, acts->k, cos_cache, sin_cache,
+    rope_forward_qk(acts-&gt;q, acts-&gt;k, cos_cache, sin_cache,
                     12, 4, num_tokens, 64, 0);
 
     // 4. Attention
     attention_forward_causal_head_major_gqa(
-        acts->q, acts->k, acts->v,
-        acts->scores, acts->attn_out,
+        acts-&gt;q, acts-&gt;k, acts-&gt;v,
+        acts-&gt;scores, acts-&gt;attn_out,
         12, 4, num_tokens, 64, 64, 2048);
 
     // 5. Output projection + residual
-    ck_attention_project_head_major(acts->attn_out, weights->wo, weights->bo,
-                                     acts->proj_out, acts->scratch,
+    ck_attention_project_head_major(acts-&gt;attn_out, weights-&gt;wo, weights-&gt;bo,
+                                     acts-&gt;proj_out, acts-&gt;scratch,
                                      num_tokens, 768, 12, 64);
-    ck_add_inplace(acts->proj_out, input, num_tokens, 768);
+    ck_add_inplace(acts-&gt;proj_out, input, num_tokens, 768);
 
     // 6-8. MLP block...
 }</pre>
@@ -1398,22 +1883,22 @@ typedef struct {
     // d_mlp_out = d_output (residual gradient passthrough)
 
     // 2. Backward through FC2
-    fc2_backward_kernel(d_output, acts->swiglu_out, weights->w2,
-                        d_swiglu, grads->d_w2, grads->d_b2, ...);
+    fc2_backward_kernel(d_output, acts-&gt;swiglu_out, weights-&gt;w2,
+                        d_swiglu, grads-&gt;d_w2, grads-&gt;d_b2, ...);
 
     // 3. Backward through SwiGLU
-    swiglu_backward(acts->fc1_out, d_swiglu, d_fc1, num_tokens, 2048);
+    swiglu_backward(acts-&gt;fc1_out, d_swiglu, d_fc1, num_tokens, 2048);
 
     // ... continue backwards through all ops
 
     // N. Backward through RMSNorm 1
-    rmsnorm_backward(d_rmsnorm, input, weights->ln1_gamma,
-                     acts->rstd1, d_input, grads->d_ln1_gamma,
+    rmsnorm_backward(d_rmsnorm, input, weights-&gt;ln1_gamma,
+                     acts-&gt;rstd1, d_input, grads-&gt;d_ln1_gamma,
                      num_tokens, 768, 768);
 }</pre>
 </div>
 
-<h2>IR Serialization</h2>
+<h3>IR Serialization (v7)</h3>
 
 <div class="grid grid-2">
     <div class="card">
@@ -1434,7 +1919,7 @@ typedef struct {
     </div>
 </div>
 
-<h2>Memory Layout</h2>
+<h3>Memory Layout (v7)</h3>
 
 <div class="card">
     <h3 style="margin-top: 0;">Buffer Allocation</h3>
@@ -1474,7 +1959,7 @@ typedef struct {
     </tr>
 </table>
 
-<h2>Bump Allocator: Dtype-Aware Layout</h2>
+<h3>Bump Allocator: Dtype-Aware Layout (v7)</h3>
 
 <div class="alert alert-info">
     <div class="alert-icon">
@@ -1493,17 +1978,17 @@ typedef struct {
 size_t off = 0;
 
 // Weights: bf16 (2 bytes each)
-m->token_emb_offset = off;
+m-&gt;token_emb_offset = off;
 off += align64(V * aligned_embed * 2);     // bf16
 
-m->wq_offset = off;
+m-&gt;wq_offset = off;
 off += align64(num_heads * head_dim * embed * 2);  // bf16
 
 // Activations: fp32 (4 bytes each)
-m->embedded_input_offset = off;
+m-&gt;embedded_input_offset = off;
 off += align64(T * aligned_embed * 4);     // fp32
 
-m->q_offset = off;
+m-&gt;q_offset = off;
 off += align64(num_heads * T * head_dim * 4);  // fp32</pre>
 </div>
 
@@ -1544,7 +2029,7 @@ static size_t bump(size_t *off, size_t bytes) {
 }</pre>
 </div>
 
-<h2>Source Files</h2>
+<h3>Source Files (v7)</h3>
 
 <table>
     <tr>
@@ -1578,6 +2063,64 @@ static size_t bump(size_t *off, size_t bytes) {
 </table>
 
 <p>For full source code, see the <a href="doxygen/files.html">Doxygen source browser</a>.</p>
+
+  </div>
+</details>
+
+<div id="cg-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+  <div class="cg-ov-bar">
+    <span class="cg-ov-title" id="cg-ov-title">Diagram</span>
+    <span>
+      <button type="button" id="cg-ov-out" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="cg-ov-in" aria-label="Zoom in">+</button>
+      <button type="button" id="cg-ov-close" aria-label="Close">&times;</button>
+    </span>
+  </div>
+  <div class="cg-ov-stage" id="cg-ov-stage"><img id="cg-ov-img" alt=""></div>
+</div>
+
+<script>
+  (function() {
+    var overlay = document.getElementById('cg-svg-overlay');
+    var stage = document.getElementById('cg-ov-stage');
+    var img = document.getElementById('cg-ov-img');
+    var title = document.getElementById('cg-ov-title');
+    var scale = 1;
+    function applyScale() {
+      var base = Math.max(stage.clientWidth - 32, 280);
+      img.style.width = Math.round(base * scale) + 'px';
+    }
+    function open(svg) {
+      var xml = new XMLSerializer().serializeToString(svg);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+      img.alt = svg.getAttribute('aria-label') || 'diagram';
+      title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+      scale = 1;
+      overlay.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      img.onload = applyScale;
+      applyScale();
+      document.getElementById('cg-ov-close').focus();
+    }
+    function close() {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+      svg.addEventListener('click', function() { open(svg); });
+      svg.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+      });
+    });
+    document.getElementById('cg-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+    document.getElementById('cg-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+    document.getElementById('cg-ov-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+  })();
+</script>
+
+<p>Related: <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>, <a href="kernel-architecture.html#composite-circuits">Composite Circuits</a>, <a href="v8-numerical-contracts.html#gemma3-schedule-case-study">v8 Numerical Contracts — Gemma3 schedule case study</a>, <a href="architecture.html">System Architecture</a>, <a href="xray.html">X-Ray</a>, <a href="gguf-bump.html">GGUF to Bump</a>, <a href="v8-runbook.html">v8 Runbook</a>, and the <a href="v7-runbook.html">v7 Inference + Training Runbook</a>.</p>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1808,7 +2351,7 @@ static size_t bump(size_t *off, size_t bytes) {
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-08-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-12</p>
             </div>
         </div>
     </footer>
