@@ -1,0 +1,38 @@
+{
+  "schema": "cke.audio.matched_five_minute.v1",
+  "status": "pass",
+  "fixture": {
+    "duration_seconds": 300.0,
+    "sample_rate": 16000,
+    "channels": 1,
+    "wav_sha256": "cca3c7deb9cf5673780258483bbd919c27d8ac0e0a721e9d744fdddbbd1a23ab",
+    "pcm_s16le_sha256": "2c8f4695908e622938bba7791874cce5cb456b537e8917d1aa24ac9bc905583c"
+  },
+  "parakeet": {
+    "model": "nvidia/parakeet-tdt-0.6b-v3",
+    "word_error_rate": 0.10434782608695652,
+    "wall_seconds": 369.18816874793265,
+    "real_time_factor": 1.2306272291597755,
+    "peak_rss_bytes": 2868682752,
+    "report_sha256": "c62ffdc59e313e9a05639c7b99ecc1925bcb2776c503260a205f8e0a36f0d2d0"
+  },
+  "whisper": {
+    "model": "openai/whisper-base",
+    "word_error_rate": 0.05652173913043478,
+    "wall_seconds": 10.189471545047127,
+    "real_time_factor": 0.03396490515015709,
+    "windows": 11,
+    "worker_lifecycle": "per-window",
+    "report_sha256": "07ac61b5be3c75a87e99586c702a5d74091b9b3b2d6dd17e25a782f92afc6b87",
+    "certification_sha256": "198045295fecd729c4942294417620abccdfaefd5b4237816193e0226025bb14"
+  },
+  "comparison": {
+    "word_error_rate_delta_parakeet_minus_whisper": 0.047826086956521734,
+    "wall_time_ratio_parakeet_over_whisper": 36.232317555996
+  },
+  "limitations": [
+    "Whisper persistent-worker mode failed with a dynamic-module pickling error; the matched Whisper result used its supported per-window mode",
+    "Parakeet uses Python orchestration over native CKE kernels",
+    "The comparison covers one five-minute English recording"
+  ]
+}

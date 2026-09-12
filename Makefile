@@ -1365,6 +1365,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_cohere_transcribe_model_contract -v
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_inventory.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_runner.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_whisper_long_audio_certification.py

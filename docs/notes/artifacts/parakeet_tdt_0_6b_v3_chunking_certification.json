@@ -1,0 +1,40 @@
+{
+  "schema": "cke.parakeet.chunking_certification.v1",
+  "status": "pass",
+  "audio_sha256": "cca3c7deb9cf5673780258483bbd919c27d8ac0e0a721e9d744fdddbbd1a23ab",
+  "duration_seconds": 300.0,
+  "policy": {
+    "kind": "overlapping_full_attention_windows",
+    "window_seconds": 180.0,
+    "overlap_seconds": 30.0,
+    "state": "reset_each_window",
+    "ownership": "word_midpoint_at_overlap_midpoint",
+    "timestamp_offset": "source_window_start"
+  },
+  "windows": 2,
+  "selected_words": 700,
+  "deterministic_transcript": true,
+  "deterministic_word_trajectory": true,
+  "chunked_word_error_rate": 0.07246376811594203,
+  "full_attention_word_error_rate": 0.10434782608695652,
+  "chunked_vs_full_word_error_rate": 0.048458149779735685,
+  "performance": {
+    "total_seconds": 231.19062519504223,
+    "real_time_factor": 0.7706354173168074,
+    "process_cpu_seconds": {
+      "user": 1595.515012,
+      "system": 5.503208
+    },
+    "peak_rss_bytes": 3242315776
+  },
+  "reports": {
+    "full_attention": "92f085f1644b0f0f5f8e91867ec0f398638178fee3a70fd108e6733bd21c85fc",
+    "first_chunked": "9a3dfffe8bbd7a73cc2dc40c032b27719f7f4b519569cc54f508c5bce66ed4ab",
+    "repeat_chunked": "0cdceb466e9b29793909eef9dd6e39830bff07e178456554ea525b655152eeea"
+  },
+  "limitations": [
+    "five-minute English boundary fixture",
+    "decoder and encoder state reset for every window",
+    "word ownership uses timestamp midpoint at the overlap midpoint"
+  ]
+}

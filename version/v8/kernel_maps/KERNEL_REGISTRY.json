@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 369,
+      "total": 371,
       "by_op": {
         "add_backward": 1,
         "add_stream": 2,
@@ -16,6 +16,7 @@
         "attn_gate_sigmoid_mul": 2,
         "attn_gate_sigmoid_mul_backward": 1,
         "attn_gate_softplus_mul": 1,
+        "audio_argmax": 1,
         "audio_batch_norm": 1,
         "audio_conv1d": 2,
         "audio_conv2d": 1,
@@ -32,6 +33,7 @@
         "audio_relative_position": 1,
         "audio_relative_shift": 1,
         "audio_resample": 2,
+        "audio_scaled_residual_add": 1,
         "audio_stft": 3,
         "audio_stft_tables": 1,
         "audio_wav_decode": 1,
@@ -10968,6 +10970,134 @@
       "_source_file": "attn_gate_softplus_mul_forward.json"
     },
     {
+      "id": "audio_argmax_first_f32",
+      "op": "audio_argmax",
+      "operation_interface": "audio.argmax.first_index.fp32.v1",
+      "variant": "finite_first_index_on_tie",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_argmax_first_finite_fp32",
+        "phases": [
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "i32"
+      },
+      "inputs": [
+        {
+          "name": "values",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "index",
+          "dtype": "i32",
+          "shape": [
+            1
+          ],
+          "layout": "scalar",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "elements"
+      ],
+      "params": [],
+      "constraints": {
+        "notes": "Input must be finite; ties select the lowest index."
+      },
+      "impl": {
+        "function": "audio_argmax_first_f32",
+        "c_declaration": "int audio_argmax_first_f32(const float *values, int elements, int *selected);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_argmax_first_finite_fp32",
+          "status": "validated",
+          "phases": [
+            "decode"
+          ],
+          "function": "audio_argmax_first_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "contract_defined"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp32",
+            "merge_order": "first_index_on_tie",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "values",
+            "source": "activation:values",
+            "ports": [
+              "input:values"
+            ]
+          },
+          {
+            "name": "elements",
+            "source": "dim:elements"
+          },
+          {
+            "name": "selected",
+            "source": "output:index",
+            "ports": [
+              "output:index"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ],
+        "oracle": "NumPy argmax over finite FP32 values"
+      },
+      "name": "audio_argmax_first_f32",
+      "_source_file": "audio_argmax_first_f32.json"
+    },
+    {
       "id": "audio_batch_norm_inference_channel_major_f32",
       "op": "audio_batch_norm",
       "operation_interface": "audio_batch_norm.channel_major.inference.fp32.v1",
@@ -11188,7 +11318,7 @@
       "id": "audio_conformer_relative_attention_f32",
       "op": "audio_relative_attention",
       "operation_interface": "audio_attention.transformer_xl_relative.full.fp32.v1",
-      "variant": "token_major_transformer_xl_relative_eager_fp32",
+      "variant": "token_major_transformer_xl_relative_head_parallel_fp32",
       "selection": {
         "status": "candidate",
         "priority": 100,
@@ -11302,12 +11432,13 @@
           "name": "scores",
           "dtype": "fp32",
           "shape": [
+            "H",
             "T"
           ],
           "size_resolution": "required",
           "lifetime": "kernel_call",
           "alignment": 64,
-          "layout": "key_contiguous",
+          "layout": "head_major_key_contiguous",
           "access": "read_write",
           "storage_class": "scratch",
           "consumption": "required"
@@ -11343,14 +11474,15 @@
           "implementation": {
             "isa_dispatch": "scalar",
             "threading": {
-              "runtime": "serial",
+              "runtime": "ck_threadpool",
               "work_partition": [
-                "serial"
+                "independent_heads"
               ],
               "dispatch": [
+                "ck_threadpool_parallel_for_n",
                 "inline"
               ],
-              "reduction_order_effect": "contract_defined"
+              "reduction_order_effect": "none"
             }
           },
           "arithmetic": {
@@ -11358,7 +11490,7 @@
             "merge_order": "none",
             "deterministic": true,
             "thread_count_changes_arithmetic_order": false,
-            "split_strategy": "serial"
+            "split_strategy": "independent_outputs"
           }
         }
       ],
@@ -11452,7 +11584,7 @@
         ],
         "oracle": "Transformers ParakeetConformerSelfAttention eager FP32 CPU"
       },
-      "notes": "Uses one caller-owned T-element score row; it does not materialize a T-by-T score matrix.",
+      "notes": "Uses one caller-owned T-element score row per head so head workers never share mutable scratch; it does not materialize a T-by-T score matrix.",
       "name": "audio_conformer_relative_attention_f32",
       "_source_file": "audio_conformer_relative_attention_f32.json"
     },
@@ -13592,6 +13724,160 @@
       "notes": "Band-limited provider. Radius and rate semantics are explicit call-IR dimensions; codegen must not infer them from a model family.",
       "name": "audio_resample_windowed_sinc_f32",
       "_source_file": "audio_resample_windowed_sinc_f32.json"
+    },
+    {
+      "id": "audio_scaled_residual_add_f32",
+      "op": "audio_scaled_residual_add",
+      "operation_interface": "audio.residual_add.scaled.fp32.v1",
+      "variant": "separate_multiply_add_fp32",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "audio_scaled_residual_add_separate_fp32",
+        "phases": [
+          "prefill",
+          "decode"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "residual",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "branch",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "elements"
+      ],
+      "params": [
+        {
+          "name": "scale",
+          "dtype": "fp32"
+        }
+      ],
+      "impl": {
+        "function": "audio_scaled_residual_add_f32",
+        "c_declaration": "int audio_scaled_residual_add_f32(const float *residual, const float *branch, float scale, float *output, size_t elements);",
+        "sources": [
+          "src/kernels/audio_kernels.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "audio_scaled_residual_add_separate_fp32",
+          "status": "validated",
+          "phases": [
+            "prefill",
+            "decode"
+          ],
+          "function": "audio_scaled_residual_add_f32",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "none",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "independent_outputs"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "residual",
+            "source": "activation:residual",
+            "ports": [
+              "input:residual"
+            ]
+          },
+          {
+            "name": "branch",
+            "source": "activation:branch",
+            "ports": [
+              "input:branch"
+            ]
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "elements",
+            "source": "dim:elements"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_audio_encoder.py"
+        ],
+        "oracle": "NumPy FP32 multiply followed by FP32 add"
+      },
+      "name": "audio_scaled_residual_add_f32",
+      "_source_file": "audio_scaled_residual_add_f32.json"
     },
     {
       "id": "audio_stft_power_centered_window_f32",

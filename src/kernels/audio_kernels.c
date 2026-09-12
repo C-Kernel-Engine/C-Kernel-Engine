@@ -1366,6 +1366,79 @@ int audio_relative_shift_f32(
     return 0;
 }
 
+typedef struct {
+    const float *query;
+    const float *key;
+    const float *value;
+    const float *relative_key;
+    const float *bias_u;
+    const float *bias_v;
+    float *output;
+    float *scores_scratch;
+    int frames;
+    int heads;
+    int head_dim;
+    int channels;
+    float scale;
+} ck_audio_conformer_relative_attention_f32_args_t;
+
+static void ck_audio_conformer_relative_attention_f32_head_range(
+    int begin,
+    int end,
+    void *opaque)
+{
+    const ck_audio_conformer_relative_attention_f32_args_t *args =
+        (const ck_audio_conformer_relative_attention_f32_args_t *)opaque;
+    for (int head = begin; head < end; ++head) {
+        const int head_offset = head * args->head_dim;
+        const float *u = args->bias_u + head_offset;
+        const float *v = args->bias_v + head_offset;
+        float *scores = args->scores_scratch + (size_t)head * args->frames;
+        for (int query_frame = 0; query_frame < args->frames; ++query_frame) {
+            const float *q = args->query +
+                (size_t)query_frame * args->channels + head_offset;
+            float maximum = -INFINITY;
+            for (int key_frame = 0; key_frame < args->frames; ++key_frame) {
+                const float *k = args->key +
+                    (size_t)key_frame * args->channels + head_offset;
+                const int relative_frame =
+                    args->frames - 1 + key_frame - query_frame;
+                const float *r = args->relative_key +
+                    (size_t)relative_frame * args->channels + head_offset;
+                float content = 0.0f;
+                float position = 0.0f;
+                for (int dim = 0; dim < args->head_dim; ++dim) {
+                    content += (q[dim] + u[dim]) * k[dim];
+                    position += (q[dim] + v[dim]) * r[dim];
+                }
+                const float score = (content + position) * args->scale;
+                scores[key_frame] = score;
+                if (score > maximum) {
+                    maximum = score;
+                }
+            }
+            float denominator = 0.0f;
+            for (int key_frame = 0; key_frame < args->frames; ++key_frame) {
+                const float probability = expf(scores[key_frame] - maximum);
+                scores[key_frame] = probability;
+                denominator += probability;
+            }
+            const float inverse_denominator = 1.0f / denominator;
+            float *out = args->output +
+                (size_t)query_frame * args->channels + head_offset;
+            for (int dim = 0; dim < args->head_dim; ++dim) {
+                float sum = 0.0f;
+                for (int key_frame = 0; key_frame < args->frames; ++key_frame) {
+                    const float *value_row = args->value +
+                        (size_t)key_frame * args->channels + head_offset;
+                    sum += scores[key_frame] * inverse_denominator * value_row[dim];
+                }
+                out[dim] = sum;
+            }
+        }
+    }
+}
+
 int audio_conformer_relative_attention_f32(
     const float *query,
     const float *key,
@@ -1391,55 +1464,39 @@ int audio_conformer_relative_attention_f32(
         scale <= 0.0f) {
         return -2;
     }
-    if ((size_t)frames > SIZE_MAX / sizeof(float) ||
-        scores_scratch_bytes < (size_t)frames * sizeof(float)) {
+    if ((size_t)frames > SIZE_MAX / (size_t)heads ||
+        (size_t)frames * (size_t)heads > SIZE_MAX / sizeof(float) ||
+        scores_scratch_bytes <
+            (size_t)frames * (size_t)heads * sizeof(float)) {
         return -3;
     }
     const int channels = heads * head_dim;
-    for (int query_frame = 0; query_frame < frames; ++query_frame) {
-        for (int head = 0; head < heads; ++head) {
-            const int head_offset = head * head_dim;
-            const float *q = query + (size_t)query_frame * channels + head_offset;
-            const float *u = bias_u + head_offset;
-            const float *v = bias_v + head_offset;
-            float maximum = -INFINITY;
-            for (int key_frame = 0; key_frame < frames; ++key_frame) {
-                const float *k = key + (size_t)key_frame * channels + head_offset;
-                const int relative_frame = frames - 1 + key_frame - query_frame;
-                const float *r = relative_key +
-                    (size_t)relative_frame * channels + head_offset;
-                float content = 0.0f;
-                float position = 0.0f;
-                for (int dim = 0; dim < head_dim; ++dim) {
-                    content += (q[dim] + u[dim]) * k[dim];
-                    position += (q[dim] + v[dim]) * r[dim];
-                }
-                const float score = (content + position) * scale;
-                scores_scratch[key_frame] = score;
-                if (score > maximum) {
-                    maximum = score;
-                }
-            }
-            float denominator = 0.0f;
-            for (int key_frame = 0; key_frame < frames; ++key_frame) {
-                const float probability = expf(scores_scratch[key_frame] - maximum);
-                scores_scratch[key_frame] = probability;
-                denominator += probability;
-            }
-            const float inverse_denominator = 1.0f / denominator;
-            float *out = output +
-                (size_t)query_frame * channels + head_offset;
-            for (int dim = 0; dim < head_dim; ++dim) {
-                float sum = 0.0f;
-                for (int key_frame = 0; key_frame < frames; ++key_frame) {
-                    const float *value_row = value +
-                        (size_t)key_frame * channels + head_offset;
-                    sum += scores_scratch[key_frame] * inverse_denominator *
-                        value_row[dim];
-                }
-                out[dim] = sum;
-            }
-        }
+    ck_audio_conformer_relative_attention_f32_args_t args = {
+        .query = query,
+        .key = key,
+        .value = value,
+        .relative_key = relative_key,
+        .bias_u = bias_u,
+        .bias_v = bias_v,
+        .output = output,
+        .scores_scratch = scores_scratch,
+        .frames = frames,
+        .heads = heads,
+        .head_dim = head_dim,
+        .channels = channels,
+        .scale = scale,
+    };
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int active = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (active > heads) {
+        active = heads;
+    }
+    if (pool != NULL && active > 1) {
+        ck_threadpool_parallel_for_n(
+            pool, active, 0, heads, 1,
+            ck_audio_conformer_relative_attention_f32_head_range, &args);
+    } else {
+        ck_audio_conformer_relative_attention_f32_head_range(0, heads, &args);
     }
     return 0;
 }
@@ -1462,6 +1519,53 @@ int audio_transpose_channel_to_token_f32(
                 input[(size_t)channel * frames + frame];
         }
     }
+    return 0;
+}
+
+int audio_scaled_residual_add_f32(
+    const float *residual,
+    const float *branch,
+    float scale,
+    float *output,
+    size_t elements)
+{
+    if (residual == NULL || branch == NULL || output == NULL) {
+        return -1;
+    }
+    if (elements == 0 || !isfinite(scale)) {
+        return -2;
+    }
+    for (size_t index = 0; index < elements; ++index) {
+        /* Preserve the pinned elementwise multiply then add cast boundary. */
+        volatile float scaled = branch[index] * scale;
+        output[index] = residual[index] + scaled;
+    }
+    return 0;
+}
+
+int audio_argmax_first_f32(const float *values, int elements, int *selected)
+{
+    if (values == NULL || selected == NULL) {
+        return -1;
+    }
+    if (elements <= 0) {
+        return -2;
+    }
+    if (!isfinite(values[0])) {
+        return -3;
+    }
+    int best = 0;
+    float maximum = values[0];
+    for (int index = 1; index < elements; ++index) {
+        if (!isfinite(values[index])) {
+            return -3;
+        }
+        if (values[index] > maximum) {
+            maximum = values[index];
+            best = index;
+        }
+    }
+    *selected = best;
     return 0;
 }
 

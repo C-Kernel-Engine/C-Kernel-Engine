@@ -235,10 +235,10 @@
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>V8_PRIVATE_VISION_CORPUS_MANIFEST=/path/to/manifest.json \
-QWEN3VL_PRIVATE_CORPUS_DECODER=/path/to/Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
-QWEN3VL_PRIVATE_CORPUS_MMPROJ=/path/to/mmproj-BF16.gguf \
-QWEN3VL_PRIVATE_CORPUS_LLAMA_ROOT=/path/to/llama.cpp \
+<pre>V8_PRIVATE_VISION_CORPUS_MANIFEST="$CKE_PRIVATE_CORPUS_MANIFEST" \
+QWEN3VL_PRIVATE_CORPUS_DECODER="$CKE_QWEN3VL_DECODER_GGUF" \
+QWEN3VL_PRIVATE_CORPUS_MMPROJ="$CKE_QWEN3VL_MMPROJ_GGUF" \
+QWEN3VL_PRIVATE_CORPUS_LLAMA_ROOT="$CKE_LLAMA_CPP_ROOT" \
 make test-qwen3vl-private-corpus-parity-auto</pre>
     </div>
     <p class="v8-note" style="margin-bottom: 0;">
@@ -782,13 +782,11 @@ version/v8/scripts/ck_run_v8.py run \
         Codegen contains no Whisper model-name branch &mdash; the same v8 lowering path that carries text and vision
         carries the audio circuits in <code>version/v8/circuits/</code>.
     </p>
-    <p><strong>Step 1 &mdash; Point at the generated artifacts.</strong>
-        Each run directory must contain the generated runtime (<code>libmodel.so</code>) and its sidecars;
-        the runner refuses to start without them:</p>
+    <p><strong>Step 1 &mdash; Select the Hugging Face checkpoint.</strong>
+        The runner downloads the checkpoint once, converts it, and builds the generated encoder and decoder runtimes:</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>export CK_WHISPER_ENCODER_RUN_DIR=/path/to/whisper-tiny-encoder
-export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
+<pre>export CK_AUDIO_MODEL=hf://openai/whisper-tiny</pre>
     </div>
     <p><strong>Step 2 &mdash; Prepare the WAV.</strong>
         The frontend expects mono 16&nbsp;kHz PCM16. Convert any source format first:</p>
@@ -801,10 +799,8 @@ export CK_WHISPER_DECODER_RUN_DIR=/path/to/whisper-tiny-decoder</pre>
     <p><strong>Step 3 &mdash; Run the transcription.</strong></p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>version/v8/scripts/cks-v8-run audio \
-  --encoder-run-dir $CK_WHISPER_ENCODER_RUN_DIR \
-  --decoder-run-dir $CK_WHISPER_DECODER_RUN_DIR \
-  --wav /tmp/test-audio.wav \
+<pre>version/v8/scripts/cks-v8-run audio "$CK_AUDIO_MODEL" \
+  --wav recording.wav \
   --language en \
   --task transcribe \
   --max-tokens 128 \
@@ -887,16 +883,15 @@ jq -r '.decoder.transcript_text' \
     <h3 style="margin-top: 0;">Short Exact And Long Nightly Gates</h3>
     <p>
         Nightly already covers the log-Mel frontend against PyTorch, the audio transformer primitives, and the portable v8 audio
-        circuit/codegen regression. The short JFK token-exact check remains available for local artifact directories:
+        circuit/codegen regression. Run the short public checkpoint path through the same front door:
     </p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>make test-audio
 
-CK_WHISPER_ENCODER_RUN_DIR=/path/to/encoder \
-CK_WHISPER_DECODER_RUN_DIR=/path/to/decoder \
-CK_WHISPER_WAV=/path/to/jfk.wav \
-make test-whisper-e2e-auto</pre>
+version/v8/scripts/cks-v8-run audio hf://openai/whisper-tiny \
+  --wav recording.wav \
+  --output build/whisper-short-report.json</pre>
     </div>
     <p style="margin-bottom: 0;">
         The artifact gate requires the full reference token sequence and EOS without tolerance relaxation.

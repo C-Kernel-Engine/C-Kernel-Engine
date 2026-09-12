@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "cke.parakeet.operation_reuse_inventory",
-  "status": "native_short_wav_e2e_pass",
+  "status": "native_five_minute_chunked_e2e_pass",
   "generated_at": "2026-09-12",
   "scope": "Native CPU text transcription for nvidia/parakeet-tdt-0.6b-v3; diarization is a separate milestone and is excluded.",
   "reference_contract": {
@@ -369,14 +369,19 @@
     "tensor_manifest": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json",
     "audio": "version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav",
     "native_e2e_json": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json",
-    "reproduction": "version/v8/scripts/run_parakeet_native_v8.py --model <converted BUMP directory> --fixture <reference NPZ> --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav --decode"
+    "five_minute_full_attention": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_five_minute_certification.json",
+    "five_minute_chunking": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_chunking_certification.json",
+    "matched_whisper": "docs/notes/artifacts/parakeet_whisper_five_minute_matched.json",
+    "long_audio_corpus": "version/v8/test_assets/parakeet_tdt_0_6b_v3/long_audio_corpus.json",
+    "reproduction": "version/v8/scripts/run_parakeet_native_v8.py --model .ck_build/parakeet-tdt-0.6b-v3 --fixture docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav --decode"
   },
   "claim_boundary": {
-    "native_cke_transcription": "short_wav_e2e_pass",
+    "native_cke_transcription": "five_minute_full_and_chunked_e2e_pass",
     "native_cke_parity": "exact_50_token_and_duration_trajectory",
-    "long_audio": "not_tested",
+    "long_audio": "five_minute_deterministic_overlap_pass_42_minute_not_tested",
     "multilingual": "not_tested",
     "diarization": "out_of_scope",
-    "bump_conversion": "699_mapped_24_explicitly_ignored_0_unaccounted"
+    "bump_conversion": "699_mapped_24_explicitly_ignored_0_unaccounted",
+    "resampling": "synthetic_48khz_stereo_short_fixture_pass"
   }
 }

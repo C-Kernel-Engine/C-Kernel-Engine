@@ -1,0 +1,120 @@
+{
+  "schema": "cke.parakeet.host_math_inventory.v1",
+  "status": "native_kernel_session_with_declared_host_math_debt",
+  "source": "version/v8/scripts/run_parakeet_native_v8.py",
+  "target": "generated circuit with planner-owned memory and session-owned decoder state",
+  "entries": [
+    {
+      "site": "ParakeetSession.frontend",
+      "operation": "nonperiodic Hann window generation",
+      "current": "NumPy float64 arange/cos followed by FP32 cast",
+      "classification": "model_math",
+      "required_resolution": "declare a CKE provider preserving float64 cosine evaluation and FP32 cast boundaries",
+      "status": "open"
+    },
+    {
+      "site": "ParakeetSession.subsampling",
+      "operation": "post-stride padding-mask zero fill",
+      "current": "NumPy slice assignment after every strided Conv2D",
+      "classification": "model_math",
+      "required_resolution": "lower a declared masked-fill operation using the live subsampled length",
+      "status": "open"
+    },
+    {
+      "site": "ParakeetSession.subsampling and convolution",
+      "operation": "channel/time transpose, flatten, and contiguous copies",
+      "current": "NumPy transpose/reshape/copy",
+      "classification": "layout_math",
+      "required_resolution": "bind declared layout providers and planner-owned destination buffers",
+      "status": "open"
+    },
+    {
+      "site": "ParakeetSession.encoder_block",
+      "operation": "four residual additions including two 0.5-scaled Macaron branches",
+      "current": "NumPy FP32 add and multiply composition",
+      "classification": "model_math",
+      "required_resolution": "lower explicit scaled and unscaled residual operations without changing evaluation order",
+      "status": "resolved_native_provider",
+      "resolution": "audio_scaled_residual_add_f32 preserves an explicit FP32 multiply then add boundary for scaled and unscaled branches"
+    },
+    {
+      "site": "ParakeetSession.joint",
+      "operation": "encoder and decoder projection add",
+      "current": "NumPy FP32 addition before native ReLU",
+      "classification": "model_math",
+      "required_resolution": "lower the broadcast-free FP32 add through a declared provider",
+      "status": "resolved_native_provider",
+      "resolution": "audio_scaled_residual_add_f32 with scale 1.0"
+    },
+    {
+      "site": "ParakeetSession.decode",
+      "operation": "token-logit and duration-logit argmax",
+      "current": "two NumPy argmax calls",
+      "classification": "model_math",
+      "required_resolution": "select an exact first-index-on-tie CKE argmax provider for each declared logits slice",
+      "status": "resolved_native_provider",
+      "resolution": "audio_argmax_first_f32 provides deterministic first-index-on-tie selection over finite FP32 logits"
+    },
+    {
+      "site": "ParakeetSession.decode",
+      "operation": "TDT greedy state machine and duration advancement",
+      "current": "Python loop with blank-zero correction and encoder-derived step bound",
+      "classification": "runtime_model_semantics",
+      "required_resolution": "move into a versioned native session API with explicit reset and termination state",
+      "status": "open"
+    },
+    {
+      "site": "ParakeetSession.decode",
+      "operation": "decoder hidden and cell state allocation",
+      "current": "NumPy zero arrays created for every trajectory",
+      "classification": "session_ownership",
+      "required_resolution": "own prepared state in the native session and zero it through an explicit reset operation",
+      "status": "open"
+    },
+    {
+      "site": "decode_token_timestamps",
+      "operation": "token streaming and timestamp refinement",
+      "current": "Python tokenizers orchestration and cumulative duration arithmetic",
+      "classification": "output_orchestration",
+      "required_resolution": "retain as declared host postprocessing until the shared audio output ABI owns timestamps",
+      "status": "retained_boundary"
+    },
+    {
+      "site": "Kernels methods and ParakeetSession intermediates",
+      "operation": "activation and scratch allocation",
+      "current": "NumPy-owned arrays passed to allocation-free C entry points",
+      "classification": "planning_debt",
+      "required_resolution": "replace request-scoped arrays with planned arena slots and declared per-call scratch",
+      "status": "open"
+    },
+    {
+      "site": "BumpWeights",
+      "operation": "read-only weight mapping and FP32 views",
+      "current": "NumPy memmap backed by BUMPWGT5 offsets",
+      "classification": "host_orchestration",
+      "required_resolution": "native model/session loader owns the same immutable mappings",
+      "status": "retained_boundary"
+    },
+    {
+      "site": "compare and report checks",
+      "operation": "finite checks, exact equality, and error statistics",
+      "current": "NumPy validation after execution",
+      "classification": "certification_only",
+      "required_resolution": "remain outside production inference",
+      "status": "retained_boundary"
+    }
+  ],
+  "target_acceptance": {
+    "production_model_math_in_python": 0,
+    "production_kernel_heap_allocation": 0,
+    "planner_declared_activation_and_scratch": true,
+    "session_owned_decoder_state": true,
+    "reference_framework_import_during_inference": false
+  },
+  "summary": {
+    "resolved_native_model_math_entries": 3,
+    "open_model_or_layout_math_entries": 3,
+    "open_runtime_or_planning_entries": 3,
+    "retained_host_output_loader_certification_entries": 3
+  }
+}

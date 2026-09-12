@@ -91,8 +91,8 @@ version/v8/scripts/cks-v8-run run \
 | GPT-2 | `hf://openai-community/gpt2` | Raw continuation model; do not apply an instruction chat template |
 | Qwen3-VL 8B | `hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf` | Add `--mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf`, `--image-path`, and the runbook's vision options |
 | Qwen3.6-VL | `hf://ggml-org/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q4_K_M.gguf` | Add `--mmproj hf://ggml-org/Qwen3.6-27B-GGUF/mmproj-Qwen3.6-27B-Q8_0.gguf`; use the separate OCR command in the v8 runbook because text-only execution does not certify vision |
-| Whisper Tiny, Base, or Small | `version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav /path/to/audio.wav` | Audio uses the `audio` subcommand; see the v8 runbook for generated artifact directories and language/task options |
-| Parakeet TDT 0.6B v3 | [`hf://nvidia/parakeet-tdt-0.6b-v3`](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | FP32 BUMP candidate: one 7.435-second WAV has an exact 50-token and duration trajectory; use the [Parakeet HTML guide](https://c-kernel-engine.github.io/C-Kernel-Engine/parakeet-tdt.html) |
+| Whisper Tiny, Base, or Small | `version/v8/scripts/cks-v8-run audio hf://openai/whisper-base --wav recording.wav` | Audio uses the `audio` subcommand; see the v8 runbook for generated artifact directories and language/task options |
+| Parakeet TDT 0.6B v3 | [`hf://nvidia/parakeet-tdt-0.6b-v3`](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | FP32 BUMP native-kernel candidate: exact short trajectory plus deterministic five-minute and 42-minute evidence; use the [Parakeet HTML guide](https://c-kernel-engine.github.io/C-Kernel-Engine/parakeet-tdt.html) |
 
 Use `--force-convert --force-compile` when intentionally rebuilding a model.
 Qwen3.8 Flash Next remains in the evidence table below rather than this
@@ -151,7 +151,7 @@ records the strongest evidence for each family.
 | Laguna-XS 2.1 Q4_K_M | Coherent text; exact embedding/RMSNorm and near-exact router replay | 2,048 tokens | Ryzen Zen 5 bring-up; diagnostic llama.cpp oracle |
 | Instella-MoE 16B-A3B BF16 | Top-1 PyTorch match and 0.99998 full-logit cosine at the tested checkpoint | 32-token checkpoint | x86 BF16 reference/runtime lane; quantized and long trajectories open |
 | Whisper Tiny, Base, and Small FP32 | Token-exact Hugging Face trajectory on public JFK fixtures | JFK fixture; 33-second Base long-form fixture | Generated x86 encoder/decoder runtime |
-| Parakeet TDT 0.6B v3 FP32 | Exact 50-token and 50-duration Transformers trajectory from a BUMPWGT5-backed native-kernel run | One 7.435-second LibriSpeech WAV; long audio, multilingual speech, and diarization remain open | Ryzen 9 9950X3D short-fixture bring-up |
+| Parakeet TDT 0.6B v3 FP32 | Exact 50-token and 50-duration Transformers trajectory plus deterministic five-minute repeats and complete 42-minute overlapping-window execution | English audio; multilingual speech, generated-circuit execution, concurrent sessions, and diarization remain open | Ryzen 9 9950X3D; five-minute run: 7.25% WER and RTF 0.771; 42-minute run: RTF 0.847 and 3.29 GiB peak RSS |
 
 The [model and kernel matrix](https://c-kernel-engine.github.io/C-Kernel-Engine/model-kernel-matrix.html)
 contains per-family commands, formats, open boundaries, and evidence classes. The
@@ -323,7 +323,7 @@ The articles explain the motivation and math; the documentation records the supp
 | Distributed CPU AI | [MPI, RDMA, NUMA, and CKE](https://www.shivasnotes.com/blog/5922/Distributed-CPU-AI-MPI-RDMA-NUMA-and-C-Kernel-Engine) and [Pipeline vs Tensor Parallelism](https://www.shivasnotes.com/blog/5923/Pipeline-vs-Tensor-Parallelism-How-CKE-Splits-AI-Across-CPU-Nodes) | [Scaling architecture](https://c-kernel-engine.github.io/C-Kernel-Engine/scaling.html) | [Scaling roadmap](docs/site/_pages/scaling.html) |
 | System throughput | [CPU strategic bet](https://www.shivasnotes.com/blog/5878/Why-I-Stopped-Getting-High-on-the-Newer-AI-Models-And-Why-My-Strategic-Bet-Is-Still-Consistent-CPUs-Smaller-Models-and-Less-Compute-Will-Win) | [CKE Throughput Unit](https://c-kernel-engine.github.io/C-Kernel-Engine/cke-throughput-unit.html) | [CKU definition](docs/site/_pages/cke-throughput-unit.html) |
 | Gemma4 architecture | [Four Attention Paths, Shared KV, and Sliding Windows](https://www.shivasnotes.com/blog/5935/Gemma4-In-CKE-Four-Attention-Paths-Shared-KV-And-Sliding-Windows) | [Gemma4 speculative pair](https://c-kernel-engine.github.io/C-Kernel-Engine/gemma4-speculative-pair.html) | [Gemma4 circuit](version/v8/circuits/gemma4.json) |
-| Audio roadmap | [How Audio Transformers Work](https://www.shivasnotes.com/blog/5928/How-Audio-Transformers-Work-The-Encoder-Path-Whisper-Timestamps-And-Why-Audio-Is-Not-A-VLM-Patch) | [Execution roadmap](https://c-kernel-engine.github.io/C-Kernel-Engine/version-history.html) | Audio circuit and kernels are planned after the v8 hardening gate |
+| Audio roadmap | [How Audio Transformers Work](https://www.shivasnotes.com/blog/5928/How-Audio-Transformers-Work-The-Encoder-Path-Whisper-Timestamps-And-Why-Audio-Is-Not-A-VLM-Patch) | [Execution roadmap](https://c-kernel-engine.github.io/C-Kernel-Engine/version-history.html) | Whisper is the generated-runtime baseline; Parakeet native-kernel execution is progressing through long-audio hardening |
 
 ## Correctness Before Speed
 

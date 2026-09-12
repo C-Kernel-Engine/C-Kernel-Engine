@@ -48,7 +48,7 @@
     "runtime_invariants": {
       "weight_container": "BUMPWGT5",
       "production_kernel_heap_allocation": false,
-      "attention_scratch": "one_fp32_score_row",
+      "attention_scratch": "one_fp32_score_row_per_head",
       "lstm_scratch": "four_hidden_width_fp32_gates"
     }
   },
@@ -57,7 +57,9 @@
     "relative_attention": "audio_conformer_relative_attention_f32",
     "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
     "batch_norm": "audio_batch_norm_inference_channel_major_f32",
-    "lstm": "audio_lstm_step_f32"
+    "lstm": "audio_lstm_step_f32",
+    "scaled_residual_add": "audio_scaled_residual_add_f32",
+    "argmax": "audio_argmax_first_f32"
   },
   "sequence": ["frontend", "encoder", "transducer"],
   "block_types": {

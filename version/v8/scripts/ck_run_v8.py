@@ -63,6 +63,8 @@ CODEGEN_STAMP_NAME = ".ck_codegen_bundle.json"
 IR_STAMP_NAME = ".ck_ir_bundle.json"
 RUNTIME_STAMP_NAME = ".ck_runtime_bundle.json"
 RUNTIME_BUNDLE_SCHEMA = "ck-v8-runtime-bundle-v2"
+PARAKEET_TDT_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
+PARAKEET_TDT_REVISION = "541d1f99c6b0c3cd0b11a95167540bb8edefd82b"
 
 
 def _configure_scratch_environment() -> Path:
@@ -2320,15 +2322,155 @@ def step_build_whisper_runtimes(
     return encoder, decoder
 
 
+def _audio_checkpoint_kind(checkpoint_dir: Path) -> str:
+    config_path = checkpoint_dir / "config.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"audio checkpoint has no valid config.json: {checkpoint_dir}") from exc
+    model_type = str(config.get("model_type") or config.get("model") or "").lower()
+    architectures = {
+        str(value).lower() for value in (config.get("architectures") or [])
+    }
+    if model_type == "parakeet_tdt" or "parakeetfortdt" in architectures:
+        return "parakeet_tdt"
+    if model_type == "whisper" or any("whisper" in value for value in architectures):
+        return "whisper"
+    raise RuntimeError(
+        f"unsupported audio checkpoint architecture in {config_path}: "
+        f"model_type={model_type or '<missing>'}"
+    )
+
+
+def _resolve_audio_checkpoint(
+    model_input: str, *, force_download: bool
+) -> tuple[Path, str, str]:
+    input_type, info = detect_input_type(model_input)
+    if input_type == "hf_id":
+        model_id = str(info["model_id"])
+        if model_id == PARAKEET_TDT_MODEL_ID:
+            repo_dir = model_id.replace("/", "--")
+            revision_dir = PARAKEET_TDT_REVISION[:8]
+            checkpoint_dir = CACHE_DIR / repo_dir / revision_dir
+            if not force_download:
+                for cache_root in _cache_roots():
+                    candidate = cache_root / repo_dir / revision_dir
+                    if _is_safetensors_checkpoint_dir(candidate):
+                        checkpoint_dir = candidate
+                        break
+            if force_download or not _is_safetensors_checkpoint_dir(checkpoint_dir):
+                checkpoint_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    from huggingface_hub import snapshot_download
+                except ImportError as exc:
+                    raise RuntimeError("huggingface_hub not installed") from exc
+
+                def _fetch_parakeet() -> None:
+                    snapshot_download(
+                        repo_id=model_id,
+                        revision=PARAKEET_TDT_REVISION,
+                        local_dir=str(checkpoint_dir),
+                        cache_dir=str(_hf_hub_cache_dir(CACHE_DIR)),
+                    )
+
+                _run_with_download_retries(
+                    model_id, PARAKEET_TDT_REVISION, _fetch_parakeet
+                )
+        else:
+            checkpoint_dir = step_download(
+                model_id, CACHE_DIR, force=force_download
+            )
+        default_name = info["model_id"].replace("/", "--")
+    elif input_type == "local_dir":
+        checkpoint_dir = info["path"]
+        default_name = checkpoint_dir.name
+    else:
+        raise RuntimeError(
+            "audio checkpoint must be a Hugging Face model ID or local directory"
+        )
+    return checkpoint_dir, default_name, _audio_checkpoint_kind(checkpoint_dir)
+
+
+def _build_parakeet_native_runtime(
+    checkpoint_dir: Path,
+    output_dir: Path,
+    *,
+    force_convert: bool,
+    force_compile: bool,
+) -> Path:
+    if not _is_safetensors_checkpoint_dir(checkpoint_dir):
+        if not (
+            (checkpoint_dir / "weights.bump").is_file()
+            and (checkpoint_dir / "weights_manifest.json").is_file()
+        ):
+            raise RuntimeError(
+                f"Parakeet checkpoint has no safetensors or BUMP weights: {checkpoint_dir}"
+            )
+        model_dir = checkpoint_dir
+    else:
+        step_convert_safetensors(
+            checkpoint_dir, output_dir, force=force_convert
+        )
+        model_dir = output_dir
+
+    make_cmd = ["make", "--no-print-directory"]
+    if force_compile:
+        make_cmd.append("-B")
+    make_cmd.extend(["build/libckernel_engine.so", "build/libckernel_audio.so"])
+    run_cmd(make_cmd, cwd=PROJECT_ROOT)
+    return model_dir
+
+
 def run_audio_pipeline(args: argparse.Namespace) -> int:
     encoder_run_dir = args.encoder_run_dir
     decoder_run_dir = args.decoder_run_dir
     model_input = getattr(args, "model", None)
     if model_input:
-        encoder_run_dir, decoder_run_dir = step_build_whisper_runtimes(
+        checkpoint_dir, default_name, checkpoint_kind = _resolve_audio_checkpoint(
             str(model_input),
-            run_dir=getattr(args, "run_dir", None),
             force_download=bool(getattr(args, "force_download", False)),
+        )
+        if checkpoint_kind == "parakeet_tdt":
+            if str(args.task) != "transcribe":
+                raise RuntimeError("Parakeet TDT currently supports transcription only")
+            if str(args.language) != "en":
+                raise RuntimeError(
+                    "Parakeet multilingual output is not certified yet; use --language en"
+                )
+            root = (
+                args.run_dir.expanduser().resolve()
+                if args.run_dir is not None
+                else CACHE_DIR / f"{default_name}--audio"
+            )
+            model_dir = _build_parakeet_native_runtime(
+                checkpoint_dir,
+                root,
+                force_convert=bool(getattr(args, "force_convert", False)),
+                force_compile=bool(getattr(args, "force_compile", False)),
+            )
+            module_path = SCRIPTS_DIR / "run_parakeet_long_audio_v8.py"
+            cmd = [
+                sys.executable,
+                str(module_path),
+                "--model", str(model_dir),
+                "--wav", str(args.wav),
+                "--engine", str(BUILD_DIR / "libckernel_engine.so"),
+                "--audio-lib", str(BUILD_DIR / "libckernel_audio.so"),
+                "--window-seconds", str(float(args.window_seconds)),
+                "--overlap-seconds", str(float(args.overlap_seconds)),
+            ]
+            if args.output is not None:
+                cmd.extend(["--output", str(args.output)])
+            if args.resume:
+                if args.output is None:
+                    raise RuntimeError("--resume requires --output")
+                cmd.append("--resume")
+            run_cmd(cmd, cwd=PROJECT_ROOT)
+            return 0
+        encoder_run_dir, decoder_run_dir = step_build_whisper_runtimes(
+            str(checkpoint_dir),
+            run_dir=getattr(args, "run_dir", None),
+            force_download=False,
             force_convert=bool(getattr(args, "force_convert", False)),
             force_compile=bool(getattr(args, "force_compile", False)),
             encoder_linear_weight_dtype=str(
@@ -2389,7 +2531,7 @@ Examples:
     --image-path version/v8/test_assets/v8_vision_doc_card_72.png --prompt "Explain this image."
 
   version/v8/scripts/cks-v8-run audio hf://openai/whisper-base \\
-    --wav /path/to/audio.wav
+    --wav recording.wav
 """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -2502,6 +2644,18 @@ Examples:
         help="Generate monotonic paired Whisper timestamp tokens",
     )
     audio_parser.add_argument("--output", type=Path)
+    audio_parser.add_argument(
+        "--window-seconds", type=float, default=180.0,
+        help="Parakeet full-attention window length (default: 180 seconds)",
+    )
+    audio_parser.add_argument(
+        "--overlap-seconds", type=float, default=30.0,
+        help="Parakeet overlap reconciled at whole-word boundaries (default: 30 seconds)",
+    )
+    audio_parser.add_argument(
+        "--resume", action="store_true",
+        help="Resume a Parakeet long-audio report at a completed window boundary",
+    )
     audio_parser.add_argument(
         "--temp-dir",
         type=Path,
