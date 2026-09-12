@@ -1364,6 +1364,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_audio_encoder_contract -v
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_cohere_transcribe_model_contract -v
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_certification.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_inventory.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
@@ -1447,6 +1448,30 @@ test-cohere-transcribe-oracle-auto:
 			--threads "$${CK_NUM_THREADS:-1}" \
 			--output-dir "$${CK_COHERE_TRANSCRIBE_OUTPUT:-build/cohere-transcribe-oracle}" \
 			$$attention_arg; \
+	fi
+
+.PHONY: test-cohere-transcribe-native-auto
+test-cohere-transcribe-native-auto: $(BUILD_DIR)/libckernel_engine.so $(LIB_AUDIO)
+	@if [ -z "$$CK_COHERE_TRANSCRIBE_MODEL" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_AUDIO" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_REFERENCE_MANIFEST" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_REFERENCE_SUMMARY" ]; then \
+		echo "SKIP: set CK_COHERE_TRANSCRIBE_MODEL, CK_COHERE_TRANSCRIBE_AUDIO, CK_COHERE_TRANSCRIBE_REFERENCE_MANIFEST, and CK_COHERE_TRANSCRIBE_REFERENCE_SUMMARY"; \
+	else \
+		bundle="$${CK_COHERE_TRANSCRIBE_BUMP:-build/cohere-transcribe-bump}"; \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/convert_cohere_transcribe_gguf_to_bump_v8.py \
+			--gguf "$$CK_COHERE_TRANSCRIBE_MODEL" --output-dir "$$bundle" && \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_cohere_transcribe_native_v8.py \
+			--model "$$bundle" \
+			--audio "$$CK_COHERE_TRANSCRIBE_AUDIO" \
+			--engine "$(BUILD_DIR)/libckernel_engine.so" \
+			--audio-lib "$(LIB_AUDIO)" \
+			--reference-manifest "$$CK_COHERE_TRANSCRIBE_REFERENCE_MANIFEST" \
+			--reference-summary "$$CK_COHERE_TRANSCRIBE_REFERENCE_SUMMARY" \
+			--language "$${CK_COHERE_TRANSCRIBE_LANGUAGE:-en}" \
+			--max-new-tokens "$${CK_COHERE_TRANSCRIBE_MAX_TOKENS:-64}" \
+			--decode \
+			--output "$${CK_COHERE_TRANSCRIBE_NATIVE_OUTPUT:-build/cohere-transcribe-native.json}"; \
 	fi
 
 # Policy:
@@ -5692,7 +5717,7 @@ nightly-list:
 	@$(PYTHON) scripts/nightly_runner.py --list
 
 .PHONY: nightly nightly-quick nightly-json nightly-demo-readiness nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
-.PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto test-cohere-transcribe-oracle-auto libckernel_audio.so
+.PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto test-cohere-transcribe-oracle-auto test-cohere-transcribe-native-auto libckernel_audio.so
 
 # ============================================================================
 # Status Reports (reads from version/meta/kernel_meta.json)

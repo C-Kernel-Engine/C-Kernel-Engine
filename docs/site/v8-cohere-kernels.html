@@ -1231,13 +1231,30 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71 3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div style="min-width: 0;">
-        <strong>Status honesty.</strong> The seven providers below are a <strong>provider foundation</strong>: each
-        carries a kernel map, a map-owned call ABI, and a numerical execution contract, and each contract is
-        test-validated. None of them is a selection-managed production provider, no circuit consumes them yet,
-        and Cohere Transcribe end-to-end transcription is <em>not</em> certified. The Conformer encoder
-        attention, the cross-attention decoder, and the tokenizer are still blocked from promotion.
+        <strong>Status honesty.</strong> Cohere now has a native short-audio correctness path. The declared
+        <code>cohere_transcribe</code> circuit composes the frontend providers below with CKE dense, normalization,
+        activation, relative-attention, causal-attention, cross-attention, residual, and argmax kernels. On the
+        pinned 7.435-second fixture it emits the same 32 generated token IDs and transcript as CrispASR. The
+        Python session driver reads a complete mixed FP16/FP32 BUMP bundle and its tokenizer sidecar; long audio,
+        timestamps, resampling, multilingual coverage, quantization, and optimized execution remain open.
       </div>
     </div>
+    <p style="color: var(--text-secondary);">
+      Use the public
+      <a href="https://huggingface.co/cstr/cohere-transcribe-03-2026-GGUF">cstr/cohere-transcribe-03-2026-GGUF</a>
+      F16 artifact for this correctness lane. The official CohereLabs repository is gated; the public GGUF keeps
+      the native smoke reproducible without making private credentials part of the runner.
+    </p>
+    <pre><code>huggingface-cli download cstr/cohere-transcribe-03-2026-GGUF cohere-transcribe.gguf \
+  --local-dir cohere-transcribe-source
+
+python version/v8/scripts/convert_cohere_transcribe_gguf_to_bump_v8.py \
+  --gguf cohere-transcribe-source/cohere-transcribe.gguf \
+  --output-dir cohere-transcribe-bump
+
+python version/v8/scripts/run_cohere_transcribe_native_v8.py \
+  --model cohere-transcribe-bump \
+  --audio recording.wav --decode --language en</code></pre>
     <p style="color: var(--text-secondary);">
       All seven live in <code>src/kernels/audio_kernels.c</code> and form the Conformer frontend:
     </p>
@@ -1265,16 +1282,17 @@
     <p style="color: var(--text-secondary); margin-top: 0.75rem;">
       The model contract (PR #436) validates the real checkpoint generically: a cohere-transcribe GGUF is a
       <strong>48-layer Conformer encoder</strong> (rel-pos attention, depthwise conv + batchnorm, GLU; 39 tensors
-      per block) plus an <strong>8-layer cross-attention decoder</strong> (26 tensors per block), 2,104 tensors
-      matched exactly &mdash; and conversion then emits an explicit <code>HARD MODEL CONTRACT FAULT</code> instead
-      of entering a partial runtime. PR #441 added the oracle harness
+      per block) plus an <strong>8-layer cross-attention decoder</strong> (26 tensors per block), with all 2,104
+      tensors matched exactly. The dedicated converter retains mixed FP16/FP32 storage in a BUMPWGT5 bundle and
+      records every source tensor in the sidecar manifest. PR #441 added the oracle harness
       <code>version/v8/scripts/certify_cohere_transcribe_oracle_v8.py</code>, which captures stage-wise X-Ray dumps
-      so each frontend stage can be certified against the reference before the encoder is promoted.
+      so every encoder block and the generated token trajectory can be compared against the reference. The oracle's
+      unpinned <code>enc_out</code> intermediate is excluded because CrispASR can reuse that buffer before host readback.
     </p>
 
     <div class="svg-expand">
     <svg viewBox="0 0 1180 420" width="100%" role="img" tabindex="0" data-svg-title="Transcribe frontend pipeline with status badges"
-         aria-label="Cohere Transcribe frontend pipeline: waveform feeds pre-emphasis, then centered STFT power, then time-major log-mel, then per-feature normalize, then grouped conv2d subsampling, then GLU split gating; these seven stages carry contract-tested provider-foundation badges. The chain then reaches the 48-layer Conformer encoder and 8-layer cross-attention decoder, which carry blocked provider-foundation badges, meaning not promoted and no end-to-end certification."
+         aria-label="Cohere Transcribe native short-audio pipeline: waveform preprocessing feeds a 48-layer Conformer encoder and an 8-layer causal cross-attention decoder from a complete BUMP bundle. The pinned short fixture matches all 32 CrispASR generated token IDs. Long audio, timestamps, resampling, multilingual coverage, quantization, and performance remain open."
          style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
       <defs>
         <marker id="ck-arrow2" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
@@ -1332,19 +1350,19 @@
       <rect x="404" y="234" width="360" height="26" rx="6" fill="#0b1118" stroke="#2f8d59" stroke-width="1"/>
       <text x="584" y="252" text-anchor="middle" class="ck-good">relative shift exact: raw[h,q,T-1+k-q] -&gt; scores[h,q,k]</text>
 
-      <!-- encoder/decoder blocked -->
+      <!-- encoder/decoder short-audio bring-up -->
       <rect x="24" y="292" width="560" height="66" rx="10" fill="#0b1118" stroke="#b8860b" stroke-width="1.2"/>
-      <text x="44" y="318" class="ck-warn">BLOCKED - 48-layer Conformer encoder (rel-pos attention, depthwise conv + batchnorm)</text>
-      <text x="44" y="340" class="ck-sub">encoder attention not promoted - stage-wise X-Ray oracle exists (PR #441)</text>
+      <text x="44" y="318" class="ck-good">NATIVE - 48-layer Conformer encoder (rel-pos attention, depthwise conv + batchnorm)</text>
+      <text x="44" y="340" class="ck-sub">all 48 X-Ray boundaries finite; layer 47 RMSE 0.0000407 on the pinned fixture</text>
 
       <rect x="624" y="292" width="532" height="66" rx="10" fill="#0b1118" stroke="#b8860b" stroke-width="1.2"/>
-      <text x="644" y="318" class="ck-warn">BLOCKED - 8-layer cross-attention decoder + tokenizer</text>
-      <text x="644" y="340" class="ck-sub">conversion emits HARD MODEL CONTRACT FAULT until promotion</text>
+      <text x="644" y="318" class="ck-good">NATIVE - 8-layer cross-attention decoder + GGUF tokenizer</text>
+      <text x="644" y="340" class="ck-sub">32 generated IDs and transcript exactly match CrispASR from the BUMP bundle</text>
 
       <path d="M764,196 C900,196 250,260 300,288" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ck-arrow2)"/>
 
-      <text x="24" y="392" class="ck-cap">Evidence (PRs #433, #436, #441): seven provider contracts validated; real GGUF inventory 2104/2104 tensors (48 encoder x 39, 8 decoder x 26); oracle harness captures stage-wise X-Ray dumps.</text>
-      <text x="24" y="412" class="ck-cap">Caveats: not a complete runtime - no CKE audio generation trajectory is certified; encoder attention, cross-attention, and decoder promotion remain open.</text>
+      <text x="24" y="392" class="ck-cap">Evidence: real GGUF inventory 2104/2104; 48 encoder X-Ray blocks; exact 32-token greedy trajectory and transcript on the 7.435-second public fixture.</text>
+      <text x="24" y="412" class="ck-cap">Caveats: correctness-oriented Python session driver; long audio, timestamps, resampling, multilingual coverage, quantization, and tuned performance remain open.</text>
     </svg>
     <div class="svg-expand-hint">click / tap the diagram to expand</div>
     </div>
@@ -1656,7 +1674,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-06</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-12</p>
             </div>
         </div>
     </footer>

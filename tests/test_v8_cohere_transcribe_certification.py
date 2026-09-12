@@ -62,6 +62,8 @@ out = Path(sys.argv[sys.argv.index('-of') + 1]).with_suffix('.json')
 out.write_text(json.dumps({{'transcription': 'Ask not what your country can do for you.'}}))
 print('cohere:  enc compute       12.5 ms')
 print('cohere:  dec compute        7.5 ms')
+print('cohere: step   0  tok= 2178  p=0.998  ▁Well')
+print('cohere: step   1  tok=    3  p=1.000  <|endoftext|>')
 """,
         encoding="utf-8",
     )
@@ -109,7 +111,9 @@ def test_oracle_capture_publishes_reproducible_xray_inputs(tmp_path: Path) -> No
     schema = json.loads(SCHEMA.read_text())
     assert not list(Draft202012Validator(schema).iter_errors(manifest))
     assert report["status"] == "PASS"
-    assert report["checkpoint_count"] == 52
+    assert report["checkpoint_count"] == 51
+    assert report["generated_token_ids"] == [2178, 3]
+    assert "crisp.enc_out.bin" in report["excluded_diagnostic_captures"]
     assert report["threads"] == 4
     assert report["timings_ms"]["enc_compute"] == 12.5
     assert len(report["oracle"]["sha256"]) == 64

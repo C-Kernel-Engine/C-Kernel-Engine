@@ -92,8 +92,8 @@ class CohereTranscribeModelContractTests(unittest.TestCase):
             converter.gguf_ck_declared_metadata_keys(),
         )
         blocker = converter.gguf_ck_conversion_blocker(self.arch)
-        self.assertIn("provider_foundation", blocker)
-        self.assertIn("decoder cross-attention", blocker)
+        self.assertIn("dedicated_audio_converter", blocker)
+        self.assertIn("convert_cohere_transcribe_gguf_to_bump_v8.py", blocker)
 
 
 if __name__ == "__main__":
