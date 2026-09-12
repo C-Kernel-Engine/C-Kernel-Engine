@@ -1,0 +1,53 @@
+{
+  "id": "audio_lstm_step_f32",
+  "op": "audio_lstm",
+  "operation_interface": "audio_lstm.single_step.pytorch_ifgo.fp32.v1",
+  "variant": "single_layer_stateful_ifgo_fp32",
+   "selection": {"status": "candidate", "priority": 100, "equivalence_group": "audio_lstm_pytorch_ifgo_single_step_fp32", "phases": ["decode"]},
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["I"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "hidden_state_in", "dtype": "fp32",
+      "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "state", "consumption": "required"},
+    {"name": "cell_state_in", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read", "storage_class": "state", "consumption": "required"}
+  ],
+  "weights": [
+    {"name": "weight_ih", "dtype": "fp32", "shape": ["4*H", "I"], "layout": "ifgo_output_feature_major", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "weight_hh", "dtype": "fp32", "shape": ["4*H", "H"], "layout": "ifgo_output_feature_major", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias_ih", "dtype": "fp32", "shape": ["4*H"], "layout": "ifgo_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias_hh", "dtype": "fp32", "shape": ["4*H"], "layout": "ifgo_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"},
+    {"name": "hidden_state", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read_write", "storage_class": "state", "consumption": "required", "alias_of": "input:hidden_state_in"},
+    {"name": "cell_state", "dtype": "fp32", "shape": ["H"], "layout": "feature_contiguous", "placement": "local", "access": "read_write", "storage_class": "state", "consumption": "required", "alias_of": "input:cell_state_in"}
+  ],
+  "scratch": [{"name": "gates", "dtype": "fp32", "shape": ["4*H"], "size_resolution": "required", "lifetime": "kernel_call", "alignment": 64, "layout": "ifgo_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"}],
+  "dims": ["input_size", "hidden_size"],
+  "impl": {"function": "audio_lstm_step_f32", "c_declaration": "int audio_lstm_step_f32(const float *input, const float *weight_ih, const float *weight_hh, const float *bias_ih, const float *bias_hh, float *hidden_state, float *cell_state, float *output, float *gates_scratch, size_t gates_scratch_bytes, int input_size, int hidden_size);", "sources": ["src/kernels/audio_kernels.c"]},
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_lstm_pytorch_ifgo_single_step_fp32",
+    "status": "validated",
+    "phases": ["decode"],
+    "function": "audio_lstm_step_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "weight_ih", "source": "weight_f:weight_ih", "ports": ["weight:weight_ih"]},
+    {"name": "weight_hh", "source": "weight_f:weight_hh", "ports": ["weight:weight_hh"]},
+    {"name": "bias_ih", "source": "weight_f:bias_ih", "ports": ["weight:bias_ih"]},
+    {"name": "bias_hh", "source": "weight_f:bias_hh", "ports": ["weight:bias_hh"]},
+    {"name": "hidden_state", "source": "runtime:hidden_state", "cast": "float*", "ports": ["input:hidden_state_in", "output:hidden_state"]},
+    {"name": "cell_state", "source": "runtime:cell_state", "cast": "float*", "ports": ["input:cell_state_in", "output:cell_state"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "gates_scratch", "source": "scratch:gates", "cast": "float*"},
+    {"name": "gates_scratch_bytes", "source": "scratch_size:gates"},
+    {"name": "input_size", "source": "dim:input_size"},
+    {"name": "hidden_size", "source": "dim:hidden_size"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"], "oracle": "torch.nn.LSTM single-step FP32 CPU"}
+}

@@ -88,6 +88,12 @@ lib.audio_conv1d_channel_major_f32.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_int,
 ]
 lib.audio_conv1d_channel_major_f32.restype = ctypes.c_int
+lib.audio_conv1d_channel_major_grouped_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_conv1d_channel_major_grouped_f32.restype = ctypes.c_int
 lib.audio_conv2d_whc_grouped_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -168,6 +174,27 @@ lib.audio_feature_normalize_per_feature_f32.argtypes = [
     _FLOAT_P, _FLOAT_P, ctypes.c_int, ctypes.c_int, ctypes.c_float,
 ]
 lib.audio_feature_normalize_per_feature_f32.restype = ctypes.c_int
+lib.audio_relative_sinusoidal_position_f32.argtypes = [
+    _FLOAT_P, ctypes.c_int, ctypes.c_int,
+]
+lib.audio_relative_sinusoidal_position_f32.restype = ctypes.c_int
+lib.audio_batch_norm_inference_channel_major_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    ctypes.c_int, ctypes.c_int, ctypes.c_float,
+]
+lib.audio_batch_norm_inference_channel_major_f32.restype = ctypes.c_int
+lib.audio_lstm_step_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, ctypes.c_size_t,
+    ctypes.c_int, ctypes.c_int,
+]
+lib.audio_lstm_step_f32.restype = ctypes.c_int
+lib.audio_conformer_relative_attention_f32.argtypes = [
+    _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P, _FLOAT_P,
+    _FLOAT_P, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_float,
+    _FLOAT_P, ctypes.c_size_t,
+]
+lib.audio_conformer_relative_attention_f32.restype = ctypes.c_int
 lib.audio_stft_power_fft400_f32.argtypes = [
     _FLOAT_P, ctypes.c_int, _FLOAT_P, _FLOAT_P, _FLOAT_P,
     ctypes.c_int, _FLOAT_P, ctypes.c_int, _FLOAT_P,
@@ -329,6 +356,111 @@ def check_per_feature_normalization() -> None:
     ) == 0
     assert np.array_equal(single, np.zeros_like(single))
     print("audio_per_feature_normalization max_diff=0 tol=0 [PASS]")
+
+
+def check_relative_sinusoidal_position() -> None:
+    frames, channels = 7, 16
+    actual = np.empty((2 * frames - 1, channels), dtype=np.float32)
+    assert lib.audio_relative_sinusoidal_position_f32(
+        _fptr(actual), frames, channels,
+    ) == 0
+    position_ids = torch.arange(frames - 1, -frames, -1, dtype=torch.float32)
+    inv_freq = 1.0 / (
+        10000.0 ** (torch.arange(0, channels, 2, dtype=torch.float32) / channels)
+    )
+    frequencies = torch.outer(position_ids, inv_freq)
+    expected = torch.stack((frequencies.sin(), frequencies.cos()), dim=-1).reshape(
+        2 * frames - 1, channels,
+    ).numpy()
+    maximum = float(np.max(np.abs(actual - expected)))
+    assert maximum <= 6.0e-8, maximum
+    assert lib.audio_relative_sinusoidal_position_f32(
+        _fptr(actual), frames, channels - 1,
+    ) == -2
+    assert lib.audio_relative_sinusoidal_position_f32(
+        _fptr(actual), 2**30 + 1, channels,
+    ) == -2
+    print(f"audio_relative_sinusoidal_position max_diff={maximum:.8e} tol=6e-08 [PASS]")
+
+
+def check_batch_norm_inference() -> None:
+    rng = np.random.default_rng(20260912)
+    channels, frames = 5, 11
+    source = rng.normal(0.0, 0.7, (channels, frames)).astype(np.float32)
+    mean = rng.normal(0.0, 0.2, channels).astype(np.float32)
+    variance = rng.uniform(0.2, 1.4, channels).astype(np.float32)
+    weight = rng.normal(1.0, 0.15, channels).astype(np.float32)
+    bias = rng.normal(0.0, 0.1, channels).astype(np.float32)
+    epsilon = 1.0e-5
+    expected = F.batch_norm(
+        torch.from_numpy(source)[None], torch.from_numpy(mean),
+        torch.from_numpy(variance), torch.from_numpy(weight),
+        torch.from_numpy(bias), training=False, momentum=0.1, eps=epsilon,
+    )[0].numpy()
+    actual = np.empty_like(source)
+    assert lib.audio_batch_norm_inference_channel_major_f32(
+        _fptr(source), _fptr(mean), _fptr(variance), _fptr(weight), _fptr(bias),
+        _fptr(actual), channels, frames, epsilon,
+    ) == 0
+    maximum = float(np.max(np.abs(actual - expected)))
+    assert maximum <= 2.5e-7, maximum
+    invalid_variance = variance.copy()
+    invalid_variance[-1] = -1.0
+    untouched = np.full_like(source, np.float32(123.0))
+    assert lib.audio_batch_norm_inference_channel_major_f32(
+        _fptr(source), _fptr(mean), _fptr(invalid_variance), _fptr(weight),
+        _fptr(bias), _fptr(untouched), channels, frames, epsilon,
+    ) == -3
+    assert np.all(untouched == np.float32(123.0))
+    print(f"audio_batch_norm_inference max_diff={maximum:.8e} tol=2.5e-07 [PASS]")
+
+
+def check_lstm_step() -> None:
+    rng = np.random.default_rng(20260913)
+    input_size, hidden_size = 6, 5
+    source = rng.normal(0.0, 0.2, input_size).astype(np.float32)
+    hidden = rng.normal(0.0, 0.2, hidden_size).astype(np.float32)
+    cell = rng.normal(0.0, 0.2, hidden_size).astype(np.float32)
+    weight_ih = rng.normal(0.0, 0.15, (4 * hidden_size, input_size)).astype(np.float32)
+    weight_hh = rng.normal(0.0, 0.15, (4 * hidden_size, hidden_size)).astype(np.float32)
+    bias_ih = rng.normal(0.0, 0.05, 4 * hidden_size).astype(np.float32)
+    bias_hh = rng.normal(0.0, 0.05, 4 * hidden_size).astype(np.float32)
+
+    module = torch.nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True)
+    with torch.no_grad():
+        module.weight_ih_l0.copy_(torch.from_numpy(weight_ih))
+        module.weight_hh_l0.copy_(torch.from_numpy(weight_hh))
+        module.bias_ih_l0.copy_(torch.from_numpy(bias_ih))
+        module.bias_hh_l0.copy_(torch.from_numpy(bias_hh))
+        expected_output, (expected_hidden, expected_cell) = module(
+            torch.from_numpy(source)[None, None],
+            (torch.from_numpy(hidden.copy())[None, None], torch.from_numpy(cell.copy())[None, None]),
+        )
+
+    actual_hidden = hidden.copy()
+    actual_cell = cell.copy()
+    actual_output = np.empty(hidden_size, dtype=np.float32)
+    scratch = np.empty(4 * hidden_size, dtype=np.float32)
+    assert lib.audio_lstm_step_f32(
+        _fptr(source), _fptr(weight_ih), _fptr(weight_hh), _fptr(bias_ih),
+        _fptr(bias_hh), _fptr(actual_hidden), _fptr(actual_cell),
+        _fptr(actual_output), _fptr(scratch), scratch.nbytes, input_size, hidden_size,
+    ) == 0
+    expected_output_np = expected_output[0, 0].numpy()
+    expected_hidden_np = expected_hidden[0, 0].numpy()
+    expected_cell_np = expected_cell[0, 0].numpy()
+    maximum = max(
+        float(np.max(np.abs(actual_output - expected_output_np))),
+        float(np.max(np.abs(actual_hidden - expected_hidden_np))),
+        float(np.max(np.abs(actual_cell - expected_cell_np))),
+    )
+    assert maximum <= 1.0e-7, maximum
+    assert lib.audio_lstm_step_f32(
+        _fptr(source), _fptr(weight_ih), _fptr(weight_hh), _fptr(bias_ih),
+        _fptr(bias_hh), _fptr(actual_hidden), _fptr(actual_cell),
+        _fptr(actual_output), _fptr(scratch), scratch.nbytes - 1, input_size, hidden_size,
+    ) == -3
+    print(f"audio_lstm_step max_diff={maximum:.8e} tol=1e-07 [PASS]")
 
 
 def check_resample() -> None:
@@ -613,6 +745,61 @@ def check_relative_shift() -> None:
     print("audio_relative_shift exact_index_mapping [PASS]")
 
 
+def check_conformer_relative_attention() -> None:
+    rng = np.random.default_rng(20260914)
+    frames, heads, head_dim = 7, 3, 4
+    channels = heads * head_dim
+    query = rng.normal(0.0, 0.25, (frames, channels)).astype(np.float32)
+    key = rng.normal(0.0, 0.25, (frames, channels)).astype(np.float32)
+    value = rng.normal(0.0, 0.25, (frames, channels)).astype(np.float32)
+    relative = rng.normal(0.0, 0.25, (2 * frames - 1, channels)).astype(np.float32)
+    bias_u = rng.normal(0.0, 0.1, (heads, head_dim)).astype(np.float32)
+    bias_v = rng.normal(0.0, 0.1, (heads, head_dim)).astype(np.float32)
+    scale = np.float32(head_dim**-0.5)
+
+    q = torch.from_numpy(query).reshape(frames, heads, head_dim).permute(1, 0, 2)
+    k = torch.from_numpy(key).reshape(frames, heads, head_dim).permute(1, 0, 2)
+    v = torch.from_numpy(value).reshape(frames, heads, head_dim).permute(1, 0, 2)
+    r = torch.from_numpy(relative).reshape(2 * frames - 1, heads, head_dim).permute(1, 0, 2)
+    content = (q + torch.from_numpy(bias_u)[:, None, :]) @ k.transpose(1, 2)
+    position_raw = (q + torch.from_numpy(bias_v)[:, None, :]) @ r.transpose(1, 2)
+    position = torch.empty((heads, frames, frames), dtype=torch.float32)
+    for query_frame in range(frames):
+        for key_frame in range(frames):
+            position[:, query_frame, key_frame] = position_raw[
+                :, query_frame, frames - 1 + key_frame - query_frame,
+            ]
+    probability = torch.softmax((content + position) * float(scale), dim=-1)
+    expected = (probability @ v).permute(1, 0, 2).reshape(frames, channels).numpy()
+
+    actual = np.empty_like(query)
+    scratch = np.empty(frames, dtype=np.float32)
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(actual), frames, heads,
+        head_dim, float(scale), _fptr(scratch), scratch.nbytes,
+    ) == 0
+    maximum = float(np.max(np.abs(actual - expected)))
+    rmse = float(np.sqrt(np.mean((actual - expected) ** 2)))
+    assert maximum <= 1.5e-7, maximum
+    assert rmse <= 4.0e-8, rmse
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(actual), frames, heads,
+        head_dim, float(scale), _fptr(scratch), scratch.nbytes - 1,
+    ) == -3
+    assert lib.audio_conformer_relative_attention_f32(
+        _fptr(query), _fptr(key), _fptr(value), _fptr(relative),
+        _fptr(bias_u), _fptr(bias_v), _fptr(actual), 2**30 + 1, heads,
+        head_dim, float(scale), _fptr(scratch), scratch.nbytes,
+    ) == -2
+    print(
+        "audio_conformer_relative_attention "
+        f"max_diff={maximum:.8e} tol=1.5e-07 [PASS] "
+        f"rmse={rmse:.8e} rmse_tol=4e-08"
+    )
+
+
 def check_global_log_mel_window() -> None:
     sample_rate = 16000
     samples = (
@@ -687,6 +874,37 @@ def _check_conv(name: str, cin: int, cout: int, frames: int, stride: int) -> Non
         f"{name} max_diff={max_diff:.8e} tol=2.0e-05 [PASS] "
         f"rmse={rmse:.8e} rmse_tol=2.0e-06"
     )
+
+
+def check_grouped_conv1d() -> None:
+    rng = np.random.default_rng(20260912)
+    for cin, cout, groups in ((8, 12, 4), (16, 16, 16)):
+        frames, kernel, stride, padding = 19, 5, 1, 2
+        output_frames = (frames + 2 * padding - kernel) // stride + 1
+        source = rng.normal(0.0, 0.15, (cin, frames)).astype(np.float32)
+        weight = rng.normal(0.0, 0.08, (cout, cin // groups, kernel)).astype(np.float32)
+        bias = rng.normal(0.0, 0.03, cout).astype(np.float32)
+        actual = np.empty((cout, output_frames), dtype=np.float32)
+        assert lib.audio_conv1d_channel_major_grouped_f32(
+            _fptr(source), _fptr(weight), _fptr(bias), _fptr(actual), cin, cout,
+            frames, kernel, stride, padding, groups, output_frames,
+        ) == 0
+        expected = F.conv1d(
+            torch.from_numpy(source)[None], torch.from_numpy(weight),
+            torch.from_numpy(bias), stride=stride, padding=padding, groups=groups,
+        )[0].numpy()
+        difference = np.abs(actual - expected)
+        assert float(difference.max()) <= 3.0e-7, (groups, float(difference.max()))
+    invalid = np.empty((12, 19), dtype=np.float32)
+    assert lib.audio_conv1d_channel_major_grouped_f32(
+        _fptr(source), _fptr(weight), _fptr(bias), _fptr(invalid), 16, 12,
+        frames, kernel, stride, padding, 5, output_frames,
+    ) < 0
+    assert lib.audio_conv1d_channel_major_grouped_f32(
+        _fptr(source), _fptr(weight), _fptr(bias), _fptr(invalid), 16, 12,
+        frames, kernel, stride, 2**30, 4, output_frames,
+    ) == -3
+    print("audio_grouped_conv1d groups=4,depthwise max_diff<=3.0e-07 invalid_group_rejected=1 [PASS]")
 
 
 def check_conv_stride2_production_equivalence() -> None:
@@ -879,6 +1097,9 @@ def main() -> None:
     check_pcm()
     check_pad_or_truncate()
     check_preemphasis()
+    check_relative_sinusoidal_position()
+    check_batch_norm_inference()
+    check_lstm_step()
     check_per_feature_normalization()
     check_resample()
     check_bandlimited_resample()
@@ -887,7 +1108,9 @@ def main() -> None:
     check_grouped_conv2d()
     check_split_glu()
     check_relative_shift()
+    check_conformer_relative_attention()
     check_global_log_mel_window()
+    check_grouped_conv1d()
     _check_conv("audio_conv1d_whisper_stem1", 80, 384, 16, 1)
     _check_conv("audio_conv1d_whisper_stem2", 384, 384, 16, 2)
     check_conv_stride2_production_equivalence()
@@ -897,7 +1120,7 @@ def main() -> None:
     _check_cross_attention("audio_cross_attention_unequal_small", 3, 5, 17, 8)
     _check_cross_attention("audio_cross_attention_whisper_decode", 6, 1, 1500, 64)
     check_tiled_f16kv_encoder_attention()
-    print("ALL TESTS PASSED (24/24)")
+    print("ALL TESTS PASSED (29/29)")
 
 
 if __name__ == "__main__":

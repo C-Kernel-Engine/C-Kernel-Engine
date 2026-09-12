@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "kind": "cke.parakeet.native_e2e",
+  "status": "pass",
+  "model": {
+    "id": "nvidia/parakeet-tdt-0.6b-v3",
+    "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+    "dtype": "fp32"
+  },
+  "reference": {
+    "implementation": "huggingface/transformers",
+    "revision": "66799f45cea7513712580c6170cdaa4438df702a"
+  },
+  "host": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.14.4"
+  },
+  "runtime": {
+    "engine": {
+      "path": "/data/cke/worktrees/parakeet-native-check/build/libckernel_engine.so",
+      "sha256": "4fbc62a40b7e18a93c356a64ec56651751019aceb243724c56bf84e46cebc98c",
+      "bytes": 1871512,
+      "present_in_process_maps": true
+    },
+    "audio": {
+      "path": "/data/cke/worktrees/parakeet-native-check/build/libckernel_audio.so",
+      "sha256": "bc1a7ac01cc1ba826c94e3dbe205da903bdd8803fca4411a9e65357db3a9cbc9",
+      "bytes": 67704,
+      "present_in_process_maps": true
+    }
+  },
+  "weights": {
+    "format": "BUMPWGT5",
+    "weights": {
+      "path": "/tmp/parakeet-bump/weights.bump",
+      "bytes": 2508517458,
+      "sha256": "9338c65065f1e165a21b92d7aa7e1860d9e49f2261ecc8a68481f3cd620625c0"
+    },
+    "manifest": {
+      "path": "/tmp/parakeet-bump/weights_manifest.json",
+      "bytes": 360195,
+      "sha256": "23385fe695bd7b758960918a97fb9a165b0a0804e2c069ac50e61039eaeed0f2"
+    },
+    "mapped_inference_tensors": 699
+  },
+  "inputs": {
+    "audio": {
+      "path": "/data/cke/worktrees/parakeet-native-check/version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav",
+      "sha256": "5fceacff0315d49cb59fcc505bcecf1ed5f2f35c2897b1e65a59f30e5d922150"
+    },
+    "fixture": {
+      "path": "/data/cke/worktrees/parakeet-native-check/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz",
+      "sha256": "e8b6b61446b079e93050761e4d3600a83de344555a91c0c356b63869ee5e3826"
+    }
+  },
+  "shape": [
+    93,
+    640
+  ],
+  "frontend_elapsed_seconds": 0.0689464359311387,
+  "encoder_elapsed_seconds": 1.026808928931132,
+  "frontend": {
+    "finite": true,
+    "max_abs": 0.03469705581665039,
+    "mean_abs": 3.443441221684504e-05,
+    "rmse": 0.0004058009497231027
+  },
+  "comparison": {
+    "finite": true,
+    "max_abs": 0.0004328489303588867,
+    "mean_abs": 2.672236485435156e-06,
+    "rmse": 9.078932849337261e-06
+  },
+  "decode": {
+    "steps": 50,
+    "sequences_equal": true,
+    "durations_equal": true,
+    "first_divergent_sequence": null,
+    "first_divergent_duration": null,
+    "first_logits": {
+      "finite": true,
+      "max_abs": 0.000152587890625,
+      "mean_abs": 3.589008109806281e-05,
+      "rmse": 4.41301159124298e-05
+    },
+    "sequences": [
+      8192,
+      8192,
+      499,
+      530,
+      7877,
+      380,
+      1729,
+      7931,
+      7868,
+      328,
+      2739,
+      366,
+      1254,
+      869,
+      5568,
+      8192,
+      3486,
+      7877,
+      8192,
+      5930,
+      2333,
+      373,
+      539,
+      666,
+      7864,
+      8192,
+      7877,
+      1503,
+      1008,
+      279,
+      5581,
+      1535,
+      325,
+      7893,
+      283,
+      7883,
+      2336,
+      508,
+      1711,
+      3571,
+      1034,
+      5254,
+      2656,
+      506,
+      768,
+      7874,
+      3623,
+      5526,
+      7883,
+      8192
+    ],
+    "durations": [
+      0,
+      4,
+      1,
+      2,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      2,
+      2,
+      1,
+      2,
+      1,
+      1,
+      2,
+      2,
+      2,
+      1,
+      2,
+      2,
+      1,
+      1,
+      2,
+      3,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      4,
+      2,
+      3,
+      2,
+      2,
+      2,
+      2,
+      3,
+      2,
+      2,
+      1,
+      3,
+      4,
+      3,
+      2,
+      1
+    ],
+    "transcript": "Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait."
+  },
+  "checks": {
+    "runtime_libraries_loaded": true,
+    "finite_frontend": true,
+    "finite_encoder": true,
+    "frontend_rmse_at_most_5e_4": true,
+    "encoder_rmse_at_most_2e_5": true,
+    "finite_first_logits": true,
+    "sequence_trajectory_exact": true,
+    "duration_trajectory_exact": true,
+    "nonempty_transcript": true
+  },
+  "scope": "one 7.435-second mono 16 kHz PCM WAV trajectory; exact token and duration parity does not certify silence, multilingual, resampling, long-audio chunking, or diarization",
+  "total_elapsed_seconds": 2.2527717140037566
+}

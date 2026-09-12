@@ -1,0 +1,49 @@
+{
+  "id": "audio_conformer_relative_attention_f32",
+  "op": "audio_relative_attention",
+  "operation_interface": "audio_attention.transformer_xl_relative.full.fp32.v1",
+  "variant": "token_major_transformer_xl_relative_eager_fp32",
+  "selection": {"status": "candidate", "priority": 100, "equivalence_group": "audio_conformer_relative_attention_eager_fp32", "phases": ["prefill"]},
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "query", "dtype": "fp32", "shape": ["T", "H*D"], "layout": "token_major_head_interleaved", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "key", "dtype": "fp32", "shape": ["T", "H*D"], "layout": "token_major_head_interleaved", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "value", "dtype": "fp32", "shape": ["T", "H*D"], "layout": "token_major_head_interleaved", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"},
+    {"name": "relative_key", "dtype": "fp32", "shape": ["2*T-1", "H*D"], "layout": "relative_position_major_head_interleaved", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}
+  ],
+  "weights": [
+    {"name": "bias_u", "dtype": "fp32", "shape": ["H*D"], "layout": "head_interleaved", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias_v", "dtype": "fp32", "shape": ["H*D"], "layout": "head_interleaved", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["T", "H*D"], "layout": "token_major_head_interleaved", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [{"name": "scores", "dtype": "fp32", "shape": ["T"], "size_resolution": "required", "lifetime": "kernel_call", "alignment": 64, "layout": "key_contiguous", "access": "read_write", "storage_class": "scratch", "consumption": "required"}],
+  "dims": ["frames", "heads", "head_dim", "scale"],
+  "impl": {"function": "audio_conformer_relative_attention_f32", "c_declaration": "int audio_conformer_relative_attention_f32(const float *query, const float *key, const float *value, const float *relative_key, const float *bias_u, const float *bias_v, float *output, int frames, int heads, int head_dim, float scale, float *scores_scratch, size_t scores_scratch_bytes);", "sources": ["src/kernels/audio_kernels.c"]},
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_conformer_relative_attention_eager_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_conformer_relative_attention_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["serial"], "dispatch": ["inline"], "reduction_order_effect": "contract_defined"}},
+    "arithmetic": {"partial_accumulator": "fp32", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "serial"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "query", "source": "activation:query", "cast": "const float*", "ports": ["input:query"]},
+    {"name": "key", "source": "activation:key", "cast": "const float*", "ports": ["input:key"]},
+    {"name": "value", "source": "activation:value", "cast": "const float*", "ports": ["input:value"]},
+    {"name": "relative_key", "source": "activation:relative_key", "cast": "const float*", "ports": ["input:relative_key"]},
+    {"name": "bias_u", "source": "weight_f:bias_u", "ports": ["weight:bias_u"]},
+    {"name": "bias_v", "source": "weight_f:bias_v", "ports": ["weight:bias_v"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "heads", "source": "dim:heads"},
+    {"name": "head_dim", "source": "dim:head_dim"},
+    {"name": "scale", "source": "dim:scale"},
+    {"name": "scores_scratch", "source": "scratch:scores", "cast": "float*"},
+    {"name": "scores_scratch_bytes", "source": "scratch_size:scores"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"], "oracle": "Transformers ParakeetConformerSelfAttention eager FP32 CPU"},
+  "notes": "Uses one caller-owned T-element score row; it does not materialize a T-by-T score matrix."
+}

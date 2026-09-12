@@ -1616,6 +1616,30 @@ def _build_config(model_dir: Path, arch: str, config_template: Path | None) -> d
     )
     for key, value in contract_config.items():
         cfg.setdefault(str(key), value)
+    if arch == "parakeet_tdt":
+        encoder = hf.get("encoder_config")
+        if not isinstance(encoder, dict):
+            raise SystemExit("Parakeet TDT config missing encoder_config")
+        cfg.update({
+            "num_layers": int(encoder["num_hidden_layers"]),
+            "num_hidden_layers": int(encoder["num_hidden_layers"]),
+            "embed_dim": int(encoder["hidden_size"]),
+            "hidden_size": int(encoder["hidden_size"]),
+            "intermediate_size": int(encoder["intermediate_size"]),
+            "num_heads": int(encoder["num_attention_heads"]),
+            "num_attention_heads": int(encoder["num_attention_heads"]),
+            "num_kv_heads": int(encoder["num_key_value_heads"]),
+            "num_key_value_heads": int(encoder["num_key_value_heads"]),
+            "head_dim": int(encoder["hidden_size"]) // int(encoder["num_attention_heads"]),
+            "context_length": int(encoder["max_position_embeddings"]),
+            "vocab_size": int(hf["vocab_size"]),
+            "blank_token_id": int(hf["blank_token_id"]),
+            "decoder_hidden_size": int(hf["decoder_hidden_size"]),
+            "num_decoder_layers": int(hf["num_decoder_layers"]),
+            "durations": [int(value) for value in hf["durations"]],
+            "max_symbols_per_step": int(hf["max_symbols_per_step"]),
+            "encoder_config": encoder,
+        })
     config_builder = str(arch_contract.get("config_builder") or "").strip().lower()
     cfg.setdefault("model", arch)
     cfg.setdefault("model_type", arch)
@@ -3062,7 +3086,7 @@ def main() -> int:
     ap.add_argument("--ram-dir", type=Path, default=Path("/dev/shm"), help="tmpfs directory for --ram-output; default: /dev/shm")
     ap.add_argument("--config-out", required=True, type=Path)
     ap.add_argument("--manifest-out", required=True, type=Path)
-    ap.add_argument("--arch", default="auto", choices=["auto", "muse_glimmer_text", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
+    ap.add_argument("--arch", default="auto", choices=["auto", "parakeet_tdt", "muse_glimmer_text", "gemma4", "gemma4_assistant", "gemma3", "llama", "qwen2", "qwen3", "qwen3vl", "qwen3_vl_vision", "cohere_compass_text", "cohere_compass_vision", "cohere_command_a_plus_text", "qwen35", "qwen4_exp", "nemotron_h", "glm4", "kimi_vl", "instella_moe", "whisper_encoder", "whisper_decoder"])
     ap.add_argument("--config-template", type=Path, help="existing v8 config/manifest to reuse explicit runtime policy")
     ap.add_argument("--dtype", default="preserve", choices=["preserve", "bf16", "fp32"])
     ap.add_argument(

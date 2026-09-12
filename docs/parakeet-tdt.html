@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CKE Parakeet TDT native CPU bring-up</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0f172a; --panel:#172033; --line:#334155; --text:#dbe5f1; --muted:#9fb0c6; --ok:#34d399; --link:#60a5fa; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui,sans-serif; }
+    main { max-width:1000px; margin:auto; padding:2rem; }
+    h1,h2 { color:#fff; } a { color:var(--link); } code,pre { font-family:ui-monospace,monospace; }
+    pre { overflow:auto; padding:1rem; background:#090f1d; border:1px solid var(--line); border-radius:.5rem; }
+    .status { display:inline-block; color:#052e23; background:var(--ok); padding:.25rem .6rem; border-radius:999px; font-weight:700; }
+    table { width:100%; border-collapse:collapse; background:var(--panel); }
+    th,td { padding:.7rem; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:#fff; } .muted { color:var(--muted); }
+  </style>
+</head>
+<body><main>
+  <p><a href="index.html">CKE documentation</a> / Parakeet TDT</p>
+  <h1>Parakeet TDT 0.6B native CPU bring-up</h1>
+  <p><span class="status">Short WAV E2E passes</span></p>
+  <p>CKE converts the pinned <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3">nvidia/parakeet-tdt-0.6b-v3</a> checkpoint to BUMPWGT5, decodes PCM WAV audio, runs the 24-layer FastConformer encoder and the TDT prediction/joint networks, and emits text without importing PyTorch or Transformers during inference.</p>
+
+  <h2>Reproduce the validated path</h2>
+  <pre><code>hf download nvidia/parakeet-tdt-0.6b-v3 \
+  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --local-dir .ck_models/parakeet-tdt-0.6b-v3
+
+python version/v8/scripts/convert_safetensors_to_bump_v8.py \
+  --checkpoint .ck_models/parakeet-tdt-0.6b-v3 \
+  --output .ck_build/parakeet-tdt-0.6b-v3/weights.bump \
+  --config-out .ck_build/parakeet-tdt-0.6b-v3/config.json \
+  --manifest-out .ck_build/parakeet-tdt-0.6b-v3/weights_manifest.json \
+  --arch parakeet_tdt --dtype fp32
+
+python version/v8/scripts/run_parakeet_native_v8.py \
+  --model .ck_build/parakeet-tdt-0.6b-v3 \
+  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
+  --fixture docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz \
+  --engine build/libckernel_engine.so \
+  --audio-lib build/libckernel_audio.so \
+  --decode --output .ck_build/parakeet-tdt-0.6b-v3/native-e2e.json</code></pre>
+
+  <h2>Current evidence</h2>
+  <table>
+    <tr><th>Gate</th><th>Result</th></tr>
+    <tr><td>Tensor inventory</td><td>723 source tensors: 699 inference tensors mapped, 24 BatchNorm training counters explicitly excluded, zero unexplained.</td></tr>
+    <tr><td>WAV trajectory</td><td>50/50 token IDs and 50/50 durations exactly match the pinned Transformers FP32 reference.</td></tr>
+    <tr><td>Transcript</td><td>“Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.”</td></tr>
+    <tr><td>Ryzen timing</td><td>0.069 seconds frontend plus 1.027 seconds encoder for 7.435 seconds of audio on the recorded warm run. Hashing and conversion are outside those stage timings.</td></tr>
+    <tr><td>Memory ownership</td><td>New attention, grouped Conv1D, BatchNorm, position, and LSTM compute providers contain no heap allocation. Attention uses one caller-owned T-element score row; LSTM uses caller-owned 4H gate scratch and session-owned state.</td></tr>
+  </table>
+  <p>Machine-readable evidence: <a href="notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>, <a href="notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">reference fixture manifest</a>, and <a href="notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">tensor manifest</a>.</p>
+
+  <h2>Certification boundary</h2>
+  <p>The passing result covers one 7.435-second English, mono, 16 kHz PCM WAV. Silence, multilingual speech, resampling, five-minute and 42-minute audio, chunk boundaries, timestamps, concurrent sessions, and diarization remain open. The current runtime orchestration is a thin Python layer over native CKE kernels and BUMP weights.</p>
+</main></body>
+</html>

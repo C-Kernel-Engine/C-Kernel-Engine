@@ -3326,6 +3326,61 @@
       "position_transform": null,
       "description": "PyTorch BF16 Linear parity contract for oneDNN 3.7 OpenMP BRGEMM. The result is deterministic only for a fixed thread count; changing the oneDNN K partition can alter BF16 outputs by one storage step.",
       "operator_family": "gemm"
+    },
+    "audio_relative_position_descending_sin_cos_interleaved_fp32": {
+      "operator_family": "audio_relative_position",
+      "status": "validated",
+      "storage": {"input": "none", "weight": "none", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "none", "accumulator": "fp32", "contraction": "disabled", "evaluation_order": "descending_integer_position_then_even_channel_inverse_frequency_then_sin_cos_interleave"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "activation_intermediate_store", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Parakeet Transformer-XL relative positions in FP32 with descending positions and interleaved sine/cosine channels."
+    },
+    "audio_batch_norm_running_statistics_affine_fp32": {
+      "operator_family": "audio_batch_norm",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "per_channel scale=weight/sqrt(running_variance+epsilon), offset=bias-running_mean*scale, then input*scale+offset"},
+      "rounding": {"mode": "rne", "points": ["denominator_add", "norm_sqrt", "output_divide", "weighted_product", "affine_normalization", "output_store"]},
+      "reduction": {"kind": "none", "order": "none", "partial_accumulator": "none", "merge_order": "none"},
+      "threading": {"work_partition": "independent_columns", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Inference-only channel-major BatchNorm using immutable running statistics and affine parameters."
+    },
+    "audio_conv1d_channel_major_grouped_ascending_fp32": {
+      "operator_family": "audio_conv1d",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "output_channel_then_output_frame_then_group_local_input_channel_then_kernel_index"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "output_store"]},
+      "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "independent_rows", "split_strategy": "independent_outputs", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Grouped and depthwise channel-major Conv1D with explicit group-local input indexing and caller-owned outputs."
+    },
+    "audio_conformer_relative_attention_eager_fp32": {
+      "operator_family": "audio_relative_attention",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "ascending head dimension content and position dots then max-subtracted softmax then ascending key value reduction"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "vector_exponential", "output_divide", "output_store"]},
+      "reduction": {"kind": "composite", "order": "stage_ordered", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Parakeet Transformer-XL eager relative attention using one caller-owned T-element score row."
+    },
+    "audio_lstm_pytorch_ifgo_single_step_fp32": {
+      "operator_family": "audio_lstm",
+      "status": "validated",
+      "storage": {"input": "fp32", "weight": "fp32", "output": "fp32"},
+      "compute": {"input": "fp32", "weight": "fp32", "accumulator": "fp32", "contraction": "enabled", "evaluation_order": "PyTorch IFGO gate order; add input and recurrent biases, ascend input dot, ascend hidden dot, then sigmoid/tanh state update"},
+      "rounding": {"mode": "rne", "points": ["input_load", "weighted_product", "reduction_update", "vector_exponential", "activation_intermediate_store", "output_store"]},
+      "reduction": {"kind": "dot_product", "order": "ascending_k", "partial_accumulator": "fp32", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "One stateful PyTorch-order LSTM layer step using caller-owned 4H gate scratch and caller/session-owned hidden and cell state."
     }
   }
 }

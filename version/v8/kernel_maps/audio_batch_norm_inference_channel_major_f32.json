@@ -1,0 +1,41 @@
+{
+  "id": "audio_batch_norm_inference_channel_major_f32",
+  "op": "audio_batch_norm",
+  "operation_interface": "audio_batch_norm.channel_major.inference.fp32.v1",
+  "variant": "running_statistics_affine_fp32",
+  "selection": {"status": "candidate", "priority": 100, "equivalence_group": "audio_batch_norm_running_statistics_affine_fp32", "phases": ["prefill"]},
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "input", "dtype": "fp32", "shape": ["C", "T"], "layout": "channel_major_contiguous", "placement": "local", "access": "read", "storage_class": "activation", "consumption": "required"}],
+  "weights": [
+    {"name": "running_mean", "dtype": "fp32", "shape": ["C"], "layout": "channel_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "running_variance", "dtype": "fp32", "shape": ["C"], "layout": "channel_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "weight", "dtype": "fp32", "shape": ["C"], "layout": "channel_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"},
+    {"name": "bias", "dtype": "fp32", "shape": ["C"], "layout": "channel_contiguous", "placement": "local", "access": "read", "storage_class": "weight", "consumption": "required"}
+  ],
+  "outputs": [{"name": "output", "dtype": "fp32", "shape": ["C", "T"], "layout": "channel_major_contiguous", "placement": "local", "access": "write", "storage_class": "activation", "consumption": "required"}],
+  "scratch": [],
+  "dims": ["channels", "frames", "normalization_epsilon"],
+  "impl": {"function": "audio_batch_norm_inference_channel_major_f32", "c_declaration": "int audio_batch_norm_inference_channel_major_f32(const float *input, const float *running_mean, const float *running_variance, const float *weight, const float *bias, float *output, int channels, int frames, float epsilon);", "sources": ["src/kernels/audio_kernels.c"]},
+  "modes": {"inference": true, "training": false, "backward": false},
+  "numerical_capabilities": [{
+    "contract_id": "audio_batch_norm_running_statistics_affine_fp32",
+    "status": "validated",
+    "phases": ["prefill"],
+    "function": "audio_batch_norm_inference_channel_major_f32",
+    "explicit_selector": true,
+    "implementation": {"isa_dispatch": "scalar", "threading": {"runtime": "serial", "work_partition": ["independent_columns"], "dispatch": ["inline"], "reduction_order_effect": "none"}},
+    "arithmetic": {"partial_accumulator": "none", "merge_order": "none", "deterministic": true, "thread_count_changes_arithmetic_order": false, "split_strategy": "independent_outputs"}
+  }],
+  "call_abi": {"version": 1, "params": [
+    {"name": "input", "source": "activation:input", "cast": "const float*", "ports": ["input:input"]},
+    {"name": "running_mean", "source": "weight_f:running_mean", "ports": ["weight:running_mean"]},
+    {"name": "running_variance", "source": "weight_f:running_variance", "ports": ["weight:running_variance"]},
+    {"name": "weight", "source": "weight_f:weight", "ports": ["weight:weight"]},
+    {"name": "bias", "source": "weight_f:bias", "ports": ["weight:bias"]},
+    {"name": "output", "source": "output:output", "cast": "float*", "ports": ["output:output"]},
+    {"name": "channels", "source": "dim:channels"},
+    {"name": "frames", "source": "dim:frames"},
+    {"name": "epsilon", "source": "dim:normalization_epsilon"}
+  ]},
+  "tests": {"unit": ["unittest/test_audio_encoder.py"], "oracle": "torch.nn.functional.batch_norm inference FP32 CPU"}
+}

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "name": "parakeet_tdt",
+  "family": "audio_transducer",
+  "flags": {
+    "activation": "silu_relu",
+    "normalization": "layernorm_batchnorm",
+    "feature_layout": "token_major",
+    "encoder_layout": "token_major",
+    "decoder": "tdt"
+  },
+  "contract": {
+    "audio_frontend": {
+      "input_modality": "wav_bytes",
+      "container": "riff_wave",
+      "sample_encoding": "pcm_s16_le",
+      "channels": 1,
+      "sample_rate": 16000,
+      "preemphasis": 0.97,
+      "n_fft": 512,
+      "window_length": 400,
+      "window": "nonperiodic_hann",
+      "hop_length": 160,
+      "centering": "constant_zero",
+      "mel_bins": 128,
+      "mel_scale": "slaney",
+      "log_zero_guard": 5.960464477539063e-8,
+      "normalization": "per_feature_sample_variance_live_frames"
+    },
+    "audio_encoder": {
+      "stem": "three_stride2_grouped_conv2d_subsampling",
+      "subsampling_factor": 8,
+      "blocks": 24,
+      "position_encoding": "transformer_xl_relative_sinusoidal",
+      "attention": "bidirectional_relative",
+      "convolution": "pointwise_glu_depthwise_batchnorm_silu_pointwise",
+      "macaron_feed_forward_scale": 0.5
+    },
+    "transducer": {
+      "prediction_network": "two_layer_pytorch_ifgo_lstm",
+      "joint_activation": "relu",
+      "blank_token_id_config_key": "blank_token_id",
+      "durations_config_key": "durations",
+      "max_symbols_per_step_config_key": "max_symbols_per_step",
+      "blank_zero_duration_policy": "advance_one_frame",
+      "decoder_state_lifetime": "session"
+    },
+    "runtime_invariants": {
+      "weight_container": "BUMPWGT5",
+      "production_kernel_heap_allocation": false,
+      "attention_scratch": "one_fp32_score_row",
+      "lstm_scratch": "four_hidden_width_fp32_gates"
+    }
+  },
+  "kernels": {
+    "relative_position": "audio_relative_sinusoidal_position_f32",
+    "relative_attention": "audio_conformer_relative_attention_f32",
+    "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
+    "batch_norm": "audio_batch_norm_inference_channel_major_f32",
+    "lstm": "audio_lstm_step_f32"
+  },
+  "sequence": ["frontend", "encoder", "transducer"],
+  "block_types": {
+    "frontend": {"sequence": ["audio_wav_decode", "audio_preemphasis", "audio_stft_tables", "audio_stft", "audio_mel_filters", "audio_log_mel", "audio_feature_normalize"]},
+    "encoder": {"sequence": ["subsampling", "relative_position", "fastconformer_blocks", "encoder_projection"]},
+    "transducer": {"sequence": ["embedding_lookup", "lstm", "decoder_projection", "joint_relu", "joint_head", "tdt_greedy_step"]}
+  }
+}
