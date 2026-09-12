@@ -56,11 +56,13 @@ encoder/bridge paths, and Whisper Tiny, Base, and Small use generated FP32 audio
 frontend, encoder, and decoder runtimes. Each lane retains its own evidence and
 certification boundary.
 
-Text models use the same generated-runtime entry point. Replace `MODEL` with a
-public `hf://` artifact from the table or a local GGUF/safetensors directory:
+Text models use the same generated-runtime entry point. This example downloads
+the public Gemma3 artifact on first use; the table below provides direct
+Hugging Face references for the other runnable lanes:
 
 ```bash
-version/v8/scripts/cks-v8-run run MODEL \
+version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 2048 \
   --prompt 'Give me a concise example of safe C code.' \
   --max-tokens 256
@@ -84,6 +86,7 @@ version/v8/scripts/cks-v8-run run MODEL \
 | Cohere Command A+ 218B/25B-active | `hf://CohereLabs/command-a-plus-05-2026-w4a4` | Experimental 160 GB-class NVFP4 SafeTensors lane; use the exact evidence boundary below before quoting support |
 | Laguna-XS 2.1 | `hf://ggml-org/Laguna-XS-2.1-GGUF/Laguna-XS-2.1-Q4_K_M.gguf` | `--chat-template auto --thinking-mode suppressed --temperature 0.0` for the shortest smoke |
 | Kimi-VL A3B text decoder | `hf://moonshotai/Kimi-VL-A3B-Instruct` | `--chat-template kimi_vl`; current certified scope is text only |
+| Muse-Glimmer 30B text decoder | `hf://meta-models/Muse-Glimmer-30B` | BF16 AVX-512 + oneDNN lane; three 128-token trajectories are exact against PyTorch; vision and long context are not yet certified |
 | Instella-MoE 16B-A3B | `hf://amd/Instella-MoE-16B-A3B-Think` | BF16 SafeTensors lane; use the exact command in the v8 runbook |
 | GPT-2 | `hf://openai-community/gpt2` | Raw continuation model; do not apply an instruction chat template |
 | Qwen3-VL 8B | `hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf` | Add `--mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf`, `--image-path`, and the runbook's vision options |
@@ -140,6 +143,7 @@ records the strongest evidence for each family.
 | Gemma4 E4B IT Q4_K_M and BF16 | Coherent Q4_K_M generation plus safetensors/PyTorch numerical lane; vision bridge is smoke-level | 2,048 tokens | Intel AVX2 and AMD Zen 5 development runs |
 | GLM4 9B and Nemotron Nano 9B v2 Q4_K_M | Coherent end-to-end text; partial-RoPE/FP16-KV and Mamba2 contracts respectively | 1,024 tokens | x86 runtime and parity lanes |
 | Kimi-VL A3B BF16 text decoder | Repeatable coherent text; first token and top-20 match PyTorch, cosine 0.997696 | 2,048 tokens | Intel AVX2 and Ryzen AVX-512 |
+| Muse-Glimmer 30B BF16 text decoder | 384/384 finite full-vocabulary logit rows and all greedy tokens bit-exact to pinned PyTorch eager BF16 | Three 128-token trajectories; window-boundary and long-context certification remain open | Ryzen 9 9950X3D AVX-512 BF16 with oneDNN 3.12 and PyTorch SLEEF |
 | Cohere2 Command R7B Q4_K_M | First eight greedy positions agree with llama.cpp | 2,048-token runtime smoke | x86 runtime lane; long trajectory and matched performance open |
 | Cohere North Mini Code 30B-A3B Q4_K_M | Coherent, repeatable text plus identical first-logit hash and token sequence across two full-capacity runs | 131,072-token execution | Ryzen 9 9950X3D AVX-512/VNNI; average 71.35 tok/s prefill and 0.65 tok/s full-history decode |
 | Cohere Command A+ 218B/25B-active W4A4 | Native packed NVFP4 runtime maps 675/675 required weights, passes leaf parity, and produces coherent short text | 126-token prompt plus 32 decode steps | Ryzen 9 9950X3D short bring-up; full-model and long-context parity open |
