@@ -2,6 +2,7 @@ var audio__kernels_8c =
 [
     [ "CK_AUDIO_PI_D", "audio__kernels_8c.html#a6b35bbc9ad4c67b3fed7f2290b925171", null ],
     [ "CK_AUDIO_PI_F", "audio__kernels_8c.html#a6e7adb42c11df3ade2b6b770105e369b", null ],
+    [ "audio_argmax_first_f32", "audio__kernels_8c.html#a6a5776244c3c4f843a9cca21633a2a31", null ],
     [ "audio_batch_norm_inference_channel_major_f32", "audio__kernels_8c.html#a3dabaffd1650f760ba18262ddcf76317", null ],
     [ "audio_conformer_relative_attention_f32", "audio__kernels_8c.html#a8c1dbdaaaa1720632a38fd37fa857eb3", null ],
     [ "audio_conv1d_channel_major_f32", "audio__kernels_8c.html#adf8b1ff9727b956bc11157aa96051a62", null ],
@@ -21,6 +22,7 @@ var audio__kernels_8c =
     [ "audio_resample_linear_f32", "audio__kernels_8c.html#a09f214a1c9147bcc92e30edfde9daece", null ],
     [ "audio_resample_windowed_sinc_f32", "audio__kernels_8c.html#adfa99d0523f008d9969a75cd60f31171", null ],
     [ "audio_resampled_frame_count", "audio__kernels_8c.html#af899a2a47519d1740ab65706a5430e14", null ],
+    [ "audio_scaled_residual_add_f32", "audio__kernels_8c.html#a6083b9c155a89f465cd92947f5b67ebe", null ],
     [ "audio_stft_power_centered_window_f32", "audio__kernels_8c.html#a6e888c894007289bcf32b40a94d9e11b", null ],
     [ "audio_stft_power_fft400_f32", "audio__kernels_8c.html#af7139f62dca603c8ed0761ef489804c5", null ],
     [ "audio_stft_power_fft400_frame_f32", "audio__kernels_8c.html#a720f9e30546e68a3d69346ec336dcb78", null ],
@@ -36,6 +38,7 @@ var audio__kernels_8c =
     [ "audio_whisper_log_mel_window_wav_pcm16_f32", "audio__kernels_8c.html#a3cfe264d4c0a3c1552fdcfb8ef9d5761", null ],
     [ "audio_whisper_mel_filters_slaney_f32", "audio__kernels_8c.html#a01991d85b95102453b3912c03f83f2cb", null ],
     [ "audio_whisper_stft_power_reference_f32", "audio__kernels_8c.html#a6cc87d2eaa6781543bc2730968241057", null ],
+    [ "ck_audio_conformer_relative_attention_f32_head_range", "audio__kernels_8c.html#a6bc3b046b2b14b89b7837f70f2e5195a", null ],
     [ "ck_audio_conv1d_channel_major_f32_work", "audio__kernels_8c.html#a89c6ec8d05af4d452933a0091ef15df7", null ],
     [ "ck_audio_conv2d_whc_grouped_f32_range", "audio__kernels_8c.html#afca6a710888587007175544a5cf1f144", null ],
     [ "ck_audio_glu_split_f32_range", "audio__kernels_8c.html#af73450729ab2539a82695d0e5c7a35bb", null ],
