@@ -27,20 +27,33 @@ def test_parakeet_operation_inventory_is_complete_and_honest():
     operations = inventory["operations"]
     counts = Counter(item["disposition"] for item in operations)
 
-    assert inventory["status"] == "inventory_complete_implementation_not_started"
+    assert inventory["status"] == "native_short_wav_e2e_pass"
     assert inventory["summary"] == {"operations": len(operations), **dict(counts)}
     assert len(operations) == 30
     assert len({item["operation"] for item in operations}) == len(operations)
     assert all(item["finding"] and item["cke_foundation"] for item in operations)
     assert inventory["claim_boundary"] == {
-        "native_cke_transcription": "not_implemented",
-        "native_cke_parity": "not_tested",
+        "native_cke_transcription": "short_wav_e2e_pass",
+        "native_cke_parity": "exact_50_token_and_duration_trajectory",
         "long_audio": "not_tested",
         "multilingual": "not_tested",
         "diarization": "out_of_scope",
+        "bump_conversion": "699_mapped_24_explicitly_ignored_0_unaccounted",
     }
-    assert any(item["operation"].startswith("two-layer") and item["disposition"] == "missing_provider" for item in operations)
-    assert any(item["operation"].startswith("inference BatchNorm") and item["disposition"] == "missing_provider" for item in operations)
+    by_operation = {item["operation"]: item for item in operations}
+    assert (
+        by_operation["inference BatchNorm1D"]["cke_foundation"]
+        == "audio_batch_norm_inference_channel_major_f32"
+    )
+    assert by_operation["inference BatchNorm1D"]["implementation_status"] == "short_fixture_validated"
+    lstm = by_operation["two-layer 640-wide LSTM prediction network"]
+    assert lstm["cke_foundation"] == "audio_lstm_step_f32"
+    assert lstm["implementation_status"] == "short_fixture_validated"
+    assert {item["operation"] for item in operations if item["implementation_status"] == "open"} == {
+        "PCM decode and mono conversion",
+        "sample-rate validation and resampling",
+        "token timestamps",
+    }
 
 
 def test_parakeet_reference_fixture_arrays_are_present_finite_and_hashed():

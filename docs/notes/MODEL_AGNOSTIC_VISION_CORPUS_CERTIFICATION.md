@@ -21,11 +21,13 @@ compatibility entrypoint. Versioned profiles under
 `version/v8/parity_profiles/vision/` declare architecture, encoder source,
 chat template, composition circuit, and llama.cpp execution policy.
 
-The Qwen3-VL profile has reproduced a real 16-token case bit-exactly with
-matched flash-attention settings. The complete 40-image campaign and
-independent vision-encoder parity remain required before the migration is
-complete. Qwen3.6-VL and Gemma4 profiles are candidate lanes, not certified
-model claims.
+At source commit `352108874`, the Qwen3-VL profile reproduced the complete
+40-image corpus with matched flash-attention settings: images 1-20 passed on
+P3 AVX2 and images 21-40 passed on Ryzen AVX-512. All 640 generated
+full-vocabulary rows were bit-exact to llama.cpp, with 40 distinct image and
+prefix hashes. This certifies shared-prefix decoder parity; independent
+vision-encoder parity and OCR task quality remain open. Qwen3.6-VL and Gemma4
+profiles are candidate lanes, not certified model claims.
 
 Remaining model-specific assumptions include:
 
