@@ -120,6 +120,24 @@ def test_successful_rebuild_removes_stale_failure_artifact(tmp_path: Path) -> No
     assert not diagnostic.exists()
 
 
+def test_nonzero_return_writes_failure_artifact(monkeypatch, tmp_path: Path) -> None:
+    builder = _load_builder()
+    diagnostic_path = tmp_path / "explicit-diagnostic.json"
+    monkeypatch.setattr(builder, "main", lambda _args: 7)
+
+    result = builder.run_cli(["--diagnostic-output", str(diagnostic_path)])
+
+    assert result == 7
+    diagnostic = json.loads(diagnostic_path.read_text(encoding="utf-8"))
+    Draft202012Validator(
+        json.loads(DIAGNOSTIC_SCHEMA.read_text(encoding="utf-8"))
+    ).validate(diagnostic)
+    assert diagnostic["status"] == "failed"
+    assert diagnostic["failure"]["code"] == "CKE-V8-BUILD-NONZERO"
+    assert diagnostic["failure"]["observed"] == {"exit_status": 7}
+    assert diagnostic["pipeline"]["later_stages"] == "not_generated"
+
+
 def test_missing_manifest_is_classified_as_user_configuration(tmp_path: Path) -> None:
     missing = tmp_path / "missing.json"
     result = subprocess.run(

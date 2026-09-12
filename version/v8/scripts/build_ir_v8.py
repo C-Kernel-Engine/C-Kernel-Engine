@@ -252,7 +252,30 @@ def run_cli(args: List[str]) -> int:
     if diagnostic_path is not None:
         diagnostic_path.unlink(missing_ok=True)
     try:
-        return main(args)
+        result = main(args)
+        if result == 0:
+            return 0
+        exc = BuildDiagnosticError(
+            f"v8 build returned nonzero status {result} without raising an exception",
+            code="CKE-V8-BUILD-NONZERO",
+            stage="build",
+            summary="v8 build did not complete successfully",
+            remediation=(
+                "Inspect the preceding build output and diagnostic context; repair the "
+                "failing stage rather than treating this run as successful."
+            ),
+            observed={"exit_status": result},
+        )
+        if diagnostic_path is not None:
+            _write_build_diagnostic(args, exc, diagnostic_path)
+        print(
+            f"CKE build failed [{exc.diagnostic['code']}]: "
+            f"{exc.diagnostic['summary']}",
+            file=sys.stderr,
+        )
+        if diagnostic_path is not None:
+            print(f"Diagnostic report: {diagnostic_path}", file=sys.stderr)
+        return result
     except Exception as exc:
         if diagnostic_path is not None:
             _write_build_diagnostic(args, exc, diagnostic_path)
@@ -16674,12 +16697,24 @@ def main(args: List[str]) -> int:
         manifest_path = parsed_args.manifest
     elif parsed_args.model:
         # TODO: Find cached model
-        print("Error: --model not implemented yet, use --manifest")
-        return 1
+        raise BuildDiagnosticError(
+            "--model is not implemented; provide --manifest",
+            code="CKE-V8-INVALID-BUILD-INPUT",
+            stage="input_validation",
+            category="user_configuration",
+            summary="the requested model input mode is not implemented",
+            remediation="Generate or provide a weights manifest with --manifest.",
+            observed={"model": str(parsed_args.model)},
+        )
     else:
-        print("Error: Must specify --manifest or --model")
-        parser.print_help()
-        return 1
+        raise BuildDiagnosticError(
+            "must specify --manifest or --model",
+            code="CKE-V8-INVALID-BUILD-INPUT",
+            stage="input_validation",
+            category="user_configuration",
+            summary="no model build input was provided",
+            remediation="Provide a weights manifest with --manifest.",
+        )
 
     print(f"Loading manifest: {manifest_path}")
     manifest = load_manifest(manifest_path)

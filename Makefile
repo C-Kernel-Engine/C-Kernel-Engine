@@ -1683,8 +1683,8 @@ test-v8-cohere-laguna-contracts:
 		-v
 
 .PHONY: test-v8-artifact-compile-matrix
-test-v8-artifact-compile-matrix:
-	@echo "Running metadata-only real-artifact compile matrix..."
+test-v8-artifact-compile-matrix: $(BUILD_DIR)/libckernel_engine.so $(BUILD_DIR)/libckernel_tokenizer.so
+	@echo "Running real-manifest lowering, link, and load matrix..."
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_artifact_compile_matrix.py
 
 .PHONY: test-v8-muse-glimmer-contracts

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -65,6 +66,40 @@ def _run(command: list[str]) -> None:
         text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _link_runtime(generated: Path, output_dir: Path) -> None:
+    compiler = os.environ.get("CC", "cc")
+    library = output_dir / "libmodel.so"
+    _run(
+        [
+            compiler,
+            "-shared",
+            "-fPIC",
+            "-O0",
+            "-std=c11",
+            "-fopenmp",
+            "-Iinclude",
+            "-Iversion/v8/src",
+            "-Wl,-z,defs",
+            "-Wl,-rpath,$ORIGIN",
+            "-o",
+            str(library),
+            str(generated),
+            "src/ckernel_alloc.c",
+            "version/v8/src/ckernel_model_load_v8.c",
+            "version/v8/src/ck_parallel_decode_v8.c",
+            "version/v8/src/ck_parallel_prefill_v8.c",
+            "-Lbuild",
+            "-lckernel_tokenizer",
+            "-lckernel_engine",
+            "-lm",
+            "-lpthread",
+        ]
+    )
+    shutil.copy2(ROOT / "build" / "libckernel_engine.so", output_dir)
+    shutil.copy2(ROOT / "build" / "libckernel_tokenizer.so", output_dir)
+    CK_RUN_V8._validate_runtime_bundle(output_dir)
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
@@ -147,14 +182,32 @@ def test_real_manifest_compiles_through_both_execution_phases(
             "--strict-contracts",
         ]
     )
-    _run(
-        [
-            "cc",
-            "-std=c11",
-            "-fopenmp",
-            "-Iinclude",
-            "-Iversion/v8/src",
-            "-fsyntax-only",
-            str(generated),
-        ]
+    _link_runtime(generated, work)
+
+
+def test_runtime_link_rejects_missing_provider_symbol(tmp_path: Path) -> None:
+    source = tmp_path / "missing_provider.c"
+    source.write_text(
+        "extern void cke_provider_that_does_not_exist(void);\n"
+        "void ck_model_probe(void) { cke_provider_that_does_not_exist(); }\n",
+        encoding="utf-8",
     )
+    result = subprocess.run(
+        [
+            os.environ.get("CC", "cc"),
+            "-shared",
+            "-fPIC",
+            "-Wl,-z,defs",
+            "-o",
+            str(tmp_path / "invalid.so"),
+            str(source),
+            "-Lbuild",
+            "-lckernel_engine",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "cke_provider_that_does_not_exist" in result.stderr
