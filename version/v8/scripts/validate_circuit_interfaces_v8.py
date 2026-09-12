@@ -3,19 +3,48 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class CircuitInterfaceError(RuntimeError):
     """Raised when circuit dataflow cannot satisfy a selected provider."""
 
+    def __init__(
+        self,
+        summary: str,
+        detail: str,
+        remediation: str,
+        *,
+        expected: Optional[Dict[str, Any]] = None,
+        observed: Optional[Dict[str, Any]] = None,
+    ):
+        self.summary = summary
+        self.detail = detail
+        self.remediation = remediation
+        self.expected = expected or {}
+        self.observed = observed or {}
+        super().__init__(
+            f"HARD CIRCUIT INTERFACE FAULT: {summary}\n"
+            f"  {detail}\n"
+            f"  Fix: {remediation}\n"
+            "  Do not add a port-name guess, implicit alias, or model-family bypass."
+        )
 
-def _fault(summary: str, detail: str, remediation: str) -> CircuitInterfaceError:
+
+def _fault(
+    summary: str,
+    detail: str,
+    remediation: str,
+    *,
+    expected: Optional[Dict[str, Any]] = None,
+    observed: Optional[Dict[str, Any]] = None,
+) -> CircuitInterfaceError:
     return CircuitInterfaceError(
-        f"HARD CIRCUIT INTERFACE FAULT: {summary}\n"
-        f"  {detail}\n"
-        f"  Fix: {remediation}\n"
-        "  Do not add a port-name guess, implicit alias, or model-family bypass."
+        summary,
+        detail,
+        remediation,
+        expected=expected,
+        observed=observed,
     )
 
 
@@ -112,12 +141,16 @@ def validate_graph_slots(
                 f"circuit declares unknown {role} ports",
                 f"context={context}, interface={interface_id!r}, unknown={unknown}",
                 "rename the circuit ports to the canonical operation interface.",
+                expected={"canonical_ports": sorted(ports)},
+                observed={"declared_ports": sorted(normalized), "unknown_ports": unknown},
             )
         if missing:
             raise _fault(
                 f"circuit omits required {role} ports",
                 f"context={context}, interface={interface_id!r}, missing={missing}",
                 "connect every required port or mark a genuinely optional provider port as optional.",
+                expected={"required_ports": sorted(required)},
+                observed={"declared_ports": sorted(normalized), "missing_ports": missing},
             )
         declared[direction] = normalized
         canonical[direction] = ports

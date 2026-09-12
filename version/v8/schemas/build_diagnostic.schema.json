@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cke.v8.build_diagnostic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "status",
+    "mode",
+    "identity",
+    "source_revision",
+    "failure",
+    "pipeline",
+    "traceback"
+  ],
+  "properties": {
+    "schema": {"const": "cke.v8.build_diagnostic"},
+    "schema_version": {"const": 1},
+    "status": {"const": "failed"},
+    "mode": {"enum": ["prefill", "decode"]},
+    "identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["manifest_path"],
+      "properties": {
+        "manifest_path": {"type": ["string", "null"]},
+        "model": {"type": "string"},
+        "model_name": {"type": "string"},
+        "source": {"type": ["string", "object"]},
+        "template": {"type": "string"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "source_revision": {"type": ["string", "null"]},
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "stage",
+        "category",
+        "summary",
+        "detail",
+        "remediation",
+        "location",
+        "expected",
+        "observed",
+        "candidates"
+      ],
+      "properties": {
+        "code": {"type": "string", "pattern": "^CKE-V8-[A-Z0-9-]+$"},
+        "stage": {"type": "string", "minLength": 1},
+        "category": {
+          "enum": ["user_configuration", "missing_dependency", "implementation_defect"]
+        },
+        "summary": {"type": "string", "minLength": 1},
+        "detail": {"type": "string"},
+        "remediation": {"type": "string", "minLength": 1},
+        "location": {"type": "object"},
+        "expected": {"type": "object"},
+        "observed": {"type": "object"},
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["provider", "decision", "stage"],
+            "properties": {
+              "provider": {"type": "string"},
+              "decision": {"enum": ["rejected", "ranked", "selected"]},
+              "stage": {"type": "string"},
+              "reason": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failed_stage", "later_stages"],
+      "properties": {
+        "failed_stage": {"type": "string", "minLength": 1},
+        "later_stages": {"const": "not_generated"}
+      }
+    },
+    "traceback": {"type": "string"}
+  }
+}
