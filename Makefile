@@ -6616,6 +6616,7 @@ test-kernel-maps:
 		tests/test_v8_provider_selection.py \
 		tests/test_v8_kernel_call_abi.py \
 		tests/test_v8_shared_provider_migration.py \
+		tests/test_v8_build_diagnostics.py \
 		tests/test_v8_prefill_independent_row_parallel.py \
 		tests/test_v8_geglu_parallel_alias.py \
 		tests/test_v8_rope_split_direct_parallel.py \

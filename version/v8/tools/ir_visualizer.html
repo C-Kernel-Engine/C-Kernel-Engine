@@ -2531,6 +2531,8 @@ python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$RUN" --html
                     </div>
                 </div>
 
+            <div id="buildDiagnosticPanel" style="display:none;margin-top:1rem;"></div>
+
             <!-- ── Artifact Matrix ─────────────────────────────── -->
             <div id="artifactMatrix" style="margin-top:1rem;"></div>
 
@@ -4460,6 +4462,14 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             const reportMode = window.__ckReportMode === 'training' ? 'training' : 'inference';
             const isTrainingScope = reportMode === 'training';
             const filesView = typeof currentFiles === 'function' ? currentFiles() : ((window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files) || {});
+            const buildDiagnostic = (filesView && typeof filesView.build_diagnostic === 'object')
+                ? filesView.build_diagnostic
+                : null;
+            const activeBuildFailure = Boolean(
+                buildDiagnostic &&
+                buildDiagnostic.schema === 'cke.v8.build_diagnostic' &&
+                buildDiagnostic.status === 'failed'
+            );
             const dataLab = (trainPipelineData && typeof trainPipelineData.data_lab === 'object') ? trainPipelineData.data_lab : {};
             const bridgeView = (filesView && typeof filesView.multimodal_bridge_report === 'object') ? filesView.multimodal_bridge_report : null;
 
@@ -4485,6 +4495,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 { key: 'perf_gate_report', label: 'perf_gate_report.json', ready: Boolean(perfGateData) },
                 { key: 'multimodal_bridge_report', label: 'multimodal_bridge/bridge_report.json', ready: Boolean(bridgeView) },
                 { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
+                { key: 'build_diagnostic', label: 'build_diagnostic.json', ready: Boolean(buildDiagnostic) },
             ];
             if (hasTrainRuntimeContext || Boolean(asanSummaryData)) {
                 inferenceOptional.push({ key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) });
@@ -4529,7 +4540,9 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             // Readiness ring tracks required artifacts only. Optional progress is
             // shown in breakdown text and the optional counter card.
             const coveragePct = requiredPct;
-            const statusText = requiredPresent === required.length ? 'ready' : 'partial';
+            const statusText = activeBuildFailure
+                ? 'failed'
+                : (requiredPresent === required.length ? 'ready' : 'partial');
 
             const modelName = (embeddedMeta && embeddedMeta.model) ||
                 (manifestData && manifestData.model_name) ||
@@ -4558,6 +4571,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             const pipelineLegend = document.getElementById('pipelineLegend');
             const summaryWarnings = document.getElementById('summaryWarnings');
             const summaryRunbook = document.getElementById('summaryRunbook');
+            const buildDiagnosticPanel = document.getElementById('buildDiagnosticPanel');
 
             const setChipState = (el, text, state) => {
                 if (!el) return;
@@ -4574,7 +4588,59 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 summaryModeChip.textContent = isTrainingScope ? 'mode: training' : `mode: ${multimodalMode}`;
             }
             if (summaryStatusChip) {
-                setChipState(summaryStatusChip, `status: ${statusText}`, statusText === 'ready' ? 'good' : 'warn');
+                setChipState(
+                    summaryStatusChip,
+                    `status: ${statusText}`,
+                    statusText === 'ready' ? 'good' : (statusText === 'failed' ? 'bad' : 'warn')
+                );
+            }
+            if (buildDiagnosticPanel) {
+                if (!activeBuildFailure) {
+                    buildDiagnosticPanel.style.display = 'none';
+                    buildDiagnosticPanel.innerHTML = '';
+                } else {
+                    const failure = buildDiagnostic.failure || {};
+                    const location = failure.location || {};
+                    const candidates = Array.isArray(failure.candidates) ? failure.candidates : [];
+                    const identity = buildDiagnostic.identity || {};
+                    const locationText = [
+                        location.circuit ? `circuit=${location.circuit}` : '',
+                        location.section ? `section=${location.section}` : '',
+                        location.layer !== undefined && location.layer !== null ? `layer=${location.layer}` : '',
+                        location.operation ? `op=${location.operation}` : '',
+                        location.provider ? `provider=${location.provider}` : '',
+                    ].filter(Boolean).join(' · ');
+                    const candidateRows = candidates.length === 0
+                        ? '<div style="color:var(--text-muted);">No provider candidates were recorded for this failure.</div>'
+                        : `<table><thead><tr><th>Provider</th><th>Decision</th><th>Stage</th><th>Reason</th></tr></thead><tbody>${candidates.map(row => `
+                            <tr>
+                                <td><code>${escapeHtml(row.provider || '-')}</code></td>
+                                <td>${escapeHtml(row.decision || '-')}</td>
+                                <td>${escapeHtml(row.stage || '-')}</td>
+                                <td><code>${escapeHtml(row.reason || '-')}</code></td>
+                            </tr>
+                        `).join('')}</tbody></table>`;
+                    buildDiagnosticPanel.style.display = 'block';
+                    buildDiagnosticPanel.innerHTML = `
+                        <div class="summary-error-item">
+                            <strong>Build failed [${escapeHtml(failure.code || 'CKE-V8-BUILD-ERROR')}]</strong><br>
+                            ${escapeHtml(failure.summary || 'v8 build failed')}
+                        </div>
+                        <div class="parity-section" style="margin-top:0.6rem;">
+                            <h3>Repair Context</h3>
+                            <div><strong>Stage:</strong> <code>${escapeHtml(failure.stage || buildDiagnostic.pipeline?.failed_stage || '-')}</code></div>
+                            <div><strong>Location:</strong> <code>${escapeHtml(locationText || '-')}</code></div>
+                            <div><strong>Model:</strong> <code>${escapeHtml(identity.model_name || identity.model || '-')}</code></div>
+                            <div><strong>Source revision:</strong> <code>${escapeHtml(buildDiagnostic.source_revision || '-')}</code></div>
+                            <div style="margin-top:0.4rem;"><strong>Next action:</strong> ${escapeHtml(failure.remediation || '-')}</div>
+                            <div style="margin-top:0.4rem;color:var(--text-muted);">Later pipeline stages: ${escapeHtml(buildDiagnostic.pipeline?.later_stages || 'unknown')}</div>
+                            <details style="margin-top:0.6rem;">
+                                <summary>Expected and observed contract</summary>
+                                <pre style="white-space:pre-wrap;overflow:auto;">expected=${escapeHtml(JSON.stringify(failure.expected || {}, null, 2))}\nobserved=${escapeHtml(JSON.stringify(failure.observed || {}, null, 2))}</pre>
+                            </details>
+                            <div style="overflow:auto;margin-top:0.6rem;">${candidateRows}</div>
+                        </div>`;
+                }
             }
             if (summaryModelName) summaryModelName.textContent = modelName;
             if (summaryGeneratedAt) summaryGeneratedAt.textContent = generatedAt;

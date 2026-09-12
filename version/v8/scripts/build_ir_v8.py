@@ -57,12 +57,14 @@ import argparse
 import ast
 import copy
 import fnmatch
+import hashlib
 import importlib.util
 import json
 import re
 import os
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -82,6 +84,188 @@ from validate_circuit_interfaces_v8 import (
     validate_graph_slots,
 )
 from resolve_layout_chain_v8 import rank_layout_routes
+
+
+class BuildDiagnosticError(RuntimeError):
+    """Build failure carrying stable, renderer-friendly repair context."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str,
+        stage: str,
+        category: str = "implementation_defect",
+        summary: str = "v8 build contract failed",
+        remediation: str = "Repair the declared circuit/provider contract; do not disable validation.",
+        location: Optional[Dict[str, Any]] = None,
+        expected: Optional[Dict[str, Any]] = None,
+        observed: Optional[Dict[str, Any]] = None,
+        candidates: Optional[List[Dict[str, Any]]] = None,
+    ):
+        super().__init__(message)
+        self.diagnostic = {
+            "code": code,
+            "stage": stage,
+            "category": category,
+            "summary": summary,
+            "detail": message,
+            "remediation": remediation,
+            "location": location or {},
+            "expected": expected or {},
+            "observed": observed or {},
+            "candidates": candidates or [],
+        }
+
+
+def _cli_value(args: List[str], name: str) -> Optional[str]:
+    for index, value in enumerate(args):
+        if value == name and index + 1 < len(args):
+            return args[index + 1]
+        prefix = f"{name}="
+        if value.startswith(prefix):
+            return value[len(prefix):]
+    return None
+
+
+def _build_diagnostic_path(args: List[str]) -> Optional[Path]:
+    explicit = _cli_value(args, "--diagnostic-output")
+    if explicit:
+        return Path(explicit)
+    for name in (
+        "--call-output",
+        "--lowered-output",
+        "--layout-output",
+        "--output",
+        "--init-output",
+    ):
+        output = _cli_value(args, name)
+        if output:
+            return Path(output).parent / "build_diagnostic.json"
+    return None
+
+
+def _manifest_diagnostic_identity(args: List[str]) -> Dict[str, Any]:
+    manifest_name = _cli_value(args, "--manifest")
+    identity: Dict[str, Any] = {"manifest_path": manifest_name}
+    if not manifest_name:
+        return identity
+    try:
+        manifest_bytes = Path(manifest_name).read_bytes()
+        payload = json.loads(manifest_bytes)
+    except (OSError, ValueError):
+        return identity
+    config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
+    template = payload.get("template") if isinstance(payload.get("template"), dict) else {}
+    identity.update(
+        {
+            "model": payload.get("model") or config.get("model"),
+            "model_name": payload.get("model_name") or config.get("model_name"),
+            "source": payload.get("source"),
+            "template": template.get("name"),
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        }
+    )
+    return {key: value for key, value in identity.items() if value is not None}
+
+
+def _source_revision() -> Optional[str]:
+    for env_name in ("CK_SOURCE_COMMIT", "GITHUB_SHA"):
+        value = str(os.environ.get(env_name, "") or "").strip()
+        if value:
+            return value
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[3],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        ).stdout.strip() or None
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _fallback_build_diagnostic(exc: Exception) -> Dict[str, Any]:
+    message = str(exc)
+    if isinstance(exc, (FileNotFoundError, json.JSONDecodeError)):
+        code, stage = "CKE-V8-INVALID-BUILD-INPUT", "input_validation"
+        category = "user_configuration"
+        remediation = "Verify the manifest path and JSON content, then rerun the build."
+    elif message.startswith("HARD CIRCUIT INTERFACE FAULT"):
+        code, stage = "CKE-V8-CIRCUIT-INTERFACE", "circuit_validation"
+        category = "implementation_defect"
+        remediation = "Repair the declared circuit/provider interface; do not disable validation."
+    elif message.startswith("HARD CIRCUIT DATAFLOW FAULT"):
+        code, stage = "CKE-V8-CIRCUIT-DATAFLOW", "dataflow_planning"
+        category = "implementation_defect"
+        remediation = "Repair the circuit dataflow and physical storage binding; do not infer a port alias."
+    elif message.startswith("HARD KERNEL"):
+        code, stage = "CKE-V8-KERNEL-RESOLUTION", "provider_resolution"
+        category = "implementation_defect"
+        remediation = "Validate or add a provider for the exact operation and storage contract."
+    else:
+        code, stage = "CKE-V8-BUILD-ERROR", "build"
+        category = "implementation_defect"
+        remediation = "Inspect the diagnostic context and repair the failing build stage."
+    return {
+        "code": code,
+        "stage": stage,
+        "category": category,
+        "summary": message.splitlines()[0] or type(exc).__name__,
+        "detail": message,
+        "remediation": remediation,
+        "location": {},
+        "expected": {},
+        "observed": {},
+        "candidates": [],
+    }
+
+
+def _write_build_diagnostic(args: List[str], exc: Exception, path: Path) -> None:
+    diagnostic = (
+        copy.deepcopy(exc.diagnostic)
+        if isinstance(exc, BuildDiagnosticError)
+        else _fallback_build_diagnostic(exc)
+    )
+    payload = {
+        "schema": "cke.v8.build_diagnostic",
+        "schema_version": 1,
+        "status": "failed",
+        "mode": _cli_value(args, "--mode") or "decode",
+        "identity": _manifest_diagnostic_identity(args),
+        "source_revision": _source_revision(),
+        "failure": diagnostic,
+        "pipeline": {
+            "failed_stage": diagnostic["stage"],
+            "later_stages": "not_generated",
+        },
+        "traceback": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def run_cli(args: List[str]) -> int:
+    diagnostic_path = _build_diagnostic_path(args)
+    if diagnostic_path is not None:
+        diagnostic_path.unlink(missing_ok=True)
+    try:
+        return main(args)
+    except Exception as exc:
+        if diagnostic_path is not None:
+            _write_build_diagnostic(args, exc, diagnostic_path)
+        diagnostic = (
+            exc.diagnostic if isinstance(exc, BuildDiagnosticError)
+            else _fallback_build_diagnostic(exc)
+        )
+        print(f"CKE build failed [{diagnostic['code']}]: {diagnostic['summary']}", file=sys.stderr)
+        if diagnostic_path is not None:
+            print(f"Diagnostic report: {diagnostic_path}", file=sys.stderr)
+        if "--debug" in args:
+            traceback.print_exc()
+        return 2
 
 
 def _kernel_map_by_id(registry: Dict[str, Any], kernel_id: str) -> Dict[str, Any]:
@@ -7542,18 +7726,38 @@ def resolve_swiglu_moe_provider(
             "up_weight": up_dtype,
             "down_weight": down_dtype,
         }
+    selection_trace: List[Dict[str, Any]] = []
     kernel_id = find_kernel(
         registry,
         op=kernel_op,
         quant=quant,
         mode=mode,
         prefer_q8_activation=prefer_q8_activation,
+        selection_trace=selection_trace,
     )
     if kernel_id:
         return kernel_id
-    raise RuntimeError(
+    message = (
         "HARD KERNEL RESOLUTION FAULT: no composite SwiGLU provider "
         f"for gate={gate_dtype}, up={up_dtype}, down={down_dtype}."
+    )
+    raise BuildDiagnosticError(
+        message,
+        code="CKE-V8-COMPOSITE-PROVIDER-NOT-FOUND",
+        stage="provider_resolution",
+        summary="No production composite SwiGLU provider matches the artifact storage tuple",
+        expected={
+            "operation": kernel_op,
+            "gate_weight": gate_dtype,
+            "up_weight": up_dtype,
+            "down_weight": down_dtype,
+            "phase": mode,
+        },
+        candidates=selection_trace,
+        remediation=(
+            "Validate or add a provider for this exact storage tuple; do not promote "
+            "a candidate without numerical evidence."
+        ),
     )
 
 
@@ -9678,7 +9882,24 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 context=context,
             )
         except CircuitInterfaceError as exc:
-            raise RuntimeError(str(exc)) from exc
+            raise BuildDiagnosticError(
+                str(exc),
+                code="CKE-V8-CIRCUIT-INTERFACE",
+                stage="circuit_validation",
+                summary=exc.summary,
+                remediation=exc.remediation,
+                location={
+                    "circuit": template.get("name", "<embedded>"),
+                    "section": arranged.get("section"),
+                    "layer": arranged.get("layer"),
+                    "operation": arranged.get("op"),
+                    "instance": arranged.get("instance", 0),
+                    "provider": kernel_id,
+                    "operation_interface": interface_id,
+                },
+                expected=exc.expected,
+                observed={**exc.observed, "interface_detail": exc.detail},
+            ) from exc
 
     _attach_semantic_checkpoints(template, arranged_kernels, registry, config)
 
@@ -16431,6 +16652,16 @@ def main(args: List[str]) -> int:
         help="Enable per-kernel profiling instrumentation in generated code"
     )
     parser.add_argument(
+        "--diagnostic-output",
+        type=Path,
+        help="Failure diagnostic JSON (default: build_diagnostic.json beside generated outputs)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print the full traceback after writing structured failure evidence",
+    )
+    parser.add_argument(
         "--prefer-q8-activation",
         action="store_true",
         help="Prefer Q8-activation matmul kernels (gemv/gemm *_q8_* variants) for speed"
@@ -16709,4 +16940,4 @@ def main(args: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(run_cli(sys.argv[1:]))
