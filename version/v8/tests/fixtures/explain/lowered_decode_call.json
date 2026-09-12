@@ -1,0 +1,263 @@
+{
+  "format": "lowered-ir-v3",
+  "version": 3,
+  "mode": "decode",
+  "_comment": "Trimmed fixture: first 3 operations of the Gemma-3-270M decode call IR (real artifact: gemma-3-270m-it-Q5_K_M/lowered_decode_call.json). Op idx 2 carries the full required/resolved contract for rmsnorm_forward_llama_production.",
+  "config": {
+    "model": "gemma3",
+    "embed_dim": 640,
+    "num_layers": 18,
+    "rms_eps": 9.999999974752427e-07
+  },
+  "operations": [
+    {
+      "idx": 0,
+      "function": "embedding_forward_q8_0",
+      "op": "dense_embedding_lookup",
+      "layer": -1,
+      "section": "header",
+      "args": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "expr": "(int32_t*)(model->bump + A_TOKEN_IDS)",
+          "buffer_ref": "token_ids"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len",
+          "expr": "1"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size",
+          "expr": "262144"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb",
+          "expr": "(const void*)(model->bump + W_TOKEN_EMB)",
+          "weight_ref": "token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null",
+          "expr": "NULL"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "expr": "(float*)(model->bump + A_EMBEDDED_INPUT)",
+          "buffer_ref": "embedded_input"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim",
+          "expr": "640"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim",
+          "expr": "640"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len",
+          "expr": "1"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0",
+          "expr": "0"
+        }
+      ],
+      "errors": [],
+      "warnings": [],
+      "call_abi": {
+        "version": 1,
+        "owner": "kernel_map",
+        "kernel_id": "embedding_forward_q8_0",
+        "source_file": "embedding_forward_q8_0.json"
+      },
+      "bias_for": "None"
+    },
+    {
+      "idx": 1,
+      "function": "ck_memcpy_parallel_dispatch",
+      "op": "residual_save",
+      "layer": 0,
+      "section": "body",
+      "args": [
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "expr": "(void*)(model->bump + A_RESIDUAL)",
+          "buffer_ref": "residual"
+        },
+        {
+          "name": "src",
+          "source": "activation:src",
+          "expr": "(const void*)(model->bump + A_EMBEDDED_INPUT)",
+          "buffer_ref": "embedded_input"
+        },
+        {
+          "name": "size",
+          "source": "dim:_memcpy_bytes",
+          "expr": "2560"
+        }
+      ],
+      "errors": [],
+      "warnings": [],
+      "call_abi": {
+        "version": 1,
+        "owner": "kernel_map",
+        "kernel_id": "memcpy",
+        "source_file": "memcpy.json"
+      },
+      "bias_for": "None"
+    },
+    {
+      "idx": 2,
+      "function": "rmsnorm_forward_llama_production",
+      "op": "attn_norm",
+      "layer": 0,
+      "section": "body",
+      "args": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "expr": "(const float*)(model->bump + A_EMBEDDED_INPUT)",
+          "buffer_ref": "embedded_input"
+        },
+        {
+          "name": "gamma",
+          "source": "weight:gamma",
+          "expr": "(const float*)(model->bump + W_LAYER_0_LN1_GAMMA)",
+          "weight_ref": "layer.0.ln1_gamma"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "expr": "(float*)(model->bump + A_EMBEDDED_INPUT)",
+          "buffer_ref": "embedded_input"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "null",
+          "expr": "NULL"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len",
+          "expr": "1"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim",
+          "expr": "640"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim",
+          "expr": "640"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps",
+          "expr": "9.999999974752427e-07"
+        }
+      ],
+      "errors": [],
+      "warnings": [],
+      "call_abi": {
+        "version": 1,
+        "owner": "kernel_map",
+        "kernel_id": "rmsnorm_forward_llama_production",
+        "source_file": "rmsnorm_forward_llama_production.json"
+      },
+      "required_contract": {
+        "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "validation": "validated",
+        "evidence": "Single-token decode retains the serial llama.cpp-compatible provider."
+      },
+      "resolved_contract": {
+        "schema": "cke.graph_ir_numerical_contract",
+        "schema_version": 1,
+        "operation": "decoder.rmsnorm",
+        "phase": "decode",
+        "required_contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "resolved_contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "kernel_id": "rmsnorm_forward_llama_production",
+        "function": "rmsnorm_forward_llama_production",
+        "selector": null,
+        "implementation": {
+          "isa_dispatch": "compile_time",
+          "threading": {
+            "runtime": "serial",
+            "work_partition": [
+              "independent_rows"
+            ],
+            "dispatch": [
+              "inline"
+            ],
+            "reduction_order_effect": "none"
+          }
+        },
+        "semantics": {
+          "operator_family": "rmsnorm",
+          "status": "validated",
+          "storage": {
+            "input": "fp32",
+            "weight": "fp32",
+            "output": "fp32"
+          },
+          "compute": {
+            "input": "fp32",
+            "weight": "fp32",
+            "accumulator": "fp64",
+            "contraction": "disabled",
+            "evaluation_order": "fp32_square_then_fp64_ascending_sum_then_fp32_mean_then_llama_cpu_isa_rsqrt_then_scale_weight"
+          },
+          "rounding": {
+            "mode": "rne",
+            "points": [
+              "square_product",
+              "reduction_finalize",
+              "reciprocal_sqrt",
+              "normalization_scale",
+              "weight_scale"
+            ]
+          },
+          "reduction": {
+            "kind": "normalization",
+            "order": "left_to_right",
+            "partial_accumulator": "fp64",
+            "merge_order": "none"
+          },
+          "threading": {
+            "work_partition": "independent_rows",
+            "split_strategy": "independent_outputs",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false
+          },
+          "position_transform": null,
+          "description": "llama.cpp CPU production RMSNorm: FP32 squares, ascending FP64 row sum, and the active CPU provider reciprocal-square-root sequence. AVX-512 uses RSQRT14 plus one Newton refinement; AVX2 uses scalar sqrt/div."
+        },
+        "operation_interface": "rmsnorm.fp32.v1",
+        "interface_call_abi": "validated",
+        "checkpoint": {
+          "id": "decoder.layer.{layer}.rmsnorm.output",
+          "producer": "rmsnorm",
+          "logical_layout": "token_major",
+          "axis_names": [
+            "token",
+            "channel"
+          ]
+        }
+      },
+      "bias_for": "None"
+    }
+  ],
+  "errors": []
+}

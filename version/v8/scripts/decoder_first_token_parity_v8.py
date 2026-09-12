@@ -702,14 +702,17 @@ def _apply_requested_oracle_attention_semantics(
     for dump in dumps:
         source_name = str(getattr(dump, "source_name", "") or "")
         alias = None
-        if "rope_q" in requested and source_name.startswith("Qcur-"):
+        current_name = str(dump.op_name)
+        if "rope_q" in requested and current_name == "qcur_rope":
             alias = "rope_q"
         elif source_name.startswith("Kcur-"):
             occurrence = re.search(r"-occ-(\d+)", source_name)
             occurrence_id = int(occurrence.group(1)) if occurrence else 0
             if occurrence_id == 0 and "k_proj" in requested:
                 alias = "k_proj"
-            elif occurrence_id == 1 and "rope_k" in requested:
+            elif "rope_k" in requested and (
+                current_name == "kcur_rope" or occurrence_id == 1
+            ):
                 alias = "rope_k"
         elif "v_proj" in requested and source_name.startswith("Vcur-"):
             # llama.cpp exposes both the projection result and a later tensor
@@ -1393,21 +1396,31 @@ def _normalize_ck_attention_head_major_layout(
         or runtime_config.get("num_kv_heads", 0)
         or 0
     )
-    head_dim = int(runtime_config.get("head_dim", 0) or 0)
-    if q_heads <= 0 or kv_heads <= 0 or head_dim <= 0:
+    default_head_dim = int(runtime_config.get("head_dim", 0) or 0)
+    if q_heads <= 0 or kv_heads <= 0 or default_head_dim <= 0:
         return dumps
     head_major = {
-        "qk_norm_q": q_heads,
-        "rope_q": q_heads,
-        "qk_norm_k": kv_heads,
-        "rope_k": kv_heads,
-        "attn_pregate": q_heads,
+        "qk_norm_q": (q_heads, "layer_q_head_dim"),
+        "rope_q": (q_heads, "layer_q_head_dim"),
+        "qk_norm_k": (kv_heads, "layer_k_head_dim"),
+        "rope_k": (kv_heads, "layer_k_head_dim"),
+        "attn_pregate": (q_heads, "layer_v_head_dim"),
     }
     for dump in dumps:
         op_name = _canonical_dump_op_name(str(dump.op_name))
-        heads = head_major.get(op_name)
-        if heads is None:
+        layout = head_major.get(op_name)
+        if layout is None:
             continue
+        heads, layer_dim_key = layout
+        head_dim = default_head_dim
+        layer_dims = runtime_config.get(layer_dim_key)
+        layer_id = int(dump.layer_id)
+        if (
+            isinstance(layer_dims, list)
+            and 0 <= layer_id < len(layer_dims)
+            and int(layer_dims[layer_id] or 0) > 0
+        ):
+            head_dim = int(layer_dims[layer_id])
         values = np.asarray(dump.data)
         row_width = int(heads) * int(head_dim)
         if values.size == 0 or values.size % row_width != 0:
@@ -1517,24 +1530,18 @@ def _coalesce_multimodal_prefill_segments(
             coalesced.extend(candidates)
             continue
 
-        arrays = [np.asarray(dump.data) for dump in ordered]
-        segment_sizes = [int(count) for _, count, _ in segments]
-        token_axes: list[int] = []
-        for array, segment_rows in zip(arrays, segment_sizes):
-            axes = [axis for axis, extent in enumerate(array.shape) if int(extent) == segment_rows]
-            token_axes.append(axes[0] if len(axes) == 1 else -1)
-        if token_axes and token_axes[0] >= 0 and len(set(token_axes)) == 1:
-            merged = np.concatenate(arrays, axis=token_axes[0])
-        else:
-            # Flat legacy dumps for token-major providers have one complete
-            # row after another. Preserve that representation when the tensor
-            # metadata does not expose a unique token axis.
-            merged = np.concatenate([array.reshape(-1) for array in arrays])
-            if (
-                row_shape
-                and int(np.prod(np.array(row_shape, dtype=np.int64))) == int(row_elems)
-            ):
-                merged = merged.reshape((int(total_rows), *row_shape))
+        # GGML ``ne`` metadata is least-significant-dimension first and is not
+        # a NumPy/C-order shape. Its token extent can look like a valid NumPy
+        # axis while the file bytes are still contiguous token rows. Preserve
+        # physical row order across segments, then attach the logical shape.
+        merged = np.concatenate(
+            [np.asarray(array.data).reshape(-1) for array in ordered]
+        )
+        if (
+            row_shape
+            and int(np.prod(np.array(row_shape, dtype=np.int64))) == int(row_elems)
+        ):
+            merged = merged.reshape((int(total_rows), *row_shape))
         selected = ordered[-1]
         coalesced.append(
             parity_test_v7.ParityDump(

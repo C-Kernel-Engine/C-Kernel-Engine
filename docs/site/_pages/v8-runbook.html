@@ -222,6 +222,34 @@
     </p>
 </div>
 
+<h2 id="shared-vision-certification">Shared Vision Certification</h2>
+
+<div class="card card-blue">
+    <p>
+        The Qwen3-VL and Qwen3.6-VL corpus lanes use
+        <code>certify_multimodal_llamacpp_corpus_v8.py</code> with versioned
+        profiles under <code>version/v8/parity_profiles/vision/</code>. A profile
+        fixes the encoder source, composition circuit, chat template, and
+        llama.cpp attention mode. Unknown profile fields and incompatible
+        encoder sources fail before an image is processed.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>V8_PRIVATE_VISION_CORPUS_MANIFEST=/path/to/manifest.json \
+QWEN3VL_PRIVATE_CORPUS_DECODER=/path/to/Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
+QWEN3VL_PRIVATE_CORPUS_MMPROJ=/path/to/mmproj-BF16.gguf \
+QWEN3VL_PRIVATE_CORPUS_LLAMA_ROOT=/path/to/llama.cpp \
+make test-qwen3vl-private-corpus-parity-auto</pre>
+    </div>
+    <p class="v8-note" style="margin-bottom: 0;">
+        The report is resumable and redacted by default. Exact decoder rows use
+        the CKE-produced visual prefix in both engines, so this lane does not by
+        itself certify image preprocessing or the vision encoder. Qwen3.6-VL
+        and Gemma4 profiles remain candidate lanes until their pinned artifacts
+        satisfy their declared numerical and corpus gates.
+    </p>
+</div>
+
 <h2 id="demo-readiness-nightly">Overnight Demo Readiness</h2>
 
 <div class="card card-blue">

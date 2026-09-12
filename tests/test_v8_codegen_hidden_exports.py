@@ -46,6 +46,47 @@ def _arg(name: str, expr: str) -> dict[str, str]:
 
 
 class HiddenExportExtentTests(unittest.TestCase):
+    def test_prefill_attention_export_covers_every_token_row(self) -> None:
+        emitted = prefill_codegen.emit_prefill_op(
+            {
+                "function": "quantize_row_q8_k",
+                "op": "quantize_out_proj_input",
+                "layer": 2,
+                "args": [
+                    _arg("x", "ATTN"),
+                    _arg("y", "ATTN_Q8"),
+                    _arg("k", "4096"),
+                    _arg("rows", "4096"),
+                ],
+                "resolved_codegen_capability": {
+                    "operator_family": "activation_quantization",
+                    "function": "quantize_row_q8_k",
+                    "output_storage": {
+                        "format": "q8_k",
+                        "block_elements": 256,
+                        "block_bytes": 292,
+                        "block_elements_symbol": "QK_K",
+                        "c_block_type": "block_q8_K",
+                    },
+                    "prefill_batch": {
+                        "function": "quantize_batch_q8_k_4row_nearest_even_parallel_dispatch",
+                        "row_group": 4,
+                        "tail_function": "quantize_row_q8_k",
+                        "rounding_contract": "llama_repack_q8_k_4row_nearest_even",
+                    },
+                },
+            },
+            16,
+            {"embed_dim": 4096},
+        )
+
+        self.assertIn(
+            '"attn_out", (const float*)(ATTN), '
+            "(int)((size_t)num_tokens * (size_t)(4096))",
+            emitted,
+        )
+        self.assertIn('"attn_out_last"', emitted)
+
     def test_fused_q4_gateup_swiglu_exports_materialized_output(self) -> None:
         gate = {
             "op": "mlp_gate_up",

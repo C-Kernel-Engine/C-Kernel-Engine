@@ -148,6 +148,18 @@ def _make_qwen3vl_manifest() -> dict:
 
 
 class V8Qwen3VLTemplateTests(unittest.TestCase):
+    def test_converter_accepts_bf16_vision_weights(self) -> None:
+        self.assertEqual(
+            convert_gguf_to_bump_v8.ck_dtype_from_ggml_type(
+                convert_gguf_to_bump_v8.GGML_TYPE_BF16
+            ),
+            convert_gguf_to_bump_v8.CK_DT_BF16,
+        )
+        self.assertIn(
+            convert_gguf_to_bump_v8.GGML_TYPE_BF16,
+            convert_gguf_to_bump_v8.VISION_GGUF_WEIGHT_TYPES,
+        )
+
     def test_bridge_uses_aligned_arena_activation_base(self) -> None:
         layout = {
             "memory": {

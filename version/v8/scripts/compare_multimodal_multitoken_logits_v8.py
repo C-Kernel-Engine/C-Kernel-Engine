@@ -466,6 +466,32 @@ def _dump_element_count_mismatches(
     return mismatches
 
 
+def _filter_requested_dump_semantics(
+    dumps: list[Any], requested_names: set[str]
+) -> list[Any]:
+    """Exclude oracle callback aliases outside the requested X-ray contract."""
+    requested = {
+        first_token._canonical_dump_op_name(re.sub(r"-\d+$", "", name))
+        for name in requested_names
+    }
+    return [
+        dump
+        for dump in dumps
+        if first_token._canonical_dump_op_name(str(dump.op_name)) in requested
+    ]
+
+
+def _diagnostic_tensor_dump_requested(args: argparse.Namespace) -> bool:
+    return bool(
+        getattr(args, "dump_step", None) is not None
+        or getattr(args, "dump_first_divergence", False)
+        or getattr(args, "hidden_state_step", None) is not None
+        or getattr(args, "llama_persistent_dump_step", None) is not None
+        or bool(getattr(args, "llama_persistent_dump_names", ""))
+        or bool(getattr(args, "llama_persistent_dump_flash_inputs", False))
+    )
+
+
 def _hidden_full_replay_name(name: str) -> str:
     # Full replay runs through prefill, which exports last-row tensors with
     # the *_last suffix for token-major intermediates.
@@ -561,6 +587,8 @@ def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace)
             str(int(args.top_k)),
             "--decode-mode",
             str(args.llama_decode_mode),
+            "--flash-attn",
+            str(getattr(args, "llama_flash_attention", "disabled")),
             "--logits-out",
             str(logits_out),
             "--logits-seq-out",
@@ -607,6 +635,11 @@ def _run_llama_greedy_sequence(inputs: dict[str, Any], args: argparse.Namespace)
                 "--dump-greedy-decode-step", str(persistent_dump_step),
             ])
             if bool(getattr(args, "llama_persistent_dump_flash_inputs", False)):
+                if str(getattr(args, "llama_flash_attention", "disabled")) != "enabled":
+                    raise ValueError(
+                        "--llama-persistent-dump-flash-inputs requires "
+                        "--llama-flash-attention enabled"
+                    )
                 cmd.append("--dump-flash-inputs")
         proc = subprocess.run(cmd, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False)
         if proc.returncode != 0:
@@ -1259,13 +1292,11 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
     if not requested_names:
         raise ValueError("--hidden-state-names did not contain any names")
     names = _resolve_ck_hidden_export_names(requested_names)
+    runtime_config = dict((inputs["runtime"].get("manifest") or {}).get("config") or {})
     bridge_report = inputs.get("bridge_report")
     bridge_report = bridge_report if isinstance(bridge_report, dict) else {}
-    bridge_contract = bridge_report.get("bridge_contract")
-    bridge_contract = bridge_contract if isinstance(bridge_contract, dict) else {}
-    segmented_ck_prefill = (
-        step_index == 0
-        and bridge_contract.get("prefill_batching") == "segmented_append"
+    segmented_ck_prefill = step_index == 0 and _uses_segmented_append_prefill(
+        bridge_report, runtime_config=runtime_config
     )
     capture_names = list(names)
     if segmented_ck_prefill and ({"mlp_gate", "mlp_up"} & set(names)):
@@ -1571,7 +1602,6 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
     if neutrality["status"] == "accepted" and llama_dir_value is not None:
         llama_dir = Path(llama_dir_value).resolve()
         try:
-            runtime_config = dict((inputs["runtime"].get("manifest") or {}).get("config") or {})
             layer_count = int(runtime_config.get("num_layers", 0) or 0)
             semantic_names = {
                 re.sub(r"-\d+$", "", name) for name in names
@@ -1597,6 +1627,12 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
                 )
             ck_dumps = _normalize_ck_recurrent_state_layout(ck_dumps, runtime_config)
             llama_dumps = first_token._load_llama_dump_dir(llama_dir)
+            oracle_name_map = dict(
+                getattr(args, "hidden_state_oracle_name_map", {}) or {}
+            )
+            llama_dumps = _apply_hidden_oracle_name_map(
+                llama_dumps, oracle_name_map
+            )
             llama_dumps = first_token._apply_requested_oracle_attention_semantics(
                 llama_dumps, semantic_names
             )
@@ -1611,6 +1647,10 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
                 llama_dumps,
                 layer_count=layer_count,
                 alias_after_attn="after_attn" in semantic_names,
+            )
+            ck_dumps = _filter_requested_dump_semantics(ck_dumps, semantic_names)
+            llama_dumps = _filter_requested_dump_semantics(
+                llama_dumps, semantic_names
             )
             structural_mismatches = _dump_element_count_mismatches(
                 ck_dumps, llama_dumps
@@ -1637,11 +1677,17 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
                     or oracle_comparison["summary"]["missing"]
                     else "ok"
                 )
-            loaded_ck_names = {str(dump.op_name) for dump in ck_dumps}
+            loaded_ck_names = {
+                first_token._canonical_dump_op_name(str(dump.op_name))
+                for dump in ck_dumps
+            }
             oracle_comparison["runtime_missing_ck_exports"] = [
-                name for name in names if name not in loaded_ck_names
+                name
+                for name in names
+                if first_token._canonical_dump_op_name(name) not in loaded_ck_names
             ]
             oracle_comparison["llama_dump_dir"] = str(llama_dir)
+            oracle_comparison["explicit_name_map"] = oracle_name_map
         except Exception as exc:
             oracle_comparison = {
                 "status": "error",
@@ -1661,6 +1707,9 @@ def _capture_hidden_state_step(report: dict[str, Any], args: argparse.Namespace)
         "preflight": {
             "status": "pass",
             "requested_names": names,
+            "oracle_name_map": dict(
+                getattr(args, "hidden_state_oracle_name_map", {}) or {}
+            ),
             "capture_layers": capture_layers,
             "available_exporter_count": len(catalog),
         },
@@ -1957,15 +2006,18 @@ def run_multimodal_multitoken_parity(args: argparse.Namespace) -> dict[str, Any]
         },
         "top_k": int(args.top_k),
         "llama_decode_mode": str(args.llama_decode_mode),
+        "llama_flash_attention": str(
+            getattr(args, "llama_flash_attention", "disabled")
+        ),
         "execution_modes": {
             "ck_strict_parity": bool(args.ck_strict_parity),
             "gemm_schedule": str(getattr(args, "gemm_schedule", "auto")),
             "llama_decode_mode": str(args.llama_decode_mode),
-            "llama_tensor_repack": not bool(args.llama_no_repack),
-            "diagnostic_tensor_dump": bool(
-                getattr(args, "dump_step", None) is not None
-                or getattr(args, "dump_first_divergence", False)
+            "llama_flash_attention": str(
+                getattr(args, "llama_flash_attention", "disabled")
             ),
+            "llama_tensor_repack": not bool(args.llama_no_repack),
+            "diagnostic_tensor_dump": _diagnostic_tensor_dump_requested(args),
             "ck_environment": _ck_environment_evidence(),
             "prefill_mode_contract": mode_contract,
         },
@@ -2012,11 +2064,38 @@ def _configure_hidden_oracle_capture(
         raise ValueError("--hidden-state-names did not contain any names")
     layer = int(getattr(args, "hidden_state_layer", -1))
     requested = [f"{name}-{layer}" if layer >= 0 else name for name in names]
+    oracle_name_map = _parse_hidden_oracle_name_map(
+        str(getattr(args, "hidden_state_oracle_map", "") or ""),
+        requested_names=names,
+    )
     runtime_config = dict((inputs["runtime"].get("manifest") or {}).get("config") or {})
     layer_count = int(runtime_config.get("num_layers", 0) or 0)
-    resolved_names = first_token._resolve_llama_dump_names(
-        ",".join(requested), layer_count=layer_count
-    )
+    resolved: list[str] = []
+    for requested_name in requested:
+        match = re.match(r"^(.*?)-(\d+)$", requested_name)
+        semantic_name = match.group(1) if match else requested_name
+        requested_layer = int(match.group(2)) if match else None
+        oracle_name = oracle_name_map.get(semantic_name)
+        if oracle_name is None:
+            value = first_token._resolve_llama_dump_names(
+                requested_name, layer_count=layer_count
+            )
+        elif requested_layer is None:
+            if layer_count <= 0:
+                raise ValueError(
+                    f"cannot expand oracle mapping for {semantic_name!r} without a "
+                    "positive decoder layer count"
+                )
+            value = ",".join(f"{oracle_name}-{layer_id}" for layer_id in range(layer_count))
+        else:
+            if requested_layer < 0 or requested_layer >= layer_count:
+                raise ValueError(
+                    f"oracle mapping layer {requested_layer} is outside decoder layers "
+                    f"[0, {layer_count - 1}]"
+                )
+            value = f"{oracle_name}-{requested_layer}"
+        resolved.extend(item for item in value.split(",") if item)
+    resolved_names = ",".join(dict.fromkeys(resolved))
     explicit_step = getattr(args, "llama_persistent_dump_step", None)
     explicit_names = str(getattr(args, "llama_persistent_dump_names", "") or "")
     if explicit_step is not None and int(explicit_step) != step:
@@ -2030,6 +2109,7 @@ def _configure_hidden_oracle_capture(
         )
     args.llama_persistent_dump_step = step
     args.llama_persistent_dump_names = resolved_names
+    args.hidden_state_oracle_name_map = oracle_name_map
     if getattr(args, "llama_persistent_dump_dir", None) is None:
         root = (
             Path(args.hidden_state_dir).resolve()
@@ -2037,6 +2117,67 @@ def _configure_hidden_oracle_capture(
             else args.workdir.resolve() / f"hidden_state_step_{step:04d}"
         )
         args.llama_persistent_dump_dir = root / "llama"
+
+
+def _parse_hidden_oracle_name_map(
+    value: str, *, requested_names: list[str]
+) -> dict[str, str]:
+    """Parse explicit CKE semantic to llama.cpp graph-node mappings."""
+    mapping: dict[str, str] = {}
+    requested = {re.sub(r"-\d+$", "", name) for name in requested_names}
+    oracle_names: set[str] = set()
+    for item in str(value).split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if item.count("=") != 1:
+            raise ValueError(
+                "--hidden-state-oracle-map entries must use semantic=llama_name"
+            )
+        semantic, oracle_name = (part.strip() for part in item.split("=", 1))
+        if not re.fullmatch(r"[A-Za-z0-9_.]+", semantic) or not re.fullmatch(
+            r"[A-Za-z0-9_.]+", oracle_name
+        ):
+            raise ValueError(
+                "--hidden-state-oracle-map names may contain only letters, digits, _, and ."
+            )
+        if semantic not in requested:
+            raise ValueError(
+                f"oracle mapping for unrequested hidden boundary {semantic!r}"
+            )
+        if semantic in mapping:
+            raise ValueError(f"duplicate oracle mapping for {semantic!r}")
+        if oracle_name in oracle_names:
+            raise ValueError(
+                f"oracle graph node {oracle_name!r} is mapped to more than one boundary"
+            )
+        mapping[semantic] = oracle_name
+        oracle_names.add(oracle_name)
+    return mapping
+
+
+def _apply_hidden_oracle_name_map(
+    dumps: list[Any], mapping: dict[str, str]
+) -> list[Any]:
+    """Relabel explicitly mapped llama.cpp graph nodes to CKE semantics."""
+    if not mapping:
+        return dumps
+    inverse = {oracle_name: semantic for semantic, oracle_name in mapping.items()}
+    out: list[Any] = []
+    for dump in dumps:
+        semantic = inverse.get(str(dump.op_name), str(dump.op_name))
+        out.append(
+            first_token.parity_test_v7.ParityDump(
+                int(dump.layer_id),
+                semantic,
+                dump.data,
+                int(dump.token_id),
+                str(dump.dtype),
+                source_token_id=int(dump.source_token_id),
+                source_name=str(dump.source_name),
+            )
+        )
+    return out
 
 
 def _resolve_stop_token_ids(bridge_report: dict[str, Any]) -> set[int]:
@@ -2057,14 +2198,7 @@ def _resolve_oracle_prefill_mode(
     allow_diagnostic_mismatch: bool = False,
 ) -> dict[str, Any]:
     """Fail closed when the oracle and CK execute different prefill schedules."""
-    bridge = bridge_report.get("bridge_contract")
-    bridge = bridge if isinstance(bridge, dict) else {}
-    schedule = bridge.get("prefill_schedule")
-    schedule = schedule if isinstance(schedule, dict) else {}
-    segmented_append = (
-        schedule.get("segments") == ["text_before", "visual", "text_after"]
-        and schedule.get("cache_transition") == "append_preserve"
-    )
+    segmented_append = _uses_segmented_append_prefill(bridge_report)
     required = "batched" if segmented_append else None
     # The pinned oracle helper accepts only concrete batched/sequential modes.
     # Batched is its production default even when CK's bridge does not impose
@@ -2085,6 +2219,37 @@ def _resolve_oracle_prefill_mode(
         "compatible": compatible,
         "scope": "production" if compatible else "diagnostic_only",
     }
+
+
+def _uses_segmented_append_prefill(
+    bridge_report: dict[str, Any], *, runtime_config: dict[str, Any] | None = None
+) -> bool:
+    """Resolve the executed mixed-prefill schedule from current and legacy evidence."""
+    contracts: list[dict[str, Any]] = []
+    report_contract = bridge_report.get("bridge_contract")
+    if isinstance(report_contract, dict):
+        contracts.append(report_contract)
+    runtime_contract = (runtime_config or {}).get("multimodal_bridge_contract")
+    if isinstance(runtime_contract, dict):
+        contracts.append(runtime_contract)
+    for contract in contracts:
+        if contract.get("prefill_batching") == "segmented_append":
+            return True
+        schedule = contract.get("prefill_schedule")
+        if (
+            isinstance(schedule, dict)
+            and schedule.get("segments") == ["text_before", "visual", "text_after"]
+            and schedule.get("cache_transition") == "append_preserve"
+        ):
+            return True
+    # Current bridge reports retain the actual invocation shape even when the
+    # embedded source contract lists every supported schedule rather than the
+    # selected one.
+    return bool(
+        bridge_report.get("multimodal_prompt_segmented")
+        and str(bridge_report.get("bridge_runtime_policy") or "") == "decode-staged"
+        and int(bridge_report.get("prefix_tokens", 0) or 0) > 0
+    )
 
 
 def _run_requested_diagnostics(report: dict[str, Any], args: argparse.Namespace) -> bool:
@@ -2177,6 +2342,15 @@ def main() -> int:
     )
     ap.add_argument("--llama-decode-mode", choices=["auto", "batched", "sequential"], default="auto")
     ap.add_argument(
+        "--llama-flash-attention",
+        choices=["disabled", "enabled", "auto"],
+        default="disabled",
+        help=(
+            "llama.cpp attention implementation used by the oracle; select enabled "
+            "when comparing CKE's production F16 flash-attention schedule"
+        ),
+    )
+    ap.add_argument(
         "--allow-diagnostic-prefill-mode-mismatch",
         action="store_true",
         help="Allow sequential llama replay against batched CK prefill; the report is diagnostic-only.",
@@ -2239,6 +2413,15 @@ def main() -> int:
     )
     ap.add_argument("--hidden-state-layer", type=int, default=0)
     ap.add_argument("--hidden-state-names", type=str, default="attn_out,out_proj,after_attn,layer_out")
+    ap.add_argument(
+        "--hidden-state-oracle-map",
+        type=str,
+        default="",
+        help=(
+            "Comma-separated CKE semantic=llama.cpp graph-node mappings for model-specific "
+            "X-ray boundaries; unmapped names retain the shared defaults"
+        ),
+    )
     ap.add_argument("--hidden-state-dir", type=Path, default=None)
     ap.add_argument("--hidden-state-atol", type=float, default=1.0e-5)
     ap.add_argument("--hidden-state-rtol", type=float, default=1.0e-3)

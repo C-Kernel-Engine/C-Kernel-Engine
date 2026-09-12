@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import runpy
 import shutil
@@ -113,6 +114,116 @@ def run_xray_stage() -> int:
     return 0
 
 
+EXPLAIN_FIXTURES = ROOT / "version" / "v8" / "tests" / "fixtures" / "explain"
+EXPLAIN_VIEW_MARKERS = [
+    "Explain This Operation",
+    "explainOpSelect",
+    "explainProvenance",
+    "explainReports",
+    "kernel-maps.html#resolution",
+    "codegen.html",
+]
+EXPLAIN_SUCCESS_MARKERS = [
+    '"explain_reports"',
+    '"explain_provenance"',
+    "rmsnorm_forward_llama_production",
+    "rmsnorm_llama_cpu_production_fp32_output",
+    "rmsnorm_forward_llama_production.json",
+]
+EXPLAIN_FAILURE_MARKERS = [
+    "HARD KERNEL RESOLUTION FAULT",
+    "status_not_production:observed",
+    "weight_dtype_mismatch",
+    "HARD CIRCUIT DATAFLOW FAULT",
+    "unmatched=['x']",
+    "not_generated",
+    "reconstructed",
+    "369032982",  # Laguna bring-up commit (PR #404) provenance
+    "b9712c383",  # Nemotron #412-era provenance
+    "tests/test_v8_laguna_contract.py",
+    "tests/test_v8_nemotron_state_shape.py",
+]
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def run_explain_stage() -> int:
+    """v8-only stage: explain fixtures embed, failure reports surface their
+    rejection reasons, and bundle-stamp mismatch is disclosed as stale."""
+    open_viz = ROOT / "version" / "v8" / "tools" / "open_ir_visualizer_v8.py"
+    failures: list[str] = []
+
+    with tempfile.TemporaryDirectory(prefix="ck-viz-explain-") as tmp:
+        # 1) Run dir with the full fixture set: success chain + both failure reports.
+        run_dir = Path(tmp) / "run"
+        run_dir.mkdir()
+        for fixture in sorted(EXPLAIN_FIXTURES.glob("*.json")):
+            shutil.copy(fixture, run_dir / fixture.name)
+        html = _generate(open_viz, run_dir, run_dir / "ir_report.html")
+        if html is None:
+            failures.append("generate_with_fixtures")
+        else:
+            for marker in EXPLAIN_VIEW_MARKERS + EXPLAIN_SUCCESS_MARKERS + EXPLAIN_FAILURE_MARKERS:
+                if marker not in html:
+                    failures.append(f"missing_marker:{marker}")
+
+        # 2) Partial build: only ir1 -> later stage artifacts are not loaded,
+        # and the provenance table says so instead of inventing a chain.
+        partial_dir = Path(tmp) / "partial"
+        partial_dir.mkdir()
+        shutil.copy(EXPLAIN_FIXTURES / "ir1_decode.json", partial_dir / "ir1_decode.json")
+        html_partial = _generate(open_viz, partial_dir, partial_dir / "ir_report.html")
+        if html_partial is None:
+            failures.append("generate_partial")
+        else:
+            if '"ir1_decode": {' not in html_partial:
+                failures.append("partial_missing_ir1")
+            if '"lowered_decode_call": {' in html_partial:
+                failures.append("partial_filled_lowered_from_elsewhere")
+            if '"status": "not_loaded"' not in html_partial:
+                failures.append("partial_missing_not_loaded_provenance")
+
+        # 3) Stale artifacts: a bundle stamp whose recorded sha256 disagrees
+        # with the file on disk must be disclosed, never silently used.
+        stale_dir = Path(tmp) / "stale"
+        stale_dir.mkdir()
+        for name in ("ir1_decode.json", "lowered_decode_call.json"):
+            shutil.copy(EXPLAIN_FIXTURES / name, stale_dir / name)
+        good = _sha256(stale_dir / "ir1_decode.json")
+        bad = "0" * 64
+        stamp = {
+            "inputs": {"schema": "ck-v8-ir-bundle-v1"},
+            "outputs": {
+                "decode_ir": {"path": str(stale_dir / "ir1_decode.json"), "sha256": good, "size": 1},
+                "decode_call": {"path": str(stale_dir / "lowered_decode_call.json"), "sha256": bad, "size": 1},
+            },
+        }
+        (stale_dir / ".ck_ir_bundle.json").write_text(json.dumps(stamp), encoding="utf-8")
+        html_stale = _generate(open_viz, stale_dir, stale_dir / "ir_report.html")
+        if html_stale is None:
+            failures.append("generate_stale")
+        else:
+            if '"status": "stale"' not in html_stale:
+                failures.append("stale_not_disclosed")
+            if '"status": "match"' not in html_stale:
+                failures.append("match_not_recorded")
+
+    if failures:
+        for f in failures:
+            print(f"  ✗ {f}")
+        print(f"L3_explain_embed  max_diff={len(failures):.2e}  tol=1e+00  [FAIL]")
+        return 1
+    print(f"  ✓ explain embed: {len(EXPLAIN_SUCCESS_MARKERS)} chain + {len(EXPLAIN_FAILURE_MARKERS)} failure markers embedded from fixtures")
+    print("  ✓ explain partial build: later stages not loaded, no cross-run fill")
+    print("  ✓ explain staleness: bundle-stamp mismatch disclosed as stale")
+    print("L3_explain_embed  max_diff=0.00e+00  tol=1e+00  [PASS]")
+    return 0
+
+
+
 if __name__ == "__main__":
     os.environ.setdefault("CK_VIS_VERSION", "v8")
     os.environ.setdefault("CK_VIS_MODELS_ROOT", str(Path.home() / ".cache" / "ck-engine-v8" / "models"))
@@ -132,4 +243,5 @@ if __name__ == "__main__":
             base_code = 1
 
     xray_code = run_xray_stage()
-    sys.exit(0 if (base_code == 0 and xray_code == 0) else 1)
+    explain_code = run_explain_stage()
+    sys.exit(0 if (base_code == 0 and xray_code == 0 and explain_code == 0) else 1)

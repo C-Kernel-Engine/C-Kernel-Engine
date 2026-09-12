@@ -1,0 +1,75 @@
+{
+  "schema": "cke.v8.explain_op_report",
+  "schema_version": 1,
+  "kind": "provider_selection_failure",
+  "reconstructed": true,
+  "_comment": "RECONSTRUCTED FIXTURE of a historical failure mode, shaped for the explain-this-operation panel. It is not a captured run artifact. Provenance: Laguna-XS 2.1 bring-up in PR #404 (commit 369032982, feat(v8/laguna): bring up the quantized text runtime) and the compact MoE provider work in PR #422 (commit 71f11c08f); the concrete omitted-binding shape matches the repair recorded in commit 2063aa6b7 (fix(v8): restore Laguna and Nemotron compilation, branch fix/v8-laguna-nemotron-contracts), whose message states that Laguna omitted an exact attention-gate projection input and strict MLP metadata. The candidate list and rejection vocabulary mirror find_kernel() selection_trace entries in version/v8/scripts/build_ir_v8.py.",
+  "title": "Laguna: attention-gate projection rejected by provider compatibility filtering",
+  "requested": {
+    "op": "attention_gate_projection",
+    "phase": "decode",
+    "layer": 0,
+    "circuit": "version/v8/circuits/laguna.json",
+    "quant": { "weight": "q4_k", "activation": "q8_0", "output": "fp32" }
+  },
+  "stages": [
+    {
+      "stage": "circuit_operation",
+      "status": "available",
+      "detail": "Circuit op attention_gate_projection (layer 0) was composed, but the circuit did not declare its projection input, so the resolver saw a binding request without a declared source stream."
+    },
+    {
+      "stage": "required_contract",
+      "status": "available",
+      "detail": "Requested binding: attention_projection class, decode phase, weight=q4_k, activation=q8_0 (planned Q8 stream), fp32 output."
+    },
+    {
+      "stage": "provider_selection",
+      "status": "failed",
+      "fault": "HARD KERNEL RESOLUTION FAULT",
+      "detail": "Every candidate provider was rejected by compatibility filtering; zero providers remained for the requested binding."
+    },
+    { "stage": "kernel_map", "status": "not_generated" },
+    { "stage": "generated_call", "status": "not_generated" },
+    { "stage": "c_implementation", "status": "not_generated" }
+  ],
+  "candidates": [
+    {
+      "provider": "attn_gate_softplus_mul_forward",
+      "decision": "rejected",
+      "stage": "provider_selection",
+      "reason": "status_not_production:observed",
+      "status": "observed",
+      "priority": 900,
+      "equivalence_group": "attn_gate_softplus_mul.fp32.v1",
+      "note": "Candidate-only lifecycle at bring-up time: the softplus gate kernel was validated as observed, not production, so the explicit-selection filter refused it."
+    },
+    {
+      "provider": "ck_attention_project_head_major_quant",
+      "decision": "rejected",
+      "stage": "dtype_compatibility",
+      "reason": "weight_dtype_mismatch",
+      "status": "production",
+      "priority": 100,
+      "equivalence_group": "attention_projection.mixed_quant.v1",
+      "note": "The generic head-major projection provider declares mixed_w_fp32_a storage; it does not cover the requested q4_k gate weight role, so dtype compatibility filtering rejected it."
+    }
+  ],
+  "selected": null,
+  "docs": [
+    { "label": "Kernel Maps - the resolution algorithm", "href": "kernel-maps.html#resolution" },
+    { "label": "Kernel Maps - a real resolver trace", "href": "kernel-maps.html#selection-trace" },
+    { "label": "Codegen - when compilation fails, start here", "href": "codegen.html" }
+  ],
+  "source_refs": [
+    "version/v8/circuits/laguna.json",
+    "version/v8/kernel_maps/attn_gate_softplus_mul_forward.json",
+    "version/v8/kernel_maps/ck_attention_project_head_major_quant.json",
+    "version/v8/scripts/build_ir_v8.py (find_kernel compatibility filters)"
+  ],
+  "verifying_tests": [
+    "tests/test_v8_laguna_contract.py",
+    "tests/test_v8_shared_provider_migration.py"
+  ],
+  "guidance": "Where to look: the circuit's projection_inputs / required binding for the gate projection in version/v8/circuits/laguna.json, then the candidate provider's selection status and quant roles in its kernel map JSON. The historical repair declared the missing attention-gate projection input in the circuit and promoted an exact provider; it did not patch the resolver. This panel does not propose an automatic fix."
+}

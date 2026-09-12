@@ -13,17 +13,27 @@ This is a harness refactor, not a request to weaken Qwen3-VL certification.
 The existing Qwen3-VL command and report must remain compatible until the
 generic runner has reproduced the complete 40-image result.
 
-## Current Coupling
+## Implementation Status
 
-`certify_qwen3vl_llamacpp_corpus_v8.py` currently owns both generic corpus
-behavior and Qwen3-VL policy. Model-specific assumptions include:
+`certify_multimodal_llamacpp_corpus_v8.py` now owns the shared corpus
+lifecycle. `certify_qwen3vl_llamacpp_corpus_v8.py` is retained as a
+compatibility entrypoint. Versioned profiles under
+`version/v8/parity_profiles/vision/` declare architecture, encoder source,
+chat template, composition circuit, and llama.cpp execution policy.
+
+The Qwen3-VL profile has reproduced a real 16-token case bit-exactly with
+matched flash-attention settings. The complete 40-image campaign and
+independent vision-encoder parity remain required before the migration is
+complete. Qwen3.6-VL and Gemma4 profiles are candidate lanes, not certified
+model claims.
+
+Remaining model-specific assumptions include:
 
 - decoder GGUF plus a separate `mmproj` GGUF;
-- the `qwen3vl` chat template and suppressed-thinking mode;
+- suppressed-thinking behavior in the shared bridge;
 - Qwen3-VL image token budgeting and bridge command;
 - llama.cpp as the only oracle type;
-- Qwen3-VL names in console output, report schemas, Make variables, and
-  nightly suite names;
+- historical Qwen3-VL names in Make variables and nightly suite names;
 - one image per sample and one hard-coded OCR prompt.
 
 The corpus manifest itself is close to reusable, but the runner currently
