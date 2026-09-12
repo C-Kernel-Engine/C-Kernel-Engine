@@ -27,6 +27,7 @@ CHECKPOINT_SCHEMA_PATH = (
     Path(__file__).resolve().parents[1] / "schemas/checkpoint_manifest.schema.json"
 )
 BENCH_PATTERN = re.compile(r"^cohere:\s+([^\n]+?)\s+([0-9]+(?:\.[0-9]+)?) ms(?:\s|$)")
+TOKEN_PATTERN = re.compile(r"^cohere:\s+step\s+\d+\s+tok=\s*(\d+)\s", re.MULTILINE)
 
 
 class CertificationError(RuntimeError):
@@ -176,16 +177,11 @@ def build_checkpoint_manifest(dump_dir: Path, normalized_dir: Path) -> dict[str,
             axis_names=["token", "channel"],
         )
     )
-    checkpoints.append(
-        _checkpoint_entry(
-            checkpoint_id="audio.decoder.cross_attention.context",
-            producer="cohere_encoder_projection",
-            layer=-1,
-            source_path=dump_dir / "crisp.enc_out.bin",
-            normalized_path=normalized_dir / "cross_attention_context.f32",
-            axis_names=["token", "channel"],
-        )
-    )
+    # Do not promote crisp.enc_out.bin into the checkpoint manifest. At the
+    # pinned CrispASR revision enc_out is an intermediate, not a graph output;
+    # its allocator may reuse the buffer for later cross-K/V projections before
+    # the host reads it. Per-block snapshots and decoder attention are pinned
+    # graph outputs and remain authoritative.
     attention = dump_dir / "crisp.decoder_attention.bin"
     if attention.is_file():
         checkpoints.append(
@@ -328,6 +324,10 @@ def main(argv: list[str] | None = None) -> int:
         "language": args.language,
         "wall_seconds": elapsed,
         "timings_ms": _parse_benchmarks(completed.stdout),
+        "generated_token_ids": [int(value) for value in TOKEN_PATTERN.findall(completed.stdout)],
+        "excluded_diagnostic_captures": {
+            "crisp.enc_out.bin": "intermediate buffer is not pinned as a graph output by the oracle",
+        },
         "log": str(log_path),
         "command": command,
     }

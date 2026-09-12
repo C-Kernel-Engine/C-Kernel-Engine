@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "name": "cohere_transcribe",
+  "family": "audio_encoder_decoder",
+  "status": "native_short_audio_e2e",
+  "flags": {
+    "activation": "silu_relu",
+    "normalization": "layernorm_batchnorm",
+    "feature_layout": "time_major",
+    "encoder_layout": "token_major",
+    "decoder": "causal_transformer_cross_attention"
+  },
+  "contract": {
+    "artifact": {
+      "source_architecture": "cohere-transcribe",
+      "required_tensor_count": 2104,
+      "correctness_storage": ["fp16", "fp32"],
+      "tokenizer": "gguf_sentencepiece"
+    },
+    "audio_frontend": {
+      "input_modality": "wav_bytes",
+      "container": "riff_wave",
+      "sample_encoding": "pcm_s16_le",
+      "sample_rate": 16000,
+      "preemphasis": 0.97,
+      "n_fft": 512,
+      "window_length": 400,
+      "window": "model_tensor",
+      "hop_length": 160,
+      "centering": "constant_zero",
+      "mel_bins": 128,
+      "mel_filterbank": "model_tensor",
+      "log_zero_guard": 5.960464477539063e-8,
+      "normalization": "per_feature_population_variance_all_frames"
+    },
+    "audio_encoder": {
+      "stem": "three_stride2_grouped_conv2d_subsampling",
+      "subsampling_factor": 8,
+      "blocks": 48,
+      "width": 1280,
+      "heads": 8,
+      "head_dimension": 160,
+      "position_encoding": "transformer_xl_relative_sinusoidal",
+      "attention": "bidirectional_relative",
+      "convolution": "pointwise_glu_depthwise_batchnorm_silu_pointwise",
+      "macaron_feed_forward_scale": 0.5,
+      "projection_width": 1024
+    },
+    "audio_decoder": {
+      "blocks": 8,
+      "width": 1024,
+      "heads": 8,
+      "head_dimension": 128,
+      "feed_forward_width": 4096,
+      "activation": "relu",
+      "position_encoding": "learned_absolute",
+      "self_attention": "causal_f16_kv_cache",
+      "cross_attention": "immutable_encoder_f16_kv_cache",
+      "context": 1024,
+      "termination": "endoftext"
+    },
+    "runtime_invariants": {
+      "production_kernel_heap_allocation": false,
+      "attention_scratch": "caller_owned_score_rows",
+      "persistent_kv": "session_owned",
+      "long_audio": "not_certified",
+      "timestamps": "not_certified"
+    }
+  },
+  "kernels": {
+    "relative_position": "audio_relative_sinusoidal_position_f32",
+    "relative_attention": "audio_conformer_relative_attention_f32",
+    "grouped_conv1d": "audio_conv1d_channel_major_grouped_f32",
+    "grouped_conv2d": "audio_conv2d_whc_grouped_f32",
+    "batch_norm": "audio_batch_norm_inference_channel_major_f32",
+    "scaled_residual_add": "audio_scaled_residual_add_f32",
+    "self_attention": "attention_forward_query_key_head_major_f32_decode_heads",
+    "cross_attention": "attention_forward_query_key_head_major_f32_decode_heads",
+    "argmax": "audio_argmax_first_f32"
+  },
+  "sequence": ["frontend", "encoder", "decoder"],
+  "block_types": {
+    "frontend": {
+      "sequence": ["audio_wav_decode", "audio_preemphasis", "audio_stft", "audio_log_mel", "audio_feature_normalize"]
+    },
+    "encoder": {
+      "sequence": ["subsampling", "relative_position", "fastconformer_blocks", "encoder_projection"]
+    },
+    "decoder": {
+      "sequence": ["prompt", "causal_self_attention", "cross_attention", "relu_ffn", "lm_head", "greedy_eos"]
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "cke.v8.cohere_transcribe_native_evidence",
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "single public 7.435-second English PCM16 WAV fixture",
+  "cke_source_base_commit": "107fc07407d71ac14d3df52cf78118acf6d4c9ab",
+  "model": {
+    "repository": "cstr/cohere-transcribe-03-2026-GGUF",
+    "revision": "77234fcd7f77d271e5fc57f14fb05f260275558c",
+    "file": "cohere-transcribe.gguf",
+    "bytes": 4136505120,
+    "sha256": "f38225c97dd8185823167cd5107370cda4bf7f77e5042cae7e254f1e6dabced4",
+    "tensor_inventory": {"matched": 2104, "expected": 2104}
+  },
+  "input": {
+    "file": "version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav",
+    "bytes": 237964,
+    "sha256": "5fceacff0315d49cb59fcc505bcecf1ed5f2f35c2897b1e65a59f30e5d922150"
+  },
+  "oracle": {
+    "name": "CrispASR",
+    "revision": "ab87fba65a4ade1ef30ccaa881458a0914aae557",
+    "ggml_revision": "2dd13eddc783f2cd0a29324affd78081cc6f0034",
+    "binary_sha256": "cc8e5870041af3bad738d5045dc8c44e8caa6dd888c84a13c568e7265d426977",
+    "wall_seconds": 1.2401641979813576,
+    "checkpoint_count": 51
+  },
+  "cke_runtime": {
+    "engine_sha256": "7583a82ae7adc6875b5bf7d65cbcc1fa9db058e3f907af29be9f67f89a800447",
+    "audio_sha256": "dba313bff5450aa4401dcb5ccee4bebbf8c220891d83a747cd7980e12eccf2be",
+    "threads": 16,
+    "bundle": {
+      "weights_bytes": 4136363893,
+      "weights_sha256": "00324600d6487da49915d7a2e3a16e59156b3c9246d697a0bea2c51ae3f50c44",
+      "manifest_sha256": "22996b8c853c002e2492074f7b9aa26a626092f7e01d7418eb7f9e8f36012510",
+      "config_sha256": "0c238aedf5ac1c600380ff5328049c3010a08b3f352f9a131a2598dbd1e4eb10",
+      "source_tensors_consumed": 2104,
+      "source_tensors_total": 2104
+    },
+    "wall_seconds": 8.893829489010386,
+    "peak_rss_kib": 8177328
+  },
+  "numerics": {
+    "frontend": {"rmse": 0.00036743576264210723, "max_abs": 0.031045198440551758},
+    "encoder_layer_47": {"rmse": 0.000040736040023347074, "max_abs": 0.00026702880859375},
+    "generated_token_count": 32,
+    "generated_token_ids_exact": true,
+    "transcript_exact": true,
+    "eos_exact": true
+  },
+  "generated_token_ids": [2178, 13784, 563, 792, 13789, 13767, 4394, 546, 939, 593, 993, 916, 10672, 1119, 13768, 13765, 877, 9504, 2102, 858, 3057, 13785, 884, 580, 4773, 935, 746, 527, 1916, 2239, 4341, 13785],
+  "transcript": "Well, I don't wish to see it any more observed phoebe turning away her eyes. It is certainly very like the old portrait.",
+  "excluded_diagnostic_captures": {
+    "crisp.enc_out.bin": "CrispASR does not pin the intermediate as a graph output before host readback; recomputation from the layer-47 checkpoint correlates with CKE at 0.9999999887 while the captured buffer correlates at 0.0031."
+  },
+  "not_certified": ["long audio", "timestamps", "resampling", "multilingual", "quantized execution", "performance"]
+}
