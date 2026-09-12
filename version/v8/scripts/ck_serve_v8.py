@@ -62,8 +62,10 @@ for _p in (str(SCRIPTS_DIR), str(PROJECT_ROOT)):
 
 if __package__:
     from . import ck_serve_runtime_v8
+    from .ck_chat_completions_v8 import add_chat_completions_route
 else:
     import ck_serve_runtime_v8
+    from ck_chat_completions_v8 import add_chat_completions_route
 
 # Reuse color/logging constants from the runtime module so both entrypoints
 # share identical console styling.
@@ -2623,6 +2625,8 @@ def create_app(
             if cur is not None:
                 return cur
             return response
+
+    add_chat_completions_route(router, create_response)
 
     model_created_at = int(time.time())
 
