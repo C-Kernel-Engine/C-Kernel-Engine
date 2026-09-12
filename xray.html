@@ -1341,6 +1341,32 @@ cache_layout: kv_cache_v1 · layer/head/token/channel strides</code></pre>
     fixtures; failure-narrative sequencing and bug-bundle export are designed but not built.
 </p>
 
+<h2>The Explain Tab: One Operation, End to End</h2>
+
+<p>
+    The IR visualizer's <strong>Explain</strong> tab answers a different question than X-Ray. X-Ray asks
+    <em>where did the numbers diverge</em>; Explain asks <em>how was this one operation supposed to be
+    built at all</em>. It traces a single op through the chain
+    <strong>circuit operation &rarr; required contract &rarr; provider selection &rarr; kernel map &rarr;
+    generated call &rarr; C implementation and tests</strong>, deriving every field from the run's own
+    artifacts (<code>ir1_*.json</code>, <code>lowered_*_call.json</code>, the kernel registry) rather
+    than inferring compiler decisions from error strings. When a run stopped early, the chain shows what
+    existed at the failure point and marks every later stage <strong>not generated</strong>; the
+    provenance strip compares each artifact against its <code>.ck_ir_bundle.json</code> /
+    <code>.ck_codegen_bundle.json</code> stamp and discloses stale or mixed-revision files instead of
+    silently using them.
+</p>
+
+<p>
+    Three details matter for agents consuming the tab:
+</p>
+
+<ul>
+    <li><strong>Failure-mode reports</strong> (<code>explain_*.json</code>, schema <code>cke.v8.explain_op_report</code>) render what was requested, which providers were considered, why each was rejected, and which stage failed &mdash; the same vocabulary as <a href="codegen.html">Codegen's "When compilation fails, start here" table</a> and <a href="kernel-maps.html#resolution">the resolution algorithm</a>. The checked-in fixtures (<code>version/v8/tests/fixtures/explain/</code>) are reconstructed historical failure modes from the Laguna and Nemotron bring-ups, labeled as such with their commit/PR provenance.</li>
+    <li><strong>Copy diagnostic</strong> produces a compact JSON bundle (schema <code>cke.v8.explain_diagnostic</code>) for a human or a smaller local agent: the request, the chain as far as it resolved, rejection reasons, source locations, and the tests that verify a repair.</li>
+    <li><strong>Repair guidance is "where to look", never "apply this"</strong> &mdash; the bundle names the circuit JSON, the candidate kernel maps, and the resolver; it does not present any change as automatically safe.</li>
+</ul>
+
 <h2>Gates and Commands</h2>
 
 <pre><code># lightweight gate: schema, resolver, canonicalization, classification, bisection, manifest tests
