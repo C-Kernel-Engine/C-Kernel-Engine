@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -10,8 +11,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "version" / "v8" / "scripts"))
 
 from fastapi.testclient import TestClient
+from pydantic import TypeAdapter
 
 from ck_serve_v8 import create_app, CK_SESSION_REQUEST_RAW_PROMPT
+from server.schemas.streaming import ResponseStreamEvent
 
 # Reuse inline Qwen3 contract from test_live_app
 QWEN3_CONTRACT = {
@@ -37,6 +40,15 @@ QWEN3_CONTRACT = {
 }
 
 DUMMY_CHAT_TEMPLATES = {"tool_use": "tool jinja", "default": "default"}
+STREAM_EVENT_ADAPTER = TypeAdapter(ResponseStreamEvent)
+ROLE_AWARE_TEMPLATE = """
+{% for message in messages %}
+<{{ message.role }}>{{ message.content }}
+{% for call in message.get('tool_calls', []) %}
+CALL {{ call.id }} {{ call.function.name }} {{ call.function.arguments | tojson }}
+{% endfor %}</{{ message.role }}>
+{% endfor %}
+"""
 
 
 class FakeSession:
@@ -79,6 +91,15 @@ def iter_sse(text):
     return events
 
 
+def assert_valid_stream(events):
+    assert [payload["sequence_number"] for _, payload in events] == list(
+        range(len(events))
+    )
+    for event, payload in events:
+        assert payload["type"] == event
+        STREAM_EVENT_ADAPTER.validate_python(payload)
+
+
 def test_tool_call_single_non_stream():
     session = FakeSession(chunks=('{"name":"get_weather","arguments":{"location":"Paris"}}',))
     client = TestClient(create_app(session, model="fake-model", chat_contract=QWEN3_CONTRACT, chat_templates=DUMMY_CHAT_TEMPLATES))
@@ -107,6 +128,8 @@ def test_tool_call_single_stream():
     })
     assert resp.status_code == 200
     events = iter_sse(resp.text)
+    assert_valid_stream(events)
+    assert not any(ev == "response.output_text.delta" for ev, _ in events)
     deltas = [p["delta"] for ev, p in events if ev == "response.function_call_arguments.delta"]
     assert len(deltas) == 1
     assert json.loads(deltas[0]) == {"location": "Paris"}
@@ -137,6 +160,7 @@ def test_tool_call_malformed_failed():
         "tools": [{"type": "function", "name": "get_weather", "parameters": {}}],
     })
     events = iter_sse(resp2.text)
+    assert_valid_stream(events)
     assert any(ev == "response.failed" for ev, _ in events)
     assert any(ev == "error" for ev, _ in events)
 
@@ -181,14 +205,97 @@ def test_tool_call_parallel_false_incomplete():
         "parallel_tool_calls": False,
     })
     events = iter_sse(resp2.text)
+    assert_valid_stream(events)
     assert any(ev == "response.incomplete" for ev, _ in events)
     completed = next(p["response"] for ev, p in events if ev == "response.incomplete")
     assert len([i for i in completed["output"] if i["type"] == "function_call"]) == 1
 
 
+def test_function_output_continues_stored_tool_history():
+    session = FakeSession(
+        chunks=(
+            '{"name":"get_weather","arguments":{"location":"Paris"}}',
+        )
+    )
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates={"tool_use": ROLE_AWARE_TEMPLATE},
+        )
+    )
+    tools = [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "parameters": {"type": "object"},
+        }
+    ]
+    first = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": "Weather?", "tools": tools},
+    ).json()
+    call = next(item for item in first["output"] if item["type"] == "function_call")
+
+    session.chunks = ["It is sunny."]
+    second = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "previous_response_id": first["id"],
+            "input": [
+                {
+                    "type": "function_call_output",
+                    "call_id": call["call_id"],
+                    "output": "sunny, 22 C",
+                }
+            ],
+            "tools": tools,
+        },
+    )
+
+    assert second.status_code == 200
+    assert "<user>Weather?" in session.last_user
+    assert f"CALL {call['call_id']} get_weather" in session.last_user
+    assert "<tool>sunny, 22 C" in session.last_user
+
+
+def test_function_output_rejects_unknown_history_and_call_id():
+    session = FakeSession()
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates={"tool_use": ROLE_AWARE_TEMPLATE},
+        )
+    )
+    output = {
+        "type": "function_call_output",
+        "call_id": "call_missing",
+        "output": "result",
+    }
+    missing_response = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "previous_response_id": "resp_missing",
+            "input": [output],
+        },
+    )
+    assert missing_response.status_code == 404
+
+    unknown_call = client.post(
+        "/v1/responses",
+        json={"model": "fake-model", "input": [output]},
+    )
+    assert unknown_call.status_code == 400
+    assert "unknown call_id" in unknown_call.json()["detail"]
+
+
 def test_tool_call_cancellation_stream():
     import concurrent.futures
-    import threading
 
     class BlockingSession:
         def __init__(self):
@@ -222,9 +329,70 @@ def test_tool_call_cancellation_stream():
         active_id = next(iter(app.state.active_streams))
         resp = client.post(f"/v1/responses/{active_id}/cancel")
         assert resp.status_code == 200
-        try:
-            result = fut.result(timeout=5)
-            # after cancel, streaming should have response.cancelled
-            assert "response.cancelled" in result.text or result.status_code == 200
-        except Exception:
+        result = fut.result(timeout=5)
+        assert result.status_code == 200
+        events = iter_sse(result.text)
+        assert_valid_stream(events)
+        assert events[-1][0] == "response.cancelled"
+
+
+def test_tool_call_cancellation_reports_native_failure_and_timeout():
+    import concurrent.futures
+
+    class ControlledSession:
+        def __init__(self, *, cancel_error=None):
+            self.cancel_error = cancel_error
+            self.release = threading.Event()
+
+        def generate(
+            self,
+            system,
+            user,
+            *,
+            max_tokens,
+            temperature,
+            top_p,
+            on_token,
+            flags=0,
+            stop_on_text=(),
+            stop_at_eos=False,
+        ):
+            self.release.wait(timeout=5)
+            return {"prompt_tokens": 1, "generated_tokens": 0, "stop_reason": 3}
+
+        def cancel(self):
+            if self.cancel_error is not None:
+                raise self.cancel_error
+
+        def close(self):
             pass
+
+    for session, expected_status in (
+        (ControlledSession(cancel_error=RuntimeError("cancel failed")), 500),
+        (ControlledSession(), 504),
+    ):
+        app = create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates=DUMMY_CHAT_TEMPLATES,
+            cancel_wait_seconds=0.01,
+        )
+        client = TestClient(app)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            future = pool.submit(
+                client.post,
+                "/v1/responses",
+                json={"model": "fake-model", "input": "hi", "stream": True},
+            )
+            for _ in range(50):
+                with app.state.active_streams_lock:
+                    if app.state.active_streams:
+                        break
+                time.sleep(0.01)
+            assert app.state.active_streams
+            response_id = next(iter(app.state.active_streams))
+            cancelled = client.post(f"/v1/responses/{response_id}/cancel")
+            assert cancelled.status_code == expected_status
+            session.release.set()
+            future.result(timeout=5)

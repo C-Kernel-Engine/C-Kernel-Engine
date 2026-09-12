@@ -487,6 +487,74 @@ def _extract_prompt(body: Any) -> str:
     return "\n".join(parts)
 
 
+def _content_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for part in content:
+        if isinstance(part, str):
+            parts.append(part)
+            continue
+        text = getattr(part, "text", None)
+        if isinstance(text, str):
+            parts.append(text)
+    return "\n".join(parts)
+
+
+def _input_chat_messages(value: Any) -> list[dict[str, Any]]:
+    """Convert Responses input items to role-preserving chat-template messages."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [{"role": "user", "content": value}]
+
+    messages: list[dict[str, Any]] = []
+    for item in value:
+        item_type = getattr(item, "type", None)
+        if item_type == "message" or (
+            item_type is None and getattr(item, "role", None) is not None
+        ):
+            role = getattr(item, "role", "user")
+            role = getattr(role, "value", role)
+            messages.append(
+                {"role": str(role), "content": _content_text(item.content)}
+            )
+        elif item_type == "function_call":
+            try:
+                arguments = json.loads(item.arguments)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    f"function_call {item.call_id!r} has invalid JSON arguments"
+                ) from exc
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": item.call_id,
+                            "type": "function",
+                            "function": {
+                                "name": item.name,
+                                "arguments": arguments,
+                            },
+                        }
+                    ],
+                }
+            )
+        elif item_type == "function_call_output":
+            messages.append(
+                {
+                    "role": "tool",
+                    "content": _content_text(item.output),
+                    "tool_call_id": item.call_id,
+                }
+            )
+    return messages
+
+
 def _usage(
     input_tokens: int, output_tokens: int, reasoning_tokens: int = 0
 ) -> dict[str, Any]:
@@ -904,7 +972,7 @@ def _has_tool_support(
 def _render_with_chat_templates(
     chat_template: str | None,
     chat_templates: dict[str, str] | None,
-    prompt: str,
+    messages: list[dict[str, Any]],
     body: Any,
     chat_contract: dict[str, Any] | None = None,
     effective_thinking: str = "suppressed",
@@ -929,12 +997,9 @@ def _render_with_chat_templates(
     if not tmpl_str:
         return None
     try:
-        # Build minimal messages list expected by HF/qwen templates
-        messages: list[dict[str, Any]] = []
         instructions = getattr(body, "instructions", None) if body is not None else None
         if isinstance(instructions, str) and instructions.strip():
-            messages.append({"role": "system", "content": instructions})
-        messages.append({"role": "user", "content": str(prompt or "")})
+            messages = [{"role": "system", "content": instructions}, *messages]
         tools = None
         if body is not None and getattr(body, "tools", None):
             tools = [t.model_dump() for t in body.tools]  # type: ignore
@@ -1079,6 +1144,15 @@ def _strip_tool_json_from_text(
     """Remove tool JSON snippets from text to get residual message text."""
     if not text or not tool_calls:
         return text
+    stripped = text.strip()
+    if (stripped.startswith("{") and stripped.endswith("}")) or (
+        stripped.startswith("[") and stripped.endswith("]")
+    ):
+        try:
+            json.loads(stripped)
+            return ""
+        except json.JSONDecodeError:
+            pass
     remaining = text
     # remove <tool_call> blocks
     import re as _re2
@@ -1116,6 +1190,7 @@ def create_app(
     chat_contract: dict[str, Any] | None = None,
     chat_template: str | None = None,
     chat_templates: dict[str, str] | None = None,
+    cancel_wait_seconds: float = 10.0,
 ):
     """Build the FastAPI app around a live session (real or injected fake).
 
@@ -1135,6 +1210,7 @@ def create_app(
 
     router = APIRouter()
     response_store: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    response_history_store: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
     response_store_lock = threading.Lock()
     response_store_limit = 256
     _flight_lock = threading.Lock()
@@ -1176,15 +1252,58 @@ def create_app(
                     detail="Model doesn't support tool calling",
                 )
 
-    def _store_response(response_id: str, response: dict[str, Any]) -> None:
+    def _store_response(
+        response_id: str,
+        response: dict[str, Any],
+        history: list[dict[str, Any]],
+    ) -> None:
         with response_store_lock:
             response_store[response_id] = response
+            response_history_store[response_id] = history
             response_store.move_to_end(response_id)
+            response_history_store.move_to_end(response_id)
             while len(response_store) > response_store_limit:
-                response_store.popitem(last=False)
+                evicted_id, _ = response_store.popitem(last=False)
+                response_history_store.pop(evicted_id, None)
+
+    def _request_messages(body) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+        if body.previous_response_id:
+            with response_store_lock:
+                previous = response_history_store.get(body.previous_response_id)
+            if previous is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Previous response {body.previous_response_id!r} not found",
+                )
+            messages.extend(dict(message) for message in previous)
+
+        try:
+            current = _input_chat_messages(body.input)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        known_call_ids = {
+            call.get("id")
+            for message in [*messages, *current]
+            for call in message.get("tool_calls", [])
+            if isinstance(call, dict) and call.get("id")
+        }
+        for message in current:
+            if message.get("role") != "tool":
+                continue
+            call_id = message.get("tool_call_id")
+            if call_id not in known_call_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Function output references unknown call_id {call_id!r}",
+                )
+        messages.extend(current)
+        return messages
 
     def _prepare_request(body):
         _validate_request(body)
+        messages = _request_messages(body)
         prompt = _extract_prompt(body)
         tok_limit = (
             body.max_output_tokens if body.max_output_tokens is not None else max_tokens
@@ -1206,10 +1325,20 @@ def create_app(
             jinja_rendered = _render_with_chat_templates(
                 chat_template,
                 chat_templates,
-                prompt,
+                messages,
                 body,
                 chat_contract,
                 effective_thinking,
+            )
+
+        requires_role_rendering = any(
+            message.get("role") != "user" or message.get("tool_calls")
+            for message in messages
+        )
+        if requires_role_rendering and jinja_rendered is None:
+            raise HTTPException(
+                status_code=422,
+                detail="The selected model template cannot render role-aware tool history",
             )
 
         if jinja_rendered is not None and jinja_rendered.strip():
@@ -1372,7 +1501,21 @@ def create_app(
         except Exception:
             pass
         if should_store:
-            _store_response(response_id, resp)
+            history = _request_messages(body)
+            assistant: dict[str, Any] = {"role": "assistant", "content": text}
+            if tool_calls:
+                assistant["tool_calls"] = [
+                    {
+                        "id": call.get("call_id"),
+                        "type": "function",
+                        "function": {
+                            "name": call.get("name"),
+                            "arguments": json.loads(call.get("arguments") or "{}"),
+                        },
+                    }
+                    for call in tool_calls
+                ]
+            _store_response(response_id, resp, [*history, assistant])
         return resp
 
     def stream_events(
@@ -1429,13 +1572,19 @@ def create_app(
         def on_token(_tid, text):
             if text:
                 complete.append(text)
-                if splitter is not None:
-                    for state, delta in splitter.feed(text):
-                        events.put(
-                            ("reasoning_text" if state == "thinking" else "text", delta)
-                        )
-                else:
-                    events.put(("text", text))
+                if not body.tools:
+                    if splitter is not None:
+                        for state, delta in splitter.feed(text):
+                            events.put(
+                                (
+                                    "reasoning_text"
+                                    if state == "thinking"
+                                    else "text",
+                                    delta,
+                                )
+                            )
+                    else:
+                        events.put(("text", text))
             return -1 if cancelled.is_set() else 0
 
         def worker():
@@ -1451,7 +1600,7 @@ def create_app(
                     stop_on_text=stop_markers,
                     stop_at_eos=stop_at_eos,
                 )
-                if splitter is not None:
+                if splitter is not None and not body.tools:
                     for state, delta in splitter.flush():
                         events.put(
                             ("reasoning_text" if state == "thinking" else "text", delta)
@@ -1936,6 +2085,17 @@ def create_app(
                                 message_content_part_added = True
                             if message_content_part_added:
                                 yield from emit(
+                                    "response.output_text.delta",
+                                    {
+                                        "type": "response.output_text.delta",
+                                        "item_id": message_id,
+                                        "output_index": msg_out_idx,
+                                        "content_index": 0,
+                                        "delta": remaining_text,
+                                        "logprobs": None,
+                                    },
+                                )
+                                yield from emit(
                                     "response.content_part.done",
                                     {
                                         "type": "response.content_part.done",
@@ -2005,6 +2165,18 @@ def create_app(
                                 },
                             )
                             message_content_part_added = True
+                        if has_tools and remaining_text:
+                            yield from emit(
+                                "response.output_text.delta",
+                                {
+                                    "type": "response.output_text.delta",
+                                    "item_id": message_id,
+                                    "output_index": message_index,
+                                    "content_index": 0,
+                                    "delta": remaining_text,
+                                    "logprobs": None,
+                                },
+                            )
                         # Content part done before output_text.done (OpenAI order)
                         if message_content_part_added:
                             yield from emit(
@@ -2422,21 +2594,20 @@ def create_app(
         with active_streams_lock:
             entry = active_streams.get(response_id)
         if entry is not None:
-            try:
-                entry["cancelled"].set()
-            except Exception:
-                pass
+            entry["cancelled"].set()
             try:
                 session.cancel()
-            except Exception:
-                pass
-            # Wait for worker to notice cancellation and exit (so next POST won't get 429)
-            try:
-                finished: threading.Event = entry["finished"]
-                # Wait up to 10s for native loop to break (one decode latency)
-                finished.wait(timeout=10.0)
-            except Exception:
-                pass
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Native session cancellation failed: {exc}",
+                ) from exc
+            finished: threading.Event = entry["finished"]
+            if not finished.wait(timeout=max(0.0, cancel_wait_seconds)):
+                raise HTTPException(
+                    status_code=504,
+                    detail="Generation did not stop before the cancellation deadline",
+                )
         else:
             # Stale: store says in_progress but no active stream entry.
             # Do not call process-wide session.cancel() - it would cancel the
@@ -2492,6 +2663,7 @@ def create_app(
 
     # Expose internal state for testing / debugging
     app.state.response_store = response_store
+    app.state.response_history_store = response_history_store
     app.state.response_store_lock = response_store_lock
     app.state.active_streams = active_streams
     app.state.active_streams_lock = active_streams_lock
