@@ -1,0 +1,105 @@
+<!-- TITLE: Parakeet TDT Native CPU Bring-up -->
+<!-- NAV: kernels -->
+
+<div class="container">
+  <h1>Parakeet TDT Native CPU Bring-up</h1>
+  <p class="lead">The first Parakeet milestone freezes the reference and maps every required operation to CKE. A pinned FP32 reference fixture passes on Ryzen, but native CKE transcription has not been implemented or tested. Diarization is a separate milestone.</p>
+
+  <style>
+    .para-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin:1rem 0; }
+    .para-card { background:var(--dark-card); border:1px solid var(--grey); border-radius:10px; padding:1rem; }
+    .para-table { overflow-x:auto; margin:1rem 0; }
+    .para-table table { width:100%; min-width:850px; border-collapse:collapse; font-size:.86rem; }
+    .para-table th,.para-table td { border:1px solid var(--grey); padding:.55rem; text-align:left; vertical-align:top; }
+    .para-table th { color:var(--orange); background:#121a24; }
+    .status { white-space:nowrap; font-weight:700; }
+    .status-reuse,.status-reuse_candidate { color:#7fd4a3; }
+    .status-map_promotion,.status-contract_extension,.status-composition_gap { color:#ffd38a; }
+    .status-missing_provider,.status-missing_runtime,.status-missing_composition { color:#ff8a80; }
+    .para-code { overflow-x:auto; background:#0b1118; border:1px solid #263242; border-radius:8px; padding:.8rem; }
+    main code { overflow-wrap:anywhere; }
+  </style>
+
+  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>Reference fixture: passed. Operation inventory: complete. Native CKE conversion, generated circuit, transcription parity, multilingual audio, long audio, and diarization: not tested.</div></div>
+
+  <h2 id="reference">Frozen reference</h2>
+  <div class="para-grid">
+    <div class="para-card"><strong>Checkpoint</strong><br><a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3/tree/541d1f99c6b0c3cd0b11a95167540bb8edefd82b"><code>nvidia/parakeet-tdt-0.6b-v3</code></a><br><code>541d1f99...defd82b</code><br>CC BY 4.0</div>
+    <div class="para-card"><strong>Reference code</strong><br><a href="https://github.com/huggingface/transformers/tree/66799f45cea7513712580c6170cdaa4438df702a/src/transformers/models/parakeet">Transformers commit <code>66799f45...</code></a><br>FP32 eager CPU</div>
+    <div class="para-card"><strong>Model shape</strong><br>24-layer FastConformer, width 1024<br>2-layer LSTM, width 640<br>723 tensors, 2,508,311,120 bytes</div>
+    <div class="para-card"><strong>Decoder</strong><br>8,193 token logits including blank 8192<br>durations [0, 1, 2, 3, 4]<br>0.08-second encoder frames</div>
+  </div>
+  <p>The checkpoint metadata says <code>5.6.0.dev0</code>. The released v5.6.0 source does not contain <code>ParakeetForTDT</code>, so certification pins the executable source commit directly.</p>
+
+  <h2 id="fixture">First reference fixture</h2>
+  <p>The 7.435-second mono 16 kHz utterance <code>2086-149220-0033.wav</code> is the sample linked by NVIDIA's model card and comes from the <a href="https://www.openslr.org/12">CC BY 4.0 LibriSpeech corpus</a>. On Ryzen with PyTorch 2.13.0+cpu, 16 threads, and the pinned Transformers commit, the reference completed in 0.39 seconds and produced 50 decode steps, 44 nonblank emissions, durations, and token timestamps.</p>
+  <blockquote>Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.</blockquote>
+  <p>The compressed tensor fixture retains audio, normalized frontend features and mask, subsampling, encoder layers 0 and 23, projected encoder output, initial decoder output, all 8,198 first-step joint logits, generated token IDs, and durations. Every recorded array is finite and has an independent content hash.</p>
+  <ul>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">Fixture report (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz">Intermediate tensors (NPZ)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">Complete 723-tensor manifest (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json">Operation-reuse inventory (JSON)</a></li>
+  </ul>
+
+  <h2 id="inventory">Operation-reuse inventory</h2>
+  <p>Reusable means the provider's interface fits. Candidate reuse still requires a comparison at the named fixture boundary. Missing composition means the mathematical pieces exist but no declared Parakeet graph binds them yet.</p>
+  <div class="para-table"><table><thead><tr><th>Stage</th><th>Required operation</th><th>Disposition</th><th>CKE foundation and exact gap</th></tr></thead><tbody><tr><td>frontend</td><td>PCM decode and mono conversion</td><td><span class="status status-reuse">Reusable</span></td><td><code>audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32</code><br>16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input.</td></tr>
+<tr><td>frontend</td><td>sample-rate validation and resampling</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_resample_windowed_sinc_f32</code><br>The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately.</td></tr>
+<tr><td>frontend</td><td>pre-emphasis x[t]-0.97*x[t-1]</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_preemphasis_f32</code><br>Arithmetic and first-sample rule match; real-fixture comparison remains required.</td></tr>
+<tr><td>frontend</td><td>centered STFT power, n_fft=512, win=400, hop=160</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_stft_power_centered_window_f32</code><br>Use an explicit non-periodic Hann window and zero padding. Existing provider supports the shape; compare direct-DFT accumulation with torch.stft.</td></tr>
+<tr><td>frontend</td><td>Slaney mel filter bank, 128 bins</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_whisper_mel_filters_slaney_f32</code><br>Provider is dimension-general despite its legacy name. Compare every filter coefficient with the pinned librosa FP32 bank.</td></tr>
+<tr><td>frontend</td><td>natural-log mel projection</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_log_mel_time_major_f32</code><br>Time-major layout and ln(sum+epsilon) match structurally; freeze the pinned epsilon and accumulation tolerance.</td></tr>
+<tr><td>frontend</td><td>per-feature normalization over live frames</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_feature_normalize_per_feature_f32</code><br>Sample variance uses N-1 and epsilon after sqrt. Batched padding masks need composition around the provider.</td></tr>
+<tr><td>encoder</td><td>three-stage grouped Conv2D subsampling</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_conv2d_whc_grouped_f32</code><br>Covers regular, depthwise, and 1x1 stages with bias. Circuit must reproduce masking after every Conv2D and CHW/time reshapes.</td></tr>
+<tr><td>encoder</td><td>subsampling ReLU</td><td><span class="status status-map_promotion">Map promotion</span></td><td><code>relu_forward</code><br>Kernel exists but lacks a current v8 inference kernel map; promote a narrow FP32 map or fuse only after parity.</td></tr>
+<tr><td>encoder</td><td>subsampling flatten and linear projection</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Optional bias is supported. Layout conversion from [C,H,W] to time-major C*W must be declared.</td></tr>
+<tr><td>encoder</td><td>relative sinusoidal position encoding</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs FP32 descending relative positions [T-1..-(T-1)], sin/cos interleave, and exact cast boundaries.</td></tr>
+<tr><td>encoder</td><td>LayerNorm at five block sites</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>layernorm_fp32_exact</code><br>Shape fits, but existing exact contract targets ggml reduction order. PyTorch FP32 CPU parity must be measured before selection.</td></tr>
+<tr><td>encoder</td><td>Macaron FFN linear-SiLU-linear</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>gemm_nt_fp32_exact; recurrent_silu_forward</code><br>Linear provider is reusable. Standalone SiLU needs an architecture-neutral map and PyTorch FP32 numerical certification.</td></tr>
+<tr><td>encoder</td><td>half-scaled FFN residual</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>add_stream_inplace</code><br>DSL needs explicit 0.5 branch scaling at both FFN residual sites with preserved operation order.</td></tr>
+<tr><td>encoder</td><td>Transformer-XL relative self-attention</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>gemm_nt_fp32_exact; audio_relative_shift_f32</code><br>Q/K/V/O and relative-K projections reuse GEMM. Bias-u/v, content/position score composition, non-causal mask, FP32 softmax, value product, and layout contracts need a declared composite/provider.</td></tr>
+<tr><td>encoder</td><td>Conformer pointwise/depthwise Conv1D</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_conv1d_channel_major_f32</code><br>Kernel covers stride/padding. Parakeet weights omit convolution bias, while the map currently requires one; bind a prepared zero bias or add an optional-bias contract.</td></tr>
+<tr><td>encoder</td><td>channel-split GLU</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_glu_split_channel_major_f32</code><br>Layout and value*sigmoid(gate) match; compare libm/SLEEF behavior against pinned PyTorch.</td></tr>
+<tr><td>encoder</td><td>inference BatchNorm1D</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs running mean/variance, affine weight/bias, epsilon, FP32 order, no training-state updates, and no per-call allocation.</td></tr>
+<tr><td>encoder</td><td>padding-mask zeroing before convolution</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>none</code><br>Declare masked fill over channel-major activations; must use post-subsampling live lengths.</td></tr>
+<tr><td>transducer</td><td>encoder 1024-to-640 projector</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Bias is present and provider dimensions fit.</td></tr>
+<tr><td>prediction</td><td>8193-by-640 token embedding</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>embedding_forward_fp32</code><br>Vocabulary includes blank id 8192. Select the FP32 variant without positional embeddings.</td></tr>
+<tr><td>prediction</td><td>two-layer 640-wide LSTM prediction network</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs prepared/session-owned hidden and cell state, PyTorch gate order and nonlinearities, explicit reset/reuse semantics, and no compute-time heap allocation.</td></tr>
+<tr><td>prediction</td><td>decoder 640-to-640 projector</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Bias is present.</td></tr>
+<tr><td>joint</td><td>joint encoder-plus-decoder add and ReLU</td><td><span class="status status-map_promotion">Map promotion</span></td><td><code>add_stream_inplace; relu_forward</code><br>Elementwise kernels exist; ReLU needs a v8 inference map and broadcast/add shapes must be declared.</td></tr>
+<tr><td>joint</td><td>joint 640-to-8198 token-duration head</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Output splits into 8193 token logits and five duration logits.</td></tr>
+<tr><td>decode</td><td>greedy TDT token-duration state machine</td><td><span class="status status-missing_runtime">Missing runtime</span></td><td><code>none</code><br>Argmax token and duration independently; blank with predicted duration zero advances by one; nonblank duration zero stays on frame; max output is bounded by encoder traversal.</td></tr>
+<tr><td>decode</td><td>Metaspace BPE decode</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>existing tokenizer infrastructure</code><br>Tokenizer JSON has 8192 BPE entries with Metaspace replacement U+2581. Verify repeated tokens, blank/pad suppression, punctuation, and UTF-8 languages.</td></tr>
+<tr><td>decode</td><td>token timestamps</td><td><span class="status status-missing_runtime">Missing runtime</span></td><td><code>none</code><br>Cumulative duration gives frame index; frame rate is 0.08 s. Punctuation is collapsed to the previous token endpoint by the pinned processor.</td></tr>
+<tr><td>conversion</td><td>safetensors to BUMP plus sidecar conversion</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>convert_safetensors_to_bump_v8.py foundation</code><br>Add strict Parakeet name/shape rules and require all 723 tensors to be consumed or explicitly classified; do not load Transformers during inference.</td></tr>
+<tr><td>runtime</td><td>Parakeet circuit and native session</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>v8 circuit/lowering/runtime foundations</code><br>Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths.</td></tr></tbody></table></div>
+
+  <h2 id="milestones">Implementation milestones</h2>
+  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>Exit evidence</th></tr></thead><tbody><tr><td>1</td><td>frontend and subsampling X-Ray</td><td>CKE matches the committed frontend and subsampling tensors for the short fixture under stated tolerances.</td></tr>
+<tr><td>2</td><td>one FastConformer block</td><td>Layer 0 matches at all five residual boundaries; BatchNorm and relative attention contracts are explicit.</td></tr>
+<tr><td>3</td><td>full encoder</td><td>All 24 encoder boundaries and the 1024-to-640 projection match; memory is bounded for the tested clip.</td></tr>
+<tr><td>4</td><td>prediction, joint, and TDT decode</td><td>Native token ids, durations, timestamps, and transcript match the pinned reference on the short fixture.</td></tr>
+<tr><td>5</td><td>BUMP conversion and native CLI</td><td>All 723 tensors are accounted for, generated C builds, and normal inference has no reference-framework dependency.</td></tr>
+<tr><td>6</td><td>long audio and multilingual coverage</td><td>Five-minute then 42-minute runs report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior.</td></tr></tbody></table></div>
+  <p>New production compute paths must use planner-declared scratch or session-owned state. They may not allocate or free heap memory per call, hide allocation in helpers, substitute large stack buffers, or share mutable scratch across sessions.</p>
+
+  <h2 id="reproduce">Reproduce the reference capture</h2>
+  <p>Download the exact Hugging Face revision once into the shared model cache, then run the fixture tool. Transformers, PyTorch, librosa, and soundfile belong to this certification environment; the eventual CKE inference path will not depend on them.</p>
+  <pre class="para-code"><code>export CKE_MODEL_CACHE="$HOME/.cache/cke/models"
+hf download nvidia/parakeet-tdt-0.6b-v3 \
+  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --local-dir "$CKE_MODEL_CACHE/parakeet-tdt-0.6b-v3-541d1f99"
+
+PYTHONPATH="$HOME/.cache/cke/reference/transformers-66799f45" \
+python version/v8/scripts/capture_parakeet_reference_v8.py \
+  --model-dir "$CKE_MODEL_CACHE/parakeet-tdt-0.6b-v3-541d1f99" \
+  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
+  --output-json /tmp/parakeet-reference.json \
+  --output-npz /tmp/parakeet-reference.npz \
+  --model-revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --transformers-revision 66799f45cea7513712580c6170cdaa4438df702a</code></pre>
+
+  <h2 id="next">Next work</h2>
+  <p>The next PR should implement and X-Ray only the frontend plus Conv2D subsampling against this fixture. One FastConformer block follows after the BatchNorm and relative-attention contracts are settled. Diarization begins in a separate PR after a bounded checkpoint comparison, and it first integrates with the already working Whisper path.</p>
+</div>

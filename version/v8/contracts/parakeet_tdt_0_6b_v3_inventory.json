@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "kind": "cke.parakeet.operation_reuse_inventory",
+  "status": "inventory_complete_implementation_not_started",
+  "generated_at": "2026-09-12",
+  "scope": "Native CPU text transcription for nvidia/parakeet-tdt-0.6b-v3; diarization is a separate milestone and is excluded.",
+  "reference_contract": {
+    "model": {
+      "id": "nvidia/parakeet-tdt-0.6b-v3",
+      "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+      "license": "CC-BY-4.0",
+      "weights_sha256": "3a2026366188c8c68598edbbff92f8d11590a08e0ae2e6775544e7b07d6a5e11",
+      "weights_bytes": 2508311120,
+      "tensor_count": 723
+    },
+    "implementation": {
+      "repository": "huggingface/transformers",
+      "revision": "66799f45cea7513712580c6170cdaa4438df702a",
+      "version": "5.15.0.dev0",
+      "source_sha256": {
+        "modeling_parakeet.py": "61c7e96716e20411650a8190213eb5f19916dfb05a8ffbed5e123cb8769ee69c",
+        "generation_parakeet.py": "ee5ac5310d699f7d48d9c04e525bebae6b905e663f74fb418470ce514703d0ba",
+        "feature_extraction_parakeet.py": "5ec8a9664456edfc0b56c64083bdcdd74dd78364504d35207ab917d1c3b9f575"
+      },
+      "note": "The checkpoint says 5.6.0.dev0. Released v5.6.0 lacks ParakeetForTDT, so the executable source commit is pinned directly."
+    },
+    "dtype": "float32",
+    "attention_backend": "eager Transformer-XL relative-position composition",
+    "processor": {
+      "sample_rate": 16000,
+      "preemphasis": 0.97,
+      "n_fft": 512,
+      "win_length": 400,
+      "hop_length": 160,
+      "hann_periodic": false,
+      "stft_centered": true,
+      "stft_pad_mode": "constant",
+      "mel_bins": 128,
+      "mel_scale": "slaney",
+      "log": "natural",
+      "normalization": "per-feature sample variance over live frames",
+      "padding_side": "right"
+    },
+    "model_shape": {
+      "encoder_layers": 24,
+      "encoder_width": 1024,
+      "encoder_ffn_width": 4096,
+      "attention_heads": 8,
+      "head_dim": 128,
+      "conv_kernel": 9,
+      "subsampling_factor": 8,
+      "subsampling_channels": 256,
+      "decoder_layers": 2,
+      "decoder_width": 640,
+      "vocab_size_including_blank": 8193,
+      "blank_token_id": 8192,
+      "joint_output_width": 8198,
+      "durations": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "max_symbols_per_step": 10
+    }
+  },
+  "existing_foundation": {
+    "origin_commit": "cb1df70f0407b78b23c6bb11da2957d92d6dd517",
+    "origin_pr": 433,
+    "note": "Cohere Transcribe provider work deliberately introduced architecture-neutral FastConformer primitives. Presence is not Parakeet certification."
+  },
+  "summary": {
+    "operations": 30,
+    "reuse": 5,
+    "reuse_candidate": 9,
+    "map_promotion": 2,
+    "contract_extension": 3,
+    "composition_gap": 4,
+    "missing_provider": 3,
+    "missing_runtime": 2,
+    "missing_composition": 2
+  },
+  "operations": [
+    {
+      "operation": "PCM decode and mono conversion",
+      "stage": "frontend",
+      "disposition": "reuse",
+      "cke_foundation": "audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32",
+      "finding": "16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input."
+    },
+    {
+      "operation": "sample-rate validation and resampling",
+      "stage": "frontend",
+      "disposition": "contract_extension",
+      "cke_foundation": "audio_resample_windowed_sinc_f32",
+      "finding": "The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately."
+    },
+    {
+      "operation": "pre-emphasis x[t]-0.97*x[t-1]",
+      "stage": "frontend",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_preemphasis_f32",
+      "finding": "Arithmetic and first-sample rule match; real-fixture comparison remains required."
+    },
+    {
+      "operation": "centered STFT power, n_fft=512, win=400, hop=160",
+      "stage": "frontend",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_stft_power_centered_window_f32",
+      "finding": "Use an explicit non-periodic Hann window and zero padding. Existing provider supports the shape; compare direct-DFT accumulation with torch.stft."
+    },
+    {
+      "operation": "Slaney mel filter bank, 128 bins",
+      "stage": "frontend",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_whisper_mel_filters_slaney_f32",
+      "finding": "Provider is dimension-general despite its legacy name. Compare every filter coefficient with the pinned librosa FP32 bank."
+    },
+    {
+      "operation": "natural-log mel projection",
+      "stage": "frontend",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_log_mel_time_major_f32",
+      "finding": "Time-major layout and ln(sum+epsilon) match structurally; freeze the pinned epsilon and accumulation tolerance."
+    },
+    {
+      "operation": "per-feature normalization over live frames",
+      "stage": "frontend",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_feature_normalize_per_feature_f32",
+      "finding": "Sample variance uses N-1 and epsilon after sqrt. Batched padding masks need composition around the provider."
+    },
+    {
+      "operation": "three-stage grouped Conv2D subsampling",
+      "stage": "encoder",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_conv2d_whc_grouped_f32",
+      "finding": "Covers regular, depthwise, and 1x1 stages with bias. Circuit must reproduce masking after every Conv2D and CHW/time reshapes."
+    },
+    {
+      "operation": "subsampling ReLU",
+      "stage": "encoder",
+      "disposition": "map_promotion",
+      "cke_foundation": "relu_forward",
+      "finding": "Kernel exists but lacks a current v8 inference kernel map; promote a narrow FP32 map or fuse only after parity."
+    },
+    {
+      "operation": "subsampling flatten and linear projection",
+      "stage": "encoder",
+      "disposition": "reuse",
+      "cke_foundation": "gemm_nt_fp32_exact",
+      "finding": "Optional bias is supported. Layout conversion from [C,H,W] to time-major C*W must be declared."
+    },
+    {
+      "operation": "relative sinusoidal position encoding",
+      "stage": "encoder",
+      "disposition": "missing_provider",
+      "cke_foundation": "none",
+      "finding": "Needs FP32 descending relative positions [T-1..-(T-1)], sin/cos interleave, and exact cast boundaries."
+    },
+    {
+      "operation": "LayerNorm at five block sites",
+      "stage": "encoder",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "layernorm_fp32_exact",
+      "finding": "Shape fits, but existing exact contract targets ggml reduction order. PyTorch FP32 CPU parity must be measured before selection."
+    },
+    {
+      "operation": "Macaron FFN linear-SiLU-linear",
+      "stage": "encoder",
+      "disposition": "composition_gap",
+      "cke_foundation": "gemm_nt_fp32_exact; recurrent_silu_forward",
+      "finding": "Linear provider is reusable. Standalone SiLU needs an architecture-neutral map and PyTorch FP32 numerical certification."
+    },
+    {
+      "operation": "half-scaled FFN residual",
+      "stage": "encoder",
+      "disposition": "composition_gap",
+      "cke_foundation": "add_stream_inplace",
+      "finding": "DSL needs explicit 0.5 branch scaling at both FFN residual sites with preserved operation order."
+    },
+    {
+      "operation": "Transformer-XL relative self-attention",
+      "stage": "encoder",
+      "disposition": "composition_gap",
+      "cke_foundation": "gemm_nt_fp32_exact; audio_relative_shift_f32",
+      "finding": "Q/K/V/O and relative-K projections reuse GEMM. Bias-u/v, content/position score composition, non-causal mask, FP32 softmax, value product, and layout contracts need a declared composite/provider."
+    },
+    {
+      "operation": "Conformer pointwise/depthwise Conv1D",
+      "stage": "encoder",
+      "disposition": "contract_extension",
+      "cke_foundation": "audio_conv1d_channel_major_f32",
+      "finding": "Kernel covers stride/padding. Parakeet weights omit convolution bias, while the map currently requires one; bind a prepared zero bias or add an optional-bias contract."
+    },
+    {
+      "operation": "channel-split GLU",
+      "stage": "encoder",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "audio_glu_split_channel_major_f32",
+      "finding": "Layout and value*sigmoid(gate) match; compare libm/SLEEF behavior against pinned PyTorch."
+    },
+    {
+      "operation": "inference BatchNorm1D",
+      "stage": "encoder",
+      "disposition": "missing_provider",
+      "cke_foundation": "none",
+      "finding": "Needs running mean/variance, affine weight/bias, epsilon, FP32 order, no training-state updates, and no per-call allocation."
+    },
+    {
+      "operation": "padding-mask zeroing before convolution",
+      "stage": "encoder",
+      "disposition": "composition_gap",
+      "cke_foundation": "none",
+      "finding": "Declare masked fill over channel-major activations; must use post-subsampling live lengths."
+    },
+    {
+      "operation": "encoder 1024-to-640 projector",
+      "stage": "transducer",
+      "disposition": "reuse",
+      "cke_foundation": "gemm_nt_fp32_exact",
+      "finding": "Bias is present and provider dimensions fit."
+    },
+    {
+      "operation": "8193-by-640 token embedding",
+      "stage": "prediction",
+      "disposition": "reuse_candidate",
+      "cke_foundation": "embedding_forward_fp32",
+      "finding": "Vocabulary includes blank id 8192. Select the FP32 variant without positional embeddings."
+    },
+    {
+      "operation": "two-layer 640-wide LSTM prediction network",
+      "stage": "prediction",
+      "disposition": "missing_provider",
+      "cke_foundation": "none",
+      "finding": "Needs prepared/session-owned hidden and cell state, PyTorch gate order and nonlinearities, explicit reset/reuse semantics, and no compute-time heap allocation."
+    },
+    {
+      "operation": "decoder 640-to-640 projector",
+      "stage": "prediction",
+      "disposition": "reuse",
+      "cke_foundation": "gemm_nt_fp32_exact",
+      "finding": "Bias is present."
+    },
+    {
+      "operation": "joint encoder-plus-decoder add and ReLU",
+      "stage": "joint",
+      "disposition": "map_promotion",
+      "cke_foundation": "add_stream_inplace; relu_forward",
+      "finding": "Elementwise kernels exist; ReLU needs a v8 inference map and broadcast/add shapes must be declared."
+    },
+    {
+      "operation": "joint 640-to-8198 token-duration head",
+      "stage": "joint",
+      "disposition": "reuse",
+      "cke_foundation": "gemm_nt_fp32_exact",
+      "finding": "Output splits into 8193 token logits and five duration logits."
+    },
+    {
+      "operation": "greedy TDT token-duration state machine",
+      "stage": "decode",
+      "disposition": "missing_runtime",
+      "cke_foundation": "none",
+      "finding": "Argmax token and duration independently; blank with predicted duration zero advances by one; nonblank duration zero stays on frame; max output is bounded by encoder traversal."
+    },
+    {
+      "operation": "Metaspace BPE decode",
+      "stage": "decode",
+      "disposition": "contract_extension",
+      "cke_foundation": "existing tokenizer infrastructure",
+      "finding": "Tokenizer JSON has 8192 BPE entries with Metaspace replacement U+2581. Verify repeated tokens, blank/pad suppression, punctuation, and UTF-8 languages."
+    },
+    {
+      "operation": "token timestamps",
+      "stage": "decode",
+      "disposition": "missing_runtime",
+      "cke_foundation": "none",
+      "finding": "Cumulative duration gives frame index; frame rate is 0.08 s. Punctuation is collapsed to the previous token endpoint by the pinned processor."
+    },
+    {
+      "operation": "safetensors to BUMP plus sidecar conversion",
+      "stage": "conversion",
+      "disposition": "missing_composition",
+      "cke_foundation": "convert_safetensors_to_bump_v8.py foundation",
+      "finding": "Add strict Parakeet name/shape rules and require all 723 tensors to be consumed or explicitly classified; do not load Transformers during inference."
+    },
+    {
+      "operation": "Parakeet circuit and native session",
+      "stage": "runtime",
+      "disposition": "missing_composition",
+      "cke_foundation": "v8 circuit/lowering/runtime foundations",
+      "finding": "Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths."
+    }
+  ],
+  "implementation_order": [
+    {
+      "milestone": 1,
+      "name": "frontend and subsampling X-Ray",
+      "exit": "CKE matches the committed frontend and subsampling tensors for the short fixture under stated tolerances."
+    },
+    {
+      "milestone": 2,
+      "name": "one FastConformer block",
+      "exit": "Layer 0 matches at all five residual boundaries; BatchNorm and relative attention contracts are explicit."
+    },
+    {
+      "milestone": 3,
+      "name": "full encoder",
+      "exit": "All 24 encoder boundaries and the 1024-to-640 projection match; memory is bounded for the tested clip."
+    },
+    {
+      "milestone": 4,
+      "name": "prediction, joint, and TDT decode",
+      "exit": "Native token ids, durations, timestamps, and transcript match the pinned reference on the short fixture."
+    },
+    {
+      "milestone": 5,
+      "name": "BUMP conversion and native CLI",
+      "exit": "All 723 tensors are accounted for, generated C builds, and normal inference has no reference-framework dependency."
+    },
+    {
+      "milestone": 6,
+      "name": "long audio and multilingual coverage",
+      "exit": "Five-minute then 42-minute runs report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior."
+    }
+  ],
+  "acceptance_constraints": [
+    "No malloc, calloc, realloc, aligned allocation, free, alloca, large VLA, or shared mutable scratch in new production compute paths or reachable helpers.",
+    "Planner scratch records size formula, overflow checks, dtype, alignment, lifetime, capacity, and worker ownership; insufficient capacity fails before output writes.",
+    "Reference-framework dependencies are limited to conversion and certification.",
+    "Every numerical claim names the exact tensor boundary, tolerance or bitwise rule, reference source revision, and artifact hash.",
+    "Whisper remains a separately working baseline.",
+    "Diarization is not part of this implementation or PR."
+  ],
+  "evidence": {
+    "reference_fixture_json": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json",
+    "reference_fixture_npz": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz",
+    "tensor_manifest": "docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json",
+    "audio": "version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav"
+  },
+  "claim_boundary": {
+    "native_cke_transcription": "not_implemented",
+    "native_cke_parity": "not_tested",
+    "long_audio": "not_tested",
+    "multilingual": "not_tested",
+    "diarization": "out_of_scope"
+  }
+}

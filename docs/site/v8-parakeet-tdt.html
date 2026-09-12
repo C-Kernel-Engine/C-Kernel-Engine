@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kernel Catalog | C-Kernel-Engine</title>
-    <meta name="description" content="Catalog of C-Kernel-Engine CPU kernels and v8 kernel registry providers, covering quantized GEMM/GEMV, attention, recurrent, MoE, and normalization families.">
+    <title>Parakeet TDT Native CPU Bring-up | C-Kernel-Engine | C-Kernel-Engine</title>
+    <meta name="description" content="Pinned Parakeet TDT 0.6B v3 operation-reuse inventory, complete tensor manifest, Ryzen FP32 reference fixture, implementation milestones, and explicit native CKE support boundaries.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/kernels.html">
-    <meta property="og:title" content="Kernel Catalog | C-Kernel-Engine">
-    <meta property="og:description" content="Catalog of C-Kernel-Engine CPU kernels and v8 kernel registry providers, covering quantized GEMM/GEMV, attention, recurrent, MoE, and normalization families.">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-parakeet-tdt.html">
+    <meta property="og:title" content="Parakeet TDT Native CPU Bring-up | C-Kernel-Engine | C-Kernel-Engine">
+    <meta property="og:description" content="Pinned Parakeet TDT 0.6B v3 operation-reuse inventory, complete tensor manifest, Ryzen FP32 reference fixture, implementation milestones, and explicit native CKE support boundaries.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/kernels.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-parakeet-tdt.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -984,372 +984,108 @@
     </header>
     <main>
 
-<h1>Kernel Catalog</h1>
+<div class="container">
+  <h1>Parakeet TDT Native CPU Bring-up</h1>
+  <p class="lead">The first Parakeet milestone freezes the reference and maps every required operation to CKE. A pinned FP32 reference fixture passes on Ryzen, but native CKE transcription has not been implemented or tested. Diarization is a separate milestone.</p>
 
-<p>This document lists the high-performance C kernels available in the engine. These kernels are designed to be "micro-libraries"—you can copy <code>src/kernels/rope_kernels.c</code> into your own project without taking the rest of the engine.</p>
+  <style>
+    .para-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin:1rem 0; }
+    .para-card { background:var(--dark-card); border:1px solid var(--grey); border-radius:10px; padding:1rem; }
+    .para-table { overflow-x:auto; margin:1rem 0; }
+    .para-table table { width:100%; min-width:850px; border-collapse:collapse; font-size:.86rem; }
+    .para-table th,.para-table td { border:1px solid var(--grey); padding:.55rem; text-align:left; vertical-align:top; }
+    .para-table th { color:var(--orange); background:#121a24; }
+    .status { white-space:nowrap; font-weight:700; }
+    .status-reuse,.status-reuse_candidate { color:#7fd4a3; }
+    .status-map_promotion,.status-contract_extension,.status-composition_gap { color:#ffd38a; }
+    .status-missing_provider,.status-missing_runtime,.status-missing_composition { color:#ff8a80; }
+    .para-code { overflow-x:auto; background:#0b1118; border:1px solid #263242; border-radius:8px; padding:.8rem; }
+    main code { overflow-wrap:anywhere; }
+  </style>
 
-<p>Registry snapshot: the v8 provider registry (<code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code>) currently holds <strong>364 provider maps across 126 ops</strong> (commit <code>f7aedf6e4</code>, 2026-09-12). The tables below are a curated catalog, not the full census — for the registry organized by operation family with selection rules, see <a href="kernel-architecture.html">v8 Kernel Architecture</a> and <a href="kernel-maps.html">Kernel Maps and Provider Selection</a>.</p>
+  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>Reference fixture: passed. Operation inventory: complete. Native CKE conversion, generated circuit, transcription parity, multilingual audio, long audio, and diarization: not tested.</div></div>
 
-<h2>Naming Convention</h2>
+  <h2 id="reference">Frozen reference</h2>
+  <div class="para-grid">
+    <div class="para-card"><strong>Checkpoint</strong><br><a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3/tree/541d1f99c6b0c3cd0b11a95167540bb8edefd82b"><code>nvidia/parakeet-tdt-0.6b-v3</code></a><br><code>541d1f99...defd82b</code><br>CC BY 4.0</div>
+    <div class="para-card"><strong>Reference code</strong><br><a href="https://github.com/huggingface/transformers/tree/66799f45cea7513712580c6170cdaa4438df702a/src/transformers/models/parakeet">Transformers commit <code>66799f45...</code></a><br>FP32 eager CPU</div>
+    <div class="para-card"><strong>Model shape</strong><br>24-layer FastConformer, width 1024<br>2-layer LSTM, width 640<br>723 tensors, 2,508,311,120 bytes</div>
+    <div class="para-card"><strong>Decoder</strong><br>8,193 token logits including blank 8192<br>durations [0, 1, 2, 3, 4]<br>0.08-second encoder frames</div>
+  </div>
+  <p>The checkpoint metadata says <code>5.6.0.dev0</code>. The released v5.6.0 source does not contain <code>ParakeetForTDT</code>, so certification pins the executable source commit directly.</p>
 
-<div class="grid grid-2">
-    <div class="card">
-        <ul>
-            <li><strong><code>_naive</code></strong>: Reference implementation, easy to read, slow.</li>
-            <li><strong><code>_parallel</code></strong>: OpenMP-accelerated for multi-core CPUs.</li>
-        </ul>
-    </div>
-    <div class="card">
-        <ul>
-            <li><strong><code>_avx512</code></strong>: Explicit intrinsics for AVX-512 (x86_64).</li>
-            <li><strong><code>_head_major</code></strong>: Optimized memory layout where the "Head" dimension is outermost or stride-optimized.</li>
-        </ul>
-    </div>
+  <h2 id="fixture">First reference fixture</h2>
+  <p>The 7.435-second mono 16 kHz utterance <code>2086-149220-0033.wav</code> is the sample linked by NVIDIA's model card and comes from the <a href="https://www.openslr.org/12">CC BY 4.0 LibriSpeech corpus</a>. On Ryzen with PyTorch 2.13.0+cpu, 16 threads, and the pinned Transformers commit, the reference completed in 0.39 seconds and produced 50 decode steps, 44 nonblank emissions, durations, and token timestamps.</p>
+  <blockquote>Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.</blockquote>
+  <p>The compressed tensor fixture retains audio, normalized frontend features and mask, subsampling, encoder layers 0 and 23, projected encoder output, initial decoder output, all 8,198 first-step joint logits, generated token IDs, and durations. Every recorded array is finite and has an independent content hash.</p>
+  <ul>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.json">Fixture report (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz">Intermediate tensors (NPZ)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_tensor_manifest.json">Complete 723-tensor manifest (JSON)</a></li>
+    <li><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json">Operation-reuse inventory (JSON)</a></li>
+  </ul>
+
+  <h2 id="inventory">Operation-reuse inventory</h2>
+  <p>Reusable means the provider's interface fits. Candidate reuse still requires a comparison at the named fixture boundary. Missing composition means the mathematical pieces exist but no declared Parakeet graph binds them yet.</p>
+  <div class="para-table"><table><thead><tr><th>Stage</th><th>Required operation</th><th>Disposition</th><th>CKE foundation and exact gap</th></tr></thead><tbody><tr><td>frontend</td><td>PCM decode and mono conversion</td><td><span class="status status-reuse">Reusable</span></td><td><code>audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32</code><br>16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input.</td></tr>
+<tr><td>frontend</td><td>sample-rate validation and resampling</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_resample_windowed_sinc_f32</code><br>The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately.</td></tr>
+<tr><td>frontend</td><td>pre-emphasis x[t]-0.97*x[t-1]</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_preemphasis_f32</code><br>Arithmetic and first-sample rule match; real-fixture comparison remains required.</td></tr>
+<tr><td>frontend</td><td>centered STFT power, n_fft=512, win=400, hop=160</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_stft_power_centered_window_f32</code><br>Use an explicit non-periodic Hann window and zero padding. Existing provider supports the shape; compare direct-DFT accumulation with torch.stft.</td></tr>
+<tr><td>frontend</td><td>Slaney mel filter bank, 128 bins</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_whisper_mel_filters_slaney_f32</code><br>Provider is dimension-general despite its legacy name. Compare every filter coefficient with the pinned librosa FP32 bank.</td></tr>
+<tr><td>frontend</td><td>natural-log mel projection</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_log_mel_time_major_f32</code><br>Time-major layout and ln(sum+epsilon) match structurally; freeze the pinned epsilon and accumulation tolerance.</td></tr>
+<tr><td>frontend</td><td>per-feature normalization over live frames</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_feature_normalize_per_feature_f32</code><br>Sample variance uses N-1 and epsilon after sqrt. Batched padding masks need composition around the provider.</td></tr>
+<tr><td>encoder</td><td>three-stage grouped Conv2D subsampling</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_conv2d_whc_grouped_f32</code><br>Covers regular, depthwise, and 1x1 stages with bias. Circuit must reproduce masking after every Conv2D and CHW/time reshapes.</td></tr>
+<tr><td>encoder</td><td>subsampling ReLU</td><td><span class="status status-map_promotion">Map promotion</span></td><td><code>relu_forward</code><br>Kernel exists but lacks a current v8 inference kernel map; promote a narrow FP32 map or fuse only after parity.</td></tr>
+<tr><td>encoder</td><td>subsampling flatten and linear projection</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Optional bias is supported. Layout conversion from [C,H,W] to time-major C*W must be declared.</td></tr>
+<tr><td>encoder</td><td>relative sinusoidal position encoding</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs FP32 descending relative positions [T-1..-(T-1)], sin/cos interleave, and exact cast boundaries.</td></tr>
+<tr><td>encoder</td><td>LayerNorm at five block sites</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>layernorm_fp32_exact</code><br>Shape fits, but existing exact contract targets ggml reduction order. PyTorch FP32 CPU parity must be measured before selection.</td></tr>
+<tr><td>encoder</td><td>Macaron FFN linear-SiLU-linear</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>gemm_nt_fp32_exact; recurrent_silu_forward</code><br>Linear provider is reusable. Standalone SiLU needs an architecture-neutral map and PyTorch FP32 numerical certification.</td></tr>
+<tr><td>encoder</td><td>half-scaled FFN residual</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>add_stream_inplace</code><br>DSL needs explicit 0.5 branch scaling at both FFN residual sites with preserved operation order.</td></tr>
+<tr><td>encoder</td><td>Transformer-XL relative self-attention</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>gemm_nt_fp32_exact; audio_relative_shift_f32</code><br>Q/K/V/O and relative-K projections reuse GEMM. Bias-u/v, content/position score composition, non-causal mask, FP32 softmax, value product, and layout contracts need a declared composite/provider.</td></tr>
+<tr><td>encoder</td><td>Conformer pointwise/depthwise Conv1D</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_conv1d_channel_major_f32</code><br>Kernel covers stride/padding. Parakeet weights omit convolution bias, while the map currently requires one; bind a prepared zero bias or add an optional-bias contract.</td></tr>
+<tr><td>encoder</td><td>channel-split GLU</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_glu_split_channel_major_f32</code><br>Layout and value*sigmoid(gate) match; compare libm/SLEEF behavior against pinned PyTorch.</td></tr>
+<tr><td>encoder</td><td>inference BatchNorm1D</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs running mean/variance, affine weight/bias, epsilon, FP32 order, no training-state updates, and no per-call allocation.</td></tr>
+<tr><td>encoder</td><td>padding-mask zeroing before convolution</td><td><span class="status status-composition_gap">Composition gap</span></td><td><code>none</code><br>Declare masked fill over channel-major activations; must use post-subsampling live lengths.</td></tr>
+<tr><td>transducer</td><td>encoder 1024-to-640 projector</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Bias is present and provider dimensions fit.</td></tr>
+<tr><td>prediction</td><td>8193-by-640 token embedding</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>embedding_forward_fp32</code><br>Vocabulary includes blank id 8192. Select the FP32 variant without positional embeddings.</td></tr>
+<tr><td>prediction</td><td>two-layer 640-wide LSTM prediction network</td><td><span class="status status-missing_provider">Missing provider</span></td><td><code>none</code><br>Needs prepared/session-owned hidden and cell state, PyTorch gate order and nonlinearities, explicit reset/reuse semantics, and no compute-time heap allocation.</td></tr>
+<tr><td>prediction</td><td>decoder 640-to-640 projector</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Bias is present.</td></tr>
+<tr><td>joint</td><td>joint encoder-plus-decoder add and ReLU</td><td><span class="status status-map_promotion">Map promotion</span></td><td><code>add_stream_inplace; relu_forward</code><br>Elementwise kernels exist; ReLU needs a v8 inference map and broadcast/add shapes must be declared.</td></tr>
+<tr><td>joint</td><td>joint 640-to-8198 token-duration head</td><td><span class="status status-reuse">Reusable</span></td><td><code>gemm_nt_fp32_exact</code><br>Output splits into 8193 token logits and five duration logits.</td></tr>
+<tr><td>decode</td><td>greedy TDT token-duration state machine</td><td><span class="status status-missing_runtime">Missing runtime</span></td><td><code>none</code><br>Argmax token and duration independently; blank with predicted duration zero advances by one; nonblank duration zero stays on frame; max output is bounded by encoder traversal.</td></tr>
+<tr><td>decode</td><td>Metaspace BPE decode</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>existing tokenizer infrastructure</code><br>Tokenizer JSON has 8192 BPE entries with Metaspace replacement U+2581. Verify repeated tokens, blank/pad suppression, punctuation, and UTF-8 languages.</td></tr>
+<tr><td>decode</td><td>token timestamps</td><td><span class="status status-missing_runtime">Missing runtime</span></td><td><code>none</code><br>Cumulative duration gives frame index; frame rate is 0.08 s. Punctuation is collapsed to the previous token endpoint by the pinned processor.</td></tr>
+<tr><td>conversion</td><td>safetensors to BUMP plus sidecar conversion</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>convert_safetensors_to_bump_v8.py foundation</code><br>Add strict Parakeet name/shape rules and require all 723 tensors to be consumed or explicitly classified; do not load Transformers during inference.</td></tr>
+<tr><td>runtime</td><td>Parakeet circuit and native session</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>v8 circuit/lowering/runtime foundations</code><br>Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths.</td></tr></tbody></table></div>
+
+  <h2 id="milestones">Implementation milestones</h2>
+  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>Exit evidence</th></tr></thead><tbody><tr><td>1</td><td>frontend and subsampling X-Ray</td><td>CKE matches the committed frontend and subsampling tensors for the short fixture under stated tolerances.</td></tr>
+<tr><td>2</td><td>one FastConformer block</td><td>Layer 0 matches at all five residual boundaries; BatchNorm and relative attention contracts are explicit.</td></tr>
+<tr><td>3</td><td>full encoder</td><td>All 24 encoder boundaries and the 1024-to-640 projection match; memory is bounded for the tested clip.</td></tr>
+<tr><td>4</td><td>prediction, joint, and TDT decode</td><td>Native token ids, durations, timestamps, and transcript match the pinned reference on the short fixture.</td></tr>
+<tr><td>5</td><td>BUMP conversion and native CLI</td><td>All 723 tensors are accounted for, generated C builds, and normal inference has no reference-framework dependency.</td></tr>
+<tr><td>6</td><td>long audio and multilingual coverage</td><td>Five-minute then 42-minute runs report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior.</td></tr></tbody></table></div>
+  <p>New production compute paths must use planner-declared scratch or session-owned state. They may not allocate or free heap memory per call, hide allocation in helpers, substitute large stack buffers, or share mutable scratch across sessions.</p>
+
+  <h2 id="reproduce">Reproduce the reference capture</h2>
+  <p>Download the exact Hugging Face revision once into the shared model cache, then run the fixture tool. Transformers, PyTorch, librosa, and soundfile belong to this certification environment; the eventual CKE inference path will not depend on them.</p>
+  <pre class="para-code"><code>export CKE_MODEL_CACHE="$HOME/.cache/cke/models"
+hf download nvidia/parakeet-tdt-0.6b-v3 \
+  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --local-dir "$CKE_MODEL_CACHE/parakeet-tdt-0.6b-v3-541d1f99"
+
+PYTHONPATH="$HOME/.cache/cke/reference/transformers-66799f45" \
+python version/v8/scripts/capture_parakeet_reference_v8.py \
+  --model-dir "$CKE_MODEL_CACHE/parakeet-tdt-0.6b-v3-541d1f99" \
+  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
+  --output-json /tmp/parakeet-reference.json \
+  --output-npz /tmp/parakeet-reference.npz \
+  --model-revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --transformers-revision 66799f45cea7513712580c6170cdaa4438df702a</code></pre>
+
+  <h2 id="next">Next work</h2>
+  <p>The next PR should implement and X-Ray only the frontend plus Conv2D subsampling against this fixture. One FastConformer block follows after the BatchNorm and relative-attention contracts are settled. Diarization begins in a separate PR after a bounded checkpoint comparison, and it first integrates with the already working Whisper path.</p>
 </div>
-
-<h2>1. Attention, RoPE & Recurrent State</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>attention_forward_causal_head_major</code></td>
-            <td><code>attention_kernels.c</code></td>
-            <td>Standard Scaled Dot-Product Attention (SDPA) with causal masking. Expects <code>[Head, Token, Dim]</code> layout.</td>
-        </tr>
-        <tr>
-            <td><code>rope_forward</code></td>
-            <td><code>rope_kernels.c</code></td>
-            <td>Rotary Positional Embeddings. Rotates query/key vectors in-place.</td>
-        </tr>
-        <tr>
-            <td><code>causal_softmax_head_major</code></td>
-            <td><code>softmax_kernels.c</code></td>
-            <td>Softmax applied to attention scores, masking out future tokens (causal mask).</td>
-        </tr>
-        <tr>
-            <td><code>gated_deltanet_autoregressive_forward</code></td>
-            <td><code>deltanet_kernels.c</code></td>
-            <td>Single-token Gated DeltaNet recurrent update for Qwen3.5/qwen3next parity. Updates per-head state matrices <code>[Head, Dim, Dim]</code> and emits <code>[Head, Dim]</code> output.</td>
-        </tr>
-        <tr>
-            <td><code>qwen4_qsa_index_select_bf16</code> / <code>attention_forward_sparse_token_major_gqa_bf16cache_pytorch_cpu_flash_contract</code></td>
-            <td><code>qwen4_exp_kernels.c</code> / <code>attention_kernels.c</code></td>
-            <td>Query-Selected Attention (QSA): <code>qsa_index_select</code> picks the token indices each query attends to; <code>qsa_attention</code> runs sparse token-major GQA against the BF16 cache. Concept: <a href="concepts.html#qsa">Sparse / Query-Selected Attention</a>.</td>
-        </tr>
-        <tr>
-            <td><code>mamba2_selective_scan_f32_parallel_dispatch</code></td>
-            <td><code>mamba2_kernels.c</code>, <code>ck_parallel_prefill_v8.c</code></td>
-            <td>Mamba2 selective scan with a parallel prefill dispatch variant that chunks by independent head ranges (serial fallback below the chunk threshold). Details: <a href="v8-moe-expert-kernels.html#moe-throughput">Throughput kernels beyond MoE</a>.</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>Composed vs Fused Gates</h2>
-
-<p>Not every gated block needs its own standalone kernel file.</p>
-
-<ul>
-    <li><strong>Gated attention</strong> is still normal causal attention plus a gate epilogue: <code>attention -&gt; sigmoid -&gt; mul -&gt; outproj</code>. CK can express that as stitched kernels without inventing a dedicated <code>gated_attention_kernels.c</code>.</li>
-    <li><strong>SwiGLU / GeGLU</strong> follow the same rule. We keep the atomic activation kernels and only use fused decode helpers where profiling justifies the extra complexity.</li>
-    <li><strong>Gated DeltaNet</strong> is different because the gate participates inside the recurrent state update itself. That makes <code>src/kernels/deltanet_kernels.c</code> a real kernel family, not just a wrapper around GEMM/GEMV.</li>
-</ul>
-
-<p>Rule of thumb: keep CK graph-first and stitch atomic kernels by default; add fused wrappers only when measurements show the gate epilogue is a real hotspot.</p>
-
-<h2>Qwen3.5 DeltaNet Block Flow</h2>
-
-<p>The Qwen3.5 / qwen3next linear-attention block is easier to reason about if you separate the three different gating roles instead of collapsing them into one "state-space" idea.</p>
-
-<ol>
-    <li><strong>Project from the token input <code>x</code>.</strong> The block produces <code>[q, k, v, z]</code> from <code>ssm_in(x)</code> and <code>[beta, alpha]</code> from <code>ssm_beta_alpha(x)</code>.</li>
-    <li><strong>Run the short convolution path.</strong> The local conv cache mixes the projected <code>q/k/v</code> lanes before the recurrent update. The <code>z</code>, <code>beta</code>, and <code>alpha</code> lanes do not go through that conv kernel.</li>
-    <li><strong>Turn <code>alpha</code> into the recurrent decay gate.</strong> In llama.cpp this becomes a decay control <code>g</code> via <code>softplus(alpha + dt)</code> followed by a learned scale. That gate controls how much of the old recurrent state survives.</li>
-    <li><strong>Update the per-head memory matrix <code>S_t</code>.</strong> DeltaNet keeps a recurrent state matrix <code>[Head, Dim, Dim]</code>, not just a hidden state vector.</li>
-    <li><strong>Normalize and gate the recurrent output.</strong> After the DeltaNet core produces <code>h_t</code>, the block applies gated normalization: <code>RMSNorm(h_t) * SiLU(z)</code>.</li>
-    <li><strong>Project back out.</strong> The gated normalized result goes through <code>ssm_out</code> to rejoin the residual stream.</li>
-</ol>
-
-<p>For single-token decode, the recurrent update that CK matches in <code>src/kernels/deltanet_kernels.c</code> is:</p>
-
-<pre><code>q_hat   = norm(q) / sqrt(d)
-k_hat   = norm(k)
-beta_s  = sigmoid(beta)
-gate    = exp(g)
-
-S_decay = gate * S_prev
-kv_mem  = S_decay^T * k_hat
-delta   = beta_s * (v - kv_mem)
-S_new   = S_decay + outer(k_hat, delta)
-out     = S_new^T * q_hat</code></pre>
-
-<p>Interpretation:</p>
-<ul>
-    <li><strong><code>g</code></strong> controls forgetting / decay of old memory.</li>
-    <li><strong><code>beta</code></strong> controls how aggressively the block writes the correction term.</li>
-    <li><strong><code>z</code></strong> is the output gate applied after the recurrent core, during gated normalization.</li>
-</ul>
-
-<p>This is why Qwen3.5 feels Mamba-like without being "just Mamba": it has a short convolution path and a recurrent cache, but the core memory update is a DeltaNet matrix-state rule, and Qwen3.5 alternates these DeltaNet blocks with separate full Gated Attention blocks.</p>
-
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3>📊 Flash Attention Analysis</h3>
-        <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
-        <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
-        <p><small>SIMD optimizations, threading strategies, and performance trade-offs.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>🔁 Gated DeltaNet Deep Dive</h3>
-        <p>Visual infographic of the single-token recurrent update, memory layout, ISA dispatch, and how DeltaNet compares to standard attention:</p>
-        <p><a href="deltanet-deep-dive.html"><strong>Gated DeltaNet: Recurrent Attention Deep Dive</strong></a></p>
-        <p><small>SVG diagrams, SIMD tier breakdown, and CK-Engine kernel rules.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>🎙️ Audio Pipeline: Whisper Tiny</h3>
-        <p>How one WAV file becomes tokens: PCM conversion, STFT/FFT-400, log-Mel, Conv1D stem, generated encoder memory, and persistent-KV decode — every stage a <a href="kernel-maps.html">kernel-map contract</a>:</p>
-        <p><a href="v8-whisper-tiny.html"><strong>Whisper Tiny End-to-End</strong></a></p>
-        <p><small>Pipeline infographic, nightly gates, parity evidence, and current limitations.</small></p>
-        <p><a href="audio-kernels-deep-dive.html"><strong>Audio Kernels Deep Dive</strong></a></p>
-        <p><small>Kernel-by-kernel math for WAV decode, resample, STFT, log-Mel, Conv1D stem, and the token transpose.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>Parakeet TDT Bring-up</h3>
-        <p>The pinned native-CPU plan maps all 30 frontend, FastConformer, LSTM, joint, decoding, conversion, and runtime requirements to existing CKE providers or explicit gaps:</p>
-        <p><a href="v8-parakeet-tdt.html"><strong>Parakeet TDT Operation Inventory and Reference Fixture</strong></a></p>
-        <p><small>Ryzen reference tensors, complete checkpoint manifest, implementation milestones, and honest unsupported boundaries.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>🗺️ v8 Kernel Architecture</h3>
-        <p>The full v8 registry organized by operation family — provider selection rules, equivalence groups, and the math behind MLA, DeltaNet, Mamba2, MoE routing, and quantized GEMM:</p>
-        <p><a href="kernel-architecture.html"><strong>v8 Kernel Architecture</strong></a></p>
-        <p><small>Registry census, selection filter chain, and per-op-family contracts.</small></p>
-        <p><a href="architecture-variants.html"><strong>Architecture Variants</strong></a></p>
-        <p><small>What Laguna, Cohere2, Instella, and Nemotron-H each forced the registry to grow.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>🧩 MoE Expert Kernels</h3>
-        <p>Grouped/bucketed expert prefill for Qwen3.5-MoE, Laguna's mixed-quant compact experts, and the parallel throughput kernels (Mamba2 prefill, Q5_1 unpack reuse):</p>
-        <p><a href="v8-moe-expert-kernels.html"><strong>MoE Expert Kernels: Grouped Prefill and Mixed-Quant Compact Experts</strong></a></p>
-        <p><small>Provider-by-provider math, equivalence groups, and evidence captions.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>🎧 Cohere Kernel Story</h3>
-        <p>How the Cohere family mostly composes the existing registry — Command R's single new kernel, North's zero-new-kernel MoE, the Compass BF16 vision frontend, and the Transcribe audio provider foundation:</p>
-        <p><a href="v8-cohere-kernels.html"><strong>Cohere Kernel Story: Reuse, BF16 Vision, and the Transcribe Audio Stack</strong></a></p>
-        <p><small>Registry reuse map and frontend pipeline infographics with honest status badges.</small></p>
-    </div>
-    <div class="card card-accent">
-        <h3>Muse-Glimmer Text</h3>
-        <p>How Muse-Glimmer composes grouped-query attention, centered normalization, attention gates, and caller-owned scratch while preserving PyTorch eager BF16 arithmetic:</p>
-        <p><a href="v8-muse-glimmer.html"><strong>Muse-Glimmer Text Bring-up and Certification</strong></a></p>
-        <p><small>Numerical X-ray findings, pinned Ryzen evidence, reproduction commands, memory limits, and open certification gates.</small></p>
-    </div>
-</div>
-
-<h2>2. Elementwise & Activation</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>gelu_fast_inplace</code></td>
-            <td><code>gelu_kernels.c</code></td>
-            <td>Gaussian Error Linear Unit. Uses the fast approximation (tanh).</td>
-        </tr>
-        <tr>
-            <td><code>swiglu_forward</code></td>
-            <td><code>swiglu_kernels.c</code></td>
-            <td>SwiGLU activation (Gated Linear Unit with Swish). Used in Llama/Mistral. Input size is <code>2 * dim</code>.</td>
-        </tr>
-        <tr>
-            <td><code>sigmoid_forward</code></td>
-            <td><code>sigmoid_kernels.c</code></td>
-            <td>Standard logistic sigmoid function.</td>
-        </tr>
-        <tr>
-            <td><code>hyper_stream_expand_f32</code> / <code>hyper_connection_mix_bf16</code> / <code>hyper_stream_inject_f32</code></td>
-            <td><code>hyper_connection_kernels.c</code></td>
-            <td>Hyper-connection multi-stream residuals: expand the residual stream into N lanes, mix lanes after each block (<code>hyper_connection_mix</code>, <code>hyper_connection_final_mix</code>), and inject back into the single-stream residual. BF16 and Q4_K/Q5_0/Q6_K weight variants exist. Concept: <a href="concepts.html#hyper-connections">Hyper-Connections</a>.</td>
-        </tr>
-        <tr>
-            <td><code>qwen4_ple_ngram_embed_bf16</code> / <code>qwen4_ple_gate_conv_inject_bf16</code></td>
-            <td><code>qwen4_exp_kernels.c</code></td>
-            <td>Per-Layer Embedding (PLE): n-gram embedding lookup (<code>ple_ngram_embed</code>) and the gate/conv injection that folds the per-layer embedding into the hidden state (<code>ple_gate_conv_inject</code>). Concept: <a href="concepts.html#per-layer-embedding">Per-Layer Embedding</a>.</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>3. Normalization</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>rmsnorm_forward</code></td>
-            <td><code>rmsnorm_kernels.c</code></td>
-            <td>Root Mean Square Normalization. Lighter than LayerNorm (no mean subtraction).</td>
-        </tr>
-        <tr>
-            <td><code>layernorm_naive_serial</code></td>
-            <td><code>layernorm_kernels.c</code></td>
-            <td>Standard LayerNorm. Subtracts mean, divides by variance.</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>4. GEMM (Matrix Multiplication)</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>gemm_naive_parallel</code></td>
-            <td><code>gemm_kernels.c</code></td>
-            <td>OpenMP-parallelized SGEMM (C = A * B).</td>
-        </tr>
-        <tr>
-            <td><code>gemm_avx512_parallel</code></td>
-            <td><code>gemm_kernels.c</code></td>
-            <td>Hand-tuned AVX-512 implementation for max throughput on modern Intel/AMD chips.</td>
-        </tr>
-        <tr>
-            <td><code>moe_swiglu_expert_forward_nvfp4</code> / <code>moe_swiglu_shared_forward_nvfp4</code></td>
-            <td><code>gemm_kernels_nvfp4.c</code>, <code>gemm_kernels_q8_0.c</code></td>
-            <td>NVFP4 (E2M1 weights with FP sub-scales) routed and shared SwiGLU expert MLPs, computed against Q8_0 activations via a workspace path. Format deep dive: <a href="quantization.html#nvfp4">NVFP4</a>.</td>
-        </tr>
-        <tr>
-            <td><code>moe_swiglu_packed_expert_forward_bf16</code> / <code>moe_swiglu_expert_forward_q4k_q5k_bucketed</code></td>
-            <td><code>axpy_kernels.c</code>, <code>gemm_kernels_q4k_q8k.c</code>, <code>ck_parallel_prefill_v8.c</code></td>
-            <td>Packed MoE experts (all experts in one weight blob) and bucketed expert prefill that groups tokens by expert before the Q4_K/Q5_K GEMMs. Details: <a href="v8-moe-expert-kernels.html#moe-grouped-prefill">Grouped and bucketed expert prefill</a>.</td>
-        </tr>
-        <tr>
-            <td><code>gemm_nt_q5_1_q8_1_parallel_dispatch</code> (variant <code>gemm_nt_q5_1_q8_1_m4</code>)</td>
-            <td><code>gemm_kernels_q5_1_q8_1.c</code>, <code>ck_parallel_prefill_v8.c</code></td>
-            <td>Q5_1 weight x Q8_1 activation prefill GEMM; the AVX2 m4 tile unpacks each Q5_1 block once and dots it against four activation rows. Details: <a href="v8-moe-expert-kernels.html#moe-throughput">Throughput kernels beyond MoE</a>.</td>
-        </tr>
-        <tr>
-            <td><code>gemv_bf16_parallel_dispatch</code> / <code>gemv_bf16_bf16_storage_parallel_dispatch</code></td>
-            <td><code>gemm_kernels_bf16.c</code></td>
-            <td>BF16 decode GEMV with parallel dispatch, in FP32-accumulate and BF16-storage variants.</td>
-        </tr>
-        <tr>
-            <td><code>patch_projection_image_bf16_native_storage</code></td>
-            <td><code>gemm_kernels_bf16.c</code></td>
-            <td>Vision patch projection as a BF16 GEMM over image patches (native-storage variant for the Cohere Compass frontend; a oneDNN conv3d-storage variant also exists). See <a href="v8-cohere-kernels.html">Cohere Kernel Story</a>.</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>5. Loss & Training Kernels</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>softmax_cross_entropy_loss</code></td>
-            <td><code>loss_kernels.c</code></td>
-            <td>Fused softmax + CE loss/gradient kernel used by v7 training parity harness.</td>
-        </tr>
-        <tr>
-            <td><code>softmax_cross_entropy_loss_ptref</code></td>
-            <td><code>loss_kernels.c</code></td>
-            <td>Strict PyTorch-reference CE variant for parity experiments and drift diagnostics.</td>
-        </tr>
-    </tbody>
-</table>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Cross-Entropy Deep Dive (v7)</h3>
-    <p>For full derivation (<code>p - one_hot</code>), PyTorch reduction semantics (<code>ignore_index</code>, denominator rules), and long-horizon drift-fix evidence, see:</p>
-    <p><a href="v7-cross-entropy-parity.html"><strong>v7 Cross-Entropy Parity</strong></a></p>
-</div>
-
-<h2>Audio Frontend (Cohere Transcribe)</h2>
-
-<p>The Transcribe audio frontend turns a WAV file into encoder-ready features with the following providers; the full pipeline story is in the <a href="v8-cohere-kernels.html">Cohere Kernel Story — Transcribe audio stack</a>.</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>Kernel</th>
-            <th>Source File</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>audio_stft_power_precomputed_f32</code> (+ <code>audio_stft_power_centered_window_f32</code>, <code>audio_stft_power_fft400_f32</code>)</td>
-            <td><code>audio_kernels.c</code></td>
-            <td>Short-time Fourier transform power spectrum (<code>audio_stft</code>), with precomputed tables, centered-window, and FFT-400 variants.</td>
-        </tr>
-        <tr>
-            <td><code>audio_log_mel_time_major_f32</code></td>
-            <td><code>audio_kernels.c</code></td>
-            <td>Log-Mel filterbank energies, time-major output (<code>audio_log_mel</code>).</td>
-        </tr>
-        <tr>
-            <td><code>audio_preemphasis_f32</code> / <code>audio_feature_normalize_per_feature_f32</code></td>
-            <td><code>audio_kernels.c</code></td>
-            <td>Pre-emphasis filter (<code>audio_preemphasis</code>) and per-feature normalization (<code>audio_feature_normalize</code>) for the frontend features.</td>
-        </tr>
-        <tr>
-            <td><code>audio_conv2d_whc_grouped_f32</code> / <code>audio_glu_split_channel_major_f32</code></td>
-            <td><code>audio_kernels.c</code></td>
-            <td>Grouped Conv2D over width/height/channel feature maps (<code>audio_conv2d</code>) and the split channel-major GLU (<code>audio_glu</code>) in the encoder stem.</td>
-        </tr>
-        <tr>
-            <td><code>audio_relative_shift_f32</code></td>
-            <td><code>audio_kernels.c</code></td>
-            <td>Relative-position shift for the Transformer-XL-style attention bias (<code>audio_relative_shift</code>).</td>
-        </tr>
-    </tbody>
-</table>
-
-<h2>Memory Layouts</h2>
-
-<p>Most kernels assume <strong>Row-Major</strong> contiguous memory unless specified otherwise.</p>
-
-<ul>
-    <li><strong>Matrices</strong>: <code>[Rows, Cols]</code></li>
-    <li><strong>Attention Tensors</strong>: <code>[Heads, Tokens, Head_Dim]</code> (Head-Major) helps with cache locality during the attention loop.</li>
-</ul>
-
-<p style="font-size:.78rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
-    Catalog refreshed against <code>version/v8/kernel_maps/KERNEL_REGISTRY.json</code> (364 provider maps across
-    126 ops) at commit <code>f7aedf6e4</code> (2026-09-12). Provider counts are a hand-maintained snapshot until
-    the docs build regenerates them; the registry JSON is the source of truth.
-</p>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

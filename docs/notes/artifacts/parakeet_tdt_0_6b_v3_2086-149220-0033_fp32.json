@@ -1,0 +1,455 @@
+{
+  "schema_version": 1,
+  "kind": "cke.parakeet.reference_fixture",
+  "status": "pass",
+  "scope": "one short FP32 CPU reference trajectory; no CKE parity claim",
+  "model": {
+    "id": "nvidia/parakeet-tdt-0.6b-v3",
+    "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+    "weights": {
+      "sha256": "3a2026366188c8c68598edbbff92f8d11590a08e0ae2e6775544e7b07d6a5e11",
+      "bytes": 2508311120
+    },
+    "files": {
+      "config.json": {
+        "sha256": "e747b85e1bdfd300c8b8ac63bac8dd5221f8fe9bc275b48d06c735fcd6971b6e",
+        "bytes": 1153
+      },
+      "generation_config.json": {
+        "sha256": "b141de6ec6d7f982ece13f98f604e3fe1807ea9c0e839185d0ab7064604209d0",
+        "bytes": 289
+      },
+      "processor_config.json": {
+        "sha256": "8346a93a3b987fa1dec57a78f045cd0817d21786589a5a096b41a57a446fd1d7",
+        "bytes": 392
+      },
+      "tokenizer.json": {
+        "sha256": "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91",
+        "bytes": 1159960
+      },
+      "tokenizer_config.json": {
+        "sha256": "0b2fe0037599ee335f0b972fa682bf0ece74e4ccfec755cb7daa3405d3d3e874",
+        "bytes": 290
+      }
+    }
+  },
+  "reference": {
+    "implementation": "huggingface/transformers",
+    "revision": "66799f45cea7513712580c6170cdaa4438df702a",
+    "transformers_version": "5.15.0.dev0",
+    "source_sha256": {
+      "modeling_parakeet.py": "61c7e96716e20411650a8190213eb5f19916dfb05a8ffbed5e123cb8769ee69c",
+      "generation_parakeet.py": "ee5ac5310d699f7d48d9c04e525bebae6b905e663f74fb418470ce514703d0ba",
+      "feature_extraction_parakeet.py": "5ec8a9664456edfc0b56c64083bdcdd74dd78364504d35207ab917d1c3b9f575"
+    },
+    "torch_version": "2.13.0+cpu",
+    "python_version": "3.14.4",
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "threads": 16,
+    "dtype": "float32"
+  },
+  "audio": {
+    "path": "2086-149220-0033.wav",
+    "source_url": "https://dldata-public.s3.us-east-2.amazonaws.com/2086-149220-0033.wav",
+    "source_context": "NVIDIA model-card example; LibriSpeech utterance 2086-149220-0033",
+    "sha256": "5fceacff0315d49cb59fcc505bcecf1ed5f2f35c2897b1e65a59f30e5d922150",
+    "sample_rate": 16000,
+    "samples": 118960,
+    "seconds": 7.435,
+    "channels": 1
+  },
+  "execution": {
+    "elapsed_seconds": 0.38678051601164043
+  },
+  "arrays_file": {
+    "path": "parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz",
+    "sha256": "e8b6b61446b079e93050761e4d3600a83de344555a91c0c356b63869ee5e3826",
+    "arrays": {
+      "audio.samples": {
+        "dtype": "float32",
+        "shape": [
+          118960
+        ],
+        "finite": true,
+        "sha256": "10b1710041127cf8498241a7866066a5614f9254bcfc363f075a9ca7cf107dc5",
+        "min": -0.536407470703125,
+        "max": 0.781829833984375,
+        "mean": 1.1807090897807036e-05
+      },
+      "decode.durations": {
+        "dtype": "int64",
+        "shape": [
+          1,
+          50
+        ],
+        "finite": true,
+        "sha256": "c8f2edfa79f341f338b65ca0e0505669037bad042e89513287d6f41c5ebe6db1",
+        "min": 0.0,
+        "max": 4.0,
+        "mean": 1.86
+      },
+      "decode.sequences": {
+        "dtype": "int64",
+        "shape": [
+          1,
+          50
+        ],
+        "finite": true,
+        "sha256": "526be25110fa1b062185d307d0b15bbc82587bdceb15dd7da6bd4828e9275235",
+        "min": 279.0,
+        "max": 8192.0,
+        "mean": 3871.5
+      },
+      "decoder.first_output": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          1,
+          640
+        ],
+        "finite": true,
+        "sha256": "d0375fdd3646d00136c25b02c9ee350eb5f5d27a0985f79444bb96e327dbb9c8",
+        "min": -4.444823741912842,
+        "max": 0.5244741439819336,
+        "mean": -0.12064395925990538
+      },
+      "encoder.layer.0": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          93,
+          1024
+        ],
+        "finite": true,
+        "sha256": "491e805239df8a9e753eb9ff704b91bf07bbbad12586ab3c4201266cd330c11a",
+        "min": -190.5546875,
+        "max": 192.22509765625,
+        "mean": -0.07676264792845489
+      },
+      "encoder.layer.23": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          93,
+          1024
+        ],
+        "finite": true,
+        "sha256": "2b9950f45dcfa2a439818c9fd49847e72b5a2c012897373e2efc39572f75d793",
+        "min": -0.16138650476932526,
+        "max": 0.17731472849845886,
+        "mean": -4.362202147007045e-05
+      },
+      "encoder.projected": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          93,
+          640
+        ],
+        "finite": true,
+        "sha256": "e00d83822504ff584e1b21a86cac54df6e7e29d87d3485a320baaba0a1108940",
+        "min": -2.200401544570923,
+        "max": 3.9702868461608887,
+        "mean": -0.05699815785615908
+      },
+      "encoder.subsampling": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          93,
+          1024
+        ],
+        "finite": true,
+        "sha256": "5a2356e6d92f2c318345e662bd93a3af5dae7e825d0f84e0cb4b85c4f930bde7",
+        "min": -6772.955078125,
+        "max": 4474.7412109375,
+        "mean": -1.3967604098337865
+      },
+      "frontend.attention_mask": {
+        "dtype": "bool",
+        "shape": [
+          1,
+          744
+        ],
+        "finite": true,
+        "sha256": "3e46d1cdd37028dd5e534b5d41bac98aa7b92d757c4019f0b8c5ef9952c308ea",
+        "min": 0.0,
+        "max": 1.0,
+        "mean": 0.9986559139784946
+      },
+      "frontend.input_features": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          744,
+          128
+        ],
+        "finite": true,
+        "sha256": "47567b6adb7bd4ef6ace997425eec0e2ccc2651c931608e545b80672ecbe8e83",
+        "min": -1.5480860471725464,
+        "max": 7.0902581214904785,
+        "mean": 2.951302514203792e-09
+      },
+      "joint.first_logits": {
+        "dtype": "float32",
+        "shape": [
+          1,
+          1,
+          1,
+          8198
+        ],
+        "finite": true,
+        "sha256": "e95303daf8f267bd7b22a0c1840998a548a04b8ea7b62b93549fafc28249caf7",
+        "min": -59.75439453125,
+        "max": 8.157010078430176,
+        "mean": -29.910160108582804
+      }
+    }
+  },
+  "decode": {
+    "transcript": "Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.",
+    "timestamps": [
+      {
+        "token": "W",
+        "start": 0.32,
+        "end": 0.4
+      },
+      {
+        "token": "ell",
+        "start": 0.4,
+        "end": 0.56
+      },
+      {
+        "token": ",",
+        "start": 0.56,
+        "end": 0.56
+      },
+      {
+        "token": " I",
+        "start": 0.64,
+        "end": 0.8
+      },
+      {
+        "token": " don",
+        "start": 0.8,
+        "end": 0.88
+      },
+      {
+        "token": "'",
+        "start": 0.88,
+        "end": 0.88
+      },
+      {
+        "token": "t",
+        "start": 0.96,
+        "end": 1.04
+      },
+      {
+        "token": " w",
+        "start": 1.04,
+        "end": 1.12
+      },
+      {
+        "token": "ish",
+        "start": 1.12,
+        "end": 1.28
+      },
+      {
+        "token": " to",
+        "start": 1.28,
+        "end": 1.36
+      },
+      {
+        "token": " see",
+        "start": 1.36,
+        "end": 1.52
+      },
+      {
+        "token": " it",
+        "start": 1.52,
+        "end": 1.68
+      },
+      {
+        "token": " any",
+        "start": 1.68,
+        "end": 1.76
+      },
+      {
+        "token": " more",
+        "start": 1.92,
+        "end": 2.0
+      },
+      {
+        "token": ",",
+        "start": 2.0,
+        "end": 2.0
+      },
+      {
+        "token": " obser",
+        "start": 2.24,
+        "end": 2.4
+      },
+      {
+        "token": "ved",
+        "start": 2.4,
+        "end": 2.56
+      },
+      {
+        "token": " P",
+        "start": 2.56,
+        "end": 2.64
+      },
+      {
+        "token": "ho",
+        "start": 2.64,
+        "end": 2.8000000000000003
+      },
+      {
+        "token": "eb",
+        "start": 2.8000000000000003,
+        "end": 2.96
+      },
+      {
+        "token": "e",
+        "start": 2.96,
+        "end": 3.04
+      },
+      {
+        "token": ",",
+        "start": 3.04,
+        "end": 3.04
+      },
+      {
+        "token": " tur",
+        "start": 3.2800000000000002,
+        "end": 3.52
+      },
+      {
+        "token": "ning",
+        "start": 3.52,
+        "end": 3.68
+      },
+      {
+        "token": " a",
+        "start": 3.68,
+        "end": 3.84
+      },
+      {
+        "token": "way",
+        "start": 3.84,
+        "end": 4.0
+      },
+      {
+        "token": " her",
+        "start": 4.0,
+        "end": 4.16
+      },
+      {
+        "token": " e",
+        "start": 4.16,
+        "end": 4.32
+      },
+      {
+        "token": "y",
+        "start": 4.32,
+        "end": 4.4
+      },
+      {
+        "token": "es",
+        "start": 4.4,
+        "end": 4.72
+      },
+      {
+        "token": ".",
+        "start": 4.72,
+        "end": 4.72
+      },
+      {
+        "token": " It",
+        "start": 4.88,
+        "end": 5.12
+      },
+      {
+        "token": " is",
+        "start": 5.12,
+        "end": 5.28
+      },
+      {
+        "token": " cer",
+        "start": 5.28,
+        "end": 5.44
+      },
+      {
+        "token": "tain",
+        "start": 5.44,
+        "end": 5.6000000000000005
+      },
+      {
+        "token": "ly",
+        "start": 5.6000000000000005,
+        "end": 5.76
+      },
+      {
+        "token": " very",
+        "start": 5.76,
+        "end": 6.0
+      },
+      {
+        "token": " like",
+        "start": 6.0,
+        "end": 6.16
+      },
+      {
+        "token": " the",
+        "start": 6.16,
+        "end": 6.32
+      },
+      {
+        "token": " ol",
+        "start": 6.32,
+        "end": 6.4
+      },
+      {
+        "token": "d",
+        "start": 6.4,
+        "end": 6.640000000000001
+      },
+      {
+        "token": " port",
+        "start": 6.640000000000001,
+        "end": 6.96
+      },
+      {
+        "token": "rait",
+        "start": 6.96,
+        "end": 7.2
+      },
+      {
+        "token": ".",
+        "start": 7.2,
+        "end": 7.2
+      }
+    ],
+    "steps": 50,
+    "nonblank_steps": 44,
+    "blank_token_id": 8192,
+    "durations": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "checks": {
+    "required_arrays_present": true,
+    "missing_arrays": [],
+    "all_arrays_finite": true,
+    "nonempty_trajectory": true
+  },
+  "limitations": [
+    "This fixture records the reference path only; it does not establish native CKE parity.",
+    "It covers one 7.435-second English utterance and no silence, multilingual, long-audio, chunk-boundary, or diarization behavior.",
+    "Timestamps are the pinned Transformers decoder convention and still require comparison with NeMo before CKE support is promoted."
+  ]
+}
