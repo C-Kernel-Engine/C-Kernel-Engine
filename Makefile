@@ -2820,7 +2820,7 @@ test-qwen3vl-private-corpus-parity-auto:
 		test -f "$(QWEN3VL_PRIVATE_CORPUS_MMPROJ)" || { echo "ERROR: Qwen3-VL mmproj GGUF is missing"; exit 2; }; \
 		test -f "$(QWEN3VL_PRIVATE_CORPUS_LLAMA_ROOT)/build/bin/libllama.so" || { echo "ERROR: pinned llama.cpp build is missing"; exit 2; }; \
 		$(MAKE) --no-print-directory ck-cli-v8; \
-		$(PYTHON) version/v8/scripts/certify_qwen3vl_llamacpp_corpus_v8.py \
+		$(PYTHON) version/v8/scripts/certify_multimodal_llamacpp_corpus_v8.py \
 			--model-profile qwen3vl \
 			--manifest "$(QWEN3VL_PRIVATE_CORPUS_MANIFEST)" \
 			--decoder-gguf "$(QWEN3VL_PRIVATE_CORPUS_DECODER)" \
@@ -2845,7 +2845,7 @@ test-qwen36vl-private-corpus-parity-auto:
 		test -f "$(QWEN36VL_PRIVATE_CORPUS_ENCODER_RUNTIME)/libckernel_engine.so" || { echo "ERROR: Qwen3.6-VL encoder runtime engine is missing"; exit 2; }; \
 		test -f "$(QWEN36VL_PRIVATE_CORPUS_LLAMA_ROOT)/build/bin/libllama.so" || { echo "ERROR: pinned llama.cpp build is missing"; exit 2; }; \
 		$(MAKE) --no-print-directory ck-cli-v8; \
-		$(PYTHON) version/v8/scripts/certify_qwen3vl_llamacpp_corpus_v8.py \
+		$(PYTHON) version/v8/scripts/certify_multimodal_llamacpp_corpus_v8.py \
 			--model-profile qwen36vl \
 			--manifest "$(QWEN36VL_PRIVATE_CORPUS_MANIFEST)" \
 			--decoder-gguf "$(QWEN36VL_PRIVATE_CORPUS_DECODER)" \
@@ -5296,12 +5296,16 @@ ck-cli-v7: $(BUILD_DIR)/ck-cli-v7
 # v8 Native CLI
 $(BUILD_DIR)/ck-cli-v8: $(CK_CLI_V8) $(CK_SAMPLER_V8) include/ck_model_abi_v8.h include/ck_sampler_v8.h include/ck_session_v8.h include/ckernel_audio.h $(LIB_TOKENIZER)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V8) $(CK_SAMPLER_V8) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V8) $(CK_SAMPLER_V8) -L$(BUILD_DIR) \
+		-Wl,--no-as-needed -lckernel_tokenizer -Wl,--as-needed \
+		-ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
 
 $(BUILD_DIR)/libck_session_v8.so: $(CK_CLI_V8) $(CK_SAMPLER_V8) include/ck_model_abi_v8.h include/ck_sampler_v8.h include/ck_session_v8.h include/ckernel_audio.h $(LIB_TOKENIZER)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -shared -DCK_CLI_V8_NO_MAIN=1 -Wl,-soname,libck_session_v8.so \
-		-o $@ $(CK_CLI_V8) $(CK_SAMPLER_V8) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+		-o $@ $(CK_CLI_V8) $(CK_SAMPLER_V8) -L$(BUILD_DIR) \
+		-Wl,--no-as-needed -lckernel_tokenizer -Wl,--as-needed \
+		-ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
 
 ck-cli-v8: $(BUILD_DIR)/ck-cli-v8
 	@echo ""

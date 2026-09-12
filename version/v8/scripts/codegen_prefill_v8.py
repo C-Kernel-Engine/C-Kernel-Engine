@@ -644,6 +644,10 @@ def emit_prefill_op(
             if op_type == "quantize_out_proj_input":
                 lines.append(f"    ck_debug_outproj_fp32_input = (const float*)({x_expr});")
                 lines.append(
+                    f'    ck_debug_export_hidden(model, {layer}, "attn_out", '
+                    f'(const float*)({x_expr}), (int)((size_t)num_tokens * (size_t)({k_expr})));'
+                )
+                lines.append(
                     f'    if (num_tokens > 1) ck_debug_export_hidden(model, {layer}, "attn_out_last", '
                     f'(const float*)(((const float*)({x_expr})) + (((size_t)num_tokens - 1u) * (size_t)({k_expr}))), '
                     f'(int)({k_expr}));'
@@ -886,6 +890,10 @@ def emit_prefill_op(
             lines.append(f"    ck_debug_mlp_gate_up_fp32_input = (const float*)({x_expr});")
         if op_type == "quantize_out_proj_input":
             lines.append(f"    ck_debug_outproj_fp32_input = (const float*)({x_expr});")
+            lines.append(
+                f'    ck_debug_export_hidden(model, {layer}, "attn_out", '
+                f'(const float*)({x_expr}), (int)((size_t)num_tokens * (size_t)({k_expr})));'
+            )
             lines.append(
                 f'    if (num_tokens > 1) ck_debug_export_hidden(model, {layer}, "attn_out_last", '
                 f'(const float*)(((const float*)({x_expr})) + (((size_t)num_tokens - 1u) * (size_t)({k_expr}))), '

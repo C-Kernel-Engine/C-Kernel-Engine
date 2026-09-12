@@ -510,6 +510,18 @@ class PersistentTrajectoryParityTests(unittest.TestCase):
         )
         self.assertIn("return 22;", source)
 
+    def test_llama_flash_input_capture_keeps_flash_graph_and_fails_explicitly(self) -> None:
+        source = (
+            ROOT / "version" / "v8" / "scripts" / "llama_token_replay_v8.cpp"
+        ).read_text(encoding="utf-8")
+        attention_classifier = source.split(
+            "const bool dump_attention_internals", 1
+        )[1].split("DumpState dump_state", 1)[0]
+        self.assertNotIn('name.rfind("kqv-", 0)', attention_classifier)
+        self.assertIn("no flash-attention ancestor in the executed graph", source)
+        self.assertIn("if (!dump_state.capture_error.empty())", source)
+        self.assertIn("return 24;", source)
+
     def test_thread_configuration_is_applied_before_runtime_load(self) -> None:
         with mock.patch.dict(runner.os.environ, {}, clear=True):
             configured = runner._configure_ck_threads(12)
