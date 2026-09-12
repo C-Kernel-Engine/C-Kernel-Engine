@@ -780,6 +780,568 @@ function buildXrayPanelEmptyState(panel, ctx) {
     return hdr('No X-ray artifact loaded for this panel.');
 }
 
+
+// -- Explain-this-operation panel (canonical copies from ir_visualizer.html) --
+// Keep in sync with the Explain tab implementation.
+
+const EXPLAIN_DOC_LINKS = [
+    { label: 'Kernel Maps - anatomy of a kernel map', href: 'kernel-maps.html#anatomy' },
+    { label: 'Kernel Maps - the resolution algorithm', href: 'kernel-maps.html#resolution' },
+    { label: 'Kernel Maps - a real resolver trace', href: 'kernel-maps.html#selection-trace' },
+    { label: 'Codegen - v8 pipeline and failure table', href: 'codegen.html' },
+];
+
+function explainModePayloads(files, mode) {
+    files = files || {};
+    if (mode === 'prefill') {
+        return {
+            ir1: files.ir1_prefill || null,
+            call: files.lowered_prefill_call || files.lowered_prefill || null,
+        };
+    }
+    return {
+        ir1: files.ir1_decode || null,
+        call: files.lowered_decode_call || files.lowered_decode || null,
+    };
+}
+
+function explainOpsOf(payload) {
+    if (!payload || typeof payload !== 'object') return [];
+    if (Array.isArray(payload.operations)) return payload.operations;
+    if (Array.isArray(payload.ops)) return payload.ops;
+    return [];
+}
+
+function explainIndexRegistry(registry) {
+    const index = {};
+    const kernels = registry && Array.isArray(registry.kernels) ? registry.kernels : [];
+    kernels.forEach(k => { if (k && k.id != null) index[String(k.id)] = k; });
+    return index;
+}
+
+function explainCollectOps(files, mode) {
+    // Pair IR1 ops with call-IR ops by op name + layer, preferring an
+    // identical op_id/idx, then first unmatched occurrence. Positional
+    // pairing would silently join the wrong op when stages insert or
+    // drop ops between IR levels.
+    const payloads = explainModePayloads(files, mode);
+    const ir1Ops = explainOpsOf(payloads.ir1);
+    const callOps = explainOpsOf(payloads.call);
+    const callUsed = new Array(callOps.length).fill(false);
+    const rows = [];
+
+    function keyOf(name, layer) {
+        return String(name || '') + '|' + String(layer == null ? '' : layer);
+    }
+
+    ir1Ops.forEach((ir1Op) => {
+        const key = keyOf(ir1Op.op, ir1Op.layer != null ? ir1Op.layer : null);
+        const ir1Id = ir1Op.op_id != null ? ir1Op.op_id : null;
+        let partner = -1;
+        if (ir1Id != null) {
+            for (let i = 0; i < callOps.length; i++) {
+                if (callUsed[i]) continue;
+                if (callOps[i].idx === ir1Id && keyOf(callOps[i].op, callOps[i].layer != null ? callOps[i].layer : null) === key) {
+                    partner = i;
+                    break;
+                }
+            }
+        }
+        if (partner < 0) {
+            for (let i = 0; i < callOps.length; i++) {
+                if (callUsed[i]) continue;
+                if (keyOf(callOps[i].op, callOps[i].layer != null ? callOps[i].layer : null) === key) {
+                    partner = i;
+                    break;
+                }
+            }
+        }
+        if (partner >= 0) callUsed[partner] = true;
+        const callOp = partner >= 0 ? callOps[partner] : null;
+        rows.push({
+            mode: mode,
+            ref: callOp && callOp.idx != null ? ('call:' + callOp.idx) : ('ir1:' + (ir1Id != null ? ir1Id : rows.length)),
+            op: ir1Op.op || (callOp && callOp.op) || '',
+            layer: ir1Op.layer != null ? ir1Op.layer : (callOp && callOp.layer != null ? callOp.layer : null),
+            section: ir1Op.section || (callOp && callOp.section) || null,
+            kernel: ir1Op.kernel || null,
+            hasIr1: true,
+            hasCall: !!callOp,
+            ir1Op: ir1Op,
+            callOp: callOp,
+        });
+    });
+
+    callOps.forEach((callOp, i) => {
+        if (callUsed[i]) return;
+        rows.push({
+            mode: mode,
+            ref: callOp.idx != null ? ('call:' + callOp.idx) : ('callpos:' + i),
+            op: callOp.op || '',
+            layer: callOp.layer != null ? callOp.layer : null,
+            section: callOp.section || null,
+            kernel: (callOp.call_abi && callOp.call_abi.kernel_id) || callOp.function || null,
+            hasIr1: false,
+            hasCall: true,
+            ir1Op: null,
+            callOp: callOp,
+        });
+    });
+    return rows;
+}
+
+function explainDataflowSummary(dataflow) {
+    const df = dataflow && typeof dataflow === 'object' ? dataflow : {};
+    const summarize = (ports) => Object.keys(ports || {}).map(name => {
+        const p = ports[name] || {};
+        const bits = [name];
+        if (p.dtype) bits.push(String(p.dtype));
+        if (p.slot) bits.push('slot ' + String(p.slot));
+        else if (p.from) bits.push('from ' + String(p.from));
+        return bits.join(' / ');
+    });
+    return { inputs: summarize(df.inputs), outputs: summarize(df.outputs) };
+}
+
+function explainBuildChain(files, registry, mode, ref) {
+    const payloads = explainModePayloads(files, mode);
+    const rows = explainCollectOps(files, mode);
+    const row = rows.find(r => r.ref === ref) || null;
+    const regIndex = explainIndexRegistry(registry);
+    const hasRegistry = !!(registry && Array.isArray(registry.kernels));
+    if (!row) {
+        return {
+            found: false,
+            mode: mode,
+            ref: ref,
+            reason: 'no explanation available for this op',
+            stages: [],
+            docs: EXPLAIN_DOC_LINKS,
+        };
+    }
+    const ir1Op = row.ir1Op;
+    const callOp = row.callOp;
+    const stages = [];
+
+    // 1. Circuit operation (ir1_*).
+    if (ir1Op) {
+        const df = explainDataflowSummary(ir1Op.dataflow);
+        const iv = ir1Op.interface_validation || {};
+        stages.push({
+            id: 'circuit', label: 'Circuit operation', status: 'resolved',
+            fields: [
+                ['op', ir1Op.op],
+                ['kernel', ir1Op.kernel],
+                ['layer', ir1Op.layer != null ? ir1Op.layer : '-'],
+                ['section', ir1Op.section || '-'],
+                ['inputs', df.inputs.length ? df.inputs.join('; ') : '-'],
+                ['outputs', df.outputs.length ? df.outputs.join('; ') : '-'],
+                ['interface', iv.operation_interface || '-'],
+            ],
+            summary: String(ir1Op.op || '') + ' (layer ' + (ir1Op.layer != null ? ir1Op.layer : '-') + ')',
+        });
+    } else {
+        stages.push({
+            id: 'circuit', label: 'Circuit operation', status: 'not_generated',
+            detail: 'ir1_' + mode + '.json was not loaded for this run; the circuit operation view is unavailable.',
+        });
+    }
+
+    // 2. Required contract (call IR first, circuit interface join second).
+    const rc = callOp && callOp.required_contract ? callOp.required_contract : null;
+    const iv = ir1Op && ir1Op.interface_validation ? ir1Op.interface_validation : null;
+    if (rc && rc.contract_id) {
+        stages.push({
+            id: 'contract', label: 'Required contract', status: 'resolved',
+            fields: [
+                ['contract_id', rc.contract_id],
+                ['validation', rc.validation || '-'],
+                ['evidence', rc.evidence || '-'],
+            ],
+            summary: String(rc.contract_id),
+        });
+    } else if (iv && iv.operation_interface) {
+        stages.push({
+            id: 'contract', label: 'Required contract', status: 'resolved',
+            fields: [
+                ['operation_interface', iv.operation_interface],
+                ['join_status', iv.status || '-'],
+                ['schema', iv.schema || '-'],
+            ],
+            detail: 'From the circuit interface join; the lowered call IR was not loaded for this op.',
+            summary: String(iv.operation_interface),
+        });
+    } else {
+        stages.push({
+            id: 'contract', label: 'Required contract',
+            status: callOp || ir1Op ? 'missing' : 'not_generated',
+            detail: callOp || ir1Op
+                ? 'The loaded artifacts carry no required-contract record for this op.'
+                : 'lowered_' + mode + '_call.json was not loaded; nothing past the circuit stage was generated for this op.',
+        });
+    }
+
+    // 3. Provider selection (call_abi + resolved contract).
+    const abi = callOp && callOp.call_abi ? callOp.call_abi : null;
+    const resolved = callOp && callOp.resolved_contract ? callOp.resolved_contract : null;
+    if (abi || resolved) {
+        stages.push({
+            id: 'provider', label: 'Provider selection', status: 'resolved',
+            fields: [
+                ['provider', (abi && abi.kernel_id) || (resolved && resolved.kernel_id) || '-'],
+                ['binding_owner', (abi && abi.owner) || '-'],
+                ['map_file', (abi && abi.source_file) || '-'],
+                ['function', (resolved && resolved.function) || (callOp && callOp.function) || '-'],
+                ['resolved_contract', (resolved && (resolved.resolved_contract_id || resolved.contract_id)) || '-'],
+                ['selector', resolved && resolved.selector != null ? resolved.selector : 'default ranking'],
+            ],
+            summary: String((abi && abi.kernel_id) || (resolved && resolved.kernel_id) || ''),
+        });
+    } else {
+        stages.push({
+            id: 'provider', label: 'Provider selection',
+            status: callOp ? 'missing' : 'not_generated',
+            detail: callOp
+                ? 'The call IR carries no call_abi/resolved_contract for this op.'
+                : 'lowered_' + mode + '_call.json was not loaded; provider selection output was not generated.',
+        });
+    }
+
+    // 4. Kernel map (registry entry).
+    const kernelId = (abi && abi.kernel_id) || (resolved && resolved.kernel_id)
+        || (callOp && callOp.function) || (ir1Op && ir1Op.kernel) || null;
+    const mapEntry = kernelId != null ? regIndex[String(kernelId)] || null : null;
+    if (mapEntry) {
+        const caps = Array.isArray(mapEntry.numerical_capabilities) ? mapEntry.numerical_capabilities : [];
+        const cap0 = caps.length ? caps[0] : null;
+        const quant = mapEntry.quant || {};
+        stages.push({
+            id: 'kernel_map', label: 'Kernel map', status: 'resolved',
+            fields: [
+                ['map_id', mapEntry.id],
+                ['operation_interface', mapEntry.operation_interface || '-'],
+                ['variant', mapEntry.variant || '-'],
+                ['quant', ['weight=' + (quant.weight || '-'), 'activation=' + (quant.activation || '-'), 'output=' + (quant.output || '-')].join(' ')],
+                ['numerical_contract', cap0 ? String(cap0.contract_id) + ' (' + String(cap0.status || '-') + ')' : '-'],
+            ],
+            summary: String(mapEntry.id || ''),
+        });
+    } else {
+        stages.push({
+            id: 'kernel_map', label: 'Kernel map',
+            status: kernelId == null ? 'not_generated' : 'missing',
+            detail: kernelId == null
+                ? 'No provider was resolved, so no kernel map entry applies.'
+                : (hasRegistry
+                    ? 'No kernel map entry "' + kernelId + '" exists in the loaded registry.'
+                    : 'The kernel registry was not loaded; the kernel map stage cannot be shown.'),
+        });
+    }
+
+    // 5. Generated call.
+    if (callOp && callOp.function) {
+        const args = Array.isArray(callOp.args) ? callOp.args : [];
+        stages.push({
+            id: 'call', label: 'Generated call', status: 'resolved',
+            fields: [
+                ['function', callOp.function],
+                ['errors', Array.isArray(callOp.errors) && callOp.errors.length ? callOp.errors.join('; ') : 'none'],
+            ],
+            args: args.map(a => ({
+                name: a && a.name != null ? String(a.name) : '?',
+                expr: a && a.expr != null ? String(a.expr) : '',
+                source: a && a.source != null ? String(a.source) : '',
+            })),
+            summary: String(callOp.function) + '(' + args.length + ' args)',
+        });
+    } else {
+        stages.push({
+            id: 'call', label: 'Generated call',
+            status: callOp ? 'missing' : 'not_generated',
+            detail: callOp
+                ? 'The call IR entry for this op carries no function/args.'
+                : 'lowered_' + mode + '_call.json was not loaded; no generated call exists for this op.',
+        });
+    }
+
+    // 6. C implementation / tests (kernel map impl + tests).
+    const impl = mapEntry && mapEntry.impl ? mapEntry.impl : null;
+    if (impl && impl.function) {
+        const tests = mapEntry.tests || {};
+        const unitTests = Array.isArray(tests.unit) ? tests.unit : [];
+        const parityTests = Array.isArray(tests.parity) ? tests.parity : [];
+        stages.push({
+            id: 'c_impl', label: 'C implementation / tests', status: 'resolved',
+            fields: [
+                ['function', impl.function],
+                ['sources', Array.isArray(impl.sources) && impl.sources.length ? impl.sources.join('; ') : '-'],
+                ['unit_tests', unitTests.length ? unitTests.join('; ') : '-'],
+                ['parity', parityTests.length ? parityTests.map(p => String((p && p.oracle) || p)).join('; ') : '-'],
+            ],
+            summary: String(impl.function),
+        });
+    } else {
+        stages.push({
+            id: 'c_impl', label: 'C implementation / tests',
+            status: mapEntry ? 'missing' : 'not_generated',
+            detail: mapEntry
+                ? 'The kernel map entry carries no impl block.'
+                : 'No kernel map entry was resolved, so the C implementation stage does not apply.',
+        });
+    }
+
+    return {
+        found: true,
+        mode: mode,
+        ref: ref,
+        op: { op: row.op, layer: row.layer, section: row.section, kernel: row.kernel },
+        kernelId: kernelId,
+        stages: stages,
+        docs: EXPLAIN_DOC_LINKS,
+    };
+}
+
+function explainProvenanceRows(prov) {
+    return prov && Array.isArray(prov.artifacts) ? prov.artifacts : [];
+}
+
+function explainStalenessSummary(prov) {
+    const rows = explainProvenanceRows(prov);
+    const counts = { match: 0, stale: 0, no_stamp: 0, not_loaded: 0 };
+    const messages = [];
+    rows.forEach(r => {
+        const status = String(r.status || 'not_loaded');
+        if (counts[status] != null) counts[status] += 1;
+        if (status === 'stale') {
+            messages.push(String(r.key) + ': artifact on disk differs from its ' + String(r.stamp_bundle || '.ck bundle') + ' stamp; this stage may come from a different build (stale or mixed-revision).');
+        } else if (status === 'no_stamp') {
+            messages.push(String(r.key) + ': no bundle stamp records this artifact; revision provenance is unavailable for it.');
+        }
+    });
+    return { counts: counts, messages: messages, stale: counts.stale > 0 };
+}
+
+function explainStatusChip(status) {
+    if (status === 'resolved' || status === 'available' || status === 'match') return '<span class="status-chip status-chip-good">' + escapeHtml(status) + '</span>';
+    if (status === 'failed' || status === 'stale') return '<span class="status-chip status-chip-bad">' + escapeHtml(status) + '</span>';
+    if (status === 'missing' || status === 'no_stamp') return '<span class="status-chip status-chip-warn">' + escapeHtml(String(status).replace(/_/g, ' ')) + '</span>';
+    return '<span class="status-chip status-chip-muted">' + escapeHtml(String(status).replace(/_/g, ' ')) + '</span>';
+}
+
+function buildExplainEmptyStateHtml(reason) {
+    return '<div style="margin-top:0.5rem; padding:0.75rem 1rem; background:rgba(255,180,0,0.08); border:1px solid rgba(255,180,0,0.3); border-radius:8px; font-size:0.74rem; color:var(--text-secondary); line-height:1.6;">'
+        + '<strong style="color:var(--orange);">No explanation available for this op.</strong>'
+        + '<div style="margin-top:0.3rem;">' + escapeHtml(reason || 'This run carries no IR or call artifacts the explanation chain can be derived from.') + '</div>'
+        + '</div>';
+}
+
+function buildExplainChainHtml(chain) {
+    if (!chain || !chain.found) {
+        return buildExplainEmptyStateHtml(chain && chain.reason ? chain.reason : 'no explanation available for this op');
+    }
+    let html = '';
+    chain.stages.forEach(stage => {
+        html += '<div style="border:1px solid var(--grey); border-radius:8px; padding:0.6rem 0.9rem; margin-top:0.5rem;">';
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">'
+            + '<strong>' + escapeHtml(stage.label) + '</strong>' + explainStatusChip(stage.status) + '</div>';
+        if (Array.isArray(stage.fields)) {
+            html += '<table style="margin-top:0.4rem; font-size:0.76rem; width:100%;">';
+            stage.fields.forEach(([k, v]) => {
+                html += '<tr><td style="color:var(--text-muted); padding-right:0.75rem; white-space:nowrap; vertical-align:top;">' + escapeHtml(String(k)) + '</td>'
+                    + '<td style="word-break:break-word;"><code>' + escapeHtml(v == null ? '-' : String(v)) + '</code></td></tr>';
+            });
+            html += '</table>';
+        }
+        if (Array.isArray(stage.args) && stage.args.length) {
+            html += '<pre style="font-size:0.72rem; white-space:pre-wrap; margin-top:0.4rem;">'
+                + escapeHtml(stage.args.map(a => a.name.padEnd(18) + ' ' + a.expr + (a.source ? '    (' + a.source + ')' : '')).join('\n'))
+                + '</pre>';
+        }
+        if (stage.detail) {
+            html += '<div style="margin-top:0.35rem; font-size:0.74rem; color:var(--text-muted);">' + escapeHtml(stage.detail) + '</div>';
+        }
+        html += '</div>';
+    });
+    if (Array.isArray(chain.docs) && chain.docs.length) {
+        html += '<div style="margin-top:0.6rem; font-size:0.74rem; color:var(--text-muted);">Docs: '
+            + chain.docs.map(d => '<a href="' + escapeHtml(d.href) + '">' + escapeHtml(d.label) + '</a>').join(' | ')
+            + '</div>';
+    }
+    return html;
+}
+
+function buildExplainProvenanceHtml(prov) {
+    if (!prov || !Array.isArray(prov.artifacts) || !prov.artifacts.length) {
+        return '<div style="font-size:0.74rem; color:var(--text-muted);">No provenance data embedded for this run.</div>';
+    }
+    const summary = explainStalenessSummary(prov);
+    let html = '<div style="font-size:0.74rem; margin-bottom:0.4rem;">'
+        + '<span class="status-chip ' + (prov.strict_run_artifacts ? 'status-chip-good' : 'status-chip-warn') + '">strict run artifacts: ' + (prov.strict_run_artifacts ? 'on' : 'off') + '</span>'
+        + ' <span class="status-chip status-chip-good">match: ' + summary.counts.match + '</span>'
+        + ' <span class="status-chip ' + (summary.counts.stale ? 'status-chip-bad' : 'status-chip-muted') + '">stale: ' + summary.counts.stale + '</span>'
+        + ' <span class="status-chip ' + (summary.counts.no_stamp ? 'status-chip-warn' : 'status-chip-muted') + '">no stamp: ' + summary.counts.no_stamp + '</span>'
+        + ' <span class="status-chip status-chip-muted">not loaded: ' + summary.counts.not_loaded + '</span>'
+        + '</div>';
+    if (summary.messages.length) {
+        html += '<div style="margin-bottom:0.4rem; padding:0.5rem 0.75rem; background:rgba(231,76,60,0.08); border:1px solid rgba(231,76,60,0.3); border-radius:8px; font-size:0.74rem; color:var(--text-secondary);">'
+            + summary.messages.map(m => '<div>' + escapeHtml(m) + '</div>').join('') + '</div>';
+    }
+    html += '<table style="font-size:0.74rem; width:100%;">';
+    html += '<tr><th style="text-align:left;">artifact</th><th style="text-align:left;">status</th><th style="text-align:left;">loaded sha256</th><th style="text-align:left;">stamped sha256</th></tr>';
+    prov.artifacts.forEach(r => {
+        html += '<tr><td><code>' + escapeHtml(String(r.key)) + '</code></td><td>' + explainStatusChip(r.status) + '</td>'
+            + '<td style="word-break:break-all; color:var(--text-muted);">' + escapeHtml(r.loaded_sha256 ? String(r.loaded_sha256).slice(0, 16) + '...' : '-') + '</td>'
+            + '<td style="word-break:break-all; color:var(--text-muted);">' + escapeHtml(r.stamped_sha256 ? String(r.stamped_sha256).slice(0, 16) + '...' : '-') + '</td></tr>';
+    });
+    html += '</table>';
+    const roots = Array.isArray(prov.planner_source_roots) ? prov.planner_source_roots : [];
+    const commits = Array.isArray(prov.embedded_commits) ? prov.embedded_commits : [];
+    const stamps = Array.isArray(prov.bundle_stamps) ? prov.bundle_stamps : [];
+    html += '<div style="margin-top:0.4rem; font-size:0.72rem; color:var(--text-muted);">';
+    if (stamps.length) html += '<div>bundle stamps: ' + stamps.map(s => '<code>' + escapeHtml(String(s)) + '</code>').join(' ') + '</div>';
+    if (roots.length) html += '<div>producing checkout(s): ' + roots.map(s => '<code>' + escapeHtml(String(s)) + '</code>').join(' ') + '</div>';
+    if (commits.length) {
+        html += '<div>embedded commit stamps: ' + commits.map(c => '<code>' + escapeHtml(c.origin + '=' + c.value) + '</code>').join(' ') + '</div>';
+    } else {
+        html += '<div>embedded commit stamps: none recorded in the loaded artifacts</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function buildExplainReportHtml(name, report) {
+    const reconstructed = report.reconstructed === true;
+    let html = '<div style="border:1px solid var(--grey); border-radius:8px; padding:0.75rem 1rem; margin-top:0.6rem;">';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">'
+        + '<strong>' + escapeHtml(String(report.title || name)) + '</strong>'
+        + '<span>' + (reconstructed ? '<span class="status-chip status-chip-warn">reconstructed fixture</span> ' : '')
+        + '<span class="status-chip status-chip-muted">' + escapeHtml(String(report.kind || 'report')) + '</span></span></div>';
+    const req = report.requested || {};
+    html += '<div style="margin-top:0.4rem; font-size:0.76rem;">requested: <code>' + escapeHtml(String(req.op || '-')) + '</code>'
+        + ' phase <code>' + escapeHtml(String(req.phase || '-')) + '</code>'
+        + (req.layer != null ? ' layer <code>' + escapeHtml(String(req.layer)) + '</code>' : '')
+        + (req.circuit ? ' circuit <code>' + escapeHtml(String(req.circuit)) + '</code>' : '') + '</div>';
+    if (Array.isArray(report.stages) && report.stages.length) {
+        html += '<div style="margin-top:0.4rem;">';
+        report.stages.forEach(s => {
+            html += '<div style="font-size:0.74rem; margin-top:0.2rem;">' + explainStatusChip(s.status)
+                + ' <strong>' + escapeHtml(String(s.stage).replace(/_/g, ' ')) + '</strong>'
+                + (s.fault ? ' <code>' + escapeHtml(String(s.fault)) + '</code>' : '')
+                + (s.detail ? '<div style="color:var(--text-muted); margin-left:0.4rem;">' + escapeHtml(String(s.detail)) + '</div>' : '')
+                + '</div>';
+        });
+        html += '</div>';
+    }
+    if (Array.isArray(report.candidates) && report.candidates.length) {
+        html += '<table style="margin-top:0.5rem; font-size:0.74rem; width:100%;">'
+            + '<tr><th style="text-align:left;">provider</th><th style="text-align:left;">decision</th><th style="text-align:left;">stage</th><th style="text-align:left;">reason</th></tr>';
+        report.candidates.forEach(c => {
+            html += '<tr><td><code>' + escapeHtml(String(c.provider || '-')) + '</code></td>'
+                + '<td>' + escapeHtml(String(c.decision || '-')) + '</td>'
+                + '<td>' + escapeHtml(String(c.stage || '-')) + '</td>'
+                + '<td><code>' + escapeHtml(String(c.reason || '-')) + '</code>'
+                + (c.note ? '<div style="color:var(--text-muted);">' + escapeHtml(String(c.note)) + '</div>' : '')
+                + '</td></tr>';
+        });
+        html += '</table>';
+        html += '<div style="font-size:0.74rem; margin-top:0.25rem;">selected: <code>' + escapeHtml(report.selected == null ? 'none' : String(report.selected)) + '</code></div>';
+    }
+    const pm = report.port_mismatch;
+    if (pm && typeof pm === 'object') {
+        html += '<div style="margin-top:0.5rem; font-size:0.74rem;">'
+            + '<div>declared ports: <code>' + escapeHtml((Array.isArray(pm.declared) ? pm.declared : []).map(p => String(p.port) + ' -> ' + String(p.slot || '')).join(', ')) + '</code></div>'
+            + '<div>canonical ports: <code>' + escapeHtml((Array.isArray(pm.canonical) ? pm.canonical : []).map(p => String(p.port) + ' (' + String(p.role || '') + ')').join(', ')) + '</code></div>'
+            + (pm.secondary ? '<div style="color:var(--text-muted);">' + escapeHtml(String(pm.secondary)) + '</div>' : '')
+            + '</div>';
+    }
+    if (report.guidance) {
+        html += '<div style="margin-top:0.5rem; padding:0.5rem 0.75rem; background:rgba(255,180,0,0.08); border:1px solid rgba(255,180,0,0.3); border-radius:8px; font-size:0.74rem; color:var(--text-secondary);">'
+            + escapeHtml(String(report.guidance)) + '</div>';
+    }
+    if (Array.isArray(report.source_refs) && report.source_refs.length) {
+        html += '<div style="margin-top:0.4rem; font-size:0.72rem; color:var(--text-muted);">source: ' + report.source_refs.map(r => '<code>' + escapeHtml(String(r)) + '</code>').join(' ') + '</div>';
+    }
+    if (Array.isArray(report.verifying_tests) && report.verifying_tests.length) {
+        html += '<div style="font-size:0.72rem; color:var(--text-muted);">verified by: ' + report.verifying_tests.map(r => '<code>' + escapeHtml(String(r)) + '</code>').join(' ') + '</div>';
+    }
+    if (Array.isArray(report.docs) && report.docs.length) {
+        html += '<div style="margin-top:0.3rem; font-size:0.72rem; color:var(--text-muted);">Docs: '
+            + report.docs.map(d => '<a href="' + escapeHtml(String(d.href || '')) + '">' + escapeHtml(String(d.label || d.href || '')) + '</a>').join(' | ')
+            + '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function explainBuildDiagnostic(opts) {
+    // Compact bundle for a human or a smaller local agent: what was
+    // requested, how far the chain resolved, why selection/build
+    // failed, where the relevant source lives, which test verifies a
+    // repair. Repair guidance is "where to look", never "apply this".
+    opts = opts || {};
+    const meta = opts.meta || {};
+    const chain = opts.chain || null;
+    const reports = opts.reports && typeof opts.reports === 'object' ? opts.reports : {};
+    const prov = opts.provenance || null;
+    const sourceRefs = [];
+    const verifyingTests = [];
+    const failureReports = Object.keys(reports).sort().map(name => {
+        const r = reports[name] || {};
+        (Array.isArray(r.source_refs) ? r.source_refs : []).forEach(s => { if (!sourceRefs.includes(String(s))) sourceRefs.push(String(s)); });
+        (Array.isArray(r.verifying_tests) ? r.verifying_tests : []).forEach(s => { if (!verifyingTests.includes(String(s))) verifyingTests.push(String(s)); });
+        const failedStage = (Array.isArray(r.stages) ? r.stages : []).find(s => s.status === 'failed') || null;
+        return {
+            name: name,
+            kind: r.kind || null,
+            title: r.title || null,
+            reconstructed: r.reconstructed === true,
+            requested: r.requested || null,
+            failed_stage: failedStage ? { stage: failedStage.stage, fault: failedStage.fault || null, detail: failedStage.detail || null } : null,
+            rejected: (Array.isArray(r.candidates) ? r.candidates : [])
+                .filter(c => c.decision === 'rejected')
+                .map(c => ({ provider: c.provider || null, stage: c.stage || null, reason: c.reason || null })),
+            selected: r.selected != null ? r.selected : null,
+        };
+    });
+    if (chain && chain.found && chain.kernelId) {
+        const mapRef = 'version/v8/kernel_maps/' + String(chain.kernelId) + '.json';
+        if (!sourceRefs.includes(mapRef)) sourceRefs.push(mapRef);
+    }
+    return {
+        schema: 'cke.v8.explain_diagnostic',
+        schema_version: 1,
+        run: {
+            model: meta.model || null,
+            run_dir: meta.run_dir || null,
+            strict_run_artifacts: !!meta.strict_run_artifacts,
+            generated_at: meta.generated_at || null,
+        },
+        requested: opts.requested || null,
+        chain: chain && chain.found
+            ? chain.stages.map(s => ({
+                stage: s.id,
+                status: s.status,
+                summary: s.summary || null,
+                detail: s.detail || null,
+            }))
+            : null,
+        chain_reason: chain && !chain.found ? (chain.reason || 'no explanation available for this op') : null,
+        failure_reports: failureReports,
+        provenance: prov ? {
+            strict_run_artifacts: !!prov.strict_run_artifacts,
+            bundle_stamps: Array.isArray(prov.bundle_stamps) ? prov.bundle_stamps : [],
+            planner_source_roots: Array.isArray(prov.planner_source_roots) ? prov.planner_source_roots : [],
+            embedded_commits: Array.isArray(prov.embedded_commits) ? prov.embedded_commits : [],
+            artifact_status: explainProvenanceRows(prov).map(r => ({ key: r.key, status: r.status })),
+            staleness: explainStalenessSummary(prov).messages,
+        } : null,
+        source_refs: sourceRefs,
+        verifying_tests: verifyingTests,
+        docs: EXPLAIN_DOC_LINKS,
+        guidance: 'Repair guidance is limited to where to look: the circuit JSON, the candidate kernel map JSONs, and the resolver in version/v8/scripts/build_ir_v8.py. Nothing in this bundle is an automatically safe fix; do not apply changes from it without reading the referenced source.',
+    };
+}
+
 // Export for test harness (CommonJS for Node.js compatibility)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -791,6 +1353,12 @@ if (typeof module !== 'undefined' && module.exports) {
         xrayPhaseOf, xrayContractState, xrayCircuitRows,
         xrayGrowthEdges, xrayRunIdentityOf, xrayRankingMatchesReport, xrayBoardVerdict,
         xrayCircuitScope, xraySelectCircuitCallIr, xrayLiveKeyForFile,
-        xrayEmptyStateContext, buildXrayPanelEmptyState
+        xrayEmptyStateContext, buildXrayPanelEmptyState,
+        explainModePayloads, explainOpsOf, explainIndexRegistry,
+        explainCollectOps, explainDataflowSummary, explainBuildChain,
+        explainProvenanceRows, explainStalenessSummary, explainStatusChip,
+        buildExplainEmptyStateHtml, buildExplainChainHtml,
+        buildExplainProvenanceHtml, buildExplainReportHtml,
+        explainBuildDiagnostic
     };
 }

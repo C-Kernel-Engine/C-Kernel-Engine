@@ -1,0 +1,210 @@
+{
+  "format": "ir1-dataflow",
+  "version": 3,
+  "mode": "decode",
+  "_comment": "Trimmed fixture: first 3 ops of the Gemma-3-270M decode IR1 (real artifact: gemma-3-270m-it-Q5_K_M/ir1_decode.json). Op 2 (attn_norm) is the rmsnorm_forward_llama_production chain used by the explain panel tests.",
+  "ops": [
+    {
+      "op_id": 0,
+      "kernel": "embedding_forward_q8_0",
+      "op": "dense_embedding_lookup",
+      "template_op_id": null,
+      "section": "header",
+      "layer": -1,
+      "instance": 0,
+      "params": {},
+      "interface_validation": {
+        "schema": "cke.v8.circuit_interface_join",
+        "schema_version": 1,
+        "status": "implicit_dataflow",
+        "operation": "dense_embedding_lookup",
+        "phase": "decode",
+        "provider_id": "embedding_forward_q8_0",
+        "operation_interface": "embedding.q8_0_weight_fp32_output.v1"
+      },
+      "dataflow": {
+        "inputs": {
+          "token_ids": {
+            "from": "external:token_ids",
+            "dtype": "i32",
+            "slot": "external:token_ids"
+          }
+        },
+        "outputs": {
+          "out": {
+            "dtype": "fp32",
+            "slot": "main_stream"
+          }
+        }
+      },
+      "weights": {
+        "token_emb": {
+          "name": "token_emb",
+          "offset": 448,
+          "size": 178257920,
+          "dtype": "q8_0"
+        }
+      }
+    },
+    {
+      "op_id": 1,
+      "kernel": "memcpy",
+      "op": "residual_save",
+      "template_op_id": null,
+      "section": "body",
+      "layer": 0,
+      "instance": 0,
+      "_auto_inserted": true,
+      "interface_validation": {
+        "schema": "cke.v8.circuit_interface_join",
+        "schema_version": 1,
+        "status": "implicit_dataflow",
+        "operation": "residual_save",
+        "phase": "decode",
+        "provider_id": "memcpy",
+        "operation_interface": "residual_save.memcpy_copy.v1"
+      },
+      "dataflow": {
+        "inputs": {
+          "src": {
+            "from_op": 0,
+            "from_output": "out",
+            "dtype": "fp32",
+            "slot": "main_stream"
+          }
+        },
+        "outputs": {
+          "dst": {
+            "dtype": "fp32",
+            "slot": "residual"
+          }
+        }
+      },
+      "weights": {}
+    },
+    {
+      "op_id": 2,
+      "kernel": "rmsnorm_forward_llama_production",
+      "op": "attn_norm",
+      "template_op_id": null,
+      "section": "body",
+      "layer": 0,
+      "instance": 0,
+      "params": {},
+      "required_contract": {
+        "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "validation": "validated",
+        "evidence": "Single-token decode retains the serial llama.cpp-compatible provider."
+      },
+      "resolved_contract": {
+        "schema": "cke.graph_ir_numerical_contract",
+        "schema_version": 1,
+        "operation": "decoder.rmsnorm",
+        "phase": "decode",
+        "required_contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "resolved_contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "contract_id": "rmsnorm_llama_cpu_production_fp32_output",
+        "kernel_id": "rmsnorm_forward_llama_production",
+        "function": "rmsnorm_forward_llama_production",
+        "selector": null,
+        "implementation": {
+          "isa_dispatch": "compile_time",
+          "threading": {
+            "runtime": "serial",
+            "work_partition": [
+              "independent_rows"
+            ],
+            "dispatch": [
+              "inline"
+            ],
+            "reduction_order_effect": "none"
+          }
+        },
+        "semantics": {
+          "operator_family": "rmsnorm",
+          "status": "validated",
+          "storage": {
+            "input": "fp32",
+            "weight": "fp32",
+            "output": "fp32"
+          },
+          "compute": {
+            "input": "fp32",
+            "weight": "fp32",
+            "accumulator": "fp64",
+            "contraction": "disabled",
+            "evaluation_order": "fp32_square_then_fp64_ascending_sum_then_fp32_mean_then_llama_cpu_isa_rsqrt_then_scale_weight"
+          },
+          "rounding": {
+            "mode": "rne",
+            "points": [
+              "square_product",
+              "reduction_finalize",
+              "reciprocal_sqrt",
+              "normalization_scale",
+              "weight_scale"
+            ]
+          },
+          "reduction": {
+            "kind": "normalization",
+            "order": "left_to_right",
+            "partial_accumulator": "fp64",
+            "merge_order": "none"
+          },
+          "threading": {
+            "work_partition": "independent_rows",
+            "split_strategy": "independent_outputs",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false
+          },
+          "position_transform": null,
+          "description": "llama.cpp CPU production RMSNorm: FP32 squares, ascending FP64 row sum, and the active CPU provider reciprocal-square-root sequence. AVX-512 uses RSQRT14 plus one Newton refinement; AVX2 uses scalar sqrt/div."
+        },
+        "operation_interface": "rmsnorm.fp32.v1",
+        "interface_call_abi": "validated",
+        "checkpoint": {
+          "id": "decoder.layer.{layer}.rmsnorm.output",
+          "producer": "rmsnorm",
+          "logical_layout": "token_major",
+          "axis_names": [
+            "token",
+            "channel"
+          ]
+        }
+      },
+      "interface_validation": {
+        "schema": "cke.v8.circuit_interface_join",
+        "schema_version": 1,
+        "status": "implicit_dataflow",
+        "operation": "attn_norm",
+        "phase": "decode",
+        "provider_id": "rmsnorm_forward_llama_production",
+        "operation_interface": "rmsnorm.fp32.v1"
+      },
+      "dataflow": {
+        "inputs": {
+          "input": {
+            "from_op": 0,
+            "from_output": "out",
+            "dtype": "fp32",
+            "slot": "main_stream"
+          }
+        },
+        "outputs": {
+          "output": {
+            "dtype": "fp32",
+            "slot": "main_stream"
+          }
+        }
+      },
+      "weights": {
+        "ln1_gamma": {
+          "name": "layer.0.ln1_gamma",
+          "offset": 189375036,
+          "size": 2560,
+          "dtype": "fp32"
+        }
+      }
+    }
+  ]
+}

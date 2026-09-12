@@ -1,0 +1,57 @@
+{
+  "schema": "cke.v8.explain_op_report",
+  "schema_version": 1,
+  "kind": "circuit_port_mismatch",
+  "reconstructed": true,
+  "_comment": "RECONSTRUCTED FIXTURE of a historical failure mode, shaped for the explain-this-operation panel. It is not a captured run artifact. Provenance: Nemotron-H bring-up around PR #412 (commit b9712c383, perf(v8/nemotron): parallelize recurrent prefill topology); the concrete port-name mismatch shape matches the repair recorded in commit 2063aa6b7 (fix(v8): restore Laguna and Nemotron compilation, branch fix/v8-laguna-nemotron-contracts), whose message states that Nemotron declared legacy projection ports and bound quantized providers to FP32 storage. The fault text mirrors the HARD CIRCUIT DATAFLOW FAULT raised by _canonical_graph_slot_overrides in version/v8/scripts/build_ir_v8.py.",
+  "title": "Nemotron: legacy projection port names fail the circuit dataflow join",
+  "requested": {
+    "op": "mamba_in_proj",
+    "phase": "prefill",
+    "layer": 0,
+    "circuit": "version/v8/circuits/nemotron_h.json",
+    "quant": { "weight": "q8_0", "activation": "q8_0", "output": "fp32" }
+  },
+  "stages": [
+    {
+      "stage": "circuit_operation",
+      "status": "available",
+      "detail": "Circuit op mamba_in_proj (layer 0) declared graph_slots inputs {x: layer_input} using the legacy x/y port names."
+    },
+    {
+      "stage": "required_contract",
+      "status": "failed",
+      "fault": "HARD CIRCUIT DATAFLOW FAULT",
+      "detail": "graph_slots ports do not match canonical inputs for op='mamba_in_proj': unmatched=['x'], canonical=['A']. Matmul-class providers expose canonical A (input) / C (output) ports; the single-port x->A remap only applies when the edge is unambiguous, and this binding was not."
+    },
+    { "stage": "provider_selection", "status": "not_generated" },
+    { "stage": "kernel_map", "status": "not_generated" },
+    { "stage": "generated_call", "status": "not_generated" },
+    { "stage": "c_implementation", "status": "not_generated" }
+  ],
+  "port_mismatch": {
+    "declared": [
+      { "port": "x", "slot": "layer_input", "role": "input" }
+    ],
+    "canonical": [
+      { "port": "A", "role": "input", "meaning": "activation matrix (token stream)" },
+      { "port": "C", "role": "output", "meaning": "projection result" }
+    ],
+    "secondary": "The same bring-up bound quantized (Q8) projection providers to FP32 storage slots; the repair bound them through the planned main_stream_q8 stream."
+  },
+  "docs": [
+    { "label": "Kernel Maps - anatomy of a kernel map", "href": "kernel-maps.html#anatomy" },
+    { "label": "Kernel Maps - the resolution algorithm", "href": "kernel-maps.html#resolution" },
+    { "label": "Codegen - when compilation fails, start here", "href": "codegen.html" }
+  ],
+  "source_refs": [
+    "version/v8/circuits/nemotron_h.json",
+    "version/v8/scripts/build_ir_v8.py (_canonical_graph_slot_overrides)",
+    "version/v8/scripts/validate_circuit_interfaces_v8.py (validate_graph_slots)"
+  ],
+  "verifying_tests": [
+    "tests/test_v8_nemotron_state_shape.py",
+    "version/v8/scripts/validate_circuit_interfaces_v8.py"
+  ],
+  "guidance": "Where to look: the circuit's graph_slots for the failing projection op in version/v8/circuits/nemotron_h.json against the canonical ports the operation interface declares (A/C for matmul-class projections), then the activation stream the slot names resolve to. The historical repair renamed the declared ports to the canonical A/C names and rebound storage to the planned Q8 stream; it did not special-case Nemotron in the compiler. This panel does not propose an automatic fix."
+}

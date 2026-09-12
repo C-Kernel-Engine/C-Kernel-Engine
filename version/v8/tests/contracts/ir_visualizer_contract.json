@@ -2,9 +2,8 @@
   "$schema": "visualizer_contract_v1",
   "_testing_guide": "This JSON is the single source of truth for IR visualizer tests. L1 (test_visualizer_health_v8.py) reads tabs/functions/elements from here. L2 (test_visualizer_js_units_v8.py) reads test_vectors. To add a tab: add to tabs[] + required_functions[]. To add a unit-tested function: add to test_vectors{} + update fixtures/ir_pure_functions.js. Run: make v8-visualizer-health",
   "name": "ir_visualizer",
-  "description": "CK-Engine v8 IR Visualizer — inference + training tabs",
+  "description": "CK-Engine v8 IR Visualizer \u2014 inference + training tabs",
   "source": "version/v8/tools/ir_visualizer.html",
-
   "tabs": [
     {
       "id": "memory",
@@ -91,13 +90,19 @@
       "description": "Backend parity X-ray: per-checkpoint numerical drift, ranking, execution trace"
     },
     {
+      "id": "explain",
+      "label": "Explain",
+      "render_fn": "renderExplain",
+      "panel_id": "explain",
+      "description": "Explain this operation: circuit op -> contract -> provider -> kernel map -> generated call -> C implementation, plus failure reports and revision provenance"
+    },
+    {
       "id": "tests",
       "label": "Tests",
       "panel_id": "tests",
       "description": "Operator-facing quick/all test entrypoints and debugging commands"
     }
   ],
-
   "required_functions": {
     "core": [
       "formatBytes",
@@ -128,7 +133,10 @@
       "renderXray",
       "renderXrayContext",
       "renderXrayCircuit",
-      "renderXrayRunbook"
+      "renderXrayRunbook",
+      "renderExplain",
+      "renderExplainChain",
+      "copyExplainDiagnostic"
     ],
     "utilities": [
       "normalizeShapeInput",
@@ -155,7 +163,6 @@
       "buildXrayPanelEmptyState"
     ]
   },
-
   "required_dom_elements": [
     "totalWeights",
     "totalActivations",
@@ -170,123 +177,337 @@
     "xrayDrift",
     "xrayRanking",
     "xrayTrace",
-    "xrayRunbook"
+    "xrayRunbook",
+    "explainOpSelect",
+    "explainEmpty",
+    "explainChain",
+    "explainDiagnostic",
+    "explainProvenance",
+    "explainReports"
   ],
-
   "pure_function_tests": {
     "fixture_file": "version/v8/tests/fixtures/ir_pure_functions.js",
     "functions": [
       {
         "name": "formatBytes",
         "tests": [
-          { "name": "bytes",     "call": "formatBytes(512)",                     "expect": "512 B" },
-          { "name": "KB",        "call": "formatBytes(2048)",                    "expect": "2.00 KB" },
-          { "name": "MB",        "call": "formatBytes(3 * 1024 * 1024)",         "expect": "3.00 MB" },
-          { "name": "GB",        "call": "formatBytes(2.5 * 1024 ** 3)",         "expect": "2.50 GB" }
+          {
+            "name": "bytes",
+            "call": "formatBytes(512)",
+            "expect": "512 B"
+          },
+          {
+            "name": "KB",
+            "call": "formatBytes(2048)",
+            "expect": "2.00 KB"
+          },
+          {
+            "name": "MB",
+            "call": "formatBytes(3 * 1024 * 1024)",
+            "expect": "3.00 MB"
+          },
+          {
+            "name": "GB",
+            "call": "formatBytes(2.5 * 1024 ** 3)",
+            "expect": "2.50 GB"
+          }
         ]
       },
       {
         "name": "normalizeShapeInput",
         "tests": [
-          { "name": "null",       "call": "normalizeShapeInput(null)",             "expect": [] },
-          { "name": "array",      "call": "normalizeShapeInput([2,3,4])",          "expect": ["2","3","4"] },
-          { "name": "string",     "call": "normalizeShapeInput('2x3x4')",          "expect": ["2","3","4"] },
-          { "name": "bracketed",  "call": "normalizeShapeInput('[2,3,4]')",         "expect": ["2","3","4"] },
-          { "name": "number",     "call": "normalizeShapeInput(42)",               "expect": ["42"] },
-          { "name": "empty",      "call": "normalizeShapeInput('')",               "expect": [] },
-          { "name": "obj_shape",  "call": "normalizeShapeInput({shape:[1,2]})",    "expect": ["1","2"] }
+          {
+            "name": "null",
+            "call": "normalizeShapeInput(null)",
+            "expect": []
+          },
+          {
+            "name": "array",
+            "call": "normalizeShapeInput([2,3,4])",
+            "expect": [
+              "2",
+              "3",
+              "4"
+            ]
+          },
+          {
+            "name": "string",
+            "call": "normalizeShapeInput('2x3x4')",
+            "expect": [
+              "2",
+              "3",
+              "4"
+            ]
+          },
+          {
+            "name": "bracketed",
+            "call": "normalizeShapeInput('[2,3,4]')",
+            "expect": [
+              "2",
+              "3",
+              "4"
+            ]
+          },
+          {
+            "name": "number",
+            "call": "normalizeShapeInput(42)",
+            "expect": [
+              "42"
+            ]
+          },
+          {
+            "name": "empty",
+            "call": "normalizeShapeInput('')",
+            "expect": []
+          },
+          {
+            "name": "obj_shape",
+            "call": "normalizeShapeInput({shape:[1,2]})",
+            "expect": [
+              "1",
+              "2"
+            ]
+          }
         ]
       },
       {
         "name": "formatShapeDisplay",
         "tests": [
-          { "name": "multi",  "call": "formatShapeDisplay([2,3,4])",  "expect": "2 × 3 × 4" },
-          { "name": "single", "call": "formatShapeDisplay([5])",      "expect": "[5]" },
-          { "name": "empty",  "call": "formatShapeDisplay(null)",     "expect": "-" }
+          {
+            "name": "multi",
+            "call": "formatShapeDisplay([2,3,4])",
+            "expect": "2 \u00d7 3 \u00d7 4"
+          },
+          {
+            "name": "single",
+            "call": "formatShapeDisplay([5])",
+            "expect": "[5]"
+          },
+          {
+            "name": "empty",
+            "call": "formatShapeDisplay(null)",
+            "expect": "-"
+          }
         ]
       },
       {
         "name": "normalizeMode",
         "tests": [
-          { "name": "prefill", "call": "normalizeMode('prefill')", "expect": "prefill" },
-          { "name": "decode",  "call": "normalizeMode('decode')",  "expect": "decode" },
-          { "name": "other",   "call": "normalizeMode('xyz')",     "expect": "decode" }
+          {
+            "name": "prefill",
+            "call": "normalizeMode('prefill')",
+            "expect": "prefill"
+          },
+          {
+            "name": "decode",
+            "call": "normalizeMode('decode')",
+            "expect": "decode"
+          },
+          {
+            "name": "other",
+            "call": "normalizeMode('xyz')",
+            "expect": "decode"
+          }
         ]
       },
       {
         "name": "escapeHtml",
         "tests": [
-          { "name": "tags",   "call": "escapeHtml('<b>hi</b>')",  "expect": "&lt;b&gt;hi&lt;/b&gt;" },
-          { "name": "quotes", "call": "escapeHtml('a\"b')",       "expect": "a&quot;b" },
-          { "name": "null",   "call": "escapeHtml(null)",         "expect": "" }
+          {
+            "name": "tags",
+            "call": "escapeHtml('<b>hi</b>')",
+            "expect": "&lt;b&gt;hi&lt;/b&gt;"
+          },
+          {
+            "name": "quotes",
+            "call": "escapeHtml('a\"b')",
+            "expect": "a&quot;b"
+          },
+          {
+            "name": "null",
+            "call": "escapeHtml(null)",
+            "expect": ""
+          }
         ]
       },
       {
         "name": "quoteShell",
         "tests": [
-          { "name": "safe",   "call": "quoteShell('hello')",       "expect": "hello" },
-          { "name": "spaces", "call": "quoteShell('hello world')", "expect": "\"hello world\"" },
-          { "name": "empty",  "call": "quoteShell('')",            "expect": "" }
+          {
+            "name": "safe",
+            "call": "quoteShell('hello')",
+            "expect": "hello"
+          },
+          {
+            "name": "spaces",
+            "call": "quoteShell('hello world')",
+            "expect": "\"hello world\""
+          },
+          {
+            "name": "empty",
+            "call": "quoteShell('')",
+            "expect": ""
+          }
         ]
       },
       {
         "name": "normalizePathString",
         "tests": [
-          { "name": "backslash", "call": "normalizePathString('a\\\\b\\\\c')", "expect": "a/b/c" },
-          { "name": "trailing",  "call": "normalizePathString('/a/b/')",       "expect": "/a/b" }
+          {
+            "name": "backslash",
+            "call": "normalizePathString('a\\\\b\\\\c')",
+            "expect": "a/b/c"
+          },
+          {
+            "name": "trailing",
+            "call": "normalizePathString('/a/b/')",
+            "expect": "/a/b"
+          }
         ]
       },
       {
         "name": "pathDirname",
         "tests": [
-          { "name": "basic", "call": "pathDirname('/a/b/c')", "expect": "/a/b" },
-          { "name": "root",  "call": "pathDirname('/a')",     "expect": "/" },
-          { "name": "empty", "call": "pathDirname('')",       "expect": "" }
+          {
+            "name": "basic",
+            "call": "pathDirname('/a/b/c')",
+            "expect": "/a/b"
+          },
+          {
+            "name": "root",
+            "call": "pathDirname('/a')",
+            "expect": "/"
+          },
+          {
+            "name": "empty",
+            "call": "pathDirname('')",
+            "expect": ""
+          }
         ]
       },
       {
         "name": "extractGgufStem",
         "tests": [
-          { "name": "path",     "call": "extractGgufStem('/models/qwen.gguf')",          "expect": "qwen" },
-          { "name": "url",      "call": "extractGgufStem('https://x.co/m.gguf?dl=1')",   "expect": "m" },
-          { "name": "non_gguf", "call": "extractGgufStem('model.bin')",                   "expect": "" }
+          {
+            "name": "path",
+            "call": "extractGgufStem('/models/qwen.gguf')",
+            "expect": "qwen"
+          },
+          {
+            "name": "url",
+            "call": "extractGgufStem('https://x.co/m.gguf?dl=1')",
+            "expect": "m"
+          },
+          {
+            "name": "non_gguf",
+            "call": "extractGgufStem('model.bin')",
+            "expect": ""
+          }
         ]
       },
       {
         "name": "relativePathFromTo",
         "tests": [
-          { "name": "sibling", "call": "relativePathFromTo('/a/b', '/a/c')",   "expect": "../c" },
-          { "name": "child",   "call": "relativePathFromTo('/a/b', '/a/b/c')", "expect": "c" },
-          { "name": "same",    "call": "relativePathFromTo('/a/b', '/a/b')",   "expect": "." },
-          { "name": "nonabs",  "call": "relativePathFromTo('a/b', '/c')",      "expect": null }
+          {
+            "name": "sibling",
+            "call": "relativePathFromTo('/a/b', '/a/c')",
+            "expect": "../c"
+          },
+          {
+            "name": "child",
+            "call": "relativePathFromTo('/a/b', '/a/b/c')",
+            "expect": "c"
+          },
+          {
+            "name": "same",
+            "call": "relativePathFromTo('/a/b', '/a/b')",
+            "expect": "."
+          },
+          {
+            "name": "nonabs",
+            "call": "relativePathFromTo('a/b', '/c')",
+            "expect": null
+          }
         ]
       },
       {
         "name": "xrayReportKindLabel",
         "tests": [
-          { "name": "whisper",  "call": "xrayReportKindLabel({schema:'cke.whisper_encoder_pytorch_xray'})", "expect": "Whisper Encoder X-Ray" },
-          { "name": "ranking",  "call": "xrayReportKindLabel({schema:'cke.xray_ranking_report'})",          "expect": "Ranking Report" },
-          { "name": "decoder",  "call": "xrayReportKindLabel({schema:'cke.xray.decoder_pytorch'})",         "expect": "Decoder X-Ray" },
-          { "name": "fallback", "call": "xrayReportKindLabel({})",                                          "expect": "X-Ray Report" }
+          {
+            "name": "whisper",
+            "call": "xrayReportKindLabel({schema:'cke.whisper_encoder_pytorch_xray'})",
+            "expect": "Whisper Encoder X-Ray"
+          },
+          {
+            "name": "ranking",
+            "call": "xrayReportKindLabel({schema:'cke.xray_ranking_report'})",
+            "expect": "Ranking Report"
+          },
+          {
+            "name": "decoder",
+            "call": "xrayReportKindLabel({schema:'cke.xray.decoder_pytorch'})",
+            "expect": "Decoder X-Ray"
+          },
+          {
+            "name": "fallback",
+            "call": "xrayReportKindLabel({})",
+            "expect": "X-Ray Report"
+          }
         ]
       },
       {
         "name": "xrayBackendLabel",
         "tests": [
-          { "name": "whisper_torch",   "call": "xrayBackendLabel({schema:'cke.whisper_encoder_pytorch_xray'})",                          "expect": "PyTorch" },
-          { "name": "ranking_oracle",  "call": "xrayBackendLabel({schema:'cke.xray_ranking_report'})",                                     "expect": "ggml-oracle" },
-          { "name": "orch_llamacpp",   "call": "xrayBackendLabel({schema:'cke.xray_orchestration_report', final_report:{oracle_backend:'llamacpp'}})", "expect": "llama.cpp" },
-          { "name": "orch_pytorch",    "call": "xrayBackendLabel({schema:'cke.xray_orchestration_report', final_report:{oracle_backend:'pytorch'}})",    "expect": "PyTorch" },
-          { "name": "trace_backend",   "call": "xrayBackendLabel({schema:'cke.xray_execution_trace', backend:'ck'})",                      "expect": "ck" }
+          {
+            "name": "whisper_torch",
+            "call": "xrayBackendLabel({schema:'cke.whisper_encoder_pytorch_xray'})",
+            "expect": "PyTorch"
+          },
+          {
+            "name": "ranking_oracle",
+            "call": "xrayBackendLabel({schema:'cke.xray_ranking_report'})",
+            "expect": "ggml-oracle"
+          },
+          {
+            "name": "orch_llamacpp",
+            "call": "xrayBackendLabel({schema:'cke.xray_orchestration_report', final_report:{oracle_backend:'llamacpp'}})",
+            "expect": "llama.cpp"
+          },
+          {
+            "name": "orch_pytorch",
+            "call": "xrayBackendLabel({schema:'cke.xray_orchestration_report', final_report:{oracle_backend:'pytorch'}})",
+            "expect": "PyTorch"
+          },
+          {
+            "name": "trace_backend",
+            "call": "xrayBackendLabel({schema:'cke.xray_execution_trace', backend:'ck'})",
+            "expect": "ck"
+          }
         ]
       },
       {
         "name": "xrayReportStatus",
         "tests": [
-          { "name": "explicit",       "call": "xrayReportStatus({status:'pass'})",                                  "expect": "pass" },
-          { "name": "checks_all_pass","call": "xrayReportStatus({checks:[{status:'pass'},{status:'pass'}]})",       "expect": "pass" },
-          { "name": "checks_one_fail","call": "xrayReportStatus({checks:[{status:'pass'},{status:'fail'}]})",       "expect": "fail" },
-          { "name": "unknown",        "call": "xrayReportStatus({})",                                               "expect": "unknown" }
+          {
+            "name": "explicit",
+            "call": "xrayReportStatus({status:'pass'})",
+            "expect": "pass"
+          },
+          {
+            "name": "checks_all_pass",
+            "call": "xrayReportStatus({checks:[{status:'pass'},{status:'pass'}]})",
+            "expect": "pass"
+          },
+          {
+            "name": "checks_one_fail",
+            "call": "xrayReportStatus({checks:[{status:'pass'},{status:'fail'}]})",
+            "expect": "fail"
+          },
+          {
+            "name": "unknown",
+            "call": "xrayReportStatus({})",
+            "expect": "unknown"
+          }
         ]
       },
       {
@@ -347,21 +568,61 @@
       {
         "name": "xrayPhaseOf",
         "tests": [
-          { "name": "whisper_is_prefill", "call": "xrayPhaseOf({schema:'cke.whisper_encoder_pytorch_xray'})", "expect": "prefill" },
-          { "name": "decoder_is_decode",  "call": "xrayPhaseOf({schema:'cke.xray.decoder_pytorch'})",        "expect": "decode" },
-          { "name": "run_phase_wins",     "call": "xrayPhaseOf({run:{phase:'teacher_forced'}})",             "expect": "teacher_forced" },
-          { "name": "from_comparisons",   "call": "xrayPhaseOf({final_report:{comparisons:[{resolved_execution:{phase:'prefill'}}]}})", "expect": "prefill" },
-          { "name": "unknown",            "call": "xrayPhaseOf({schema:'cke.xray_ranking_report', checks:[]})", "expect": null }
+          {
+            "name": "whisper_is_prefill",
+            "call": "xrayPhaseOf({schema:'cke.whisper_encoder_pytorch_xray'})",
+            "expect": "prefill"
+          },
+          {
+            "name": "decoder_is_decode",
+            "call": "xrayPhaseOf({schema:'cke.xray.decoder_pytorch'})",
+            "expect": "decode"
+          },
+          {
+            "name": "run_phase_wins",
+            "call": "xrayPhaseOf({run:{phase:'teacher_forced'}})",
+            "expect": "teacher_forced"
+          },
+          {
+            "name": "from_comparisons",
+            "call": "xrayPhaseOf({final_report:{comparisons:[{resolved_execution:{phase:'prefill'}}]}})",
+            "expect": "prefill"
+          },
+          {
+            "name": "unknown",
+            "call": "xrayPhaseOf({schema:'cke.xray_ranking_report', checks:[]})",
+            "expect": null
+          }
         ]
       },
       {
         "name": "xrayContractState",
         "tests": [
-          { "name": "match",        "call": "xrayContractState({required_contract:{'numerics.attention_reduction':'fp32_online'}, resolved_contract:{contract_id:'fp32_online'}})", "expect": "match" },
-          { "name": "substitution", "call": "xrayContractState({required_contract:{contract_id:'fp32_exact'}, resolved_contract:{contract_id:'fp32_fastgelu'}})", "expect": "substitution" },
-          { "name": "unresolved",   "call": "xrayContractState({required_contract:{'execution.phase':'decode'}})", "expect": "unresolved" },
-          { "name": "resolved_only","call": "xrayContractState({resolved_contract:{contract_id:'fp32_compute'}})", "expect": "resolved" },
-          { "name": "none",         "call": "xrayContractState({op:'matmul'})", "expect": "none" }
+          {
+            "name": "match",
+            "call": "xrayContractState({required_contract:{'numerics.attention_reduction':'fp32_online'}, resolved_contract:{contract_id:'fp32_online'}})",
+            "expect": "match"
+          },
+          {
+            "name": "substitution",
+            "call": "xrayContractState({required_contract:{contract_id:'fp32_exact'}, resolved_contract:{contract_id:'fp32_fastgelu'}})",
+            "expect": "substitution"
+          },
+          {
+            "name": "unresolved",
+            "call": "xrayContractState({required_contract:{'execution.phase':'decode'}})",
+            "expect": "unresolved"
+          },
+          {
+            "name": "resolved_only",
+            "call": "xrayContractState({resolved_contract:{contract_id:'fp32_compute'}})",
+            "expect": "resolved"
+          },
+          {
+            "name": "none",
+            "call": "xrayContractState({op:'matmul'})",
+            "expect": "none"
+          }
         ]
       },
       {
@@ -631,6 +892,131 @@
             "name": "generic_summary_unknown_backend_not_guessed",
             "call": "xrayLiveKeyForFile('xray_summary.json', {backend:'tensorrt'})",
             "expect": null
+          }
+        ]
+      },
+      {
+        "name": "explainOpsOf",
+        "tests": [
+          {
+            "name": "operations_list",
+            "call": "explainOpsOf({operations:[{idx:0}]}).length",
+            "expect": 1
+          },
+          {
+            "name": "ops_list",
+            "call": "explainOpsOf({ops:[{op_id:0},{op_id:1}]}).length",
+            "expect": 2
+          },
+          {
+            "name": "missing_payload",
+            "call": "explainOpsOf(null).length",
+            "expect": 0
+          }
+        ]
+      },
+      {
+        "name": "explainIndexRegistry",
+        "tests": [
+          {
+            "name": "indexes_by_id",
+            "call": "explainIndexRegistry({kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]})['rmsnorm_forward_llama_production'].variant",
+            "expect": "llama_cpu_production_fp32_output"
+          }
+        ]
+      },
+      {
+        "name": "explainCollectOps",
+        "tests": [
+          {
+            "name": "pairs_ir1_and_call_ops",
+            "call": "explainCollectOps({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{from_op:1,dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]},lowered_decode_call:{operations:[{idx:2,op:'attn_norm',layer:0,section:'body',function:'rmsnorm_forward_llama_production',args:[{name:'input',expr:'(const float*)(model->bump + A_EMBEDDED_INPUT)',source:'activation:input'}],errors:[],call_abi:{version:1,owner:'kernel_map',kernel_id:'rmsnorm_forward_llama_production',source_file:'rmsnorm_forward_llama_production.json'},required_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',validation:'validated'},resolved_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',kernel_id:'rmsnorm_forward_llama_production',function:'rmsnorm_forward_llama_production'}}]}}, 'decode')",
+            "expect_fn": "(r) => r.length === 1 && r[0].ref === 'call:2' && r[0].hasIr1 && r[0].hasCall && r[0].op === 'attn_norm'"
+          },
+          {
+            "name": "ir1_only_marks_circuit_only",
+            "call": "explainCollectOps({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]}}, 'decode')",
+            "expect_fn": "(r) => r.length === 1 && r[0].hasCall === false && r[0].ref === 'ir1:2'"
+          },
+          {
+            "name": "empty_files_yield_no_ops",
+            "call": "explainCollectOps({}, 'decode').length",
+            "expect": 0
+          }
+        ]
+      },
+      {
+        "name": "explainBuildChain",
+        "tests": [
+          {
+            "name": "successful_chain_all_stages_resolved",
+            "call": "explainBuildChain({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{from_op:1,dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]},lowered_decode_call:{operations:[{idx:2,op:'attn_norm',layer:0,section:'body',function:'rmsnorm_forward_llama_production',args:[{name:'input',expr:'(const float*)(model->bump + A_EMBEDDED_INPUT)',source:'activation:input'}],errors:[],call_abi:{version:1,owner:'kernel_map',kernel_id:'rmsnorm_forward_llama_production',source_file:'rmsnorm_forward_llama_production.json'},required_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',validation:'validated'},resolved_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',kernel_id:'rmsnorm_forward_llama_production',function:'rmsnorm_forward_llama_production'}}]}}, {kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]}, 'decode', 'call:2')",
+            "expect_fn": "(c) => c.found === true && c.kernelId === 'rmsnorm_forward_llama_production' && c.stages.length === 6 && c.stages.every(s => s.status === 'resolved') && c.stages[4].args[0].expr.indexOf('A_EMBEDDED_INPUT') >= 0 && c.stages[5].fields[1][1].indexOf('rmsnorm_kernels.c') >= 0"
+          },
+          {
+            "name": "partial_build_marks_later_stages_not_generated",
+            "call": "explainBuildChain({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]}}, {kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]}, 'decode', 'ir1:2')",
+            "expect_fn": "(c) => c.found === true && c.stages[0].status === 'resolved' && c.stages[2].status === 'not_generated' && c.stages[4].status === 'not_generated'"
+          },
+          {
+            "name": "no_artifacts_is_explicit_empty_state",
+            "call": "explainBuildChain({}, null, 'decode', 'call:0')",
+            "expect_fn": "(c) => c.found === false && c.reason === 'no explanation available for this op'"
+          }
+        ]
+      },
+      {
+        "name": "explainStalenessSummary",
+        "tests": [
+          {
+            "name": "stale_rows_are_disclosed",
+            "call": "explainStalenessSummary({artifacts:[{key:'lowered_decode_call',status:'stale',stamp_bundle:'.ck_ir_bundle.json'},{key:'ir1_decode',status:'match'},{key:'layout_decode',status:'no_stamp'}]})",
+            "expect_fn": "(s) => s.stale === true && s.counts.stale === 1 && s.counts.match === 1 && s.counts.no_stamp === 1 && s.messages.length === 2 && s.messages[0].indexOf('stale or mixed-revision') >= 0 && s.messages[1].indexOf('no bundle stamp') >= 0"
+          }
+        ]
+      },
+      {
+        "name": "explainBuildDiagnostic",
+        "tests": [
+          {
+            "name": "payload_carries_chain_failures_and_where_to_look_guidance",
+            "call": "explainBuildDiagnostic({meta:{model:'m',run_dir:'/run',strict_run_artifacts:true},requested:{mode:'decode',op_ref:'call:2'},chain:explainBuildChain({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{from_op:1,dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]},lowered_decode_call:{operations:[{idx:2,op:'attn_norm',layer:0,section:'body',function:'rmsnorm_forward_llama_production',args:[{name:'input',expr:'(const float*)(model->bump + A_EMBEDDED_INPUT)',source:'activation:input'}],errors:[],call_abi:{version:1,owner:'kernel_map',kernel_id:'rmsnorm_forward_llama_production',source_file:'rmsnorm_forward_llama_production.json'},required_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',validation:'validated'},resolved_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',kernel_id:'rmsnorm_forward_llama_production',function:'rmsnorm_forward_llama_production'}}]}},{kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]},'decode','call:2'),reports:{explain_laguna:{title:'Laguna provider rejection',kind:'provider_selection_failure',reconstructed:true,requested:{op:'attention_gate_projection',phase:'decode',layer:0,circuit:'version/v8/circuits/laguna.json'},stages:[{stage:'circuit_operation',status:'available'},{stage:'provider_selection',status:'failed',fault:'HARD KERNEL RESOLUTION FAULT'},{stage:'kernel_map',status:'not_generated'}],candidates:[{provider:'attn_gate_softplus_mul_forward',decision:'rejected',stage:'provider_selection',reason:'status_not_production:observed',note:'candidate only'}],selected:null,docs:[{label:'resolution',href:'kernel-maps.html#resolution'}],source_refs:['version/v8/circuits/laguna.json'],verifying_tests:['tests/test_v8_laguna_contract.py'],guidance:'Where to look: the circuit binding.'}},provenance:{artifacts:[{key:'lowered_decode_call',status:'stale',stamp_bundle:'.ck_ir_bundle.json'},{key:'ir1_decode',status:'match'},{key:'layout_decode',status:'no_stamp'}]}})",
+            "expect_fn": "(p) => p.schema === 'cke.v8.explain_diagnostic' && p.chain.length === 6 && p.chain.every(s => s.status === 'resolved') && p.failure_reports.length === 1 && p.failure_reports[0].rejected[0].reason === 'status_not_production:observed' && p.failure_reports[0].failed_stage.fault === 'HARD KERNEL RESOLUTION FAULT' && p.verifying_tests.indexOf('tests/test_v8_laguna_contract.py') >= 0 && p.source_refs.indexOf('version/v8/kernel_maps/rmsnorm_forward_llama_production.json') >= 0 && p.provenance.staleness.length === 2 && p.guidance.indexOf('where to look') >= 0 && p.guidance.indexOf('do not apply') >= 0"
+          }
+        ]
+      },
+      {
+        "name": "buildExplainChainHtml",
+        "tests": [
+          {
+            "name": "renders_stage_labels_and_docs_links",
+            "call": "buildExplainChainHtml(explainBuildChain({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{from_op:1,dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]},lowered_decode_call:{operations:[{idx:2,op:'attn_norm',layer:0,section:'body',function:'rmsnorm_forward_llama_production',args:[{name:'input',expr:'(const float*)(model->bump + A_EMBEDDED_INPUT)',source:'activation:input'}],errors:[],call_abi:{version:1,owner:'kernel_map',kernel_id:'rmsnorm_forward_llama_production',source_file:'rmsnorm_forward_llama_production.json'},required_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',validation:'validated'},resolved_contract:{contract_id:'rmsnorm_llama_cpu_production_fp32_output',kernel_id:'rmsnorm_forward_llama_production',function:'rmsnorm_forward_llama_production'}}]}}, {kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]}, 'decode', 'call:2'))",
+            "expect_fn": "(h) => h.indexOf('Provider selection') >= 0 && h.indexOf('Kernel map') >= 0 && h.indexOf('rmsnorm_forward_llama_production.json') >= 0 && h.indexOf('kernel-maps.html#resolution') >= 0 && h.indexOf('codegen.html') >= 0"
+          },
+          {
+            "name": "partial_chain_marks_not_generated",
+            "call": "buildExplainChainHtml(explainBuildChain({ir1_decode:{ops:[{op_id:2,op:'attn_norm',kernel:'rmsnorm_forward_llama_production',layer:0,section:'body',interface_validation:{operation_interface:'rmsnorm.fp32.v1',status:'implicit_dataflow'},dataflow:{inputs:{input:{dtype:'fp32',slot:'main_stream'}},outputs:{out:{dtype:'fp32',slot:'main_stream'}}}}]}}, {kernels:[{id:'rmsnorm_forward_llama_production',op:'rmsnorm',operation_interface:'rmsnorm.fp32.v1',variant:'llama_cpu_production_fp32_output',quant:{weight:'fp32',activation:'fp32',output:'fp32'},numerical_capabilities:[{contract_id:'rmsnorm_llama_cpu_production_fp32_output',status:'validated'}],impl:{function:'rmsnorm_forward_llama_production',sources:['src/kernels/rmsnorm_kernels.c']},tests:{unit:['unittest/test_rmsnorm_llama_production.cpp'],parity:[{oracle:'llama.cpp'}]}}]}, 'decode', 'ir1:2'))",
+            "expect_fn": "(h) => h.indexOf('not generated') >= 0 && h.indexOf('No explanation available') < 0"
+          }
+        ]
+      },
+      {
+        "name": "buildExplainReportHtml",
+        "tests": [
+          {
+            "name": "failure_report_shows_rejection_and_reconstruction_label",
+            "call": "buildExplainReportHtml('explain_laguna', {title:'Laguna provider rejection',kind:'provider_selection_failure',reconstructed:true,requested:{op:'attention_gate_projection',phase:'decode',layer:0,circuit:'version/v8/circuits/laguna.json'},stages:[{stage:'circuit_operation',status:'available'},{stage:'provider_selection',status:'failed',fault:'HARD KERNEL RESOLUTION FAULT'},{stage:'kernel_map',status:'not_generated'}],candidates:[{provider:'attn_gate_softplus_mul_forward',decision:'rejected',stage:'provider_selection',reason:'status_not_production:observed',note:'candidate only'}],selected:null,docs:[{label:'resolution',href:'kernel-maps.html#resolution'}],source_refs:['version/v8/circuits/laguna.json'],verifying_tests:['tests/test_v8_laguna_contract.py'],guidance:'Where to look: the circuit binding.'})",
+            "expect_fn": "(h) => h.indexOf('reconstructed fixture') >= 0 && h.indexOf('status_not_production:observed') >= 0 && h.indexOf('not generated') >= 0 && h.indexOf('selected: <code>none</code>') >= 0 && h.indexOf('kernel-maps.html#resolution') >= 0 && h.indexOf('tests/test_v8_laguna_contract.py') >= 0 && h.indexOf('Where to look') >= 0"
+          }
+        ]
+      },
+      {
+        "name": "buildExplainEmptyStateHtml",
+        "tests": [
+          {
+            "name": "explicit_no_explanation_state",
+            "call": "buildExplainEmptyStateHtml('no ir1_decode.json loaded')",
+            "expect_fn": "(h) => h.indexOf('No explanation available for this op.') >= 0 && h.indexOf('no ir1_decode.json loaded') >= 0"
           }
         ]
       }
