@@ -56,6 +56,92 @@ class TestKernelAllocationAudit(unittest.TestCase):
             [warning["code"] for warning in report["warnings"]],
             ["production_allocator_debt", "mapped_allocator_without_scratch"],
         )
+        self.assertEqual(report["counts"]["reviewed_allocating_functions"], 21)
+        self.assertEqual(report["counts"]["unreviewed_allocating_functions"], 0)
+        self.assertEqual(report["ownership_validation_failures"], [])
+        self.assertEqual(len(report["provenance"]["source_revision"]), 40)
+        self.assertEqual(len(report["provenance"]["ownership_manifest_sha256"]), 64)
+        self.assertEqual(len(report["provenance"]["allocation_baseline_sha256"]), 64)
+
+    def test_ownership_inventory_identifies_selected_and_transitive_debt(self):
+        report = AUDIT.build_report()
+        rows = {row["function"]: row for row in report["ownership_inventory"]}
+        image = rows[
+            "patch_projection_image_bf16_pytorch_onednn_conv3d_storage"
+        ]
+        helper = rows["patch_projection_bf16_pytorch_onednn_conv3d_storage"]
+        self.assertEqual(image["priority"], "P0")
+        self.assertEqual(image["provider_reachability"], "direct")
+        self.assertIn("qwen3_vl_vision", image["circuit_consumers"])
+        self.assertEqual(helper["provider_reachability"], "transitive")
+        self.assertEqual(
+            [provider["id"] for provider in helper["mapped_providers"]],
+            ["patch_projection_image_bf16_pytorch_onednn_conv3d_storage"],
+        )
+
+    def test_external_library_risk_names_muse_projection_path(self):
+        risks = {
+            row["function"]: row
+            for row in AUDIT.build_report()["external_library_allocation_risks"]
+        }
+        projection = risks[
+            "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage_workspace_impl"
+        ]
+        self.assertEqual(projection["priority"], "P0")
+        self.assertGreater(projection["external_create_calls"], 0)
+        self.assertEqual(projection["provider_reachability"], "direct")
+        self.assertIn("muse_glimmer_text", projection["circuit_consumers"])
+        self.assertIn("qwen4_exp", projection["circuit_consumers"])
+
+    def test_missing_ownership_annotation_fails_closed(self):
+        groups = {
+            "src/kernels/example.c::allocating": {
+                "classification": "production"
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "ownership.json"
+            manifest.write_text(
+                json.dumps({"functions": {}, "external_library_risks": []}),
+                encoding="utf-8",
+            )
+            original = AUDIT.OWNERSHIP
+            try:
+                AUDIT.OWNERSHIP = manifest
+                _, failures = AUDIT._load_ownership(groups, {})
+            finally:
+                AUDIT.OWNERSHIP = original
+        self.assertIn("unreviewed allocating functions", failures[0])
+
+    def test_external_library_create_inventory_is_complete(self):
+        report = AUDIT.build_report()
+        self.assertEqual(report["counts"]["external_library_allocation_risks"], 5)
+        self.assertGreater(report["counts"]["external_library_create_calls"], 0)
+        risks = {
+            row["function"]: row
+            for row in report["external_library_allocation_risks"]
+        }
+        patch = risks["patch_projection_bf16_pytorch_onednn_conv3d_storage"]
+        self.assertGreater(patch["external_create_calls"], 0)
+        self.assertEqual(patch["provider_reachability"], "transitive")
+        self.assertIn("qwen3_vl_vision", patch["circuit_consumers"])
+
+    def test_external_create_scanner_ignores_comments_and_literals(self):
+        source = '''
+        void init(void) {
+            // dnnl_engine_create(&engine, 0, 0);
+            const char *text = "dnnl_memory_create(...)";
+            dnnl_primitive_create(&primitive, descriptor);
+        }
+        '''
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.c"
+            path.write_text(source, encoding="utf-8")
+            calls = AUDIT.scan_external_creates(path)
+        self.assertEqual(
+            [(call["function"], call["api"]) for call in calls],
+            [("init", "dnnl_primitive_create")],
+        )
 
     def test_new_allocator_identity_fails_closed(self):
         report = {
@@ -73,6 +159,30 @@ class TestKernelAllocationAudit(unittest.TestCase):
             "maximum_mapped_allocating_without_scratch_contract": 100,
         }
         with self.assertRaisesRegex(RuntimeError, "new kernel allocator call sites"):
+            AUDIT.validate_ratchet(report, baseline)
+
+    def test_new_external_library_create_identity_fails_closed(self):
+        report = {
+            "call_site_identities": {},
+            "external_create_call_site_identities": {
+                "src/kernels/new.c::compute::dnnl_memory_create": 1
+            },
+            "counts": {
+                "production_allocation_calls": 0,
+                "mapped_allocating_providers": 0,
+                "mapped_allocating_without_scratch_contract": 0,
+            },
+        }
+        baseline = {
+            "maximum_call_site_identities": {},
+            "maximum_external_create_call_site_identities": {},
+            "maximum_production_allocation_calls": 0,
+            "maximum_mapped_allocating_providers": 0,
+            "maximum_mapped_allocating_without_scratch_contract": 0,
+        }
+        with self.assertRaisesRegex(
+            RuntimeError, "new external-library create call sites"
+        ):
             AUDIT.validate_ratchet(report, baseline)
 
     def test_recurrent_v8_provider_is_allocation_free_and_scratch_owned(self):

@@ -1,0 +1,93 @@
+<!-- TITLE: v8 Kernel Allocation Ownership -->
+<!-- NAV: kernels -->
+
+<div class="container">
+  <h1>v8 Kernel Allocation Ownership</h1>
+  <p class="lead">
+    CKE tracks every direct C allocation inside <code>src/kernels</code> as ownership debt. The audit currently finds
+    55 allocation call sites in 21 functions, including 51 sites classified as production. Every function now has a
+    reviewed owner, lifetime, size formula, execution role, migration target, and priority. The nightly ratchet rejects
+    new or unreviewed sites.
+  </p>
+
+  <style>
+    .alloc-section { margin-top: 1.4rem; background: #0f151c; border: 1px solid #22313f; border-radius: 12px; padding: 1.15rem; }
+    .alloc-section h2 { margin: 0 0 0.6rem; color: var(--orange); }
+    .alloc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.7rem; }
+    .alloc-card { background: var(--dark-card); border: 1px solid var(--grey); border-radius: 9px; padding: 0.85rem; color: var(--text-secondary); }
+    .alloc-card strong { display: block; color: var(--text-primary); font-size: 1.35rem; }
+    .alloc-table-wrap { overflow-x: auto; margin-top: 0.7rem; }
+    .alloc-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.84rem; }
+    .alloc-table th, .alloc-table td { border: 1px solid var(--grey); padding: 0.5rem 0.6rem; text-align: left; vertical-align: top; }
+    .alloc-table th { color: var(--orange); background: #121a24; }
+    .p0 { color: #ff8a80; } .p1 { color: #ffd38a; } .p2 { color: #8cb4ff; }
+    main code { overflow-wrap: anywhere; }
+  </style>
+
+  <section class="alloc-section" id="evidence">
+    <h2>Evidence and scope</h2>
+    <div class="alloc-grid">
+      <div class="alloc-card"><strong>55</strong>direct allocation sites</div>
+      <div class="alloc-card"><strong>51</strong>production sites</div>
+      <div class="alloc-card"><strong>21 / 21</strong>functions reviewed</div>
+      <div class="alloc-card"><strong>5</strong>external-library risks recorded</div>
+    </div>
+    <p>
+      <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/kernel_allocation_ownership.json">The ownership manifest</a>
+      is the reviewed source of size formulas and migration decisions. The
+      <a href="test-report.html#kernel-allocation-details">nightly allocation report</a> and <a href="site/nightly-results/latest.json">latest nightly JSON</a> combine it with a fresh source scan,
+      kernel-map reachability, and checked-in circuit consumers. Reproduce it with
+      <code>python3 version/v8/scripts/audit_kernel_allocations_v8.py --check --json</code> or
+      <code>make test-v8-kernel-allocations</code>. The audit implementation and contract tests are in
+      <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/scripts/audit_kernel_allocations_v8.py">audit_kernel_allocations_v8.py</a>
+      and <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/tests/test_v8_kernel_allocation_audit.py">test_v8_kernel_allocation_audit.py</a>.
+    </p>
+    <p>
+      Counts are static source locations. They do not count live allocations, bytes retained, or leaks. One allocation
+      can have several cleanup sites, so comparing <code>malloc</code> and <code>free</code> source counts cannot diagnose a
+      leak. Runtime instrumentation and ownership/control-flow analysis are required for that claim.
+    </p>
+  </section>
+
+  <section class="alloc-section" id="priorities">
+    <h2>Repair order</h2>
+    <div class="alloc-table-wrap"><table class="alloc-table">
+      <thead><tr><th>Priority</th><th>Path</th><th>Consumers</th><th>Ownership action</th></tr></thead>
+      <tbody>
+        <tr><td class="p0">P0</td><td><code>patch_projection_image_bf16_pytorch_onednn_conv3d_storage</code> and its Conv3D helper</td><td><code>qwen3_vl_vision</code> candidate contract</td><td>Move image packing and BF16 conversion buffers to planner scratch. Prepare shape-specific oneDNN state outside compute.</td></tr>
+        <tr><td class="p0">P0</td><td><code>gemm_nt_bf16_pytorch_onednn_3_12_brgemm_bf16_storage_workspace</code></td><td><code>muse_glimmer_text</code>, <code>qwen4_exp</code></td><td>Tensor scratch is already caller-owned. Measure oneDNN allocations, then prepare reusable descriptors, primitives, memory objects, and library scratch during model/session setup.</td></tr>
+        <tr><td class="p1">P1</td><td>oneDNN 3.7 legacy GEMM provider helper</td><td>Qwen-family legacy numerical contract</td><td>Redirect or retire the heap-backed map after numerical and ABI checks.</td></tr>
+        <tr><td class="p1">P1</td><td>Whisper WAV log-Mel frontend</td><td>Audio frontend</td><td>Give decoded samples frontend or session ownership; this lifetime is outside generated kernel scratch.</td></tr>
+        <tr><td class="p2">P2</td><td>Attention, MLA, AMX GEMM, fused attention, and recurrent compatibility wrappers</td><td>No selected heap-backed v8 entry point</td><td>Keep them outside generated paths and retire them incrementally. Their mapped replacements already receive planner scratch.</td></tr>
+        <tr><td>Defer</td><td>ggml oracle and tensor-dump utilities</td><td>Diagnostics only</td><td>Keep separately classified; add caller-owned diagnostic buffers only if repeated allocation becomes material.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="alloc-section" id="selected-paths">
+    <h2>What the source scan means for selected paths</h2>
+    <p>
+      A function with no direct map can still be reachable through a provider helper. The report therefore resolves
+      direct and transitive map ownership and lists circuits whose numerical contracts can select each map. Conversely,
+      an allocating compatibility wrapper can remain in source while generated v8 code calls its allocation-free
+      <code>_workspace</code> entry point. The manifest records both cases explicitly.
+    </p>
+    <p>
+      Muse attention and projection tensors use planner-declared scratch, and Muse added no direct C allocator site.
+      Its BF16 projection path is still labeled <em>caller-owned tensor scratch</em>, rather than allocation-free execution,
+      because oneDNN creates objects per invocation and may allocate internally under a global mutex. The audit records
+      this as an external-library risk that grep cannot discover.
+    </p>
+  </section>
+
+  <section class="alloc-section" id="acceptance">
+    <h2>Acceptance gate for each repair</h2>
+    <ul>
+      <li>Preserve the numerical contract, cast boundaries, alignment, aliasing rules, and required ABI compatibility.</li>
+      <li>Declare exact scratch size, lifetime, capacity, and per-worker ownership; reject null, undersized, and overflowing workspaces before writes.</li>
+      <li>Run parity tests at minimum, exact, tail, and large shapes, plus concurrent-session isolation where the provider is threaded.</li>
+      <li>Instrument repeated calls after initialization, including the selected helper and external-library call chain.</li>
+      <li>Record before/after allocation counts and timing. Do not raise the allocation baseline to land a new provider.</li>
+    </ul>
+  </section>
+</div>

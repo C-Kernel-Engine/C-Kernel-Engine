@@ -1083,7 +1083,7 @@
       <div class="table-scroll">
       <details class="alloc-accordion" id="kernel-allocation-details">
         <summary><span class="alloc-accordion-title">Allocation call sites</span><span class="alloc-accordion-count" id="kernel-allocation-rowcount">click to expand</span></summary>
-        <p class="alloc-guide">How to read this table: raw <code>malloc()</code>/<code>free()</code> calls inside production kernels are <strong>allocation debt</strong> — every call should eventually be owned by an arena slot or a declared scratch contract. A row whose <em>Mapped Provider</em> is <code>-</code> marks an allocation no provider has claimed yet; that is outstanding debt, not proof of a leak. The leak signature to watch for instead is allocation calls without matching frees — compare <em>Allocation Calls</em> against <em>Free Calls</em> in the cards above.</p>
+        <p class="alloc-guide">How to read this table: these are static allocator source locations, not live allocations or leak evidence. A row whose <em>Mapped Provider</em> is <code>-</code> has no direct map association; it may be a compatibility wrapper, an internal helper, or unmapped debt. Leak detection requires ownership/control-flow analysis and runtime memory checks. See the <a href="v8-kernel-allocation-ownership.html">reviewed ownership inventory and cleanup order</a>.</p>
       <table class="results-table">
         <thead><tr><th>Class</th><th>Source</th><th>Function</th><th>Call</th><th>Mapped Provider</th></tr></thead>
         <tbody id="kernel-allocation-tbody"><tr><td colspan="5" class="updated-time">No kernel allocation audit was published in this report.</td></tr></tbody>
