@@ -64,6 +64,21 @@ class V8DSLNightlyRegistrationTests(unittest.TestCase):
         self.assertEqual(entry["target"], "test-v8-cohere-laguna-contracts")
         self.assertIn("v8_cohere_laguna_contracts", nightly.NIGHTLY_PROFILES["demo-readiness"])
 
+    def test_real_manifest_compile_matrix_is_required_and_visible(self) -> None:
+        entry = nightly.MAKE_TARGETS.get("v8_artifact_compile_matrix")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["name"], "v8 Real-Manifest Lowering/Compile Matrix")
+        self.assertEqual(entry["target"], "test-v8-artifact-compile-matrix")
+        self.assertIn(
+            "v8_artifact_compile_matrix",
+            nightly.NIGHTLY_PROFILES["demo-readiness"],
+        )
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertRegex(
+            makefile,
+            r"v8-regression-fast:[^\n]*test-v8-artifact-compile-matrix",
+        )
+
     def test_cohere_and_laguna_numerical_providers_are_in_the_nightly_gate(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         for test_file in (

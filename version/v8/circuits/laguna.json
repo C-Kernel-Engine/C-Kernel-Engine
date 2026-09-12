@@ -5,7 +5,8 @@
   "projection_inputs": {
     "q_proj": {"x": "main_stream_q8"},
     "k_proj": {"x": "main_stream_q8"},
-    "v_proj": {"x": "main_stream_q8"}
+    "v_proj": {"x": "main_stream_q8"},
+    "attention_gate_projection": {"x": "main_stream_q8"}
   },
   "flags": {
     "activation": "swiglu",
@@ -69,6 +70,7 @@
       "norm_type": "rmsnorm",
       "body_type": "dense_first_then_routed_shared_moe",
       "activation": "swiglu",
+      "mlp_formula": "dense SwiGLU or routed-plus-shared SwiGLU selected by layer kind",
       "dense_mlp_formula": "gate/up -> SwiGLU -> down",
       "moe_formula": "sigmoid router with correction bias -> top-8 routed SwiGLU plus shared SwiGLU",
       "residual_formula": "attention residual followed by dense or routed-plus-shared MLP residual"

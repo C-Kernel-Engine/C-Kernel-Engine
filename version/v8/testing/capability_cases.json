@@ -27,6 +27,36 @@
       "evidence_paths": ["tests/test_v8_laguna_contract.py"]
     },
     {
+      "id": "laguna-xs.real-manifest-compile",
+      "family": "laguna",
+      "circuits": ["laguna"],
+      "evidence_level": "contract",
+      "phases": ["lowering", "compile", "prefill", "decode"],
+      "oracle": "none",
+      "artifact": {"kind": "real_manifest", "catalog_id": "laguna_xs_2_1"},
+      "entrypoint": {"kind": "make", "target": "test-v8-artifact-compile-matrix"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": [
+        "tests/test_v8_artifact_compile_matrix.py",
+        "tests/fixtures/v8/artifact_manifests/laguna-xs-2.1-q4_k_m.json"
+      ]
+    },
+    {
+      "id": "nemotron-nano-9b-v2.real-manifest-compile",
+      "family": "nemotron_h",
+      "circuits": ["nemotron_h"],
+      "evidence_level": "contract",
+      "phases": ["lowering", "compile", "prefill", "decode"],
+      "oracle": "none",
+      "artifact": {"kind": "real_manifest", "catalog_id": "nemotron_nano_9b"},
+      "entrypoint": {"kind": "make", "target": "test-v8-artifact-compile-matrix"},
+      "schedule": {"events": ["pull_request", "nightly"], "resource_class": "portable"},
+      "evidence_paths": [
+        "tests/test_v8_artifact_compile_matrix.py",
+        "tests/fixtures/v8/artifact_manifests/nemotron-nano-9b-v2-q4_k_m.json"
+      ]
+    },
+    {
       "id": "qwen35-moe.storage-lowering",
       "family": "qwen35",
       "circuits": ["qwen35"],

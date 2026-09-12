@@ -77,7 +77,7 @@
             "additionalProperties": false,
             "required": ["kind"],
             "properties": {
-              "kind": {"enum": ["synthetic_fixture", "real_model"]},
+              "kind": {"enum": ["synthetic_fixture", "real_manifest", "real_model"]},
               "catalog_id": {
                 "type": "string",
                 "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
@@ -85,7 +85,11 @@
             },
             "allOf": [
               {
-                "if": {"properties": {"kind": {"const": "real_model"}}},
+                "if": {
+                  "properties": {
+                    "kind": {"enum": ["real_manifest", "real_model"]}
+                  }
+                },
                 "then": {"required": ["catalog_id"]}
               }
             ]

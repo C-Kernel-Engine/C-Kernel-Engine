@@ -3,10 +3,10 @@
   "name": "nemotron_h",
   "family": "nemotron_h",
   "projection_inputs": {
-    "mamba_in_proj": {"x": "main_stream_q8"},
-    "q_proj": {"x": "main_stream_q8"},
-    "k_proj": {"x": "main_stream_q8"},
-    "v_proj": {"x": "main_stream_q8"}
+    "mamba_in_proj": {"A": "main_stream_q8"},
+    "q_proj": {"A": "main_stream_q8"},
+    "k_proj": {"A": "main_stream_q8"},
+    "v_proj": {"A": "main_stream_q8"}
   },
   "flags": {
     "use_qkv_bias": false,
@@ -162,7 +162,10 @@
               "op": "mamba_in_proj",
               "graph_slots": {
                 "inputs": {
-                  "x": "layer_input"
+                  "A": "main_stream_q8"
+                },
+                "outputs": {
+                  "C": "recurrent_qkv_packed"
                 }
               }
             },
@@ -180,7 +183,10 @@
               "op": "q_proj",
               "graph_slots": {
                 "inputs": {
-                  "x": "layer_input"
+                  "A": "main_stream_q8"
+                },
+                "outputs": {
+                  "C": "q_scratch"
                 }
               }
             },
@@ -188,7 +194,10 @@
               "op": "k_proj",
               "graph_slots": {
                 "inputs": {
-                  "x": "layer_input"
+                  "A": "main_stream_q8"
+                },
+                "outputs": {
+                  "C": "k_scratch"
                 }
               }
             },
@@ -196,7 +205,10 @@
               "op": "v_proj",
               "graph_slots": {
                 "inputs": {
-                  "x": "layer_input"
+                  "A": "main_stream_q8"
+                },
+                "outputs": {
+                  "C": "v_scratch"
                 }
               }
             },

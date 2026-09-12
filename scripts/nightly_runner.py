@@ -850,6 +850,12 @@ MAKE_TARGETS = {
         "target": "test-v8-cohere-laguna-contracts",
         "timeout_sec": 300,
     },
+    "v8_artifact_compile_matrix": {
+        "name": "v8 Real-Manifest Lowering/Compile Matrix",
+        "category": "inference",
+        "target": "test-v8-artifact-compile-matrix",
+        "timeout_sec": 300,
+    },
     "v8_muse_glimmer_contracts": {
         "name": "Muse-Glimmer Text Compiler/Kernel Contracts",
         "category": "parity",
@@ -1135,6 +1141,7 @@ NIGHTLY_PROFILES = {
         "v8_model_memory_plans",
         "v8_numerical_contracts",
         "v8_cohere_laguna_contracts",
+        "v8_artifact_compile_matrix",
         "v8_muse_glimmer_contracts",
         "v8_qwen38_dense_contracts",
         "v8_command_a_plus_nvfp4",
