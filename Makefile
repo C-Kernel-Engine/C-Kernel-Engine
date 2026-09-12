@@ -1682,6 +1682,11 @@ test-v8-cohere-laguna-contracts:
 		tests.test_v8_laguna_contract \
 		-v
 
+.PHONY: test-v8-artifact-compile-matrix
+test-v8-artifact-compile-matrix:
+	@echo "Running metadata-only real-artifact compile matrix..."
+	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_artifact_compile_matrix.py
+
 .PHONY: test-v8-muse-glimmer-contracts
 test-v8-muse-glimmer-contracts: $(BUILD_DIR)/libckernel_engine.so
 	@echo "Running Muse-Glimmer text compiler and exact BF16 kernel contracts..."
@@ -6550,7 +6555,7 @@ v7-regression-fast: test-v7-dsl-policy
 	@echo "Running v7 regression fast suite..."
 	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
-v8-regression-fast: test-v8-dsl-policy
+v8-regression-fast: test-v8-dsl-policy test-v8-artifact-compile-matrix
 	@echo "Running v8 regression fast suite..."
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 

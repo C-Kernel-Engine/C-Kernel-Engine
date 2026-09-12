@@ -23,7 +23,7 @@ def test_checked_in_capability_cases_are_reachable() -> None:
     report = audit.audit_manifest(load_manifest(), ROOT)
     assert report["status"] == "pass", report["errors"]
     assert report["scope"] == "registration_only"
-    assert report["summary"] == {"cases": 10, "families": 7, "errors": 0}
+    assert report["summary"] == {"cases": 12, "families": 8, "errors": 0}
     assert report["coverage"]["cohere2"] == {
         "contract": 1,
         "full_artifact": 1,
