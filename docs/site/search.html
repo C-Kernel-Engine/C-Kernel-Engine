@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v8 Vision Encoder Architecture | C-Kernel-Engine</title>
-    <meta name="description" content="Architecture page for how C-Kernel-Engine v8 lowers and runs the Qwen3-VL vision encoder, bridges the prefix, and continues generation in the decoder.">
-    <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-vision-encoder.html">
-    <meta property="og:title" content="v8 Vision Encoder Architecture | C-Kernel-Engine">
-    <meta property="og:description" content="Architecture page for how C-Kernel-Engine v8 lowers and runs the Qwen3-VL vision encoder, bridges the prefix, and continues generation in the decoder.">
+    <title>Search the Documentation | C-Kernel-Engine</title>
+    <meta name="description" content="Client-side search across all C-Kernel-Engine documentation pages, sections, and anchors.">
+    <meta name="robots" content="noindex,follow">
+    <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/search.html">
+    <meta property="og:title" content="Search the Documentation | C-Kernel-Engine">
+    <meta property="og:description" content="Client-side search across all C-Kernel-Engine documentation pages, sections, and anchors.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-vision-encoder.html">
+    <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/search.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -953,7 +953,7 @@
             <a href="support-hardware.html" class="" style="color:var(--green)">Support Lab</a>
             <a href="cke-throughput-unit.html" class="" style="color:var(--orange)">CKU</a>
             <div class="nav-dropdown">
-                <span class="nav-trigger active">Architecture</span>
+                <span class="nav-trigger ">Architecture</span>
                 <div class="nav-dropdown-menu mega-menu">
                     <!-- Architecture Home Link -->
                     <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
@@ -1027,776 +1027,360 @@
     </header>
     <main>
 
+<h1>Search the Documentation</h1>
+
+<div class="search-page">
+    <form id="search-form" class="search-page-form" action="search.html" method="get" data-test="search-form">
+        <input type="search" id="search-query" name="q" data-test="search-input"
+               aria-label="Search documentation" placeholder="Search kernels, runbooks, guides..." autocomplete="off">
+        <button type="submit" data-test="search-submit">Search</button>
+    </form>
+    <p id="search-status" class="search-status" data-test="search-status" role="status"></p>
+    <div id="search-results" data-test="search-results"></div>
+</div>
+
 <style>
-.v8-vision-hero {
-    display: grid;
-    grid-template-columns: 1.15fr 0.95fr;
-    gap: 1rem;
-    margin: 0.85rem 0 1.35rem;
-}
-.v8-vision-panel {
-    background:
-        radial-gradient(circle at top right, rgba(7,173,248,0.12), transparent 45%),
-        linear-gradient(145deg, rgba(255,180,0,0.09), rgba(7,173,248,0.05));
-    border: 1px solid var(--grey);
-    border-radius: 12px;
-    padding: 1rem 1.15rem;
-}
-.v8-vision-panel h2,
-.v8-vision-panel h3 {
-    margin-top: 0;
-}
-.v8-vision-panel h2::before,
-.v8-vision-panel h3::before {
-    display: none;
-}
-.v8-vision-chip-row {
+.search-page-form {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-top: 0.85rem;
+    gap: 0.5rem;
+    margin: 1rem 0 0.5rem;
 }
-.v8-vision-chip {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.73rem;
-    border-radius: 999px;
-    padding: 0.18rem 0.58rem;
-    background: rgba(7,173,248,0.12);
-    border: 1px solid rgba(7,173,248,0.25);
-    color: var(--text-secondary);
-}
-.v8-vision-flow {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0.7rem;
-    margin: 1rem 0 1.35rem;
-}
-.v8-vision-step {
-    position: relative;
-    background: var(--dark-card);
+
+.search-page-form input {
+    flex: 1;
+    min-width: 0;
+    background: var(--code-bg);
     border: 1px solid var(--grey);
-    border-top: 3px solid var(--orange);
-    border-radius: 10px;
-    padding: 0.9rem 0.95rem;
-    min-height: 170px;
-}
-.v8-vision-step-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--orange);
-    margin-bottom: 0.45rem;
-}
-.v8-vision-step h3 {
-    margin: 0 0 0.45rem;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: inherit;
     font-size: 1rem;
+    padding: 0.65rem 0.9rem;
 }
-.v8-vision-step p {
-    margin: 0;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
+
+.search-page-form input:focus {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+    border-color: var(--orange);
 }
-.v8-vision-step code {
-    font-size: 0.76rem;
-}
-.v8-vision-contracts {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.9rem;
-    margin: 0.9rem 0 1.3rem;
-}
-.v8-vision-contract {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--grey);
-    border-radius: 10px;
-    padding: 1rem;
-}
-.v8-vision-contract h3 {
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-}
-.v8-vision-contract ul {
-    margin-bottom: 0;
-}
-.v8-vision-compare {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.95rem;
-    margin: 0.9rem 0 1.3rem;
-}
-.v8-vision-compare .card {
-    height: 100%;
-}
-.v8-vision-compare h3 {
-    margin-top: 0;
-}
-.v8-vision-artifacts code {
-    font-size: 0.79rem;
-}
-.v8-vision-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.7rem;
-    margin-top: 0.95rem;
-}
-.v8-vision-link {
-    display: inline-block;
-    text-decoration: none;
-    border-radius: 7px;
-    padding: 0.5rem 0.8rem;
-    font-weight: 600;
-}
-.v8-vision-link.primary {
+
+.search-page-form button {
     background: var(--orange);
     color: var(--dark);
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.65rem 1.25rem;
+    cursor: pointer;
+    transition: var(--transition);
 }
-.v8-vision-link.secondary {
-    background: rgba(7,173,248,0.12);
-    border: 1px solid rgba(7,173,248,0.3);
-    color: var(--text-primary);
+
+.search-page-form button:hover {
+    background: var(--orange-light);
 }
-.v8-speed-svg-wrap {
-    margin: 1rem 0 1.15rem;
+
+.search-page-form button:focus {
+    outline: 2px solid var(--orange-light);
+    outline-offset: 2px;
+}
+
+.search-status {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0.5rem 0 1rem;
+}
+
+.search-result {
+    background: var(--dark-card);
     border: 1px solid var(--grey);
-    border-radius: 12px;
-    background: #081018;
-    overflow-x: auto;
+    border-left: 3px solid var(--grey-light);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
 }
-.v8-speed-svg {
-    display: block;
-    min-width: 860px;
-    width: 100%;
-    height: auto;
+
+.search-result:hover {
+    border-left-color: var(--orange);
 }
-@media (max-width: 1100px) {
-    .v8-vision-flow {
-        grid-template-columns: repeat(2, 1fr);
-    }
+
+.search-result-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
 }
-@media (max-width: 900px) {
-    .v8-vision-hero,
-    .v8-vision-contracts,
-    .v8-vision-compare {
-        grid-template-columns: 1fr;
-    }
+
+.search-result-title a {
+    color: var(--white);
+    text-decoration: none;
 }
-@media (max-width: 640px) {
-    .v8-vision-flow {
-        grid-template-columns: 1fr;
-    }
+
+.search-result-title a:hover {
+    color: var(--orange);
+}
+
+.search-result-section {
+    margin-top: 0.5rem;
+}
+
+.search-result-section a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.search-result-snippet {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0.15rem 0 0;
+}
+
+.search-result-snippet mark {
+    background: rgba(255, 180, 0, 0.3);
+    color: var(--orange-light);
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+.search-result-url {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
 }
 </style>
 
-<h1>v8 Vision Encoder Architecture</h1>
+<script>
+(function() {
+    'use strict';
 
-<p>
-    This page explains how the validated <code>v8</code> vision lane works under the hood:
-    how a real image becomes a deterministic encoder prefix, how that prefix crosses the bridge,
-    and where the current system is already template-driven versus where the bridge host still carries explicit policy.
-</p>
+    var input = document.getElementById('search-query');
+    var statusEl = document.getElementById('search-status');
+    var resultsEl = document.getElementById('search-results');
 
-<div class="alert alert-success">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-    </div>
-    <div>
-        <strong>Current Scope</strong><br>
-        The working path today is the validated <code>v8</code> Qwen3-VL encoder + decoder pair. This page is about that architecture and why it matters, not a claim that all multimodal families are already solved.
-    </div>
-</div>
+    function setStatus(message) {
+        statusEl.textContent = message;
+    }
 
-<div class="v8-vision-hero">
-    <div class="v8-vision-panel">
-        <h2>Why This Matters</h2>
-        <p>
-            This is the first point where the same <code>C-Kernel-Engine</code> inference stack is visibly spanning both sides of a multimodal transformer:
-            a vision encoder graph on one end and a decoder graph on the other.
-        </p>
-        <p>
-            That is a real architecture milestone. The system is no longer only “text inference with extra kernels.”
-            It now proves that templates, lowering, memory planning, codegen, and runtime stitching can carry an image-derived prefix into a decoder without a separate one-off runtime.
-        </p>
-        <div class="v8-vision-chip-row">
-            <span class="v8-vision-chip">template-driven graph</span>
-            <span class="v8-vision-chip">GGUF-derived config</span>
-            <span class="v8-vision-chip">deterministic memory</span>
-            <span class="v8-vision-chip">encoder → bridge → decoder</span>
-        </div>
-    </div>
-    <div class="v8-vision-panel">
-        <h2>Validated Components</h2>
-        <ul>
-            <li><strong>Circuit:</strong> <code>version/v8/circuits/qwen3_vl_vision.json</code></li>
-            <li><strong>Converter:</strong> <code>version/v8/scripts/convert_gguf_to_bump_v8.py</code></li>
-            <li><strong>Lowering:</strong> <code>version/v8/scripts/build_ir_v8.py</code></li>
-            <li><strong>Host bridge:</strong> <code>version/v8/scripts/run_multimodal_bridge_v8.py</code></li>
-            <li><strong>Operator surface:</strong> <code>version/v8/scripts/ck_run_v8.py</code></li>
-        </ul>
-        <p>
-            The checked-in smoke image uses <code>.ppm</code>, the Portable Pixmap format. A PPM file is just a small header plus raw RGB pixels, so the bridge can parse it directly and keep CI independent of PNG/JPEG decoder differences. It is a deterministic test fixture format, not a requirement for normal image runs.
-        </p>
-        <div class="v8-vision-links">
-            <a class="v8-vision-link primary" href="v8-runbook.html">Open v8 Runbook</a>
-            <a class="v8-vision-link secondary" href="vision-encoder-parity.html">See Encoder Parity Notes</a>
-        </div>
-    </div>
-</div>
+    function clearResults() {
+        while (resultsEl.firstChild) {
+            resultsEl.removeChild(resultsEl.firstChild);
+        }
+    }
 
-<h2>End-to-End Flow</h2>
+    function tokenize(text) {
+        return text.toLowerCase().split(/[^a-z0-9_.-]+/).filter(Boolean);
+    }
 
-<div class="v8-vision-flow">
-    <div class="v8-vision-step">
-        <div class="v8-vision-step-label">Step 1</div>
-        <h3>GGUF Intake</h3>
-        <p>
-            The converter reads tensor names, dtypes, shapes, tokenizer metadata, and Qwen3-VL vision metadata from the GGUF files.
-            This is where artifact-specific truth enters the system.
-        </p>
-    </div>
-    <div class="v8-vision-step">
-        <div class="v8-vision-step-label">Step 2</div>
-        <h3>Template Resolution</h3>
-        <p>
-            The encoder graph shape comes from <code>qwen3_vl_vision.json</code>:
-            patch frontend, position path, attention body, deepstack branch, and projector footer.
-        </p>
-    </div>
-    <div class="v8-vision-step">
-        <div class="v8-vision-step-label">Step 3</div>
-        <h3>IR + Layout</h3>
-        <p>
-            <code>build_ir_v8.py</code> lowers that template into concrete kernel calls, activation buffers,
-            and offsets. The result is deterministic IR plus a deterministic memory plan.
-        </p>
-    </div>
-    <div class="v8-vision-step">
-        <div class="v8-vision-step-label">Step 4</div>
-        <h3>Bridge Prefix</h3>
-        <p>
-            The encoder runtime writes a named activation carrying projector output rows.
-            Those rows become the multimodal prefix consumed by the decoder prefill/decode bridge.
-        </p>
-    </div>
-    <div class="v8-vision-step">
-        <div class="v8-vision-step-label">Step 5</div>
-        <h3>Decoder Continuation</h3>
-        <p>
-            The decoder runs on the decode-layout runtime and treats the encoder rows as a staged prefix.
-            Text tokens resume after the vision grid using the bridge contract’s row/grid semantics.
-        </p>
-    </div>
-</div>
+    function words(text) {
+        return text.toLowerCase().split(/[^a-z0-9_.-]+/).filter(Boolean);
+    }
 
-<svg viewBox="0 0 1180 430" width="100%" role="img"
-     aria-label="Qwen3-VL vision pipeline: image to patch frontend to ViT encoder to projector bridge prefix, stitched into the Qwen3 decoder prefill and decode."
-     style="max-width:1180px;margin:0.5rem auto 1.5rem;display:block;font-family:'Inter',system-ui,sans-serif;">
-  <defs>
-    <linearGradient id="vp-enc" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#07adf8"/><stop offset="1" stop-color="#00bcd4"/>
-    </linearGradient>
-    <linearGradient id="vp-dec" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffb400"/><stop offset="1" stop-color="#e5a200"/>
-    </linearGradient>
-    <linearGradient id="vp-bridge" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#00bcd4"/><stop offset="1" stop-color="#ffb400"/>
-    </linearGradient>
-    <marker id="vp-a" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
-    </marker>
-    <style>
-      .vp-card{fill:#2f2f2f;stroke:#454545;stroke-width:1.4;}
-      .vp-t{fill:#f5f5f5;font-size:15px;font-weight:700;}
-      .vp-s{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
-      .vp-band{fill:#9aa7b4;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;}
-    </style>
-  </defs>
+    // Score one field against the query tokens.
+    // exact word >> word prefix >> substring; phrase bonus when the whole
+    // query appears verbatim.
+    function scoreField(field, tokens, phrase, weights) {
+        if (!field) return 0;
+        var lower = field.toLowerCase();
+        var fieldWords = words(field);
+        var score = 0;
+        tokens.forEach(function(token) {
+            var best = 0;
+            fieldWords.forEach(function(word) {
+                if (word === token) best = Math.max(best, weights.exact);
+                else if (word.indexOf(token) === 0) best = Math.max(best, weights.prefix);
+            });
+            if (best === 0 && lower.indexOf(token) !== -1) best = weights.substring;
+            score += best;
+        });
+        if (score > 0 && phrase.length > 2 && lower.indexOf(phrase) !== -1) {
+            score += weights.phrase;
+        }
+        return score;
+    }
 
-  <!-- ENCODER LANE -->
-  <rect x="14" y="34" width="690" height="170" rx="14" fill="rgba(7,173,248,0.06)" stroke="#1d4a5e" stroke-width="1.2"/>
-  <text x="34" y="58" class="vp-band" fill="#56c7f5">Vision encoder graph · template-driven</text>
+    var WEIGHTS = {
+        title: { exact: 60, prefix: 30, substring: 15, phrase: 40 },
+        heading: { exact: 25, prefix: 12, substring: 6, phrase: 20 },
+        body: { exact: 8, prefix: 4, substring: 2, phrase: 10 }
+    };
 
-  <rect class="vp-card" x="34"  y="74" width="120" height="110" rx="11"/>
-  <text x="94" y="104" text-anchor="middle" class="vp-t">Image</text>
-  <text x="94" y="126" text-anchor="middle" class="vp-s">RGB · resize</text>
-  <text x="94" y="142" text-anchor="middle" class="vp-s">normalize</text>
-  <text x="94" y="166" text-anchor="middle" class="vp-s" fill="#56c7f5">[C,H,W]</text>
+    function searchIndex(index, query) {
+        var tokens = tokenize(query);
+        var phrase = query.toLowerCase().trim();
+        if (!tokens.length) return [];
+        var hits = [];
+        index.pages.forEach(function(page) {
+            var pageScore = scoreField(page.title, tokens, phrase, WEIGHTS.title);
+            pageScore += scoreField(page.description, tokens, phrase, WEIGHTS.body);
+            var sections = [];
+            (page.sections || []).forEach(function(section) {
+                var sectionScore = scoreField(section.heading, tokens, phrase, WEIGHTS.heading);
+                sectionScore += scoreField(section.text, tokens, phrase, WEIGHTS.body);
+                if (sectionScore > 0) {
+                    sections.push({ section: section, score: sectionScore });
+                }
+            });
+            sections.sort(function(a, b) { return b.score - a.score; });
+            sections.slice(0, 3).forEach(function(hit) { pageScore += hit.score; });
+            if (pageScore > 0) {
+                hits.push({ page: page, score: pageScore, sections: sections.slice(0, 3) });
+            }
+        });
+        hits.sort(function(a, b) { return b.score - a.score; });
+        return hits.slice(0, 25);
+    }
 
-  <rect class="vp-card" x="178" y="74" width="150" height="110" rx="11" stroke="#07adf8"/>
-  <text x="253" y="104" text-anchor="middle" class="vp-t">Patch frontend</text>
-  <text x="253" y="126" text-anchor="middle" class="vp-s">im2patch · dual proj</text>
-  <text x="253" y="142" text-anchor="middle" class="vp-s">merge · bias</text>
-  <text x="253" y="158" text-anchor="middle" class="vp-s">tiled 2D pos + RoPE</text>
-  <text x="253" y="176" text-anchor="middle" class="vp-s" fill="#56c7f5">[patches, d]</text>
+    // Pick a snippet window around the first token occurrence.
+    function makeSnippet(text, tokens) {
+        if (!text) return '';
+        var lower = text.toLowerCase();
+        var pos = -1;
+        tokens.forEach(function(token) {
+            var at = lower.indexOf(token);
+            if (at !== -1 && (pos === -1 || at < pos)) pos = at;
+        });
+        if (pos === -1) return text.slice(0, 160);
+        var start = Math.max(0, pos - 70);
+        var end = Math.min(text.length, pos + 110);
+        var snippet = text.slice(start, end);
+        if (start > 0) snippet = '...' + snippet;
+        if (end < text.length) snippet = snippet + '...';
+        return snippet;
+    }
 
-  <rect class="vp-card" x="352" y="74" width="150" height="110" rx="11" stroke="#07adf8"/>
-  <text x="427" y="104" text-anchor="middle" class="vp-t">Transformer body</text>
-  <text x="427" y="126" text-anchor="middle" class="vp-s">LN · packed QKV</text>
-  <text x="427" y="142" text-anchor="middle" class="vp-s">full attn · out proj</text>
-  <text x="427" y="158" text-anchor="middle" class="vp-s">residual · MLP</text>
-  <text x="427" y="176" text-anchor="middle" class="vp-s" fill="#56c7f5">× N layers</text>
+    // Append text to parent with token matches wrapped in <mark>.
+    // DOM-only rendering: index prose is treated as untrusted text.
+    function appendHighlighted(parent, text, tokens) {
+        var lower = text.toLowerCase();
+        var cursor = 0;
+        while (cursor < text.length) {
+            var nextAt = -1;
+            var nextToken = '';
+            tokens.forEach(function(token) {
+                var at = lower.indexOf(token, cursor);
+                if (at !== -1 && (nextAt === -1 || at < nextAt)) {
+                    nextAt = at;
+                    nextToken = token;
+                }
+            });
+            if (nextAt === -1) break;
+            if (nextAt > cursor) {
+                parent.appendChild(document.createTextNode(text.slice(cursor, nextAt)));
+            }
+            var mark = document.createElement('mark');
+            mark.textContent = text.slice(nextAt, nextAt + nextToken.length);
+            parent.appendChild(mark);
+            cursor = nextAt + nextToken.length;
+        }
+        if (cursor < text.length) {
+            parent.appendChild(document.createTextNode(text.slice(cursor)));
+        }
+    }
 
-  <rect class="vp-card" x="526" y="74" width="158" height="110" rx="11" stroke="#07adf8"/>
-  <text x="605" y="104" text-anchor="middle" class="vp-t">Deepstack + proj</text>
-  <text x="605" y="126" text-anchor="middle" class="vp-s">layer taps merged</text>
-  <text x="605" y="142" text-anchor="middle" class="vp-s">branch MLP blocks</text>
-  <text x="605" y="158" text-anchor="middle" class="vp-s">projector footer</text>
-  <text x="605" y="176" text-anchor="middle" class="vp-s" fill="#56c7f5">[rows, d_model]</text>
+    function pageHref(page, section) {
+        if (section && section.anchor) {
+            return page.url + '#' + section.anchor;
+        }
+        return page.url;
+    }
 
-  <path d="M154,129 L176,129" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#vp-a)"/>
-  <path d="M328,129 L350,129" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#vp-a)"/>
-  <path d="M502,129 L524,129" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#vp-a)"/>
+    function render(hits, tokens) {
+        clearResults();
+        hits.forEach(function(hit) {
+            var card = document.createElement('div');
+            card.className = 'search-result';
+            card.setAttribute('data-test', 'search-result');
 
-  <!-- BRIDGE -->
-  <rect x="724" y="74" width="120" height="110" rx="11" fill="url(#vp-bridge)" opacity="0.9"/>
-  <text x="784" y="120" text-anchor="middle" fill="#101317" font-size="15" font-weight="800">BRIDGE</text>
-  <text x="784" y="142" text-anchor="middle" fill="#1a1f24" font-size="11" font-family="'JetBrains Mono',monospace">named activation</text>
-  <text x="784" y="158" text-anchor="middle" fill="#1a1f24" font-size="11" font-family="'JetBrains Mono',monospace">prefix rows + grid</text>
-  <path d="M684,129 L722,129" fill="none" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#vp-a)"/>
+            var title = document.createElement('div');
+            title.className = 'search-result-title';
+            var titleLink = document.createElement('a');
+            titleLink.href = hit.page.url;
+            titleLink.textContent = hit.page.title || hit.page.url;
+            title.appendChild(titleLink);
+            card.appendChild(title);
 
-  <!-- DECODER LANE -->
-  <rect x="864" y="34" width="302" height="170" rx="14" fill="rgba(255,180,0,0.06)" stroke="#5e4d1d" stroke-width="1.2"/>
-  <text x="884" y="58" class="vp-band" fill="#ffce5a">Qwen3 decoder · decode-layout runtime</text>
+            var urlLine = document.createElement('div');
+            urlLine.className = 'search-result-url';
+            urlLine.textContent = hit.page.url;
+            card.appendChild(urlLine);
 
-  <rect class="vp-card" x="884" y="74" width="124" height="110" rx="11" stroke="#ffb400"/>
-  <text x="946" y="108" text-anchor="middle" class="vp-t">Mixed prefill</text>
-  <text x="946" y="130" text-anchor="middle" class="vp-s">vision rows</text>
-  <text x="946" y="146" text-anchor="middle" class="vp-s">+ text tokens</text>
-  <text x="946" y="170" text-anchor="middle" class="vp-s" fill="#ffce5a">staged prefix</text>
+            if (!hit.sections.length && hit.page.description) {
+                var descSnippet = document.createElement('p');
+                descSnippet.className = 'search-result-snippet';
+                appendHighlighted(descSnippet, makeSnippet(hit.page.description, tokens), tokens);
+                card.appendChild(descSnippet);
+            }
 
-  <rect class="vp-card" x="1024" y="74" width="124" height="110" rx="11" stroke="#ffb400"/>
-  <text x="1086" y="108" text-anchor="middle" class="vp-t">Decode</text>
-  <text x="1086" y="130" text-anchor="middle" class="vp-s">KV cache</text>
-  <text x="1086" y="146" text-anchor="middle" class="vp-s">token stream</text>
-  <text x="1086" y="170" text-anchor="middle" class="vp-s" fill="#ffce5a">caption out</text>
+            hit.sections.forEach(function(sectionHit) {
+                var section = sectionHit.section;
+                var row = document.createElement('div');
+                row.className = 'search-result-section';
+                row.setAttribute('data-test', 'search-result-section');
 
-  <path d="M844,129 L882,129" fill="none" stroke="#8aa0b4" stroke-width="1.8" marker-end="url(#vp-a)"/>
-  <path d="M1008,129 L1022,129" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#vp-a)"/>
+                var link = document.createElement('a');
+                link.href = pageHref(hit.page, section);
+                link.textContent = section.heading || 'Top of page';
+                row.appendChild(link);
 
-  <!-- COMPILE SUBSTRATE -->
-  <rect x="14" y="248" width="1152" height="150" rx="14" fill="#262626" stroke="#3a3a3a" stroke-width="1.2"/>
-  <text x="34" y="276" class="vp-band">One deterministic stack underneath both lanes</text>
-  <g>
-    <rect class="vp-card" x="34"   y="294" width="206" height="84" rx="10"/>
-    <text x="54" y="324" class="vp-t" font-size="14">GGUF intake</text>
-    <text x="54" y="346" class="vp-s">tensors · vision metadata</text>
-    <text x="54" y="364" class="vp-s">convert_gguf_to_bump_v8</text>
+                var snippetText = makeSnippet(section.text || section.heading || '', tokens);
+                if (snippetText) {
+                    var snippet = document.createElement('p');
+                    snippet.className = 'search-result-snippet';
+                    appendHighlighted(snippet, snippetText, tokens);
+                    row.appendChild(snippet);
+                }
+                card.appendChild(row);
+            });
 
-    <rect class="vp-card" x="262" y="294" width="206" height="84" rx="10"/>
-    <text x="282" y="324" class="vp-t" font-size="14">Template resolve</text>
-    <text x="282" y="346" class="vp-s">qwen3_vl_vision.json</text>
-    <text x="282" y="364" class="vp-s">graph order + kernel ids</text>
+            resultsEl.appendChild(card);
+        });
+    }
 
-    <rect class="vp-card" x="490" y="294" width="206" height="84" rx="10"/>
-    <text x="510" y="324" class="vp-t" font-size="14">IR + memory plan</text>
-    <text x="510" y="346" class="vp-s">build_ir_v8.py</text>
-    <text x="510" y="364" class="vp-s">offsets · buffers · no malloc</text>
+    function run(query) {
+        clearResults();
+        var trimmed = query.trim();
+        if (!trimmed) {
+            setStatus('Type a query above, or press / anywhere on the docs to jump here.');
+            return;
+        }
+        setStatus('Searching...');
+        // Relative path: the site is served from a subpath on GitHub Pages.
+        fetch('search-index.json')
+            .then(function(response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function(index) {
+                var tokens = tokenize(trimmed);
+                var hits = searchIndex(index, trimmed);
+                if (!hits.length) {
+                    setStatus('No results for "' + trimmed + '". Try different keywords.');
+                    return;
+                }
+                setStatus(hits.length + ' result' + (hits.length === 1 ? '' : 's') + ' for "' + trimmed + '"');
+                render(hits, tokens);
+            })
+            .catch(function() {
+                setStatus('Search index could not be loaded. Try reloading the page.');
+            });
+    }
 
-    <rect class="vp-card" x="718" y="294" width="206" height="84" rx="10"/>
-    <text x="738" y="324" class="vp-t" font-size="14">Codegen</text>
-    <text x="738" y="346" class="vp-s">encoder_v8.c</text>
-    <text x="738" y="364" class="vp-s">kernel dispatch · SIMD tier</text>
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            input.value = '';
+            input.blur();
+        }
+    });
 
-    <rect x="946" y="294" width="206" height="84" rx="10" fill="rgba(71,180,117,0.14)" stroke="#47b475" stroke-width="1.5"/>
-    <text x="966" y="324" class="vp-t" font-size="14" fill="#a7e0bf">Bridge host</text>
-    <text x="966" y="346" class="vp-s" fill="#a7e0bf">run_multimodal_bridge_v8</text>
-    <text x="966" y="364" class="vp-s" fill="#a7e0bf">maps rows → decoder prefix</text>
-  </g>
-  <path d="M240,336 L260,336" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#vp-a)"/>
-  <path d="M468,336 L488,336" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#vp-a)"/>
-  <path d="M696,336 L716,336" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#vp-a)"/>
-  <path d="M924,336 L944,336" fill="none" stroke="#8aa0b4" stroke-width="1.4" marker-end="url(#vp-a)"/>
-  <!-- substrate feeds both lanes -->
-  <path d="M340,294 L340,210 L340,206" fill="none" stroke="#5a6b78" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#vp-a)"/>
-  <path d="M1049,294 L1049,210 L1049,206" fill="none" stroke="#5a6b78" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#vp-a)"/>
-</svg>
-
-<h2>Source of Truth Stack</h2>
-
-<div class="v8-vision-contracts">
-    <div class="v8-vision-contract">
-        <h3>1. GGUF</h3>
-        <p>The artifact-specific source of truth.</p>
-        <ul>
-            <li>Tensor names and shapes</li>
-            <li>Weight dtypes and quantization types</li>
-            <li>Vision metadata like patch size, image size, projector dims, deepstack hints</li>
-            <li>Tokenizer and chat template metadata</li>
-        </ul>
-    </div>
-    <div class="v8-vision-contract">
-        <h3>2. Template</h3>
-        <p>The structural source of truth.</p>
-        <ul>
-            <li>Header/body/footer graph order</li>
-            <li>Vision-specific operator sequence</li>
-            <li>Kernel ids and contract sections</li>
-            <li>What the encoder is, not the exact artifact numbers</li>
-        </ul>
-    </div>
-    <div class="v8-vision-contract">
-        <h3>3. Lowered Manifest + Layout</h3>
-        <p>The execution source of truth.</p>
-        <ul>
-            <li>Concrete call graph</li>
-            <li>Resolved buffers and offsets</li>
-            <li>Quant/kernel decisions</li>
-            <li>Bridge-visible activation locations</li>
-        </ul>
-    </div>
-    <div class="v8-vision-contract">
-        <h3>4. Bridge Host</h3>
-        <p>The orchestration source of truth.</p>
-        <ul>
-            <li>Loads image input</li>
-            <li>Runs encoder and decoder runtimes</li>
-            <li>Maps encoder output into decoder prefix rows</li>
-            <li>Owns the remaining family-specific bridge glue</li>
-        </ul>
-    </div>
-</div>
-
-<h2>What Is Already Derived</h2>
-
-<div class="v8-vision-compare">
-    <div class="card card-green">
-        <h3>Mostly Derived Today</h3>
-        <ul>
-            <li>Vision graph structure from <code>qwen3_vl_vision.json</code></li>
-            <li>Patch/grid/projector dimensions from GGUF metadata</li>
-            <li>Quant summary and weight mapping from the actual artifact</li>
-            <li>Kernel call order from lowering, not handwritten encoder code</li>
-            <li>Memory buffer sizes and offsets from the layout planner</li>
-            <li>Named activation resolution for the projector output bridge</li>
-        </ul>
-    </div>
-    <div class="card card-accent">
-        <h3>Still Explicit In The Host</h3>
-        <ul>
-            <li>Qwen3-VL smart-resize/image preprocessing logic</li>
-            <li>Synthetic image generators for seam-only probes</li>
-            <li>Some bridge row/grid fallback rules</li>
-            <li>Chat-template fallback parsing in the bridge runner</li>
-            <li>The current choice of which bridge decoder API to call</li>
-        </ul>
-    </div>
-</div>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-    </div>
-    <div>
-        <strong>Honest State</strong><br>
-        The encoder runtime itself is already mostly template/manifest/lowering driven. The remaining hardcoded family knowledge is concentrated in the bridge shell, not in the generated encoder graph.
-    </div>
-</div>
-
-<h2>The Actual Encoder Shape</h2>
-
-<div class="card">
-    <p>
-        The current Qwen3-VL encoder template is not a toy wrapper. It encodes a real transformer-style path:
-    </p>
-    <ol>
-        <li><strong>Patch frontend:</strong> patchify, dual patch projection, stream merge, patch bias, tiled 2D position addition</li>
-        <li><strong>Position contract:</strong> 2D position ids plus multi-section RoPE for vision attention</li>
-        <li><strong>Transformer body:</strong> layernorm, packed QKV projection, split Q/K/V, full attention, out projection, residual, MLP</li>
-        <li><strong>Deepstack branch:</strong> selected layer taps are spatially merged and projected through branch MLP blocks</li>
-        <li><strong>Projector footer:</strong> the resulting rows become the bridge-visible vision embedding prefix for the decoder</li>
-    </ol>
-    <p style="margin-bottom: 0;">
-        That matters because the engine is not “calling an external encoder.” It is lowering and running the encoder as part of the same system.
-    </p>
-</div>
-
-<h2>Inside the Patch Frontend</h2>
-
-<p>
-    The patch frontend is where a raw image becomes encoder tokens. These steps map directly to kernels in
-    <code>src/kernels/vision_kernels.c</code> &mdash; there is no hidden Python preprocessing doing the heavy lifting.
-</p>
-
-<svg viewBox="0 0 1180 360" width="100%" role="img"
-     aria-label="Vision patch embedding: im2patch slices the image into a patch grid, each patch is flattened and projected, then 2x2 spatial merge groups patches and tiled 2D position ids are added."
-     style="max-width:1180px;margin:0.5rem auto 1.25rem;display:block;font-family:'Inter',system-ui,sans-serif;">
-  <defs>
-    <marker id="pf-a" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
-    </marker>
-    <style>
-      .pf-t{fill:#f5f5f5;font-size:14px;font-weight:700;}
-      .pf-s{fill:#b0b0b0;font-size:11px;font-family:'JetBrains Mono',monospace;}
-      .pf-k{fill:#56c7f5;font-size:10.5px;font-family:'JetBrains Mono',monospace;}
-      .pf-step{fill:#9aa7b4;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
-    </style>
-  </defs>
-
-  <!-- Step 1: image grid -->
-  <text x="20" y="32" class="pf-step">1 · im2patch</text>
-  <g stroke="#3a6072" stroke-width="1.2" fill="rgba(7,173,248,0.08)">
-    <rect x="20" y="44" width="40" height="40"/><rect x="60" y="44" width="40" height="40"/><rect x="100" y="44" width="40" height="40"/><rect x="140" y="44" width="40" height="40"/>
-    <rect x="20" y="84" width="40" height="40"/><rect x="60" y="84" width="40" height="40"/><rect x="100" y="84" width="40" height="40"/><rect x="140" y="84" width="40" height="40"/>
-    <rect x="20" y="124" width="40" height="40"/><rect x="60" y="124" width="40" height="40"/><rect x="100" y="124" width="40" height="40"/><rect x="140" y="124" width="40" height="40"/>
-    <rect x="20" y="164" width="40" height="40"/><rect x="60" y="164" width="40" height="40"/><rect x="100" y="164" width="40" height="40"/><rect x="140" y="164" width="40" height="40"/>
-  </g>
-  <rect x="20" y="44" width="80" height="80" fill="none" stroke="#ffb400" stroke-width="2.4"/>
-  <text x="20" y="224" class="pf-s">image [C,H,W]</text>
-  <text x="20" y="240" class="pf-k">patch P×P · grid (H/P)×(W/P)</text>
-
-  <path d="M188,124 L228,124" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#pf-a)"/>
-
-  <!-- Step 2: flattened patch rows -->
-  <text x="244" y="32" class="pf-step">2 · flatten</text>
-  <g>
-    <rect x="244" y="44" width="150" height="20" rx="3" fill="#2f2f2f" stroke="#ffb400" stroke-width="1.6"/>
-    <rect x="244" y="68" width="150" height="20" rx="3" fill="#2f2f2f" stroke="#454545"/>
-    <rect x="244" y="92" width="150" height="20" rx="3" fill="#2f2f2f" stroke="#454545"/>
-    <rect x="244" y="116" width="150" height="20" rx="3" fill="#2f2f2f" stroke="#454545"/>
-    <text x="319" y="148" text-anchor="middle" class="pf-s">⋮</text>
-  </g>
-  <text x="244" y="224" class="pf-s">patches</text>
-  <text x="244" y="240" class="pf-k">[num_patches, C·P·P]</text>
-
-  <path d="M402,100 L442,100" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#pf-a)"/>
-
-  <!-- Step 3: dual patch projection -->
-  <text x="458" y="32" class="pf-step">3 · patch embed</text>
-  <rect x="458" y="44" width="180" height="120" rx="11" fill="#2f2f2f" stroke="#07adf8" stroke-width="1.5"/>
-  <text x="548" y="78" text-anchor="middle" class="pf-t">Dual patch proj</text>
-  <text x="548" y="100" text-anchor="middle" class="pf-s">GEMM W_patch</text>
-  <text x="548" y="118" text-anchor="middle" class="pf-s">+ stream merge</text>
-  <text x="548" y="136" text-anchor="middle" class="pf-s">+ patch bias</text>
-  <text x="458" y="224" class="pf-s">embedded</text>
-  <text x="458" y="240" class="pf-k">[num_patches, d]</text>
-
-  <path d="M646,104 L686,104" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#pf-a)"/>
-
-  <!-- Step 4: 2x2 spatial merge -->
-  <text x="702" y="32" class="pf-step">4 · spatial_merge_2x2</text>
-  <g stroke="#454545" stroke-width="1.1" fill="#2f2f2f">
-    <rect x="702" y="44" width="22" height="22"/><rect x="724" y="44" width="22" height="22"/>
-    <rect x="702" y="66" width="22" height="22"/><rect x="724" y="66" width="22" height="22"/>
-  </g>
-  <rect x="702" y="44" width="44" height="44" fill="none" stroke="#00bcd4" stroke-width="2.2"/>
-  <path d="M756,66 L792,66" fill="none" stroke="#00bcd4" stroke-width="1.6" marker-end="url(#pf-a)"/>
-  <rect x="794" y="50" width="64" height="34" rx="6" fill="rgba(0,188,212,0.16)" stroke="#00bcd4" stroke-width="1.4"/>
-  <text x="826" y="72" text-anchor="middle" class="pf-k" fill="#7fe6f5">merged tok</text>
-  <text x="702" y="116" class="pf-s">4 patches → 1 row</text>
-  <text x="702" y="132" class="pf-k">tile_order_index_2d</text>
-  <text x="702" y="148" class="pf-k">(merge_size = 2)</text>
-  <text x="702" y="224" class="pf-s">merged grid</text>
-  <text x="702" y="240" class="pf-k">[rows, 4·d]</text>
-
-  <path d="M870,90 L908,120" fill="none" stroke="#8aa0b4" stroke-width="1.6" marker-end="url(#pf-a)"/>
-
-  <!-- Step 5: tiled 2D position -->
-  <text x="924" y="32" class="pf-step">5 · +2D position</text>
-  <rect x="924" y="44" width="236" height="120" rx="11" fill="#2f2f2f" stroke="#07adf8" stroke-width="1.5"/>
-  <text x="1042" y="76" text-anchor="middle" class="pf-t">Tiled 2D pos + RoPE</text>
-  <text x="1042" y="98" text-anchor="middle" class="pf-s">position_embeddings_add_tiled_2d</text>
-  <text x="1042" y="116" text-anchor="middle" class="pf-s">vision_position_ids_2d_merge</text>
-  <text x="1042" y="134" text-anchor="middle" class="pf-s">multi-section RoPE</text>
-  <text x="1042" y="152" text-anchor="middle" class="pf-k" fill="#56c7f5">→ ready for transformer body</text>
-
-  <!-- footer note -->
-  <text x="20" y="300" class="pf-s" fill="#808080">Gemma4 vision swaps step 4/5 for </text>
-  <text x="320" y="300" class="pf-k">spatial_average_pool_contiguous</text>
-  <text x="600" y="300" class="pf-s" fill="#808080"> + </text>
-  <text x="624" y="300" class="pf-k">position_embeddings_add_gemma4v_xy</text>
-  <text x="20" y="322" class="pf-s" fill="#808080">All steps are pure, bump-allocated kernels — deterministic and reproducible across runs.</text>
-</svg>
-
-<h2>Important Artifacts</h2>
-
-<div class="card v8-vision-artifacts">
-    <table class="table">
-        <thead>
-            <tr><th>Artifact</th><th>Role</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><code>encoder/weights_manifest.json</code></td>
-                <td>Resolved config, embedded template, quant summary, and weight inventory</td>
-            </tr>
-            <tr>
-                <td><code>encoder/ir1.json</code></td>
-                <td>Pre-lowering operator expansion from the template</td>
-            </tr>
-            <tr>
-                <td><code>encoder/layout.json</code></td>
-                <td>Activation buffers and memory offsets used by the generated runtime</td>
-            </tr>
-            <tr>
-                <td><code>encoder/call.json</code></td>
-                <td>Call-ready IR consumed by code generation</td>
-            </tr>
-            <tr>
-                <td><code>encoder/encoder_v8.c</code></td>
-                <td>Generated C runtime for the vision encoder graph</td>
-            </tr>
-            <tr>
-                <td><code>multimodal_bridge/bridge_report.json</code></td>
-                <td>Final bridge contract: prefix rows, grid, prompt segmentation, generated text</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<h2>What “Template-Driven Bridge” Means</h2>
-
-<div class="card">
-    <p>
-        The Qwen3-VL bridge policy is now declared as a template contract instead of living only as host-runner convention:
-    </p>
-    <ul>
-        <li><strong>Image preprocess contract:</strong> resize policy, alignment rule, normalization stats, channel layout</li>
-        <li><strong>Multimodal bridge contract:</strong> mixed visual/text prefill, MRoPE 2D grid metadata, persistent decoder KV cache, and staged decode continuation</li>
-        <li><strong>Chat contract:</strong> prompt shell, stop markers, and image marker placement</li>
-    </ul>
-    <p style="margin-bottom: 0;">
-        The bridge shell can now ask “what does the resolved contract say?” and choose the staged runtime from that contract.
-    </p>
-</div>
-
-<h2>Current Speed Read</h2>
-
-<div class="card">
-    <p>
-        The Qwen3-VL OCR speed work is now moving through measured bottlenecks instead of guessing.
-        The first large win changed <code>decode-staged</code> into a hybrid decoder runtime:
-        decode IR with prefill-sized activations for the mixed image/text prefix, followed by safe incremental decode.
-        The current patch adds CK threadpool dispatch inside <code>gemm_nt_f16</code> for large FP16 vision-encoder GEMMs.
-    </p>
-    <table>
-        <thead>
-            <tr>
-                <th>Stage</th>
-                <th>Measured signal</th>
-                <th>What changed</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Original OCR path</td>
-                <td>Multiple-minute end-to-end run on real SDPR-style OCR images</td>
-                <td>Correctness-first Qwen3-VL bridge and decoder path</td>
-            </tr>
-            <tr>
-                <td>Staged bridge</td>
-                <td>Encoder about <strong>212.7s -&gt; 85.8s</strong>; mixed prefill about <strong>68.3s -&gt; 47.5s</strong>; steady path about <strong>281s -&gt; 133s</strong></td>
-                <td>Hybrid decoder runtime, staged mixed visual/text prefix, FP16 KV cache correctness, and encoder/decoder profiling</td>
-            </tr>
-            <tr>
-                <td>FP16 encoder GEMM threadpool</td>
-                <td>Encoder about <strong>85.8s -&gt; 59.0s</strong>; mixed prefill still about <strong>47s</strong>; one-token path about <strong>106s</strong></td>
-                <td>Threadpool dispatch for large <code>gemm_nt_f16</code> vision-encoder GEMMs</td>
-            </tr>
-            <tr>
-                <td>Small OCR smoke</td>
-                <td>Output remains coherent (<code>CK</code>), encoder about <strong>6.7s</strong> on the small local smoke</td>
-                <td>Regression guard for the fast path without requiring the full SDPR image workload</td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="v8-speed-svg-wrap">
-        <svg class="v8-speed-svg" viewBox="0 0 980 360" role="img" aria-label="Qwen3-VL OCR speed ladder from original path to staged bridge to FP16 GEMM threadpool to the next Q4_K prefill microkernel target.">
-            <defs>
-                <linearGradient id="speedPanel" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#0f1b26"/>
-                    <stop offset="100%" stop-color="#10151d"/>
-                </linearGradient>
-                <linearGradient id="speedWin" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#123824"/>
-                    <stop offset="100%" stop-color="#0d2025"/>
-                </linearGradient>
-                <linearGradient id="speedNext" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#3a260c"/>
-                    <stop offset="100%" stop-color="#151820"/>
-                </linearGradient>
-                <marker id="speedArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-                    <path d="M0 0 L10 5 L0 10 Z" fill="#07adf8"/>
-                </marker>
-                <style>
-                    .speed-title { fill: #f4f4f4; font: 700 22px JetBrains Mono, monospace; }
-                    .speed-sub { fill: #9aa7b5; font: 13px Inter, Arial, sans-serif; }
-                    .speed-card-title { fill: #ffffff; font: 700 15px JetBrains Mono, monospace; }
-                    .speed-card-small { fill: #b9c4cf; font: 12px Inter, Arial, sans-serif; }
-                    .speed-card-metric { fill: #ffb400; font: 700 18px JetBrains Mono, monospace; }
-                    .speed-card-green { fill: #47b475; font: 700 18px JetBrains Mono, monospace; }
-                    .speed-card-cyan { fill: #07adf8; font: 700 18px JetBrains Mono, monospace; }
-                    .speed-label { fill: #8d9aaa; font: 11px JetBrains Mono, monospace; }
-                    .speed-note { fill: #ced6df; font: 12px Inter, Arial, sans-serif; }
-                </style>
-            </defs>
-
-            <rect x="0" y="0" width="980" height="360" fill="#081018"/>
-            <text x="32" y="38" class="speed-title">Qwen3-VL OCR Speed Ladder</text>
-            <text x="32" y="62" class="speed-sub">Measured bottleneck removal: encoder bridge first, then FP16 GEMM threading, then decoder Q4_K prefill.</text>
-
-            <rect x="30" y="92" width="200" height="150" rx="12" fill="url(#speedPanel)" stroke="#2c3948"/>
-            <text x="48" y="122" class="speed-card-title">1. Original OCR</text>
-            <text x="48" y="153" class="speed-card-metric">multi-minute</text>
-            <text x="48" y="180" class="speed-card-small">Correct path existed,</text>
-            <text x="48" y="199" class="speed-card-small">but encoder + mixed</text>
-            <text x="48" y="218" class="speed-card-small">prefill were both slow.</text>
-
-            <line x1="238" y1="167" x2="283" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
-
-            <rect x="292" y="92" width="200" height="150" rx="12" fill="url(#speedWin)" stroke="#2d6a4f"/>
-            <text x="310" y="122" class="speed-card-title">2. Staged Bridge</text>
-            <text x="310" y="153" class="speed-card-green">281s -> 133s</text>
-            <text x="310" y="180" class="speed-card-small">Hybrid decoder runtime,</text>
-            <text x="310" y="199" class="speed-card-small">FP16 KV cache copy,</text>
-            <text x="310" y="218" class="speed-card-small">encoder/decoder profile.</text>
-
-            <line x1="500" y1="167" x2="545" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
-
-            <rect x="554" y="92" width="200" height="150" rx="12" fill="url(#speedWin)" stroke="#2d6a4f"/>
-            <text x="572" y="122" class="speed-card-title">3. F16 GEMM Pool</text>
-            <text x="572" y="153" class="speed-card-green">85.8s -> 59.0s</text>
-            <text x="572" y="180" class="speed-card-small">Large vision encoder</text>
-            <text x="572" y="199" class="speed-card-small">GEMMs dispatch through</text>
-            <text x="572" y="218" class="speed-card-small">the CK threadpool.</text>
-
-            <line x1="762" y1="167" x2="807" y2="167" stroke="#07adf8" stroke-width="3" marker-end="url(#speedArrow)"/>
-
-            <rect x="816" y="92" width="134" height="150" rx="12" fill="url(#speedNext)" stroke="#ffb400"/>
-            <text x="833" y="122" class="speed-card-title">4. Next</text>
-            <text x="833" y="153" class="speed-card-cyan">Q4_K prefill</text>
-            <text x="833" y="180" class="speed-card-small">mlp_gate_up</text>
-            <text x="833" y="199" class="speed-card-small">about 23.7s</text>
-            <text x="833" y="218" class="speed-card-small">needs packed tile.</text>
-
-            <rect x="32" y="278" width="916" height="44" rx="10" fill="#0c141d" stroke="#263242"/>
-            <text x="52" y="305" class="speed-note">Rule from the profile: do not add scheduler complexity unless it moves real OCR time. Q8 threadpool did not, so it was dropped.</text>
-            <text x="52" y="340" class="speed-label">Current state: encoder improved; decoder mixed prefill is now the dominant wall.</text>
-        </svg>
-    </div>
-    <p>
-        This is still not llama.cpp-speed OCR, but the shape is encouraging: the path moved from many minutes toward
-        roughly a minute-class real-image run by fixing one measured bottleneck at a time. A tested Q8-contract
-        threadpool idea for the next encoder bottleneck did not materially move the real profile, so it was dropped
-        instead of carrying complexity.
-    </p>
-    <p style="margin-bottom: 0;">
-        The next dominant cost is no longer the vision encoder scheduler. The profile now points at decoder mixed
-        prefill, especially <code>gemm_nt_q4_k_q8_k</code> in <code>mlp_gate_up</code> at about <strong>23.7s</strong>
-        on the real OCR image. That needs packed/reused Q4_K prefill microkernel work, not another scheduler-only patch.
-    </p>
-</div>
-
-<h2>Why This Is A Real Milestone</h2>
-
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
-    <div>
-        <strong>Serious Software Signal</strong><br>
-        The important thing is not only that Qwen3-VL now captions an image. It is that the same deterministic stack now spans GGUF intake, template lowering, generated vision execution, bridge stitching, and decoder continuation. That is the shape of a real transformer runtime, not an application wrapper.
-    </div>
-</div>
+    var params = new URLSearchParams(window.location.search);
+    var query = params.get('q') || '';
+    input.value = query;
+    run(query);
+    if (!query.trim()) {
+        input.focus();
+    }
+})();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1981,6 +1565,7 @@
             }
         });
     })();
+
     // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
     (function() {
         var searchInput = document.getElementById('site-search-input');

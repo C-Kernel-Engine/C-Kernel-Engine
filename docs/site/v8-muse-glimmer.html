@@ -731,6 +731,36 @@
             padding: 1rem 1.25rem;
         }
 
+        /* Site search */
+        .site-search {
+            display: flex;
+            align-items: center;
+            flex: 0 1 240px;
+            min-width: 140px;
+        }
+
+        .site-search input {
+            width: 100%;
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.5rem 0.75rem;
+            transition: var(--transition);
+        }
+
+        .site-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .site-search input:focus {
+            outline: 2px solid var(--orange);
+            outline-offset: 1px;
+            border-color: var(--orange);
+        }
+
         /* Mobile hamburger button */
         .nav-toggle {
             display: none;
@@ -773,6 +803,16 @@
 
             .nav-toggle {
                 display: flex;
+            }
+
+            .site-search {
+                order: 3;
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+
+            .site-search input {
+                font-size: 1rem;
             }
 
             .site-nav {
@@ -900,6 +940,9 @@
             <span></span>
             <span></span>
         </button>
+        <form class="site-search" role="search" action="search.html" method="get" data-test="site-search">
+            <input type="search" name="q" id="site-search-input" aria-label="Search documentation" placeholder="Search docs ( / )" autocomplete="off">
+        </form>
         <nav class="site-nav">
             <a href="index.html" class="">Home</a>
             <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
@@ -1332,6 +1375,24 @@ python version/v8/scripts/certify_muse_glimmer_text_v8.py compare \
         document.addEventListener('click', function(e) {
             if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
                 dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
+    (function() {
+        var searchInput = document.getElementById('site-search-input');
+        if (!searchInput) return;
+        document.addEventListener('keydown', function(e) {
+            var target = e.target;
+            var tag = (target.tagName || '').toLowerCase();
+            var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && !typing) {
+                e.preventDefault();
+                searchInput.focus();
             }
         });
     })();
