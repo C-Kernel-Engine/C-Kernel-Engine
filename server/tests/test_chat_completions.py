@@ -129,6 +129,15 @@ def test_non_stream_text_completion_uses_responses_runtime():
         "completion_tokens": 2,
         "total_tokens": 9,
     }
+    performance = data["cke_performance"]
+    assert performance["prompt_tokens"] == 7
+    assert performance["generated_tokens"] == 2
+    assert performance["prefill_ms"] == 2.0
+    assert performance["decode_ms"] == 3.0
+    assert performance["request_total_ms"] >= 0.0
+    assert performance["non_native_ms"] == max(
+        0.0, round(performance["request_total_ms"] - performance["total_ms"], 3)
+    )
     assert "system:be terse" in session.last_prompt
     assert "user:hello" in session.last_prompt
 
@@ -198,6 +207,17 @@ def test_streaming_tool_call_has_one_argument_stream_and_usage():
     assert finishes == ["tool_calls"]
     usage_rows = [row for row in chunks if not row["choices"]]
     assert usage_rows[0]["usage"]["total_tokens"] == 8
+    terminal = next(
+        row
+        for row in chunks
+        if row["choices"] and row["choices"][0]["finish_reason"] == "tool_calls"
+    )
+    performance = terminal["cke_performance"]
+    assert performance["prompt_tokens"] == 7
+    assert performance["generated_tokens"] == 1
+    assert performance["prefill_ms"] == 2.0
+    assert performance["decode_ms"] == 3.0
+    assert performance["request_total_ms"] >= 0.0
     assert not any(
         choice["delta"].get("content")
         for row in chunks

@@ -164,7 +164,22 @@ def _finish_reason(response: dict[str, Any]) -> str:
     return "stop"
 
 
-def _chat_completion(response: dict[str, Any]) -> dict[str, Any]:
+def _cke_performance(
+    response: dict[str, Any], request_total_ms: float
+) -> dict[str, Any] | None:
+    native = response.get("performance")
+    if not isinstance(native, dict):
+        return None
+    profile = dict(native)
+    native_total_ms = float(native.get("total_ms") or 0.0)
+    profile["request_total_ms"] = round(request_total_ms, 3)
+    profile["non_native_ms"] = round(max(0.0, request_total_ms - native_total_ms), 3)
+    return profile
+
+
+def _chat_completion(
+    response: dict[str, Any], *, request_total_ms: float
+) -> dict[str, Any]:
     status = str(response.get("status") or "")
     if status in {"failed", "cancelled"}:
         error = response.get("error") or {}
@@ -196,7 +211,7 @@ def _chat_completion(response: dict[str, Any]) -> dict[str, Any]:
     if reasoning:
         message["reasoning_content"] = reasoning
     usage = response.get("usage") or {}
-    return {
+    completion = {
         "id": response["id"].replace("resp_", "chatcmpl_", 1),
         "object": "chat.completion",
         "created": response["created_at"],
@@ -214,6 +229,10 @@ def _chat_completion(response: dict[str, Any]) -> dict[str, Any]:
             "total_tokens": usage.get("total_tokens", 0),
         },
     }
+    performance = _cke_performance(response, request_total_ms)
+    if performance is not None:
+        completion["cke_performance"] = performance
+    return completion
 
 
 def _chat_chunk(
@@ -224,6 +243,7 @@ def _chat_chunk(
     delta: dict[str, Any],
     finish_reason: str | None = None,
     usage: dict[str, int] | None = None,
+    cke_performance: dict[str, Any] | None = None,
 ) -> str:
     payload: dict[str, Any] = {
         "id": completion_id,
@@ -238,6 +258,8 @@ def _chat_chunk(
     }
     if usage is not None:
         payload["usage"] = usage
+    if cke_performance is not None:
+        payload["cke_performance"] = cke_performance
     return f"data: {json.dumps(payload)}\n\n"
 
 
@@ -259,6 +281,7 @@ async def _iter_response_events(response: StreamingResponse) -> AsyncIterator[di
 async def _chat_stream(
     response: StreamingResponse,
     body: CreateChatCompletionRequest,
+    request_started: float,
 ) -> AsyncIterator[str]:
     created = int(time.time())
     completion_id = "chatcmpl_pending"
@@ -337,12 +360,16 @@ async def _chat_stream(
             )
         elif event_type in {"response.completed", "response.incomplete"}:
             current = event.get("response") or {}
+            performance = _cke_performance(
+                current, (time.perf_counter() - request_started) * 1000.0
+            )
             yield _chat_chunk(
                 completion_id,
                 body.model,
                 created,
                 delta={},
                 finish_reason=_finish_reason(current),
+                cke_performance=performance,
             )
             if body.stream_options and body.stream_options.include_usage:
                 usage = current.get("usage") or {}
@@ -382,6 +409,7 @@ def add_chat_completions_route(
     async def create_chat_completion(
         body: CreateChatCompletionRequest, request: Request
     ):
+        request_started = time.perf_counter()
         responses_body = _to_responses_request(body)
         response = create_response(responses_body, request)
         if body.stream:
@@ -390,7 +418,7 @@ def add_chat_completions_route(
                     status_code=500, detail="CKE did not return a streaming response"
                 )
             return StreamingResponse(
-                _chat_stream(response, body),
+                _chat_stream(response, body, request_started),
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -400,4 +428,7 @@ def add_chat_completions_route(
             )
         if not isinstance(response, dict):
             raise HTTPException(status_code=500, detail="Invalid CKE response envelope")
-        return _chat_completion(response)
+        return _chat_completion(
+            response,
+            request_total_ms=(time.perf_counter() - request_started) * 1000.0,
+        )

@@ -77,6 +77,13 @@ The real-model pilot certifies a two-turn `read_file` workflow. Editing, shell
 execution, concurrent sessions, and unattended operation require separate
 permission and reliability validation.
 
+Chat Completions responses include a CKE extension named `cke_performance`.
+For streaming requests it appears on the terminal chunk. The extension retains
+native prompt/output token counts and prefill/decode timings, then adds
+`request_total_ms` and `non_native_ms` for the complete server request. Client
+tool execution occurs between requests and is not included, so measure that
+interval separately when profiling an agent task.
+
 Run the schema tests with:
 
 ```bash
