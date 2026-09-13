@@ -1064,14 +1064,18 @@ the math, the way the C actually computes it, the memory layout, and the evidenc
     <li><a href="#k8-transpose">8. Token Transpose &mdash; <code>audio_transpose_channel_to_token_f32</code></a></li>
     <li><a href="#k9-supporting">9. Supporting Kernels &mdash; position embeddings, erf GELU, head-major attention</a></li>
     <li><a href="#k10-encoder">10. The Encoder Body &mdash; four bidirectional blocks</a></li>
+    <li><a href="#k11-rel-attention">11. Transformer-XL Relative Attention &mdash; position table, fused scores, relative shift</a></li>
+    <li><a href="#k12-conv-module">12. The FastConformer Convolution Module &mdash; GLU, depthwise Conv1D, inference BatchNorm</a></li>
+    <li><a href="#k13-lstm">13. The LSTM Step &mdash; IFGO gates in PyTorch order</a></li>
+    <li><a href="#k14-logmel-contracts">14. One Log-Mel Family, Three Contracts &mdash; Whisper vs Parakeet vs Cohere</a></li>
     <li><a href="#parity">Parity &amp; Nightly Coverage</a></li>
 </ul>
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 1: WAV DECODE
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k1-wav">1. WAV Decode: Bytes With a Contract, Not a Library Call</h2>
 
@@ -1153,9 +1157,9 @@ fuses the two into the single call the generated code makes. For audio that is a
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 2: RESAMPLE
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k2-resample">2. Resample: Two Explicit Paths to 16 kHz</h2>
 
@@ -1244,9 +1248,9 @@ shrinks silently by a rounding choice.</p>
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 3: PAD / TRUNCATE
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k3-pad">3. Pad / Truncate: The Fixed 480,000-Sample Contract</h2>
 
@@ -1317,9 +1321,9 @@ returns how many frames were real.</p>
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 4: STFT POWER
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k4-stft">4. STFT Power: Whisper Geometry as a 20&times;20 Mixed-Radix FFT</h2>
 
@@ -1410,9 +1414,9 @@ CK has three implementations of the same contract &mdash; a table-driven direct 
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 5: MEL FILTERS
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k5-mel">5. Mel Filters: The Slaney Filterbank, Built Once</h2>
 
@@ -1481,9 +1485,9 @@ runs.</p>
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 6: LOG-MEL
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k6-logmel">6. Log-Mel: Perceptual Compression With a Global Clamp</h2>
 
@@ -1575,9 +1579,9 @@ rescale. The fused entry point <code>audio_whisper_log_mel_reference_f32</code> 
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 7: CONV1D STEM
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k7-conv">7. Conv1D Stem: The Only Learned Layers Before Attention</h2>
 
@@ -1672,9 +1676,9 @@ padding are parameters &mdash; because the same contraction serves any 1D conv f
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 8: TOKEN TRANSPOSE
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k8-transpose">8. Token Transpose: The Named Layout Seam</h2>
 
@@ -1757,15 +1761,15 @@ reads.</p>
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      PARITY COVERAGE
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <hr>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ===================================================================
      KERNEL 9: SUPPORTING KERNELS
-     ═══════════════════════════════════════════════════════════════════ -->
+     =================================================================== -->
 
 <h2 id="k9-supporting">9. Supporting Kernels: The Shared Glue</h2>
 
@@ -1838,6 +1842,507 @@ is a weighted mixture of all 1500 value rows.</p>
     </div>
 </div>
 
+<style>
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #ck-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ck-svg-overlay .ck-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ck-svg-overlay .ck-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ck-svg-overlay .ck-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ck-svg-overlay .ck-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ck-svg-overlay .ck-ov-stage img { max-width: none; height: auto; }
+</style>
+
+<!-- ===================================================================
+     KERNEL 11: TRANSFORMER-XL RELATIVE ATTENTION
+     =================================================================== -->
+
+<h2 id="k11-rel-attention">11. Transformer-XL Relative Attention: One Position Table, Two Score Kernels</h2>
+
+<p>The FastConformer encoders in Parakeet and Cohere do not use learned absolute positions or RoPE. Position
+enters only through the attention scores, Transformer-XL style: a sinusoidal table over <em>relative</em> offsets,
+two learned per-head bias vectors <code>bias_u</code>/<code>bias_v</code>, and a score that is the sum of a
+content term and a position term. CKE implements this as three providers.
+<code>audio_relative_sinusoidal_position_f32</code> builds the <code>[2T-1, E]</code> table once per forward
+(descending offsets <code>T-1 .. -(T-1)</code>, sin/cos interleaved). Each layer projects it with the existing
+GEMM provider into a head-interleaved <code>relative_key</code>. Then either the scores are computed fused
+&mdash; Parakeet's <code>audio_conformer_relative_attention_f32</code> &mdash; or a full raw position-score
+matrix is materialized and re-indexed by <code>audio_relative_shift_f32</code>, which is the composition
+Cohere's encoder uses.</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 740" width="100%" role="img" tabindex="0" data-svg-title="Transformer-XL relative attention: position table, fused scores, relative shift"
+     aria-label="Transformer-XL relative attention in three stages. Stage one: audio_relative_sinusoidal_position_f32 builds a 185 by 1024 table where row r encodes offset p equals T-1-r, descending from plus 92 to minus 92, with sin of p times inverse frequency in even channels and cos in odd channels, inverse frequency equals 1 over 10000 to the power c over E. Stage two: each layer projects the table with its own relative_k_proj GEMM into a head-interleaved relative_key of shape 185 by 1024, 8 heads of 128 dims. Stage three: the fused Parakeet kernel audio_conformer_relative_attention_f32 computes, per head, query, and key, content equals sum over d of q plus u times k, position equals sum over d of q plus v times the relative_key row 92 plus k minus q, score equals content plus position times 128 to the minus one half, then softmax over keys with row-max tracking and the value product, output 93 by 1024; scratch is one caller-owned fp32 score row per head, heads scheduled independently, full bidirectional 93 by 93 grid with no mask. An inset shows the standalone Cohere shift kernel audio_relative_shift_f32, a pure index copy from raw scores of shape H, T, 2T-1 to scores of shape H, T, T where scores h q k equals raw h q T-1+k-q, with a T equals 4 mini-grid showing query 1 copying raw cells 2 through 5."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <style>
+    .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+    .ck-new{fill:#323232;stroke:#07adf8;stroke-width:2;}
+    .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+    .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+    .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+    .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  </style>
+  <defs>
+    <marker id="dd-rel-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="28" class="ck-band">transformer-xl relative attention - one position table, two score kernels (worked shape: T=93, E=1024, 8 heads x 128)</text>
+
+  <rect x="24" y="44" width="548" height="190" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="70" class="ck-band">1. position table - audio_relative_sinusoidal_position_f32</text>
+  <text x="44" y="96" class="ck-sub">row r encodes offset p = T-1-r (descending +92 .. -92)</text>
+  <text x="44" y="118" class="ck-sub">inv = 1 / 10000^(c/E), c = even channel index</text>
+  <text x="44" y="140" class="ck-sub">out[r][c]   = sin(p * inv)</text>
+  <text x="44" y="162" class="ck-sub">out[r][c+1] = cos(p * inv)</text>
+  <text x="44" y="190" class="ck-hi">output [2T-1, E] = [185, 1024] fp32</text>
+  <text x="44" y="212" class="ck-sub">serial, no allocation; built once per encoder forward</text>
+
+  <path d="M572,139 L608,139" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+
+  <rect x="612" y="44" width="544" height="190" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="632" y="70" class="ck-band">2. per-layer projection - existing GEMM provider</text>
+  <text x="632" y="96" class="ck-sub">relative_key = positions . relative_k_proj^T (no bias)</text>
+  <text x="632" y="118" class="ck-hi">[185, 1024] - 8 heads x 128 dims, head-interleaved</text>
+  <text x="632" y="140" class="ck-sub">row T-1+k-q is the embedding of offset k-q</text>
+  <text x="632" y="162" class="ck-sub">each of the 24 layers has its own relative_k_proj</text>
+  <text x="632" y="190" class="ck-sub">no RoPE: position enters only through the scores</text>
+
+  <rect x="24" y="264" width="1132" height="300" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="290" class="ck-band">3. fused per-head scores - audio_conformer_relative_attention_f32 (Parakeet)</text>
+
+  <rect class="ck-box" x="44" y="310" width="330" height="52" rx="8"/>
+  <text x="64" y="332" class="ck-sub">Q, K, V [93, 1024]</text>
+  <text x="64" y="350" class="ck-sub">token-major, head-interleaved</text>
+  <rect class="ck-box" x="44" y="374" width="330" height="52" rx="8"/>
+  <text x="64" y="396" class="ck-sub">bias_u, bias_v [1024]</text>
+  <text x="64" y="414" class="ck-sub">one learned 128-vector per head</text>
+  <rect class="ck-box" x="44" y="438" width="330" height="52" rx="8"/>
+  <text x="64" y="460" class="ck-sub">relative_key [185, 1024]</text>
+  <text x="64" y="478" class="ck-sub">from stage 2</text>
+
+  <rect class="ck-new" x="414" y="310" width="400" height="180" rx="8"/>
+  <text x="434" y="336" class="ck-hi">per head h, query q, key k:</text>
+  <text x="434" y="364" class="ck-sub">content  = sum_d (q+u)[d] * k[d]</text>
+  <text x="434" y="388" class="ck-sub">position = sum_d (q+v)[d] * r[92+k-q][d]</text>
+  <text x="434" y="412" class="ck-sub">score = (content + position) * 128^-0.5</text>
+  <text x="434" y="442" class="ck-sub">the Transformer-XL four-term expansion,</text>
+  <text x="434" y="462" class="ck-sub">pre-combined into two dot products</text>
+
+  <rect class="ck-box" x="846" y="310" width="286" height="180" rx="8"/>
+  <text x="866" y="336" class="ck-title" font-size="12">softmax + value product</text>
+  <text x="866" y="362" class="ck-sub">row max tracked in score pass</text>
+  <text x="866" y="384" class="ck-sub">p = expf(s - max) / sum(p)</text>
+  <text x="866" y="406" class="ck-sub">out[q][d] = sum_k p[k]*V[k][d]</text>
+  <text x="866" y="434" class="ck-hi">output [93, 1024]</text>
+
+  <path d="M374,336 L410,336" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+  <path d="M374,400 L410,372" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+  <path d="M374,464 L410,428" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+  <path d="M814,400 L842,400" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+
+  <text x="44" y="524" class="ck-sub">scratch: one fp32 score row per head [8, 93], caller-owned - the kernel never touches the heap</text>
+  <text x="44" y="546" class="ck-sub">heads scheduled independently on ck_threadpool  |  full bidirectional 93 x 93 grid, no causal mask</text>
+
+  <rect x="24" y="596" width="1132" height="128" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="622" class="ck-band">the standalone shift - audio_relative_shift_f32 (Cohere encoder)</text>
+  <text x="44" y="648" class="ck-sub">scores[h][q][k] = raw[h][q][T-1+k-q] - pure index copy [H,T,2T-1] -&gt; [H,T,T]</text>
+  <text x="44" y="670" class="ck-sub">threadpool over H*T rows, zero arithmetic - exactness of the index map is the contract</text>
+  <text x="44" y="696" class="ck-sub">Cohere materializes the shifted matrix for its attn.pos_bias_u/v composition;</text>
+  <text x="44" y="716" class="ck-sub">Parakeet folds the same index math into stage 3 and never builds the raw matrix</text>
+
+  <text x="800" y="612" class="ck-cap">raw row (T=4), offsets k-q</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="10.5">
+    <rect x="800" y="618" width="36" height="26" fill="#323232" stroke="#454545"/><text x="812" y="635" fill="#b0b0b0">-3</text>
+    <rect x="836" y="618" width="36" height="26" fill="#323232" stroke="#454545"/><text x="848" y="635" fill="#b0b0b0">-2</text>
+    <rect x="872" y="618" width="36" height="26" fill="#323232" stroke="#07adf8"/><text x="884" y="635" fill="#7fd8ec">-1</text>
+    <rect x="908" y="618" width="36" height="26" fill="#323232" stroke="#07adf8"/><text x="922" y="635" fill="#7fd8ec">0</text>
+    <rect x="944" y="618" width="36" height="26" fill="#323232" stroke="#07adf8"/><text x="956" y="635" fill="#7fd8ec">+1</text>
+    <rect x="980" y="618" width="36" height="26" fill="#323232" stroke="#07adf8"/><text x="992" y="635" fill="#7fd8ec">+2</text>
+    <rect x="1016" y="618" width="36" height="26" fill="#323232" stroke="#454545"/><text x="1028" y="635" fill="#b0b0b0">+3</text>
+  </g>
+  <path d="M944,646 L944,660" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-rel-arrow)"/>
+  <g font-family="'JetBrains Mono',monospace" font-size="10.5">
+    <rect x="872" y="664" width="36" height="24" fill="#323232" stroke="#07adf8"/><text x="880" y="680" fill="#7fd8ec">k=0</text>
+    <rect x="908" y="664" width="36" height="24" fill="#323232" stroke="#07adf8"/><text x="916" y="680" fill="#7fd8ec">k=1</text>
+    <rect x="944" y="664" width="36" height="24" fill="#323232" stroke="#07adf8"/><text x="952" y="680" fill="#7fd8ec">k=2</text>
+    <rect x="980" y="664" width="36" height="24" fill="#323232" stroke="#07adf8"/><text x="988" y="680" fill="#7fd8ec">k=3</text>
+  </g>
+  <text x="1032" y="680" class="ck-cap">q=1: copy raw[2..5]</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>The position kernel is serial and allocation-free: one <code>powf</code> per channel pair, one <code>sinf</code>/<code>cosf</code> per element, rows written position-major so the attention kernel's <code>r[T-1+k-q]</code> row is one contiguous 1024-float read.</li>
+            <li>The attention kernel partitions <strong>heads</strong> across the threadpool, then walks queries and keys; content and position dots accumulate in scalar FP32 over the 128-dim head slice, and the row max is tracked during the score pass so softmax is exactly two passes with no third pass.</li>
+            <li>The score scratch is <code>[heads, frames]</code> and <strong>caller-owned</strong> &mdash; one row per head, no heap allocation inside the kernel (a v8 runtime invariant).</li>
+            <li>The shift kernel does no arithmetic at all: <code>output[key] = raw[origin+key]</code> with <code>origin = T-1-q</code>, threadpool over <code>H*T</code> rows &mdash; its contract is the exactness of the index map, which the map states as <code>raw[h,q,T-1+k-q] -&gt; scores[h,q,k]</code>.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Two Score Kernels for One Idea</h3>
+        <p>Cohere's pinned encoder composes Transformer-XL the textbook way &mdash; a full raw <code>[H,T,2T-1]</code> position-score product followed by a shift &mdash; so the shift is a named provider with its own oracle. Parakeet's pinned reference computes the same scores by direct indexing, so CKE fuses bias-u/v, the relative lookup, softmax, and the value product into one head-parallel provider and never materializes the shifted matrix. Both are pinned against PyTorch in <code>unittest/test_audio_encoder.py</code> (<code>check_relative_sinusoidal_position</code>, <code>check_relative_shift</code>, <code>check_conformer_relative_attention</code>), and the Parakeet end-to-end encoder RMSE is 9.08e-6 against a 2e-5 gate. Claim boundary: this is eager FP32 reference math &mdash; head-parallel, not flash &mdash; and the checkpoint's 5,000-position limit bounds the full-attention path.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ===================================================================
+     KERNEL 12: FASTCONFORMER CONVOLUTION MODULE
+     =================================================================== -->
+
+<h2 id="k12-conv-module">12. The FastConformer Convolution Module: GLU, Depthwise Conv1D, Inference BatchNorm</h2>
+
+<p>Every FastConformer block carries a convolution module between the attention and the second Macaron FFN:
+<strong>pointwise Conv1D (1024&rarr;2048) &rarr; GLU &rarr; depthwise Conv1D (K=9) &rarr; BatchNorm &rarr;
+SiLU &rarr; pointwise Conv1D (1024&rarr;1024)</strong>, wrapped in a residual add. Three of its stages are the
+new providers &mdash; <code>audio_conv1d_channel_major_grouped_f32</code> (one kernel covering pointwise,
+grouped, and depthwise via the <code>groups</code> argument, with an optional bias), <code>audio_glu_split_channel_major_f32</code>,
+and <code>audio_batch_norm_inference_channel_major_f32</code>. All of them operate on the same
+<strong>channel-major <code>[C, T]</code></strong> layout: one contiguous 93-float row per channel on the
+worked fixture (width 1024, 93 frames after subsampling).</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 690" width="100%" role="img" tabindex="0" data-svg-title="FastConformer convolution module: pointwise conv, GLU, depthwise conv, inference BatchNorm"
+     aria-label="FastConformer convolution module dataflow. The input arrives token-major as 93 by 1024 and is transposed to channel-major C by T for every stage. Stage one: pointwise_conv1, audio_conv1d_channel_major_grouped_f32 with groups 1 and kernel size 1, expanding 1024 to 2048 channels, output 2048 by 93. Stage two: GLU split, audio_glu_split_channel_major_f32, where value is channels 0 to 1023 and gate is channels 1024 to 2047, output equals value times sigmoid of gate, shape 1024 by 93. Stage three: depthwise conv, the same grouped provider with groups 1024, kernel 9, padding 4, stride 1, so each channel applies its own 9-tap FIR and the frame count is preserved, weight shape 1024 by 1 by 9 with no bias in the Parakeet checkpoint. Stage four: inference BatchNorm, audio_batch_norm_inference_channel_major_f32, folding to a per-channel affine with scale equals weight over square root of running variance plus 1e-5 and offset equals bias minus running mean times scale. Stage five: SiLU then pointwise_conv2 back to 1024 channels, transpose back to 93 by 1024, and an unscaled residual add. Insets show the depthwise tap math out c t equals sum over j of w c j times x c t+j-4 with AVX2 FMA interior frames and scalar fmaf bounds-checked edge frames, and the BatchNorm inference-only contract with frozen running statistics and the 24 training counters excluded at conversion."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <defs>
+    <marker id="dd-conv-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="28" class="ck-band">fastconformer convolution module - token-major at the boundary, channel-major inside (worked shape: [1024, 93])</text>
+
+  <rect x="24" y="46" width="1132" height="36" rx="8" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="590" y="69" text-anchor="middle" class="ck-sub">input [93, 1024] token-major -&gt; transpose -&gt; every stage below is [C, T] channel-major -&gt; transpose back -&gt; residual add (scale 1.0)</text>
+
+  <rect class="ck-box" x="24" y="104" width="356" height="118" rx="8"/>
+  <text x="44" y="130" class="ck-title" font-size="12">pointwise_conv1</text>
+  <text x="44" y="152" class="ck-sub">audio_conv1d_channel_major_grouped_f32</text>
+  <text x="44" y="172" class="ck-sub">groups=1, K=1, no padding</text>
+  <text x="44" y="192" class="ck-sub">1024 -&gt; 2048 channels</text>
+  <text x="44" y="212" class="ck-hi">[2048, 93]</text>
+
+  <rect class="ck-box" x="412" y="104" width="356" height="118" rx="8"/>
+  <text x="432" y="130" class="ck-title" font-size="12">GLU split</text>
+  <text x="432" y="152" class="ck-sub">audio_glu_split_channel_major_f32</text>
+  <text x="432" y="172" class="ck-sub">value = ch 0..1023 | gate = ch 1024..2047</text>
+  <text x="432" y="192" class="ck-sub">out = value * sigmoid(gate)</text>
+  <text x="432" y="212" class="ck-hi">[1024, 93]</text>
+
+  <rect class="ck-new" x="800" y="104" width="356" height="118" rx="8"/>
+  <text x="820" y="130" class="ck-hi">depthwise conv</text>
+  <text x="820" y="152" class="ck-sub">same provider, groups=1024</text>
+  <text x="820" y="172" class="ck-sub">K=9, pad=4, stride=1 - T preserved</text>
+  <text x="820" y="192" class="ck-sub">weight [1024, 1, 9], bias NULL (Parakeet)</text>
+  <text x="820" y="212" class="ck-hi">[1024, 93]</text>
+
+  <path d="M380,163 L408,163" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+  <path d="M768,163 L796,163" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+  <path d="M978,222 L978,258" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+
+  <rect class="ck-box" x="24" y="262" width="356" height="118" rx="8"/>
+  <text x="44" y="288" class="ck-title" font-size="12">inference BatchNorm</text>
+  <text x="44" y="308" class="ck-sub">scale[c] = w[c] / sqrt(var[c] + 1e-5)</text>
+  <text x="44" y="328" class="ck-sub">offset[c] = b[c] - mean[c]*scale[c]</text>
+  <text x="44" y="348" class="ck-hi">y[c][t] = x[c][t]*scale[c] + offset[c]</text>
+  <text x="44" y="368" class="ck-sub">audio_batch_norm_inference_channel_major_f32</text>
+
+  <rect class="ck-box" x="412" y="262" width="356" height="118" rx="8"/>
+  <text x="432" y="288" class="ck-title" font-size="12">SiLU + pointwise_conv2</text>
+  <text x="432" y="308" class="ck-sub">recurrent_silu_forward: x * sigmoid(x)</text>
+  <text x="432" y="328" class="ck-sub">then K=1 conv, 1024 -&gt; 1024</text>
+  <text x="432" y="348" class="ck-sub">(SiLU is elementwise - layout-free)</text>
+  <text x="432" y="368" class="ck-hi">[1024, 93]</text>
+
+  <rect class="ck-box" x="800" y="262" width="356" height="118" rx="8"/>
+  <text x="820" y="288" class="ck-title" font-size="12">residual + transpose back</text>
+  <text x="820" y="308" class="ck-sub">audio_scaled_residual_add_f32, scale 1.0</text>
+  <text x="820" y="328" class="ck-sub">branch joins the block residual stream</text>
+  <text x="820" y="348" class="ck-sub">(the 0.5 scale is only on FFN halves)</text>
+  <text x="820" y="368" class="ck-hi">[93, 1024] token-major</text>
+
+  <path d="M380,321 L408,321" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+  <path d="M768,321 L796,321" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+  <path d="M978,222 C978,245 190,240 192,258" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-conv-arrow)"/>
+
+  <rect x="24" y="420" width="556" height="180" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="446" class="ck-band">how the depthwise conv reads</text>
+  <text x="44" y="474" class="ck-sub">out[c][t] = sum_j w[c][j] * x[c][t + j - 4]</text>
+  <text x="44" y="496" class="ck-sub">group = c_out / (C_out/G) - G = C is depthwise</text>
+  <text x="44" y="518" class="ck-sub">interior frames: AVX2 + FMA, 8 outputs per iteration</text>
+  <text x="44" y="540" class="ck-sub">edge frames: scalar fmaf, taps bounds-checked</text>
+  <text x="44" y="562" class="ck-sub">zero padding is index math - never materialized</text>
+  <text x="44" y="584" class="ck-sub">one provider: pointwise, grouped, depthwise</text>
+
+  <rect x="612" y="420" width="544" height="180" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="632" y="446" class="ck-band">why BatchNorm is inference-only</text>
+  <text x="632" y="474" class="ck-sub">running mean/var are frozen checkpoint tensors</text>
+  <text x="632" y="496" class="ck-sub">folds to a per-channel affine - one fma per element</text>
+  <text x="632" y="518" class="ck-sub">no batch statistics, no momentum, no counter updates</text>
+  <text x="632" y="540" class="ck-sub">the 24 BatchNorm training counters are excluded</text>
+  <text x="632" y="562" class="ck-sub">at conversion: 699 mapped + 24 excluded + 0 left</text>
+  <text x="632" y="584" class="ck-warn">invalid variance (nonfinite or var+eps &lt;= 0) fails closed</text>
+
+  <text x="24" y="640" class="ck-cap">Evidence: conv1d (groups), GLU, and batch_norm oracles in unittest/test_audio_encoder.py (make test-audio); encoder RMSE 9.08e-6 vs 2e-5 gate.</text>
+  <text x="24" y="662" class="ck-cap">Caveat: shapes are the 7.435 s fixture (93 frames, width 1024); Cohere's 48-layer encoder runs the same module at width 1280 with biased convs.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>The grouped Conv1D derives the group from the output channel (<code>group = c_out / (C_out/G)</code>); a depthwise conv is just <code>G = C</code>, so one provider covers pointwise, grouped, and depthwise &mdash; validated against <code>torch.nn.functional.conv1d</code>'s <code>groups</code> parameter.</li>
+            <li>Interior output frames run AVX2+FMA eight at a time (with a contiguous stride-2 load path and a gather fallback); the edge frames use the scalar <code>fmaf</code> loop with bounds-checked taps, so zero padding is index math and never materialized.</li>
+            <li>The GLU is layout-free elementwise over <code>C*T</code>: because the input is <code>[2C, T]</code> channel-major, value and gate are two contiguous <code>C*T</code> blocks &mdash; <code>out[i] = value[i] * sigmoid(gate[i])</code>, threadpool over elements.</li>
+            <li>BatchNorm folds to a per-channel affine: <code>scale</code> and <code>offset</code> are computed once per channel, then the frame loop is one multiply-add per element. Running statistics are read-only &mdash; the checkpoint's 24 training counters are excluded at conversion by contract, and a nonfinite or non-positive <code>var+eps</code> returns an error instead of producing NaNs.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Channel-Major Inside</h3>
+        <p>Depthwise conv and BatchNorm both stream one channel across all frames; in channel-major that is one contiguous 93-float row &mdash; unit-stride loads for the AVX2 interior and trivial prefetch. Token-major would straddle 1024 floats per tap. The module pays two transposes at its boundary (host-side <code>value.T</code> copies in the runner) so every kernel inside keeps the layout it is vectorized for &mdash; the layout seam is explicit in the orchestration, not hidden behind a kernel flag. Parakeet's depthwise weights carry no bias, so the provider's bias pointer is optional; the same contract serves Cohere's biased convolutions. Pinned in <code>unittest/test_audio_encoder.py</code> (<code>check_grouped_conv1d</code>, <code>check_split_glu</code>, <code>check_batch_norm_inference</code>, <code>check_conv_stride2_production_equivalence</code>).</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ===================================================================
+     KERNEL 13: LSTM STEP
+     =================================================================== -->
+
+<h2 id="k13-lstm">13. The LSTM Step: IFGO Gates in PyTorch Order, One Token at a Time</h2>
+
+<p>Parakeet's prediction network is a two-layer, 640-wide LSTM &mdash; the language-model half of the TDT
+transducer. <code>audio_lstm_step_f32</code> advances it by exactly one token: one gate preactivation over the
+fused <code>[4H, I]</code>/<code>[4H, H]</code> weight matrices, one IFGO nonlinearity pass in PyTorch's gate
+order, and an in-place state update. The kernel is deliberately a <em>step</em>: the next input token depends on
+an argmax over the joint head, which depends on this LSTM's output, so there is no sequence to batch. State
+(<code>h</code>, <code>c</code>) is session-owned and persists across decode steps; the 4H gate buffer is
+caller-owned scratch shared by both layers; the kernel never touches the heap.</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 600" width="100%" role="img" tabindex="0" data-svg-title="LSTM step: IFGO gate math, state update, and ownership contract"
+     aria-label="The LSTM step kernel audio_lstm_step_f32 in three stages. Stage one, gate preactivation: gates of size 4H equals 2560 equals b_ih plus b_hh plus W_ih times x plus W_hh times h, with W_ih and W_hh shaped 2560 by 640, computed as one serial fp32 dot product per gate row, input dimensions first then hidden dimensions, in index order, deterministic. Stage two, IFGO nonlinearities in PyTorch gate order: i equals sigmoid of gates slice 0 to 640, f equals sigmoid of gates slice 640 to 1280, g equals tanh of gates slice 1280 to 1920, o equals sigmoid of gates slice 1920 to 2560. Stage three, state update: c prime equals f times c plus i times g, h prime equals o times tanh of c prime, output equals h prime, with h and c updated in place. The ownership strip shows session-owned state h and c of shape 2 by 640 zero-initialized and persisting across decode steps, a caller-owned 2560-float gate scratch reused by both layers with no heap in the kernel, layer 0 input from the 8193 by 640 embedding row of the current token with blank id 8192, layer 1 input from layer 0 output, and the scheduling rule that the LSTM steps only after a nonblank token or on step one, while after a blank the cached decoder projection is reused."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <defs>
+    <marker id="dd-lstm-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="28" class="ck-band">lstm step - ifgo gates in pytorch order, one token at a time (worked shape: I = H = 640, 4H = 2560)</text>
+
+  <rect x="24" y="46" width="360" height="250" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="72" class="ck-band">1. gate preactivation</text>
+  <text x="44" y="100" class="ck-hi">gates[4H] = b_ih + b_hh</text>
+  <text x="44" y="122" class="ck-hi">          + W_ih . x + W_hh . h</text>
+  <text x="44" y="150" class="ck-sub">W_ih [2560, 640], x [640]</text>
+  <text x="44" y="172" class="ck-sub">W_hh [2560, 640], h [640]</text>
+  <text x="44" y="200" class="ck-sub">one serial fp32 dot per gate row:</text>
+  <text x="44" y="222" class="ck-sub">input dims first, then hidden dims,</text>
+  <text x="44" y="244" class="ck-sub">in index order - deterministic</text>
+  <text x="44" y="272" class="ck-sub">accumulator seeded with b_ih + b_hh</text>
+
+  <path d="M384,171 L420,171" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-lstm-arrow)"/>
+
+  <rect x="424" y="46" width="400" height="250" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="444" y="72" class="ck-band">2. ifgo nonlinearities (pytorch gate order)</text>
+  <rect class="ck-box" x="444" y="86" width="360" height="44" rx="6"/>
+  <text x="464" y="113" class="ck-sub">i = sigmoid(gates[0 : 640])</text>
+  <rect class="ck-box" x="444" y="140" width="360" height="44" rx="6"/>
+  <text x="464" y="167" class="ck-sub">f = sigmoid(gates[640 : 1280])</text>
+  <rect class="ck-box" x="444" y="194" width="360" height="44" rx="6"/>
+  <text x="464" y="221" class="ck-sub">g = tanh(gates[1280 : 1920])</text>
+  <rect class="ck-box" x="444" y="248" width="360" height="44" rx="6"/>
+  <text x="464" y="275" class="ck-sub">o = sigmoid(gates[1920 : 2560])</text>
+
+  <path d="M824,171 L860,171" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#dd-lstm-arrow)"/>
+
+  <rect x="864" y="46" width="292" height="250" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="884" y="72" class="ck-band">3. state update</text>
+  <text x="884" y="104" class="ck-hi">c' = f*c + i*g</text>
+  <text x="884" y="128" class="ck-hi">h' = o*tanh(c')</text>
+  <text x="884" y="152" class="ck-hi">output = h'</text>
+  <text x="884" y="184" class="ck-sub">h and c updated in place</text>
+  <text x="884" y="206" class="ck-sub">(old h feeds the gates;</text>
+  <text x="884" y="226" class="ck-sub">new h' is the output)</text>
+  <text x="884" y="258" class="ck-sub">sigmoid/tanh via expf/tanhf</text>
+
+  <rect x="24" y="330" width="1132" height="190" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="356" class="ck-band">ownership and scheduling - the decode-loop contract</text>
+  <text x="44" y="384" class="ck-sub">session-owned state: h[2, 640] and c[2, 640], zero-initialized, persisting across decode steps</text>
+  <text x="44" y="406" class="ck-sub">caller-owned scratch: gates [4H = 2560] fp32, reused by both layers - the kernel never touches the heap</text>
+  <text x="44" y="428" class="ck-sub">layer 0 input: embedding row dec.embedding.weight[token] (8193 x 640 table; blank = id 8192)</text>
+  <text x="44" y="450" class="ck-sub">layer 1 input: layer 0 output h' - then the 640 -&gt; 640 decoder projector (GEMM + bias)</text>
+  <text x="44" y="478" class="ck-warn">stepped only after a NONBLANK token (or on step 1); after a blank the cached projection is reused</text>
+  <text x="44" y="500" class="ck-sub">two layers per decoder_step call; state slices are per-layer, so sessions never share mutable state</text>
+
+  <text x="24" y="556" class="ck-cap">Evidence: check_lstm_step oracle vs torch.nn.LSTM single-step FP32 CPU; 50/50 tokens and 50/50 durations exact on the pinned fixture (PR #504).</text>
+  <text x="24" y="578" class="ck-cap">Caveat: single-step eager FP32 by design; sequence-fused or quantized LSTM variants are out of scope for this provider.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">How The C Reads</h3>
+        <ul>
+            <li>The gate preactivation is 4H independent serial dot products &mdash; input dims first, then hidden dims, single FP32 accumulator seeded with <code>b_ih + b_hh</code> &mdash; so the result is deterministic regardless of thread count (the map declares the kernel serial).</li>
+            <li>The nonlinearity pass walks <strong>IFGO</strong> slices of the same scratch buffer &mdash; PyTorch's gate order, which is exactly what the checkpoint's fused <code>weight_ih_l*</code> tensors assume. Getting the order wrong still produces finite numbers, just the wrong transcript; the oracle exists for that reason.</li>
+            <li><code>h</code> and <code>c</code> are updated in place from their old values, and the runner passes distinct per-layer state slices &mdash; two decode sessions never share mutable state (guarded by <code>tests/test_v8_parakeet_native.py</code>).</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why a Step Kernel, Not a Sequence Kernel</h3>
+        <p>The transducer's next input token depends on an argmax over the joint head, which depends on this LSTM's output &mdash; a classic recurrent decode dependency with nothing to batch. A single-step provider with session-owned state is the honest shape: the prediction network runs only after nonblank emissions (44 times on the 50-step fixture trajectory), state lifetime is the decode session, and reset/reuse semantics live in the runner rather than in kernel flags. Evidence: <code>check_lstm_step</code> against <code>torch.nn.LSTM</code> single-step FP32 CPU in <code>unittest/test_audio_encoder.py</code>, and 50/50 token IDs plus 50/50 durations exact against the pinned Transformers reference end to end.</p>
+    </div>
+</div>
+
+<hr>
+
+<!-- ===================================================================
+     KERNEL 14: LOG-MEL CONTRACTS
+     =================================================================== -->
+
+<h2 id="k14-logmel-contracts">14. One Log-Mel Family, Three Contracts: Whisper vs Parakeet vs Cohere</h2>
+
+<p>Sections 4&ndash;6 walked the Whisper log-mel. Parakeet and Cohere reuse the same Conformer frontend provider
+family &mdash; pre-emphasis, centered STFT, Slaney mel, natural-log projection, per-feature normalization &mdash;
+but the <strong>contract</strong> differs at five points, and each difference changes the numbers the encoder was
+trained to expect. The table below is the exact divergence map, grounded in the two circuit contracts
+(<code>parakeet_tdt.json</code>, <code>cohere_transcribe.json</code>) and the two session runners that select
+the provider arguments.</p>
+
+<div class="svg-expand">
+<svg viewBox="0 0 1180 690" width="100%" role="img" tabindex="0" data-svg-title="Log-mel contract differences: Whisper vs Parakeet vs Cohere"
+     aria-label="Comparison table of the three log-mel contracts across seven rows. Pre-emphasis: Whisper none, Parakeet 0.97 FIR filter, Cohere 0.97 FIR with the same provider. STFT geometry: Whisper n_fft 400 hop 160, Parakeet n_fft 512 window 400 hop 160, Cohere identical to Parakeet. Window and padding: Whisper periodic Hann with reflect padding, Parakeet nonperiodic Hann with zero padding, Cohere reads the window from checkpoint tensor fe.window with zero padding. Mel bank: Whisper 80 Slaney bins computed at runtime, Parakeet 128 Slaney bins computed and pinned to librosa, Cohere 128 bins read from checkpoint tensor fe.mel_fb. Log rule: Whisper log10 of max of sum and 1e-10, Parakeet natural log of sum plus 2 to the minus 24, Cohere the same natural log rule. Final transform: Whisper a global clamp with floor at the maximum minus 8 then x plus 4 over 4, Parakeet per-feature normalization with sample variance N-1 over live frames only, Cohere per-feature normalization over all frames including padding with the provider's N-1 denominator, noting the circuit contract string says population variance while the certified provider computes sample variance. Output layout: Whisper mel-major 80 by 1500 then a token transpose, Parakeet time-major 744 by 128, Cohere time-major T by 128. The shared Conformer-family providers are audio_preemphasis_f32, audio_stft_power_centered_window_f32, audio_whisper_mel_filters_slaney_f32, audio_log_mel_time_major_f32, and audio_feature_normalize_per_feature_f32, while Whisper uses its own audio_stft_power_fft400_f32 and audio_whisper_log_mel_from_power_reference_f32 pair."
+     style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+  <text x="24" y="28" class="ck-band">one log-mel family, three contracts - what actually differs</text>
+
+  <rect class="ck-box" x="214" y="44" width="300" height="34" rx="8"/>
+  <text x="364" y="66" text-anchor="middle" class="ck-title" font-size="12">whisper (tiny / base)</text>
+  <rect class="ck-box" x="524" y="44" width="300" height="34" rx="8"/>
+  <text x="674" y="66" text-anchor="middle" class="ck-title" font-size="12">parakeet tdt</text>
+  <rect class="ck-box" x="834" y="44" width="322" height="34" rx="8"/>
+  <text x="995" y="66" text-anchor="middle" class="ck-title" font-size="12">cohere transcribe</text>
+
+  <text x="34" y="122" class="ck-sub">pre-emphasis</text>
+  <rect class="ck-box" x="214" y="86" width="300" height="62" rx="6"/>
+  <text x="230" y="122" class="ck-sub">none</text>
+  <rect class="ck-box" x="524" y="86" width="300" height="62" rx="6"/>
+  <text x="540" y="122" class="ck-sub">0.97 FIR: y[t] = x[t] - 0.97*x[t-1]</text>
+  <rect class="ck-box" x="834" y="86" width="322" height="62" rx="6"/>
+  <text x="850" y="122" class="ck-sub">0.97 FIR (same provider)</text>
+
+  <text x="34" y="184" class="ck-sub">STFT geometry</text>
+  <rect class="ck-box" x="214" y="148" width="300" height="62" rx="6"/>
+  <text x="230" y="184" class="ck-sub">n_fft 400, hop 160</text>
+  <rect class="ck-box" x="524" y="148" width="300" height="62" rx="6"/>
+  <text x="540" y="184" class="ck-sub">n_fft 512, win 400, hop 160</text>
+  <rect class="ck-box" x="834" y="148" width="322" height="62" rx="6"/>
+  <text x="850" y="184" class="ck-sub">n_fft 512, win 400, hop 160</text>
+
+  <text x="34" y="246" class="ck-sub">window + padding</text>
+  <rect class="ck-box" x="214" y="210" width="300" height="62" rx="6"/>
+  <text x="230" y="236" class="ck-sub">periodic Hann</text>
+  <text x="230" y="256" class="ck-sub">reflect padding</text>
+  <rect class="ck-box" x="524" y="210" width="300" height="62" rx="6"/>
+  <text x="540" y="236" class="ck-sub">nonperiodic Hann</text>
+  <text x="540" y="256" class="ck-sub">zero padding</text>
+  <rect class="ck-box" x="834" y="210" width="322" height="62" rx="6"/>
+  <text x="850" y="236" class="ck-sub">checkpoint tensor fe.window</text>
+  <text x="850" y="256" class="ck-sub">zero padding</text>
+
+  <text x="34" y="308" class="ck-sub">mel bank</text>
+  <rect class="ck-box" x="214" y="272" width="300" height="62" rx="6"/>
+  <text x="230" y="298" class="ck-sub">80 bins, Slaney</text>
+  <text x="230" y="318" class="ck-sub">computed at runtime</text>
+  <rect class="ck-box" x="524" y="272" width="300" height="62" rx="6"/>
+  <text x="540" y="298" class="ck-sub">128 bins, Slaney</text>
+  <text x="540" y="318" class="ck-sub">computed, librosa-pinned</text>
+  <rect class="ck-box" x="834" y="272" width="322" height="62" rx="6"/>
+  <text x="850" y="298" class="ck-sub">128 bins</text>
+  <text x="850" y="318" class="ck-sub">checkpoint tensor fe.mel_fb</text>
+
+  <text x="34" y="370" class="ck-sub">log rule</text>
+  <rect class="ck-box" x="214" y="334" width="300" height="62" rx="6"/>
+  <text x="230" y="370" class="ck-sub">log10(max(s, 1e-10))</text>
+  <rect class="ck-box" x="524" y="334" width="300" height="62" rx="6"/>
+  <text x="540" y="370" class="ck-hi">ln(s + 2^-24)</text>
+  <rect class="ck-box" x="834" y="334" width="322" height="62" rx="6"/>
+  <text x="850" y="370" class="ck-hi">ln(s + 2^-24)</text>
+
+  <text x="34" y="432" class="ck-sub">final transform</text>
+  <rect class="ck-box" x="214" y="396" width="300" height="62" rx="6"/>
+  <text x="230" y="422" class="ck-sub">global clamp: floor at max-8,</text>
+  <text x="230" y="442" class="ck-sub">then (x + 4) / 4</text>
+  <rect class="ck-box" x="524" y="396" width="300" height="62" rx="6"/>
+  <text x="540" y="422" class="ck-sub">per-feature norm, sample var</text>
+  <text x="540" y="442" class="ck-sub">(N-1), live frames only</text>
+  <rect class="ck-box" x="834" y="396" width="322" height="62" rx="6"/>
+  <text x="850" y="422" class="ck-sub">per-feature norm, all frames</text>
+  <text x="850" y="442" class="ck-sub">incl. padding, provider N-1 *</text>
+
+  <text x="34" y="494" class="ck-sub">output layout</text>
+  <rect class="ck-box" x="214" y="458" width="300" height="62" rx="6"/>
+  <text x="230" y="484" class="ck-sub">mel-major [80, 1500]</text>
+  <text x="230" y="504" class="ck-sub">then token transpose (sec. 8)</text>
+  <rect class="ck-box" x="524" y="458" width="300" height="62" rx="6"/>
+  <text x="540" y="494" class="ck-sub">time-major [744, 128]</text>
+  <rect class="ck-box" x="834" y="458" width="322" height="62" rx="6"/>
+  <text x="850" y="494" class="ck-sub">time-major [T, 128]</text>
+
+  <text x="24" y="546" class="ck-warn">* contract string says population_variance; the selected provider computes sample variance (N-1) - the behavior certified exact vs CrispASR</text>
+
+  <rect x="24" y="566" width="1132" height="56" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+  <text x="44" y="588" class="ck-sub">shared conformer-family providers: audio_preemphasis_f32 | audio_stft_power_centered_window_f32 | audio_whisper_mel_filters_slaney_f32</text>
+  <text x="44" y="608" class="ck-sub">| audio_log_mel_time_major_f32 | audio_feature_normalize_per_feature_f32  -  whisper uses its own pair (sections 4 and 6)</text>
+
+  <text x="24" y="650" class="ck-cap">Evidence: whisper log-mel max &lt;= 1.1e-3 (make test-audio); parakeet frontend RMSE 4.06e-4 vs 5e-4 gate; cohere 32/32 IDs exact vs CrispASR.</text>
+  <text x="24" y="672" class="ck-cap">Caveat: contracts are not interchangeable - log base, guard epsilon, normalization span, and layout each change what the encoder expects.</text>
+</svg>
+<div class="svg-expand-hint">click / tap the diagram to expand</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Why Seven Providers Cover All Three</h3>
+        <p>The frontend family is dimension-general by design: <code>audio_preemphasis_f32</code> takes the coefficient, <code>audio_stft_power_centered_window_f32</code> takes n_fft/window/hop/centering, <code>audio_whisper_mel_filters_slaney_f32</code> builds any bank size (its legacy name notwithstanding), <code>audio_log_mel_time_major_f32</code> takes its epsilon as an argument, and <code>audio_feature_normalize_per_feature_f32</code> takes the frame span. What differs per lane is <strong>contract, not code</strong>: which epsilon, which window source, which frames count as live. Whisper is the odd one out &mdash; log10, a global data-dependent clamp, no normalization &mdash; because its <code>(x+4)/4</code> squash is the scaling contract the Whisper encoder was trained with.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Claim Boundary</h3>
+        <p>Three distinct numerical contracts, three distinct oracles: Whisper against the <code>torch.stft</code>-style reference (log-Mel max &le; 1.1e-3), Parakeet against the pinned Transformers feature extractor (frontend RMSE 4.06e-4, gate 5e-4), Cohere against CrispASR stage dumps (32/32 token IDs exact). Feeding one model's audio through another's contract is wrong by construction, not by tolerance. One wrinkle worth knowing: the <code>cohere_transcribe</code> circuit contract string says <code>per_feature_population_variance_all_frames</code>, but the selected provider computes a <em>sample</em> variance (N&minus;1) over all frames &mdash; the certified behavior, pinned exact against CrispASR; the contract label and the implementation disagree, and the oracle pins the implementation.</p>
+    </div>
+</div>
+
+<hr>
+
 <h2 id="parity">Parity &amp; Nightly Coverage</h2>
 
 <div class="card card-green">
@@ -1858,11 +2363,66 @@ is a weighted mixture of all 1500 value rows.</p>
         The Parakeet TDT lane reuses this frontend family (pre-emphasis, centered STFT, Slaney log-mel, per-feature
         normalization, grouped Conv2D subsampling) and adds five FastConformer/transducer providers &mdash; grouped
         Conv1D, relative sinusoidal position, relative attention, inference BatchNorm, and a stateful LSTM step &mdash;
-        whose PyTorch oracles run in the same <code>unittest/test_audio_encoder.py</code> suite. See
+        whose PyTorch oracles run in the same <code>unittest/test_audio_encoder.py</code> suite. Sections
+        <a href="#k11-rel-attention">11</a>&ndash;<a href="#k14-logmel-contracts">14</a> walk those kernels and the
+        three-way log-mel contract split; see
         <a href="v8-parakeet-tdt.html">Parakeet TDT Native CPU Bring-up</a> for the architecture, decode semantics,
         and runbook.
     </p>
 </div>
+
+<div id="ck-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+  <div class="ck-ov-bar">
+    <span class="ck-ov-title" id="ck-ov-title">Diagram</span>
+    <span>
+      <button type="button" id="ck-ov-out" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="ck-ov-in" aria-label="Zoom in">+</button>
+      <button type="button" id="ck-ov-close" aria-label="Close">&times;</button>
+    </span>
+  </div>
+  <div class="ck-ov-stage" id="ck-ov-stage"><img id="ck-ov-img" alt=""></div>
+</div>
+
+<script>
+  (function() {
+    var overlay = document.getElementById('ck-svg-overlay');
+    var stage = document.getElementById('ck-ov-stage');
+    var img = document.getElementById('ck-ov-img');
+    var title = document.getElementById('ck-ov-title');
+    var scale = 1;
+    function applyScale() {
+      var base = Math.max(stage.clientWidth - 32, 280);
+      img.style.width = Math.round(base * scale) + 'px';
+    }
+    function open(svg) {
+      var xml = new XMLSerializer().serializeToString(svg);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+      img.alt = svg.getAttribute('aria-label') || 'diagram';
+      title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+      scale = 1;
+      overlay.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      img.onload = applyScale;
+      applyScale();
+      document.getElementById('ck-ov-close').focus();
+    }
+    function close() {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+      svg.addEventListener('click', function() { open(svg); });
+      svg.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+      });
+    });
+    document.getElementById('ck-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+    document.getElementById('ck-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+    document.getElementById('ck-ov-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+  })();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

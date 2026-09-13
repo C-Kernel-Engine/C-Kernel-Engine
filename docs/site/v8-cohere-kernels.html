@@ -1346,15 +1346,15 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
           <tr><td><code>audio_stft_power_centered_window_f32</code></td><td><code>audio_kernels.c:498</code></td>
             <td>centered, windowed STFT power spectrum</td><td><span class="pill cand">provider foundation</span></td></tr>
           <tr><td><code>audio_log_mel_time_major_f32</code></td><td><code>audio_kernels.c:553</code></td>
-            <td>log-mel filterbank energies, time-major layout</td><td><span class="pill cand">provider foundation</span></td></tr>
+            <td>log-mel filterbank energies, time-major layout (<a href="audio-kernels-deep-dive.html#k14-logmel-contracts">contract split</a>)</td><td><span class="pill cand">provider foundation</span></td></tr>
           <tr><td><code>audio_feature_normalize_per_feature_f32</code></td><td><code>audio_kernels.c:328</code></td>
             <td>per-mel-bin mean/variance normalization</td><td><span class="pill cand">provider foundation</span></td></tr>
           <tr><td><code>audio_conv2d_whc_grouped_f32</code></td><td><code>audio_kernels.c:1025</code></td>
             <td>grouped conv2d subsampling frontend (WHC layout)</td><td><span class="pill cand">provider foundation</span></td></tr>
           <tr><td><code>audio_glu_split_channel_major_f32</code></td><td><code>audio_kernels.c:1115</code></td>
-            <td>GLU split-gating after the frontend conv</td><td><span class="pill cand">provider foundation</span></td></tr>
+            <td>GLU split-gating after the frontend conv (<a href="audio-kernels-deep-dive.html#k12-conv-module">how this kernel works</a>)</td><td><span class="pill cand">provider foundation</span></td></tr>
           <tr><td><code>audio_relative_shift_f32</code></td><td><code>audio_kernels.c:1173</code></td>
-            <td>relative-position shift for Conformer rel-pos attention (attn.pos_bias_u/v); exactly maps raw[h,q,T-1+k-q] to scores[h,q,k]</td><td><span class="pill cand">provider foundation</span></td></tr>
+            <td>relative-position shift for Conformer rel-pos attention (attn.pos_bias_u/v); exactly maps raw[h,q,T-1+k-q] to scores[h,q,k] (<a href="audio-kernels-deep-dive.html#k11-rel-attention">how this kernel works</a>)</td><td><span class="pill cand">provider foundation</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -1449,6 +1449,135 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
       The certified audio lane (Whisper, production) is a different stack:
       <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a> and
       <a href="v8-whisper-tiny.html">Whisper Tiny End-to-End</a>.
+    </p>
+
+    <h3 id="transcribe-decoder">4.1 The 8-layer cross-attention decoder, kernel by kernel</h3>
+    <p style="color: var(--text-secondary);">
+      The decoder is where Transcribe stops looking like Parakeet. Instead of a transducer, it is an 8-layer
+      pre-LayerNorm transformer decoder (width 1024, 8 heads &times; 128 dims, ReLU FFN 1024&rarr;4096&rarr;1024)
+      with <strong>learned absolute positions</strong>, causal self-attention over a growing F16 KV cache, and
+      cross-attention into an <strong>immutable F16 encoder K/V cache computed once per speech slice</strong>.
+      It composes existing providers end to end &mdash; GEMM for every projection, LayerNorm,
+      <code>attention_forward_query_key_head_major_f32_decode_heads</code> for both attention sites, and
+      <code>audio_argmax_first_f32</code> for the greedy pick &mdash; so the decoder needed no new C kernels
+      beyond the encoder family above. The F16 rounding is deliberate and part of the parity story:
+      <code>_f16_cache_round</code> reproduces Cohere's persistent-cache storage contract exactly, for both the
+      growing self-attention cache and the precomputed cross-attention cache.
+    </p>
+
+    <div class="svg-expand">
+    <svg viewBox="0 0 1180 680" width="100%" role="img" tabindex="0" data-svg-title="Cohere Transcribe cross-attention decoder: per-slice cross K/V precompute and the per-token decode step"
+         aria-label="Cohere Transcribe decoder dataflow in two lanes. Lane one, once per speech slice: the 48-layer Conformer encoder memory of shape T by 1280 is projected per decoder layer by cross_k and cross_v GEMMs from 1280 to 1024, split into 8 heads of 128 dims, and F16-rounded into an immutable cross K/V cache of shape 8 by T by 128 per layer, matching Cohere's persistent F16 cache contract. Lane two, per generated token: the token embedding plus a learned absolute position embedding passes through the embedding LayerNorm, then 8 pre-LayerNorm blocks each running causal self-attention with q, k, v GEMMs that append F16-rounded keys and values to a growing cache, cross-attention whose query attends the immutable cross K/V from lane one, and a ReLU feed-forward network 1024 to 4096 to 1024, each with its residual add; after the final LayerNorm the head GEMM produces logits, audio_argmax_first_f32 selects the next token with first-index tie-breaking, the generated token feeds the next step, and the loop stops at the endoftext token. A facts strip notes the self-attention cache grows per step while the cross cache is never recomputed, the context budget is 1024 tokens, and last-layer cross-attention weights are retained per step for diagnostics."
+         style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+      <defs>
+        <marker id="ck-dec-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+        </marker>
+      </defs>
+
+      <text x="24" y="28" class="ck-band">cohere transcribe decoder - per-slice cross kv precompute, then one decode step per generated token</text>
+
+      <rect x="24" y="46" width="1132" height="140" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="72" class="ck-band">once per speech slice - cross kv precompute (all 8 layers, then immutable)</text>
+
+      <rect class="ck-box" x="44" y="86" width="220" height="84" rx="8"/>
+      <text x="64" y="110" class="ck-title" font-size="12">encoder memory</text>
+      <text x="64" y="132" class="ck-sub">[T, 1280] fp32</text>
+      <text x="64" y="152" class="ck-sub">48-layer conformer output</text>
+
+      <rect class="ck-box" x="304" y="86" width="240" height="84" rx="8"/>
+      <text x="324" y="110" class="ck-title" font-size="12">cross_k / cross_v GEMM</text>
+      <text x="324" y="132" class="ck-sub">per layer, with bias</text>
+      <text x="324" y="152" class="ck-sub">1280 -&gt; 1024</text>
+
+      <rect class="ck-box" x="584" y="86" width="240" height="84" rx="8"/>
+      <text x="604" y="110" class="ck-title" font-size="12">head split</text>
+      <text x="604" y="132" class="ck-sub">8 heads x 128 dims</text>
+      <text x="604" y="152" class="ck-sub">head-major rows</text>
+
+      <rect class="ck-new" x="864" y="86" width="272" height="84" rx="8"/>
+      <text x="884" y="110" class="ck-hi">cross K/V cache</text>
+      <text x="884" y="132" class="ck-sub">[8, T, 128] per layer, f16-rounded</text>
+      <text x="884" y="152" class="ck-sub">immutable for the whole slice</text>
+
+      <path d="M264,128 L300,128" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M544,128 L580,128" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M824,128 L860,128" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+
+      <rect x="24" y="220" width="1132" height="290" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="246" class="ck-band">per generated token - 8 pre-ln blocks, then the head</text>
+
+      <rect class="ck-box" x="44" y="266" width="170" height="150" rx="8"/>
+      <text x="60" y="292" class="ck-title" font-size="12">embed</text>
+      <text x="60" y="314" class="ck-sub">dec.emb[token] +</text>
+      <text x="60" y="332" class="ck-sub">dec.pos[position]</text>
+      <text x="60" y="356" class="ck-sub">learned absolute pos</text>
+      <text x="60" y="380" class="ck-sub">-&gt; emb_ln</text>
+
+      <rect class="ck-box" x="226" y="266" width="170" height="150" rx="8"/>
+      <text x="242" y="292" class="ck-title" font-size="12">self-attn (causal)</text>
+      <text x="242" y="314" class="ck-sub">q/k/v GEMMs</text>
+      <text x="242" y="332" class="ck-sub">append f16 k/v to</text>
+      <text x="242" y="350" class="ck-sub">growing cache</text>
+      <text x="242" y="374" class="ck-sub">attn_o + residual</text>
+
+      <rect class="ck-new" x="408" y="266" width="170" height="150" rx="8"/>
+      <text x="424" y="292" class="ck-hi">cross-attn</text>
+      <text x="424" y="314" class="ck-sub">cross_q GEMM</text>
+      <text x="424" y="332" class="ck-sub">attend immutable</text>
+      <text x="424" y="350" class="ck-sub">cross K/V (lane 1)</text>
+      <text x="424" y="374" class="ck-sub">cross_o + residual</text>
+
+      <rect class="ck-box" x="590" y="266" width="170" height="150" rx="8"/>
+      <text x="606" y="292" class="ck-title" font-size="12">FFN</text>
+      <text x="606" y="314" class="ck-sub">relu MLP</text>
+      <text x="606" y="332" class="ck-sub">1024 -&gt; 4096</text>
+      <text x="606" y="350" class="ck-sub">-&gt; 1024</text>
+      <text x="606" y="374" class="ck-sub">+ residual</text>
+
+      <rect class="ck-box" x="772" y="266" width="170" height="150" rx="8"/>
+      <text x="788" y="292" class="ck-title" font-size="12">head</text>
+      <text x="788" y="314" class="ck-sub">out_ln, then</text>
+      <text x="788" y="332" class="ck-sub">head GEMM + bias</text>
+      <text x="788" y="356" class="ck-sub">logits over the</text>
+      <text x="788" y="374" class="ck-sub">GGUF vocab</text>
+
+      <rect class="ck-box" x="954" y="266" width="182" height="150" rx="8"/>
+      <text x="970" y="292" class="ck-title" font-size="12">select</text>
+      <text x="970" y="314" class="ck-sub">audio_argmax_first_f32</text>
+      <text x="970" y="332" class="ck-sub">first-index ties</text>
+      <text x="970" y="356" class="ck-warn">stop at &lt;|endoftext|&gt;</text>
+      <text x="970" y="380" class="ck-sub">else feed token back</text>
+
+      <path d="M214,341 L222,341" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M396,341 L404,341" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M578,341 L586,341" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M760,341 L768,341" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+      <path d="M942,341 L950,341" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#ck-dec-arrow)"/>
+
+      <text x="408" y="440" class="ck-sub">self-attn / cross-attn / FFN repeat x 8 layers, each with its own cross K/V from lane 1</text>
+      <path d="M1045,416 L1045,478 L129,478 L129,420" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ck-dec-arrow)"/>
+      <text x="320" y="496" class="ck-cap">generated token feeds the next step (prompt tokens run the same blocks without selection)</text>
+
+      <path d="M1000,170 C1000,205 493,236 493,262" fill="none" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ck-dec-arrow)"/>
+
+      <rect x="24" y="540" width="1132" height="70" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="44" y="564" class="ck-sub">self-attention kv is f16-rounded on append (_f16_cache_round) - the persistent-cache storage contract, not an optimization</text>
+      <text x="44" y="588" class="ck-sub">cross kv is computed once and never recomputed  |  context budget 1024 tokens  |  last-layer cross-attention weights retained per step</text>
+
+      <text x="24" y="646" class="ck-cap">Evidence: 32/32 generated token IDs and transcript exact vs CrispASR (7.435 s fixture); two five-minute runs identical, zero word edits.</text>
+      <text x="24" y="668" class="ck-cap">Caveat: correctness-oriented Python session driver; generated-circuit lowering, quantization, multilingual quality, and tuned performance remain open.</text>
+    </svg>
+    <div class="svg-expand-hint">click / tap the diagram to expand</div>
+    </div>
+
+    <p class="ck-note">
+      The kernels inside the encoder that feeds this decoder are walked in the deep dive:
+      <a href="audio-kernels-deep-dive.html#k11-rel-attention">Transformer-XL relative attention and the relative shift</a>,
+      <a href="audio-kernels-deep-dive.html#k12-conv-module">the FastConformer convolution module</a>, and
+      <a href="audio-kernels-deep-dive.html#k14-logmel-contracts">the three-way log-mel contract split</a>.
+      The decoder-side attention provider contract is the same head-major decode family the Whisper lane certifies
+      (<a href="audio-kernels-deep-dive.html#k9-supporting">deep dive, section 9</a>).
     </p>
   </div>
 
@@ -1707,6 +1836,7 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
             }
         });
     })();
+
     // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
     (function() {
         var searchInput = document.getElementById('site-search-input');
@@ -1771,7 +1901,7 @@ python version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-12</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-09-13</p>
             </div>
         </div>
     </footer>
