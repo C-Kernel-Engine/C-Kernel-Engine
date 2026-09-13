@@ -1,0 +1,49 @@
+{
+  "schema": "cke.cohere_transcribe.long_audio_corpus.v1",
+  "classification": "private_retained_user_workload",
+  "redistribution": false,
+  "model": {
+    "repository": "cstr/cohere-transcribe-03-2026-GGUF",
+    "revision": "77234fcd7f77d271e5fc57f14fb05f260275558c",
+    "file": "cohere-transcribe.gguf",
+    "sha256": "f38225c97dd8185823167cd5107370cda4bf7f77e5042cae7e254f1e6dabced4"
+  },
+  "segmentation": {
+    "provider": "Silero VAD 6.2.0 through CrispASR",
+    "oracle_revision": "ab87fba65a4ade1ef30ccaa881458a0914aae557",
+    "threshold": 0.5,
+    "minimum_speech_ms": 250,
+    "minimum_silence_ms": 100,
+    "speech_padding_ms": 30,
+    "maximum_slice_seconds": 30
+  },
+  "fixtures": {
+    "five_minute": {
+      "catalog_uri": "sha256://7d1be9de45062a32b94e8e8e65f86ce4422551db21f81b59f8f3a8044bd1b582",
+      "wav_sha256": "7d1be9de45062a32b94e8e8e65f86ce4422551db21f81b59f8f3a8044bd1b582",
+      "bytes": 9600044,
+      "frames": 4800000,
+      "sample_rate": 16000,
+      "channels": 1,
+      "sample_width_bytes": 2,
+      "duration_seconds": 300.0,
+      "speech_slice_sha256": "da7b99563c6e20e1c8b1ac20d8122521db2f583a6dd802296873c20ae4a7e266",
+      "speech_slices": 13,
+      "speech_seconds": 225.15,
+      "oracle_transcript_sha256": "59aa21d1c144ad3e5776f1a5e4df085aecfaa7a9021548f34b42f7dba1920f53"
+    },
+    "complete_recording": {
+      "catalog_uri": "sha256://5690063a657511ab16498b2f9aefc720c8d1c517e1e450445a8467ce710116fe",
+      "wav_sha256": "5690063a657511ab16498b2f9aefc720c8d1c517e1e450445a8467ce710116fe",
+      "bytes": 81344098,
+      "frames": 40672000,
+      "sample_rate": 16000,
+      "channels": 1,
+      "sample_width_bytes": 2,
+      "duration_seconds": 2542.0,
+      "speech_slice_sha256": "1a90238ed65f043c6653d62e71a65c954fee0b4bc15082378ee108b251c74cdc",
+      "speech_slices": 123,
+      "speech_seconds": 2288.04
+    }
+  }
+}

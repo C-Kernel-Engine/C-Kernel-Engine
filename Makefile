@@ -1365,6 +1365,7 @@ test-audio-v8-contracts:
 	$(PYTHON) $(PYTHONFLAGS) -m unittest tests.test_v8_cohere_transcribe_model_contract -v
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_certification.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_native.py
+	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_cohere_transcribe_long_audio.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_inventory.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_parakeet_native.py
 	$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_safetensors_to_bump.py -k "whisper_encoder or whisper_decoder"
@@ -1472,6 +1473,37 @@ test-cohere-transcribe-native-auto: $(BUILD_DIR)/libckernel_engine.so $(LIB_AUDI
 			--max-new-tokens "$${CK_COHERE_TRANSCRIBE_MAX_TOKENS:-64}" \
 			--decode \
 			--output "$${CK_COHERE_TRANSCRIBE_NATIVE_OUTPUT:-build/cohere-transcribe-native.json}"; \
+	fi
+
+.PHONY: test-cohere-transcribe-long-audio-auto
+test-cohere-transcribe-long-audio-auto: $(BUILD_DIR)/libckernel_engine.so $(LIB_AUDIO)
+	@if [ -z "$$CK_COHERE_TRANSCRIBE_BUMP" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_LONG_AUDIO" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS" ] || \
+	    [ -z "$$CK_COHERE_TRANSCRIBE_LONG_REFERENCE" ]; then \
+		echo "SKIP: set CK_COHERE_TRANSCRIBE_BUMP, CK_COHERE_TRANSCRIBE_LONG_AUDIO, CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS, and CK_COHERE_TRANSCRIBE_LONG_REFERENCE"; \
+	else \
+		output_dir="$${CK_COHERE_TRANSCRIBE_LONG_OUTPUT:-build/cohere-transcribe-long-audio}"; \
+		mkdir -p "$$output_dir"; \
+		for run in first repeat; do \
+			$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/run_cohere_transcribe_long_audio_v8.py \
+				--model "$$CK_COHERE_TRANSCRIBE_BUMP" \
+				--audio "$$CK_COHERE_TRANSCRIBE_LONG_AUDIO" \
+				--engine "$(BUILD_DIR)/libckernel_engine.so" \
+				--audio-lib "$(LIB_AUDIO)" \
+				--speech-segments "$$CK_COHERE_TRANSCRIBE_SPEECH_SEGMENTS" \
+				--reference-transcript "$$CK_COHERE_TRANSCRIBE_LONG_REFERENCE" \
+				--language "$${CK_COHERE_TRANSCRIBE_LANGUAGE:-en}" \
+				--max-new-tokens "$${CK_COHERE_TRANSCRIBE_MAX_TOKENS:-256}" \
+				--output "$$output_dir/$$run.json" \
+				--text-output "$$output_dir/$$run.txt" \
+				--srt-output "$$output_dir/$$run.srt" || exit $$?; \
+		done; \
+		$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/certify_cohere_transcribe_long_audio_v8.py \
+			--candidate "$$output_dir/first.json" \
+			--repeat "$$output_dir/repeat.json" \
+			--reference "$$CK_COHERE_TRANSCRIBE_LONG_REFERENCE" \
+			--output "$$output_dir/certification.json"; \
 	fi
 
 # Policy:
