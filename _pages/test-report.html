@@ -1160,7 +1160,8 @@
     <h2>Test Details</h2>
     <p class="sub-test-summary">
       <span id="sub-tests-passed">0</span> kernel tests passed,
-      <span id="sub-tests-failed">0</span> failed
+      <span id="sub-tests-failed">0</span> failed,
+      <span id="sub-tests-not-tested">0</span> uncertified measurements
       (click rows to expand)
     </p>
     <table class="results-table">
@@ -1190,6 +1191,7 @@
     }
     #sub-tests-passed { color: #48bb78; }
     #sub-tests-failed { color: #f56565; }
+    #sub-tests-not-tested { color: var(--text-muted); }
 
     .expandable-row {
       cursor: pointer;
@@ -1239,6 +1241,9 @@
     }
     .sub-test-item.fail {
       border-left: 3px solid #f56565;
+    }
+    .sub-test-item.not-tested {
+      border-left: 3px solid var(--text-muted);
     }
     .sub-test-name {
       flex: 1;
@@ -1640,8 +1645,10 @@ function renderResults(data) {
   // Sub-test summary
   const subPassed = summary.sub_tests_passed || 0;
   const subFailed = summary.sub_tests_failed || 0;
+  const subNotTested = summary.sub_tests_not_tested || 0;
   document.getElementById('sub-tests-passed').textContent = subPassed;
   document.getElementById('sub-tests-failed').textContent = subFailed;
+  document.getElementById('sub-tests-not-tested').textContent = subNotTested;
   renderRunnerHardware(data.runner_hardware || null);
   renderCapabilityEvidence(data.capability_evidence || null);
   renderRegressionFast(data.regression_fast || null);
@@ -1708,8 +1715,9 @@ function renderResults(data) {
     const subTests = result.sub_tests || [];
     const subPassed = subTests.filter(s => s.status === 'pass').length;
     const subFailed = subTests.filter(s => s.status === 'fail').length;
+    const subNotTested = subTests.filter(s => s.status === 'not_tested').length;
     const kernelCount = subTests.length > 0
-      ? `<span class="kernel-count"><span class="passed">${subPassed}✓</span>${subFailed > 0 ? ` <span class="failed">${subFailed}✗</span>` : ''}</span>`
+      ? `<span class="kernel-count"><span class="passed">${subPassed}✓</span>${subFailed > 0 ? ` <span class="failed">${subFailed}✗</span>` : ''}${subNotTested > 0 ? ` ${subNotTested}○` : ''}</span>`
       : '-';
 
     tr.innerHTML = `
@@ -2488,8 +2496,9 @@ function renderBackpropRegression(data) {
 }
 
 function renderSubTest(st) {
-  const statusClass = st.status === 'pass' ? 'pass' : 'fail';
-  const statusIcon = st.status === 'pass' ? '✓' : '✗';
+  const statusClass = st.status === 'pass' ? 'pass' : (st.status === 'fail' ? 'fail' : 'not-tested');
+  const statusIcon = st.status === 'pass' ? '✓' : (st.status === 'fail' ? '✗' : '○');
+  const iconClass = st.status === 'pass' ? 'test-pass' : (st.status === 'fail' ? 'test-fail' : 'test-skip');
 
   let metrics = '';
   if (st.max_diff !== null && st.max_diff !== undefined) {
@@ -2502,8 +2511,8 @@ function renderSubTest(st) {
 
   return `
     <div class="sub-test-item ${statusClass}">
-      <span class="${statusClass === 'pass' ? 'test-pass' : 'test-fail'}">${statusIcon}</span>
-      <span class="sub-test-name">${st.name}</span>
+      <span class="${iconClass}">${statusIcon}</span>
+      <span class="sub-test-name">${st.name}${st.configuration ? ` <small>${st.configuration}</small>` : ''}</span>
       <span class="sub-test-metrics">${metrics}</span>
     </div>
   `;
