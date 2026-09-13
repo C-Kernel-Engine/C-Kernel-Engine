@@ -213,12 +213,12 @@
   <h3 id="stage-map">Stage-to-artifact map</h3>
   <p>Every stage binds to declared artifacts: the circuit block, the selected providers, the kernel-map contracts, and the documentation that explains that layer of the system. Kernel maps are the resolver-facing contracts described in <a href="kernel-maps.html#anatomy">Kernel Maps &mdash; anatomy</a>; provider math for the shared frontend family is walked stage by stage in the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>.</p>
   <div class="para-table"><table><thead><tr><th>Stage</th><th>Circuit block</th><th>Selected providers</th><th>Kernel map / contract</th><th>Docs</th></tr></thead><tbody>
-    <tr><td>PCM decode, pre-emphasis, STFT, log-mel, normalize</td><td><code>frontend</code></td><td><code>audio_wav_decode_pcm16_mono_f32</code>, <code>audio_preemphasis_f32</code>, <code>audio_stft_power_centered_window_f32</code>, <code>audio_whisper_mel_filters_slaney_f32</code>, <code>audio_log_mel_time_major_f32</code>, <code>audio_feature_normalize_per_feature_f32</code></td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/tree/main/version/v8/kernel_maps">version/v8/kernel_maps/audio_*.json</a></td><td><a href="audio-kernels-deep-dive.html">Audio deep dive</a> (same provider family, Whisper context)</td></tr>
+    <tr><td>PCM decode, pre-emphasis, STFT, log-mel, normalize</td><td><code>frontend</code></td><td><code>audio_wav_decode_pcm16_mono_f32</code>, <code>audio_preemphasis_f32</code>, <code>audio_stft_power_centered_window_f32</code>, <code>audio_whisper_mel_filters_slaney_f32</code>, <code>audio_log_mel_time_major_f32</code>, <code>audio_feature_normalize_per_feature_f32</code></td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/tree/main/version/v8/kernel_maps">version/v8/kernel_maps/audio_*.json</a></td><td><a href="audio-kernels-deep-dive.html">Audio deep dive</a> (same provider family, Whisper context; <a href="audio-kernels-deep-dive.html#k14-logmel-contracts">log-mel contract split</a>)</td></tr>
     <tr><td>Grouped Conv2D subsampling + projection</td><td><code>encoder.subsampling</code></td><td><code>audio_conv2d_whc_grouped_f32</code>, <code>relu_forward_inplace</code>, <code>gemm_nt_f32_llama_production_parallel_dispatch</code></td><td><code>audio_conv2d_whc_grouped_f32.json</code></td><td><a href="kernel-maps.html#resolution">Resolution algorithm</a></td></tr>
-    <tr><td>Relative positions + Transformer-XL attention</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_relative_sinusoidal_position_f32</code>, <code>audio_conformer_relative_attention_f32</code> (PR #504; head-parallel since PR #507 with one caller-owned score row per head, no heap)</td><td><code>audio_relative_sinusoidal_position_f32.json</code>, <code>audio_conformer_relative_attention_f32.json</code></td><td><a href="v8-numerical-contracts.html">v8 numerical contracts</a></td></tr>
-    <tr><td>Convolution module (pointwise &rarr; GLU &rarr; depthwise &rarr; BatchNorm &rarr; SiLU &rarr; pointwise)</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_conv1d_channel_major_grouped_f32</code> (new, optional bias), <code>audio_glu_split_channel_major_f32</code>, <code>audio_batch_norm_inference_channel_major_f32</code> (new), <code>recurrent_silu_forward</code></td><td><code>audio_conv1d_channel_major_grouped_f32.json</code>, <code>audio_batch_norm_inference_channel_major_f32.json</code></td><td><a href="v8-cohere-kernels.html">Cohere kernel story</a> (the Transcribe provider foundation these extend)</td></tr>
+    <tr><td>Relative positions + Transformer-XL attention</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_relative_sinusoidal_position_f32</code>, <code>audio_conformer_relative_attention_f32</code> (PR #504; head-parallel since PR #507 with one caller-owned score row per head, no heap)</td><td><code>audio_relative_sinusoidal_position_f32.json</code>, <code>audio_conformer_relative_attention_f32.json</code></td><td><a href="v8-numerical-contracts.html">v8 numerical contracts</a>; <a href="audio-kernels-deep-dive.html#k11-rel-attention">how this kernel works</a></td></tr>
+    <tr><td>Convolution module (pointwise &rarr; GLU &rarr; depthwise &rarr; BatchNorm &rarr; SiLU &rarr; pointwise)</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_conv1d_channel_major_grouped_f32</code> (new, optional bias), <code>audio_glu_split_channel_major_f32</code>, <code>audio_batch_norm_inference_channel_major_f32</code> (new), <code>recurrent_silu_forward</code></td><td><code>audio_conv1d_channel_major_grouped_f32.json</code>, <code>audio_batch_norm_inference_channel_major_f32.json</code></td><td><a href="v8-cohere-kernels.html">Cohere kernel story</a> (the Transcribe provider foundation these extend); <a href="audio-kernels-deep-dive.html#k12-conv-module">how this kernel works</a></td></tr>
     <tr><td>Macaron FFN halves, five LayerNorm sites, residual adds, encoder projector</td><td><code>encoder</code></td><td><code>gemm_nt_f32_llama_production_parallel_dispatch</code>, <code>recurrent_silu_forward</code>, <code>layernorm_naive_serial_matched_precision</code>, <code>audio_scaled_residual_add_f32</code> (scaled and unscaled residual adds, PR #507)</td><td>existing FP32 exact maps + <code>audio_scaled_residual_add_f32.json</code></td><td><a href="kernel-architecture.html">v8 kernel architecture</a></td></tr>
-    <tr><td>Prediction network (embedding + 2-layer LSTM + projector)</td><td><code>transducer</code></td><td><code>audio_lstm_step_f32</code> (new in PR #504; PyTorch IFGO gate order, session-owned h/c state, caller-owned 4H gate scratch)</td><td><code>audio_lstm_step_f32.json</code></td><td><a href="v8-parakeet-tdt.html#tdt-decode">TDT decode below</a></td></tr>
+    <tr><td>Prediction network (embedding + 2-layer LSTM + projector)</td><td><code>transducer</code></td><td><code>audio_lstm_step_f32</code> (new in PR #504; PyTorch IFGO gate order, session-owned h/c state, caller-owned 4H gate scratch)</td><td><code>audio_lstm_step_f32.json</code></td><td><a href="v8-parakeet-tdt.html#tdt-decode">TDT decode below</a>; <a href="audio-kernels-deep-dive.html#k13-lstm">how this kernel works</a></td></tr>
     <tr><td>Joint add + ReLU + 8198-wide head</td><td><code>transducer</code></td><td><code>relu_forward_inplace</code>, <code>gemm_nt_f32_llama_production_parallel_dispatch</code></td><td>existing FP32 exact maps</td><td>&mdash;</td></tr>
     <tr><td>Greedy TDT state machine, argmax decisions, detokenization, timestamps</td><td><code>transducer.tdt_greedy_step</code></td><td>runner state machine (<code>ParakeetSession.decode</code>) with <code>audio_argmax_first_f32</code> (deterministic first-index ties, PR #507) for both argmaxes; <code>tokenizers</code> package for Metaspace BPE detok; punctuation-collapsed timestamp refinement</td><td>circuit contract keys <code>blank_token_id</code>, <code>durations</code>, <code>max_symbols_per_step</code> + <code>audio_argmax_first_f32.json</code></td><td><a href="sentencepiece.html">Tokenizer docs</a></td></tr>
   </tbody></table></div>
@@ -233,6 +233,90 @@
     <li><strong>Advance rule.</strong> If the token is blank <em>and</em> the predicted duration is 0, the duration is forced to 1 &mdash; a blank may never freeze the loop. A nonblank token with duration 0 is legal and holds the frame (multiple symbols on one encoder frame, bounded by <code>max_symbols_per_step&nbsp;=&nbsp;10</code>). The frame index then advances by the duration.</li>
     <li><strong>Termination.</strong> The loop stops when the frame index reaches 93 (the encoder length). A hard bound of <code>10 &times; 93 = 930</code> steps raises <code>TDT decoder exceeded its encoder-derived step bound</code> instead of looping forever.</li>
   </ol>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 560" width="100%" role="img" tabindex="0" data-svg-title="TDT greedy decode state machine: four transitions and the termination rule"
+       aria-label="The greedy TDT decode state machine. The loop state is the frame index f, the last emitted token, the two-layer LSTM hidden and cell state, and the cached decoder projection. Each iteration runs the joint head on the sum of encoder row f and the cached projection, producing 8198 logits, then takes two independent first-index argmaxes: the token over logits 0 to 8192 and the duration index over logits 8193 to 8197 mapped through the durations table 0, 1, 2, 3, 4. Four transitions: blank with duration 0 forces duration to 1 and advances one frame with the cache kept and no LSTM step; blank with positive duration advances f by d with the cache kept and no LSTM step; nonblank with duration 0 holds the frame and steps the LSTM, bounded by 10 symbols per frame; nonblank with positive duration advances f by d and steps the LSTM, updating hidden state, cell state, and the cached projection. Termination: the loop stops when f reaches 93, and a hard bound of 930 steps raises an error instead of looping forever."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <defs>
+      <marker id="tdt-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="28" class="ck-band">tdt greedy decode - the state machine (state: frame f, last token, lstm h/c, decoder projection cache)</text>
+
+    <rect x="24" y="50" width="270" height="130" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+    <text x="44" y="76" class="ck-band">loop state</text>
+    <text x="44" y="102" class="ck-sub">frame f (0 .. 93)</text>
+    <text x="44" y="122" class="ck-sub">last token (init: blank 8192)</text>
+    <text x="44" y="142" class="ck-sub">lstm h[2,640], c[2,640]</text>
+    <text x="44" y="162" class="ck-sub">cached decoder projection [640]</text>
+
+    <rect class="ck-box" x="340" y="50" width="380" height="130" rx="8"/>
+    <text x="360" y="76" class="ck-title" font-size="12">1. joint (always runs)</text>
+    <text x="360" y="100" class="ck-sub">relu(encoder[f] + cache) -&gt; head GEMM</text>
+    <text x="360" y="122" class="ck-sub">8198 logits = 8193 token + 5 duration</text>
+    <text x="360" y="146" class="ck-sub">blank = id 8192</text>
+    <text x="360" y="166" class="ck-hi">runs even when the cache is reused</text>
+
+    <rect class="ck-box" x="780" y="50" width="376" height="130" rx="8"/>
+    <text x="800" y="76" class="ck-title" font-size="12">2. two independent argmaxes</text>
+    <text x="800" y="100" class="ck-sub">token = argmax(logits[0:8193])</text>
+    <text x="800" y="122" class="ck-sub">d = durations[argmax(logits[8193:8198])]</text>
+    <text x="800" y="146" class="ck-sub">durations table [0, 1, 2, 3, 4]</text>
+    <text x="800" y="166" class="ck-sub">audio_argmax_first_f32 - first-index ties</text>
+
+    <path d="M294,115 L336,115" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+    <path d="M720,115 L776,115" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+
+    <rect x="24" y="230" width="270" height="140" rx="8" fill="#323232" stroke="#ffd38a" stroke-width="1.8"/>
+    <text x="44" y="258" class="ck-warn">blank + d=0 (forced)</text>
+    <text x="44" y="284" class="ck-sub">d := 1 - a blank may never</text>
+    <text x="44" y="304" class="ck-sub">freeze the loop</text>
+    <text x="44" y="330" class="ck-sub">f += 1 | cache kept</text>
+    <text x="44" y="350" class="ck-sub">no LSTM step</text>
+
+    <rect class="ck-box" x="310" y="230" width="270" height="140" rx="8"/>
+    <text x="330" y="258" class="ck-title" font-size="12">blank + d&gt;0</text>
+    <text x="330" y="284" class="ck-sub">f += d | cache kept</text>
+    <text x="330" y="304" class="ck-sub">no LSTM step</text>
+    <text x="330" y="330" class="ck-sub">skips silence fast:</text>
+    <text x="330" y="350" class="ck-sub">recorded step 2 jumps f=1 -&gt; 5</text>
+
+    <rect class="ck-box" x="596" y="230" width="270" height="140" rx="8"/>
+    <text x="616" y="258" class="ck-title" font-size="12">nonblank + d=0 (hold)</text>
+    <text x="616" y="284" class="ck-sub">frame f held</text>
+    <text x="616" y="304" class="ck-sub">LSTM step: h/c + cache updated</text>
+    <text x="616" y="330" class="ck-sub">multiple symbols on one frame,</text>
+    <text x="616" y="350" class="ck-sub">bounded by max_symbols = 10</text>
+
+    <rect class="ck-box" x="882" y="230" width="274" height="140" rx="8"/>
+    <text x="902" y="258" class="ck-title" font-size="12">nonblank + d&gt;0</text>
+    <text x="902" y="284" class="ck-sub">f += d</text>
+    <text x="902" y="304" class="ck-sub">LSTM step: h/c + cache updated</text>
+    <text x="902" y="330" class="ck-sub">the common emit-and-move:</text>
+    <text x="902" y="350" class="ck-sub">44 of 50 recorded steps emit</text>
+
+    <path d="M968,180 L968,210" fill="none" stroke="#8aa0b4" stroke-width="1.5"/>
+    <path d="M159,210 L1024,210" fill="none" stroke="#8aa0b4" stroke-width="1.5"/>
+    <path d="M159,210 L159,226" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+    <path d="M445,210 L445,226" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+    <path d="M731,210 L731,226" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+    <path d="M1019,210 L1019,226" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#tdt-arrow)"/>
+    <path d="M30,370 L30,394 L12,394 L12,115 L20,115" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#tdt-arrow)"/>
+    <text x="40" y="390" class="ck-cap">next iteration</text>
+
+    <rect x="24" y="410" width="1132" height="70" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+    <text x="44" y="436" class="ck-good">loop while f &lt; 93 - stop when f &gt;= 93, then detokenize (Metaspace BPE) and emit timestamps</text>
+    <text x="44" y="460" class="ck-warn">hard bound: 10 x 93 = 930 steps - exceeding it raises "TDT decoder exceeded its encoder-derived step bound"</text>
+
+    <text x="24" y="516" class="ck-cap">Grounding: ParakeetSession.decode in version/v8/scripts/run_parakeet_native_v8.py; circuit keys blank_token_id, durations, max_symbols_per_step.</text>
+    <text x="24" y="538" class="ck-cap">Evidence: 50/50 token IDs and 50/50 durations exact vs the pinned Transformers reference; the worked-trajectory strip lives in the architecture diagram above.</text>
+  </svg>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+  </div>
+
   <p>Worked example from the recorded native trajectory (see the diagram strip): the first two steps are blanks &mdash; step&nbsp;1 predicts duration&nbsp;0, forced to&nbsp;1; step&nbsp;2 predicts duration&nbsp;4, skipping frames 1&ndash;4 (leading silence). Step&nbsp;3 emits token 499 at frame&nbsp;5, and only then does the LSTM step. Across the clip, 6 of the 50 recorded entries are blank (including the initial state), 44 are emissions, and the durations sum to exactly 93 frames &times; 0.08&nbsp;s&nbsp;= 7.44&nbsp;s of coverage for the 7.435&nbsp;s clip. Token timestamps are emitted as cumulative duration &times; 0.08&nbsp;s with the reference processor's punctuation-collapsing refinement (<code>decode_token_timestamps</code>); the short fixture matches all 44 reference timestamp entries exactly.</p>
 
   <h2 id="runbook">Runbook: reproduce the certified path</h2>
