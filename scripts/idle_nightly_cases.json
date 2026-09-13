@@ -1,0 +1,123 @@
+{
+  "schema": "cke.idle-nightly.v1",
+  "defaults": {
+    "max_load_per_physical_core": 0.2,
+    "monitor_interval_seconds": 10,
+    "terminate_grace_seconds": 15,
+    "keep_managed_worktrees": 2,
+    "max_swap_activity_pages": 4096,
+    "timeout_seconds": 21600,
+    "fingerprint_env": [
+      "CC",
+      "CFLAGS",
+      "CK_NUM_THREADS",
+      "V8_QWEN36_MODEL",
+      "V8_QWEN38_MODEL",
+      "V8_QWEN35_MOE_MODEL",
+      "V8_GEMMA4_MODEL",
+      "V8_GLM4_MODEL",
+      "V8_NEMOTRON9_MODEL",
+      "V8_INSTELLA_MODEL",
+      "V8_KIMI_MODEL",
+      "V8_LAGUNA_MODEL",
+      "V8_COHERE2_MODEL"
+    ],
+    "identity_files": [
+      "scripts/idle_nightly_cases.json",
+      "version/v8/testing/capability_cases.json",
+      "version/v8/regression/families.json",
+      "version/v8/regression/prompts.json"
+    ]
+  },
+  "cases": [
+    {
+      "id": "portable-quick",
+      "cadence_hours": 6,
+      "timeout_seconds": 3600,
+      "resources": {
+        "min_available_memory_gib": 8,
+        "min_runtime_available_memory_gib": 2,
+        "min_free_disk_gib": 12,
+        "min_free_swap_gib": 2
+      },
+      "command": [
+        "python3",
+        "scripts/nightly_runner.py",
+        "--prepare",
+        "--quick",
+        "--json",
+        "{attempt_dir}/nightly.json",
+        "--markdown",
+        "{attempt_dir}/nightly.md"
+      ],
+      "report": "{attempt_dir}/nightly.json"
+    },
+    {
+      "id": "full-nightly",
+      "cadence_hours": 24,
+      "timeout_seconds": 21600,
+      "resources": {
+        "min_available_memory_gib": 16,
+        "min_runtime_available_memory_gib": 4,
+        "min_free_disk_gib": 32,
+        "min_free_swap_gib": 2
+      },
+      "command": [
+        "python3",
+        "scripts/nightly_runner.py",
+        "--prepare",
+        "--json",
+        "{attempt_dir}/nightly.json",
+        "--markdown",
+        "{attempt_dir}/nightly.md"
+      ],
+      "report": "{attempt_dir}/nightly.json"
+    },
+    {
+      "id": "demo-readiness",
+      "cadence_hours": 48,
+      "timeout_seconds": 43200,
+      "resources": {
+        "min_available_memory_gib": 48,
+        "min_runtime_available_memory_gib": 8,
+        "min_free_disk_gib": 80,
+        "min_free_swap_gib": 2
+      },
+      "command": [
+        "python3",
+        "scripts/nightly_runner.py",
+        "--prepare",
+        "--profile",
+        "demo-readiness",
+        "--json",
+        "{attempt_dir}/nightly.json",
+        "--markdown",
+        "{attempt_dir}/nightly.md"
+      ],
+      "report": "{attempt_dir}/nightly.json"
+    },
+    {
+      "id": "high-capacity-e2e",
+      "cadence_hours": 72,
+      "timeout_seconds": 64800,
+      "resources": {
+        "min_available_memory_gib": 96,
+        "min_runtime_available_memory_gib": 12,
+        "min_free_disk_gib": 128,
+        "min_free_swap_gib": 2
+      },
+      "command": [
+        "python3",
+        "scripts/nightly_runner.py",
+        "--prepare",
+        "--profile",
+        "xeon-e2e",
+        "--json",
+        "{attempt_dir}/nightly.json",
+        "--markdown",
+        "{attempt_dir}/nightly.md"
+      ],
+      "report": "{attempt_dir}/nightly.json"
+    }
+  ]
+}

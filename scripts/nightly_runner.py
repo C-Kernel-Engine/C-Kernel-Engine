@@ -527,6 +527,47 @@ class TestSuite:
     ci_skip: bool = False  # Skip in CI mode (tests requiring full shared library)
 
 
+def prepare_local_build() -> TestResult:
+    """Build inside a clean local worktree and retain preparation evidence."""
+    allowed_cpus = (
+        len(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else (os.cpu_count() or 1)
+    )
+    started = time.time()
+    command = ["make", f"-j{allowed_cpus}"]
+    try:
+        prepared = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1800,
+        )
+        status = "pass" if prepared.returncode == 0 else "fail"
+        error = "" if prepared.returncode == 0 else f"make exited {prepared.returncode}"
+        stdout = prepared.stdout
+        stderr = prepared.stderr
+    except (OSError, subprocess.SubprocessError) as exc:
+        status = "fail"
+        error = f"{type(exc).__name__}: {exc}"
+        stdout = ""
+        stderr = ""
+    return TestResult(
+        name="Local engine build preparation",
+        category="inference",
+        status=status,
+        duration_sec=time.time() - started,
+        stdout=_trim_output(stdout, FAIL_STDOUT_CHARS, keep_head_tail=True),
+        stderr=_trim_output(stderr, FAIL_STDERR_CHARS, keep_head_tail=True),
+        error_msg=error,
+        execution_kind="command",
+        execution_id="make",
+        execution_args=[f"-j{allowed_cpus}"],
+    )
+
+
 # Tests to skip in CI mode (use --ci flag)
 # Currently empty - SmolLM-135M is downloaded in CI workflow
 CI_SKIP_TESTS = set()
@@ -575,6 +616,11 @@ TEST_SUITES = {
         "Nightly Runner Hardware Capture",
         "inference",
         UNITTEST_DIR / "test_nightly_runner_hardware.py",
+    ),
+    "idle_nightly_coordinator": TestSuite(
+        "Idle-host Nightly Coordinator",
+        "inference",
+        ROOT / "tests" / "test_idle_nightly_coordinator.py",
     ),
     # NOTE: Orchestration test disabled - v6.5 uses generated code with local helpers,
     # not orchestration layer. Use llamacpp-parity-full for quantized kernel validation.
@@ -1131,7 +1177,7 @@ QUICK_TESTS = [
     "gemm", "relu", "relu2", "nemotron_router", "moe_relu2_expert", "mamba2_reference", "gemma4_assistant", "softmax", "rmsnorm", "attention", "attention_sliding",
     "deltanet_backward",
     "relu_bf16", "rmsnorm_bf16",
-    "q4k_kernels",
+    "q4k_kernels", "idle_nightly_coordinator",
 ]
 
 NIGHTLY_PROFILES = {
@@ -1684,6 +1730,50 @@ def compare_with_baseline(results: list[TestResult], baseline: dict):
                 r.perf_delta_pct = ((r.perf_metric - base_perf) / base_perf) * 100
 
 
+def _repository_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, timeout=10
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _execution_inventory(
+    *,
+    prepare: bool,
+    tests: list[str],
+    make_targets: list[str],
+    benchmarks: list[str],
+) -> list[dict]:
+    inventory = []
+    if prepare:
+        allowed_cpus = (
+            len(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else (os.cpu_count() or 1)
+        )
+        inventory.append({"kind": "command", "id": "make", "args": [f"-j{allowed_cpus}"]})
+    inventory.extend({"kind": "python", "id": key, "args": []} for key in tests)
+    inventory.extend(
+        {
+            "kind": "make",
+            "id": MAKE_TARGETS[key]["target"],
+            "args": [str(arg) for arg in MAKE_TARGETS[key].get("args", [])],
+        }
+        for key in make_targets
+    )
+    inventory.extend(
+        {
+            "kind": "make",
+            "id": BENCH_TARGETS[key]["target"],
+            "args": [str(arg) for arg in BENCH_TARGETS[key].get("args", [])],
+        }
+        for key in benchmarks
+    )
+    return inventory
+
+
 def print_summary(results: list[TestResult], start_time: datetime):
     """Print test run summary."""
     total = len(results)
@@ -1771,7 +1861,13 @@ def print_summary(results: list[TestResult], start_time: datetime):
     return 0 if failed == 0 and timeout == 0 else 1
 
 
-def save_json_report(results: list[TestResult], filepath: Path, start_time: datetime):
+def save_json_report(
+    results: list[TestResult],
+    filepath: Path,
+    start_time: datetime,
+    *,
+    selection: dict | None = None,
+):
     """Save results as JSON report."""
     # Count total sub-tests
     total_sub_tests = sum(len(r.sub_tests) for r in results)
@@ -1803,6 +1899,11 @@ def save_json_report(results: list[TestResult], filepath: Path, start_time: date
     report = {
         "timestamp": start_time.isoformat(),
         "event": os.environ.get("GITHUB_EVENT_NAME", "local"),
+        "run_identity": {
+            "attempt_id": os.environ.get("CK_IDLE_NIGHTLY_ATTEMPT", ""),
+            "repository_commit": _repository_commit(),
+        },
+        "selection": selection or {},
         "duration_sec": sum(r.duration_sec for r in results),
         "runner_python": {
             "executable": sys.executable,
@@ -1987,6 +2088,11 @@ def main():
         help="Retain disposable Xeon sweep downloads after each model lane",
     )
     parser.add_argument("--ci", action="store_true", help="CI mode: skip tests requiring full shared library")
+    parser.add_argument(
+        "--prepare",
+        action="store_true",
+        help="Build the local engine before running tests (clean local worktrees)",
+    )
     parser.add_argument("--category", type=str, help="Run specific category (kernels, bf16, quant, inference, training, parity, archive, bench)")
     parser.add_argument("--json", type=str, metavar="FILE", help="Save JSON report to file")
     parser.add_argument("--markdown", type=str, metavar="FILE", help="Save Markdown summary to file")
@@ -2068,6 +2174,27 @@ def main():
     start_time = datetime.now()
     results = []
     baseline = load_baseline()
+    selection = {
+        "mode": (
+            f"profile:{args.profile}"
+            if args.profile
+            else "quick" if args.quick else f"category:{args.category}" if args.category else "full"
+        ),
+        "expected_executions": _execution_inventory(
+            prepare=args.prepare,
+            tests=tests_to_run,
+            make_targets=make_targets_to_run,
+            benchmarks=bench_targets_to_run,
+        ),
+    }
+
+    if args.prepare:
+        preparation = prepare_local_build()
+        results.append(preparation)
+        print(
+            f"  [prepare] Local engine build... "
+            f"{'✓' if preparation.status == 'pass' else '✗'} ({preparation.duration_sec:.1f}s)"
+        )
 
     # Run Python tests
     for i, test_key in enumerate(tests_to_run, 1):
@@ -2171,7 +2298,7 @@ def main():
 
     # Save JSON if requested
     if args.json:
-        save_json_report(results, Path(args.json), start_time)
+        save_json_report(results, Path(args.json), start_time, selection=selection)
     if args.markdown:
         save_markdown_report(results, Path(args.markdown), start_time)
 

@@ -5748,6 +5748,10 @@ nightly-archive:
 nightly-list:
 	@$(PYTHON) scripts/nightly_runner.py --list
 
+.PHONY: test-idle-nightly-coordinator
+test-idle-nightly-coordinator:
+	@$(PYTHON) $(PYTHONFLAGS) -m unittest -v tests.test_idle_nightly_coordinator
+
 .PHONY: nightly nightly-quick nightly-json nightly-demo-readiness nightly-baseline nightly-kernels nightly-bf16 nightly-quant nightly-inference nightly-parity nightly-xeon-e2e nightly-gemma4-e2e nightly-archive nightly-list
 .PHONY: test-audio test-audio-v8-contracts test-whisper-e2e-auto test-cohere-transcribe-oracle-auto test-cohere-transcribe-native-auto libckernel_audio.so
 

@@ -1228,6 +1228,43 @@
 </div>
 
 <div class="card card-blue">
+    <h3 id="idle-local-nightly" style="margin-top: 0;">Idle-host local nightly</h3>
+    <p>
+        GitHub and local hardware use the same <code>scripts/nightly_runner.py</code> test and evidence engine. GitHub builds in its workflow; each clean local worktree passes <code>--prepare</code> so build preparation is recorded in the nightly report. The local coordinator only admits a registered profile when measured load, available RAM, and free disk satisfy its tier. The checked schedule runs the portable profile first, then progressively admits full, demo-readiness, and high-capacity evidence on larger hosts.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 scripts/idle_nightly_coordinator.py \
+  --repo /srv/cke/C-Kernel-Engine \
+  --ref origin/main --fetch \
+  --state-dir /srv/cke/nightly-state \
+  --list</pre>
+    </div>
+    <p>
+        Each cron invocation runs at most one due profile. Results are atomic and keyed by the source commit, case contract, compiler, physical-core selection, tracked environment, and registered manifest hashes. A zero process exit becomes <code>PASS</code> only when the fresh report matches the attempt and commit, reconciles its summary, contains its complete declared execution inventory, and has no unexpected skips. On restart, a stale <code>RUNNING</code> attempt becomes <code>INTERRUPTED</code> before another attempt begins. Every child is restricted to one logical CPU per physical core, and the common CKE, OpenMP, OpenBLAS, and MKL thread limits match that physical-core count.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>*/10 * * * * cd /srv/cke/C-Kernel-Engine &amp;&amp; /usr/bin/python3 scripts/idle_nightly_coordinator.py --repo /srv/cke/C-Kernel-Engine --ref origin/main --fetch --state-dir /srv/cke/nightly-state &gt;&gt;/srv/cke/nightly-state/cron.log 2&gt;&amp;1</pre>
+    </div>
+    <p>
+        Reserve the host before interactive work by creating <code>/srv/cke/nightly-state/PAUSE</code>. The coordinator terminates and reaps only its owned process group, records the profile as <code>INTERRUPTED</code>, and retries it from the profile boundary after the reservation file is removed. Admission checks free swap as well as load, RAM, and disk; a running profile also interrupts on sustained swap activity or loss of its configured memory reserve. Use <code>--rerun</code> only to ignore cadence. The <code>--exclusive</code> option bypasses the idle-load check for a deliberately reserved host, but it does not bypass pause, memory, disk, or swap safety. This is profile-level recovery; it does not claim per-test or mid-inference checkpointing.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>touch /srv/cke/nightly-state/PAUSE
+# use the host, then allow scheduled work again
+rm /srv/cke/nightly-state/PAUSE</pre>
+    </div>
+    <p class="v8-note" style="margin-bottom: 0;">
+        Run only trusted refs such as <code>origin/main</code>. The coordinator creates a detached per-commit worktree, loads the checked schedule from that commit, reuses model caches outside the worktree, retains at most two coordinator-owned worktrees by default, and never resets the operator checkout. Contributor PR code must use an isolated approval path without credentials or writable private corpora.
+    </p>
+    <p class="mini-note">
+        This coordinator currently owns one host and one local ledger. P3/Ryzen pooling requires bounded runner cases plus an authoritative lease service with host capabilities, attempt fencing, and combined reporting; independently pointing both hosts at one JSON ledger is unsupported.
+    </p>
+</div>
+
+<div class="card card-blue">
     <h3 style="margin-top: 0;">Modality gates</h3>
     <table class="table">
         <thead>

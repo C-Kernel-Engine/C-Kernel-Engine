@@ -27,18 +27,51 @@ def _load_runner():
 
 
 class NightlyArtifactStatusTests(unittest.TestCase):
+    def test_local_prepare_records_build_failure_and_physical_affinity_jobs(self) -> None:
+        runner = _load_runner()
+        completed = subprocess.CompletedProcess(
+            ["make", "-j8"], 2, stdout="compiler output", stderr="compile failed"
+        )
+        with mock.patch.object(runner.os, "sched_getaffinity", return_value=set(range(8))):
+            with mock.patch.object(runner.subprocess, "run", return_value=completed) as run:
+                result = runner.prepare_local_build()
+        self.assertEqual(result.status, "fail")
+        self.assertEqual(result.execution_args, ["-j8"])
+        self.assertEqual(result.error_msg, "make exited 2")
+        run.assert_called_once_with(
+            ["make", "-j8"],
+            cwd=runner.ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1800,
+        )
+
     def test_json_report_records_the_runner_python(self) -> None:
         runner = _load_runner()
         with tempfile.TemporaryDirectory() as tmp:
             report = Path(tmp) / "nightly.json"
+            selection = {
+                "mode": "quick",
+                "expected_executions": [{"kind": "python", "id": "fixture", "args": []}],
+            }
             with mock.patch.object(
                 runner, "capture_runner_hardware", return_value={"available": False}
             ):
-                runner.save_json_report([], report, datetime(2026, 8, 26, 1, 2, 3))
+                with mock.patch.dict(
+                    runner.os.environ, {"CK_IDLE_NIGHTLY_ATTEMPT": "attempt-1"}
+                ):
+                    with mock.patch.object(runner, "_repository_commit", return_value="a" * 40):
+                        runner.save_json_report(
+                            [], report, datetime(2026, 8, 26, 1, 2, 3), selection=selection
+                        )
             payload = json.loads(report.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["runner_python"]["executable"], sys.executable)
         self.assertTrue(payload["runner_python"]["version"])
+        self.assertEqual(payload["run_identity"]["attempt_id"], "attempt-1")
+        self.assertEqual(payload["run_identity"]["repository_commit"], "a" * 40)
+        self.assertEqual(payload["selection"], selection)
 
     def test_json_report_maps_existing_results_to_current_capability_evidence(self) -> None:
         runner = _load_runner()
