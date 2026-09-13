@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parakeet TDT Native CPU Bring-up | C-Kernel-Engine | C-Kernel-Engine</title>
-    <meta name="description" content="Pinned Parakeet TDT 0.6B v3 operation-reuse inventory, complete tensor manifest, Ryzen FP32 reference fixture, implementation milestones, and explicit native CKE support boundaries.">
+    <meta name="description" content="Native FP32 Parakeet TDT 0.6B v3 WAV-to-transcript: architecture, TDT decode semantics, stage-to-kernel map, tested runbook, troubleshooting, and explicit support boundaries.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-parakeet-tdt.html">
     <meta property="og:title" content="Parakeet TDT Native CPU Bring-up | C-Kernel-Engine | C-Kernel-Engine">
-    <meta property="og:description" content="Pinned Parakeet TDT 0.6B v3 operation-reuse inventory, complete tensor manifest, Ryzen FP32 reference fixture, implementation milestones, and explicit native CKE support boundaries.">
+    <meta property="og:description" content="Native FP32 Parakeet TDT 0.6B v3 WAV-to-transcript: architecture, TDT decode semantics, stage-to-kernel map, tested runbook, troubleshooting, and explicit support boundaries.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://c-kernel-engine.github.io/C-Kernel-Engine/v8-parakeet-tdt.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -986,7 +986,7 @@
 
 <div class="container">
   <h1>Parakeet TDT Native CPU Bring-up</h1>
-  <p class="lead">The first Parakeet milestone freezes the reference and maps every required operation to CKE. A pinned FP32 reference fixture passes on Ryzen, but native CKE transcription has not been implemented or tested. Diarization is a separate milestone.</p>
+  <p class="lead">CKE converts the pinned <code>nvidia/parakeet-tdt-0.6b-v3</code> checkpoint to BUMPWGT5 and transcribes a 7.435-second WAV entirely with native CKE kernels &mdash; 50/50 token IDs and 50/50 durations exactly match the pinned Transformers FP32 reference. The certified scope is that one clip; long audio, multilingual speech, resampling, timestamps, streaming, and diarization remain untested or out of scope.</p>
 
   <style>
     .para-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin:1rem 0; }
@@ -996,14 +996,273 @@
     .para-table th,.para-table td { border:1px solid var(--grey); padding:.55rem; text-align:left; vertical-align:top; }
     .para-table th { color:var(--orange); background:#121a24; }
     .status { white-space:nowrap; font-weight:700; }
-    .status-reuse,.status-reuse_candidate { color:#7fd4a3; }
-    .status-map_promotion,.status-contract_extension,.status-composition_gap { color:#ffd38a; }
-    .status-missing_provider,.status-missing_runtime,.status-missing_composition { color:#ff8a80; }
+    .status-reuse,.status-reuse_candidate,.status-implemented { color:#7fd4a3; }
+    .status-map_promotion,.status-contract_extension,.status-composition_gap,.status-tested { color:#ffd38a; }
+    .status-missing_provider,.status-missing_runtime,.status-missing_composition,.status-planned { color:#ff8a80; }
     .para-code { overflow-x:auto; background:#0b1118; border:1px solid #263242; border-radius:8px; padding:.8rem; }
     main code { overflow-wrap:anywhere; }
+    .svg-expand { position: relative; }
+    .svg-expand svg { cursor: zoom-in; }
+    .svg-expand svg:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+    .svg-expand-hint {
+      text-align: center; font-size: 0.72rem; color: var(--text-muted);
+      margin-top: -0.6rem; margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    }
+    #ck-svg-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0, 0, 0, 0.95); padding: 3.2rem 1rem 1rem;
+    }
+    #ck-svg-overlay .ck-ov-bar {
+      position: fixed; top: 0; left: 0; right: 0; padding: 0.55rem 1rem;
+      background: rgba(0,0,0,0.9); border-bottom: 1px solid #333;
+      display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    }
+    #ck-svg-overlay .ck-ov-title { color: #ccc; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ck-svg-overlay .ck-ov-bar button {
+      background: #333; color: #ffb400; border: 1px solid #555; padding: 0.3rem 0.7rem;
+      cursor: pointer; border-radius: 4px; font-size: 0.85rem;
+    }
+    #ck-svg-overlay .ck-ov-stage { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    #ck-svg-overlay .ck-ov-stage img { max-width: none; height: auto; }
   </style>
 
-  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>Reference fixture: passed. Operation inventory: complete. Native CKE conversion, generated circuit, transcription parity, multilingual audio, long audio, and diarization: not tested.</div></div>
+  <div class="alert alert-info"><div><strong>Current claim boundary</strong><br>Reference fixture: passed. Native conversion and end-to-end transcription: passed on one 7.435-second English, mono, 16&nbsp;kHz PCM WAV, exact at token-ID and duration level against the pinned reference. Long audio, multilingual speech, resampling, silence robustness, word-level timestamps, streaming, concurrent sessions, and diarization: not tested. Orchestration is a Python ctypes driver over native CKE kernels and BUMP weights; a generated-C Parakeet artifact does not exist yet.</div></div>
+
+  <h2 id="status">Status: implemented, tested, planned</h2>
+  <div class="para-table"><table><thead><tr><th>Capability</th><th>State</th><th>Evidence</th></tr></thead><tbody>
+    <tr><td>safetensors &rarr; BUMPWGT5 conversion (<code>--arch parakeet_tdt</code>)</td><td><span class="status status-implemented">Implemented + tested</span></td><td>699 inference tensors mapped, 24 BatchNorm training counters explicitly excluded, 0 unaccounted; <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a></td></tr>
+    <tr><td>Native FP32 WAV &rarr; transcript (frontend, 24-layer encoder, LSTM prediction, joint, greedy TDT)</td><td><span class="status status-implemented">Implemented + tested</span></td><td>50/50 token IDs and 50/50 durations exact vs pinned Transformers on the short fixture; kernel oracles in <code>make test-audio</code>; contracts in <code>make test-audio-v8-contracts</code></td></tr>
+    <tr><td>Frontend/encoder numerical parity thresholds</td><td><span class="status status-implemented">Implemented + tested</span></td><td>frontend RMSE 4.06e-4 (gate 5e-4), encoder RMSE 9.08e-6 (gate 2e-5), first-step joint logits finite</td></tr>
+    <tr><td>Transcript detokenization (Metaspace BPE, 8,192 entries + blank)</td><td><span class="status status-tested">Tested, host-dependent</span></td><td>Uses the <code>tokenizers</code> package when installed; the report records <code>null</code> transcript otherwise, while token IDs stay exact</td></tr>
+    <tr><td>Long audio (5-minute, 42-minute), chunk boundaries</td><td><span class="status status-planned">Planned</span></td><td>milestone 6 below; no chunking exists in the runner</td></tr>
+    <tr><td>Multilingual speech, silence robustness, non-16&nbsp;kHz input, resampling</td><td><span class="status status-planned">Not tested</span></td><td>the runner rejects non-mono/non-16&nbsp;kHz/non-16-bit WAV with an explicit error</td></tr>
+    <tr><td>Word-level timestamps</td><td><span class="status status-planned">Not implemented in the native runner</span></td><td>durations are recorded, so cumulative duration &times; 0.08&nbsp;s is derivable; the pinned reference's punctuation-collapsed timestamps are not reproduced</td></tr>
+    <tr><td>Streaming / partial hypotheses, concurrent sessions</td><td><span class="status status-planned">Not implemented</span></td><td>the decode loop is offline over the complete encoder memory; TDT's architecture permitting streaming is not a CKE streaming claim</td></tr>
+    <tr><td>Speaker diarization</td><td><span class="status status-planned">Separate capability</span></td><td>out of scope for this model lane; diarization is a separate milestone that first integrates with the Whisper path, not a Parakeet transcription feature</td></tr>
+    <tr><td>Training / fine-tuning</td><td><span class="status status-planned">Not implemented</span></td><td>inference-only providers; BatchNorm runs in frozen inference mode</td></tr>
+  </tbody></table></div>
+
+  <h2 id="architecture">How audio becomes text</h2>
+  <p>The pipeline has four compute stages plus a decode state machine, all declared in the circuit <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/circuits/parakeet_tdt.json"><code>version/v8/circuits/parakeet_tdt.json</code></a> and executed by <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/scripts/run_parakeet_native_v8.py"><code>run_parakeet_native_v8.py</code></a>, which calls native providers through <code>libckernel_engine.so</code> and <code>libckernel_audio.so</code>. The frontend turns PCM samples into 128-bin log-mel frames; three stride-2 grouped Conv2D stages subsample 743 live frames to a 93&times;1024 token grid; 24 FastConformer blocks and a 1024&rarr;640 projection produce the 93&times;640 encoder memory; the transducer loop then walks that memory frame by frame.</p>
+
+  <div class="svg-expand">
+  <svg viewBox="0 0 1180 770" width="100%" role="img" tabindex="0" data-svg-title="Parakeet TDT architecture: WAV to transcript"
+       aria-label="Parakeet TDT architecture in three lanes. Lane one, frontend: a mono 16 kilohertz 16-bit PCM WAV flows through pre-emphasis, centered STFT power with n_fft 512, window 400, hop 160, Slaney log-mel with 128 bins, and per-feature normalization over live frames, producing a 744 by 128 feature grid. Lane two, encoder: grouped Conv2D subsampling reduces 743 live frames by a factor of 8, then 24 FastConformer blocks, each containing a half-scaled feed-forward, Transformer-XL relative attention, a convolution module, a second half-scaled feed-forward, and a final LayerNorm, followed by a 1024-to-640 projection, producing a 93 by 640 encoder memory. Lane three, transducer: at each frame the encoder row and the prediction-network output are summed, passed through ReLU and the joint head producing 8193 token logits plus 5 duration logits; independent argmax picks token and duration; the TDT advance rule forces duration 1 on blank with predicted duration 0, otherwise adds the predicted duration to the frame index, holding the frame on nonblank duration zero; the two-layer LSTM prediction network only runs after a nonblank token; the loop stops when the frame index reaches 93; token IDs are detokenized with Metaspace BPE into the transcript. A worked-example strip shows the first recorded steps: frame 0 blank forced to advance 1, frame 1 blank advancing 4 to frame 5, frame 5 token 499 advancing 1, and the final step at frame 92 blank advancing 1 to frame 93 where the loop stops, with all durations summing to 93 frames of 0.08 seconds each."
+       style="max-width: 1180px; margin: 0.5rem auto 1rem; display: block; font-family: 'Inter', system-ui, sans-serif;">
+    <style>
+      .ck-box{fill:#323232;stroke:#454545;stroke-width:1.4;}
+      .ck-new{fill:#323232;stroke:#07adf8;stroke-width:2;}
+      .ck-title{fill:#f5f5f5;font-size:15px;font-weight:700;}
+      .ck-sub{fill:#b0b0b0;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-hi{fill:#7fd8ec;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-good{fill:#7fd4a3;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-warn{fill:#ffd38a;font-size:11.5px;font-family:'JetBrains Mono',monospace;}
+      .ck-band{fill:#9aa7b4;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+      .ck-cap{fill:#808080;font-size:12px;font-family:'JetBrains Mono',monospace;}
+    </style>
+    <defs>
+      <marker id="pk-arrow" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 Z" fill="#8aa0b4"/>
+      </marker>
+    </defs>
+
+    <text x="24" y="28" class="ck-band">1. frontend - WAV to log-mel features</text>
+    <g>
+      <rect class="ck-box" x="24" y="42" width="150" height="58" rx="8"/>
+      <text x="99" y="66" text-anchor="middle" class="ck-title" font-size="12">WAV PCM16</text>
+      <text x="99" y="84" text-anchor="middle" class="ck-sub">mono 16 kHz 16-bit</text>
+
+      <rect class="ck-box" x="214" y="42" width="150" height="58" rx="8"/>
+      <text x="289" y="66" text-anchor="middle" class="ck-title" font-size="12">pre-emphasis</text>
+      <text x="289" y="84" text-anchor="middle" class="ck-sub">x[t]-0.97x[t-1]</text>
+
+      <rect class="ck-box" x="404" y="42" width="170" height="58" rx="8"/>
+      <text x="489" y="66" text-anchor="middle" class="ck-title" font-size="12">STFT power</text>
+      <text x="489" y="84" text-anchor="middle" class="ck-sub">512 / win 400 / hop 160</text>
+
+      <rect class="ck-box" x="614" y="42" width="160" height="58" rx="8"/>
+      <text x="694" y="66" text-anchor="middle" class="ck-title" font-size="12">Slaney log-mel</text>
+      <text x="694" y="84" text-anchor="middle" class="ck-sub">128 bins, ln(x+2^-24)</text>
+
+      <rect class="ck-box" x="814" y="42" width="170" height="58" rx="8"/>
+      <text x="899" y="66" text-anchor="middle" class="ck-title" font-size="12">per-feature norm</text>
+      <text x="899" y="84" text-anchor="middle" class="ck-sub">sample var, live frames</text>
+
+      <rect class="ck-new" x="1024" y="42" width="132" height="58" rx="8"/>
+      <text x="1090" y="66" text-anchor="middle" class="ck-hi">features</text>
+      <text x="1090" y="84" text-anchor="middle" class="ck-sub">744 x 128</text>
+    </g>
+    <path d="M174,71 L210,71" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M364,71 L400,71" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M574,71 L610,71" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M774,71 L810,71" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M984,71 L1020,71" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <text x="24" y="126" class="ck-sub">audio_wav_decode_pcm16_mono_f32  |  audio_preemphasis_f32  |  audio_stft_power_centered_window_f32  |  audio_whisper_mel_filters_slaney_f32 + audio_log_mel_time_major_f32  |  audio_feature_normalize_per_feature_f32</text>
+
+    <text x="24" y="172" class="ck-band">2. encoder - FastConformer memory</text>
+    <g>
+      <rect class="ck-box" x="24" y="186" width="180" height="70" rx="8"/>
+      <text x="114" y="210" text-anchor="middle" class="ck-title" font-size="12">Conv2D subsampling</text>
+      <text x="114" y="228" text-anchor="middle" class="ck-sub">3x stride-2 grouped, x8</text>
+      <text x="114" y="246" text-anchor="middle" class="ck-sub">743 -&gt; 93 frames</text>
+
+      <rect x="244" y="186" width="560" height="150" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="524" y="210" text-anchor="middle" class="ck-title" font-size="13">24 x FastConformer block (width 1024, 8 heads)</text>
+      <rect class="ck-box" x="262" y="226" width="96" height="40" rx="6"/>
+      <text x="310" y="250" text-anchor="middle" class="ck-sub">0.5 x FFN</text>
+      <rect class="ck-box" x="370" y="226" width="96" height="40" rx="6"/>
+      <text x="418" y="250" text-anchor="middle" class="ck-sub">rel-pos MHSA</text>
+      <rect class="ck-box" x="478" y="226" width="96" height="40" rx="6"/>
+      <text x="526" y="250" text-anchor="middle" class="ck-sub">conv module</text>
+      <rect class="ck-box" x="586" y="226" width="96" height="40" rx="6"/>
+      <text x="634" y="250" text-anchor="middle" class="ck-sub">0.5 x FFN</text>
+      <rect class="ck-box" x="694" y="226" width="96" height="40" rx="6"/>
+      <text x="742" y="250" text-anchor="middle" class="ck-sub">LayerNorm</text>
+      <text x="524" y="292" text-anchor="middle" class="ck-sub">audio_relative_sinusoidal_position_f32 + audio_conformer_relative_attention_f32</text>
+      <text x="524" y="312" text-anchor="middle" class="ck-sub">audio_conv1d_channel_major_grouped_f32 + audio_glu_split + audio_batch_norm_inference</text>
+
+      <rect class="ck-box" x="844" y="186" width="150" height="70" rx="8"/>
+      <text x="919" y="210" text-anchor="middle" class="ck-title" font-size="12">encoder projector</text>
+      <text x="919" y="228" text-anchor="middle" class="ck-sub">1024 -&gt; 640</text>
+      <text x="919" y="246" text-anchor="middle" class="ck-sub">gemm + bias</text>
+
+      <rect class="ck-new" x="1034" y="186" width="122" height="70" rx="8"/>
+      <text x="1095" y="214" text-anchor="middle" class="ck-hi">memory</text>
+      <text x="1095" y="236" text-anchor="middle" class="ck-sub">93 x 640</text>
+    </g>
+    <path d="M204,221 L240,221" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M804,221 L840,221" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M994,221 L1030,221" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M1090,100 C1090,150 114,140 114,182" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+
+    <text x="24" y="386" class="ck-band">3. transducer - token and duration decisions (greedy TDT)</text>
+    <g>
+      <rect class="ck-box" x="24" y="402" width="130" height="58" rx="8"/>
+      <text x="89" y="426" text-anchor="middle" class="ck-title" font-size="12">encoder[t]</text>
+      <text x="89" y="444" text-anchor="middle" class="ck-sub">640-vec row</text>
+
+      <rect class="ck-box" x="194" y="402" width="190" height="58" rx="8"/>
+      <text x="289" y="426" text-anchor="middle" class="ck-title" font-size="12">joint network</text>
+      <text x="289" y="444" text-anchor="middle" class="ck-sub">add + ReLU + head 8198</text>
+
+      <rect class="ck-box" x="424" y="402" width="190" height="58" rx="8"/>
+      <text x="519" y="426" text-anchor="middle" class="ck-title" font-size="12">two argmaxes</text>
+      <text x="519" y="444" text-anchor="middle" class="ck-sub">token 0..8192 | dur 0..4</text>
+
+      <rect x="654" y="402" width="300" height="120" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+      <text x="674" y="428" class="ck-title" font-size="12">TDT advance rule</text>
+      <text x="674" y="450" class="ck-sub">blank + dur 0 -&gt; advance 1</text>
+      <text x="674" y="470" class="ck-sub">else frame += dur</text>
+      <text x="674" y="490" class="ck-sub">nonblank dur 0 -&gt; hold frame</text>
+      <text x="674" y="510" class="ck-warn">stop when frame &gt;= 93</text>
+
+      <rect class="ck-box" x="194" y="520" width="250" height="70" rx="8"/>
+      <text x="319" y="544" text-anchor="middle" class="ck-title" font-size="12">prediction network</text>
+      <text x="319" y="562" text-anchor="middle" class="ck-sub">embed + 2x LSTM 640 (h,c session)</text>
+      <text x="319" y="580" text-anchor="middle" class="ck-sub">runs only after a nonblank token</text>
+
+      <rect class="ck-new" x="994" y="402" width="162" height="58" rx="8"/>
+      <text x="1075" y="426" text-anchor="middle" class="ck-hi">token IDs</text>
+      <text x="1075" y="444" text-anchor="middle" class="ck-sub">44 nonblank / 50</text>
+
+      <rect class="ck-box" x="994" y="520" width="162" height="58" rx="8"/>
+      <text x="1075" y="544" text-anchor="middle" class="ck-title" font-size="12">Metaspace BPE</text>
+      <text x="1075" y="562" text-anchor="middle" class="ck-sub">tokenizer.json -&gt; text</text>
+    </g>
+    <path d="M154,431 L190,431" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M384,431 L420,431" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M614,431 L650,431" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M954,431 L990,431" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M319,520 L319,464" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M1075,460 L1075,516" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+    <path d="M804,522 C804,650 89,640 89,464" fill="none" stroke="#8aa0b4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#pk-arrow)"/>
+    <text x="480" y="560" class="ck-sub">audio_lstm_step_f32 (IFGO gate order, 4H caller scratch)</text>
+    <text x="480" y="580" class="ck-sub">loop bound: 10 symbols/frame x 93 frames</text>
+    <path d="M1095,256 C1095,330 89,330 89,398" fill="none" stroke="#8aa0b4" stroke-width="1.5" marker-end="url(#pk-arrow)"/>
+
+    <rect x="24" y="622" width="1132" height="76" rx="10" fill="#0b1118" stroke="#263242" stroke-width="1.2"/>
+    <text x="44" y="646" class="ck-good">Worked example (recorded native trajectory):</text>
+    <text x="44" y="668" class="ck-sub">step 1: f=0 blank d=0-&gt;1 forced  |  step 2: f=1 blank d=4 -&gt; f=5  |  step 3: f=5 id499 d=1 -&gt; f=6  |  step 4: f=6 id530 d=2 -&gt; f=8</text>
+    <text x="44" y="688" class="ck-sub">...  step 49: f=92 blank d=1 -&gt; f=93 stop  |  sum(d) = 93 frames x 0.08 s = 7.44 s covers the 7.435 s clip</text>
+
+    <text x="24" y="732" class="ck-cap">Evidence (PRs #503, #504): native FP32 run from BUMPWGT5 weights - 50/50 token IDs and 50/50 durations exact vs the pinned Transformers reference (commit 909a2c164).</text>
+    <text x="24" y="754" class="ck-cap">Caveats: one English mono 16 kHz PCM WAV; long audio, multilingual, resampling, silence, timestamps, streaming, diarization untested; Python ctypes orchestration, not generated C.</text>
+  </svg>
+  <div class="svg-expand-hint">click / tap the diagram to expand</div>
+  </div>
+
+  <h3 id="stage-map">Stage-to-artifact map</h3>
+  <p>Every stage binds to declared artifacts: the circuit block, the selected providers, the kernel-map contracts, and the documentation that explains that layer of the system. Kernel maps are the resolver-facing contracts described in <a href="kernel-maps.html#anatomy">Kernel Maps &mdash; anatomy</a>; provider math for the shared frontend family is walked stage by stage in the <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>.</p>
+  <div class="para-table"><table><thead><tr><th>Stage</th><th>Circuit block</th><th>Selected providers</th><th>Kernel map / contract</th><th>Docs</th></tr></thead><tbody>
+    <tr><td>PCM decode, pre-emphasis, STFT, log-mel, normalize</td><td><code>frontend</code></td><td><code>audio_wav_decode_pcm16_mono_f32</code>, <code>audio_preemphasis_f32</code>, <code>audio_stft_power_centered_window_f32</code>, <code>audio_whisper_mel_filters_slaney_f32</code>, <code>audio_log_mel_time_major_f32</code>, <code>audio_feature_normalize_per_feature_f32</code></td><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/tree/main/version/v8/kernel_maps">version/v8/kernel_maps/audio_*.json</a></td><td><a href="audio-kernels-deep-dive.html">Audio deep dive</a> (same provider family, Whisper context)</td></tr>
+    <tr><td>Grouped Conv2D subsampling + projection</td><td><code>encoder.subsampling</code></td><td><code>audio_conv2d_whc_grouped_f32</code>, <code>relu_forward_inplace</code>, <code>gemm_nt_f32_llama_production_parallel_dispatch</code></td><td><code>audio_conv2d_whc_grouped_f32.json</code></td><td><a href="kernel-maps.html#resolution">Resolution algorithm</a></td></tr>
+    <tr><td>Relative positions + Transformer-XL attention</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_relative_sinusoidal_position_f32</code>, <code>audio_conformer_relative_attention_f32</code> (new in PR #504; one caller-owned T-element score row, no heap)</td><td><code>audio_relative_sinusoidal_position_f32.json</code>, <code>audio_conformer_relative_attention_f32.json</code></td><td><a href="v8-numerical-contracts.html">v8 numerical contracts</a></td></tr>
+    <tr><td>Convolution module (pointwise &rarr; GLU &rarr; depthwise &rarr; BatchNorm &rarr; SiLU &rarr; pointwise)</td><td><code>encoder.fastconformer_blocks</code></td><td><code>audio_conv1d_channel_major_grouped_f32</code> (new, optional bias), <code>audio_glu_split_channel_major_f32</code>, <code>audio_batch_norm_inference_channel_major_f32</code> (new), <code>recurrent_silu_forward</code></td><td><code>audio_conv1d_channel_major_grouped_f32.json</code>, <code>audio_batch_norm_inference_channel_major_f32.json</code></td><td><a href="v8-cohere-kernels.html">Cohere kernel story</a> (the Transcribe provider foundation these extend)</td></tr>
+    <tr><td>Macaron FFN halves, five LayerNorm sites, encoder projector</td><td><code>encoder</code></td><td><code>gemm_nt_f32_llama_production_parallel_dispatch</code>, <code>recurrent_silu_forward</code>, <code>layernorm_naive_serial_matched_precision</code></td><td>existing FP32 exact maps</td><td><a href="kernel-architecture.html">v8 kernel architecture</a></td></tr>
+    <tr><td>Prediction network (embedding + 2-layer LSTM + projector)</td><td><code>transducer</code></td><td><code>audio_lstm_step_f32</code> (new in PR #504; PyTorch IFGO gate order, session-owned h/c state, caller-owned 4H gate scratch)</td><td><code>audio_lstm_step_f32.json</code></td><td><a href="v8-parakeet-tdt.html#tdt-decode">TDT decode below</a></td></tr>
+    <tr><td>Joint add + ReLU + 8198-wide head</td><td><code>transducer</code></td><td><code>relu_forward_inplace</code>, <code>gemm_nt_f32_llama_production_parallel_dispatch</code></td><td>existing FP32 exact maps</td><td>&mdash;</td></tr>
+    <tr><td>Greedy TDT state machine + detokenization</td><td><code>transducer.tdt_greedy_step</code></td><td>runner state machine (<code>ParakeetSession.decode</code>); <code>tokenizers</code> package for Metaspace BPE detok</td><td>circuit contract keys <code>blank_token_id</code>, <code>durations</code>, <code>max_symbols_per_step</code></td><td><a href="sentencepiece.html">Tokenizer docs</a></td></tr>
+  </tbody></table></div>
+  <p class="ck-note" style="font-size:.85rem; color:var(--text-muted);">Unlike the Whisper lane, Parakeet does not yet lower through IR into a generated C artifact; the certified path is the ctypes session runner over <code>libckernel_engine.so</code> and <code>libckernel_audio.so</code>. When a generated artifact lands, <a href="codegen.html">Codegen</a> and the <a href="xray.html">X-Ray / Explain-this-operation</a> workflow apply unchanged.</p>
+
+  <h2 id="tdt-decode">TDT decode: blank handling and time advancement</h2>
+  <p>The greedy loop in <code>ParakeetSession.decode</code> holds an LSTM hidden/cell state, a current token (initially blank&nbsp;8192), a reused decoder projection cache, and a frame index into the 93-row encoder memory. Each iteration:</p>
+  <ol>
+    <li><strong>Prediction network, conditionally.</strong> The two-layer LSTM is stepped only when the previously emitted token was nonblank (or on the first iteration). After a blank, the cached decoder projection is reused unchanged &mdash; blank frames do not advance the language-model state.</li>
+    <li><strong>Joint.</strong> The current encoder row and the decoder projection are summed, passed through ReLU, and projected to 8,198 logits: 8,193 token logits (vocabulary 0&ndash;8191 plus blank 8192) followed by 5 duration logits.</li>
+    <li><strong>Two independent argmaxes.</strong> The token is the argmax of the token logits; the duration is <code>durations[argmax(duration_logits)]</code> with the checkpoint's table <code>[0, 1, 2, 3, 4]</code>.</li>
+    <li><strong>Advance rule.</strong> If the token is blank <em>and</em> the predicted duration is 0, the duration is forced to 1 &mdash; a blank may never freeze the loop. A nonblank token with duration 0 is legal and holds the frame (multiple symbols on one encoder frame, bounded by <code>max_symbols_per_step&nbsp;=&nbsp;10</code>). The frame index then advances by the duration.</li>
+    <li><strong>Termination.</strong> The loop stops when the frame index reaches 93 (the encoder length). A hard bound of <code>10 &times; 93 = 930</code> steps raises <code>TDT decoder exceeded its encoder-derived step bound</code> instead of looping forever.</li>
+  </ol>
+  <p>Worked example from the recorded native trajectory (see the diagram strip): the first two steps are blanks &mdash; step&nbsp;1 predicts duration&nbsp;0, forced to&nbsp;1; step&nbsp;2 predicts duration&nbsp;4, skipping frames 1&ndash;4 (leading silence). Step&nbsp;3 emits token 499 at frame&nbsp;5, and only then does the LSTM step. Across the clip, 6 of the 50 recorded entries are blank (including the initial state), 44 are emissions, and the durations sum to exactly 93 frames &times; 0.08&nbsp;s&nbsp;= 7.44&nbsp;s of coverage for the 7.435&nbsp;s clip. Token timestamps are derivable as cumulative duration &times; 0.08&nbsp;s, but the native runner does not emit them and does not reproduce the reference processor's punctuation-collapsing rule.</p>
+
+  <h2 id="runbook">Runbook: reproduce the certified path</h2>
+  <p><strong>Supported checkpoint.</strong> Exactly one: <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3/tree/541d1f99c6b0c3cd0b11a95167540bb8edefd82b"><code>nvidia/parakeet-tdt-0.6b-v3</code> revision <code>541d1f99...defd82b</code></a> (CC BY 4.0), converted with <code>--arch parakeet_tdt --dtype fp32</code>. Other revisions or dtypes are outside the certified claim.</p>
+  <p><strong>Input requirements.</strong> Mono, 16&nbsp;kHz, 16-bit PCM WAV (RIFF). Anything else is rejected with <code>Parakeet frontend currently requires mono 16-bit PCM WAV at 16000 Hz</code>; normalize first, e.g. <code>ffmpeg -i in.mp3 -ac 1 -ar 16000 -c:a pcm_s16le out.wav</code>. The committed fixture <code>version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav</code> is the certified input.</p>
+
+  <p><strong>Step 1 &mdash; download the pinned checkpoint (cold, once, ~2.4&nbsp;GB):</strong></p>
+  <pre class="para-code"><code>hf download nvidia/parakeet-tdt-0.6b-v3 \
+  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --local-dir .ck_models/parakeet-tdt-0.6b-v3</code></pre>
+
+  <p><strong>Step 2 &mdash; convert to BUMPWGT5 (cold, once):</strong> writes <code>weights.bump</code> (2,508,517,458 bytes in the recorded run), <code>config.json</code>, and <code>weights_manifest.json</code>. Conversion time is one-time setup cost and is excluded from the warm transcription timings below.</p>
+  <pre class="para-code"><code>python version/v8/scripts/convert_safetensors_to_bump_v8.py \
+  --checkpoint .ck_models/parakeet-tdt-0.6b-v3 \
+  --output .ck_build/parakeet-tdt-0.6b-v3/weights.bump \
+  --config-out .ck_build/parakeet-tdt-0.6b-v3/config.json \
+  --manifest-out .ck_build/parakeet-tdt-0.6b-v3/weights_manifest.json \
+  --arch parakeet_tdt --dtype fp32</code></pre>
+
+  <p><strong>Step 3 &mdash; build the native libraries (cold, once per checkout):</strong></p>
+  <pre class="para-code"><code>make build/libckernel_engine.so libckernel_audio.so</code></pre>
+
+  <p><strong>Step 4 &mdash; run transcription (warm):</strong></p>
+  <pre class="para-code"><code>python version/v8/scripts/run_parakeet_native_v8.py \
+  --model .ck_build/parakeet-tdt-0.6b-v3 \
+  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
+  --fixture docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz \
+  --decode --output .ck_build/parakeet-tdt-0.6b-v3/native-e2e.json</code></pre>
+  <p><code>--fixture</code> and <code>--decode</code> turn the run into a certification: without them the runner still transcribes but has nothing to compare against. <code>--stop-after-layer -1|0|23</code> bisects the encoder against fixture boundaries for debugging.</p>
+
+  <p><strong>Output format.</strong> The report (<code>"kind": "cke.parakeet.native_e2e"</code>) records runtime-library and weight SHA-256 provenance, per-stage seconds, frontend/encoder/first-logit RMSE comparisons, the full token-ID and duration sequences, the first divergent index for each, the detokenized transcript, a <code>checks</code> map, and an overall <code>"status": "pass"</code>. The recorded evidence is the committed <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/docs/notes/artifacts/parakeet_tdt_0_6b_v3_native_e2e_fp32.json">native E2E report</a>.</p>
+
+  <p><strong>Expected evidence and warm timing.</strong> On the recorded run (commit <code>909a2c164</code>, PR #504, Ryzen&nbsp;9&nbsp;9950X3D per the README evidence table, FP32, workload&nbsp;= the 7.435-second fixture; the report JSON records platform and Python&nbsp;3.14.4 but not thread count): frontend 0.069&nbsp;s, encoder 1.027&nbsp;s, total run 2.25&nbsp;s including hashing, decode, and tokenizer work that sit outside the two stage timers &mdash; roughly 3.3&times; real time for this single short clip, not a throughput or streaming claim. Expected output transcript: <em>&ldquo;Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait.&rdquo;</em></p>
+
+  <div class="alert alert-warning"><div><strong>Verification status of this runbook.</strong> The checkpoint is not in the local model cache on this machine, so the commands above are <strong>verified-by-CI/evidence, not re-executed here</strong>: argument names are checked against the scripts' argparse definitions, and the expected outputs are the committed artifacts. Ordinary CI coverage is <code>make test-audio</code> (which runs <code>unittest/test_audio_encoder.py</code> PyTorch oracles for the five new providers) and <code>make test-audio-v8-contracts</code> (which runs <code>tests/test_v8_parakeet_inventory.py</code>). The full checkpoint E2E itself has <strong>no nightly job</strong>; the committed E2E report is cached Ryzen evidence from the PR #504 validation run.</div></div>
+
+  <h2 id="troubleshooting">When it fails: where to look</h2>
+  <div class="para-table"><table><thead><tr><th>Symptom</th><th>Likely cause</th><th>Where to look</th></tr></thead><tbody>
+    <tr><td>Conversion exits with a mapping/coverage error</td><td>checkpoint revision drift; a tensor the strict <code>parakeet_tdt</code> map does not own</td><td><code>version/v8/model_maps/safetensors_ck_map.json</code> (<code>architectures.parakeet_tdt</code>); <code>tests/test_v8_parakeet_native.py::test_complete_checkpoint_mapping_has_no_silent_leftovers</code> encodes the 699+24 split; conversion audit JSON (<code>--audit-out</code>)</td></tr>
+    <tr><td><code>expected BUMPWGT5 header</code> or manifest errors</td><td>runner pointed at an unconverted or partially converted model directory</td><td>rerun step 2; the runner reads <code>weights_manifest.json</code> entries and memmaps <code>weights.bump</code></td></tr>
+    <tr><td><code>Parakeet native FP32 path cannot load ...</code></td><td>weights converted at a non-FP32 dtype</td><td>re-convert with <code>--dtype fp32</code>; only FP32 is certified</td></tr>
+    <tr><td>WAV rejected before any compute</td><td>wrong channels/rate/depth, or a non-PCM container</td><td>normalize with the ffmpeg line in the runbook; <code>audio_wav_parse_memory</code> status codes surface the exact rejection</td></tr>
+    <tr><td><code>frontend_rmse_at_most_5e_4</code> check fails</td><td>frontend drift (window, epsilon, or normalization mismatch)</td><td>report's <code>frontend</code> block (max_abs/mean_abs/RMSE); stage math in <a href="audio-kernels-deep-dive.html">Audio Kernels Deep Dive</a>; fixture arrays <code>frontend.*</code> in the NPZ</td></tr>
+    <tr><td><code>encoder_rmse_at_most_2e_5</code> check fails</td><td>a FastConformer block diverged (attention, conv module, BatchNorm)</td><td>bisect with <code>--stop-after-layer -1</code> (subsampling), <code>0</code>, <code>23</code> against <code>encoder.subsampling</code>, <code>encoder.layer.0</code>, <code>encoder.layer.23</code> fixture boundaries; provider oracles in <code>unittest/test_audio_encoder.py</code></td></tr>
+    <tr><td><code>sequences_equal</code>/<code>durations_equal</code> false</td><td>decode-state or joint-head mismatch late in the network</td><td>report's <code>first_divergent_sequence</code>/<code>first_divergent_duration</code> index; <code>joint.first_logits</code> comparison isolates the joint head; LSTM oracle <code>check_lstm_step</code> in <code>unittest/test_audio_encoder.py</code></td></tr>
+    <tr><td><code>TDT decoder exceeded its encoder-derived step bound</code></td><td>joint never advancing the frame (pathological duration-0 emissions)</td><td>inspect recorded <code>durations</code> in the report; the bound is <code>max_symbols_per_step &times; encoder frames</code> from <code>config.json</code></td></tr>
+    <tr><td>transcript is <code>null</code> but token IDs match</td><td><code>tokenizers</code> package not installed in the environment</td><td>install <code>tokenizers</code>; certification is at token-ID level and does not require it</td></tr>
+    <tr><td>want per-operation build/selection reasoning</td><td>&mdash;</td><td><a href="xray.html">X-Ray</a> and its <em>Explain Tab: One Operation, End to End</em> (op &rarr; contract &rarr; provider &rarr; map &rarr; call &rarr; C implementation), <a href="kernel-maps.html#resolution">the resolution algorithm</a>, and <a href="codegen.html">Codegen's failure table</a> &mdash; these explain the general mechanism; the Parakeet ctypes path predates a generated artifact</td></tr>
+  </tbody></table></div>
 
   <h2 id="reference">Frozen reference</h2>
   <div class="para-grid">
@@ -1026,7 +1285,7 @@
   </ul>
 
   <h2 id="inventory">Operation-reuse inventory</h2>
-  <p>Reusable means the provider's interface fits. Candidate reuse still requires a comparison at the named fixture boundary. Missing composition means the mathematical pieces exist but no declared Parakeet graph binds them yet.</p>
+  <p>This is the frozen PR #503 inventory that scoped the bring-up: reusable means the provider's interface fits; candidate reuse required a comparison at the named fixture boundary; missing composition meant the mathematical pieces existed without a declared Parakeet graph. PR #504 closed the five <em>missing provider/runtime/composition</em> rows with the new providers named in the <a href="#stage-map">stage map</a> and the <code>parakeet_tdt</code> circuit; the dispositions below are the historical record in the <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/contracts/parakeet_tdt_0_6b_v3_inventory.json">inventory JSON</a>, whose top-level status is now <code>native_short_wav_e2e_pass</code>.</p>
   <div class="para-table"><table><thead><tr><th>Stage</th><th>Required operation</th><th>Disposition</th><th>CKE foundation and exact gap</th></tr></thead><tbody><tr><td>frontend</td><td>PCM decode and mono conversion</td><td><span class="status status-reuse">Reusable</span></td><td><code>audio_wav_decode_memory_pcm16_mono_window_f32; audio_pcm_s16_to_mono_f32</code><br>16-bit WAV is directly covered; FLAC remains host/frontend decoding before native session input.</td></tr>
 <tr><td>frontend</td><td>sample-rate validation and resampling</td><td><span class="status status-contract_extension">Contract extension</span></td><td><code>audio_resample_windowed_sinc_f32</code><br>The pinned processor rejects non-16 kHz input. CKE may expose explicit resampling, but must record this policy and certify its filter separately.</td></tr>
 <tr><td>frontend</td><td>pre-emphasis x[t]-0.97*x[t-1]</td><td><span class="status status-reuse_candidate">Candidate reuse</span></td><td><code>audio_preemphasis_f32</code><br>Arithmetic and first-sample rule match; real-fixture comparison remains required.</td></tr>
@@ -1059,16 +1318,17 @@
 <tr><td>runtime</td><td>Parakeet circuit and native session</td><td><span class="status status-missing_composition">Missing composition</span></td><td><code>v8 circuit/lowering/runtime foundations</code><br>Add declared frontend, encoder, prediction, joint, and decode components. No model-specific branches in generic emitters and no per-call heap allocation in selected compute paths.</td></tr></tbody></table></div>
 
   <h2 id="milestones">Implementation milestones</h2>
-  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>Exit evidence</th></tr></thead><tbody><tr><td>1</td><td>frontend and subsampling X-Ray</td><td>CKE matches the committed frontend and subsampling tensors for the short fixture under stated tolerances.</td></tr>
-<tr><td>2</td><td>one FastConformer block</td><td>Layer 0 matches at all five residual boundaries; BatchNorm and relative attention contracts are explicit.</td></tr>
-<tr><td>3</td><td>full encoder</td><td>All 24 encoder boundaries and the 1024-to-640 projection match; memory is bounded for the tested clip.</td></tr>
-<tr><td>4</td><td>prediction, joint, and TDT decode</td><td>Native token ids, durations, timestamps, and transcript match the pinned reference on the short fixture.</td></tr>
-<tr><td>5</td><td>BUMP conversion and native CLI</td><td>All 723 tensors are accounted for, generated C builds, and normal inference has no reference-framework dependency.</td></tr>
-<tr><td>6</td><td>long audio and multilingual coverage</td><td>Five-minute then 42-minute runs report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior.</td></tr></tbody></table></div>
-  <p>New production compute paths must use planner-declared scratch or session-owned state. They may not allocate or free heap memory per call, hide allocation in helpers, substitute large stack buffers, or share mutable scratch across sessions.</p>
+  <div class="para-table"><table><thead><tr><th>#</th><th>Milestone</th><th>State</th><th>Exit evidence</th></tr></thead><tbody>
+<tr><td>1</td><td>frontend and subsampling comparison</td><td><span class="status status-implemented">Done (PR #504)</span></td><td>recorded frontend RMSE 4.06e-4 vs fixture (gate 5e-4); subsampling boundary comparison available via <code>--stop-after-layer -1</code>.</td></tr>
+<tr><td>2</td><td>one FastConformer block</td><td><span class="status status-implemented">Done (PR #504)</span></td><td>layer-0 boundary comparison available via <code>--stop-after-layer 0</code>; BatchNorm and relative-attention contracts declared in the circuit.</td></tr>
+<tr><td>3</td><td>full encoder</td><td><span class="status status-implemented">Done (PR #504)</span></td><td>recorded projected-encoder RMSE 9.08e-6 vs fixture (gate 2e-5); layer-23 boundary comparison available via <code>--stop-after-layer 23</code>.</td></tr>
+<tr><td>4</td><td>prediction, joint, and TDT decode</td><td><span class="status status-implemented">Done (PR #504)</span></td><td>50/50 token IDs and 50/50 durations exact; first-step joint logits finite. Native timestamps deliberately not claimed.</td></tr>
+<tr><td>5</td><td>BUMP conversion and native runner</td><td><span class="status status-implemented">Done (PR #504)</span></td><td>699 mapped + 24 explicitly excluded + 0 unaccounted; inference imports no torch/transformers/safetensors (guarded by <code>tests/test_v8_parakeet_native.py</code>). Generated-C lowering is explicitly not part of this milestone as delivered.</td></tr>
+<tr><td>6</td><td>long audio and multilingual coverage</td><td><span class="status status-planned">Open</span></td><td>five-minute then 42-minute runs must report accuracy, timestamps, RTF, memory, utilization, and chunk-boundary behavior.</td></tr></tbody></table></div>
+  <p>New production compute paths must use planner-declared scratch or session-owned state. They may not allocate or free heap memory per call, hide allocation in helpers, substitute large stack buffers, or share mutable scratch across sessions. The five new providers follow this: attention uses one caller-owned T-element score row; the LSTM uses caller-owned 4H gate scratch and session-owned state (guarded by <code>tests/test_v8_parakeet_native.py::test_new_compute_kernels_do_not_allocate_or_free</code>).</p>
 
   <h2 id="reproduce">Reproduce the reference capture</h2>
-  <p>Download the exact Hugging Face revision once into the shared model cache, then run the fixture tool. Transformers, PyTorch, librosa, and soundfile belong to this certification environment; the eventual CKE inference path will not depend on them.</p>
+  <p>Download the exact Hugging Face revision once into the shared model cache, then run the fixture tool. Transformers, PyTorch, librosa, and soundfile belong to this certification environment; the CKE inference path does not depend on them.</p>
   <pre class="para-code"><code>export CKE_MODEL_CACHE="$HOME/.cache/cke/models"
 hf download nvidia/parakeet-tdt-0.6b-v3 \
   --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
@@ -1084,7 +1344,60 @@ python version/v8/scripts/capture_parakeet_reference_v8.py \
   --transformers-revision 66799f45cea7513712580c6170cdaa4438df702a</code></pre>
 
   <h2 id="next">Next work</h2>
-  <p>The next PR should implement and X-Ray only the frontend plus Conv2D subsampling against this fixture. One FastConformer block follows after the BatchNorm and relative-attention contracts are settled. Diarization begins in a separate PR after a bounded checkpoint comparison, and it first integrates with the already working Whisper path.</p>
+  <p>Milestone 6: long-audio and multilingual certification (five-minute then 42-minute runs with accuracy, timestamps, RTF, memory, utilization, and chunk-boundary reporting). Also open: lowering Parakeet through IR into a generated C artifact like the Whisper lane, native timestamp emission with the punctuation-collapsing rule, resampling policy for non-16&nbsp;kHz input, and concurrent-session certification. Diarization begins in a separate PR after a bounded checkpoint comparison, and it first integrates with the already working Whisper path.</p>
+
+  <div id="ck-svg-overlay" role="dialog" aria-modal="true" aria-label="Expanded diagram">
+    <div class="ck-ov-bar">
+      <span class="ck-ov-title" id="ck-ov-title">Diagram</span>
+      <span>
+        <button type="button" id="ck-ov-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="ck-ov-in" aria-label="Zoom in">+</button>
+        <button type="button" id="ck-ov-close" aria-label="Close">&times;</button>
+      </span>
+    </div>
+    <div class="ck-ov-stage" id="ck-ov-stage"><img id="ck-ov-img" alt=""></div>
+  </div>
+
+  <script>
+    (function() {
+      var overlay = document.getElementById('ck-svg-overlay');
+      var stage = document.getElementById('ck-ov-stage');
+      var img = document.getElementById('ck-ov-img');
+      var title = document.getElementById('ck-ov-title');
+      var scale = 1;
+      function applyScale() {
+        var base = Math.max(stage.clientWidth - 32, 280);
+        img.style.width = Math.round(base * scale) + 'px';
+      }
+      function open(svg) {
+        var xml = new XMLSerializer().serializeToString(svg);
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        img.alt = svg.getAttribute('aria-label') || 'diagram';
+        title.textContent = svg.getAttribute('data-svg-title') || 'Diagram';
+        scale = 1;
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        img.onload = applyScale;
+        applyScale();
+        document.getElementById('ck-ov-close').focus();
+      }
+      function close() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.svg-expand svg[data-svg-title]').forEach(function(svg) {
+        svg.addEventListener('click', function() { open(svg); });
+        svg.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(svg); }
+        });
+      });
+      document.getElementById('ck-ov-in').addEventListener('click', function() { scale = Math.min(4, scale + 0.25); applyScale(); });
+      document.getElementById('ck-ov-out').addEventListener('click', function() { scale = Math.max(0.4, scale - 0.25); applyScale(); });
+      document.getElementById('ck-ov-close').addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === stage || e.target === overlay) close(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
 </div>
     </main>
 

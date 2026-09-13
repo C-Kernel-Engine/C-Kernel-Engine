@@ -632,7 +632,7 @@
           <tr><td class="cert-model">Cohere North Mini Code 30B-A3B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>two repeatable 131,072-token CKE capacity runs with identical first-logit and output-token hashes</td><td>131,072</td><td>CKE repeatability</td><td>matched full-model oracle parity; practical long-code quality</td></tr>
           <tr><td class="cert-model">Cohere North Micro Vision 2.4B</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>real-image encoder/bridge/decoder run; official PyTorch layer X-Ray remains follow-up work</td><td>real-image smoke</td><td>PyTorch required</td><td>complete encoder/bridge/decoder parity; 40-image OCR quality</td></tr>
           <tr><td class="cert-model">Cohere Transcribe 2B</td><td><span class="cert-status st-contract">Contract-only</span></td><td>2,104-tensor inventory plus 52 independent oracle checkpoints; CKE conversion fails closed</td><td>&mdash;</td><td>CrispASR</td><td>assemble and certify CKE encoder, cross-attention, decoder, and tokenizer</td></tr>
-          <tr><td class="cert-model">Parakeet TDT 0.6B v3</td><td><span class="cert-status st-contract">Contract-only</span></td><td>30-operation inventory, 723-tensor manifest, and one 11-boundary FP32 reference fixture</td><td>&mdash;</td><td>Transformers</td><td>frontend/subsampling X-Ray, then one FastConformer block</td></tr>
+          <tr><td class="cert-model">Parakeet TDT 0.6B v3</td><td><span class="cert-status st-traj">Trajectory exact</span></td><td>native FP32 BUMPWGT5 run: 50/50 token IDs and 50/50 durations exact vs pinned Transformers on one 7.435 s WAV</td><td>7.435 s audio</td><td>Transformers</td><td>long audio, multilingual, resampling, silence, timestamps, generated-C lowering, diarization</td></tr>
           <tr><td class="cert-model">Cohere Command A+ 218B/25B-active</td><td><span class="cert-status st-e2e">Coherent E2E</span> <span class="cert-status st-num">Numerical sampled</span></td><td>675/675 required weights mapped; native packed NVFP4 leaf parity; coherent short text</td><td>126 prompt + 32 decode</td><td>compressed-tensors formula + pinned leaf oracle</td><td>full-model/long-context parity, vision, quality, and matched performance</td></tr>
           <tr><td class="cert-model">Command A Vision / Aya Vision / Translate</td><td><span class="cert-status st-contract">Not implemented</span></td><td>official artifacts identified; no CKE real-weight trajectory claim</td><td>&mdash;</td><td>PyTorch required</td><td>circuit/provider gap audit and complete bring-up</td></tr>
           <tr><td class="cert-model">Laguna-XS 2.1</td><td><span class="cert-status st-e2e">Coherent E2E</span></td><td>bit-exact embedding + layer-0 RMSNorm; router replay within one ULP</td><td>2,048</td><td>llama.cpp (diagnostic)</td><td>long-trajectory parity not claimed (near-tied MoE route flips)</td></tr>
@@ -911,19 +911,19 @@ QWEN38_MODEL_DIR=/path/to/qwen38-27b QWEN38_GGUF=/path/to/qwen38.gguf \
 
     <!-- Parakeet TDT -->
     <div class="model-card mc-parakeet" id="card-parakeet">
-      <span class="model-badge">inventory: parakeet_tdt_0_6b_v3</span>
+      <span class="model-badge">circuit: parakeet_tdt.json</span>
       <div class="model-title">Parakeet TDT 0.6B v3</div>
       <div class="model-arch">FastConformer · Transformer-XL relative attention · convolution module<br>2-layer LSTM predictor · token-duration joint head · Metaspace BPE</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot st-contract"></span><span class="mp-text">Complete 30-operation reuse inventory and 723-tensor checkpoint manifest</span></div>
-        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">Pinned FP32 Ryzen reference fixture with 11 finite intermediate boundaries</span></div>
-        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Native CKE conversion, generated runtime, transcript parity, long audio, multilingual audio, and diarization are not tested</span></div>
+        <div class="mp-row"><span class="mp-dot st-traj"></span><span class="mp-text">Native FP32 WAV-to-transcript: 50/50 token IDs and 50/50 durations exact vs pinned Transformers on the 7.435 s fixture</span></div>
+        <div class="mp-row"><span class="mp-dot st-num"></span><span class="mp-text">BUMPWGT5 conversion accounts for 699 inference tensors plus 24 excluded BatchNorm counters; frontend/encoder RMSE under fixture gates</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">Long audio, multilingual speech, resampling, silence, timestamps, streaming, concurrent sessions, generated-C lowering, and diarization are not tested</span></div>
       </div>
       <div class="source-note">
-        Existing Cohere Transcribe work supplies most FastConformer frontend primitives. Inference BatchNorm, LSTM state, TDT traversal, and declared model composition remain open. Read the <a href="v8-parakeet-tdt.html">Parakeet operation inventory and reference fixture</a>.
+        Five new providers (grouped Conv1D, relative position, relative attention, inference BatchNorm, stateful LSTM) extend the Cohere Transcribe FastConformer foundation; orchestration is a Python ctypes driver over native kernels and BUMP weights. Read the <a href="v8-parakeet-tdt.html">Parakeet TDT native bring-up</a>.
       </div>
-      <div class="model-tags"><span class="tag learned">reference fixture</span><span class="tag learned">reuse inventory</span><span class="tag fixed">implementation not started</span></div>
-      <div class="model-quant"><span class="mq-chip">FP32 reference</span><span class="mq-chip">native CKE pending</span></div>
+      <div class="model-tags"><span class="tag learned">trajectory exact</span><span class="tag learned">native E2E</span><span class="tag fixed">short-WAV scope</span></div>
+      <div class="model-quant"><span class="mq-chip preferred">FP32 &#9733;</span><span class="mq-chip">safetensors &#8594; BUMP</span></div>
     </div>
 
     <!-- GLM4 -->

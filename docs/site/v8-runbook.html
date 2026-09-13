@@ -1893,6 +1893,51 @@ make test-whisper-e2e-auto</pre>
     </p>
 </div>
 
+<h2>Canonical Parakeet TDT Audio Run</h2>
+
+<p class="v8-doorway"><strong>Understand:</strong> <a href="v8-parakeet-tdt.html#architecture">the Parakeet pipeline</a> &middot; <strong>Inspect:</strong> <a href="v8-parakeet-tdt.html#troubleshooting">the Parakeet troubleshooting map</a> &middot; <strong>Check:</strong> <a href="model-kernel-matrix.html#card-parakeet">Parakeet evidence</a></p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Parakeet Runbook &mdash; WAV To Transcript (Short-Fixture Scope)</h3>
+    <p>
+        Parakeet TDT 0.6B v3 runs natively but differently from Whisper: weights convert from safetensors to
+        BUMPWGT5 once, then <code>version/v8/scripts/run_parakeet_native_v8.py</code> drives native providers in
+        <code>libckernel_engine.so</code>/<code>libckernel_audio.so</code> through ctypes &mdash; no generated C
+        artifact yet. The certified scope is one 7.435-second mono 16&nbsp;kHz PCM WAV with exact token-ID and
+        duration parity against the pinned Transformers reference.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>hf download nvidia/parakeet-tdt-0.6b-v3 \
+  --revision 541d1f99c6b0c3cd0b11a95167540bb8edefd82b \
+  --local-dir .ck_models/parakeet-tdt-0.6b-v3
+
+python version/v8/scripts/convert_safetensors_to_bump_v8.py \
+  --checkpoint .ck_models/parakeet-tdt-0.6b-v3 \
+  --output .ck_build/parakeet-tdt-0.6b-v3/weights.bump \
+  --config-out .ck_build/parakeet-tdt-0.6b-v3/config.json \
+  --manifest-out .ck_build/parakeet-tdt-0.6b-v3/weights_manifest.json \
+  --arch parakeet_tdt --dtype fp32
+
+make build/libckernel_engine.so libckernel_audio.so
+
+python version/v8/scripts/run_parakeet_native_v8.py \
+  --model .ck_build/parakeet-tdt-0.6b-v3 \
+  --audio version/v8/test_assets/parakeet_tdt_0_6b_v3/2086-149220-0033.wav \
+  --fixture docs/notes/artifacts/parakeet_tdt_0_6b_v3_2086-149220-0033_fp32.npz \
+  --decode --output .ck_build/parakeet-tdt-0.6b-v3/native-e2e.json</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        Success is <code>"status": "pass"</code> in the <code>cke.parakeet.native_e2e</code> report with
+        <code>sequences_equal</code> and <code>durations_equal</code> true. Download and conversion are one-time
+        cold costs; the recorded warm run took 0.069&nbsp;s frontend + 1.027&nbsp;s encoder on Ryzen&nbsp;9&nbsp;9950X3D
+        (commit <code>909a2c164</code>). Ordinary CI covers the kernel oracles (<code>make test-audio</code>) and the
+        inventory/mapping contracts (<code>make test-audio-v8-contracts</code>); the full-checkpoint run is cached
+        evidence, not a nightly job. Long audio, multilingual input, timestamps, and diarization are not claimed.
+        Full detail: <a href="v8-parakeet-tdt.html#runbook">Parakeet TDT runbook</a>.
+    </p>
+</div>
+
 <h2>Canonical Whisper Audio Bridge</h2>
 
 <div class="card card-accent">
