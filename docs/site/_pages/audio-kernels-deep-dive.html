@@ -828,4 +828,12 @@ is a weighted mixture of all 1500 value rows.</p>
         <a href="concepts.html#audio-frontend">Concepts &mdash; Audio Frontend &amp; Cross-Attention</a>.
         For the same treatment of a recurrent kernel family, see the <a href="deltanet-deep-dive.html">Gated DeltaNet Deep Dive</a>.
     </p>
+    <p style="margin-bottom: 0; margin-top: 0.6rem;">
+        The Parakeet TDT lane reuses this frontend family (pre-emphasis, centered STFT, Slaney log-mel, per-feature
+        normalization, grouped Conv2D subsampling) and adds five FastConformer/transducer providers &mdash; grouped
+        Conv1D, relative sinusoidal position, relative attention, inference BatchNorm, and a stateful LSTM step &mdash;
+        whose PyTorch oracles run in the same <code>unittest/test_audio_encoder.py</code> suite. See
+        <a href="v8-parakeet-tdt.html">Parakeet TDT Native CPU Bring-up</a> for the architecture, decode semantics,
+        and runbook.
+    </p>
 </div>
