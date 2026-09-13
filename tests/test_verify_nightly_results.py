@@ -95,6 +95,42 @@ class NightlyVerdictTests(unittest.TestCase):
         self.assertTrue(any("audio: timeout" in error for error in errors))
         self.assertTrue(any("failed subtest nvfp4" in error for error in errors))
 
+    def test_rejects_duplicate_cases_and_performance_only_numerical_pass(self) -> None:
+        verifier = _load_verifier()
+        rows = [
+            {
+                "name": "kernel report",
+                "status": "pass",
+                "sub_tests": [
+                    {
+                        "case_id": "gemm.shape-1.avx2",
+                        "name": "AVX2",
+                        "status": "pass",
+                        "evidence_kind": "performance",
+                    },
+                    {
+                        "case_id": "gemm.shape-1.avx2",
+                        "name": "AVX2 duplicate",
+                        "status": "not_tested",
+                        "evidence_kind": "performance",
+                    },
+                    {
+                        "case_id": "vision.measurement",
+                        "name": "vision measurement",
+                        "status": "pass",
+                        "evidence_kind": "numerical_measurement",
+                    },
+                ],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = verifier.verify_report(self._write(Path(tmp), rows))
+        self.assertTrue(any("duplicate subtest case ID" in error for error in errors))
+        self.assertTrue(any("uncertified subtest AVX2 claims" in error for error in errors))
+        self.assertTrue(
+            any("uncertified subtest vision measurement claims" in error for error in errors)
+        )
+
     def test_rejects_stale_and_inconsistent_report(self) -> None:
         verifier = _load_verifier()
         rows = [{"name": "contracts", "status": "pass"}]

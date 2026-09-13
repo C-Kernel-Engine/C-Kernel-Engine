@@ -320,7 +320,37 @@ def parse_sub_tests(stdout: str) -> list:
     And performance lines like:
       kernel_name  123.4            45.6             2.71x
     """
-    sub_tests = []
+    events = []
+
+    report_headers = list(
+        re.finditer(r'^\s*TEST:\s*(.+?)\s*$', stdout, re.MULTILINE)
+    )
+
+    def report_context(position: int) -> tuple[str, str, int]:
+        selected = None
+        selected_index = -1
+        for index, header in enumerate(report_headers):
+            if header.start() > position:
+                break
+            selected = header
+            selected_index = index
+        if selected is None:
+            return "", "", selected_index
+        next_start = (
+            report_headers[selected_index + 1].start()
+            if selected_index + 1 < len(report_headers)
+            else len(stdout)
+        )
+        shape_match = re.search(
+            r'^\s*Shape:\s*(.+?)\s*$',
+            stdout[selected.end():next_start],
+            re.MULTILINE,
+        )
+        return (
+            selected.group(1).strip(),
+            shape_match.group(1).strip() if shape_match else "",
+            selected_index,
+        )
 
     # Pattern for accuracy results: name  max_diff=X  tol=Y  [PASS/FAIL]
     # Handles ANSI color codes like [92mPASS[0m
@@ -365,47 +395,54 @@ def parse_sub_tests(stdout: str) -> list:
         re.MULTILINE
     )
 
-    # Extract accuracy results from standard format
-    accuracy_results = {}
-    perf_results = {}
+    # Collect matches first, then join accuracy and timing by report context and
+    # occurrence. A display label alone is not a stable test-case identity.
     for match in accuracy_pattern.finditer(stdout):
-        name = match.group(1).strip()
-        max_diff = float(match.group(2))
-        tolerance = float(match.group(3))
-        status = match.group(4).lower()
-        accuracy_results[name] = {
-            'max_diff': max_diff,
-            'tolerance': tolerance,
-            'status': status
-        }
+        events.append(
+            (
+                match.start(),
+                "accuracy",
+                match.group(1).strip(),
+                "",
+                {
+                    "max_diff": float(match.group(2)),
+                    "tolerance": float(match.group(3)),
+                    "status": match.group(4).lower(),
+                },
+            )
+        )
 
     # Also extract from tabular format (comprehensive GEMV tests)
     for match in tabular_accuracy_pattern.finditer(stdout):
-        name = match.group(1).strip()
-        # dimensions = match.group(2)  # MxK, not stored for now
-        max_diff = float(match.group(3))
-        # mean_diff = float(match.group(4))  # not stored for now
-        tolerance = float(match.group(5))
-        status = match.group(6).lower()
-        # Don't overwrite if already found
-        if name not in accuracy_results:
-            accuracy_results[name] = {
-                'max_diff': max_diff,
-                'tolerance': tolerance,
-                'status': status
-            }
+        events.append(
+            (
+                match.start(),
+                "accuracy",
+                match.group(1).strip(),
+                match.group(2),
+                {
+                    "max_diff": float(match.group(3)),
+                    "tolerance": float(match.group(5)),
+                    "status": match.group(6).lower(),
+                },
+            )
+        )
 
     # Extract from "Test N: name" format (Q4_K/Q6_K kernel tests)
     for match in test_n_pattern.finditer(stdout):
-        name = match.group(1).strip()
-        status = match.group(2).lower()
-        max_diff = float(match.group(3))
-        if name not in accuracy_results:
-            accuracy_results[name] = {
-                'max_diff': max_diff,
-                'tolerance': None,  # Not provided in this format
-                'status': status
-            }
+        events.append(
+            (
+                match.start(),
+                "accuracy",
+                match.group(1).strip(),
+                "",
+                {
+                    "max_diff": float(match.group(3)),
+                    "tolerance": None,
+                    "status": match.group(2).lower(),
+                },
+            )
+        )
 
     # Extract unittest/test_vision.py style blocks:
     #   --- Testing position_embeddings_add_tiled_2d (...) ---
@@ -437,65 +474,114 @@ def parse_sub_tests(stdout: str) -> list:
         for diff_match in max_diff_matches:
             suffix = diff_match.group(1)
             name = f"{block_name} {suffix}" if suffix else block_name
-            if name in accuracy_results:
-                continue
-            max_diff = float(diff_match.group(2))
-            accuracy_results[name] = {
-                'max_diff': max_diff,
-                'tolerance': None,
-                'status': 'pass',
+            payload = {
+                "max_diff": float(diff_match.group(2)),
+                "tolerance": None,
+                "status": "not_tested",
             }
             if c_time_ms is not None:
-                perf_results[name] = {
-                    'pytorch_time_us': pytorch_time_ms * 1000.0 if pytorch_time_ms is not None else None,
-                    'c_time_us': c_time_ms * 1000.0,
-                    'speedup': (pytorch_time_ms / c_time_ms) if pytorch_time_ms is not None and c_time_ms > 0 else None,
-                }
+                payload.update(
+                    pytorch_time_us=(
+                        pytorch_time_ms * 1000.0 if pytorch_time_ms is not None else None
+                    ),
+                    c_time_us=c_time_ms * 1000.0,
+                    speedup=(
+                        pytorch_time_ms / c_time_ms
+                        if pytorch_time_ms is not None and c_time_ms > 0
+                        else None
+                    ),
+                )
+            events.append(
+                (block_match.start() + diff_match.start(), "measurement", name, "", payload)
+            )
 
     # Extract performance results
     for match in perf_pattern.finditer(stdout):
-        name = match.group(1).strip()
-        pytorch_time = float(match.group(2))
-        c_time = float(match.group(3))
-        speedup = float(match.group(4))
-        perf_results[name] = {
-            'pytorch_time_us': pytorch_time,
-            'c_time_us': c_time,
-            'speedup': speedup
-        }
-
-    # Merge accuracy and performance results
-    # Preserve execution order so a methodical parity lane is rendered in the
-    # same semantic order in which its boundaries were checked.
-    all_names = list(dict.fromkeys((*accuracy_results.keys(), *perf_results.keys())))
-    for name in all_names:
-        acc = accuracy_results.get(name, {})
-        perf = perf_results.get(name, {})
-
-        sub_test = SubTestResult(
-            name=name,
-            status=acc.get('status', 'pass'),
-            max_diff=acc.get('max_diff'),
-            tolerance=acc.get('tolerance'),
-            c_time_us=perf.get('c_time_us'),
-            pytorch_time_us=perf.get('pytorch_time_us'),
-            speedup=perf.get('speedup')
+        events.append(
+            (
+                match.start(),
+                "performance",
+                match.group(1).strip(),
+                "",
+                {
+                    "pytorch_time_us": float(match.group(2)),
+                    "c_time_us": float(match.group(3)),
+                    "speedup": float(match.group(4)),
+                },
+            )
         )
-        sub_tests.append(sub_test)
 
-    return sub_tests
+    records: dict[str, dict] = {}
+    occurrence_counts: dict[str, int] = {}
+    unmatched_accuracy: dict[tuple[int, str], list[str]] = {}
+
+    def identity(
+        position: int, name: str, explicit_config: str
+    ) -> tuple[str, str, tuple[int, str]]:
+        report_name, report_shape, report_index = report_context(position)
+        configuration = explicit_config or report_shape
+        parts = [part for part in (report_name, configuration, name) if part]
+        base_id = " :: ".join(parts)
+        return base_id, configuration, (report_index, base_id)
+
+    for position, kind, name, explicit_config, payload in sorted(events, key=lambda row: row[0]):
+        base_id, configuration, match_id = identity(position, name, explicit_config)
+        if kind == "performance" and unmatched_accuracy.get(match_id):
+            case_id = unmatched_accuracy[match_id].pop(0)
+            records[case_id].update(payload)
+            records[case_id]["evidence_kind"] = "numerical_and_performance"
+            continue
+
+        occurrence = occurrence_counts.get(base_id, 0) + 1
+        occurrence_counts[base_id] = occurrence
+        case_id = base_id if occurrence == 1 else f"{base_id} :: occurrence {occurrence}"
+        if kind == "performance":
+            status = "not_tested"
+            evidence_kind = "performance"
+        elif kind == "measurement":
+            status = "not_tested"
+            evidence_kind = (
+                "numerical_measurement_and_performance"
+                if payload.get("c_time_us") is not None
+                else "numerical_measurement"
+            )
+        else:
+            status = payload["status"]
+            evidence_kind = "numerical"
+
+        record = {
+            "case_id": case_id,
+            "name": name,
+            "configuration": configuration,
+            "status": status,
+            "evidence_kind": evidence_kind,
+            "max_diff": None,
+            "tolerance": None,
+            "c_time_us": None,
+            "pytorch_time_us": None,
+            "speedup": None,
+            **payload,
+        }
+        records[case_id] = record
+        if kind == "accuracy":
+            unmatched_accuracy.setdefault(match_id, []).append(case_id)
+
+    return [SubTestResult(**record) for record in records.values()]
 
 
 @dataclass
 class SubTestResult:
     """Individual test within a test file (e.g., per-kernel result)."""
     name: str
-    status: str  # "pass", "fail"
+    status: str  # "pass", "fail", "not_tested"
     max_diff: Optional[float] = None
     tolerance: Optional[float] = None
     c_time_us: Optional[float] = None
     pytorch_time_us: Optional[float] = None
     speedup: Optional[float] = None
+    case_id: str = ""
+    configuration: str = ""
+    evidence_kind: str = "numerical"
 
 
 @dataclass
@@ -1879,6 +1965,10 @@ def save_json_report(
         sum(1 for st in r.sub_tests if st.status == "fail")
         for r in results
     )
+    not_tested_sub_tests = sum(
+        sum(1 for st in r.sub_tests if st.status == "not_tested")
+        for r in results
+    )
 
     # Convert results to dicts, handling sub_tests properly
     results_dicts = []
@@ -1919,6 +2009,7 @@ def save_json_report(
             "sub_tests_total": total_sub_tests,
             "sub_tests_passed": passed_sub_tests,
             "sub_tests_failed": failed_sub_tests,
+            "sub_tests_not_tested": not_tested_sub_tests,
         },
         "results": results_dicts,
     }

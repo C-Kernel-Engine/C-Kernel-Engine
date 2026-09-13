@@ -278,9 +278,32 @@ def verify_report(
         counts[status] += 1
         if status in {"fail", "timeout"}:
             errors.append(f"{name}: {status}")
-        for subtest in row.get("sub_tests") or []:
-            if isinstance(subtest, dict) and str(subtest.get("status") or "").lower() == "fail":
-                errors.append(f"{name}: failed subtest {subtest.get('name') or '<unnamed>'}")
+        seen_subtest_ids: set[str] = set()
+        for subtest_index, subtest in enumerate(row.get("sub_tests") or []):
+            if not isinstance(subtest, dict):
+                errors.append(f"{name}: subtest {subtest_index} is not an object")
+                continue
+            subtest_name = str(subtest.get("name") or "<unnamed>")
+            subtest_status = str(subtest.get("status") or "").lower()
+            case_id = str(subtest.get("case_id") or "").strip()
+            if case_id:
+                if case_id in seen_subtest_ids:
+                    errors.append(f"{name}: duplicate subtest case ID {case_id}")
+                seen_subtest_ids.add(case_id)
+            if subtest_status not in {"pass", "fail", "not_tested"}:
+                errors.append(f"{name}: subtest {subtest_name} has invalid status {subtest_status!r}")
+            elif subtest_status == "fail":
+                errors.append(f"{name}: failed subtest {subtest_name}")
+            evidence_kind = str(subtest.get("evidence_kind") or "numerical")
+            uncertified_kinds = {
+                "performance",
+                "numerical_measurement",
+                "numerical_measurement_and_performance",
+            }
+            if evidence_kind in uncertified_kinds and subtest_status != "not_tested":
+                errors.append(
+                    f"{name}: uncertified subtest {subtest_name} claims numerical {subtest_status}"
+                )
 
     expected = {
         "total": len(results),

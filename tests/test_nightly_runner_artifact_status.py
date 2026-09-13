@@ -426,6 +426,83 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         self.assertEqual([row.name for row in parsed], names)
         self.assertTrue(all(row.status == "pass" for row in parsed))
 
+    def test_repeated_kernel_labels_preserve_each_shape_and_verdict(self) -> None:
+        runner = _load_runner()
+        output = """
+  TEST: GEMM small
+  Shape: M=1, N=32, K=64
+  Naive (parallel)  max_diff=2.0e-03  tol=1e-04  [FAIL]
+  Naive (parallel)  10.0  5.0  2.00x
+  TEST: GEMM large
+  Shape: M=32, N=128, K=256
+  Naive (parallel)  max_diff=0.0e+00  tol=1e-04  [PASS]
+  Naive (parallel)  40.0  20.0  2.00x
+"""
+        parsed = runner.parse_sub_tests(output)
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual([row.name for row in parsed], ["Naive (parallel)"] * 2)
+        self.assertEqual([row.status for row in parsed], ["fail", "pass"])
+        self.assertEqual(
+            [row.configuration for row in parsed],
+            ["M=1, N=32, K=64", "M=32, N=128, K=256"],
+        )
+        self.assertEqual(len({row.case_id for row in parsed}), 2)
+        self.assertTrue(all(row.evidence_kind == "numerical_and_performance" for row in parsed))
+
+    def test_timing_does_not_cross_identical_report_boundaries(self) -> None:
+        runner = _load_runner()
+        output = """
+  TEST: GEMM
+  Shape: M=1
+  Kernel  max_diff=2.0e-03  tol=1e-04  [FAIL]
+  TEST: GEMM
+  Shape: M=1
+  Kernel  max_diff=0.0e+00  tol=1e-04  [PASS]
+  Kernel  10.0  5.0  2.00x
+"""
+        parsed = runner.parse_sub_tests(output)
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual([row.status for row in parsed], ["fail", "pass"])
+        self.assertIsNone(parsed[0].c_time_us)
+        self.assertEqual(parsed[0].evidence_kind, "numerical")
+        self.assertEqual(parsed[1].c_time_us, 5.0)
+        self.assertEqual(parsed[1].evidence_kind, "numerical_and_performance")
+
+    def test_vision_difference_without_verdict_is_not_certified(self) -> None:
+        runner = _load_runner()
+        parsed = runner.parse_sub_tests(
+            "--- Testing vision_x ---\nMax diff: 100.0\n"
+        )
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].status, "not_tested")
+        self.assertEqual(parsed[0].evidence_kind, "numerical_measurement")
+        self.assertEqual(parsed[0].max_diff, 100.0)
+        self.assertIsNone(parsed[0].tolerance)
+
+    def test_timing_only_subtest_is_not_numerically_certified(self) -> None:
+        runner = _load_runner()
+        parsed = runner.parse_sub_tests("FastKernel  10.0  5.0  2.00x\n")
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].status, "not_tested")
+        self.assertEqual(parsed[0].evidence_kind, "performance")
+        self.assertIsNone(parsed[0].max_diff)
+        self.assertIsNone(parsed[0].tolerance)
+
+        result = runner.TestResult(
+            "Performance fixture", "kernels", "pass", 0.1, sub_tests=parsed
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "nightly.json"
+            with mock.patch.object(
+                runner, "capture_runner_hardware", return_value={"available": False}
+            ):
+                runner.save_json_report(
+                    [result], report, datetime(2026, 9, 13, 1, 2, 3)
+                )
+            payload = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(payload["summary"]["sub_tests_passed"], 0)
+        self.assertEqual(payload["summary"]["sub_tests_not_tested"], 1)
+
     def test_phase_status_prevents_q8_pass_from_masking_bf16_skip(self) -> None:
         runner = _load_runner()
         target = {
