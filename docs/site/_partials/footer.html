@@ -182,6 +182,25 @@
             }
         });
     })();
+
+    // Site search keyboard shortcuts: "/" or Ctrl+K / Cmd+K focuses the header search box.
+    (function() {
+        var searchInput = document.getElementById('site-search-input');
+        if (!searchInput) return;
+        document.addEventListener('keydown', function(e) {
+            var target = e.target;
+            var tag = (target.tagName || '').toLowerCase();
+            var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && !typing) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    })();
     </script>
 
     <!-- MathJax for LaTeX equations across docs pages -->
