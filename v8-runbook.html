@@ -1289,7 +1289,7 @@ rm /srv/cke/nightly-state/PAUSE</pre>
 
 <div class="card card-blue">
     <p>
-        The Qwen3-VL and Qwen3.6-VL corpus lanes use
+        The Qwen3-VL, Qwen3.6-VL, and Gemma4 corpus lanes use
         <code>certify_multimodal_llamacpp_corpus_v8.py</code> with versioned
         profiles under <code>version/v8/parity_profiles/vision/</code>. A profile
         fixes the encoder source, composition circuit, chat template, and
@@ -1303,6 +1303,14 @@ QWEN3VL_PRIVATE_CORPUS_DECODER="$CKE_QWEN3VL_DECODER_GGUF" \
 QWEN3VL_PRIVATE_CORPUS_MMPROJ="$CKE_QWEN3VL_MMPROJ_GGUF" \
 QWEN3VL_PRIVATE_CORPUS_LLAMA_ROOT="$CKE_LLAMA_CPP_ROOT" \
 make test-qwen3vl-private-corpus-parity-auto</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>V8_PRIVATE_VISION_CORPUS_MANIFEST="$CKE_PRIVATE_CORPUS_MANIFEST" \
+GEMMA4_PRIVATE_CORPUS_DECODER="$CKE_GEMMA4_DECODER_GGUF" \
+GEMMA4_PRIVATE_CORPUS_MMPROJ="$CKE_GEMMA4_MMPROJ_GGUF" \
+GEMMA4_PRIVATE_CORPUS_LLAMA_ROOT="$CKE_LLAMA_CPP_ROOT" \
+make test-gemma4-private-corpus-parity-auto</pre>
     </div>
     <p class="v8-note" style="margin-bottom: 0;">
         The report is resumable and redacted by default. Exact decoder rows use
