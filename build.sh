@@ -259,5 +259,11 @@ echo "  Writing: sitemap.xml"
     echo '</urlset>'
 } > "$SCRIPT_DIR/sitemap.xml"
 
+# Build the client-side search index from the assembled pages
+if [ -f "$SCRIPT_DIR/scripts/build_search_index.py" ]; then
+    echo "  Building search index..."
+    python3 "$SCRIPT_DIR/scripts/build_search_index.py" || echo "  Warning: search index build failed"
+fi
+
 echo "Build complete! Generated files:"
 ls -la "$SCRIPT_DIR"/*.html 2>/dev/null || echo "  No HTML files generated"

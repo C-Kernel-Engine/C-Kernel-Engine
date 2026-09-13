@@ -1,0 +1,357 @@
+<!-- TITLE: Search -->
+<!-- NAV: search -->
+
+<h1>Search the Documentation</h1>
+
+<div class="search-page">
+    <form id="search-form" class="search-page-form" action="search.html" method="get" data-test="search-form">
+        <input type="search" id="search-query" name="q" data-test="search-input"
+               aria-label="Search documentation" placeholder="Search kernels, runbooks, guides..." autocomplete="off">
+        <button type="submit" data-test="search-submit">Search</button>
+    </form>
+    <p id="search-status" class="search-status" data-test="search-status" role="status"></p>
+    <div id="search-results" data-test="search-results"></div>
+</div>
+
+<style>
+.search-page-form {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0 0.5rem;
+}
+
+.search-page-form input {
+    flex: 1;
+    min-width: 0;
+    background: var(--code-bg);
+    border: 1px solid var(--grey);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 0.65rem 0.9rem;
+}
+
+.search-page-form input:focus {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+    border-color: var(--orange);
+}
+
+.search-page-form button {
+    background: var(--orange);
+    color: var(--dark);
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.65rem 1.25rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.search-page-form button:hover {
+    background: var(--orange-light);
+}
+
+.search-page-form button:focus {
+    outline: 2px solid var(--orange-light);
+    outline-offset: 2px;
+}
+
+.search-status {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0.5rem 0 1rem;
+}
+
+.search-result {
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-left: 3px solid var(--grey-light);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.search-result:hover {
+    border-left-color: var(--orange);
+}
+
+.search-result-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.search-result-title a {
+    color: var(--white);
+    text-decoration: none;
+}
+
+.search-result-title a:hover {
+    color: var(--orange);
+}
+
+.search-result-section {
+    margin-top: 0.5rem;
+}
+
+.search-result-section a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.search-result-snippet {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0.15rem 0 0;
+}
+
+.search-result-snippet mark {
+    background: rgba(255, 180, 0, 0.3);
+    color: var(--orange-light);
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+.search-result-url {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+</style>
+
+<script>
+(function() {
+    'use strict';
+
+    var input = document.getElementById('search-query');
+    var statusEl = document.getElementById('search-status');
+    var resultsEl = document.getElementById('search-results');
+
+    function setStatus(message) {
+        statusEl.textContent = message;
+    }
+
+    function clearResults() {
+        while (resultsEl.firstChild) {
+            resultsEl.removeChild(resultsEl.firstChild);
+        }
+    }
+
+    function tokenize(text) {
+        return text.toLowerCase().split(/[^a-z0-9_.-]+/).filter(Boolean);
+    }
+
+    function words(text) {
+        return text.toLowerCase().split(/[^a-z0-9_.-]+/).filter(Boolean);
+    }
+
+    // Score one field against the query tokens.
+    // exact word >> word prefix >> substring; phrase bonus when the whole
+    // query appears verbatim.
+    function scoreField(field, tokens, phrase, weights) {
+        if (!field) return 0;
+        var lower = field.toLowerCase();
+        var fieldWords = words(field);
+        var score = 0;
+        tokens.forEach(function(token) {
+            var best = 0;
+            fieldWords.forEach(function(word) {
+                if (word === token) best = Math.max(best, weights.exact);
+                else if (word.indexOf(token) === 0) best = Math.max(best, weights.prefix);
+            });
+            if (best === 0 && lower.indexOf(token) !== -1) best = weights.substring;
+            score += best;
+        });
+        if (score > 0 && phrase.length > 2 && lower.indexOf(phrase) !== -1) {
+            score += weights.phrase;
+        }
+        return score;
+    }
+
+    var WEIGHTS = {
+        title: { exact: 60, prefix: 30, substring: 15, phrase: 40 },
+        heading: { exact: 25, prefix: 12, substring: 6, phrase: 20 },
+        body: { exact: 8, prefix: 4, substring: 2, phrase: 10 }
+    };
+
+    function searchIndex(index, query) {
+        var tokens = tokenize(query);
+        var phrase = query.toLowerCase().trim();
+        if (!tokens.length) return [];
+        var hits = [];
+        index.pages.forEach(function(page) {
+            var pageScore = scoreField(page.title, tokens, phrase, WEIGHTS.title);
+            pageScore += scoreField(page.description, tokens, phrase, WEIGHTS.body);
+            var sections = [];
+            (page.sections || []).forEach(function(section) {
+                var sectionScore = scoreField(section.heading, tokens, phrase, WEIGHTS.heading);
+                sectionScore += scoreField(section.text, tokens, phrase, WEIGHTS.body);
+                if (sectionScore > 0) {
+                    sections.push({ section: section, score: sectionScore });
+                }
+            });
+            sections.sort(function(a, b) { return b.score - a.score; });
+            sections.slice(0, 3).forEach(function(hit) { pageScore += hit.score; });
+            if (pageScore > 0) {
+                hits.push({ page: page, score: pageScore, sections: sections.slice(0, 3) });
+            }
+        });
+        hits.sort(function(a, b) { return b.score - a.score; });
+        return hits.slice(0, 25);
+    }
+
+    // Pick a snippet window around the first token occurrence.
+    function makeSnippet(text, tokens) {
+        if (!text) return '';
+        var lower = text.toLowerCase();
+        var pos = -1;
+        tokens.forEach(function(token) {
+            var at = lower.indexOf(token);
+            if (at !== -1 && (pos === -1 || at < pos)) pos = at;
+        });
+        if (pos === -1) return text.slice(0, 160);
+        var start = Math.max(0, pos - 70);
+        var end = Math.min(text.length, pos + 110);
+        var snippet = text.slice(start, end);
+        if (start > 0) snippet = '...' + snippet;
+        if (end < text.length) snippet = snippet + '...';
+        return snippet;
+    }
+
+    // Append text to parent with token matches wrapped in <mark>.
+    // DOM-only rendering: index prose is treated as untrusted text.
+    function appendHighlighted(parent, text, tokens) {
+        var lower = text.toLowerCase();
+        var cursor = 0;
+        while (cursor < text.length) {
+            var nextAt = -1;
+            var nextToken = '';
+            tokens.forEach(function(token) {
+                var at = lower.indexOf(token, cursor);
+                if (at !== -1 && (nextAt === -1 || at < nextAt)) {
+                    nextAt = at;
+                    nextToken = token;
+                }
+            });
+            if (nextAt === -1) break;
+            if (nextAt > cursor) {
+                parent.appendChild(document.createTextNode(text.slice(cursor, nextAt)));
+            }
+            var mark = document.createElement('mark');
+            mark.textContent = text.slice(nextAt, nextAt + nextToken.length);
+            parent.appendChild(mark);
+            cursor = nextAt + nextToken.length;
+        }
+        if (cursor < text.length) {
+            parent.appendChild(document.createTextNode(text.slice(cursor)));
+        }
+    }
+
+    function pageHref(page, section) {
+        if (section && section.anchor) {
+            return page.url + '#' + section.anchor;
+        }
+        return page.url;
+    }
+
+    function render(hits, tokens) {
+        clearResults();
+        hits.forEach(function(hit) {
+            var card = document.createElement('div');
+            card.className = 'search-result';
+            card.setAttribute('data-test', 'search-result');
+
+            var title = document.createElement('div');
+            title.className = 'search-result-title';
+            var titleLink = document.createElement('a');
+            titleLink.href = hit.page.url;
+            titleLink.textContent = hit.page.title || hit.page.url;
+            title.appendChild(titleLink);
+            card.appendChild(title);
+
+            var urlLine = document.createElement('div');
+            urlLine.className = 'search-result-url';
+            urlLine.textContent = hit.page.url;
+            card.appendChild(urlLine);
+
+            if (!hit.sections.length && hit.page.description) {
+                var descSnippet = document.createElement('p');
+                descSnippet.className = 'search-result-snippet';
+                appendHighlighted(descSnippet, makeSnippet(hit.page.description, tokens), tokens);
+                card.appendChild(descSnippet);
+            }
+
+            hit.sections.forEach(function(sectionHit) {
+                var section = sectionHit.section;
+                var row = document.createElement('div');
+                row.className = 'search-result-section';
+                row.setAttribute('data-test', 'search-result-section');
+
+                var link = document.createElement('a');
+                link.href = pageHref(hit.page, section);
+                link.textContent = section.heading || 'Top of page';
+                row.appendChild(link);
+
+                var snippetText = makeSnippet(section.text || section.heading || '', tokens);
+                if (snippetText) {
+                    var snippet = document.createElement('p');
+                    snippet.className = 'search-result-snippet';
+                    appendHighlighted(snippet, snippetText, tokens);
+                    row.appendChild(snippet);
+                }
+                card.appendChild(row);
+            });
+
+            resultsEl.appendChild(card);
+        });
+    }
+
+    function run(query) {
+        clearResults();
+        var trimmed = query.trim();
+        if (!trimmed) {
+            setStatus('Type a query above, or press / anywhere on the docs to jump here.');
+            return;
+        }
+        setStatus('Searching...');
+        // Relative path: the site is served from a subpath on GitHub Pages.
+        fetch('search-index.json')
+            .then(function(response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function(index) {
+                var tokens = tokenize(trimmed);
+                var hits = searchIndex(index, trimmed);
+                if (!hits.length) {
+                    setStatus('No results for "' + trimmed + '". Try different keywords.');
+                    return;
+                }
+                setStatus(hits.length + ' result' + (hits.length === 1 ? '' : 's') + ' for "' + trimmed + '"');
+                render(hits, tokens);
+            })
+            .catch(function() {
+                setStatus('Search index could not be loaded. Try reloading the page.');
+            });
+    }
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            input.value = '';
+            input.blur();
+        }
+    });
+
+    var params = new URLSearchParams(window.location.search);
+    var query = params.get('q') || '';
+    input.value = query;
+    run(query);
+    if (!query.trim()) {
+        input.focus();
+    }
+})();
+</script>
