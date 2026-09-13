@@ -90,6 +90,27 @@ def _resolve_run_dir(model: str, run_dir: str | None) -> Path:
     return Path(info["path"])
 
 
+def resolve_runtime_context_length(
+    run_dir: Path, requested: int | None
+) -> int | None:
+    """Use the generated plan's capacity when serving a pre-built runtime."""
+    layout_path = run_dir / "layout_decode.json"
+    try:
+        payload = json.loads(layout_path.read_text(encoding="utf-8"))
+        value = payload.get("config", {}).get("context_length")
+    except (OSError, UnicodeDecodeError, ValueError, AttributeError):
+        value = None
+    planned = value if isinstance(value, int) and value > 0 else None
+    if requested is not None:
+        if planned is not None and requested > planned:
+            raise ValueError(
+                f"requested context length {requested} exceeds generated runtime "
+                f"capacity {planned}; rebuild with --context-len {requested}"
+            )
+        return requested
+    return planned
+
+
 def _build_runtime(
     model: str,
     run_dir: Path,

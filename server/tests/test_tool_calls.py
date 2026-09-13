@@ -117,6 +117,76 @@ def test_tool_call_single_non_stream():
     assert json.loads(fc["arguments"]) == {"location": "Paris"}
 
 
+def test_qwen_tagged_tool_call_non_stream():
+    session = FakeSession(
+        chunks=(
+            "<tool_call>\n<function=read_file>\n"
+            "<parameter=path>\nserver/README.md\n</parameter>\n"
+            "<parameter=line_end>\n20\n</parameter>\n"
+            "</function>\n</tool_call>",
+        )
+    )
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates=DUMMY_CHAT_TEMPLATES,
+        )
+    )
+    response = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "input": "read it",
+            "tools": [
+                {"type": "function", "name": "read_file", "parameters": {}}
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    call = next(
+        item for item in response.json()["output"] if item["type"] == "function_call"
+    )
+    assert call["name"] == "read_file"
+    assert json.loads(call["arguments"]) == {
+        "path": "server/README.md",
+        "line_end": 20,
+    }
+
+
+def test_qwen_tagged_tool_call_rejects_duplicate_parameters():
+    session = FakeSession(
+        chunks=(
+            "<tool_call><function=read_file>"
+            "<parameter=path>a</parameter><parameter=path>b</parameter>"
+            "</function></tool_call>",
+        )
+    )
+    client = TestClient(
+        create_app(
+            session,
+            model="fake-model",
+            chat_contract=QWEN3_CONTRACT,
+            chat_templates=DUMMY_CHAT_TEMPLATES,
+        )
+    )
+    response = client.post(
+        "/v1/responses",
+        json={
+            "model": "fake-model",
+            "input": "read it",
+            "tools": [
+                {"type": "function", "name": "read_file", "parameters": {}}
+            ],
+        },
+    )
+
+    assert response.json()["status"] == "failed"
+    assert "duplicate tool-call parameter" in response.json()["error"]["message"]
+
+
 def test_tool_call_single_stream():
     session = FakeSession(chunks=('{"name":"get_weather","arguments":{"location":"Paris"}}',))
     client = TestClient(create_app(session, model="fake-model", chat_contract=QWEN3_CONTRACT, chat_templates=DUMMY_CHAT_TEMPLATES))

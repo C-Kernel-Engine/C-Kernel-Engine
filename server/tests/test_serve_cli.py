@@ -265,6 +265,31 @@ def test_manifest_loader_returns_none_without_manifest(tmp_path):
     assert contract is None
 
 
+def test_runtime_context_uses_generated_decode_layout(tmp_path):
+    import json
+
+    from ck_serve_runtime_v8 import resolve_runtime_context_length
+
+    (tmp_path / "layout_decode.json").write_text(
+        json.dumps({"config": {"context_length": 16384}}), encoding="utf-8"
+    )
+    assert resolve_runtime_context_length(tmp_path, None) == 16384
+    assert resolve_runtime_context_length(tmp_path, 4096) == 4096
+    with pytest.raises(ValueError, match="exceeds generated runtime capacity 16384"):
+        resolve_runtime_context_length(tmp_path, 32768)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    ["not-json", "{}", '{"config": {"context_length": 0}}'],
+)
+def test_runtime_context_rejects_missing_or_invalid_layout(tmp_path, payload):
+    from ck_serve_runtime_v8 import resolve_runtime_context_length
+
+    (tmp_path / "layout_decode.json").write_text(payload, encoding="utf-8")
+    assert resolve_runtime_context_length(tmp_path, None) is None
+
+
 def test_manifest_loader_reads_chat_template_and_contract(tmp_path):
     import json
 

@@ -62,8 +62,10 @@ for _p in (str(SCRIPTS_DIR), str(PROJECT_ROOT)):
 
 if __package__:
     from . import ck_serve_runtime_v8
+    from .ck_chat_completions_v8 import add_chat_completions_route
 else:
     import ck_serve_runtime_v8
+    from ck_chat_completions_v8 import add_chat_completions_route
 
 # Reuse color/logging constants from the runtime module so both entrypoints
 # share identical console styling.
@@ -1051,9 +1053,40 @@ def _extract_tool_calls_from_text(
     ):
         tool_blocks.append(m.group(1).strip())
     # also handle bare JSON objects
-    candidates: list[str] = []
+    candidates: list[str | dict[str, Any]] = []
     if tool_blocks:
-        candidates = tool_blocks
+        for block in tool_blocks:
+            tagged = _re.fullmatch(
+                r"<function=([A-Za-z0-9_.:-]+)>\s*(.*?)\s*</function>",
+                block,
+                flags=_re.DOTALL,
+            )
+            if tagged is None:
+                candidates.append(block)
+                continue
+            name, parameter_text = tagged.groups()
+            arguments: dict[str, Any] = {}
+            cursor = 0
+            parameter_pattern = _re.compile(
+                r"<parameter=([A-Za-z0-9_.:-]+)>\s*(.*?)\s*</parameter>",
+                flags=_re.DOTALL,
+            )
+            for parameter in parameter_pattern.finditer(parameter_text):
+                if parameter_text[cursor : parameter.start()].strip():
+                    return [], "malformed", "malformed tagged tool-call parameters"
+                key, raw_value = parameter.groups()
+                if key in arguments:
+                    return [], "malformed", f"duplicate tool-call parameter {key!r}"
+                value_text = raw_value.strip()
+                try:
+                    value = json.loads(value_text)
+                except json.JSONDecodeError:
+                    value = value_text
+                arguments[key] = value
+                cursor = parameter.end()
+            if parameter_text[cursor:].strip():
+                return [], "malformed", "malformed tagged tool-call parameters"
+            candidates.append({"name": name, "arguments": arguments})
     else:
         # If whole text is a JSON object or array, use it directly
         if (stripped.startswith("{") and stripped.endswith("}")) or (
@@ -1090,10 +1123,13 @@ def _extract_tool_calls_from_text(
                     return [], "malformed", "malformed tool call: incomplete JSON"
     tool_calls: list[dict[str, Any]] = []
     for snippet in candidates:
-        try:
-            obj = json.loads(snippet)
-        except json.JSONDecodeError as exc:
-            return [], "malformed", f"malformed tool call: {exc}"
+        if isinstance(snippet, dict):
+            obj = snippet
+        else:
+            try:
+                obj = json.loads(snippet)
+            except json.JSONDecodeError as exc:
+                return [], "malformed", f"malformed tool call: {exc}"
         # obj may be dict or list
         items = obj if isinstance(obj, list) else [obj]
         for item in items:
@@ -2624,6 +2660,8 @@ def create_app(
                 return cur
             return response
 
+    add_chat_completions_route(router, create_response)
+
     model_created_at = int(time.time())
 
     def _model_obj(mid: str) -> dict[str, Any]:
@@ -2835,9 +2873,21 @@ def main(argv: list[str] | None = None) -> int:
             C_ORANGE,
         )
 
+    runtime_context_length = ck_serve_runtime_v8.resolve_runtime_context_length(
+        run_dir, args.context_len
+    )
+    if args.context_len is None and runtime_context_length is not None:
+        log(f"Using generated runtime context length: {runtime_context_length}")
+    elif args.context_len is None:
+        log(
+            "Warning: generated context capacity is unavailable; using the "
+            "native session default. Rebuild or pass --context-len explicitly.",
+            C_ORANGE,
+        )
+
     session = SessionV8.open(
         run_dir,
-        context_length=args.context_len,
+        context_length=runtime_context_length,
     )
 
     chat_template, chat_templates, chat_contract = _load_runtime_templates(run_dir)

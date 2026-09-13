@@ -2038,6 +2038,42 @@ make test-native-session-v8</pre>
 </div>
 
 <div class="card">
+    <h3 style="margin-top: 0;">Qwen Code Local Agent Pilot</h3>
+    <p>
+        The validated pilot connects Qwen Code 0.21.5 to the Chat Completions compatibility route
+        backed by the native Responses server. It uses the pinned Qwen3.8 27B Q4_K_M artifact and a
+        generated runtime with at least 16K context so the client system prompt and tool catalog fit.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>CK_NUM_THREADS=16 OMP_NUM_THREADS=1 \
+version/v8/scripts/cks-v8-run serve \
+  hf://ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf \
+  --run /path/to/qwen38-agent-runtime \
+  --context-len 16384 \
+  --force-compile \
+  --model-name qwen38-27b-q4km</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>OPENAI_API_KEY=cke-local-only \
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
+OPENAI_MODEL=qwen38-27b-q4km \
+qwen --bare \
+  --core-tools read_file \
+  --allowed-tools read_file \
+  --max-tool-calls 1 \
+  --model qwen38-27b-q4km</pre>
+    </div>
+    <p style="margin-bottom: 0;" class="mini-note">
+        The retained real-model evidence covers one bounded, two-turn <code>read_file</code> task.
+        Editing, shell execution, concurrent sessions, and unattended operation are not certified by
+        this pilot. On later <code>--no-build</code> starts, the server reads the compiled context
+        capacity from <code>layout_decode.json</code> and rejects requests that exceed the plan.
+    </p>
+</div>
+
+<div class="card">
     <h3 style="margin-top: 0;">Profile The Native Token Loop</h3>
     <p>Use the C CLI directly so Python startup and orchestration do not contaminate the profile:</p>
     <div class="cmd-block">

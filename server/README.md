@@ -1,23 +1,18 @@
-# Experimental Responses Schema Scaffold
+# V8 Local Inference Server
 
-This directory is a development scaffold for a subset of the OpenAI Responses
-API shape. It validates request, response, conversation, and server-sent event
-schemas with deterministic mock data.
+The v8 server loads one generated CKE runtime and exposes the supported subset
+of the OpenAI Responses API. A Chat Completions compatibility route serves
+clients such as Qwen Code through the same Responses implementation.
 
-It is not an OpenAI-compatible inference server:
+The HTTP layer remains a development server. Current boundaries are:
 
-- no CKE model is loaded;
-- no request invokes CKE inference;
-- response text and usage are mocked;
 - stores are process-local and non-durable;
-- there is no bounded queue, backpressure, authentication, or real
-  cancellation.
+- one generation may use a loaded session at a time;
+- there is no authentication or durable request queue;
+- the Chat Completions route intentionally rejects options it cannot preserve.
 
-FastAPI is temporary scaffolding so contributors can iterate on the HTTP
-contract quickly. The intended production path is a dedicated C or Rust server
-that integrates directly with CKE, loads each model once, owns a bounded
-request queue, propagates cancellation into generation, and emits streaming
-events from the native token loop.
+FastAPI owns the current HTTP/session lifecycle. Native model execution remains
+behind the C session ABI so a future C or Rust host can reuse the same boundary.
 
 ## Native runtime boundary
 
@@ -43,9 +38,44 @@ KV/recurrent state by default; callers must explicitly set
 
 The current session ABI deliberately fails closed when a generated model lacks
 the required tokenizer or chat capability. It does not infer a tokenizer or
-chat template from the model name. The FastAPI scaffold remains mocked until a
-separate PR binds this ABI and adds lifecycle, queue, cancellation, streaming,
-and integration tests.
+chat template from the model name.
+
+## Qwen Code pilot
+
+The validated pilot uses Qwen Code 0.21.5 and the Qwen3.8 27B Q4_K_M artifact.
+Generate at least a 16K runtime because the client's built-in system and tool
+catalog can exceed small development contexts:
+
+```bash
+CK_NUM_THREADS=16 OMP_NUM_THREADS=1 \
+version/v8/scripts/cks-v8-run serve \
+  hf://ggml-org/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf \
+  --run /path/to/qwen38-agent-runtime \
+  --context-len 16384 \
+  --force-compile \
+  --model-name qwen38-27b-q4km
+```
+
+The server reuses cached model bytes and regenerates the candidate runtime. On
+later `--no-build` starts it reads the compiled capacity from
+`layout_decode.json`; an explicit context larger than that plan is rejected.
+
+Point Qwen Code at the local server and begin with a read-only, bounded task:
+
+```bash
+OPENAI_API_KEY=cke-local-only \
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1 \
+OPENAI_MODEL=qwen38-27b-q4km \
+qwen --bare \
+  --core-tools read_file \
+  --allowed-tools read_file \
+  --max-tool-calls 1 \
+  --model qwen38-27b-q4km
+```
+
+The real-model pilot certifies a two-turn `read_file` workflow. Editing, shell
+execution, concurrent sessions, and unattended operation require separate
+permission and reliability validation.
 
 Run the schema tests with:
 
@@ -54,5 +84,5 @@ python3 -m pip install -r server/requirements.txt
 make test-server-schema
 ```
 
-Do not add server flags to `ck_chat.py` or `ck_run_v8.py` until a real
-`cks-v8-run serve` subcommand owns model lifecycle and starts the server.
+Use `cks-v8-run serve` as the model lifecycle entry point rather than adding
+server flags to `ck_chat.py` or `ck_run_v8.py`.
