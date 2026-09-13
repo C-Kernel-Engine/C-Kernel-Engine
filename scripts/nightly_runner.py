@@ -1126,6 +1126,14 @@ MAKE_TARGETS = {
         "redact_output": True,
         "env": {"QWEN36VL_PRIVATE_CORPUS_PRETTY": "0"},
     },
+    "gemma4_private_corpus_parity": {
+        "name": "Gemma4 Private 40-Image First-Token Parity",
+        "category": "parity",
+        "target": "test-gemma4-private-corpus-parity-auto",
+        "timeout_sec": 21600,
+        "redact_output": True,
+        "env": {"GEMMA4_PRIVATE_CORPUS_PRETTY": "0"},
+    },
     "v8_qwen3vl_vision_smoke": {
         "name": "v8 Qwen3-VL Vision Smoke",
         "category": "inference",
@@ -1292,6 +1300,7 @@ NIGHTLY_PROFILES = {
         "v8_gemma4_vision_smoke",
         "qwen3vl_private_corpus_parity",
         "qwen36vl_private_corpus_parity",
+        "gemma4_private_corpus_parity",
         "v8_gemma4_highmem",
         "v8_nemotron9_highmem",
         "v8_glm4_highmem",
@@ -1305,12 +1314,14 @@ NIGHTLY_PROFILES = {
         "qwen3vl_private_corpus_parity",
         "qwen36vl_private_corpus_parity",
         "qwen3vl_bf16_private_corpus_parity",
+        "gemma4_private_corpus_parity",
         "v8_glm4_highmem",
         "v8_kimi_highmem",
         "v8_gemma4_highmem",
         "v8_xeon_decoder_family_sweep",
     ],
     "gemma4-e2e": [
+        "gemma4_private_corpus_parity",
         "v8_gemma4_highmem",
     ],
 }

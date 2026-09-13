@@ -2834,6 +2834,21 @@ QWEN36VL_PRIVATE_CORPUS_COMPILER ?= $(if $(CK_V8_COMPILER),$(CK_V8_COMPILER),gcc
 QWEN36VL_PRIVATE_CORPUS_ARGS ?=
 QWEN36VL_PRIVATE_CORPUS_PRETTY ?= auto
 QWEN36VL_PRIVATE_CORPUS_FORCE_RERUN ?= 0
+GEMMA4_PRIVATE_CORPUS_MANIFEST ?= $(V8_PRIVATE_VISION_CORPUS_MANIFEST)
+GEMMA4_PRIVATE_CORPUS_DECODER ?= $(V8_GEMMA4_CACHED_MODEL)
+GEMMA4_PRIVATE_CORPUS_MMPROJ ?= $(V8_GEMMA4_CACHED_MMPROJ)
+GEMMA4_PRIVATE_CORPUS_LLAMA_ROOT ?= $(CK_LLAMA_CPP_ROOT)
+GEMMA4_PRIVATE_CORPUS_OUTPUT ?= $(HOME)/.cache/ck-engine-v8/private/gemma4-llamacpp-corpus
+GEMMA4_PRIVATE_CORPUS_THREADS ?= 16
+GEMMA4_PRIVATE_CORPUS_CONTEXT ?= 1024
+GEMMA4_PRIVATE_CORPUS_MAX_NEW_TOKENS ?= 1
+GEMMA4_PRIVATE_CORPUS_REQUIRED_IMAGES ?= $(V8_PRIVATE_VISION_CORPUS_REQUIRED_IMAGES)
+GEMMA4_PRIVATE_CORPUS_COMPILER ?= $(if $(CK_V8_COMPILER),$(CK_V8_COMPILER),gcc)
+GEMMA4_PRIVATE_CORPUS_LLAMA_REQUIRED_ISA ?= auto
+GEMMA4_PRIVATE_CORPUS_EXPECTED_LLAMA_COMMIT ?=
+GEMMA4_PRIVATE_CORPUS_ARGS ?=
+GEMMA4_PRIVATE_CORPUS_PRETTY ?= auto
+GEMMA4_PRIVATE_CORPUS_FORCE_RERUN ?= 0
 QWEN3VL_BF16_PRIVATE_CORPUS_MANIFEST ?= $(CK_QWEN3VL_OCR_MANIFEST)
 QWEN3VL_BF16_PRIVATE_CHECKPOINT ?= $(CK_QWEN3VL_BF16_CHECKPOINT)
 QWEN3VL_BF16_PRIVATE_ENCODER_RUNTIMES ?= $(CK_QWEN3VL_BF16_ENCODER_RUNTIMES)
@@ -2925,6 +2940,38 @@ test-qwen36vl-private-corpus-parity-auto:
 
 .PHONY: test-qwen-vl-private-corpus-parity-auto
 test-qwen-vl-private-corpus-parity-auto: test-qwen3vl-private-corpus-parity-auto test-qwen36vl-private-corpus-parity-auto
+
+.PHONY: test-gemma4-private-corpus-parity-auto
+test-gemma4-private-corpus-parity-auto:
+	@if [ -z "$(GEMMA4_PRIVATE_CORPUS_MANIFEST)" ]; then \
+		echo "SKIP: private Gemma4 vision corpus is not configured on this runner"; \
+	else \
+		test -f "$(GEMMA4_PRIVATE_CORPUS_MANIFEST)" || { echo "ERROR: private corpus manifest is missing"; exit 2; }; \
+		test -f "$(GEMMA4_PRIVATE_CORPUS_DECODER)" || { echo "ERROR: Gemma4 decoder GGUF is missing"; exit 2; }; \
+		test -f "$(GEMMA4_PRIVATE_CORPUS_MMPROJ)" || { echo "ERROR: Gemma4 mmproj GGUF is missing"; exit 2; }; \
+		test -f "$(GEMMA4_PRIVATE_CORPUS_LLAMA_ROOT)/build/bin/libllama.so" || { echo "ERROR: pinned llama.cpp build is missing"; exit 2; }; \
+		$(PYTHON) -c 'import numpy; from PIL import Image' >/dev/null 2>&1 || { echo "ERROR: Gemma4 corpus parity requires NumPy and Pillow in PYTHON=$(PYTHON)"; exit 2; }; \
+		$(MAKE) --no-print-directory ck-cli-v8; \
+		$(PYTHON) version/v8/scripts/certify_multimodal_llamacpp_corpus_v8.py \
+			--model-profile gemma4 \
+			--manifest "$(GEMMA4_PRIVATE_CORPUS_MANIFEST)" \
+			--decoder-gguf "$(GEMMA4_PRIVATE_CORPUS_DECODER)" \
+			--mmproj-gguf "$(GEMMA4_PRIVATE_CORPUS_MMPROJ)" \
+			--llama-root "$(GEMMA4_PRIVATE_CORPUS_LLAMA_ROOT)" \
+			--output-dir "$(GEMMA4_PRIVATE_CORPUS_OUTPUT)" \
+			--threads "$(GEMMA4_PRIVATE_CORPUS_THREADS)" \
+			--ck-threads "$(GEMMA4_PRIVATE_CORPUS_THREADS)" \
+			--context-len "$(GEMMA4_PRIVATE_CORPUS_CONTEXT)" \
+			--max-new-tokens "$(GEMMA4_PRIVATE_CORPUS_MAX_NEW_TOKENS)" \
+			--require-images "$(GEMMA4_PRIVATE_CORPUS_REQUIRED_IMAGES)" \
+			--compiler "$(GEMMA4_PRIVATE_CORPUS_COMPILER)" \
+			--llama-required-isa "$(GEMMA4_PRIVATE_CORPUS_LLAMA_REQUIRED_ISA)" \
+			$(if $(GEMMA4_PRIVATE_CORPUS_EXPECTED_LLAMA_COMMIT),--expected-llama-commit "$(GEMMA4_PRIVATE_CORPUS_EXPECTED_LLAMA_COMMIT)",) \
+			$(if $(filter 1,$(GEMMA4_PRIVATE_CORPUS_PRETTY)),--show-private-details,) \
+			$(if $(filter 0,$(GEMMA4_PRIVATE_CORPUS_PRETTY)),--redacted-console,) \
+			$(if $(filter 1,$(GEMMA4_PRIVATE_CORPUS_FORCE_RERUN)),--force-rerun,) \
+			--skip-native-cli --continue-on-failure $(GEMMA4_PRIVATE_CORPUS_ARGS); \
+	fi
 
 .PHONY: test-cohere-compass-private-ocr-auto
 test-cohere-compass-private-ocr-auto:

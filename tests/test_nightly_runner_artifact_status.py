@@ -231,6 +231,7 @@ class NightlyArtifactStatusTests(unittest.TestCase):
             "qwen3vl_private_corpus_parity",
             "qwen36vl_private_corpus_parity",
             "qwen3vl_bf16_private_corpus_parity",
+            "gemma4_private_corpus_parity",
             "v8_glm4_highmem",
             "v8_kimi_highmem",
             "v8_gemma4_highmem",
@@ -244,6 +245,12 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         )
         self.assertTrue(qwen36vl["redact_output"])
         self.assertEqual(qwen36vl["timeout_sec"], 21600)
+        gemma4 = runner.MAKE_TARGETS["gemma4_private_corpus_parity"]
+        self.assertEqual(
+            gemma4["target"], "test-gemma4-private-corpus-parity-auto"
+        )
+        self.assertTrue(gemma4["redact_output"])
+        self.assertEqual(gemma4["timeout_sec"], 21600)
         sweep = runner.MAKE_TARGETS["v8_xeon_decoder_family_sweep"]
         self.assertEqual(sweep["profile_only"], "xeon-e2e")
 
@@ -258,6 +265,7 @@ class NightlyArtifactStatusTests(unittest.TestCase):
             "v8_gemma4_vision_smoke",
             "qwen3vl_private_corpus_parity",
             "qwen36vl_private_corpus_parity",
+            "gemma4_private_corpus_parity",
             "v8_gemma4_highmem",
             "v8_nemotron9_highmem",
             "v8_glm4_highmem",
@@ -307,7 +315,7 @@ class NightlyArtifactStatusTests(unittest.TestCase):
         self.assertIn("v8_gemma4_highmem", inference_targets)
         self.assertEqual(
             runner.NIGHTLY_PROFILES["gemma4-e2e"],
-            ["v8_gemma4_highmem"],
+            ["gemma4_private_corpus_parity", "v8_gemma4_highmem"],
         )
         gemma4 = runner.MAKE_TARGETS["v8_gemma4_highmem"]
         self.assertEqual(gemma4["status_artifact"], "build/v8_gemma4_certification/summary.json")
